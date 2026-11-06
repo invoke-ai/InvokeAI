@@ -1,3 +1,4 @@
+import type * as Languages from '@platform/i18n/languages';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 import type * as projectsApi from '@workbench/projects/api';
@@ -22,6 +23,18 @@ import { page, userEvent } from 'vitest/browser';
 
 import { PreferencesPage } from './PreferencesPage';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
+
+vi.mock('@platform/i18n/languages', async (importOriginal) => {
+  const original = await importOriginal<typeof Languages>();
+  const catalogs = { en: { translated: 10, ready: true }, fr: { translated: 2 } };
+  return {
+    ...original,
+    getWorkbenchLanguageAvailability: (language: Languages.WorkbenchLanguage) =>
+      original.getWorkbenchLanguageAvailability(language, catalogs),
+    getEffectiveWorkbenchLanguage: (language: Languages.WorkbenchLanguage) =>
+      original.getEffectiveWorkbenchLanguage(language, catalogs),
+  };
+});
 
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),

@@ -188,6 +188,8 @@ export const CenterArea = () => {
   return (
     <Flex
       as="section"
+      role="group"
+      aria-label={activeItem?.label ?? t('widgets.centerViewEmpty')}
       bg="bg"
       direction="column"
       flex="1"

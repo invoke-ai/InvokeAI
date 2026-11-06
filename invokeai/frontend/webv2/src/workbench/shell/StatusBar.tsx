@@ -26,7 +26,9 @@ import {
   createCompactWidgetCapacity,
   useCompactWidgetCapacityResource,
 } from '@workbench/widget-frame/compactWidgetCapacity';
+import { CompactWidgetFailure } from '@workbench/widget-frame/WidgetFailureBoundary';
 import { useWidgetRecovery } from '@workbench/widget-frame/widgetRecovery';
+import { WidgetRecoveryAnnouncement } from '@workbench/widget-frame/WidgetRenderer';
 import {
   getWidgetRegionDropId,
   getWidgetRegionEndDropData,
@@ -53,6 +55,7 @@ import {
   useCallback,
   useMemo,
   useState,
+  useRef,
   useSyncExternalStore,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -290,12 +293,22 @@ const CompactBottomWidget = ({
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const restoreShortcutFocus = useShortcutFocusRestore();
   const capacity = useCompactWidgetCapacityResource();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const statusFocusTarget = useCallback(
+    () =>
+      wrapperRef.current?.querySelector<HTMLElement>(
+        '[data-scope="popover"][data-part="trigger"]:not([disabled]):not([data-disabled]):not([aria-disabled="true"])'
+      ) ?? wrapperRef.current,
+    []
+  );
   const bindWrapper = useCallback(
     (element: HTMLDivElement | null) => {
+      wrapperRef.current = element;
       setNodeRef(element);
       const release =
         item.widget.manifest.compactSizing === 'remaining-space' ? capacity?.bindChip(element) : undefined;
       return () => {
+        wrapperRef.current = null;
         release?.();
         setNodeRef(null);
       };
@@ -303,6 +316,7 @@ const CompactBottomWidget = ({
     [capacity, item.widget.manifest.compactSizing, setNodeRef]
   );
   const recovery = useWidgetRecovery(item.id, item.widget);
+  const tooltipError = recovery.getError('tooltip');
   const isActivatable = !recovery.error && (item.isExpandable || item.isPopover);
   const rowDragHandleProps = recovery.error
     ? {}
@@ -345,19 +359,33 @@ const CompactBottomWidget = ({
         : {},
     [handleKeyDown, isActivatable]
   );
-  const handleClick = useCallback(() => {
-    if (item.isExpandable && !recovery.error) {
-      onSelect(item.id);
-    }
-  }, [item.id, item.isExpandable, onSelect, recovery.error]);
+  const handleClick = useCallback(
+    (event: MouseEvent) => {
+      if (recovery.error) {
+        event.preventDefault();
+        return;
+      }
+      if (item.isExpandable && !recovery.error) {
+        onSelect(item.id);
+      }
+    },
+    [item.id, item.isExpandable, onSelect, recovery.error]
+  );
   const openFailedPanel = useCallback(() => {
-    if (item.isExpandable) {
+    if (item.isPopover) {
+      setIsPopoverOpen(true);
+    } else if (item.isExpandable) {
       onSelect(item.id);
     }
-  }, [item.id, item.isExpandable, onSelect]);
+  }, [item.id, item.isExpandable, item.isPopover, onSelect]);
   const failureOpenButton = useMemo(
     () => (
-      <Button aria-label={`${t('common.open')}: ${item.label}`} size="xs" variant="ghost" onClick={openFailedPanel}>
+      <Button
+        aria-label={`${t('widgets.failure.title', { label: item.label })} — ${t('common.open')}`}
+        size="xs"
+        variant="ghost"
+        onClick={openFailedPanel}
+      >
         {t('common.open')}
       </Button>
     ),
@@ -397,18 +425,36 @@ const CompactBottomWidget = ({
     <Box
       ref={bindWrapper}
       display="flex"
+      role="group"
+      aria-label={item.label}
+      tabIndex={-1}
+      focusVisibleRing="inside"
       data-status-bar-widget={item.id}
       data-workbench-focus-preserve={item.widget.manifest.preserveWorkbenchFocus || undefined}
       h="full"
       style={style}
     >
-      {item.isPopover && !recovery.error ? <Popover.Trigger asChild>{row}</Popover.Trigger> : row}
-      {recovery.error && (item.isExpandable || item.isPopover) ? (
-        item.isPopover ? (
-          <Popover.Trigger asChild>{failureOpenButton}</Popover.Trigger>
-        ) : (
-          failureOpenButton
-        )
+      <WidgetRecoveryAnnouncement
+        failed={recovery.hasFailure}
+        generation={recovery.generation}
+        retrying={recovery.retrying}
+        label={item.label}
+      />
+      {item.isPopover ? (
+        <Popover.Trigger asChild disabled={!!recovery.error}>
+          {row}
+        </Popover.Trigger>
+      ) : (
+        row
+      )}
+      {recovery.error && (item.isExpandable || item.isPopover) ? failureOpenButton : null}
+      {!recovery.error && tooltipError ? (
+        <CompactWidgetFailure
+          isRetrying={recovery.retrying}
+          label={item.label}
+          message={tooltipError.message}
+          onRetry={recovery.retry}
+        />
       ) : null}
     </Box>
   );
@@ -429,7 +475,7 @@ const CompactBottomWidget = ({
   if (item.isPopover) {
     return (
       <Popover.Root
-        finalFocusEl={item.widget.manifest.preserveWorkbenchFocus ? restoreShortcutFocus : undefined}
+        finalFocusEl={item.widget.manifest.preserveWorkbenchFocus ? restoreShortcutFocus : statusFocusTarget}
         lazyMount
         open={isPopoverOpen}
         positioning={WIDGET_POPOVER_POSITIONING}

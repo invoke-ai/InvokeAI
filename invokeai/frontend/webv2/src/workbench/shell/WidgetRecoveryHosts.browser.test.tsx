@@ -75,7 +75,7 @@ const Neighbor = () => {
 };
 const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
 type Host = 'center' | 'floating' | 'status';
-type Failure = 'lazy' | 'label' | 'actions' | 'body';
+type Failure = 'lazy' | 'label' | 'actions' | 'body' | 'tooltip' | 'compact';
 let host: HTMLDivElement;
 let root: Root;
 let mode: Host;
@@ -84,10 +84,23 @@ let releaseLoad: (() => void) | null;
 let attempts: number;
 let failure: Failure;
 const FixtureBody = ({ presentation }: WidgetViewProps) => {
-  if (broken && failure === 'body') {
+  const [count, setCount] = useState(0);
+  const increment = useCallback(() => setCount((value) => value + 1), []);
+  if (
+    broken &&
+    (failure === 'body' ||
+      (failure === 'tooltip' && presentation === 'tooltip') ||
+      (failure === 'compact' && presentation === 'compact'))
+  ) {
     throw new Error('body failed');
   }
-  return presentation === 'compact' ? <span>Fixture ready</span> : <button type="button">Fixture ready</button>;
+  return presentation === 'compact' ? (
+    <span>Fixture ready</span>
+  ) : (
+    <button type="button" style={{ marginTop: 64 }} onClick={increment}>
+      Fixture ready {count}
+    </button>
+  );
 };
 const FixtureLabel = () => {
   if (broken && failure === 'label') {
@@ -96,10 +109,16 @@ const FixtureLabel = () => {
   return <span>Fixture label</span>;
 };
 const FixtureActions = () => {
-  if (broken && failure === 'actions') {
+  const [failed, setFailed] = useState(false);
+  const fail = useCallback(() => setFailed(true), []);
+  if (failed || (broken && failure === 'actions')) {
     throw new Error('actions failed');
   }
-  return <button type="button">Fixture action</button>;
+  return (
+    <button type="button" onClick={fail}>
+      Fixture action
+    </button>
+  );
 };
 const implementation: WidgetImplementation = {
   view: FixtureBody,
@@ -124,7 +143,14 @@ const ActualHost = () => {
     return <CenterArea />;
   }
   if (mode === 'status') {
-    return <StatusBar dropState={DROP_STATE} />;
+    return (
+      <>
+        <StatusBar dropState={DROP_STATE} />
+        {failure === 'tooltip' ? (
+          <WidgetRendererById instanceId="fixture" region="right" widget={runtime.widgets[0]!} />
+        ) : null}
+      </>
+    );
   }
   const window = snapshot.activeProject.floatingWidgets?.fixture;
   return window ? <FloatingWidgetWindow instanceId="fixture" stackRank={0} state={window} /> : null;
@@ -251,10 +277,19 @@ describe('real shell recovery hosts', () => {
       if (mode === 'floating') {
         expect(host.querySelector('[data-floating-controls] button')).not.toBeNull();
       }
+      if (mode === 'center') {
+        expect(host.querySelector('[data-focus-region="center"]')?.getAttribute('aria-label')).toBe('Fixture');
+      }
       const retry = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-        (button) => button.getAttribute('aria-label') === 'Retry: Fixture' || button.textContent === 'Retry'
+        (button) =>
+          button.getAttribute('aria-label') === 'Fixture failed — select to retry' || button.textContent === 'Retry'
       )!;
       expect(retry.closest('button button, [role="button"] button')).toBeNull();
+      if (mode === 'center' && (failureMode === 'body' || failureMode === 'lazy')) {
+        const card = retry.parentElement!.parentElement!;
+        const menu = host.querySelector<HTMLElement>('[aria-label="Center view: Fixture"]')!;
+        expect(card.getBoundingClientRect().top).toBeGreaterThanOrEqual(menu.getBoundingClientRect().bottom);
+      }
       const compactHost = retry.closest('[data-status-bar-widget]');
       if (mode === 'status' && failureMode === 'body') {
         for (let tab = 0; tab < 10 && document.activeElement !== retry; tab++) {
@@ -270,7 +305,7 @@ describe('real shell recovery hosts', () => {
           (tooltip) => tooltip.getBoundingClientRect().height > 0
         );
         expect(visibleTooltips).toHaveLength(1);
-        expect(visibleTooltips[0]!.textContent).toBe('Error: body failed');
+        expect(visibleTooltips[0]!.textContent).toBe('body failed');
         await expect
           .poll(() => {
             const bounds = document.querySelector('[role="tooltip"]')?.getBoundingClientRect();
@@ -290,9 +325,111 @@ describe('real shell recovery hosts', () => {
       if (mode === 'status' && failureMode === 'body') {
         expect(document.activeElement).toBe(compactHost);
       }
+      if (mode === 'status') {
+        await expect
+          .poll(() => host.querySelector('[data-status-bar-widget="fixture"] [role="status"]')?.textContent)
+          .toBe('Fixture recovered');
+      }
       expect(attempts).toBe(failureMode === 'lazy' ? 2 : 1);
     }
   );
+  it.each(['center', 'floating'] as const)(
+    'preserves the healthy %s body through a failed-again chrome retry',
+    async (hostMode) => {
+      mode = hostMode;
+      failure = 'actions';
+      runtime.store = createWorkbenchStore(makeState(mode));
+      if (mode === 'floating') {
+        runtime.store.commands.widgets.float('fixture', 'right');
+      }
+      await render();
+      const body = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Fixture ready 0')!;
+      await userEvent.click(body);
+      expect(body.textContent).toBe('Fixture ready 1');
+      const retry = host.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — select to retry"]')!;
+      await userEvent.click(retry);
+      await expect
+        .poll(() => host.querySelector('button[aria-label="Fixture failed — select to retry"]'))
+        .not.toBeNull();
+      expect([...host.querySelectorAll('button')].find((button) => button.textContent === 'Fixture ready 1')).toBe(
+        body
+      );
+      expect(host.querySelectorAll('[data-testid="widget-failure"]')).toHaveLength(1);
+    }
+  );
+
+  it('keeps an old placement failure out of current-host announcements', async () => {
+    mode = 'status';
+    failure = 'compact';
+    runtime.store = createWorkbenchStore(makeState(mode));
+    await render();
+    await expect.poll(() => host.querySelector('button[aria-label="Fixture failed — select to retry"]')).not.toBeNull();
+    await act(() => {
+      mode = 'floating';
+      runtime.store.commands.widgets.float('fixture', 'bottom');
+      runtime.store.commands.widgets.setFloatingGeometry('fixture', { x: 500, y: 200, widthPx: 600, heightPx: 400 });
+    });
+    const window = host.querySelector<HTMLElement>('[data-floating-window="fixture"]')!;
+    const body = [...window.querySelectorAll('button')].find((button) => button.textContent === 'Fixture ready 0')!;
+    await userEvent.click(body);
+    await userEvent.click(
+      [...window.querySelectorAll('button')].find((button) => button.textContent === 'Fixture action')!
+    );
+    await expect.poll(() => window.querySelector('[role="status"]')?.textContent).toBe('Fixture failed');
+    await userEvent.click(
+      window.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — select to retry"]')!
+    );
+    await expect.poll(() => window.querySelector('[role="status"]')?.textContent).toBe('Fixture recovered');
+    expect([...window.querySelectorAll('button')].find((button) => button.textContent === 'Fixture ready 1')).toBe(
+      body
+    );
+  });
+
+  it('contains a tooltip failure without replacing the healthy status row or expanded panel', async () => {
+    mode = 'status';
+    failure = 'tooltip';
+    runtime.widgets[0]!.manifest.bottomPanel = 'tooltip';
+    runtime.store = createWorkbenchStore(makeState(mode));
+    await render();
+    const row = host.querySelector<HTMLElement>('[data-status-bar-widget="fixture"] [role="button"]')!;
+    await userEvent.hover(row);
+    await expect.poll(() => document.querySelector('[role="tooltip"] [data-testid="widget-failure"]')).not.toBeNull();
+    expect(host.querySelector('[data-status-bar-widget="fixture"] [role="button"]')).toBe(row);
+    expect(row.textContent).toBe('Fixture ready');
+    expect(host.querySelector('button[aria-label="Fixture failed — select to retry"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="widget-failure"]')).toBeNull();
+    expect(host.textContent).toContain('Fixture ready 0');
+  });
+
+  it('keeps a stable status popover trigger and named focus host through failure and retry', async () => {
+    mode = 'status';
+    failure = 'body';
+    runtime.widgets[0]!.manifest.bottomPanel = 'popover';
+    runtime.store = createWorkbenchStore(makeState(mode));
+    await render();
+    const row = host.querySelector<HTMLElement>('[data-status-bar-widget="fixture"] [data-part="trigger"]')!;
+    expect(row).not.toBeNull();
+    await userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — Open"]')!);
+    const popup = page.getByRole('dialog');
+    await expect.element(popup).toBeVisible();
+    const retry = popup.getByRole('button', { name: 'Retry', exact: true });
+    await retry.click();
+    await expect.element(retry).toBeVisible();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Fixture');
+    expect(host.querySelector('[data-status-bar-widget="fixture"] [data-part="trigger"]')).toBe(row);
+    await userEvent.keyboard('{Escape}');
+    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+    await expect.poll(() => document.activeElement).toBe(host.querySelector('[data-status-bar-widget="fixture"]'));
+    await userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — Open"]')!);
+    await expect.element(popup).toBeVisible();
+    broken = false;
+    await retry.click();
+    await expect.element(popup.getByRole('button', { name: 'Fixture ready 0', exact: true })).toBeVisible();
+    expect(host.querySelector('[data-status-bar-widget="fixture"] [data-part="trigger"]')).toBe(row);
+    await userEvent.keyboard('{Tab}');
+    expect(document.activeElement?.textContent).toBe('Fixture ready 0');
+  });
+
   it.each(['remove', 'account', 'unmount'] as const)(
     'does not revive a pending status recovery after %s',
     async (transition) => {
@@ -302,7 +439,9 @@ describe('real shell recovery hosts', () => {
       await render();
       await expect.poll(() => host.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
       releaseLoad = () => {};
-      await userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="Retry: Fixture"]')!);
+      await userEvent.click(
+        host.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — select to retry"]')!
+      );
       await expect.poll(() => attempts).toBe(2);
       if (transition === 'remove') {
         await act(() => runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' }));

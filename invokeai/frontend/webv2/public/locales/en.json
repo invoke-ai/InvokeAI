@@ -2836,7 +2836,10 @@
       "copyError": "Copy error",
       "copyErrorFailed": "Could not copy the error details",
       "retry": "Retry",
-      "title": "{{label}} failed"
+      "title": "{{label}} failed",
+      "recovered": "{{label}} recovered",
+      "reloadFailed": "Could not reload safely",
+      "retrying": "Retrying {{label}}"
     },
     "floating": {
       "centerFloating": "{{label}} is in a floating window",

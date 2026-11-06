@@ -46,18 +46,19 @@ describe('formatCount', () => {
 });
 
 describe('content language availability', () => {
+  const catalogs = { en: { translated: 10, ready: true }, fr: { translated: 2 } };
   it('keeps saved unavailable and incomplete choices while serving English', () => {
     for (const language of ['ar', 'fr', 'ua']) {
       const normalized = normalizeWorkbenchLanguage(language)!;
       expect(normalized).toBe(language === 'ua' ? 'uk' : language);
-      const effective = getEffectiveWorkbenchLanguage(normalized);
+      const effective = getEffectiveWorkbenchLanguage(normalized, catalogs);
       expect(effective).toBe('en');
       expect(getWorkbenchLanguageDirection(effective)).toBe('ltr');
     }
-    expect(getWorkbenchLanguageAvailability('ar')).toBe('unavailable');
-    expect(getWorkbenchLanguageAvailability('fr')).toBe('incomplete');
+    expect(getWorkbenchLanguageAvailability('ar', catalogs)).toBe('unavailable');
+    expect(getWorkbenchLanguageAvailability('fr', catalogs)).toBe('incomplete');
   });
   it('inherits available English content for regional preferences', () => {
-    expect(getEffectiveWorkbenchLanguage('en-GB')).toBe('en-GB');
+    expect(getEffectiveWorkbenchLanguage('en-GB', catalogs)).toBe('en-GB');
   });
 });

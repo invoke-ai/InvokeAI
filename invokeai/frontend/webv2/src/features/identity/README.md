@@ -17,4 +17,4 @@ App and Platform transport hand credential to Identity per [ARCHITECTURE.md](../
 
 ## User management entry
 
-Launchpad imports user management through `features/identity/launchpad`, a deferred public entry. Home and ordinary identity/session consumers do not import the management forms. The route capability guard owns access; the deferred view owns its loading and retry presentation. A failed module fetch requires a document reload on Retry, because the browser retains that failure in its module map; a view render failure retries in place.
+Launchpad imports user management through `features/identity/launchpad`, a deferred public entry. Home and ordinary identity/session consumers do not import the management forms. The route capability guard owns access; the deferred view owns its loading and retry presentation. An import failure uses a document reload on Retry to re-read the deployed entry and module graph; a view render failure retries in place. This entry does not rely on every browser caching failed fetches.

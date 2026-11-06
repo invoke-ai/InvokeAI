@@ -12,13 +12,14 @@ import { StatusWidgetChip } from '@platform/ui';
 import { system } from '@theme/system';
 import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
 import { CircleIcon } from 'lucide-react';
-import { act, type ReactNode, type SVGProps } from 'react';
+import { act, Activity, useState, type ReactNode, type SVGProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 const workbenchMocks = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const workbenchMocks = vi.hoisted(() => ({
     },
   },
   runtime: {},
+  reload: vi.fn(() => Promise.resolve()),
 }));
 
 const recoveryOwner = vi.hoisted(() => ({
@@ -45,6 +47,7 @@ const recoveryOwner = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   useWorkbenchInternalStore: () => recoveryOwner,
+  useWorkbenchReload: () => workbenchMocks.reload,
   shallowEqual: Object.is,
   useActiveProjectId: () => workbenchMocks.project.id,
   useWorkbenchQueries: () => ({
@@ -211,6 +214,11 @@ const getIdentityGeometry = ({ loadedIcon = false } = {}) => {
     labelLeft: labelRect.left,
   };
 };
+
+beforeEach(() => {
+  workbenchMocks.reload.mockReset().mockResolvedValue(undefined);
+  recoveryOwner.widgetRecovery.set('test-instance', createWidgetRecovery());
+});
 
 afterEach(async () => {
   recoveryOwner.widgetRecovery.clear();
@@ -402,6 +410,41 @@ describe('shared widget recovery', () => {
     }
   );
 
+  it.each(['left', 'center'] as const)(
+    'refocuses the %s error host when a retried import rejects again',
+    async (region) => {
+      const { widget } = createDeferredWidget();
+      const load = vi.fn().mockRejectedValue(new Error('Native-style repeated rejection'));
+      widget.implementation = createWidgetImplementationResource('test', load);
+      const view = (
+        <WidgetRenderer instance={createInstance()} presentation="expanded" region={region} widget={widget} />
+      );
+      await render(region === 'center' ? <CenterFrame>{view}</CenterFrame> : view);
+      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      const retry = [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Retry'
+      )!;
+      retry.focus();
+      await userEvent.keyboard('{Enter}');
+      await expect.poll(() => load.mock.calls.length).toBe(2);
+      await expect.poll(() => host!.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      await expect
+        .poll(() => document.activeElement)
+        .toBe(
+          [...host!.querySelectorAll<HTMLElement>(`[data-focus-region="${region}"]`)].find(
+            (frame) => frame.getBoundingClientRect().height > 0
+          )
+        );
+      const frame = document.activeElement!;
+      await userEvent.keyboard('{Tab}');
+      expect(frame.contains(document.activeElement)).toBe(true);
+      expect(host!.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      if (region === 'left') {
+        expect(frame.getAttribute('aria-label')).toBe('Test widget failed');
+      }
+    }
+  );
+
   it('refuses a stale retry after its project has left the owner', async () => {
     const { widget, resolve } = createDeferredWidget();
     const retryResource = vi.spyOn(widget.implementation, 'retry');
@@ -433,24 +476,25 @@ describe('shared widget recovery', () => {
         <WidgetRenderer instance={createInstance()} region="center" widget={widget} />
       </>
     );
-    await expect.poll(() => host?.querySelectorAll('[data-testid="widget-failure"]').length).toBe(2);
-    await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Retry: Test widget"]')!);
+    await expect.poll(() => host?.querySelectorAll('[data-testid="widget-failure"]').length).toBe(1);
+    await userEvent.click(
+      [...host!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Retry')!
+    );
     await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).toBeNull();
     expect(load).toHaveBeenCalledTimes(2);
     expect(host?.querySelectorAll('button').length).toBeGreaterThanOrEqual(2);
     delete (workbenchMocks.project.widgetInstances as Record<string, unknown>)['test-instance'];
   });
 
-  it.each(['{Enter}', '[Space]'])('resets failed chrome and body together with one %s retry', async (key) => {
-    let broken = true;
-    const HeaderActions = () => {
-      if (broken) {
-        throw new Error('chrome exploded');
-      }
-      return <button type="button">Recovered action</button>;
+  it('keeps a healthy body and its local draft through deterministic chrome failure and a failed-again retry', async () => {
+    const Body = () => {
+      const [draft, setDraft] = useState('');
+      return <input aria-label="Local draft" value={draft} onChange={(event) => setDraft(event.target.value)} />;
+    };
+    const Actions = () => {
+      throw new Error('deterministic chrome failure');
     };
     const { widget, resolve } = createDeferredWidget();
-    const retryResource = vi.spyOn(widget.implementation, 'retry');
     Object.assign(workbenchMocks.project.widgetInstances, { 'test-instance': createInstance() });
     await render(
       <>
@@ -458,17 +502,199 @@ describe('shared widget recovery', () => {
         <WidgetRenderer instance={createInstance()} region="center" widget={widget} />
       </>
     );
-    await resolve({ headerActions: HeaderActions, view: FocusableView });
-    await expect.poll(() => host?.querySelectorAll('[data-testid="widget-failure"]').length).toBe(2);
-    const retry = host!.querySelector<HTMLButtonElement>('button[aria-label="Retry: Test widget"]')!;
-    retry.focus();
-    expect(document.activeElement).toBe(retry);
-    broken = false;
-    await userEvent.keyboard(key);
-    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).toBeNull();
-    expect(retryResource).toHaveBeenCalledTimes(1);
-    expect(host?.textContent).toContain('Recovered action');
-    expect(host?.textContent).toContain('Loaded control');
+    await resolve({ headerActions: Actions, view: Body });
+    const input = host!.querySelector<HTMLInputElement>('input')!;
+    await userEvent.fill(input, 'Held draft');
+    await userEvent.click(
+      host!.querySelector<HTMLButtonElement>('button[aria-label="Test widget failed — select to retry"]')!
+    );
+    await expect
+      .poll(() => host!.querySelector('button[aria-label="Test widget failed — select to retry"]'))
+      .not.toBeNull();
+    expect(host!.querySelector('input')).toBe(input);
+    expect(input.value).toBe('Held draft');
+    expect(host!.querySelectorAll('[data-testid="widget-failure"]')).toHaveLength(1);
     delete (workbenchMocks.project.widgetInstances as Record<string, unknown>)['test-instance'];
   });
+
+  it.each(['popover', 'dialog'] as const)(
+    'keeps a named %s focus owner through a failed-again import retry',
+    async (region) => {
+      const { widget } = createDeferredWidget();
+      const load = vi.fn().mockRejectedValue(new Error('still unavailable'));
+      widget.implementation = createWidgetImplementationResource('test', load);
+      await render(
+        <WidgetRenderer instance={createInstance()} presentation="expanded" region={region} widget={widget} />
+      );
+      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      const group = host!.querySelector<HTMLElement>('[data-widget-recovery-host]')!;
+      expect(group.getAttribute('aria-label')).toBe('Test widget');
+      const retry = [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Retry'
+      )!;
+      retry.focus();
+      await userEvent.keyboard('{Enter}');
+      await expect.poll(() => load.mock.calls.length).toBe(2);
+      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      expect(host!.querySelector('[data-widget-recovery-host]')).toBe(group);
+      expect(document.activeElement).toBe(group);
+      await userEvent.keyboard('{Tab}');
+      expect(group.contains(document.activeElement)).toBe(true);
+      if (document.activeElement?.textContent !== 'Retry') {
+        await userEvent.keyboard('{Tab}');
+      }
+      expect(document.activeElement?.textContent).toBe('Retry');
+    }
+  );
+
+  it.each(['unmount', 'hide-and-reveal'] as const)(
+    'does not reload when a pending retry rejects after %s',
+    async (transition) => {
+      let reject!: (error: Error) => void;
+      const { widget } = createDeferredWidget();
+      const load = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('first import failure'))
+        .mockImplementationOnce(
+          () =>
+            new Promise<WidgetImplementation>((_resolve, rejectLoad) => {
+              reject = rejectLoad;
+            })
+        );
+      widget.implementation = createWidgetImplementationResource('test', load);
+      const Retained = ({ children }: { children: ReactNode }) => {
+        const [visible, setVisible] = useState(true);
+        return (
+          <>
+            <button type="button" onClick={() => setVisible(false)}>
+              Hide recovery
+            </button>
+            <button type="button" onClick={() => setVisible(true)}>
+              Show recovery
+            </button>
+            <Activity mode={visible ? 'visible' : 'hidden'}>{children}</Activity>
+          </>
+        );
+      };
+      await render(
+        <Retained>
+          <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
+        </Retained>
+      );
+      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      await userEvent.click(
+        [...host!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Retry')!
+      );
+      await expect.poll(() => load.mock.calls.length).toBe(2);
+      if (transition === 'unmount') {
+        await act(() => root!.unmount());
+        root = null;
+      } else {
+        await userEvent.click(
+          [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
+            (button) => button.textContent === 'Hide recovery'
+          )!
+        );
+        await userEvent.click(
+          [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
+            (button) => button.textContent === 'Show recovery'
+          )!
+        );
+      }
+      await act(async () => {
+        reject(new Error('late repeated rejection'));
+        await Promise.resolve();
+      });
+      if (transition !== 'unmount') {
+        await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      }
+      expect(workbenchMocks.reload).not.toHaveBeenCalled();
+      expect(load).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('marks a repeated import retry busy while reload preparation is pending', async () => {
+    let finish!: () => void;
+    workbenchMocks.reload.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const { widget } = createDeferredWidget();
+    const load = vi.fn().mockRejectedValue(new Error('cached import rejection'));
+    widget.implementation = createWidgetImplementationResource('test', load);
+    await render(
+      <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
+    );
+    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+    await userEvent.click(
+      [...host!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Retry')!
+    );
+    await expect.poll(() => workbenchMocks.reload.mock.calls.length).toBe(1);
+    await expect.poll(() => host!.querySelector('button[aria-busy="true"]')).not.toBeNull();
+    const retry = host!.querySelector<HTMLButtonElement>('button[aria-busy="true"]')!;
+    expect(retry.disabled).toBe(true);
+    expect(retry.getAttribute('aria-busy')).toBe('true');
+    retry.click();
+    expect(load).toHaveBeenCalledTimes(2);
+    await act(() => finish());
+    await expect.poll(() => retry.disabled).toBe(false);
+  });
+
+  it('lets non-activation workbench chords bubble from compact Retry', async () => {
+    const { widget, resolve } = createDeferredWidget();
+    await render(<WidgetRenderer instance={createInstance()} presentation="compact" region="bottom" widget={widget} />);
+    await resolve({ view: ThrowingView });
+    const events: string[] = [];
+    const listen = (event: KeyboardEvent) => {
+      events.push(event.key);
+    };
+    window.addEventListener('keydown', listen);
+    try {
+      host!.querySelector<HTMLButtonElement>('button')!.focus();
+      await userEvent.keyboard('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+      await userEvent.keyboard('{Alt>}{PageDown}{/Alt}');
+      await userEvent.keyboard('{Control>}k{/Control}');
+      expect(events).toEqual(expect.arrayContaining(['ArrowRight', 'PageDown', 'k']));
+    } finally {
+      window.removeEventListener('keydown', listen);
+    }
+  });
+
+  it.each(['{Enter}', '[Space]'])(
+    'recovers failed chrome with one %s retry while its healthy body survives',
+    async (key) => {
+      let broken = true;
+      const HeaderActions = () => {
+        if (broken) {
+          throw new Error('chrome exploded');
+        }
+        return <button type="button">Recovered action</button>;
+      };
+      const { widget, resolve } = createDeferredWidget();
+      const retryResource = vi.spyOn(widget.implementation, 'retry');
+      Object.assign(workbenchMocks.project.widgetInstances, { 'test-instance': createInstance() });
+      await render(
+        <>
+          <WidgetChromeSlotById instanceId="test-instance" widget={widget} slot="actions" />
+          <WidgetRenderer instance={createInstance()} region="center" widget={widget} />
+        </>
+      );
+      await resolve({ headerActions: HeaderActions, view: FocusableView });
+      await expect.poll(() => host?.querySelectorAll('[data-testid="widget-failure"]').length).toBe(1);
+      const retry = host!.querySelector<HTMLButtonElement>(
+        'button[aria-label="Test widget failed — select to retry"]'
+      )!;
+      retry.focus();
+      expect(document.activeElement).toBe(retry);
+      broken = false;
+      await userEvent.keyboard(key);
+      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).toBeNull();
+      expect(retryResource).toHaveBeenCalledTimes(1);
+      expect(host?.textContent).toContain('Recovered action');
+      expect(host?.textContent).toContain('Loaded control');
+      delete (workbenchMocks.project.widgetInstances as Record<string, unknown>)['test-instance'];
+    }
+  );
 });

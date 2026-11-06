@@ -16,7 +16,6 @@ import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integ
 
 import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
-import type { WidgetRecoveryStore } from './widget-frame/widgetRecovery';
 
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
@@ -24,6 +23,7 @@ import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPr
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
+import { createWidgetRecovery, type WidgetRecoveryStore } from './widget-frame/widgetRecoveryStore';
 import { areWidgetsLoaded } from './widgetRegistry';
 import { getProjectWidgetValues } from './widgetState';
 import {
@@ -952,7 +952,9 @@ export const createWorkbenchStore = (
   // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
   // settings subscription keeps the mirror current from then on.
   let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
-  const widgetRecovery = new Map<string, WidgetRecoveryStore>();
+  const widgetRecovery = new Map(
+    Object.keys(getActiveProject(state).widgetInstances).map((id) => [id, createWidgetRecovery()])
+  );
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -971,10 +973,17 @@ export const createWorkbenchStore = (
     const project = getActiveProject(nextState);
     const previousProject = getActiveProject(state);
     if (project.id !== previousProject.id || project.widgetInstances !== previousProject.widgetInstances) {
-      for (const key of widgetRecovery.keys()) {
-        const [projectId, instanceId] = JSON.parse(key) as [string, string];
-        if (projectId !== project.id || !project.widgetInstances[instanceId]) {
-          widgetRecovery.delete(key);
+      if (project.id !== previousProject.id) {
+        widgetRecovery.clear();
+      }
+      for (const id of widgetRecovery.keys()) {
+        if (!project.widgetInstances[id]) {
+          widgetRecovery.delete(id);
+        }
+      }
+      for (const id of Object.keys(project.widgetInstances)) {
+        if (!widgetRecovery.has(id)) {
+          widgetRecovery.set(id, createWidgetRecovery());
         }
       }
     }

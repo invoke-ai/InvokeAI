@@ -5,10 +5,7 @@ import { UsersPage } from '@features/identity/launchpad';
 import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
-import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
 import { PreferencesPage } from '@workbench/settings/launchpad';
 import {
@@ -179,8 +176,6 @@ export const Launchpad = () => {
 
 const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
   const location = useLocation();
-  const router = useRouter();
-  useMountEffect(() => router.subscribe('onBeforeNavigate', flushWorkbenchDrafts));
   const requestedSectionId = getRequestedSectionId(location.pathname);
   const activeSectionId = getActiveSectionId(sections, requestedSectionId);
   const activeSectionLabel = sections.find((section) => section.id === activeSectionId)?.label ?? activeSectionId;
@@ -206,26 +201,12 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
           .filter((section) => visitedIds.has(section.id))
           .map((section) => (
             <Activity key={section.id} mode={section.id === activeSectionId ? 'visible' : 'hidden'}>
-              <RetainedSection>{section.render()}</RetainedSection>
+              <Box h="full" minH="0">
+                {section.render()}
+              </Box>
             </Activity>
           ))}
       </Box>
     </Flex>
-  );
-};
-
-const RetainedSection = ({ children }: { children: ReactNode }) => {
-  useMountEffect(() => {
-    const owner = captureAccountScope();
-    return () => {
-      if (isAccountScopeCurrent(owner)) {
-        flushWorkbenchDrafts();
-      }
-    };
-  });
-  return (
-    <Box h="full" minH="0">
-      {children}
-    </Box>
   );
 };

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
@@ -1467,6 +1467,238 @@ const runSettingsJourney = async (browser) => {
   }
 };
 
+/** Browser history can leave a modal section; authorized work must settle while its Activity is hidden. */
+const runHiddenMaintenanceJourney = async (browser) => {
+  const id = 'launchpad-hidden-maintenance';
+  for (const outcome of ['success', 'error']) {
+    const { context, page } = await openRepresentativePage(browser, '/#/');
+    let finish = () => {};
+    let started = () => {};
+    const executing = new Promise((resolveStarted) => {
+      started = resolveStarted;
+    });
+    const pending = new Promise((resolvePending) => {
+      finish = resolvePending;
+    });
+    let previews = 0;
+    let mutations = 0;
+    await page.route('**/api/v1/app/gallery/maintenance/preview', (route) => {
+      previews += 1;
+      return route.fulfill({
+        status: 200,
+        json: {
+          operation: 'archive_untracked',
+          fingerprint: 'a'.repeat(64),
+          examined_count: 12,
+          affected_count: 2,
+          skipped_count: 0,
+          error_count: 0,
+          errors: [],
+          archive_path: '/fixture/gallery-archive',
+        },
+      });
+    });
+    await page.route('**/api/v1/app/gallery/maintenance/archive-untracked', async (route) => {
+      mutations += 1;
+      started();
+      await pending;
+      await route.fulfill(
+        outcome === 'error'
+          ? { status: 500, json: { detail: 'Fixture maintenance failure' } }
+          : {
+              status: 200,
+              json: {
+                operation: 'archive_untracked',
+                status: 'completed',
+                examined_count: 12,
+                skipped_count: 0,
+                failed_count: 0,
+                records_removed: 0,
+                images_archived: 2,
+                thumbnails_archived: 0,
+                thumbnails_regenerated: 0,
+                archive_path: '/fixture/gallery-archive',
+                backup_path: '/fixture/gallery-backup.sqlite',
+                errors: [],
+              },
+            }
+      );
+    });
+    try {
+      await waitForHome(page);
+      await page.evaluate(() => {
+        location.hash = '/preferences/workspace';
+      });
+      const action = page.getByRole('button', { name: 'Archive untracked files', exact: true });
+      await action.click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Archive untracked files', exact: true }).click();
+      await executing;
+      await page.goBack();
+      await waitForHome(page);
+      const settled = page.waitForResponse((response) =>
+        response.url().endsWith('/api/v1/app/gallery/maintenance/archive-untracked')
+      );
+      finish();
+      await (await settled).finished();
+      await page.goForward();
+      await page
+        .getByText(outcome === 'success' ? 'Gallery maintenance completed.' : 'Fixture maintenance failure', {
+          exact: true,
+        })
+        .waitFor();
+      await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
+      assert.equal(await action.isEnabled(), true, 'Hidden completion must release the running state.');
+      assert.equal(previews, 1);
+      assert.equal(mutations, 1, 'History navigation must never repeat destructive execution.');
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:${outcome}`);
+    } finally {
+      finish();
+      await context.close();
+    }
+  }
+  return {
+    id,
+    status: 'passed',
+    hiddenOutcomes: ['success', 'error'],
+    navigation: 'browser Back/Forward while modal',
+    mutationsPerOperation: 1,
+  };
+};
+
+/** Fault the actual first-party production module request; cover in-place retry and repeated rejection recovery. */
+const runNativeWidgetRecoveryJourney = async (browser, failures) => {
+  const id = failures === 1 ? 'workbench-native-import-recovery' : 'workbench-native-import-repeated-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/workbench/widgets/preview/implementation.ts'].file;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  let remainingFailures = failures;
+  const requests = [];
+  await page.route(`**/${chunk}`, async (route) => {
+    const blocked = remainingFailures-- > 0;
+    requests.push(blocked ? 503 : 200);
+    if (blocked) {
+      await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+    } else {
+      await route.continue();
+    }
+  });
+  try {
+    await page.goto(`${origin}${representativeProjectPath}`);
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Compose', 'Preview');
+    const card = centerRegion(page).locator('[data-testid="widget-failure"]');
+    await card.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+    assert.deepEqual(requests, [503]);
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const output = resolve(root, 'artifacts/accessibility');
+    await mkdir(output, { recursive: true });
+    await page.screenshot({ path: resolve(output, `${id}-failed.png`) });
+    const before = await page.evaluate(() => performance.timeOrigin);
+    const draft = 'Native import recovery keeps this held prompt';
+    const prompt = page.getByLabel('Positive prompt', { exact: true });
+    await prompt.fill(draft);
+    const unsaved = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+      response.json()
+    );
+    assert.equal(JSON.stringify(unsaved).includes(draft), false, 'The field must not already be saved before Retry.');
+    const retry = card.getByRole('button', { name: 'Retry', exact: true });
+    await retry.focus();
+    await retry.press('Enter');
+    if (failures > 1) {
+      await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    }
+    await waitForWorkbench(page);
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await page
+      .locator('[data-hotkey-widget-region="center"][data-hotkey-widget-type-id="preview"]')
+      .getByRole('button', { name: /^Auto-switch:/ })
+      .waitFor();
+    await centerRegion(page).locator('[data-widget-loading]').waitFor({ state: 'detached' });
+    await centerRegion(page).locator('[data-testid="widget-failure"]').waitFor({ state: 'detached' });
+    await page.getByLabel('Positive prompt', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('Positive prompt', { exact: true }).inputValue(), draft);
+    assert.deepEqual(requests, [...Array(failures).fill(503), 200]);
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    await page.screenshot({ path: resolve(output, `${id}-recovered.png`) });
+    return {
+      id,
+      status: 'passed',
+      requests,
+      chromiumVersion: browser.version(),
+      freshDocument: await page.evaluate((previous) => performance.timeOrigin > previous, before),
+      draftInitiallyUnsaved: true,
+      promptPreserved: true,
+    };
+  } finally {
+    await context.close();
+  }
+};
+
+const runNativeUsersRecoveryJourney = async (browser) => {
+  const id = 'launchpad-users-native-import-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  await fetch(`${backendOrigin}/__faults`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ intermediatesCaller: 'multiuser-admin' }),
+  });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/features/identity/ui/UsersPage.tsx'].file;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  let blocked = true;
+  const requests = [];
+  await page.route('**/api/v1/auth/users', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  await page.route(`**/${chunk}`, async (route) => {
+    requests.push(blocked ? 503 : 200);
+    if (blocked) {
+      await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+    } else {
+      await route.continue();
+    }
+  });
+  try {
+    await page.goto(origin);
+    await page.getByLabel('Email', { exact: true }).fill('fixture-admin@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('link', { name: 'Users', exact: true }).waitFor();
+    assert.deepEqual(requests, [], 'Home must not request user management.');
+    await page.getByRole('link', { name: 'Users', exact: true }).click();
+    await page.getByText('Unable to load users', { exact: true }).waitFor();
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const before = await page.evaluate(() => performance.timeOrigin);
+    blocked = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).press('Enter');
+    await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    await page.getByText('0 accounts in this workspace.', { exact: true }).waitFor();
+    assert.deepEqual(requests, [503, 200]);
+    await page.getByRole('button', { name: 'Add user', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    return { id, status: 'passed', requests, coldHomeManagementRequests: 0, freshDocument: true };
+  } finally {
+    await context.close();
+  }
+};
+
 const mockBackend = await startMockBackend(backendPort, { profile: 'representative' });
 const preview = spawnPreview({
   cwd: root,
@@ -1519,6 +1751,18 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 1));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-repeated-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-users-native-import-recovery') {
+    reports.push(await runNativeUsersRecoveryJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-hidden-maintenance') {
+    reports.push(await runHiddenMaintenanceJourney(browser));
   }
   if (reports.length === 0) {
     throw new Error(`Unknown accessibility journey ${JSON.stringify(requestedJourney)}.`);

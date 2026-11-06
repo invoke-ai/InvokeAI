@@ -26,7 +26,7 @@ export interface ExtensionRegistry {
   hotkeys: WidgetHotkeyApi;
   palette: WidgetCommandPaletteApi;
   search: WidgetSearchApi;
-  /** Read side for shell surfaces (hotkey runtime, palette/search/toolbar UI). */
+  /** Read side for shell surfaces (hotkey runtime and palette/search UI). */
   stores: ExtensionContributionStores;
 }
 

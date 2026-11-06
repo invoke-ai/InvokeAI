@@ -23,7 +23,12 @@ vi.mock('@platform/i18n/languages', async (importOriginal) => {
   return {
     ...original,
     getEffectiveWorkbenchLanguage: (language: WorkbenchLanguage) =>
-      settings.readyArabic && language === 'ar' ? 'ar' : original.getEffectiveWorkbenchLanguage(language),
+      settings.readyArabic && language === 'ar'
+        ? 'ar'
+        : original.getEffectiveWorkbenchLanguage(language, {
+            en: { translated: 1, ready: true },
+            fr: { translated: 1 },
+          }),
   };
 });
 vi.mock('@platform/i18n/client', async () => {
@@ -123,4 +128,21 @@ it('hydrates an explicitly ready Arabic fixture with matching content and RTL di
   expect(document.documentElement.dir).toBe('rtl');
   expect(document.body.dir).toBe('rtl');
   expect(settings.snapshot.preferences.language).toBe('ar');
+});
+
+it('writes the saved language only when the preference changes', async () => {
+  const writes = vi.spyOn(Storage.prototype, 'setItem');
+  try {
+    await act(() => root.render(<I18nController />));
+    await change('ar');
+    await change('ar');
+    await change('fr');
+    await change('fr');
+    expect(writes.mock.calls.filter(([key]) => key === 'invokeai:v7:webv2:language')).toEqual([
+      ['invokeai:v7:webv2:language', 'ar'],
+      ['invokeai:v7:webv2:language', 'fr'],
+    ]);
+  } finally {
+    writes.mockRestore();
+  }
 });

@@ -11,16 +11,17 @@ import type {
   WorkbenchRegion,
 } from '@workbench/widgetContracts';
 
-import { Box, Flex, Text } from '@chakra-ui/react';
+import { Box, Flex, Text, VisuallyHidden } from '@chakra-ui/react';
 import { getWidgetReadyMark, markSemanticReady } from '@platform/performance/semanticReady';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { WidgetOverlayOwnerContext } from '@platform/ui/widgetOverlays';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
+import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { memo, Suspense, use, useMemo } from 'react';
+import { memo, Suspense, use, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
@@ -90,6 +91,7 @@ export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widg
       region={region}
       widget={widget}
       fallback={failureFallback}
+      slot={slot}
     >
       {slot === 'icon' ? (
         <WidgetImplementationIcon widget={widget} />
@@ -183,22 +185,24 @@ const WidgetChromeSlot = ({
   );
 };
 
-export const WidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
+export const WidgetRenderer = ({ instance, presentation = 'expanded', region, widget }: WidgetRendererProps) => {
   const loadingFallback = useMemo(
     () => <WidgetLoadingFallback instance={instance} presentation={presentation} region={region} widget={widget} />,
     [instance, presentation, region, widget]
   );
   return (
-    <WidgetRecoveryBoundary instance={instance} presentation={presentation} region={region} widget={widget}>
+    <WidgetRecoveryBoundary
+      instance={instance}
+      presentation={presentation}
+      region={region}
+      widget={widget}
+      slot={presentation ?? 'expanded'}
+    >
       <Suspense fallback={loadingFallback}>
         <LoadedWidgetRenderer instance={instance} presentation={presentation} region={region} widget={widget} />
       </Suspense>
     </WidgetRecoveryBoundary>
   );
-};
-
-const FailedSlot = ({ error }: { error: Error }) => {
-  throw error;
 };
 
 const WidgetRecoveryBoundary = ({
@@ -208,15 +212,33 @@ const WidgetRecoveryBoundary = ({
   presentation,
   region,
   widget,
-}: WidgetRendererProps & { children: React.ReactNode; fallback?: React.ReactNode }) => {
+  slot,
+  framed,
+}: Omit<WidgetRendererProps, 'instance'> & {
+  instance: WidgetInstanceRuntimeMeta;
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  slot: string;
+  framed?: boolean;
+}) => {
   const projectId = useActiveProjectId();
-  const recovery = useWidgetRecovery(instance.id, widget);
+  const recovery = useWidgetRecovery(instance.id, widget, slot, region);
+  const { t } = useTranslation();
   if (!widget.manifest.failurePolicy.isolateRenderFailure) {
     return children;
   }
-  return (
+  const boundary = (
     <WidgetFailureBoundary
-      fallback={fallback}
+      fallback={
+        region === 'center' &&
+        slot !== 'icon' &&
+        slot !== presentation &&
+        widget.implementation.getStatus() === 'failed'
+          ? null
+          : fallback
+      }
+      framed={framed}
+      isRetrying={recovery.retrying}
       instance={instance}
       presentation={presentation}
       projectId={projectId}
@@ -226,10 +248,67 @@ const WidgetRecoveryBoundary = ({
       widgetId={widget.manifest.id}
       onRetry={recovery.retry}
       onFailure={recovery.fail}
+      onRecovered={recovery.recover}
     >
-      {recovery.error ? <FailedSlot error={recovery.error} /> : children}
+      {children}
     </WidgetFailureBoundary>
   );
+  const label = resolveWidgetInstanceLabel(instance, widget.manifest, t);
+  return (
+    <>
+      {slot === presentation && presentation === 'expanded' ? (
+        <WidgetRecoveryAnnouncement
+          failed={recovery.hasFailure}
+          label={label}
+          generation={recovery.generation}
+          retrying={recovery.retrying}
+        />
+      ) : null}
+      {(region === 'popover' || region === 'dialog') && presentation === 'expanded' && slot === presentation ? (
+        <Box
+          role="group"
+          aria-label={label}
+          data-widget-recovery-host=""
+          tabIndex={-1}
+          display="flex"
+          flex="1"
+          flexDirection="column"
+          focusVisibleRing="inside"
+          minH="0"
+          w="full"
+        >
+          {boundary}
+        </Box>
+      ) : (
+        boundary
+      )}
+    </>
+  );
+};
+
+export const WidgetRecoveryAnnouncement = ({
+  failed,
+  label,
+  generation,
+  retrying,
+}: {
+  failed: boolean;
+  label: string;
+  generation: number;
+  retrying: boolean;
+}) => {
+  const { t } = useTranslation();
+  const source = `${generation}:${retrying}:${failed}`;
+  const [announced, setAnnounced] = useState({ source, text: '' });
+  if (announced.source !== source) {
+    setAnnounced({
+      source,
+      text: t(retrying ? 'widgets.failure.retrying' : failed ? 'widgets.failure.title' : 'widgets.failure.recovered', {
+        label,
+      }),
+    });
+  }
+  return <VisuallyHidden role="status">{announced.text}</VisuallyHidden>;
 };
 
 const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
@@ -276,7 +355,20 @@ const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: Widget
         runtime={runtime}
         widget={widget}
       >
-        {content}
+        {presentation === 'compact' || presentation === 'tooltip' ? (
+          content
+        ) : (
+          <WidgetRecoveryBoundary
+            instance={instance}
+            presentation={presentation}
+            region={region}
+            widget={widget}
+            slot="body"
+            framed={false}
+          >
+            {content}
+          </WidgetRecoveryBoundary>
+        )}
       </WidgetShellFrame>
     </WidgetOverlayOwnerContext>
   );
@@ -299,38 +391,59 @@ const WidgetShellFrame = ({
   runtime: WidgetRuntimeApi;
   widget: RegisteredWidget;
 }) => {
-  const safeContent = children;
+  const { t } = useTranslation();
 
   if (presentation === 'tooltip') {
-    return <WidgetTooltipFrame icon={widget.manifest.icon}>{safeContent}</WidgetTooltipFrame>;
+    return <WidgetTooltipFrame icon={widget.manifest.icon}>{children}</WidgetTooltipFrame>;
   }
 
   // Floating windows provide their own chrome (FloatingWidgetWindow), so the
   // view renders bare, like popovers and dialogs.
   if (region === 'popover' || region === 'dialog' || region === 'floating' || presentation === 'compact') {
-    return safeContent;
+    return children;
   }
+
+  const footer = implementation.footer ? (
+    <WidgetRecoveryBoundary instance={instance} presentation="compact" region={region} widget={widget} slot="footer">
+      <FooterSlot
+        implementation={implementation}
+        instance={instance}
+        presentation={presentation}
+        region={region}
+        runtime={runtime}
+        widget={widget}
+      />
+    </WidgetRecoveryBoundary>
+  ) : null;
 
   if (region === 'left' || region === 'right' || region === 'bottom') {
     return (
-      <WidgetPanelFrame instanceId={instance.id} region={region} typeId={instance.typeId}>
-        <HeaderSlot
-          implementation={implementation}
-          instance={instance}
-          presentation={presentation}
-          region={region}
-          runtime={runtime}
-          widget={widget}
-        />
-        <PanelBodySlot>{safeContent}</PanelBodySlot>
-        <FooterSlot
-          implementation={implementation}
-          instance={instance}
-          presentation={presentation}
-          region={region}
-          runtime={runtime}
-          widget={widget}
-        />
+      <WidgetPanelFrame
+        instanceId={instance.id}
+        label={resolveWidgetInstanceLabel(instance, widget.manifest, t)}
+        region={region}
+        typeId={instance.typeId}
+      >
+        {widget.manifest.chrome?.header === 'hidden' ? null : (
+          <WidgetRecoveryBoundary
+            instance={instance}
+            presentation="compact"
+            region={region}
+            widget={widget}
+            slot="header"
+          >
+            <HeaderSlot
+              implementation={implementation}
+              instance={instance}
+              presentation={presentation}
+              region={region}
+              runtime={runtime}
+              widget={widget}
+            />
+          </WidgetRecoveryBoundary>
+        )}
+        <PanelBodySlot>{children}</PanelBodySlot>
+        {footer}
       </WidgetPanelFrame>
     );
   }
@@ -347,16 +460,9 @@ const WidgetShellFrame = ({
       w="full"
     >
       <Box flex="1" minH="0" overflow="hidden" position="relative">
-        {safeContent}
+        {children}
       </Box>
-      <FooterSlot
-        implementation={implementation}
-        instance={instance}
-        presentation={presentation}
-        region={region}
-        runtime={runtime}
-        widget={widget}
-      />
+      {footer}
     </Flex>
   );
 };
@@ -508,7 +614,7 @@ export const MissingWidgetFrame = ({
   const { t } = useTranslation();
 
   return (
-    <WidgetPanelFrame instanceId={instanceId} region={region} typeId={typeId}>
+    <WidgetPanelFrame instanceId={instanceId} label={label} region={region} typeId={typeId}>
       <Box p="3">
         <Text fontSize="md" fontWeight="700">
           {label}

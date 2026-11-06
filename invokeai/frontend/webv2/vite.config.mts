@@ -33,8 +33,6 @@ const readAppVersion = (): string => {
 
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
-  // Launchpad deactivation and editor transitions both flush drafts; this must not load editor runtimes on Home.
-  '/platform/react/draftRegistry.ts',
   '/features/fonts/data/keys.ts',
   // Launchpad entry points and the intermediates settings metadata both read it.
   '/features/intermediates/data/focus.ts',
@@ -233,6 +231,7 @@ const EDITOR_BOOT_SHARED_MODULES = [
 // routes) reach it through the same store, while the Launchpad palette does not. Without the group Rolldown splits it
 // by importer set, costing the editor boot one request per piece.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  '/platform/react/draftRegistry.ts',
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
   '/features/queue/core/deviceLabels.ts',

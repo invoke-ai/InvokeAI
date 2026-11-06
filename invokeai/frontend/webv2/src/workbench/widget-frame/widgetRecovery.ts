@@ -1,86 +1,86 @@
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 
-import { useActiveProjectSelector, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
-import { useMemo, useSyncExternalStore } from 'react';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { toaster } from '@platform/ui/toaster';
+import { useActiveProjectSelector, useWorkbenchInternalStore, useWorkbenchReload } from '@workbench/WorkbenchContext';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 
-interface Recovery {
-  generation: number;
-  error?: Error;
-}
-
-export const createWidgetRecovery = (widget: RegisteredWidget) => {
-  let snapshot: Recovery = { generation: 0 };
-  const listeners = new Set<() => void>();
-  const publish = (next: Recovery) => {
-    snapshot = next;
-    for (const listener of listeners) {
-      listener();
-    }
-  };
-  let retrying = false;
-  return {
-    getSnapshot: () => snapshot,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
+export const useWidgetRecovery = (
+  instanceId: string,
+  widget: RegisteredWidget,
+  slot = 'compact',
+  region = 'bottom'
+) => {
+  const owner = useWorkbenchInternalStore();
+  const account = captureAccountScope();
+  const projectId = useActiveProjectSelector((project) => project.id);
+  const recovery = owner.widgetRecovery.get(instanceId)!;
+  const key = (name: string) => `${region}:${name}`;
+  // The registry resource can outlive this view; a reload requested here cannot.
+  const lease = useRef({ active: true, generation: 0 });
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      lease.current.active = true;
+      const unsubscribe = recovery.subscribe(listener);
       return () => {
-        listeners.delete(listener);
+        lease.current.active = false;
+        lease.current.generation += 1;
+        unsubscribe();
       };
     },
-    fail: (error: Error) => {
-      if (!snapshot.error) {
-        publish({ ...snapshot, error });
-      }
-    },
-    retry: () => {
-      if (retrying) {
-        return;
-      }
-      retrying = true;
-      void Promise.resolve(widget.implementation.retry())
-        .catch(() => undefined)
-        .finally(() => {
-          retrying = false;
-        });
-      publish({ generation: snapshot.generation + 1 });
-    },
-  };
-};
-
-export type WidgetRecoveryStore = ReturnType<typeof createWidgetRecovery>;
-
-export const useWidgetRecovery = (instanceId: string, widget: RegisteredWidget) => {
-  const owner = useWorkbenchInternalStore();
-  const projectId = useActiveProjectSelector((project) => project.id);
-  const recovery = useMemo(() => {
-    const entries = owner.widgetRecovery;
-    const key = JSON.stringify([projectId, instanceId]);
-    let entry = entries.get(key);
-    if (!entry) {
-      entry = createWidgetRecovery(widget);
-      entries.set(key, entry);
-    }
-    return entry;
-  }, [owner, projectId, instanceId, widget]);
-  const snapshot = useSyncExternalStore(recovery.subscribe, recovery.getSnapshot);
+    [recovery]
+  );
+  const snapshot = useSyncExternalStore(subscribe, recovery.getSnapshot);
+  const reload = useWorkbenchReload();
+  const { t } = useTranslation();
   const isCurrent = () => {
     const project = owner.getSnapshot().activeProject;
     return (
+      isAccountScopeCurrent(account) &&
       project.id === projectId &&
       !!project.widgetInstances[instanceId] &&
-      owner.widgetRecovery.get(JSON.stringify([projectId, instanceId])) === recovery
+      owner.widgetRecovery.get(instanceId) === recovery
     );
   };
   return {
     ...snapshot,
+    hasFailure: Object.keys(snapshot.errors).some((name) => name.startsWith(`${region}:`)),
+    error: snapshot.errors[key(slot)],
+    getError: (name: string) => snapshot.errors[key(name)],
     retry: () => {
-      if (isCurrent()) {
-        recovery.retry();
+      if (isCurrent() && lease.current.active) {
+        const generation = lease.current.generation;
+        const current = () => lease.current.active && lease.current.generation === generation && isCurrent();
+        recovery.retry(widget, async () => {
+          if (current()) {
+            await reload(current).catch((error: unknown) => {
+              if (!current()) {
+                return;
+              }
+              toaster.create({
+                type: 'error',
+                title: t('widgets.failure.reloadFailed'),
+                description: error instanceof Error ? error.message : String(error),
+              });
+            });
+          }
+        });
+      }
+    },
+    recover: () => {
+      if (
+        isCurrent() &&
+        widget.implementation.getStatus() === 'loaded' &&
+        recovery.getSnapshot().generation === snapshot.generation
+      ) {
+        recovery.recover(key(slot));
       }
     },
     fail: (error: Error) => {
-      if (isCurrent() && recovery.getSnapshot().generation === snapshot.generation) {
-        recovery.fail(error);
-      }
+      return (
+        isCurrent() && recovery.getSnapshot().generation === snapshot.generation && recovery.fail(key(slot), error)
+      );
     },
   };
 };

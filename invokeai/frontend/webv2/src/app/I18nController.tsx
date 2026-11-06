@@ -10,6 +10,7 @@ export const I18nController = () => {
     let active = true;
     let running = false;
     let requested: string | undefined;
+    let savedPreference: string | undefined;
     const apply = async () => {
       if (running) {
         return;
@@ -41,6 +42,10 @@ export const I18nController = () => {
       if (status !== 'ready' && status !== 'error') {
         return;
       }
+      if (savedPreference === preferences.language) {
+        return;
+      }
+      savedPreference = preferences.language;
       requested = getEffectiveWorkbenchLanguage(preferences.language);
       try {
         localStorage.setItem(LANGUAGE_HINT_STORAGE_KEY, preferences.language);

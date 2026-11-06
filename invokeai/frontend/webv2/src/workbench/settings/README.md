@@ -21,3 +21,5 @@ Data & workspace keeps everyday actions (revert layout, intermediates, database 
 ## Language availability
 
 The saved language is a requested preference, preserved through aliases and imports even when its content is unavailable. Build metadata derives coverage from locale catalogs. Readiness is an explicit declaration: English is ready; English regional choices inherit it. Empty catalogs are unavailable and nonempty undeclared catalogs are incomplete. Both show explained English content while retaining the saved choice. The startup hint and i18n controller apply the effective content language and direction, so English fallback is English/LTR even for an Arabic preference. Catalog coverage alone never declares a translation ready.
+
+Gallery Maintenance requests belong to the captured account, not the visibility of the settings view. Activity hide releases view registrations while previews and confirmed executions settle retained state, including results/errors and running state. Account changes fence every completion and refresh; hiding never reauthorizes or repeats a mutation.

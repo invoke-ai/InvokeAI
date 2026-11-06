@@ -17,7 +17,7 @@ const load = () =>
   }));
 const retry = () => {
   if (importFailed) {
-    // Browsers retain failed module fetches in this document's module map; a fresh document can fetch them again.
+    // Re-read the deployment's entry and module graph; render failures below still retry in place.
     window.location.reload();
     return Promise.resolve();
   }

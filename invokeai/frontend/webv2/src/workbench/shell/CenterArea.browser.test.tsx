@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import { Box, ChakraProvider, HStack, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createInstance } from 'i18next';
 import { act, type ComponentType, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -124,6 +125,7 @@ const recoveryOwner = vi.hoisted(() => ({
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => recoveryOwner,
+  useWorkbenchReload: () => async () => {},
   useActiveProjectId: () => centerAreaMocks.project.id,
   useActiveProjectSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
     selector(centerAreaMocks.project),
@@ -204,6 +206,7 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const render = async (children: ReactNode, width = 571) => {
+  recoveryOwner.widgetRecovery.set('test-instance', createWidgetRecovery());
   host = document.createElement('div');
   host.style.cssText = `display:flex;height:320px;width:${width}px;`;
   document.body.append(host);
