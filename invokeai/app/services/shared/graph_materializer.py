@@ -1300,7 +1300,31 @@ class _ExecutionNodeBuilder:
                 if prepared_retained_axes:
                     return prepared_retained_axes
                 return tuple(axis for axis in axes if axis in retained_axes)
-            if not self._state.graph._get_input_edges(source_node.id, "condition"):
+            selected_field = self._state._resolved_if_exec_branches.get(prepared_id)
+            condition_edges = self._state.graph._get_input_edges(source_node.id, "condition")
+            if selected_field is not None and not any(
+                ancestry.get_frame_axes_for_edge(condition_edge) for condition_edge in condition_edges
+            ):
+                branch_axes, final_axes = graph_if_runtime._get_if_static_frame_analysis(
+                    self._state, ancestry, source_node.id
+                )
+                direct_axes = {
+                    axis_id
+                    for branch_edge in self._state.graph._get_input_edges(source_node.id, selected_field)
+                    for axis_id in ancestry.get_iterator_axes_for_edge(branch_edge)
+                }
+                selected_axes = branch_axes[selected_field]
+                other_field = "false_input" if selected_field == "true_input" else "true_input"
+                other_axes = branch_axes[other_field]
+                if (
+                    set(selected_axes) - direct_axes - final_axes[selected_field]
+                    and len(selected_axes) > len(other_axes)
+                    and selected_axes[: len(other_axes)] == other_axes
+                    and selected_axes[: len(axes)] == axes
+                ):
+                    # Preserve collection groups revealed when a root If expands a shorter branch prefix.
+                    return axes
+            if not condition_edges:
                 selected_field = graph_if_runtime._get_static_if_selection(self._state, source_node.id)
                 if selected_field is not None:
                     branch_axes, _ = graph_if_runtime._get_if_static_frame_analysis(

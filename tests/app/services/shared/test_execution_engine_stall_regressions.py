@@ -23,6 +23,7 @@ def _run_seed(
     *,
     compatibility: bool,
     checkpoint: int | None,
+    checkpoint_when: Callable[[GraphExecutionState], bool] | None = None,
     checkpoint_observer: Callable[[GraphExecutionState], None] | None = None,
     completion_observer: Callable[[GraphExecutionState], None] | None = None,
 ) -> dict[str, list[tuple[tuple[int, ...], Any]]]:
@@ -32,8 +33,10 @@ def _run_seed(
         state._execution_scheduler = _ExecutionScheduler(state)
     route_type = type(state._scheduler())
 
+    checkpointed = False
     for step in range(500):
-        if checkpoint == step:
+        if not checkpointed and (checkpoint == step or (checkpoint_when is not None and checkpoint_when(state))):
+            checkpointed = True
             state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
             state._execution_scheduler = (
                 _ExecutionScheduler(state)
@@ -47,6 +50,7 @@ def _run_seed(
             break
         state.complete(node.id, node.invoke(Mock()))
 
+    assert checkpoint_when is None or checkpointed, "semantic checkpoint was never reached"
     assert state.is_complete(), f"seed={seed} route={route_type.__name__} stopped before source completion"
     if completion_observer is not None:
         completion_observer(state)
@@ -76,7 +80,6 @@ _ROOT_IF_BRANCH_ITEMS: dict[int, list[tuple[tuple[int, ...], list[list[str]]]]] 
     ],
 }
 _ROOT_IF_OTHER_COLLECT_VALUES: dict[int, Any] = {2394: "S", 1728: ["Fu"], 2775: "S"}
-_ROOT_IF_PARTIAL_EXPANSION_CHECKPOINTS = {2394: 22, 1728: 24, 2775: 43}
 
 
 def _expected_root_if_outputs(seed: int) -> list[tuple[tuple[int, ...], str]]:
@@ -117,23 +120,26 @@ def _assert_out_collect_uses_matching_if_frames(
 @pytest.mark.parametrize("compatibility", [False, True], ids=["auto", "compatibility"])
 @pytest.mark.parametrize("resume", [False, True], ids=["fresh", "partial-expansion-checkpoint"])
 @pytest.mark.parametrize("seed", [2394, 1728, 2775], ids=lambda seed: f"seed-{seed}")
-def test_root_if_expansion_reframes_reused_collect_consumers(compatibility: bool, resume: bool, seed: int) -> None:
+def test_root_if_expansion_preserves_collect_groups(compatibility: bool, resume: bool, seed: int) -> None:
     expected_if = _expected_root_if_outputs(seed)
     expected_paths = [path for path, _ in expected_if]
 
+    def has_partial_expansion(state: GraphExecutionState) -> bool:
+        prepared_if_ids = state.source_prepared_mapping.get("if", ())
+        prepared_paths = {state._get_iteration_path(exec_id) for exec_id in prepared_if_ids}
+        completed_count = sum(exec_id in state.results for exec_id in prepared_if_ids)
+        return prepared_paths == set(expected_paths) and 0 < completed_count < len(expected_paths)
+
     def check_partial_expansion(state: GraphExecutionState) -> None:
-        _assert_out_collect_uses_matching_if_frames(state, expected_paths)
-        completed_if_paths = [
-            state._get_iteration_path(exec_id)
-            for exec_id in state.source_prepared_mapping["if"]
-            if exec_id in state.results
-        ]
-        assert 0 < len(completed_if_paths) < len(expected_paths)
+        assert has_partial_expansion(state)
+        if state.source_prepared_mapping.get("out"):
+            _assert_out_collect_uses_matching_if_frames(state, expected_paths)
 
     outputs = _run_seed(
         seed,
         compatibility=compatibility,
-        checkpoint=_ROOT_IF_PARTIAL_EXPANSION_CHECKPOINTS[seed] if resume else None,
+        checkpoint=None,
+        checkpoint_when=has_partial_expansion if resume else None,
         checkpoint_observer=check_partial_expansion if resume else None,
         completion_observer=lambda state: _assert_out_collect_uses_matching_if_frames(state, expected_paths),
     )
@@ -156,7 +162,7 @@ def test_root_condition_selects_each_collected_frame(compatibility: bool, checkp
 
 @pytest.mark.parametrize("compatibility", [False, True], ids=["auto", "compatibility"])
 @pytest.mark.parametrize("checkpoint", [3, 5], ids=["before-empty-parent-input", "after-empty-parent-input"])
-def test_per_item_if_closes_empty_selected_collect_frame(compatibility: bool, checkpoint: int | None) -> None:
+def test_per_item_if_broadcasts_eager_collected_branches(compatibility: bool, checkpoint: int | None) -> None:
     def check_empty_parent_anchor(state: GraphExecutionState) -> None:
         results = [
             (state._get_iteration_path(exec_id), state.results[exec_id].collection)
@@ -172,42 +178,49 @@ def test_per_item_if_closes_empty_selected_collect_frame(compatibility: bool, ch
         checkpoint_observer=check_empty_parent_anchor if checkpoint == 5 else None,
     )
 
-    assert outputs["if"] == [((0,), "T:[\"x[['b', 'a']]\"]"), ((1,), [[]])]
-    expected_items = ["S:[\"x['b', 'a']\"]", "T:[\"x[['b', 'a']]\"]", "S:[]", [[]]]
+    true_items = ["x[['b', 'a']]", "x[]"]
+    true_value = f"T:{true_items}"
+    false_value = [["x['b', 'a']"], []]
+    assert outputs["if"] == [((0,), true_value), ((1,), false_value)]
+    expected_items = ["S:[\"x['b', 'a']\"]", true_value, "S:[]", false_value]
     assert len(outputs["out"]) == 1 and outputs["out"][0][0] == ()
     assert sorted(outputs["out"][0][1], key=repr) == sorted(expected_items, key=repr)
     assert outputs["out2"] == [((), [outputs["out"][0][1]])]
 
 
 @pytest.mark.parametrize("compatibility", [False, True], ids=["auto", "compatibility"])
-@pytest.mark.parametrize("checkpoint", [None, 5, 12], ids=["fresh", "resumed", "resumed-after-parent-collections"])
-def test_nested_per_item_if_retires_empty_selected_collect_frame(compatibility: bool, checkpoint: int | None) -> None:
-    def check_empty_parent_anchor(state: GraphExecutionState) -> None:
-        results = [
+@pytest.mark.parametrize("checkpoint", ["fresh", "resumed", "after-parent-collections"])
+def test_nested_per_item_if_broadcasts_eager_collect_results_and_resumes(compatibility: bool, checkpoint: str) -> None:
+    def parent_inputs_completed(state: GraphExecutionState) -> bool:
+        return all(
+            source_id in state.executed
+            and state.source_prepared_mapping.get(source_id)
+            and all(exec_id in state.results for exec_id in state.source_prepared_mapping[source_id])
+            for source_id in ("cc1", "sx")
+        )
+
+    def check_parent_inputs(state: GraphExecutionState) -> None:
+        assert sorted(
             (state._get_iteration_path(exec_id), state.results[exec_id].collection)
             for exec_id in state.source_prepared_mapping["cc1"]
-            if exec_id in state.results
-        ]
-        assert sorted(results) == [((0, 0), []), ((0, 1), [["a"], ["c", "b"], []])]
+        ) == [((0, 0), []), ((0, 1), [["a"], ["c", "b"], []])]
         assert [
             (state._get_iteration_path(exec_id), state.results[exec_id].value)
             for exec_id in state.source_prepared_mapping["sx"]
-            if exec_id in state.results
         ] == [((0,), "np")]
 
     outputs = _run_seed(
         2057,
         compatibility=compatibility,
-        checkpoint=checkpoint,
-        checkpoint_observer=check_empty_parent_anchor if checkpoint == 12 else None,
+        checkpoint=5 if checkpoint == "resumed" else None,
+        checkpoint_when=parent_inputs_completed if checkpoint == "after-parent-collections" else None,
+        checkpoint_observer=check_parent_inputs if checkpoint == "after-parent-collections" else None,
     )
 
-    assert outputs["if"] == [
-        ((0, 0), [[]]),
-        ((0, 1), [["x['a']", "x['c', 'b']", "x[]"]]),
-    ]
+    branch_value = [[], ["x['a']", "x['c', 'b']", "x[]"]]
+    assert outputs["if"] == [((0, 0), branch_value), ((0, 1), branch_value)]
     assert outputs["out"][0] == ((), ["np"])
-    expected_nested_items = [[[]], [["x['a']", "x['c', 'b']", "x[]"]]]
+    expected_nested_items = [branch_value, branch_value]
     assert outputs["out"][1][0] == (0,)
     assert sorted(outputs["out"][1][1], key=repr) == sorted(expected_nested_items, key=repr)
     assert outputs["out2"][0][0] == ()

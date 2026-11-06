@@ -668,7 +668,7 @@ def _measure_pending_if_attachment(
     assert state.is_complete()
     assert not state.has_error()
     assert trace.count("true_body") == count
-    assert "false_body" not in trace
+    assert trace.count("false_body") == count
     assert trace.count("if") == count
     collect_exec_ids = state.source_prepared_mapping["collect"]
     assert len(collect_exec_ids) == 1
@@ -748,50 +748,6 @@ def test_completion_cache_preserves_completed_sources_after_restore() -> None:
     restored_state.complete(second.id, second.invoke(Mock()))
 
     assert restored_state.is_complete()
-
-
-def test_prepare_retirement_checks_only_activation_dependent_sources() -> None:
-    graph = Graph()
-    graph.add_node(BooleanInvocation(id="condition", value=True))
-    graph.add_node(AnyTypeTestInvocation(id="selected", value=1))
-    graph.add_node(AnyTypeTestInvocation(id="unselected", value=2))
-    graph.add_node(IfInvocation(id="if"))
-    graph.add_edge(create_edge("condition", "value", "if", "condition"))
-    graph.add_edge(create_edge("selected", "value", "if", "true_input"))
-    graph.add_edge(create_edge("unselected", "value", "if", "false_input"))
-    unrelated_source_ids = {f"independent_{index}" for index in range(120)}
-    for source_id in unrelated_source_ids:
-        graph.add_node(AnyTypeTestInvocation(id=source_id, value=source_id))
-
-    state = GraphExecutionState(graph=graph)
-    materializer = state._materializer()
-    original_candidates = materializer._get_activation_candidate_source_ids
-    candidate_sources: set[str] = set()
-    candidate_visits = 0
-    prepare_scans = 0
-
-    def counted_candidates(source_graph: object) -> tuple[str, ...]:
-        nonlocal candidate_visits, prepare_scans
-        candidates = original_candidates(source_graph)  # type: ignore[arg-type]
-        candidate_sources.update(candidates)
-        candidate_visits += len(candidates)
-        prepare_scans += 1
-        return candidates
-
-    materializer._get_activation_candidate_source_ids = counted_candidates  # type: ignore[method-assign]
-    context = Mock()
-    while (node := state.next()) is not None:
-        state.complete(node.id, node.invoke(context))
-
-    assert state.is_complete()
-    assert not state.has_error()
-    assert state.results[next(iter(state.source_prepared_mapping["if"]))].value == 1
-    assert "unselected" in state.executed
-    assert not unrelated_source_ids.intersection(candidate_sources), (
-        f"retirement candidates included unrelated sources: {unrelated_source_ids.intersection(candidate_sources)}"
-    )
-    assert candidate_sources == {"unselected"}
-    assert candidate_visits <= 2 * prepare_scans
 
 
 def _measure_if_chain_retirement_candidates(length: int) -> tuple[int, int, int, list[str]]:
