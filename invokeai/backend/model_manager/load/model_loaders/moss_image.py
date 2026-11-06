@@ -297,7 +297,8 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
             )
         model_path = Path(config.path)
         sd = load_file(model_path)
-        sd = split_fused_qkv(CheckpointPrefix.detect(sd).strip(sd))
+        sd = CheckpointPrefix.detect(sd).strip(sd)
+        sd = split_fused_qkv(sd)
         return self._load_transformer(
             config, sd, moss_image_transformer_config(sd), f"MOSS-Image checkpoint {model_path.name}"
         )
@@ -328,7 +329,8 @@ class MossImageGGUFModel(ModelLoader):
 
         sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
         # As identification does: ComfyUI-style exports may carry a `model.diffusion_model.` prefix.
-        sd = split_fused_qkv(CheckpointPrefix.detect(sd).strip(sd))
+        sd = CheckpointPrefix.detect(sd).strip(sd)
+        sd = split_fused_qkv(sd)
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**moss_image_transformer_config(sd))
         model._skip_layerwise_casting_patterns = list(MOSS_IMAGE_FP8_SKIP_PATTERNS)
