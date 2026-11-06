@@ -11,7 +11,7 @@ and scheduler, so `GenericDiffusersLoader` cannot resolve them. The transformer 
 
 The scheduler is never loaded: `moss_image_denoise` builds the schedule itself.
 
-A single-file transformer is bf16, ComfyUI's `int8_tensorwise` convrot export, or a GGUF. Comfy-Org's export and
+A single-file transformer is bf16, ComfyUI's `int8_tensorwise` convrot export, unsloth's torchao fp8 export, or a GGUF. Comfy-Org's export and
 leejet's GGUFs fuse each block's `q`, `k` and `v` into `proj.qkv`; `split_fused_qkv` unfuses them before anything else
 reads the state dict. A few Linears stay dense (`MOSS_IMAGE_FP8_SKIP_PATTERNS`), whichever quantization
 the file uses, because the vendored forward reads their weight dtype.
@@ -45,7 +45,17 @@ from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import lo
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.moss_image.checkpoint_layout import drop_comfy_attention_config, split_fused_qkv
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    attach_fp8_scales,
+    cast_state_dict,
+    clone_unreplaced_tensors,
+    dequantize_fp8_scaled,
+    extract_fp8_scaled_layers,
+    reject_quantized_side_channel,
+    split_fp8_scaled_layers,
+    translate_torchao_fp8_layers,
+    warn_on_unattached_scales,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -165,8 +175,16 @@ class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
     def _load_transformer(
-        self, config: AnyModelConfig, sd: dict[str, torch.Tensor], geometry: dict[str, Any], what: str
+        self,
+        config: AnyModelConfig,
+        sd: dict[str, torch.Tensor],
+        geometry: dict[str, Any],
+        what: str,
+        *,
+        torchao_fp8: bool = False,
     ) -> AnyModel:
+        """Build the transformer from `sd`. `torchao_fp8` says `translate_torchao_fp8_layers` renamed layers to
+        `.weight` + `.weight_scale`; that is the only source of fp8 scales accepted, any other is refused below."""
         drop_comfy_attention_config(sd)
         markers = extract_int8_convrot_markers(sd)
         # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.
@@ -181,6 +199,8 @@ class _MossImageTransformerLoading(ModelLoader):
         sd.setdefault("rope.bands", model.rope.bands)
 
         skip_patterns = _model_declared_skip_patterns(model)
+        fp8_layers: dict[str, Any] = {}
+        keep_fp8 = False
         if markers:
             # In place: a rebound dict would keep the originals alive and overshoot the reservation.
             kept_sd = drop_unconsumed_quantization_sidecars(sd)
@@ -201,24 +221,47 @@ class _MossImageTransformerLoading(ModelLoader):
                 "dequantized per forward)"
             )
         else:
-            # Strict below would name an orphaned scale key; this names the cause before anything is reserved.
-            reject_quantized_side_channel(sd, what)
+            if torchao_fp8:
+                fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={})
+                keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
+            else:
+                # Strict below would name an orphaned scale key; this names the cause before anything is reserved.
+                reject_quantized_side_channel(sd, what)
             reserve_for_load(
                 self._ram_cache.make_room,
                 sd,
                 dtype,
-                keep_fp8=False,
+                keep_fp8=keep_fp8,
                 model=model,
                 skip_patterns=skip_patterns,
-                fp8_layers={},
+                fp8_layers=fp8_layers,
                 nvfp4_payloads={},
             )
-            cast_state_dict(sd, dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
+            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
+            if fp8_layers and not keep_fp8:
+                dequantize_fp8_scaled(sd, fp8_layers, dtype)
+                fp8_layers = {}
+            # Folds the layers a skip pattern holds dense (`.proj.q` among them) with their scale applied.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
+            cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            if mapped is not None:
+                # Dense tensors the fold and cast left as they were are slices of the file mapping and would pin it,
+                # uncounted. Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
+                clone_unreplaced_tensors(sd, mapped)
+                mapped.clear()
         model.load_state_dict(sd, strict=True, assign=True)
         # `assign=True` aliases every parameter to its state dict tensor; the dict would keep the whole model alive
         # through the cast below.
         sd.clear()
         reject_incomplete_load(model, what=what)
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            self._logger.info(
+                f"{what}: kept {attached} layer(s) in fp8 (torchao fp8 checkpoint, kept for {self._fp8_kept_reason()})"
+            )
+            warn_on_unattached_scales(self._logger, "MOSS-Image", attached, fp8_layers)
+            # Already fp8: the layerwise cast would undo the scales, so it must not run.
+            return model.eval()
         return self._apply_fp8_layerwise_casting(model.eval(), config, SubModelType.Transformer)
 
 
@@ -298,9 +341,16 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
         model_path = Path(config.path)
         sd = load_file(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # unsloth's torchao fp8 build, renamed to the scaled-fp8 form. Before the split and the geometry read, which
+        # look for `.weight`.
+        torchao_fp8 = translate_torchao_fp8_layers(sd) > 0
         sd = split_fused_qkv(sd)
         return self._load_transformer(
-            config, sd, moss_image_transformer_config(sd), f"MOSS-Image checkpoint {model_path.name}"
+            config,
+            sd,
+            moss_image_transformer_config(sd),
+            f"MOSS-Image checkpoint {model_path.name}",
+            torchao_fp8=torchao_fp8,
         )
 
 

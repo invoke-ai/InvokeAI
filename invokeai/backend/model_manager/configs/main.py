@@ -1722,8 +1722,8 @@ def _raise_for_unsupported_comfy_quantization(
                 f"this {family} transformer is saved as torchao-quantized tensors that InvokeAI cannot load: "
                 f"{problem}. Only torchao float8_e4m3fn weights with one scale per output row load, such as "
                 "unsloth's FP8 builds; other layouts, including INT8 builds, are not supported. A file that is "
-                "missing one half of a weight/scale pair is probably incomplete: download it again. Otherwise "
-                "install the bf16, fp8_scaled or int8_convrot build, or a GGUF."
+                "missing one half of a weight/scale pair is probably incomplete: download it again. "
+                f"{supported or 'Otherwise install the bf16, fp8_scaled or int8_convrot build, or a GGUF.'}"
             )
     elif any(isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX) for key in state_dict):
         raise InvalidMatchError(
@@ -4567,19 +4567,25 @@ def _has_moss_image_keys(state_dict: dict[str | int, Any]) -> bool:
     )
 
 
-_MOSS_IMAGE_SUPPORTED = "Install the bf16 or Comfy-Org int8_convrot build, or a GGUF (Q8_0, Q4_K, ...), instead."
+_MOSS_IMAGE_SUPPORTED = (
+    "Install the bf16, unsloth torchao FP8 or Comfy-Org int8_convrot build, or a GGUF (Q8_0, Q4_K, ...), instead."
+)
 
 
 def _raise_for_unsupported_moss_image_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
-    """Refuse every quantization a MOSS-Image safetensors loader cannot build; Comfy-Org's int8 convrot passes.
+    """Refuse every quantization a MOSS-Image safetensors loader cannot build; Comfy-Org's int8 convrot and unsloth's
+    torchao fp8 pass.
 
     `InvalidMatchError`, not `NotAMatchError`: the file *is* a MOSS-Image transformer, so the installer shows the
-    reason instead of registering it as an unknown model nothing can load. What the loader builds is dense weights and
-    `int8_tensorwise` layers, nothing else. The shared helper names torchao builds, nvfp4 and int8 weights whose marker
+    reason instead of registering it as an unknown model nothing can load. What the loader builds is dense weights,
+    `int8_tensorwise` layers and torchao fp8 layers, nothing else. The shared helper names torchao layouts the loader
+    cannot translate (INT8 builds, per-tensor or block-wise scales), nvfp4 and int8 weights whose marker
     is missing or of another scheme (W4A8 stores I8 weights with a codebook); the checks here cover what it does not:
     packed `uint8` and fp8 weights, and a scale or marker on a weight that is not int8.
     """
-    _raise_for_unsupported_comfy_quantization(mod, state_dict, "MOSS-Image", supported=_MOSS_IMAGE_SUPPORTED)
+    _raise_for_unsupported_comfy_quantization(
+        mod, state_dict, "MOSS-Image", supported=_MOSS_IMAGE_SUPPORTED, accepts_torchao_fp8=True
+    )
 
     keys = [key for key in state_dict if isinstance(key, str)]
     for key in keys:
@@ -4591,7 +4597,8 @@ def _raise_for_unsupported_moss_image_quantization(mod: ModelOnDisk, state_dict:
             )
         if key.endswith(".weight") and dtype in FP8_WEIGHT_DTYPES:
             raise InvalidMatchError(
-                f"fp8-quantized MOSS-Image transformers are not supported yet (found '{key}'). {_MOSS_IMAGE_SUPPORTED}"
+                f"this MOSS-Image transformer stores a plain or ComfyUI scaled fp8 weight (found '{key}'), which is not "
+                f"supported; only unsloth's torchao fp8 layout loads. {_MOSS_IMAGE_SUPPORTED}"
             )
     # A scale or marker on a weight that is not int8 belongs to a scheme the loader would drop without applying.
     int8_layers = {
@@ -4611,9 +4618,10 @@ class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base,
     """Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
 
     The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
-    the loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both
-    may fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with
-    `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead.
+    the loader node. Dense (bf16/fp16/fp32) files load, and so do Comfy-Org's `int8_tensorwise` convrot export and
+    unsloth's torchao fp8 export (fp8 weights with one scale per output row). The dense and int8 files may fuse each
+    block's `q`, `k`, `v` into `proj.qkv`; the fp8 export keeps them split. Any other quantization is refused at
+    install with `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead.
     """
 
     base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)

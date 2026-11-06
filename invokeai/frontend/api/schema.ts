@@ -32176,9 +32176,10 @@ export type components = {
          * @description Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
          *
          *     The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
-         *     the loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both
-         *     may fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with
-         *     `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead.
+         *     the loader node. Dense (bf16/fp16/fp32) files load, and so do Comfy-Org's `int8_tensorwise` convrot export and
+         *     unsloth's torchao fp8 export (fp8 weights with one scale per output row). The dense and int8 files may fuse each
+         *     block's `q`, `k`, `v` into `proj.qkv`; the fp8 export keeps them split. Any other quantization is refused at
+         *     install with `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead.
          */
         Main_Checkpoint_MossImage_Config: {
             /**
