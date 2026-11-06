@@ -16,7 +16,7 @@ import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { FloatingWidgetWindow } from '@workbench/widget-frame/FloatingWidgetWindow';
 import { WidgetRendererById } from '@workbench/widget-frame/WidgetRenderer';
-import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, getPanelSizeBounds } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { createInstance } from 'i18next';
@@ -74,6 +74,7 @@ const Neighbor = () => {
   );
 };
 const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
+const NEIGHBOR_PANEL_WIDTH_PX = getPanelSizeBounds('left').min;
 type Host = 'center' | 'floating' | 'status';
 type Failure = 'lazy' | 'label' | 'actions' | 'body' | 'tooltip' | 'compact';
 let host: HTMLDivElement;
@@ -168,7 +169,7 @@ const makeState = (hostMode: Host): WorkbenchState => {
     region.instanceIds = [];
     region.activeInstanceId = '';
   }
-  project.widgetRegions.left.sizePx = 300;
+  project.widgetRegions.left.sizePx = NEIGHBOR_PANEL_WIDTH_PX;
   project.widgetRegions.left.isCollapsed = false;
   project.widgetRegions.left.instanceIds = ['neighbor'];
   project.widgetRegions.left.activeInstanceId = 'neighbor';
@@ -190,7 +191,7 @@ const render = async (accountKey = 'recovery-hosts') => {
           <FocusRegionProvider controller={focus}>
             <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
               <DndContext>
-                <div style={{ width: 300, height: 150, flexShrink: 0 }}>
+                <div style={{ width: NEIGHBOR_PANEL_WIDTH_PX, height: 150, flexShrink: 0 }}>
                   <WidgetRendererById instanceId="neighbor" region="left" widget={runtime.widgets[1]!} />
                 </div>
                 <div style={{ display: 'flex', flex: 1, minWidth: 0, height: '100%' }}>
