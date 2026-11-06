@@ -75,6 +75,8 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_WEIGHT_DTYPES,
+    TORCHAO_QDATA_SUFFIX,
+    find_torchao_fp8_problem,
     is_scale_metadata_key,
     parse_quantization_metadata,
 )
@@ -1678,7 +1680,12 @@ def _raise_for_undecodable_int8_weights(
 
 
 def _raise_for_unsupported_comfy_quantization(
-    mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str, *, supported: str | None = None
+    mod: ModelOnDisk,
+    state_dict: dict[str | int, Any],
+    family: str,
+    *,
+    supported: str | None = None,
+    accepts_torchao_fp8: bool = False,
 ) -> None:
     """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
 
@@ -1686,10 +1693,12 @@ def _raise_for_unsupported_comfy_quantization(
     right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
     registers it as a model nothing can load.
 
-    Three of them. torchao's serialized tensor subclasses (unsloth's Qwen-Image-2.1 FP8 build) store each quantized
+    Three of them. torchao's serialized tensor subclasses (unsloth's FP8 and INT8 builds) store each quantized
     weight as `<layer>._weight_qdata` beside its scale, with no `<layer>.weight` the transformer could load. Only
     a family whose fingerprint reads unquantized tensors gets here with such a file: Qwen-Image-2.1 does, while an
-    Ideogram 4 build that quantized its fingerprint Linears would not match at all.
+    Ideogram 4 build that quantized its fingerprint Linears would not match at all. A family whose loader
+    translates the fp8 form (`translate_torchao_fp8_layers`) passes `accepts_torchao_fp8`; it then refuses only
+    what `find_torchao_fp8_problem` names, which includes every INT8 build.
 
     nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
     the `comfy_quant` markers every repack carries -- including the two supported ones; the
@@ -1706,7 +1715,17 @@ def _raise_for_unsupported_comfy_quantization(
     is a header parse plus one seek per marker, and it only happens for a file that has int8
     weights to explain in the first place.
     """
-    if any(isinstance(key, str) and key.endswith("._weight_qdata") for key in state_dict):
+    if accepts_torchao_fp8:
+        problem = find_torchao_fp8_problem(state_dict)
+        if problem is not None:
+            raise InvalidMatchError(
+                f"this {family} transformer is saved as torchao-quantized tensors that InvokeAI cannot load: "
+                f"{problem}. Only torchao float8_e4m3fn weights with one scale per output row load, such as "
+                "unsloth's FP8 builds; other layouts, including INT8 builds, are not supported. A file that is "
+                "missing one half of a weight/scale pair is probably incomplete: download it again. Otherwise "
+                "install the bf16, fp8_scaled or int8_convrot build, or a GGUF."
+            )
+    elif any(isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX) for key in state_dict):
         raise InvalidMatchError(
             f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 and INT8 builds "
             f"are), which is not supported. {supported or 'Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead.'}"
@@ -2701,7 +2720,7 @@ class Main_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Main_Config_Base,
 
 
 class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."""
+    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot)."""
 
     base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
@@ -2718,7 +2737,7 @@ class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Bas
             raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
-        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1")
+        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1", accepts_torchao_fp8=True)
 
         variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
 
