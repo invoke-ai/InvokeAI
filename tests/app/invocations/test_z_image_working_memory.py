@@ -52,6 +52,7 @@ class TestTheEstimateReachesTheCache:
         context.config.get.return_value.force_tiled_decode = False
         # `ImageOutput.build` validates these, so they cannot be bare MagicMocks.
         context.images.save.return_value = MagicMock(image_name="test.png", width=512, height=512)
+        context.images.precise_storage_enabled = False
 
         expected_memory = fixed_working_memory(500 * 1024 * 1024)
         path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"

@@ -26,6 +26,16 @@ export const MOCK_BACKEND_PROFILE_COUNTS = Object.freeze({
 export const MOCK_BACKEND_FIXED_EPOCH = '2026-01-15T12:00:00.000Z';
 export const MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME = 'fixture-video-001.mp4';
 
+/**
+ * Images the mock backend lists a 16-bit PNG export for. `exportable` downloads; `busy` answers 503 with Retry-After
+ * (another export is running); `unexportable` answers 409 with a reason (a precise asset with non-finite pixels).
+ */
+export const MOCK_BACKEND_PRECISE_EXPORT = Object.freeze({
+  busy: 'fixture-image-0016.png',
+  exportable: 'fixture-image-0015.png',
+  unexportable: 'fixture-image-0017.png',
+});
+
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
 const range = (length, build) => Array.from({ length }, (_, index) => build(index));
 const ordinal = (index, width = 3) => String(index + 1).padStart(width, '0');

@@ -99,7 +99,7 @@ describe('Gallery maintenance visual evidence', () => {
     await expect
       .element(
         page.getByText(
-          'Remove gallery entries whose original image files are missing. Remaining thumbnails are moved to the archive.',
+          'Remove gallery entries whose original image files are missing. Their remaining thumbnails and precise pixel files are moved to the archive.',
           { exact: true }
         )
       )

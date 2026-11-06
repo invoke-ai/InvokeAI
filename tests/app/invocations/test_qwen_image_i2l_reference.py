@@ -28,7 +28,7 @@ def _encode(monkeypatch, image: Image.Image, **fields) -> torch.Tensor:
     vae = ModelIdentifierField(key="vae", hash="h", name="vae", base=BaseModelType.QwenImage, type=ModelType.VAE)
     invocation = QwenImageImageToLatentsInvocation(image=ImageField(image_name="ref"), vae=VAEField(vae=vae), **fields)
     context = SimpleNamespace(
-        images=SimpleNamespace(get_pil=lambda _name: image),
+        images=SimpleNamespace(get_pil=lambda _name: image, has_precise_asset=lambda _name: False),
         models=SimpleNamespace(load=lambda _identifier: None),
         config=SimpleNamespace(get=lambda: SimpleNamespace(force_tiled_decode=False)),
         tensors=SimpleNamespace(save=lambda tensor: "latents"),

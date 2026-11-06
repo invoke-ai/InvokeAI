@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -24,6 +27,36 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
         default=None, description="The id of the board the image belongs to, if one exists."
     )
     """The id of the board the image belongs to, if one exists."""
+
+
+class ImageExportFormat(str, Enum):
+    """A file format an image can be downloaded in besides its gallery file."""
+
+    PNG16 = "png16"
+    """16-bit PNG made from the image's precise asset."""
+
+
+class ImageExportFormats(BaseModel):
+    formats: list[ImageExportFormat] = Field(
+        description="The export formats available for the image; empty for an ordinary image."
+    )
+
+
+class ImageExportUnavailableError(Exception):
+    """The image cannot be exported in the requested format; the message says why."""
+
+
+class ImageExportBusyError(Exception):
+    """Another export holds the process's single export slot."""
+
+
+@dataclass
+class ImageExport:
+    """An export's file and the claim on the export slot that bounds its memory."""
+
+    content: bytes
+    release: Callable[[], None]
+    """Frees the slot. Idempotent; call it once `content` has been sent."""
 
 
 def image_record_to_dto(

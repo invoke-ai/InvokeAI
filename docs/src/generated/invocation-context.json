@@ -77,6 +77,36 @@
           "signature": "(image_name: str, mode: Optional[Literal['L', 'RGB', 'RGBA', 'CMYK', 'YCbCr', 'LAB', 'HSV', 'I', 'F']] = None) -> Image"
         },
         {
+          "description": "Gets an image's pixels as a raster that the caller owns.\nGallery PNGs arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes\nstraight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`\ncannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first. An image with a precise\nasset arrives with the stored precision and descriptor (e.g. float32, linear or premultiplied), which can\nbe anything the raster package represents.",
+          "name": "get_raster",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "RasterImage",
+          "returns": "The image as a RasterImage.",
+          "signature": "(image_name: str) -> RasterImage"
+        },
+        {
+          "description": "Whether the image was saved with a precise asset, so `get_raster` returns more than its gallery PNG holds.\nA node that must keep its 8-bit behavior for ordinary images can route on this instead of on the raster's\ndtype: a PNG-backed image never has an asset, whatever its pixel format.",
+          "name": "has_precise_asset",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to check.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "bool",
+          "returns": "",
+          "signature": "(image_name: str) -> bool"
+        },
+        {
           "description": "Saves an image, returning its DTO.\nIf the current queue item has a workflow or metadata, it is automatically saved with the image.",
           "name": "save",
           "parameters": [
@@ -108,6 +138,45 @@
           "return_type": "ImageDTO",
           "returns": "The saved image DTO.",
           "signature": "(image: Image, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
+        },
+        {
+          "description": "Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled\nexactly as in `save`.\nA raster the gallery PNG represents exactly (uint8 sRGB L/LA/RGB/RGBA with straight alpha, uint16 L) is saved\nas an ordinary image. Any other raster is saved as a precise image when `precise_storage_enabled` and the\nraster is displayable (sRGB, unit range, L/LA/RGB/RGBA, no premultiplied alpha, finite, within the asset\nbounds): its exact pixels are stored losslessly and `get_raster` returns them, while the gallery shows an\n8-bit PNG made from them by display quantization. Otherwise `RasterConversionError` is raised (and\n`PreciseAssetError` for an oversized raster); quantize explicitly first instead of relying on a silent\nconversion here. Nothing is saved when the raster is refused.",
+          "name": "save_raster",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The raster to save.",
+              "name": "raster",
+              "type": "RasterImage"
+            },
+            {
+              "default": "None",
+              "description": "See `save`.",
+              "name": "board_id",
+              "type": "Optional[str]"
+            },
+            {
+              "default": "ImageCategory.GENERAL",
+              "description": "See `save`.",
+              "name": "image_category",
+              "type": "ImageCategory"
+            },
+            {
+              "default": "None",
+              "description": "See `save`.",
+              "name": "metadata",
+              "type": "Optional[MetadataField]"
+            },
+            {
+              "default": "None",
+              "description": "The gallery PNG of a precise save, instead of the display quantization of `raster`, for a node that must keep its legacy 8-bit output bit-identical. An 8-bit PIL image of the same size whose mode equals the raster's channels (L/LA/RGB/RGBA); otherwise `RasterConversionError` is raised and nothing is saved. Passing it for a raster the gallery PNG represents exactly is an error.",
+              "name": "display_image",
+              "type": "Optional[Image]"
+            }
+          ],
+          "return_type": "ImageDTO",
+          "returns": "The saved image DTO.",
+          "signature": "(raster: RasterImage, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None, display_image: Optional[Image] = None) -> ImageDTO"
         }
       ],
       "name": "ImagesInterface"

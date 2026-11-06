@@ -39,6 +39,7 @@ import {
 import {
   absolutizeApiUrl,
   ApiError,
+  apiFetch,
   apiFetchJson,
   apiFetchRaw,
   HttpRequestIdentityExpiredError,
@@ -1089,6 +1090,73 @@ export const getGalleryImageMetadata = async (
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
+/** An export format the server offers for an image; today only the 16-bit PNG of its precise asset. */
+export type GalleryImageExportFormat = components['schemas']['ImageExportFormat'];
+
+/**
+ * The formats an image can be exported in. Empty for an image without an exportable precise asset; a failed read
+ * rejects, so the caller can tell "none" from "unknown".
+ */
+export const getGalleryImageExportFormats = async (
+  imageName: string,
+  signal?: AbortSignal
+): Promise<GalleryImageExportFormat[]> => {
+  const body = await apiFetchJson<components['schemas']['ImageExportFormats']>(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export-formats`,
+    { signal }
+  );
+
+  return Array.isArray(body.formats) ? body.formats : [];
+};
+
+/** The name the server gave the export (`Content-Disposition`), or null when absent or unusable. */
+const readContentDispositionFileName = (header: string | null): string | null => {
+  if (!header) {
+    return null;
+  }
+
+  const name =
+    /filename\s*=\s*"((?:[^"\\]|\\.)*)"/i.exec(header)?.[1]?.replace(/\\(.)/g, '$1') ??
+    /filename\s*=\s*([^;\s]+)/i.exec(header)?.[1];
+
+  // The name goes to the download anchor: never a path.
+  const baseName = name?.split(/[\\/]/).pop()?.trim();
+
+  return baseName ? baseName : null;
+};
+
+/**
+ * Export an image in a precise format and return the file with the name the server chose. Failures are the server's
+ * `ApiError`: 503 while another export runs, 409 with the reason the image cannot be exported.
+ */
+export const exportGalleryImage = async ({
+  format,
+  imageName,
+  signal,
+}: {
+  format: GalleryImageExportFormat;
+  imageName: string;
+  signal?: AbortSignal;
+}): Promise<{ blob: Blob; fileName: string }> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  const response = await apiFetch(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export?${toSearchParams({ format })}`,
+    { signal: requestSignal }
+  );
+  const blob = await response.blob();
+
+  assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
+
+  return {
+    blob,
+    fileName:
+      readContentDispositionFileName(response.headers.get('Content-Disposition')) ??
+      `${imageName.replace(/\.[^./\\]+$/, '')}-16bit.png`,
+  };
+};
+
 /**
  * Whether a board a project names still exists: false only when the server answers 404, that there is no such board.
  * A board the caller may no longer read answers 403: it exists, so the project keeps naming it, and access granted
@@ -1501,15 +1569,37 @@ export const moveGalleryVideoItemsToBoard = async (
 };
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
-const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * The job is registered before the POST answers, so a 404 right after it is a race to retry briefly; later it means the
+ * server forgot the archive. While the server reports it is building (202) there is no bound: a 16-bit archive of a
+ * large board takes as long as its encodes, and only the user or an account change cancels the wait.
+ */
+const BULK_DOWNLOAD_NOT_FOUND_GRACE_MS = 10 * 1000;
+
+const readArchiveErrorDetail = async (response: Response): Promise<string> => {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+
+    if (typeof body.detail === 'string' && body.detail) {
+      return body.detail;
+    }
+  } catch {
+    // Not a JSON error body.
+  }
+
+  return `${response.status} ${response.statusText}`;
+};
 
 /** Poll the background bulk-download artifact until ready, then return its blob and filename. */
 export const downloadGalleryArchive = async ({
   boardId,
+  exportFormat,
   imageNames,
   signal,
 }: {
   boardId?: string;
+  /** `png16` zips the images that have precise data as 16-bit PNGs; the others keep their gallery file. */
+  exportFormat?: GalleryImageExportFormat;
   imageNames?: string[];
   signal?: AbortSignal;
 }): Promise<{ blob: Blob; fileName: string }> => {
@@ -1518,7 +1608,7 @@ export const downloadGalleryArchive = async ({
   const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
     '/api/v1/images/download',
     {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+      body: JSON.stringify({ board_id: boardId, export_format: exportFormat, image_names: imageNames }),
       method: 'POST',
       signal: requestSignal,
     }
@@ -1532,14 +1622,14 @@ export const downloadGalleryArchive = async ({
 
   const startedAt = Date.now();
 
-  while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
+  for (;;) {
     const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
       signal: requestSignal,
     });
 
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
-    if (response.ok) {
+    if (response.ok && response.status !== 202) {
       const blob = await response.blob();
 
       assertAccountScopeCurrent(owner);
@@ -1547,16 +1637,17 @@ export const downloadGalleryArchive = async ({
       return { blob, fileName };
     }
 
-    if (response.status !== 404) {
-      throw new Error(`${response.status} ${response.statusText}`);
+    const isBuilding = response.status === 202;
+    const isRegistrationRace = response.status === 404 && Date.now() - startedAt < BULK_DOWNLOAD_NOT_FOUND_GRACE_MS;
+
+    if (!isBuilding && !isRegistrationRace) {
+      throw new Error(await readArchiveErrorDetail(response));
     }
 
     await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
   }
-
-  throw new Error('Timed out preparing the download archive.');
 };
 
 export const uploadGalleryImage = async (

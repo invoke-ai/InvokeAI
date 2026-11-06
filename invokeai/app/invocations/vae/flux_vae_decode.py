@@ -14,7 +14,9 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
@@ -53,7 +55,10 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
     )
 
-    def _vae_decode(self, context: InvocationContext, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
+    def _vae_decode(
+        self, context: InvocationContext, vae_info: LoadedModel, latents: torch.Tensor
+    ) -> tuple[Image.Image, RasterImage | None]:
+        """The legacy 8-bit image and, when precise storage is on and the output is finite, the unclamped raster."""
         # Deliberately still a class check, and deliberately not `is_flux_family_vae`.
         #
         # This node has accepted any `AutoencoderKL` since before the FLUX.1 VAE became one, so the
@@ -141,10 +146,13 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 with scoped_vae_tiling(vae, 0):
                     img = decode()
 
+        raster = precise_signed_decode_raster(context, img)
+
         img = img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")  # noqa: F821
         img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
-        return img_pil
+
+        return img_pil, raster
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -153,8 +161,8 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = context.tensors.load(self.latents.latents_name)[:1]
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("Running VAE")
-        image = self._vae_decode(context=context, vae_info=vae_info, latents=latents)
+        image, raster = self._vae_decode(context=context, vae_info=vae_info, latents=latents)
 
         TorchDevice.empty_cache()
-        image_dto = context.images.save(image=image)
+        image_dto = save_decoded_image(context, image, raster)
         return ImageOutput.build(image_dto)

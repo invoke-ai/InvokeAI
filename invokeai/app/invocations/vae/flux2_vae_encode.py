@@ -15,9 +15,9 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
@@ -124,12 +124,11 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.images.get_pil(self.image.image_name)
+        # Convert image to tensor (HWC -> CHW, normalize to [-1, 1])
+        image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
 
         vae_info = context.models.load(self.vae.vae)
 
-        # Convert image to tensor (HWC -> CHW, normalize to [-1, 1])
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 

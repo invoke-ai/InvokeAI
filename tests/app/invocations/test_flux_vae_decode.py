@@ -43,6 +43,7 @@ def _context() -> MagicMock:
     """An invocation context whose `force_tiled_decode` reads False rather than truthy-by-mock."""
     context = MagicMock()
     context.config.get.return_value.force_tiled_decode = False
+    context.images.precise_storage_enabled = False
     return context
 
 
@@ -52,7 +53,7 @@ def test_decode_handles_a_config_with_or_without_a_shift_factor(shift_factor: fl
     vae_info = _loaded_vae(shift_factor)
     latents = torch.ones(1, 16, 1, 1)
 
-    image = FluxVaeDecodeInvocation._vae_decode(
+    image, _ = FluxVaeDecodeInvocation._vae_decode(
         FluxVaeDecodeInvocation.model_construct(), context=_context(), vae_info=vae_info, latents=latents
     )
 

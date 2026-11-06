@@ -89,6 +89,7 @@ def _loader(cls: type, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     loader._logger = logging.getLogger(__name__)
     loader._torch_device = torch.device("cpu")
     loader._torch_dtype = torch.float32
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
     return loader
 
 
@@ -175,6 +176,7 @@ class TestRealLayout:
         loader._torch_device = torch.device("cpu")
         loader._torch_dtype = torch.float32
         loader._logger = logging.getLogger(__name__)
+        loader._app_config = SimpleNamespace(precise_image_storage=False)
         config = VAE_Checkpoint_Flux2_Config.model_construct(path="moss-image-vae.safetensors", name="moss-image-vae")
 
         vae = loader._load_model(config)

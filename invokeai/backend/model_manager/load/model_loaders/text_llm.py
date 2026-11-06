@@ -45,6 +45,7 @@ from invokeai.backend.qwen3_5.qwen3_5_vl import (
     qwen3_5_vl_config,
     qwen3_5_vl_generation_config,
 )
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
@@ -80,7 +81,9 @@ class _TextLLMLoader(ModelLoader):
         # float32 for CPU-only models: CPU float16 is emulated and slow.
         if cpu_only is True:
             return torch.float32
-        return self._torch_dtype_avoiding_float16() if avoid_float16 else self._torch_dtype
+        if avoid_float16:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, self._torch_device)
+        return self._torch_dtype
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextLLM, format=ModelFormat.Diffusers)

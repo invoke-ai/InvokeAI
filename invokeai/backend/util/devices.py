@@ -663,10 +663,9 @@ class TorchDevice:
     def dtype_avoiding_float16(cls, dtype: torch.dtype, device: torch.device) -> torch.dtype:
         """`dtype`, except float16: bfloat16 where `device` has it, float32 otherwise.
 
-        The dtype of the autoencoders that are broken or unstable in float16 -- the dtype
-        `precision: auto` picks on CUDA and MPS: the standalone FLUX.1 and FLUX.2 VAEs and the
-        Qwen-Image-2.1 pipeline's. A float32 or bfloat16 request is kept as it is. The loaders take it
-        from the configured dtype, and a calibration plan sizes its FLUX decodes by it.
+        What the autoencoders that are broken or unstable in float16 -- the dtype `precision: auto` picks on
+        CUDA and MPS -- run in. A float32 or bfloat16 request is kept as it is. `autoencoder_dtype` is the dtype
+        the loaders and the calibration plan take; this is its rule with `precise_image_storage` off.
         """
         if dtype != torch.float16:
             return dtype
@@ -674,6 +673,28 @@ class TorchDevice:
             return torch.empty(0, dtype=torch.bfloat16, device=device).dtype
         except TypeError:
             return torch.float32
+
+    @classmethod
+    def autoencoder_dtype(
+        cls,
+        dtype: torch.dtype,
+        device: torch.device,
+        precise_image_storage: bool,
+        otherwise: Optional[torch.dtype] = None,
+    ) -> torch.dtype:
+        """The dtype a VAE decoder covered by `precise_image_storage` loads and runs in.
+
+        With `precise_image_storage` on, float32 whatever the configured dtype: a precise image only holds more than
+        8 bits if the decoder ran above bfloat16 precision. Off, `otherwise` where the loader has a dtype of its own
+        for the VAE (a pipeline loader that forces bfloat16, for one), else `dtype_avoiding_float16` of the configured
+        dtype. The loaders and the working-memory calibration plan both take their dtype from here, so the plan
+        sizes the decode that runs.
+        """
+        if precise_image_storage:
+            return torch.float32
+        if otherwise is not None:
+            return otherwise
+        return cls.dtype_avoiding_float16(dtype, device)
 
     @classmethod
     def choose_anima_inference_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:

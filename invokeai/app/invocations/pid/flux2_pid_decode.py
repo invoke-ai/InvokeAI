@@ -20,8 +20,6 @@ Latent layout and normalization (the important difference from the FLUX.1 node):
 from contextlib import ExitStack
 
 import torch
-from einops import rearrange
-from PIL import Image
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -35,6 +33,7 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, VAEField
+from invokeai.app.invocations.pid.pid_output import save_pid_image
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux2.latent_norm import read_vae_bn_stats
@@ -195,7 +194,4 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         TorchDevice.empty_cache()
 
-        img = rearrange(x0[0].clamp(-1, 1), "c h w -> h w c")
-        img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
-        image_dto = context.images.save(image=img_pil)
-        return ImageOutput.build(image_dto)
+        return ImageOutput.build(save_pid_image(context, x0))

@@ -1,8 +1,9 @@
 import { galleryItems } from '@features/gallery';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { AccountScopeExpiredError, accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
   apiFetchJson: vi.fn(),
   apiFetchRaw: vi.fn(),
   sleep: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
-  apiFetch: vi.fn(),
+  apiFetch: mocks.apiFetch,
   apiFetchJson: mocks.apiFetchJson,
   apiFetchRaw: mocks.apiFetchRaw,
   sleep: mocks.sleep,
@@ -27,8 +28,10 @@ import {
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  exportGalleryImage,
   fetchImageIndexAvailability,
   getGalleryImageByName,
+  getGalleryImageExportFormats,
   getGalleryImagesByNames,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
@@ -136,6 +139,72 @@ describe('downloadGalleryArchive', () => {
     mocks.apiFetchJson.mockReset();
     mocks.apiFetchRaw.mockReset();
     mocks.sleep.mockReset();
+  });
+
+  it('sends the export format and keeps polling through 202 without a time bound until the archive is served', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'hdr.zip' });
+      // Each wait advances the clock two hours: no elapsed time ends a building archive.
+      mocks.sleep.mockImplementation(() => {
+        vi.advanceTimersByTime(2 * 60 * 60 * 1000);
+
+        return Promise.resolve();
+      });
+      mocks.apiFetchRaw
+        .mockResolvedValueOnce(new Response(null, { headers: { 'Retry-After': '2' }, status: 202 }))
+        .mockResolvedValueOnce(new Response(null, { status: 202 }))
+        .mockResolvedValueOnce(new Response('zip'));
+
+      const { fileName } = await downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' });
+
+      expect(fileName).toBe('hdr.zip');
+      const init = mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit;
+      expect(JSON.parse(init.body as string)).toEqual({ board_id: 'board-1', export_format: 'png16' });
+      expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a 404 right after the request, then fails once the grace window has passed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'gone.zip' });
+      mocks.apiFetchRaw.mockImplementation(() => Promise.resolve(new Response(null, { status: 404 })));
+      mocks.sleep.mockImplementation(() => {
+        vi.advanceTimersByTime(6 * 1000);
+
+        return Promise.resolve();
+      });
+
+      await expect(downloadGalleryArchive({ boardId: 'board-1' })).rejects.toThrow('404');
+      // Polled at 0 s and 6 s (retried), then at 12 s (failed).
+      expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails with the server detail when the job failed, without polling again', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'bad.zip' });
+    mocks.apiFetchRaw.mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'Archive build failed: disk full' }), { status: 500 })
+    );
+
+    await expect(downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' })).rejects.toThrow(
+      'Archive build failed: disk full'
+    );
+    expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the 503 for a busy 16-bit archive on as an ApiError without polling', async () => {
+    mocks.apiFetchJson.mockRejectedValue(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '30' }));
+
+    await expect(downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' })).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(mocks.apiFetchRaw).not.toHaveBeenCalled();
   });
 
   it('aborts polling before another account can request the prior account archive', async () => {
@@ -1173,5 +1242,74 @@ describe('galleryBoardExists', () => {
     await expect(galleryBoardExists('none')).resolves.toBe(true);
     await expect(galleryBoardExists('by_date:2026-07-30')).resolves.toBe(true);
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+describe('exportGalleryImage', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetch.mockReset();
+  });
+
+  const pngResponse = (disposition: string | null) =>
+    new Response('png-bytes', { headers: disposition ? { 'Content-Disposition': disposition } : {} });
+
+  it('requests the 16-bit export of the encoded image name and names the file as the server did', async () => {
+    mocks.apiFetch.mockResolvedValue(pngResponse('attachment; filename="sky photo-16bit.png"'));
+
+    const { blob, fileName } = await exportGalleryImage({ format: 'png16', imageName: 'sky photo.png' });
+
+    expect(mocks.apiFetch).toHaveBeenCalledWith('/api/v1/images/i/sky%20photo.png/export?format=png16', {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fileName).toBe('sky photo-16bit.png');
+    expect(await blob.text()).toBe('png-bytes');
+  });
+
+  it.each([
+    ['attachment; filename=plain-16bit.png', 'plain-16bit.png'],
+    ['attachment; filename="../../evil-16bit.png"', 'evil-16bit.png'],
+  ])('reads the filename from %s', async (disposition, expected) => {
+    mocks.apiFetch.mockResolvedValue(pngResponse(disposition));
+
+    expect((await exportGalleryImage({ format: 'png16', imageName: 'a.png' })).fileName).toBe(expected);
+  });
+
+  it('falls back to the image stem plus -16bit when the header is missing', async () => {
+    mocks.apiFetch.mockResolvedValue(pngResponse(null));
+
+    expect((await exportGalleryImage({ format: 'png16', imageName: 'render.v2.png' })).fileName).toBe(
+      'render.v2-16bit.png'
+    );
+  });
+
+  it('rejects with the server error, and with an expired account scope when the account changes before the file arrives', async () => {
+    mocks.apiFetch.mockRejectedValueOnce(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '2' }));
+    await expect(exportGalleryImage({ format: 'png16', imageName: 'a.png' })).rejects.toMatchObject({ status: 503 });
+
+    let release = (_response: Response): void => undefined;
+    mocks.apiFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      })
+    );
+    const pending = expect(exportGalleryImage({ format: 'png16', imageName: 'a.png' })).rejects.toBeInstanceOf(
+      AccountScopeExpiredError
+    );
+
+    accountLifecycle.activate('user-b');
+    release(pngResponse(null));
+    await pending;
+  });
+});
+
+describe('getGalleryImageExportFormats', () => {
+  it('reads the formats the server lists for the image', async () => {
+    mocks.apiFetchJson.mockReset().mockResolvedValue({ formats: ['png16'] });
+
+    await expect(getGalleryImageExportFormats('a b.png')).resolves.toEqual(['png16']);
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/a%20b.png/export-formats', {
+      signal: undefined,
+    });
   });
 });

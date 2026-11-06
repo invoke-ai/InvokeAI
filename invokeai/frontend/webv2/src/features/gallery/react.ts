@@ -2,6 +2,7 @@ export {
   GalleryUiProvider,
   GalleryItemActionsProvider,
   type GalleryItemActionContext,
+  type GalleryArchiveOptions,
   type GalleryItemActions,
   type GalleryItemActionsOptions,
   type GalleryItemContextMenuProps,

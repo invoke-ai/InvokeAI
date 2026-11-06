@@ -143,6 +143,7 @@ def _build_decode_mocks(latents: torch.Tensor, decoded: torch.Tensor, vae_class:
     image_dto.width = decoded.shape[-1]
     image_dto.height = decoded.shape[-2]
     context.images.save.return_value = image_dto
+    context.images.precise_storage_enabled = False
 
     return vae, vae_info, context
 

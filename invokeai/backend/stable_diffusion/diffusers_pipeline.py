@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
 
 import einops
+import numpy as np
 import PIL.Image
 import psutil
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as T
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -20,6 +22,15 @@ from pydantic import Field
 from transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.image_util.raster.convert import to_unit_float
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterConversionError,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
@@ -84,6 +95,66 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     if normalize:
         tensor = tensor * 2.0 - 1.0
     return tensor
+
+
+def raster_as_unit_tensor(raster: RasterImage, alpha: bool = False) -> torch.Tensor:
+    """Float32 CHW unit-range tensor of a precise raster, never clamped.
+
+    RGB by default: alpha is dropped and gray replicated, as `PIL.Image.convert("RGB")` does. With `alpha=True` RGBA:
+    the raster's straight alpha, or 1.0 where it has none. Only sRGB unit-range rasters with straight or no alpha have
+    a meaning here: linear, DATA, unbounded and premultiplied rasters raise RasterConversionError.
+    """
+    descriptor = raster.descriptor
+    if (
+        descriptor.color is not ColorEncoding.SRGB
+        or descriptor.value_range is not ValueRange.UNIT
+        or descriptor.alpha is AlphaMode.PREMULTIPLIED
+        or descriptor.channels is RasterChannels.DATA
+    ):
+        raise RasterConversionError(
+            f"cannot encode a {descriptor.channels.value}/{descriptor.color.value}/{descriptor.value_range.value}/"
+            f"{descriptor.alpha.value} image; only sRGB unit-range images with straight or no alpha are supported"
+        )
+    unit = raster if raster.dtype == np.float32 else to_unit_float(raster, np.float32)
+    pixels = unit.view()
+    has_alpha = descriptor.channels in (RasterChannels.LA, RasterChannels.RGBA)
+    height, width = pixels.shape[:2]
+    # One CHW array, filled channel by channel: no intermediate HWC copy.
+    result = np.empty((4 if alpha else 3, height, width), dtype=np.float32)
+    if descriptor.channels in (RasterChannels.L, RasterChannels.LA):
+        result[:3] = pixels[:, :, 0]
+    else:
+        result[:3] = pixels[:, :, :3].transpose(2, 0, 1)
+    if alpha:
+        result[3] = pixels[:, :, -1] if has_alpha else 1.0
+    return torch.from_numpy(result)
+
+
+def resize_unit_tensor(tensor: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """Resizes a float CHW tensor with antialiased bicubic interpolation, never clamping: the float stand-in for the
+    LANCZOS resize PIL applies to 8-bit images."""
+    return F.interpolate(tensor[None], size=(height, width), mode="bicubic", align_corners=False, antialias=True)[0]
+
+
+def trim_unit_tensor_to_grid(tensor: torch.Tensor, multiple_of: int = 8) -> torch.Tensor:
+    """Trims a float CHW tensor's sides down to multiples of `multiple_of` like `image_resized_to_grid_as_tensor`,
+    resampling (`resize_unit_tensor`) only when a side does not already fit."""
+    height, width = tensor.shape[-2:]
+    grid_width, grid_height = trim_to_multiple_of(width, height, multiple_of=multiple_of)
+    if (grid_height, grid_width) == (height, width):
+        return tensor
+    return resize_unit_tensor(tensor, grid_height, grid_width)
+
+
+def raster_resized_to_grid_as_tensor(raster: RasterImage, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
+    """`image_resized_to_grid_as_tensor` for a precise raster: float32 CHW RGB, never clamped.
+
+    Sizes that are not a multiple of `multiple_of` are trimmed like the PIL helper and then resized with antialiased
+    bicubic interpolation (PIL's LANCZOS cannot operate on floats); aligned sizes are not resampled. Refuses what
+    `raster_as_unit_tensor` refuses.
+    """
+    tensor = trim_unit_tensor_to_grid(raster_as_unit_tensor(raster), multiple_of=multiple_of)
+    return tensor * 2.0 - 1.0 if normalize else tensor
 
 
 def is_inpainting_model(unet: UNet2DConditionModel):

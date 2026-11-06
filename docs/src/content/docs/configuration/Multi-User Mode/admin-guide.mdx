@@ -250,7 +250,7 @@ a user_id that no longer exists, and will not appear in other (non-admin) users'
 Administrators keep gallery visibility of the orphaned images and videos and can review or delete
 them from there. Physical media files in `outputs/images` and `outputs/videos` are also left in
 place. Administrators can use **Settings > Data & workspace > Gallery maintenance** to review and
-remove database records whose image files are missing, archive image files and thumbnails that are
+remove database records whose image files are missing, archive image files, thumbnails and precise pixel files that are
 not associated with database records, or regenerate missing thumbnails. These actions cover images
 across all accounts, including archived-board and intermediate images; they do not maintain videos.
 Each action scans when requested, then requires confirmation before it runs. Execution is blocking,
@@ -258,10 +258,14 @@ so the request waits for the operation to finish. If the inventory changed since
 asks the administrator to review again.
 
 Removing a missing image record also removes its related semantic-index entries through the
-database's image-record relationship. The image record is deleted, and its thumbnail is archived
-when present; other images and their embeddings are preserved. Archive files are placed in a unique run
+database's image-record relationship. The image record is deleted, and its thumbnail and precise
+pixel file (`outputs/images/precise/`) are archived when present; other images and their embeddings are preserved. Archive files are placed in a unique run
 directory under `<outdir>/images-archive/gallery-maintenance/`, where `<outdir>` is the configured
 `Paths.outdir` (for example, `outputs/images-archive/gallery-maintenance/remove_missing-<id>/`).
+Inside a run directory, `images/`, `thumbnails/` and `precise/` mirror the gallery's subfolders. Archiving untracked
+files also archives precise files that have no image record, no precise-asset entry, or sit in a different subfolder
+than their record, and leftover `.tmp*` files from interrupted precise writes. A precise file that belongs to an
+existing image is never archived or adopted.
 Before making changes, the application creates a consistent database backup through its active
 database connection under `<db_dir>/backup/` (for example,
 `databases/backup/backup-<timestamp>-gallery-maintenance-<id>.db`). The result shows the exact
@@ -570,7 +574,7 @@ Include these directories/files:
 
 - `databases/` — All database files
 - `models/` — Installed models (if locally stored)
-- `outputs/` — Generated images
+- `outputs/` — Generated images, including `outputs/images/precise/` (exact working pixels of images saved with precision; back it up and restore it together with `outputs/images`)
 - `invokeai.yaml` — Configuration file
 - Any custom scripts or modifications
 

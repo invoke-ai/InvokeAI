@@ -269,7 +269,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         # Z-Image prefers bfloat16, but use safe dtype based on target device capabilities.
         target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        dtype = self._submodel_dtype(submodel_type, TorchDevice.choose_bfloat16_safe_dtype(target_device))
         try:
             result: AnyModel = load_class.from_pretrained(
                 submodel_path,

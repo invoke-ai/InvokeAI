@@ -12,6 +12,7 @@ import {
 import { getGalleryMoveTargets } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
+import { usePreciseImageStorage } from '@platform/runtime/frontendConfig';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { MenuContent, MenuIconItem } from '@platform/ui';
@@ -26,6 +27,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
+  FileDownIcon,
   FileJsonIcon,
   FolderIcon,
   ImagesIcon,
@@ -43,6 +45,7 @@ import type { ImageActions } from './useImageActions';
 import { ContextSubMenu, IMAGE_MENU_CONTENT_PROPS } from './ContextSubMenu';
 import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
 import { ImageContinueGroup, ImageUseGroups, VideoUseGroups } from './ImageItemMenuGroups';
+import { useCanExportPng16 } from './useImageExportFormats';
 import { useImageRecallCapabilities } from './useImageRecallCapabilities';
 
 export interface LegacyImageContextMenuTarget {
@@ -462,6 +465,13 @@ const BulkItemMenuItems = ({
     () => void actions.downloadItems(itemRefs, loadedItems),
     [actions, itemRefs, loadedItems]
   );
+  const handleDownloadPng16 = useCallback(
+    () => void actions.downloadItems(itemRefs, loadedItems, { exportFormat: 'png16' }),
+    [actions, itemRefs, loadedItems]
+  );
+  const hasPreciseImageStorage = usePreciseImageStorage();
+  // A selection of videos alone has no image to archive in 16 bits.
+  const canExportPng16Archive = hasPreciseImageStorage && itemRefs.some((ref) => ref.kind === 'image');
   const handleMove = useCallback(
     (boardId: string) => void actions.moveItemsToBoard(itemRefs, boardId),
     [actions, itemRefs]
@@ -503,6 +513,14 @@ const BulkItemMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
+      {canExportPng16Archive ? (
+        <ContextMenuItem
+          icon={FileDownIcon}
+          label={t('widgets.gallery.downloadSelectionPng16')}
+          value="download-selection-png16"
+          onClick={handleDownloadPng16}
+        />
+      ) : null}
       <ChangeBoardSubMenu
         boards={boards}
         itemBoardIds={itemBoardIds}
@@ -552,6 +570,7 @@ const ImageContextMenuContent = ({
     actions,
     isBulk ? null : image
   );
+  const canExportPng16 = useCanExportPng16(isBulk ? null : image);
 
   const positioning = useMemo(
     () => ({
@@ -594,6 +613,7 @@ const ImageContextMenuContent = ({
               <SingleImageMenuItems
                 actions={actions}
                 boards={boards}
+                canExportPng16={canExportPng16}
                 image={image}
                 images={images}
                 isLoadingRecallCapabilities={isLoadingRecallCapabilities}
@@ -612,6 +632,7 @@ const ImageContextMenuContent = ({
 const SingleImageMenuItems = ({
   actions,
   boards,
+  canExportPng16,
   image,
   images,
   isLoadingRecallCapabilities,
@@ -621,6 +642,8 @@ const SingleImageMenuItems = ({
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
+  /** Whether the server offers the image's precise asset as a 16-bit PNG. */
+  canExportPng16: boolean;
   image: GalleryImage;
   images: GalleryImage[];
   isLoadingRecallCapabilities: boolean;
@@ -639,6 +662,7 @@ const SingleImageMenuItems = ({
   const handleSelectForCompare = useCallback(() => actions.selectForCompare(image), [actions, image]);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
   const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
+  const handleDownloadPng16 = useCallback(() => void actions.downloadImagePng16(image), [actions, image]);
 
   return (
     <>
@@ -686,6 +710,15 @@ const SingleImageMenuItems = ({
         value="generate-pbr-maps"
         onClick={handleGeneratePbrMaps}
       />
+      {/* Appears once the server answers, so the menu grows by a row: placed after the items most often reached, so those stay put when it opens downward. */}
+      {canExportPng16 ? (
+        <ContextMenuItem
+          icon={FileDownIcon}
+          label={t('widgets.gallery.itemMenu.downloadPng16')}
+          value="download-png16"
+          onClick={handleDownloadPng16}
+        />
+      ) : null}
       <Menu.Separator borderColor="border.subtle" />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
       <ChangeBoardSubMenu boards={boards} itemBoardIds={imageSourceBoardIds} onMove={handleMove} />
@@ -797,6 +830,11 @@ const BulkMenuItems = ({
     [actions, allStarred, imageNames]
   );
   const handleDownload = useCallback(() => void actions.downloadImages(imageNames), [actions, imageNames]);
+  const handleDownloadPng16 = useCallback(
+    () => void actions.downloadImages(imageNames, { exportFormat: 'png16' }),
+    [actions, imageNames]
+  );
+  const canExportPng16Archive = usePreciseImageStorage();
   const handleMove = useCallback(
     (boardId: string) => void actions.moveImagesToBoard(imageNames, boardId),
     [actions, imageNames]
@@ -824,6 +862,14 @@ const BulkMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
+      {canExportPng16Archive ? (
+        <ContextMenuItem
+          icon={FileDownIcon}
+          label={t('widgets.gallery.downloadSelectionPng16')}
+          value="download-selection-png16"
+          onClick={handleDownloadPng16}
+        />
+      ) : null}
       <ChangeBoardSubMenu boards={boards} itemBoardIds={sourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem

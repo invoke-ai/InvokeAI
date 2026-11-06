@@ -19,6 +19,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import UNetField, VAEField
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelType, ModelVariantType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
@@ -185,8 +186,8 @@ class CreateGradientMaskInvocation(BaseInvocation):
             if variant is ModelVariantType.Inpaint or variant is FluxVariantType.DevFill:
                 mask = dilated_mask_tensor
                 vae_info = context.models.load(self.vae.vae)
-                image = context.images.get_pil(self.image.image_name)
-                image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+                # An image with a precise file encodes its stored values; any other takes the unchanged 8-bit path.
+                image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
                 if image_tensor.dim() == 3:
                     image_tensor = image_tensor.unsqueeze(0)
                 img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)

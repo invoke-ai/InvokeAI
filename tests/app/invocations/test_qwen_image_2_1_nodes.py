@@ -351,7 +351,7 @@ def test_a_decode_reads_and_writes_exactly_what_the_pipeline_does() -> None:
 
     context = SimpleNamespace(
         tensors=SimpleNamespace(load=lambda _name: latents),
-        images=SimpleNamespace(save=save),
+        images=SimpleNamespace(save=save, precise_storage_enabled=False),
         models=SimpleNamespace(
             load=lambda _identifier: SimpleNamespace(
                 compute_device=torch.device("cpu"), model=vae, model_on_device=on_device
@@ -876,7 +876,9 @@ def test_a_reference_encodes_at_its_reading_size_with_its_alpha_normalized_in_bf
         yield ({}, vae)
 
     context = SimpleNamespace(
-        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGBA", (500, 300), (255, 0, 0, 64))),
+        images=SimpleNamespace(
+            get_pil=lambda _name: Image.new("RGBA", (500, 300), (255, 0, 0, 64)), has_precise_asset=lambda _name: False
+        ),
         models=SimpleNamespace(
             load=lambda _identifier: SimpleNamespace(
                 compute_device=torch.device("cpu"), model=vae, model_on_device=on_device

@@ -1,6 +1,7 @@
 import functools
 from typing import Callable
 
+import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
@@ -15,8 +16,15 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import (
+    float_output_fits,
+    float_output_raster,
+    load_precise_unit_tensor,
+    save_decoded_image,
+)
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.raster.resample import resize_raster
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
@@ -63,7 +71,16 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         spandrel_model: SpandrelImageToImageModel,
         is_canceled: Callable[[], bool],
         step_callback: Callable[[int, int], None],
+        input_tensor: torch.Tensor | None = None,
+        float_output: np.ndarray | None = None,
     ) -> Image.Image:
+        """Upscale `image` tile by tile and return the 8-bit result.
+
+        `input_tensor` is the same image as float32 CHW in the model's range (a precise asset): tiles are read from it
+        instead of from `image`, which then only gives the size. `float_output` is a caller-allocated float32 HWC
+        buffer of the output size that receives the model's unquantized output, assembled exactly like the 8-bit
+        result (same tiles, same overlap handling); the 8-bit result is still computed from the same model outputs.
+        """
         # Compute the image tiles.
         if tile_size > 0:
             min_overlap = 20
@@ -112,21 +129,28 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             if is_canceled():
                 raise CanceledException
 
-            # Crop the current tile from the input image and convert it on demand. Converting the
-            # whole image up front would keep a float32 copy of it in memory for the entire loop,
-            # even though only one tile is ever used at a time.
-            if (
-                tile.coords.top == 0
-                and tile.coords.bottom == image.height
-                and tile.coords.left == 0
-                and tile.coords.right == image.width
-            ):
-                input_image = image
+            if input_tensor is not None:
+                # The precise pixels of the image, unquantized.
+                input_tile = input_tensor[
+                    :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right
+                ].unsqueeze(0)
+                input_tile = input_tile.to(device=device, dtype=spandrel_model.dtype)
             else:
-                input_image = image.crop((tile.coords.left, tile.coords.top, tile.coords.right, tile.coords.bottom))
-            input_tile = SpandrelImageToImageModel.pil_to_tensor(input_image).to(
-                device=device, dtype=spandrel_model.dtype
-            )
+                # Crop the current tile from the input image and convert it on demand. Converting the
+                # whole image up front would keep a float32 copy of it in memory for the entire loop,
+                # even though only one tile is ever used at a time.
+                if (
+                    tile.coords.top == 0
+                    and tile.coords.bottom == image.height
+                    and tile.coords.left == 0
+                    and tile.coords.right == image.width
+                ):
+                    input_image = image
+                else:
+                    input_image = image.crop((tile.coords.left, tile.coords.top, tile.coords.right, tile.coords.bottom))
+                input_tile = SpandrelImageToImageModel.pil_to_tensor(input_image).to(
+                    device=device, dtype=spandrel_model.dtype
+                )
 
             # Run the model on the tile.
             output_tile = spandrel_model.run(input_tile)
@@ -136,6 +160,9 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             output_tile = output_tile.squeeze(0)
             # (C, H, W) -> (H, W, C)
             output_tile = output_tile.permute(1, 2, 0)
+            float_tile = None
+            if float_output is not None:
+                float_tile = output_tile.to(device=torch.device("cpu"), dtype=torch.float32)
             output_tile = output_tile.clamp(0, 1)
             output_tile = (output_tile * 255).to(dtype=torch.uint8, device=torch.device("cpu"))
 
@@ -145,11 +172,14 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # it seems unnecessary, but we may find a need in the future.
             top_overlap = scaled_tile.overlap.top // 2
             left_overlap = scaled_tile.overlap.left // 2
-            output_tensor[
-                scaled_tile.coords.top + top_overlap : scaled_tile.coords.bottom,
-                scaled_tile.coords.left + left_overlap : scaled_tile.coords.right,
-                :,
-            ] = output_tile[top_overlap:, left_overlap:, :]
+            region = (
+                slice(scaled_tile.coords.top + top_overlap, scaled_tile.coords.bottom),
+                slice(scaled_tile.coords.left + left_overlap, scaled_tile.coords.right),
+                slice(None),
+            )
+            output_tensor[region] = output_tile[top_overlap:, left_overlap:, :]
+            if float_tile is not None:
+                float_output[region] = float_tile[top_overlap:, left_overlap:, :].numpy()
 
             step_callback(pbar.n + 1, pbar.total)
 
@@ -171,17 +201,38 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 percentage=step / total_steps,
             )
 
+        # An image with a precise asset feeds its float pixels to the model; one without takes the 8-bit path.
+        input_tensor = load_precise_unit_tensor(context, self.image.image_name)
+
         # Do the upscaling.
         with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
 
+            # The float buffer exists only when the result will be saved precisely.
+            float_output = self._float_output_buffer(context, image, spandrel_model.scale)
+
             # Upscale the image
             pil_image = self.upscale_image(
-                image, self.tile_size, spandrel_model, context.util.is_canceled, step_callback
+                image,
+                self.tile_size,
+                spandrel_model,
+                context.util.is_canceled,
+                step_callback,
+                input_tensor=input_tensor,
+                float_output=float_output,
             )
 
-        image_dto = context.images.save(image=pil_image)
+        raster = None if float_output is None else float_output_raster(context, float_output)
+        image_dto = save_decoded_image(context, pil_image, raster)
         return ImageOutput.build(image_dto)
+
+    @staticmethod
+    def _float_output_buffer(context: InvocationContext, image: Image.Image, scale: int) -> np.ndarray | None:
+        """The float32 HWC buffer a precise save of a `scale`x result needs, or None when precise storage is off or the
+        result exceeds the precise asset bounds (the node then runs its ordinary 8-bit path)."""
+        if not float_output_fits(context, image.height * scale, image.width * scale, 3):
+            return None
+        return np.empty((image.height * scale, image.width * scale, 3), dtype=np.float32)
 
 
 @invocation(
@@ -222,6 +273,11 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
                 percentage=step / total_steps,
             )
 
+        # An image with a precise asset feeds its float pixels to the first pass; one without takes the 8-bit path.
+        input_tensor = load_precise_unit_tensor(context, self.image.image_name)
+        # Passes between feed each other 8-bit images, exactly as before, so the gallery PNG does not change; only the
+        # last pass's unquantized output (and the final resize) stays in float, as `float_output`.
+
         # Do the upscaling.
         with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
@@ -230,13 +286,20 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
             context.util.signal_progress(self._get_progress_message(iteration))
 
             # First pass of upscaling. Note: `pil_image` will be mutated.
+            float_output = self._last_pass_float_buffer(
+                context, image, spandrel_model.scale, iteration, (target_width, target_height)
+            )
             pil_image = self.upscale_image(
                 image,
                 self.tile_size,
                 spandrel_model,
                 context.util.is_canceled,
                 functools.partial(step_callback, iteration),
+                input_tensor=input_tensor,
+                float_output=float_output,
             )
+            # Only the first pass reads the precise pixels; later passes take the 8-bit result.
+            input_tensor = None
 
             # Some models don't upscale the image, but we have no way to know this in advance. We'll check if the model
             # upscaled the image and run the loop below if it did. We'll require the model to upscale both dimensions
@@ -248,12 +311,16 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
                 while pil_image.width < target_width or pil_image.height < target_height:
                     iteration += 1
                     context.util.signal_progress(self._get_progress_message(iteration))
+                    float_output = self._last_pass_float_buffer(
+                        context, pil_image, spandrel_model.scale, iteration, (target_width, target_height)
+                    )
                     pil_image = self.upscale_image(
                         pil_image,
                         self.tile_size,
                         spandrel_model,
                         context.util.is_canceled,
                         functools.partial(step_callback, iteration),
+                        float_output=float_output,
                     )
 
                     # Sanity check to prevent excessive or infinite loops. All known upscaling models are at least 2x.
@@ -289,8 +356,35 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
         # See: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
         pil_image = pil_image.resize((target_width, target_height), resample=Image.Resampling.LANCZOS)
 
-        image_dto = context.images.save(image=pil_image)
+        raster = None
+        if float_output is not None:
+            raster = float_output_raster(context, float_output)
+            # A same-size resize would only copy the buffer.
+            if raster is not None and (raster.width, raster.height) != (target_width, target_height):
+                raster = resize_raster(raster, target_width, target_height, Image.Resampling.LANCZOS)
+        image_dto = save_decoded_image(context, pil_image, raster)
         return ImageOutput.build(image_dto)
+
+    @staticmethod
+    def _last_pass_float_buffer(
+        context: InvocationContext, image: Image.Image, model_scale: int, iteration: int, target: tuple[int, int]
+    ) -> np.ndarray | None:
+        """The float buffer for the pass about to run when precise storage is on and it is the last one, else None.
+
+        The loop runs another pass only while the output is smaller than `target` and fewer than 5 passes ran, so the
+        last pass is known before it runs, and earlier passes never allocate a float buffer.
+        """
+        if not context.images.precise_storage_enabled:
+            return None
+        out_width, out_height = image.width * model_scale, image.height * model_scale
+        continues = model_scale > 1 and (out_width < target[0] or out_height < target[1]) and iteration < 5
+        if continues:
+            return None
+        # The final resize of an upscaling model produces a float raster of the target size too; refuse before either
+        # is allocated. A model that does not upscale keeps the input size, whatever the requested scale.
+        if model_scale > 1 and not float_output_fits(context, target[1], target[0], 3):
+            return None
+        return SpandrelImageToImageInvocation._float_output_buffer(context, image, model_scale)
 
     @classmethod
     def _get_progress_message(cls, iteration: int, step: int | None = None, total_steps: int | None = None) -> str:

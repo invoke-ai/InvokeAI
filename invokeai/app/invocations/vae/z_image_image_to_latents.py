@@ -13,9 +13,11 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
@@ -105,18 +107,56 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return latents
 
+    @classmethod
+    def vae_encode_or_retry_tiled(
+        cls,
+        context: InvocationContext,
+        vae_info: LoadedModel,
+        image_tensor: torch.Tensor,
+        tiled: bool,
+        tile_size: int = 0,
+        deterministic: bool = False,
+    ) -> torch.Tensor:
+        """`vae_encode`, retried once tiled when an untiled encode runs out of memory, as the FLUX.1 encode node does.
+
+        The autoencoder's mid-block attention is one head over the whole latent grid, so an untiled encode grows
+        quadratically; a float32 VAE (`precise_image_storage`) needs more than a bfloat16 one. The control image of
+        `z_image_denoise` encodes through here too.
+        """
+        try:
+            return cls.vae_encode(
+                vae_info=vae_info,
+                image_tensor=image_tensor,
+                tiled=tiled,
+                tile_size=tile_size,
+                deterministic=deterministic,
+            )
+        except RuntimeError as e:
+            if tiled or not is_oom_error(e):
+                raise
+            context.util.signal_progress("VAE encode ran out of memory, retrying tiled")
+            context.logger.warning(
+                "VAE encode ran out of memory; retrying with tiling. The tiled result is not identical to an "
+                "untiled encode -- the encoder's normalisation and attention are global, so the difference is "
+                "spread over the latent rather than confined to the seams."
+            )
+            e.__traceback__ = None
+            TorchDevice.empty_cache()
+            return cls.vae_encode(
+                vae_info=vae_info, image_tensor=image_tensor, tiled=True, tile_size=0, deterministic=deterministic
+            )
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.images.get_pil(self.image.image_name)
-
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+        image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         vae_info = context.models.load(self.vae.vae)
 
         context.util.signal_progress("Running VAE")
-        latents = self.vae_encode(
+        latents = self.vae_encode_or_retry_tiled(
+            context,
             vae_info=vae_info,
             image_tensor=image_tensor,
             tiled=self.tiled or context.config.get().force_tiled_decode,

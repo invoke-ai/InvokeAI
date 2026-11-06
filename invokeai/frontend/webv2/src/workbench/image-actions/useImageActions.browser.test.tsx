@@ -16,6 +16,7 @@ import { parseOpenApiToTemplates } from '@features/workflow/react';
 import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { toaster } from '@platform/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   deleteImages: vi.fn(),
   downloadArchive: vi.fn(),
   downloadBlob: vi.fn(),
+  exportImage: vi.fn(),
   ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
   galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
@@ -108,7 +110,10 @@ vi.mock('@features/gallery', () => ({
     removeFromBoard: (...args: unknown[]) => mocks.removeFromBoard(...args),
     setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
-  galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
+  galleryTransfers: {
+    downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args),
+    exportImage: (...args: unknown[]) => mocks.exportImage(...args),
+  },
   galleryVideos: {
     workflow: (...args: unknown[]) => mocks.videoWorkflow(...args),
   },
@@ -1255,7 +1260,8 @@ type ExpectedItemActions = {
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
-    loadedItems?: Array<{ fullUrl: string; kind: 'image' | 'video'; name: string }>
+    loadedItems?: Array<{ fullUrl: string; kind: 'image' | 'video'; name: string }>,
+    options?: { exportFormat?: 'png16' }
   ): Promise<void>;
   moveItemsToBoard(refs: Array<{ kind: 'image' | 'video'; name: string }>, boardId: string): Promise<void>;
   openItemInPreview(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): void;
@@ -2456,6 +2462,171 @@ describe('primary successor after confirmed deletion', () => {
   });
 });
 
+describe('16-bit PNG export', () => {
+  let create = vi.spyOn(toaster, 'create');
+  let dismiss = vi.spyOn(toaster, 'dismiss');
+  const waitToast = () => create.mock.results.at(-1)?.value as string | undefined;
+  /** The wait is a loading toast, closed by id (a bare dismiss would close every toast). */
+  const expectWaitClosed = async () => {
+    await vi.waitFor(() => expect(waitToast()).toBeDefined());
+    expect(create).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'widgets.gallery.itemActions.exportPng16.preparing', type: 'loading' })
+    );
+    await vi.waitFor(() => expect(dismiss).toHaveBeenCalledWith(waitToast()));
+  };
+
+  beforeEach(() => {
+    create = vi.spyOn(toaster, 'create');
+    dismiss = vi.spyOn(toaster, 'dismiss');
+  });
+
+  afterEach(() => {
+    create.mockRestore();
+    dismiss.mockRestore();
+  });
+
+  const PREFIX = 'widgets.gallery.itemActions.exportPng16.';
+  const galleryImage = (imageName: string): GalleryImage => ({
+    boardId: 'none',
+    height: 512,
+    imageCategory: 'general',
+    imageName,
+    imageUrl: `/${imageName}`,
+    queuedAt: '2026-06-15T00:00:00Z',
+    sourceQueueItemId: 'queue-item',
+    starred: false,
+    thumbnailUrl: `/thumb-${imageName}`,
+    width: 512,
+  });
+  const exportPng16 = () => act(() => actionsRef.current!.downloadImagePng16(galleryImage('sky.png')));
+  const errorNotice = (message: string) =>
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'error',
+      message: `${PREFIX}${message}`,
+      title: `${PREFIX}failedTitle`,
+    });
+
+  it('announces the export, requests the 16-bit format of that image and saves the file under the server name', async () => {
+    let finish = (_file: { blob: Blob; fileName: string }): void => undefined;
+    mocks.exportImage.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+
+    const exporting = actionsRef.current!.downloadImagePng16(galleryImage('sky.png'));
+
+    // The wait shows as a toast, never as a notification that would outlive the result.
+    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce());
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    finish({ blob: new Blob(['png']), fileName: 'sky-16bit.png' });
+    await act(() => exporting);
+    await expectWaitClosed();
+
+    expect(mocks.exportImage).toHaveBeenCalledExactlyOnceWith({
+      format: 'png16',
+      imageName: 'sky.png',
+      signal: expect.any(AbortSignal),
+    });
+    expect(mocks.downloadBlob).toHaveBeenCalledExactlyOnceWith(expect.any(Blob), 'sky-16bit.png');
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'success',
+      message: 'sky-16bit.png',
+      title: `${PREFIX}success`,
+    });
+  });
+
+  it('tells the user another export is running on 503, without retrying', async () => {
+    mocks.exportImage.mockRejectedValue(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '3' }));
+
+    await exportPng16();
+
+    errorNotice('busy');
+    expect(mocks.exportImage).toHaveBeenCalledOnce();
+    expect(mocks.downloadBlob).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's reason on 409", async () => {
+    mocks.exportImage.mockRejectedValue(
+      new ApiError('{"detail":"The precise asset contains non-finite pixels."}', 409)
+    );
+
+    await exportPng16();
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'error',
+      message: 'The precise asset contains non-finite pixels.',
+      title: `${PREFIX}failedTitle`,
+    });
+  });
+
+  it.each([
+    [404, 'notFound'],
+    [403, 'forbidden'],
+  ])('says so, without suggesting a retry, when the server answers %i', async (status, message) => {
+    mocks.exportImage.mockRejectedValue(new ApiError('{"detail":"x"}', status));
+
+    await exportPng16();
+
+    errorNotice(message);
+  });
+
+  it.each([new ApiError('{"detail":"boom"}', 500), new TypeError('Failed to fetch')])(
+    'reports any other failure generically',
+    async (failure) => {
+      mocks.exportImage.mockRejectedValue(failure);
+
+      await exportPng16();
+
+      errorNotice('failed');
+    }
+  );
+
+  it('saves and reports nothing when the account changes while the export runs', async () => {
+    let finish = (_file: { blob: Blob; fileName: string }): void => undefined;
+    mocks.exportImage.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+
+    const exporting = actionsRef.current!.downloadImagePng16(galleryImage('sky.png'));
+    await act(() => accountLifecycle.activate('user-b'));
+    finish({ blob: new Blob(['png']), fileName: 'sky-16bit.png' });
+    await act(() => exporting);
+
+    expect(mocks.downloadBlob).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // The wait does not outlive the account that started it.
+    await expectWaitClosed();
+  });
+
+  it('closes the wait when the export fails', async () => {
+    mocks.exportImage.mockRejectedValue(new ApiError('{"detail":"busy"}', 503));
+
+    await exportPng16();
+
+    await expectWaitClosed();
+  });
+
+  it('reports no failure when the account changes before a failed export settles', async () => {
+    let fail = (_error: unknown): void => undefined;
+    mocks.exportImage.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      })
+    );
+
+    const exporting = actionsRef.current!.downloadImagePng16(galleryImage('sky.png'));
+    await act(() => accountLifecycle.activate('user-b'));
+    fail(new ApiError('{"detail":"busy"}', 503));
+    await act(() => exporting);
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+  });
+});
+
 describe('mixed item downloads', () => {
   const image = { fullUrl: '/full/still.png', kind: 'image' as const, name: 'still.png' };
   const firstVideo = { fullUrl: '/full/first.mp4', kind: 'video' as const, name: 'first.mp4' };
@@ -2479,6 +2650,39 @@ describe('mixed item downloads', () => {
     });
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'images.zip');
+  });
+
+  it('forwards the 16-bit export format to the archive and shows a preparing toast that closes with the result', async () => {
+    const create = vi.spyOn(toaster, 'create').mockReturnValue('archive-toast');
+    const dismiss = vi.spyOn(toaster, 'dismiss');
+    mocks.downloadArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'hdr.zip' });
+
+    await act(async () => {
+      await getItemActions().downloadItems([{ kind: 'image', name: image.name }], [image], { exportFormat: 'png16' });
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledWith({
+      exportFormat: 'png16',
+      imageNames: [image.name],
+      signal: expect.any(AbortSignal),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'widgets.gallery.itemActions.download.preparingPng16', type: 'loading' })
+    );
+    expect(dismiss).toHaveBeenCalledWith('archive-toast');
+    create.mockRestore();
+    dismiss.mockRestore();
+  });
+
+  it('says another 16-bit archive is being prepared when the server answers 503', async () => {
+    mocks.downloadArchive.mockRejectedValue(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '3' }));
+
+    await act(async () => {
+      await getItemActions().downloadItems([{ kind: 'image', name: image.name }], [image], { exportFormat: 'png16' });
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'widgets.gallery.archiveBusy' }));
+    expect(mocks.downloadBlob).not.toHaveBeenCalled();
   });
 
   it('downloads a single video from its protected full URL with its actual name', async () => {

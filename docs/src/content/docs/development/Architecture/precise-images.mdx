@@ -1,0 +1,159 @@
+---
+title: Precise Images
+description: How InvokeAI keeps float and 16-bit pixels next to the 8-bit gallery image, and how nodes read and write them.
+lastUpdated: 2026-11-05
+---
+
+import { Aside } from '@astrojs/starlight/components'
+
+The gallery shows 8-bit PNGs. Some nodes compute more than a PNG holds: 16-bit color, float16 or float32 values, or sRGB values beyond 0-1. A **precise image** is a gallery image that also keeps those exact pixels in a second file. This page describes the data model and the rules nodes follow. The user-facing switch, the list of nodes and the measured costs are in [Precise Image Storage](/configuration/invokeai-yaml/#precise-image-storage).
+
+<Aside type="caution" title="Precision is only as good as the nodes it passes through">
+  A pipeline keeps its precision only while every node on the way reads and writes precise pixels. A node that reads an image with `get_pil()` receives the 8-bit gallery image, and what it saves is an ordinary 8-bit image. The chain is 8-bit from there on. Canvas2D and the browser clipboard are 8-bit as well.
+</Aside>
+
+## RasterImage
+
+`invokeai.backend.image_util.raster.RasterImage` is the in-memory form of an image that is not tied to PIL. It is one NumPy array of shape `(height, width, channels)` plus a `RasterDescriptor` that says what the numbers mean. Nothing in it normalizes values or changes the dtype.
+
+| Property | Values |
+| --- | --- |
+| dtype | `uint8`, `uint16`, `float16`, `float32` |
+| `channels` | `L`, `LA`, `RGB`, `RGBA`, or `data` (any number of channels of non-color data) |
+| `color` | `srgb`, `linear_srgb`, or `none` (only for `data`) |
+| `value_range` | `unit` (nominal 0-1, integers span their full scale) or `unbounded` (any float, no display meaning without an explicit mapping) |
+| `alpha` | `none`, `straight`, or `premultiplied`; a raster has an alpha mode exactly when it has an alpha channel |
+| `icc_profile` | optional bytes, only for color rasters |
+
+The descriptor validates itself, so an inconsistent combination (for example `RGBA` with `alpha: none`) cannot be constructed. Float values are not clamped: a `unit` float raster may hold values below 0 or above 1, which the 8-bit gallery image clips.
+
+A `RasterImage` is immutable. Its arrays are read-only, including every array it is a view of. `view()` returns the read-only array without a copy and `to_array()` a writable copy. `RasterImage.from_array()` copies its input, `RasterImage.borrow()` wraps it without a copy and requires that the caller leaves the array alone while the raster is in use. A raster returned by `context.images.get_raster()` is owned by the caller.
+
+## The asset set of an image
+
+Every gallery image has a PNG and a WebP thumbnail. A precise image has two more things:
+
+| Part | Location | Content |
+| --- | --- | --- |
+| Gallery PNG | `outputs/images/<subfolder>/<name>.png` | 8-bit display copy, with the generation metadata, workflow and graph |
+| Thumbnail | `outputs/images/thumbnails/<subfolder>/<name>.webp` | made from the gallery PNG |
+| Precise file | `outputs/images/precise/<subfolder>/<name stem>.safetensors` | the exact pixels as a `pixels` tensor, the optional ICC profile and a JSON descriptor; no generation metadata |
+| `image_precise_assets` row | database | `image_name` (primary key, deleted with the image), `asset_format` (`raster_safetensors`), `format_version` |
+
+The row, not the presence of a file, says whether an image is precise. With a row, `get_raster` reads the precise file and any failure (missing, corrupt, unsupported version) is raised. It never falls back to the PNG, because that would silently hand 8-bit data to a node that asked for the exact pixels. Without a row, `get_raster` reads the gallery PNG.
+
+The image service owns the lifecycle of the set:
+
+- **Create.** The precise file is written to a temporary file in its folder, flushed and published without replacing an existing file, then the row is inserted. A failure at any later step of the save removes the file again.
+- **Copy.** Copying an image copies its precise file when the source has a row.
+- **Delete.** Deleting an image removes the PNG, the thumbnail and the precise file through the same delete journal, and the row follows the image record. A crash in between is finished at the next start.
+- **Move.** [Image storage maintenance](/users-guide/gallery/image-storage-maintenance/) moves the precise file of an image with a row together with its PNG. A precise file without a row belongs to no image and is left for gallery maintenance to archive.
+
+The asset bounds are 16384 pixels per side and 4 GiB of pixel data. The writer and the reader enforce the same bounds, so a file that was written can be read back.
+
+## Reading and writing in a node
+
+`context.images` offers the raster API next to the PIL one:
+
+| Call | Meaning |
+| --- | --- |
+| `get_raster(image_name)` | The image as a `RasterImage`: the precise pixels for a precise image, otherwise the gallery PNG as `uint8` sRGB `L`/`LA`/`RGB`/`RGBA` or `uint16` `L`, with palette and color-key transparency turned into straight alpha. |
+| `has_precise_asset(image_name)` | Whether the image has a precise file. Route on this, not on the dtype of the raster: a PNG-backed image never has an asset, whatever its pixel format. |
+| `precise_storage_enabled` | Whether `precise_image_storage` is on. |
+| `save_raster(raster, board_id=None, image_category=..., metadata=None, display_image=None)` | Saves a raster as a gallery image. Board, metadata, workflow and graph are handled as in `save`. |
+
+`save_raster` decides by what the gallery PNG can represent:
+
+1. A raster the PNG holds exactly (`uint8` sRGB `L`/`LA`/`RGB`/`RGBA` with straight alpha, or `uint16` `L`) is saved as an ordinary image. Passing `display_image` for it is an error.
+2. Any other raster is saved as a precise image when `precise_storage_enabled` and the raster is displayable: sRGB, `unit` range, `L`/`LA`/`RGB`/`RGBA`, no premultiplied alpha, finite values, within the asset bounds. The gallery PNG is then the display quantization of the raster (clip to 0-1 and round), or `display_image` when the node passes one, an 8-bit PIL image of the same size whose mode equals the raster's channels. A node uses `display_image` to keep a legacy 8-bit output bit for bit.
+3. Otherwise `save_raster` raises `RasterConversionError`, or `PreciseAssetError` for an oversized raster, and saves nothing. It never quantizes on its own.
+
+### Routing
+
+A node with a precise path routes in two steps so that nothing changes for existing images and workflows:
+
+- **No precise asset on the input: the legacy path, byte for byte.** The node keeps reading the PIL image and produces the same result as before.
+- **Precise asset on the input, `precise_image_storage` off: the node converts explicitly.** It quantizes with `quantize_unit(raster, numpy.uint8)` and saves the 8-bit result, or fails with an error that names the setting. It does not half-save.
+
+Turning the setting off therefore stops new precise saves only. Existing precise images and their readers keep working.
+
+### Model boundary
+
+Nodes that run a model (VAE decode and encode, upscalers, depth) share one policy in `invokeai/app/invocations/vae/precise_io.py`:
+
+- The model output is saved as a float raster when precise storage is on: the unclamped decoder output, in the dtype the decoder produced it (float16 or float32 for SD 1.5 and SDXL) or widened to float32.
+- A float32 file holds more than 8 bits only if the VAE decoder ran above bfloat16 precision: a bfloat16 decode carries about 8 bits of mantissa, and widening it afterwards adds nothing. So with `precise_image_storage` on, the covered VAEs load and run in float32 (see Autoencoder dtype below).
+- The gallery image is the node's legacy 8-bit conversion of its output. For a decoder whose VAE runs in float32 only under the setting, the decode itself differs, so the gallery image can differ slightly from the setting off.
+- If the output is not finite or exceeds the asset bounds, the node logs a warning and saves the ordinary 8-bit image instead of failing. A decode that used to yield a black image (an fp16 overflow) must not start to raise.
+- As model input, an image with a precise file is fed with its unclamped precise pixels. Images without one are encoded exactly as before. Where the input is resized on encode, the precise path resizes antialiased bicubic where the 8-bit path uses Lanczos.
+
+### Autoencoder dtype
+
+`TorchDevice.autoencoder_dtype(configured dtype, device, precise_image_storage, otherwise=None)` (`invokeai/backend/util/devices.py`) is the rule for a VAE decoder covered by the setting: float32 when `precise_image_storage` is on, else `otherwise` (the dtype the loader gave that VAE before the setting existed), else the configured dtype except float16, which breaks these VAEs. Model loaders reach it through `ModelLoader._autoencoder_dtype(otherwise=None)` and, in a pipeline loader that gives every submodel one dtype, through `ModelLoader._submodel_dtype(submodel_type, otherwise)`, which changes the VAE submodel only. The loader reads the setting from `self._app_config`. The working-memory calibration plan calls the same function for the dtypes it sizes decodes by. The setting is read at startup, so the dtype follows it after a restart.
+
+Covered (float32 under the setting):
+
+- the FLUX.1 and FLUX.2 VAEs: standalone checkpoint, standalone diffusers folder, and the VAE submodel of a Diffusers pipeline (also the FLUX.1 VAE that Z-Image decodes with and the FLUX.2 VAE that ERNIE-Image uses);
+- the VAE submodels of the Z-Image, ERNIE-Image, FLUX.3 and MOSS-Image pipelines;
+- the Qwen-Image-2.1 VAE: standalone checkpoint, standalone folder, and the pipeline's submodel.
+
+Not covered (they keep the dtype they have):
+
+- The VAE bundled in an Ideogram 4 pipeline (a vendored `AutoEncoder`). It cannot decode in tiles, so a float32 decode would have no low-VRAM fallback. A standalone FLUX.2 VAE used with Ideogram 4 is a covered FLUX.2 VAE, and the Ideogram 4 decode node gives it the pretile and out-of-memory retry (`AutoencoderKLFlux2` only).
+- Anima, Qwen Image (Krea-2) and Wan 2.2, which share `_wan_family_dtype` in `vae.py`, and MiniMax H3.
+- Self-contained SDNQ pipelines, whose VAE already loads in float32 (an SDNQ-quantized FLUX.1 VAE dequantizes to bfloat16).
+- SD 1.5 and SDXL, which cast their VAE per run by the node's `fp32` field; SD3 and CogView4 do not produce precise output.
+
+A new VAE loader for a covered family takes its dtype from these functions, and a transformer or text encoder never does. The rules that keep the float32 real:
+
+- The weights load straight into float32, not rounded to a narrower dtype first. A loader that rounds a checkpoint (the FLUX.2 VAE checkpoint loader rounds to bfloat16) skips that step under the setting.
+- Whatever consumes the VAE follows the dtype it holds: decode and encode nodes cast to the VAE's parameter dtype going in, and every place that hands a VAE-encoded tensor to a transformer casts it to the transformer's dtype (FLUX Fill and Control LoRA conditioning are cast at the source in `flux_denoise.py`).
+- The working-memory estimator prices the dtype that runs (it reads the VAE's parameters, and the FLUX.1 and FLUX.2 estimators have float32 lines), and the calibration plan sizes by `TorchDevice.autoencoder_dtype`.
+- A node that runs a covered VAE has a low-VRAM fallback: the FLUX.1, FLUX.2, Z-Image, ERNIE-Image and Ideogram 4 (standalone VAE) decode nodes tile up front when the estimate would not fit and retry tiled after an out-of-memory error; the encode nodes retry after an out-of-memory error. The Qwen-Image-2.1 nodes tile up front but have no retry. A new covered VAE needs a fallback of its own.
+
+With the setting on, the gallery PNG of the covered decoders comes from the float32 decode, so it can differ slightly from the setting off; where float32 pushes a decode over the pretile threshold, the tiled decode is the larger difference (measured figures in the [configuration reference](/configuration/invokeai-yaml/#precise-image-storage)). Encoding with them runs in float32 too, so their latents differ slightly, and the BatchNorm statistics of the FLUX.2, FLUX.3 and MOSS-Image VAEs are read in float32, which changes denoised latents slightly.
+
+### Masks and visibility
+
+Masks stay 8-bit data. A mask is read as coverage (the 8-bit value divided by 255), never stored precisely, and the mask nodes are unchanged.
+
+Where a node decides what is visible (the bounding box of an image, where a tensor mask applies), it follows the gallery image, so the decision is the same with or without a precise file. Where precise resampling and compositing need to tell hidden from visible color, alpha below `MIN_VISIBLE_ALPHA` (`0.5 / 255`, half an 8-bit step, which is what 8-bit alpha 0 means) counts as transparent. Resampling of an image with alpha is weighted by its alpha, so hidden color does not bleed into the edges.
+
+## Export and upload
+
+The API serves the precise pixels back as a 16-bit PNG:
+
+- `GET /api/v1/images/i/{image_name}/export-formats` lists `png16` for an image whose precise file the export can deliver.
+- `GET /api/v1/images/i/{image_name}/export?format=png16` returns the PNG with the ICC profile and the metadata, workflow and graph of the gallery PNG. Float assets are clipped to 0-1 and rounded to 16 bits; 16-bit assets are written as they are. Gray with alpha cannot be encoded and is not offered. Exports run one at a time and a concurrent request gets 503 with `Retry-After`.
+- `POST /api/v1/images/download` takes an optional `export_format: "png16"`. Each image with a deliverable precise file is then stored in the archive as `<category>/<name>-16bit.png` instead of its gallery file; every other image, and every image whose 16-bit PNG fails, keeps its gallery file. One such archive is built at a time.
+
+With `precise_image_storage` on, uploading a 16-bit RGB or RGBA PNG without a crop or resize stores its exact pixels the same way, so an export returns the pixels that were uploaded. Every other upload is stored as an ordinary image.
+
+The exact status codes, memory figures and archive handling are in the [configuration reference](/configuration/invokeai-yaml/#precise-image-storage).
+
+## Which nodes keep precision
+
+Precision is kept by nodes that read with `get_raster` and save with `save_raster`: the Latents to Image and Image to Latents nodes of the supported families, the PiD decoders, Depth Anything, Upscale (RealESRGAN), the Spandrel Image-to-Image nodes, Extract Image Channel, and the crop, pad, resize, scale, lerp, paste, multiply, mask-application, canvas paste-back and Clarity, Texture and Contrast Dehaze nodes. The full list with each node's behavior is in the configuration reference.
+
+These stay 8-bit:
+
+- The SD3 and CogView4 VAE nodes. They never produce precise output.
+- The Canny edge detection node and the IP-Adapter and other image encoders. They read the 8-bit image.
+- Every node that reads `get_pil()`, which includes all custom nodes written before the raster API. A precise image passes through such a node as its 8-bit gallery image, and the node's output is an ordinary image.
+- The browser: the canvas (Canvas2D) and the clipboard are 8-bit. Downloading the 16-bit PNG from the gallery is the way to get the pixels out.
+
+JPEG XL and native 16-bit gallery originals are not offered. The gallery file of a precise image is always the 8-bit PNG.
+
+## For custom node authors
+
+Existing nodes keep working unchanged. `context.images.get_pil()` returns the 8-bit gallery image of any image, precise or not, and `context.images.save()` stores an ordinary 8-bit image.
+
+To keep precision, a node:
+
+1. Reads with `context.images.get_raster(name)` and does its arithmetic on `raster.view()`, honoring `raster.descriptor` (channels, color encoding, alpha mode, value range). Rasters are read-only; use `to_array()` for a writable copy.
+2. Checks `context.images.has_precise_asset(name)` and, for an image without an asset, keeps its PIL implementation so that existing results do not change.
+3. Saves with `context.images.save_raster(result, display_image=legacy_8bit)`. It passes `display_image` only when it must keep a legacy 8-bit output identical.
+4. When `context.images.precise_storage_enabled` is false, converts explicitly with `quantize_unit` before saving, because `save_raster` refuses a raster the gallery cannot hold.
+5. Returns an `ImageOutput` as usual. The result is a normal gallery image; nothing else in the invocation changes.
+
+A node that is unsure whether its result may keep values beyond 0-1, non-sRGB color or premultiplied alpha should convert them (the raster package has `to_unit_float`, `raster_to_pil` and `quantize_unit`) instead of passing them to `save_raster`, which refuses what the gallery cannot display.

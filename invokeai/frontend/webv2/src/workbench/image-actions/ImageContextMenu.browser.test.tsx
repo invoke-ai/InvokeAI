@@ -7,6 +7,7 @@ import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { galleryKeys } from '@features/gallery/queries';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -27,6 +28,7 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 const NO_BOARDS: [] = [];
 const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
 const GENERATE_PBR_MAPS = 'widgets.gallery.itemActions.pbrMaps.label';
+const DOWNLOAD_PNG16 = 'widgets.gallery.itemMenu.downloadPng16';
 
 const findGalleryItem = vi.fn();
 
@@ -41,6 +43,7 @@ const commandsMock = vi.hoisted(() => ({
   widgets: { patchValues: vi.fn() },
 }));
 const galleryMock = vi.hoisted(() => ({
+  exportFormats: vi.fn((_imageName: string, _signal?: AbortSignal): Promise<string[]> => Promise.resolve([])),
   metadata: vi.fn((): Promise<Record<string, unknown> | null> => Promise.resolve(null)),
   resolve: vi.fn((imageName: string) => Promise.resolve({ hasWorkflow: imageName === 'made-by-workflow.png' })),
   resolveItem: vi.fn((ref: { kind: string; name: string }, _signal?: AbortSignal) =>
@@ -54,6 +57,7 @@ const galleryMock = vi.hoisted(() => ({
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getGalleryImageByName: galleryMock.resolve,
+  getGalleryImageExportFormats: galleryMock.exportFormats,
   getGalleryImageMetadata: galleryMock.metadata,
   getGalleryItemByRef: galleryMock.resolveItem,
   getGalleryVideoMetadata: galleryMock.videoMetadata,
@@ -125,6 +129,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
+  downloadImagePng16: vi.fn(() => Promise.resolve()),
   generatePbrMaps: vi.fn(() => Promise.resolve()),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
@@ -236,14 +241,27 @@ const Harness = ({ actions, images }: { actions: ImageActions; images: GalleryIm
   return <ImageContextMenu actions={actions} boards={NO_BOARDS} target={target} onClose={() => setTarget(null)} />;
 };
 
-const renderMenu = async (actions: ImageActions, images: GalleryImage[]) => {
+/** Seeds the deployment config so bulk menus do not fetch it; tests pass `true` for a server with precise storage. */
+const createConfiguredQueryClient = (preciseImageStorage = false) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  client.setQueryData(['frontend-config'], { precise_image_storage: preciseImageStorage, show_donation_link: false });
+
+  return client;
+};
+
+const renderMenu = async (
+  actions: ImageActions,
+  images: GalleryImage[],
+  queryClient = createConfiguredQueryClient()
+) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
   await interact(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
           <Harness actions={actions} images={images} />
         </ChakraProvider>
@@ -278,7 +296,7 @@ const renderItemMenu = async (
     onCopyCurrentFrame: () => void;
     onOpenDetails: () => void;
   },
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  queryClient = createConfiguredQueryClient(),
   variant?: ImageContextMenuVariant
 ) => {
   host = document.createElement('div');
@@ -391,6 +409,191 @@ describe('ImageContextMenu PBR maps', () => {
     await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
 
     expect(document.body.textContent).not.toContain(GENERATE_PBR_MAPS);
+  });
+});
+
+describe('ImageContextMenu bulk 16-bit PNG download', () => {
+  const BULK_PNG16 = 'widgets.gallery.downloadSelectionPng16';
+  const hasEntry = () => document.body.textContent?.includes(BULK_PNG16) === true;
+
+  it('downloads an image selection as 16-bit PNG when the server has precise image storage', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('a.png'), image('b.png')], createConfiguredQueryClient(true));
+
+    await pickItem(BULK_PNG16);
+
+    expect(actions.downloadImages).toHaveBeenCalledExactlyOnceWith(['a.png', 'b.png'], { exportFormat: 'png16' });
+  });
+
+  it('keeps the entry out while the config is still loading', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    void client.prefetchQuery({ ...frontendConfigQueryOptions, queryFn: () => new Promise<never>(() => {}) });
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')], client);
+
+    expect(client.getQueryState(frontendConfigQueryOptions.queryKey)?.status).toBe('pending');
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when the config request failed', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await client.prefetchQuery({ ...frontendConfigQueryOptions, queryFn: () => Promise.reject(new Error('offline')) });
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')], client);
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when a selection holds only videos', async () => {
+    const actions = createActions(vi.fn());
+    await renderItemMenu(
+      actions,
+      {
+        itemRefs: [
+          { kind: 'video' as const, name: 'a.mp4' },
+          { kind: 'video' as const, name: 'b.mp4' },
+        ],
+        items: [item('video', 'a.mp4')],
+        x: 20,
+        y: 20,
+      },
+      undefined,
+      createConfiguredQueryClient(true)
+    );
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when precise storage is off', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('downloads a mixed item selection as 16-bit PNG and leaves videos to the action', async () => {
+    const actions = createActions(vi.fn());
+    const loadedImage = item('image', 'still.png');
+    const refs = [
+      { kind: 'image' as const, name: loadedImage.name },
+      { kind: 'video' as const, name: 'clip.mp4' },
+    ];
+    await renderItemMenu(
+      actions,
+      { itemRefs: refs, items: [loadedImage], x: 20, y: 20 },
+      undefined,
+      createConfiguredQueryClient(true)
+    );
+
+    await pickItem(BULK_PNG16);
+
+    expect(actions.downloadItems).toHaveBeenCalledExactlyOnceWith(refs, [loadedImage], { exportFormat: 'png16' });
+  });
+});
+
+describe('ImageContextMenu 16-bit PNG download', () => {
+  const hasEntry = () => document.body.textContent?.includes(DOWNLOAD_PNG16) === true;
+
+  it('offers the entry once the server lists png16 for the image and hands the image to the action', async () => {
+    const actions = createActions(vi.fn());
+    galleryMock.exportFormats.mockResolvedValueOnce(['png16']);
+    await renderMenu(actions, [image('hdr.png')]);
+
+    await vi.waitFor(() => expect(hasEntry()).toBe(true));
+    expect(galleryMock.exportFormats).toHaveBeenCalledWith('hdr.png', expect.any(AbortSignal));
+    await pickItem(DOWNLOAD_PNG16);
+
+    expect(actions.downloadImagePng16).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'hdr.png' })
+    );
+    // Ordinary Download stays the gallery PNG.
+    expect(actions.downloadImage).not.toHaveBeenCalled();
+  });
+
+  it('leaves the entry out, with the rest of the menu working, for an image the server lists no format for', async () => {
+    galleryMock.exportFormats.mockClear();
+    await renderMenu(createActions(vi.fn()), [image('plain.png')]);
+
+    await vi.waitFor(() =>
+      expect(galleryMock.exportFormats).toHaveBeenCalledWith('plain.png', expect.any(AbortSignal))
+    );
+    expect(hasEntry()).toBe(false);
+    expect(getMenuItem(GENERATE_PBR_MAPS)).toBeDefined();
+  });
+
+  it('is absent from bulk menus, and asks the server nothing', async () => {
+    galleryMock.exportFormats.mockClear();
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(hasEntry()).toBe(false);
+    expect(galleryMock.exportFormats).not.toHaveBeenCalled();
+  });
+
+  it('hides the entry when the capability request fails and asks again on the next open', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const open = async () => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      await interact(() => {
+        root?.render(
+          <QueryClientProvider client={queryClient}>
+            <ChakraProvider value={system}>
+              <Harness actions={createActions(vi.fn())} images={[image('flaky.png')]} />
+            </ChakraProvider>
+          </QueryClientProvider>
+        );
+      });
+    };
+
+    galleryMock.exportFormats.mockClear();
+    galleryMock.exportFormats.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(['png16']);
+    await open();
+    await vi.waitFor(() =>
+      expect(
+        queryClient.getQueryState(galleryKeys.imageExportFormats(captureAccountScope(), 'flaky.png'))?.status
+      ).toBe('error')
+    );
+    expect(hasEntry()).toBe(false);
+    await interact(() => root?.unmount());
+    host?.remove();
+    await open();
+
+    await vi.waitFor(() => expect(hasEntry()).toBe(true));
+    expect(galleryMock.exportFormats).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('ImageContextMenu 16-bit PNG download after a failed refresh', () => {
+  it('hides the entry when a later open fails, though the earlier answer listed png16', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const hasEntry = () => document.body.textContent?.includes(DOWNLOAD_PNG16) === true;
+    const open = async () => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      await interact(() => {
+        root?.render(
+          <QueryClientProvider client={queryClient}>
+            <ChakraProvider value={system}>
+              <Harness actions={createActions(vi.fn())} images={[image('stale.png')]} />
+            </ChakraProvider>
+          </QueryClientProvider>
+        );
+      });
+    };
+
+    galleryMock.exportFormats.mockClear();
+    galleryMock.exportFormats.mockResolvedValueOnce(['png16']).mockRejectedValueOnce(new Error('offline'));
+    await open();
+    await vi.waitFor(() => expect(hasEntry()).toBe(true));
+    await interact(() => root?.unmount());
+    host?.remove();
+    await open();
+
+    await vi.waitFor(() => expect(galleryMock.exportFormats).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(hasEntry()).toBe(false));
   });
 });
 

@@ -151,6 +151,7 @@ def _z_image_context(vae: AutoencoderKL, latents: torch.Tensor) -> MagicMock:
     context.config.get.return_value.force_tiled_decode = False
     context.config.get.return_value.auto_tiled_decode = False
     context.images.save.return_value = MagicMock(image_name="decoded.png", width=SIDE, height=SIDE)
+    context.images.precise_storage_enabled = False
     return context
 
 

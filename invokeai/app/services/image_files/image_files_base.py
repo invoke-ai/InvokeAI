@@ -1,9 +1,15 @@
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterator, Sequence
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PIL.Image import Image as PILImageType
+
+if TYPE_CHECKING:
+    # Not at runtime: the raster package imports torch, which the database layer (it imports this module) must not load.
+    from invokeai.backend.image_util.raster.descriptor import RasterDescriptor
+    from invokeai.backend.image_util.raster.png_codec import PngText
+    from invokeai.backend.image_util.raster.raster import RasterImage
 
 
 class ImageFileStorageBase(ABC):
@@ -20,6 +26,33 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_precise_path(self, image_name: str, image_subfolder: str = "") -> Path:
+        """Gets the path of an image's precise asset, whether or not the image has one."""
+        pass
+
+    @abstractmethod
+    def read_precise(self, image_name: str, image_subfolder: str = "") -> "RasterImage":
+        """Reads an image's precise asset. Raises ImageFileNotFoundException when the file is missing and
+        PreciseAssetError when it is corrupt or unsupported."""
+        pass
+
+    @abstractmethod
+    def read_precise_descriptor(self, image_name: str, image_subfolder: str = "") -> "RasterDescriptor":
+        """Reads the descriptor of an image's precise asset from its header only. Raises ImageFileNotFoundException
+        when the file is missing and PreciseAssetError when it is corrupt or unsupported."""
+        pass
+
+    @abstractmethod
+    def save_precise(self, raster: "RasterImage", image_name: str, image_subfolder: str = "") -> None:
+        """Writes an image's precise asset: staged in the destination folder, then published without replacing.
+
+        Raises ImageFileSaveException on any failure, leaving no staging file and no asset at the final path. An
+        asset already at the final path is never replaced. The caller holds the image mutation lock, so maintenance
+        cannot sweep the staging file or archive the published asset before its row exists.
+        """
+        pass
+
+    @abstractmethod
     def iter_image_paths(self) -> Iterator[Path]:
         """Yields supported image paths in stable order, excluding reserved trees and symlinks."""
         pass
@@ -27,6 +60,16 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def iter_thumbnail_paths(self) -> Iterator[Path]:
         """Yields thumbnail paths in stable order, excluding reserved trees and symlinks."""
+        pass
+
+    @abstractmethod
+    def iter_precise_paths(self) -> Iterator[Path]:
+        """Yields precise asset paths (`.safetensors`) in stable order, excluding reserved trees and symlinks."""
+        pass
+
+    @abstractmethod
+    def iter_precise_staging_paths(self) -> Iterator[Path]:
+        """Yields `.tmp*` files in the precise tree: leftovers of interrupted safetensors writes, never assets."""
         pass
 
     @property
@@ -39,6 +82,12 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def thumbnail_root(self) -> Path:
         """Gets the root directory for thumbnails."""
+        pass
+
+    @property
+    @abstractmethod
+    def precise_root(self) -> Path:
+        """Gets the root directory for precise assets."""
         pass
 
     @abstractmethod
@@ -83,17 +132,20 @@ class ImageFileStorageBase(ABC):
         source_subfolder: str = "",
         image_subfolder: str = "",
         thumbnail_size: int = 256,
+        include_precise: bool = False,
     ) -> None:
-        """Duplicates an existing image's file and thumbnail under a new name.
+        """Duplicates an existing image's file, thumbnail and (when `include_precise`) precise asset.
 
         A byte-level copy, not a re-encode: every PNG chunk travels, including ones this
-        application does not parse, and no pixels are decoded.
+        application does not parse, and no pixels are decoded. The caller decides `include_precise`
+        from the record store; a flagged but missing source asset fails the copy.
         """
         pass
 
     @abstractmethod
     def get_file_size_bytes(self, image_name: str, image_subfolder: str = "") -> Optional[int]:
-        """Bytes the image and its thumbnail occupy; None when the full-size file is missing."""
+        """Bytes the image, its thumbnail and its precise asset (when present) occupy; None when the full-size file is
+        missing."""
         pass
 
     @abstractmethod
@@ -133,6 +185,13 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def rollback_delete(self, token: object) -> None:
         """Restores files represented by a staged-delete token."""
+        pass
+
+    @abstractmethod
+    def read_png_text(self, image_name: str, image_subfolder: str = "") -> "PngText":
+        """Reads the Invoke text fields of an image's gallery PNG from its chunks, without decoding the pixels or
+        touching the image cache. Raises ImageFileNotFoundException when the file is missing and PngCodecError when
+        it is not a PNG the codec accepts."""
         pass
 
     @abstractmethod

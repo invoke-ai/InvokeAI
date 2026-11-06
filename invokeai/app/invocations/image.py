@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -21,6 +22,17 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.precise_ops import (
+    any_precise,
+    mask_coverage,
+    precise_source,
+    require_same_size,
+    rgba_unit,
+    save_precise,
+    unit_float32,
+    unit_pixels,
+    writable,
+)
 from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -35,6 +47,16 @@ from invokeai.backend.image_util.color_conversion import (
     srgb_from_linear_srgb,
 )
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
+from invokeai.backend.image_util.raster.composite import (
+    composite_layer,
+    convert_channels,
+    paste_blend,
+    unit_srgb_raster,
+)
+from invokeai.backend.image_util.raster.convert import pil_refusal, quantize_unit
+from invokeai.backend.image_util.raster.descriptor import AlphaMode, ColorEncoding, RasterChannels, ValueRange
+from invokeai.backend.image_util.raster.raster import RasterImage
+from invokeai.backend.image_util.raster.resample import resize_raster
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 
@@ -59,6 +81,58 @@ def _restore_original_mode(image: Image.Image, mode: str, alpha_channel: Image.I
 
     image.putalpha(alpha_channel)
     return image
+
+
+def _opaque_value(dtype: numpy.dtype) -> int | float:
+    return int(numpy.iinfo(dtype).max) if dtype.kind == "u" else 1
+
+
+def _to_rgba_array(pixels: numpy.ndarray, channels: RasterChannels) -> numpy.ndarray:
+    """RGBA pixels from L, LA, RGB or RGBA pixels like PIL's `convert("RGBA")`: gray is replicated, alpha is opaque."""
+    if channels is RasterChannels.RGBA:
+        return pixels
+    out = numpy.empty(pixels.shape[:2] + (4,), pixels.dtype)
+    if channels is RasterChannels.RGB:
+        out[:, :, :3] = pixels
+    else:
+        out[:, :, :3] = pixels[:, :, :1]
+    out[:, :, 3] = pixels[:, :, 1] if channels is RasterChannels.LA else _opaque_value(pixels.dtype)
+    return out
+
+
+def _crop_pad_raster(raster: RasterImage, box: tuple[int, int, int, int], rgba: bool) -> RasterImage:
+    """The `box` (left, top, right, bottom) of the raster in its own dtype; outside the image everything is 0.
+
+    Zero-filled like `Image.crop`, which for RGBA means transparent. With `rgba` the result is RGBA whatever the source
+    channels, as `Image.new("RGBA", ...)` + `paste` makes it: only pixels inside the image become opaque.
+    """
+    left, top, right, bottom = box
+    width, height = right - left, bottom - top
+    if width < 1 or height < 1:
+        raise ValueError(f"Cannot produce an image of size {(width, height)}")
+    descriptor = raster.descriptor
+    source = raster.view()
+    out_descriptor = descriptor
+    if rgba:
+        out_descriptor = replace(
+            descriptor,
+            channels=RasterChannels.RGBA,
+            alpha=AlphaMode.STRAIGHT,
+            channel_count=4,
+            # A gray profile cannot describe RGBA pixels.
+            icc_profile=descriptor.icc_profile
+            if descriptor.channels in (RasterChannels.RGB, RasterChannels.RGBA)
+            else None,
+        )
+    out = numpy.zeros((height, width, out_descriptor.channel_count), source.dtype)
+    x0, y0 = max(left, 0), max(top, 0)
+    x1, y1 = min(right, raster.width), min(bottom, raster.height)
+    if x0 < x1 and y0 < y1:
+        inside = source[y0:y1, x0:x1]
+        if rgba:
+            inside = _to_rgba_array(inside, descriptor.channels)
+        out[y0 - top : y1 - top, x0 - left : x1 - left] = inside
+    return RasterImage.from_array(out, out_descriptor)
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
@@ -120,6 +194,12 @@ class ImageCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     height: int = InputField(default=512, gt=0, description="The height of the crop rectangle")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        # A precise source is cropped in its own dtype (no values change), so nothing is lost or widened.
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            box = (self.x, self.y, self.x + self.width, self.y + self.height)
+            return ImageOutput.build(save_precise(context, _crop_pad_raster(raster, box, rgba=True)))
+
         image = context.images.get_pil(self.image.image_name)
 
         image_crop = Image.new(mode="RGBA", size=(self.width, self.height), color=(0, 0, 0, 0))
@@ -159,6 +239,11 @@ class CenterPadCropInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            box = (-self.left, -self.top, raster.width + self.right, raster.height + self.bottom)
+            return ImageOutput.build(save_precise(context, _crop_pad_raster(raster, box, rgba=True)))
+
         image = context.images.get_pil(self.image.image_name)
 
         # Calculate and create new image dimensions
@@ -194,7 +279,38 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
+    def _invoke_precise(self, context: InvocationContext) -> ImageOutput:
+        """The legacy composite in float: the image, scaled per channel (alpha included) by the inverted mask, is placed
+        on a transparent layer and alpha-composited over the base."""
+        base_dto = context.images.get_dto(self.base_image.image_name)
+        image_dto = context.images.get_dto(self.image.image_name)
+        min_x, min_y = min(0, self.x), min(0, self.y)
+        width = max(base_dto.width, image_dto.width + self.x) - min_x
+        height = max(base_dto.height, image_dto.height + self.y) - min_y
+
+        # One canvas, composited in place: the base is written straight into it, the image goes over the region it
+        # covers in row blocks, so the peak is the canvas plus one input image, not several full-size layers.
+        canvas = numpy.zeros((height, width, 4), numpy.float32)
+        base_left, base_top = abs(min_x), abs(min_y)
+        canvas[base_top : base_top + base_dto.height, base_left : base_left + base_dto.width] = rgba_unit(
+            context, self.base_image.image_name
+        )
+        image = rgba_unit(context, self.image.image_name)
+        coverage = None
+        if self.mask is not None:
+            coverage = mask_coverage(ImageOps.invert(context.images.get_pil(self.mask.image_name, mode="L")))
+            require_same_size(image, coverage)
+        composite_layer(canvas, image, max(0, self.x), max(0, self.y), coverage)
+        del image
+
+        if self.crop:
+            canvas = canvas[base_top : base_top + base_dto.height, base_left : base_left + base_dto.width]
+        return ImageOutput.build(save_precise(context, unit_srgb_raster(canvas)))
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        if any_precise(context, self.base_image.image_name, self.image.image_name):
+            return self._invoke_precise(context)
+
         base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
         image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = None
@@ -264,6 +380,16 @@ class ImageMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     image2: ImageField = InputField(description="The second image to multiply")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        if any_precise(context, self.image1.image_name, self.image2.image_name):
+            first, first_channels = unit_pixels(context, self.image1.image_name)
+            second, second_channels = unit_pixels(context, self.image2.image_name)
+            if first_channels is not second_channels:
+                raise ValueError("images do not match")  # as ImageChops.multiply, which only rejects another mode
+            # ImageChops.multiply takes the top-left area both images share.
+            rows, columns = min(first.shape[0], second.shape[0]), min(first.shape[1], second.shape[1])
+            product = first[:rows, :columns] * second[:rows, :columns]
+            return ImageOutput.build(save_precise(context, unit_srgb_raster(product)))
+
         image1 = context.images.get_pil(self.image1.image_name)
         image2 = context.images.get_pil(self.image2.image_name)
 
@@ -291,11 +417,51 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
     channel: IMAGE_CHANNELS = InputField(default="A", description="The channel to get")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        raster = context.images.get_raster(self.image.image_name)
 
-        channel_image = image.getchannel(self.channel)
+        descriptor = raster.descriptor
+        bands = descriptor.channels.value
+        if self.channel not in bands:
+            raise ValueError(f"No such channel {self.channel!r} in an image with channels {bands}")
+        index = bands.index(self.channel)
 
-        image_dto = context.images.save(image=channel_image)
+        if descriptor.alpha is AlphaMode.PREMULTIPLIED and self.channel != "A":
+            raise ValueError(
+                f"Cannot take the {self.channel!r} channel of an image with premultiplied alpha: "
+                "its color values are not the displayed ones"
+            )
+        # Alpha is never transfer-encoded, so the alpha channel is sRGB whatever the image's color encoding.
+        color = ColorEncoding.SRGB if self.channel == "A" else descriptor.color
+        channel_raster = RasterImage.from_array(
+            raster.view()[:, :, index : index + 1],
+            replace(
+                descriptor,
+                channels=RasterChannels.L,
+                color=color,
+                alpha=AlphaMode.NONE,
+                channel_count=1,
+                icc_profile=None,
+            ),
+        )
+
+        keeps_precision = False
+        if channel_raster.dtype.kind == "f":
+            # A float (precise) source is displayed through a display quantization, which only means something for
+            # sRGB values in [0, 1].
+            if color is not ColorEncoding.SRGB or descriptor.value_range is not ValueRange.UNIT:
+                raise ValueError(
+                    f"Cannot take a displayable channel from a {color.value} image with "
+                    f"{descriptor.value_range.value} values"
+                )
+            # With precise storage the channel keeps its precision; otherwise it is stored as an 8-bit PNG.
+            keeps_precision = context.images.precise_storage_enabled
+            if not keeps_precision:
+                channel_raster = quantize_unit(channel_raster, numpy.uint8)
+        refusal = pil_refusal(channel_raster)
+        if refusal is not None and not keeps_precision:
+            raise ValueError(f"Cannot take a displayable channel: {refusal}")
+
+        image_dto = context.images.save_raster(channel_raster)
 
         return ImageOutput.build(image_dto)
 
@@ -512,9 +678,14 @@ class ImageResizeInvocation(BaseInvocation, WithMetadata, WithBoard):
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
-
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
+
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            resized = resize_raster(unit_float32(raster), self.width, self.height, resample_mode)
+            return ImageOutput.build(save_precise(context, resized))
+
+        image = context.images.get_pil(self.image.image_name)
 
         resize_image = image.resize(
             (self.width, self.height),
@@ -545,9 +716,17 @@ class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
+
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            width = int(raster.width * self.scale_factor)
+            height = int(raster.height * self.scale_factor)
+            resized = resize_raster(unit_float32(raster), width, height, resample_mode)
+            return ImageOutput.build(save_precise(context, resized))
+
         image = context.images.get_pil(self.image.image_name)
 
-        resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
         width = int(image.width * self.scale_factor)
         height = int(image.height * self.scale_factor)
 
@@ -576,6 +755,15 @@ class ImageLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     max: int = InputField(default=255, ge=0, le=255, description="The maximum output value")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            # The legacy map in unit values, without the 8-bit truncation, on every channel including alpha (which
+            # stays in [0, 1], as the map's outputs lie between min/255 and max/255). Color values beyond 0-1 are
+            # kept; a display quantization clips them.
+            pixels = unit_float32(raster).view() * numpy.float32((self.max - self.min) / 255)
+            pixels += numpy.float32(self.min / 255)
+            return ImageOutput.build(save_precise(context, RasterImage.from_array(pixels, raster.descriptor)))
+
         image = context.images.get_pil(self.image.image_name)
 
         image_arr = numpy.asarray(image, dtype=numpy.float32) / 255
@@ -603,6 +791,19 @@ class ImageInverseLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     max: int = InputField(default=255, ge=0, le=255, description="The maximum input value")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            # The legacy map in unit values, clamped to [0, 1]. max == min is a step at min (the legacy division by
+            # zero gives 1 above it, 0 elsewhere).
+            pixels = unit_float32(raster).view() - numpy.float32(self.min / 255)
+            numpy.maximum(pixels, 0, out=pixels)
+            if self.max == self.min:
+                pixels = (pixels > 0).astype(numpy.float32)
+            else:
+                pixels /= numpy.float32((self.max - self.min) / 255)
+                numpy.clip(pixels, 0.0, 1.0, out=pixels)
+            return ImageOutput.build(save_precise(context, RasterImage.from_array(pixels, raster.descriptor)))
+
         image = context.images.get_pil(self.image.image_name)
 
         image_arr = numpy.asarray(image, dtype=numpy.float32)
@@ -1207,6 +1408,18 @@ class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
+def _paste_unit_images(
+    context: InvocationContext, destination_name: str, source_name: str, coverage: numpy.ndarray
+) -> RasterImage:
+    """`destination.paste(source, (0, 0), mask)` in float: the source takes the destination's channels (as
+    `Image.paste` converts it) and every channel is blended by the coverage."""
+    destination, channels = unit_pixels(context, destination_name)
+    source, source_channels = unit_pixels(context, source_name)
+    require_same_size(source, coverage)
+    source = convert_channels(source, source_channels, channels)
+    return unit_srgb_raster(paste_blend(destination, source, 0, 0, coverage))
+
+
 @invocation(
     "canvas_paste_back",
     title="Canvas Paste Back",
@@ -1234,6 +1447,15 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOps.invert(mask.convert("L"))
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        if any_precise(context, self.source_image.image_name, self.target_image.image_name):
+            mask = mask_coverage(self._prepare_mask(context.images.get_pil(self.mask.image_name)))
+            return ImageOutput.build(
+                save_precise(
+                    context,
+                    _paste_unit_images(context, self.source_image.image_name, self.target_image.image_name, mask),
+                )
+            )
+
         source_image = context.images.get_pil(self.source_image.image_name)
         target_image = context.images.get_pil(self.target_image.image_name)
         mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
@@ -1311,6 +1533,25 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
+
+        names = [self.generated_image.image_name] + ([self.source_image.image_name] if self.source_image else [])
+        if any_precise(context, *names):
+            coverage = mask_coverage(mask)
+            if self.source_image:
+                raster = _paste_unit_images(
+                    context, self.source_image.image_name, self.generated_image.image_name, coverage
+                )
+            else:
+                # putalpha: gray becomes gray + alpha, color becomes RGBA, and the mask replaces any alpha.
+                pixels, channels = unit_pixels(context, self.generated_image.image_name)
+                require_same_size(pixels, coverage)
+                with_alpha = (
+                    RasterChannels.LA if channels in (RasterChannels.L, RasterChannels.LA) else RasterChannels.RGBA
+                )
+                pixels = writable(convert_channels(pixels, channels, with_alpha))
+                pixels[:, :, -1] = coverage
+                raster = unit_srgb_raster(pixels)
+            return ImageOutput.build(save_precise(context, raster))
 
         if self.source_image:
             generated_image = context.images.get_pil(self.generated_image.image_name)
@@ -1436,6 +1677,14 @@ class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        if context.images.has_precise_asset(self.image.image_name):
+            pixels = writable(rgba_unit(context, self.image.image_name))
+            mask = context.images.get_pil(self.mask.image_name, mode="L")
+            coverage = mask_coverage(ImageOps.invert(mask) if self.invert_mask else mask)
+            require_same_size(pixels, coverage)
+            pixels[:, :, 3] = coverage
+            return ImageOutput.build(save_precise(context, unit_srgb_raster(pixels)))
+
         # Load images
         image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = context.images.get_pil(self.mask.image_name, mode="L")
@@ -1552,6 +1801,18 @@ class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raster = precise_source(context, self.image.image_name)
+        if raster is not None:
+            # The geometry comes from the display PNG, so what counts as content is what the gallery shows.
+            box = (
+                self.bounding_box.tuple()
+                if self.bounding_box is not None
+                else context.images.get_pil(self.image.image_name).getbbox()
+            )
+            if box is None:
+                box = (0, 0, raster.width, raster.height)
+            return ImageOutput.build(save_precise(context, _crop_pad_raster(raster, box, rgba=False)))
+
         image = context.images.get_pil(self.image.image_name)
 
         bounding_box = self.bounding_box.tuple() if self.bounding_box is not None else image.getbbox()
@@ -1579,10 +1840,21 @@ class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoar
     bounding_box: BoundingBoxField = InputField(description="The bounding box to paste the image into")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        bounding_box = self.bounding_box.tuple()
+        if any_precise(context, self.source_image.image_name, self.target_image.image_name):
+            source = rgba_unit(context, self.source_image.image_name)
+            target = rgba_unit(context, self.target_image.image_name)
+            if (bounding_box[2] - bounding_box[0], bounding_box[3] - bounding_box[1]) != (
+                source.shape[1],
+                source.shape[0],
+            ):
+                raise ValueError("images do not match")  # as Image.paste with a box of another size
+            # The source's own alpha is the mask, and it blends every channel, alpha included.
+            pasted = paste_blend(target, source, bounding_box[0], bounding_box[1], source[:, :, 3])
+            return ImageOutput.build(save_precise(context, unit_srgb_raster(pasted)))
+
         source_image = context.images.get_pil(self.source_image.image_name, mode="RGBA")
         target_image = context.images.get_pil(self.target_image.image_name, mode="RGBA")
-
-        bounding_box = self.bounding_box.tuple()
 
         target_image.paste(source_image, bounding_box, source_image)
 

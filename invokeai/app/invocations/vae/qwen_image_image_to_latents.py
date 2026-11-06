@@ -17,9 +17,14 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.vae.precise_io import load_precise_unit_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    image_resized_to_grid_as_tensor,
+    resize_unit_tensor,
+    trim_unit_tensor_to_grid,
+)
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.qwen_image_vae import (
     QWEN_IMAGE_VAE_MIN_TILE_SIZE,
@@ -53,18 +58,37 @@ def reference_image_size(height: int, width: int) -> tuple[int, int]:
     )
 
 
+def _reference_tensor(unit: torch.Tensor) -> torch.Tensor:
+    """A (1, 3, H, W) unit-range edit reference: resized bilinearly without antialiasing, and only when the size
+    changes -- the exact preprocessing the edit LoRAs saw in training."""
+    unit = unit[None]
+    height, width = unit.shape[-2:]
+    size = reference_image_size(height, width)
+    if size != (height, width):
+        unit = F.interpolate(unit, size=size, mode="bilinear")
+    return unit
+
+
 def reference_image_tensor(image: PILImage.Image) -> torch.Tensor:
     """An edit reference as a (1, 3, H, W) tensor in [-1, 1].
 
-    RGB with any alpha dropped (not composited), resized bilinearly without antialiasing, and only when
-    the size changes -- the exact preprocessing the edit LoRAs saw in training.
+    RGB with any alpha dropped (not composited), resized as `_reference_tensor` does.
     """
-    tensor = tv_functional.to_tensor(image.convert("RGB")).unsqueeze(0)
-    height, width = tensor.shape[-2:]
-    size = reference_image_size(height, width)
-    if size != (height, width):
-        tensor = F.interpolate(tensor, size=size, mode="bilinear")
-    return tensor * 2.0 - 1.0
+    return _reference_tensor(tv_functional.to_tensor(image.convert("RGB"))) * 2.0 - 1.0
+
+
+def precise_image_tensor(unit: torch.Tensor, reference: bool, size: tuple[int, int] | None) -> torch.Tensor:
+    """A (1, 3, H, W) tensor in the VAE's input range from the unclamped unit-range values of a precise asset.
+
+    Mirrors the 8-bit path on floats: an edit reference is resized as `reference_image_tensor` does; otherwise the
+    image is resized to `size` (height, width) when given, then trimmed to the 16 grid (the post-VAE latents need
+    even spatial dims for the transformer's 2x2 patches), resampling only when a side does not already fit.
+    """
+    if reference:
+        return _reference_tensor(unit) * 2.0 - 1.0
+    if size is not None:
+        unit = resize_unit_tensor(unit, *size)
+    return trim_unit_tensor_to_grid(unit, multiple_of=REFERENCE_GRID)[None] * 2.0 - 1.0
 
 
 @invocation(
@@ -159,7 +183,8 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.images.get_pil(self.image.image_name)
+        unit = load_precise_unit_tensor(context, self.image.image_name)
+        image = context.images.get_pil(self.image.image_name) if unit is None else None
 
         # `width`/`height` are `int | None`, but the workflow UI cannot represent None in a number
         # input and sends 0 for "unset" — which `is not None`, so a naive check reached
@@ -168,9 +193,13 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
         # width=1024, height=0) encodes at the original size rather than raising.
         has_target_size = (self.width or 0) > 0 and (self.height or 0) > 0
 
-        if self.reference:
-            if has_target_size:
-                raise ValueError("An edit reference is sized automatically; leave width and height unset.")
+        if self.reference and has_target_size:
+            raise ValueError("An edit reference is sized automatically; leave width and height unset.")
+        if unit is not None:
+            size = (self.height, self.width) if has_target_size else None
+            image_tensor = precise_image_tensor(unit, self.reference, size)
+            del unit
+        elif self.reference:
             image_tensor = reference_image_tensor(image)
         else:
             # If target dimensions are specified, resize the image BEFORE encoding

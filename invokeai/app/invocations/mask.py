@@ -16,7 +16,10 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.precise_ops import save_precise, unit_pixels, writable
 from invokeai.app.invocations.primitives import BoundingBoxOutput, ImageOutput, MaskOutput
+from invokeai.backend.image_util.raster.composite import convert_channels, unit_srgb_raster
+from invokeai.backend.image_util.raster.descriptor import RasterChannels
 from invokeai.backend.image_util.util import pil_to_np
 
 
@@ -187,7 +190,8 @@ class ApplyMaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     invert: bool = InputField(default=False, description="Whether to invert the mask.")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+        precise = context.images.has_precise_asset(self.image.image_name)
+        image = None if precise else context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = context.tensors.load(self.mask.tensor_name)
 
         # Squeeze the channel dimension if it exists.
@@ -201,6 +205,22 @@ class ApplyMaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         if self.invert:
             mask_np = 255 - mask_np
+
+        if precise:
+            # The mask is binary coverage; the image keeps its precise color. Same rule as below, on float alpha.
+            pixels, channels = unit_pixels(context, self.image.image_name)
+            if pixels.shape[:2] != mask_np.shape:
+                raise ValueError("The mask and the image differ in size")
+            masked = writable(convert_channels(pixels, channels, RasterChannels.RGBA))
+            coverage = mask_np / np.float32(255)
+            if channels in (RasterChannels.LA, RasterChannels.RGBA):
+                # Which pixels take the mask is decided on the gallery image's alpha (so a sub-visible alpha counts as
+                # transparent, as it does without an asset); the mask is then applied to the precise pixels.
+                visible = np.asarray(context.images.get_pil(self.image.image_name, mode="RGBA"))[:, :, 3] > 0
+                masked[:, :, 3] = np.where(visible, coverage, masked[:, :, 3])
+            else:
+                masked[:, :, 3] = coverage  # no alpha: every pixel is opaque, so every pixel takes the mask
+            return ImageOutput.build(save_precise(context, unit_srgb_raster(masked)))
 
         # Apply the mask only to the alpha channel where the original alpha is non-zero. This preserves the original
         # image's transparency - else the transparent regions would end up as opaque black.

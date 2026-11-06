@@ -193,17 +193,25 @@ class DeviceMemory:
     `capacity_bytes`, which counts the RAM the host has available."""
 
 
-def _vae_dtypes(device: torch.device, models_path: Path) -> VaeDtypes:
-    """What the VAE loaders choose on `device`, by the loaders' own rules, for models installed under `models_path`."""
+def _vae_dtypes(device: torch.device, models_path: Path, precise_image_storage: bool) -> VaeDtypes:
+    """What the VAE loaders choose on `device`, by the loaders' own rules (`TorchDevice.autoencoder_dtype`), for models
+    installed under `models_path`."""
 
     def sdnq_quantized_vae(config: Any) -> bool:
         # Where `FluxSDNQDiffusersModel._load_model` looks, with the path the loader makes absolute.
         pipeline = SimpleNamespace(path=models_path / config.path, submodels=getattr(config, "submodels", None))
         return is_sdnq_folder(resolve_submodel_path(pipeline, SubModelType.VAE, pipeline.path / SubModelType.VAE.value))
 
+    configured = TorchDevice.choose_torch_dtype(device)
+
+    def autoencoder(otherwise: Optional[torch.dtype] = None) -> str:
+        return dtype_name(TorchDevice.autoencoder_dtype(configured, device, precise_image_storage, otherwise))
+
     return VaeDtypes(
-        standalone_flux=dtype_name(TorchDevice.dtype_avoiding_float16(TorchDevice.choose_torch_dtype(device), device)),
-        z_image_pipeline=dtype_name(TorchDevice.choose_bfloat16_safe_dtype(device)),
+        standalone_flux=autoencoder(),
+        # The pipeline loaders give every submodel a dtype of their own; only the setting moves the VAE off it.
+        z_image_pipeline=autoencoder(otherwise=TorchDevice.choose_bfloat16_safe_dtype(device)),
+        flux2_pipeline=autoencoder(otherwise=torch.bfloat16),
         sdnq_quantized_vae=sdnq_quantized_vae,
     )
 
@@ -530,7 +538,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         ] = fingerprint.environment_for,
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
         device_memory: Optional[Callable[[torch.device], DeviceMemory]] = None,
-        vae_dtypes: Callable[[torch.device, Path], VaeDtypes] = _vae_dtypes,
+        vae_dtypes: Callable[[torch.device, Path, bool], VaeDtypes] = _vae_dtypes,
     ) -> None:
         self._store = store
         self._generation_devices = generation_devices
@@ -1751,7 +1759,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     def _vae_dtypes_on(self, device: Optional[torch.device]) -> VaeDtypes:
         """What the VAE loaders choose on `device`, by default the one models load onto."""
-        return self._vae_dtypes(device or TorchDevice.choose_torch_device(), self._services.configuration.models_path)
+        configuration = self._services.configuration
+        return self._vae_dtypes(
+            device or TorchDevice.choose_torch_device(), configuration.models_path, configuration.precise_image_storage
+        )
 
     def _cache_memory(self, device: torch.device) -> DeviceMemory:
         """`DeviceMemory` for a GPU `device`: the capacity its model cache gives a calibration's lock, which that lock
