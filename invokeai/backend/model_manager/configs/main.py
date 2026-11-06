@@ -2580,10 +2580,11 @@ def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImage
 class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
 
-    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.
-    The loader keeps scaled fp8 weights when fp8 compute is available or the
+    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled, nvfp4 and int8_tensorwise(+convrot)
+    checkpoints. The loader keeps scaled fp8 weights when fp8 compute is available or the
     `default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),
-    and dequantizes them to bf16 at load time otherwise.
+    and dequantizes them to bf16 at load time otherwise. An int8 weight whose marker is missing or
+    names another format is refused at install, as the loader would refuse it.
     """
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
@@ -2603,6 +2604,17 @@ class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base,
 
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+        # Not `_raise_for_unsupported_comfy_quantization`: it refuses nvfp4, which this family loads. The loader reads
+        # both the per-tensor markers and the `_quantization_metadata` header.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            sd,
+            accepted_convrot_formats(accept_int4=False),
+            read_header=True,
+            what="Qwen Image transformer",
+            supported="Only the int8_tensorwise build (rotated or not) is supported.",
+        )
 
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 

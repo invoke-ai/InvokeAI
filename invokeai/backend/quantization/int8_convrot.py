@@ -805,8 +805,9 @@ def reject_unmarked_int8_weights(
         else f" A build that names its quantization only in the safetensors header is not supported for {architecture}."
     )
     raise ValueError(
-        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no `comfy_quant` marker, "
-        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header}"
+        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no readable int8_tensorwise marker, "
+        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header} "
+        "Use another build of this model."
     )
 
 
