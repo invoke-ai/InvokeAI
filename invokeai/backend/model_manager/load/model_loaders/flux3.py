@@ -98,6 +98,8 @@ def flux3_transformer_from_native(
 class Flux3DiffusersModel(ModelLoader):
     """Loads the submodels of a FLUX.3 Diffusers folder."""
 
+    _bfloat16_safe = True
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -114,7 +116,7 @@ class Flux3DiffusersModel(ModelLoader):
             raise ValueError("A submodel type must be provided when loading a FLUX.3 Diffusers model.")
 
         model_path = Path(config.path)
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, submodel_type).dtype
 
         match submodel_type:
             case SubModelType.Transformer:
@@ -157,6 +159,8 @@ class Flux3DiffusersModel(ModelLoader):
 class Flux3CheckpointModel(ModelLoader):
     """Loads a FLUX.3 transformer from a single bf16 file (BFL `model.safetensors`, or its ComfyUI repackage)."""
 
+    _bfloat16_safe = True
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_Flux3_Config):
             raise ValueError(f"Unexpected config type {type(config).__name__} for the FLUX.3 single-file loader.")
@@ -165,7 +169,7 @@ class Flux3CheckpointModel(ModelLoader):
 
         from safetensors.torch import load_file
 
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
         model = flux3_transformer_from_native(load_file(Path(config.path)), model_dtype, self._ram_cache.make_room)
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 

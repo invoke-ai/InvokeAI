@@ -41,6 +41,14 @@ These GPUs have native FP8 tensor cores. FP8 *Storage* on its own still only buy
 
 FP8 Storage is only used on CUDA and Intel XPU devices. On CPU PyTorch *technically* supports FP8 dtypes, but the cast operations are software-emulated and end up costing more than the memory savings buy back. If you toggle it on CPU or MPS, the loader skips the cast and returns the model unchanged with no log line. On a CUDA or XPU device whose FP8 test fails, the log shows `FP8 storage probe failed on <device> ... not using FP8.` once.
 
+## Sharing across devices and CPU encoders
+
+Devices share a cached CPU copy only when their loading policies produce the same stored weights and compute dtype. A device that retains FP8 weights and one that unpacks them need separate CPU copies. The dtype also matters: if PyTorch rejects BF16, InvokeAI falls back to FP16 on CUDA and FP32 on other devices. Matching policies can reuse the same CPU allocation without another checkpoint read.
+
+This choice is made before reading the checkpoint. With `fp8_compute` enabled (off by default), a mixed-capability setup can therefore retain two CPU copies and read a checkpoint twice even when that file contains only BF16 weights. FP8 Storage can likewise separate device caches when its device support differs. This conservative policy avoids reading large files just to decide whether their cached weights can be shared. A transient FP8 probe failure uses the unpacked policy for that load; a later successful probe can leave both copies resident until normal eviction.
+
+**CPU-only Mistral and Qwen3-VL encoders unpack FP8 weights using the CPU's dtype policy**, even on a machine with an FP8-capable GPU. This saves VRAM but increases system RAM compared with retaining the packed weights: approximately 16.8 to 32.3 GiB for the scaled-FP8 Mistral 24B encoder, and 4.4 to 8.9 GiB for Qwen3-VL 4B when unpacked to BF16. Allow more RAM where BF16 is unsupported and FP32 is required. The CPU-only encoder can share its unpacked CPU copy with another load using the same policy; the GPU's packed copy stays separate.
+
 ## Enabling FP8 Storage
 
 FP8 Storage is a **per-model setting**, configured from the Model Manager:

@@ -87,6 +87,7 @@ def _recording_model() -> tuple[MagicMock, dict[str, torch.Tensor]]:
 def _make_loader() -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
+    loader._torch_device = torch.device("cpu")
     return loader
 
 

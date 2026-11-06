@@ -79,8 +79,9 @@ class AnimaCheckpointModel(ModelLoader):
 
     _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
 
-    def _storage_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        device = self._get_execution_device(config, submodel_type) or self._torch_device
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
         return TorchDevice.choose_anima_inference_dtype(device)
 
     def _load_model(

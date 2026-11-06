@@ -74,8 +74,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
     cached encoder while they encode. The language model's weights are cached once for both.
     """
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return self._storage_dtype(config, submodel_type)
+    _bfloat16_safe = True
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -111,7 +110,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
             # device has it, float32 otherwise.
             dtype = self._torch_dtype_avoiding_float16()
         else:
-            dtype = self._layerwise_dtype(config, submodel_type)
+            dtype = self._decision(config, submodel_type).dtype
 
         if submodel_type is SubModelType.VisionEncoder:
             tower = _load_vision_tower(model_path / SubModelType.TextEncoder.value, dtype)

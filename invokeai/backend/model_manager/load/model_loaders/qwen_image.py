@@ -39,7 +39,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
     read_safetensors_metadata,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -151,8 +150,7 @@ def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
 class QwenImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Qwen Image Edit main models."""
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return torch.bfloat16
+    _fixed_dtype = torch.bfloat16
 
     def _load_model(
         self,
@@ -173,7 +171,7 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
 
         # We force bfloat16 for Qwen Image Edit models.
         # Use `dtype` (newer) with fallback to `torch_dtype` (older diffusers).
-        dtype = self._layerwise_dtype(config, submodel_type)
+        dtype = self._decision(config, submodel_type).dtype
         dtype_kwarg = {"dtype": dtype}
         try:
             result: AnyModel = load_class.from_pretrained(
@@ -255,21 +253,6 @@ class QwenImageCheckpointModel(ModelLoader):
     otherwise they are dequantized to bf16 at load time."""
 
     _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
-
-    def _storage_format(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> tuple[bool, torch.dtype]:
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        key = (id(config), submodel_type)
-        if key not in decisions:
-            device = self._get_execution_device(config, submodel_type) or self._torch_device
-            compute = should_keep_fp8_weights(device)
-            self.__dict__.setdefault("_fp8_compute_decisions", {})[device] = compute
-            decisions[key] = (
-                compute or self._snapshot_fp8_storage(config, submodel_type),
-                self._storage_dtype(config, submodel_type),
-            )
-        return decisions[key]
 
     def _load_model(
         self,

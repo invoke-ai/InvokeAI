@@ -151,8 +151,12 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if subtype == submodel_type:
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
-                cache_key = self._get_cache_key(config, subtype)
-                self._apply_fp8_layerwise_casting(submodel, config, subtype)
+                requested_decision = self._load_decision
+                try:
+                    cache_key = self._get_cache_key(config, subtype)
+                    self._apply_fp8_layerwise_casting(submodel, config, subtype)
+                finally:
+                    self._load_decision = requested_decision
                 # prefetch: nothing will get()/lock() these submodels during this load, so they
                 # must be admitted without the post-admission grace — otherwise the never-used
                 # records would be skipped by budget reconciles until some later admission on

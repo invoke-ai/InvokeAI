@@ -164,9 +164,7 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
 class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        device = self._get_execution_device(config, submodel_type) or self._torch_device
-        return TorchDevice.choose_bfloat16_safe_dtype(device)
+    _bfloat16_safe = True
 
     def _load_transformer(
         self, config: AnyModelConfig, sd: dict[str, torch.Tensor], geometry: dict[str, Any], what: str
@@ -175,7 +173,7 @@ class _MossImageTransformerLoading(ModelLoader):
         markers = extract_int8_convrot_markers(sd)
         # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.
         reject_unmarked_int8_weights(sd, markers, "MOSS-Image")
-        dtype = self._layerwise_dtype(config, SubModelType.Transformer)
+        dtype = self._decision(config, SubModelType.Transformer).dtype
 
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**geometry)

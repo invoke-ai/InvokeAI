@@ -242,8 +242,7 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
 class ZImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Z-Image main models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit)."""
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return self._storage_dtype(config, submodel_type)
+    _bfloat16_safe = True
 
     def _load_model(
         self,
@@ -271,7 +270,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
 
         # Reuse the constructor dtype that selected the shared-weight key.
-        dtype = self._layerwise_dtype(config, submodel_type)
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result: AnyModel = load_class.from_pretrained(
                 submodel_path,

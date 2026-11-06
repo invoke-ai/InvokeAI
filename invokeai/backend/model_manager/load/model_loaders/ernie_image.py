@@ -5,7 +5,6 @@ from typing import Optional
 
 import accelerate
 import safetensors.torch
-import torch
 
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -49,8 +48,7 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
     from a diffusers pipeline directory.
     """
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return self._storage_dtype(config, submodel_type)
+    _bfloat16_safe = True
 
     def _load_model(
         self,
@@ -78,7 +76,7 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
             result: AnyModel = load_class.from_pretrained(model_path, local_files_only=True)
             return result
 
-        dtype = self._layerwise_dtype(config, submodel_type)
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant, local_files_only=True)
         except OSError as e:
@@ -100,8 +98,7 @@ class ErnieImageCheckpointModel(ModelLoader):
 
     _default_submodel_type = SubModelType.Transformer
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return self._storage_dtype(config, submodel_type)
+    _bfloat16_safe = True
 
     def _load_model(
         self,
@@ -118,7 +115,7 @@ class ErnieImageCheckpointModel(ModelLoader):
 
         from diffusers import ErnieImageTransformer2DModel
 
-        model_dtype = self._layerwise_dtype(config, SubModelType.Transformer)
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         sd = safetensors.torch.load_file(Path(config.path))
         reject_quantized_side_channel(sd, f"ERNIE-Image checkpoint {Path(config.path).name}")

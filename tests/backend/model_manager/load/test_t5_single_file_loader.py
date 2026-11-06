@@ -18,6 +18,7 @@ from transformers import T5Config, T5EncoderModel
 
 import invokeai.backend.model_manager.load.model_loaders.flux as loader_module
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -119,8 +120,8 @@ def loader() -> T5EncoderSingleFileLoader:
 
 
 def _keep_fp8(monkeypatch: pytest.MonkeyPatch, keep: bool) -> None:
-    monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda _device: keep)
-    monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda _device, _logger=None: keep)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: keep)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda _device, _logger=None: keep)
 
 
 def _load_encoder(loader: T5EncoderSingleFileLoader, path: Path) -> T5EncoderModel:
@@ -252,8 +253,8 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
     monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
-    monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda device: device.type == "cuda")
-    monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda device, _logger=None: False)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.type == "cuda")
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda device, _logger=None: False)
     path = tmp_path / "t5xxl.safetensors"
     _write_scaled_fp8(_tiny_reference(), path)
     config = T5Encoder_Checkpoint_Config.model_construct(

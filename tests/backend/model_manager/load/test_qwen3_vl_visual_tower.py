@@ -188,7 +188,7 @@ def _checkpoint_loader(monkeypatch, te_config) -> Qwen3VLEncoderCheckpointLoader
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2._device_supports_fp8_storage",
+        "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage",
         lambda _device, _logger: False,
     )
     return loader

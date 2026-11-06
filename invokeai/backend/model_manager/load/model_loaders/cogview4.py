@@ -20,8 +20,7 @@ from invokeai.backend.model_manager.taxonomy import (
 class CogView4DiffusersModel(GenericDiffusersLoader):
     """Class to load CogView4 main models."""
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return torch.bfloat16
+    _fixed_dtype = torch.bfloat16
 
     def _load_model(
         self,
@@ -42,7 +41,7 @@ class CogView4DiffusersModel(GenericDiffusersLoader):
 
         # We force bfloat16 for CogView4 models. It produces black images with float16. I haven't tracked down
         # specifically which model(s) is/are responsible.
-        dtype = self._layerwise_dtype(config, submodel_type)
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,

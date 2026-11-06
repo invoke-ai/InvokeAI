@@ -194,8 +194,11 @@ def _checkpoint_case(family, monkeypatch):
     monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _d: torch.float32))
     monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.index == 0)
     for host in (mistral_encoder, qwen_image):
-        monkeypatch.setattr(host, "should_keep_fp8_weights", lambda device: device.index == 0)
-    monkeypatch.setattr(mistral_encoder, "_device_supports_fp8_storage", lambda *_a: False)
+        if hasattr(host, "should_keep_fp8_weights"):
+            monkeypatch.setattr(host, "should_keep_fp8_weights", lambda device: device.index == 0)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_a: False)
+    if hasattr(mistral_encoder, "_device_supports_fp8_storage"):
+        monkeypatch.setattr(mistral_encoder, "_device_supports_fp8_storage", lambda *_a: False)
 
     def config(**extra):
         if family == "mistral":
@@ -244,7 +247,8 @@ def test_checkpoint_caches_do_not_adopt_a_different_folded_dtype(checkpoint_case
     from invokeai.backend.model_manager.load.model_loaders import mistral_encoder, qwen_image
 
     for module in (load_default, mistral_encoder, qwen_image):
-        monkeypatch.setattr(module, "should_keep_fp8_weights", lambda _d: False)
+        if hasattr(module, "should_keep_fp8_weights"):
+            monkeypatch.setattr(module, "should_keep_fp8_weights", lambda _d: False)
     monkeypatch.setattr(
         TorchDevice,
         "choose_bfloat16_safe_dtype",
@@ -281,7 +285,8 @@ def test_checkpoint_key_freezes_the_build_capability_and_dtype(checkpoint_case, 
         return state["keep"]
 
     for module in (load_default, mistral_encoder, qwen_image):
-        monkeypatch.setattr(module, "should_keep_fp8_weights", keep)
+        if hasattr(module, "should_keep_fp8_weights"):
+            monkeypatch.setattr(module, "should_keep_fp8_weights", keep)
     monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _d: state["dtype"]))
     store = SharedCpuWeightsStore()
     loader = _loader(cls, store, RamBudget(10**9, store), "cuda:0", tmp_path)

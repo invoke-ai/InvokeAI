@@ -46,7 +46,6 @@ from invokeai.backend.model_manager.configs.mistral_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -78,7 +77,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -1128,22 +1126,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
 
     _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
 
-    def _storage_format(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> tuple[bool, torch.dtype]:
-        # Like T5, the encoder keeps checkpoint fp8 whenever storage is supported, independently
-        # of the denoiser's FP8 Storage setting. cpu_only changes both this policy and the dtype.
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        key = (id(config), submodel_type)
-        if key not in decisions:
-            device = self._get_execution_device(config, submodel_type) or self._torch_device
-            compute = should_keep_fp8_weights(device)
-            self.__dict__.setdefault("_fp8_compute_decisions", {})[device] = compute
-            decisions[key] = (
-                compute or _device_supports_fp8_storage(device, self._logger),
-                self._storage_dtype(config, submodel_type),
-            )
-        return decisions[key]
+    _encoder_fp8_storage = True
 
     def _load_model(
         self,

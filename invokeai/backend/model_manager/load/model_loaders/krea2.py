@@ -24,7 +24,6 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -60,7 +59,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -418,8 +416,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
     pipeline's tokenizer for reference images. Krea-2's edit mode loads both only when a prompt has references.
     """
 
-    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
-        return self._storage_dtype(config, submodel_type)
+    _bfloat16_safe = True
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -472,7 +469,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
         model_path = model_path / submodel_type.value
 
         # Reuse the constructor dtype that selected the shared-weight key.
-        dtype = self._layerwise_dtype(config, submodel_type)
+        dtype = self._decision(config, submodel_type).dtype
 
         extra_kwargs: dict[str, Any] = {}
         if submodel_type is SubModelType.TextEncoder:
@@ -1070,24 +1067,9 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
 
     CONFIG_CLASS = Qwen3VLEncoder_Checkpoint_Config
 
-    def _encoder_storage_format(self, config: AnyModelConfig) -> tuple[bool, bool, torch.dtype]:
-        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
-        decisions = self.__dict__.setdefault("_encoder_storage_decisions", {})
-        if device not in decisions:
-            compute = should_keep_fp8_weights(device)
-            storage = _device_supports_fp8_storage(device, self._logger)
-            self.__dict__.setdefault("_fp8_compute_decisions", {})[device] = compute
-            decisions[device] = (compute, storage, self._storage_dtype(config, SubModelType.TextEncoder))
-        return decisions[device]
-
-    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        if submodel_type is SubModelType.TextEncoder:
-            compute, storage, dtype = self._encoder_storage_format(config)
-            return (
-                f"{'fp8' if compute or storage else 'full'}-{str(dtype).removeprefix('torch.')}"
-                f"{'-layerwise' if storage else ''}"
-            )
-        return super()._cache_key_variant(config, submodel_type)
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
+    _encoder_layerwise_storage = True
 
     def _vision_encoder_nbytes(self, model_path: Path) -> int:
         return qwen3vl_visual_tower_nbytes([model_path])
@@ -1107,7 +1089,10 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
-        keep_matmul_fp8, storage_supported, model_dtype = self._encoder_storage_format(config)
+        decision = self._decision(config, SubModelType.TextEncoder)
+        keep_matmul_fp8 = decision.fp8_compute
+        storage_supported = decision.storage_supported
+        model_dtype = decision.dtype
 
         sd = load_file(str(model_path))
         # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
