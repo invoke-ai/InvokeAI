@@ -8,7 +8,12 @@ import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { releaseFocusOnRemoval } from '@workbench/focusRegions';
-import { ImageContinueGroup, ImageUseGroups, useImageRecallCapabilities } from '@workbench/image-actions';
+import {
+  ImageContinueGroup,
+  ImageUseGroups,
+  useImageRecallCapabilities,
+  VideoUseGroups,
+} from '@workbench/image-actions';
 import {
   ChevronDownIcon,
   CopyIcon,
@@ -32,9 +37,8 @@ const STAR_LABEL_KEYS = {
 
 /**
  * The selection's actions in the Preview header. An image gets Edit (every way to continue working with it) and Use
- * (it as an input, or its settings), so ⋮ keeps only housekeeping: labelled at full density, icon-only at compact,
- * where compare moves into ⋮ too. Minimal density keeps star and the full ⋮ alone; videos have neither menu and keep
- * the full ⋮ at every density.
+ * (it as an input, or its settings); a video gets Use alone. ⋮ then keeps only housekeeping: labelled at full density,
+ * icon-only at compact, where compare moves into ⋮ too. Minimal density keeps star and the full ⋮ alone.
  */
 export const PreviewActionStrip = ({
   actions,
@@ -63,7 +67,7 @@ export const PreviewActionStrip = ({
   );
   const selectForCompare = useCallback(() => image && actions.selectForCompare(image), [actions, image]);
   const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
-  const hasItemMenus = density !== 'minimal' && image !== null;
+  const hasItemMenus = density !== 'minimal';
   const openMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -94,11 +98,11 @@ export const PreviewActionStrip = ({
     />
   ) : null;
 
-  if (density === 'compact' && image) {
+  if (density === 'compact') {
     return (
       <HStack flexShrink={0} gap="0.5">
-        <EditMenu actions={actions} image={image} isIconOnly />
-        <UseMenu actions={actions} image={image} isIconOnly />
+        {image ? <EditMenu actions={actions} image={image} isIconOnly /> : null}
+        <UseMenu actions={actions} isIconOnly item={item} />
         {starButton}
         {menuButton}
       </HStack>
@@ -116,13 +120,11 @@ export const PreviewActionStrip = ({
 
   return (
     <HStack flexShrink={0} gap="0.5">
-      {/* Lead with the labelled next steps; omit them for videos, matching context-menu eligibility. */}
+      {/* Lead with the labelled next steps; videos have no Edit or compare, matching context-menu eligibility. */}
+      {image ? <EditMenu actions={actions} image={image} /> : null}
+      <UseMenu actions={actions} item={item} />
       {image ? (
-        <>
-          <EditMenu actions={actions} image={image} />
-          <UseMenu actions={actions} image={image} />
-          <StripIconButton icon={ImagesIcon} label={t('widgets.preview.selectForCompare')} onClick={selectForCompare} />
-        </>
+        <StripIconButton icon={ImagesIcon} label={t('widgets.preview.selectForCompare')} onClick={selectForCompare} />
       ) : null}
       {starButton}
       {item.kind === 'video' && onCopyCurrentFrame ? (
@@ -141,14 +143,14 @@ export const PreviewActionStrip = ({
 };
 
 /**
- * The image an open menu acts on, held from the moment it opens, as the ⋮ menu holds its target: a result that
+ * The item an open menu acts on, held from the moment it opens, as the ⋮ menu holds its target: a result that
  * Auto-switch brings in meanwhile must not take over the items, nor reload what they offer.
  */
-const useImageHeldWhileOpen = (image: GalleryImage) => {
-  const [heldImage, setHeldImage] = useState<GalleryImage | null>(null);
-  const handleOpenChange = useCallback(({ open }: { open: boolean }) => setHeldImage(open ? image : null), [image]);
+const useHeldWhileOpen = <T,>(item: T) => {
+  const [heldItem, setHeldItem] = useState<T | null>(null);
+  const handleOpenChange = useCallback(({ open }: { open: boolean }) => setHeldItem(open ? item : null), [item]);
 
-  return { handleOpenChange, menuImage: heldImage ?? image };
+  return { handleOpenChange, menuItem: heldItem ?? item };
 };
 
 interface ItemMenuProps {
@@ -193,7 +195,7 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
   const { t } = useTranslation();
   const label = t('widgets.preview.editThisImage');
   const ids = useTooltipTriggerIds();
-  const { handleOpenChange, menuImage } = useImageHeldWhileOpen(image);
+  const { handleOpenChange, menuItem: menuImage } = useHeldWhileOpen(image);
   const images = useMemo(() => [menuImage], [menuImage]);
 
   return (
@@ -219,12 +221,22 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
   );
 };
 
-/** What to take from the image: it as an input, or its recorded settings, with the viewer keys that do the same. */
-const UseMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
+/**
+ * What to take from the item: it as an input, or its recorded settings; for an image, with the viewer keys that do
+ * the same.
+ */
+const UseMenu = ({
+  actions,
+  isIconOnly = false,
+  item,
+}: Omit<ItemMenuProps, 'image'> & {
+  item: GalleryItem;
+}) => {
   const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
-  const label = t('widgets.preview.useInGenerate');
-  const { handleOpenChange, menuImage } = useImageHeldWhileOpen(image);
+  const { handleOpenChange, menuItem } = useHeldWhileOpen(item);
+  // Named for the held item, so an open menu keeps its name when Auto-switch brings in the other kind.
+  const label = t(menuItem.kind === 'video' ? 'widgets.preview.useThisVideo' : 'widgets.preview.useInGenerate');
 
   return (
     <Menu.Root ids={ids} lazyMount positioning={MENU_POSITIONING} unmountOnExit onOpenChange={handleOpenChange}>
@@ -241,7 +253,11 @@ const UseMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="16rem">
-            <UseMenuItems actions={actions} image={menuImage} />
+            {isGalleryImageItem(menuItem) ? (
+              <UseMenuItems actions={actions} image={galleryImageItemToGalleryImage(menuItem)} />
+            ) : (
+              <VideoUseGroups actions={actions} item={menuItem} presentation="guided" />
+            )}
           </MenuContent>
         </Menu.Positioner>
       </Portal>

@@ -173,6 +173,8 @@ from invokeai.backend.model_manager.starter_models.flux3 import (
     flux3_klein_gguf_q4_k_m,
     flux3_klein_gguf_q8_0,
     flux3_klein_single_file,
+    flux3_prompt_upsampler,
+    flux3_prompt_upsampler_int8,
 )
 from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_fp8,
@@ -224,6 +226,7 @@ from invokeai.backend.model_manager.starter_models.minimax_h3 import (
 from invokeai.backend.model_manager.starter_models.moss_image import (
     moss_image_base,
     moss_image_prompt_enhancer,
+    moss_image_qwen3_5_encoder_int8,
     moss_image_sft,
 )
 from invokeai.backend.model_manager.starter_models.qwen_image import (
@@ -552,6 +555,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux3_klein_base_single_file,
     flux3_klein_gguf_q4_k_m,
     flux3_klein_gguf_q8_0,
+    flux3_prompt_upsampler,
+    flux3_prompt_upsampler_int8,
     qwen3_vl_encoder_4b,
     qwen_image_2_1_turbo,
     qwen_image_2_1,
@@ -564,6 +569,7 @@ STARTER_MODELS: list[StarterModel] = [
     moss_image_base,
     moss_image_sft,
     moss_image_prompt_enhancer,
+    moss_image_qwen3_5_encoder_int8,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,

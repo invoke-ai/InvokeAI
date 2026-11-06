@@ -67,6 +67,7 @@ import { LayerStackHeader } from './LayerStackHeader';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
 import { createLayerTreeAutoScroller, type LayerTreeAutoScroller } from './layerTreeAutoScroll';
 import { outermostRowIds, projectLayerDrop, type LayerDropTarget } from './layerTreeDrop';
+import { LayerTreeGuides } from './LayerTreeGuides';
 
 export type LayersTreeEngine = LayerStackActionsEngine & LayerSurfaceEngine & Pick<CanvasEngineHandle, 'previews'>;
 
@@ -1215,6 +1216,7 @@ export const LayersTree = ({
               }
               return (
                 <VirtualSlot key={item.key} size={item.size} start={item.start}>
+                  {panelRow.kind !== 'header' && panelRow.guides ? <LayerTreeGuides guides={panelRow.guides} /> : null}
                   {panelRow.kind === 'node' ? (
                     <LayerRow
                       ancestorOfPrimary={primaryAncestorIds.has(panelRow.row.id)}

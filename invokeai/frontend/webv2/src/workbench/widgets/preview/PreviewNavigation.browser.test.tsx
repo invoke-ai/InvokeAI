@@ -476,6 +476,7 @@ vi.mock('@workbench/image-actions', async () => ({
   },
   ImageContinueGroup: () => null,
   ImageUseGroups: () => null,
+  VideoUseGroups: () => null,
   RecallActionButtons: () => null,
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
