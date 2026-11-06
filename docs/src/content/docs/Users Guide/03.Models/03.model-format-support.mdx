@@ -52,11 +52,11 @@ Others are recognized by their layer names and fail, or misbehave, only when the
   layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. FLUX.3 also loads Black Forest
   Labs' own builds: the nvfp4 export in NVIDIA ModelOpt's layout and `fp8r` (fp8 with one scale per row). It refuses
   AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1 and FLUX.3, unsloth's torchao FP8 builds (fp8 weights
-  with one scale per output row; FLUX.3's under diffusers' key names) load as fp8 scaled; other torchao layouts, such
-  as per-tensor or block-wise fp8 and INT8 builds, are refused at install. MOSS-Image loads Comfy-Org's int8 build
-  and GGUFs; its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao builds, are refused at install, unscaled fp8
-  included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported;
-  Krea-2 refuses them at install.
+  with one scale per output row; FLUX.3's under diffusers' key names) load as fp8 scaled; other torchao layouts, such as
+  per-tensor or block-wise fp8 and INT8 builds, are refused at install. MOSS-Image loads Comfy-Org's int8 build and
+  GGUFs; its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao builds, are refused at install, unscaled fp8
+  included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported; Krea-2 refuses them at
+  install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
