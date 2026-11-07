@@ -63,6 +63,19 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together;
+  // splitting by the new importer sets would add a startup request on both routes.
+  '/features/identity/core/schemas.ts',
+  '/features/identity/core/sessionPolicy.ts',
+  '/features/identity/core/storedCredential.ts',
+  '/features/identity/core/tokenStorage.ts',
+  '/features/identity/data/api.ts',
+  '/features/identity/session.ts',
+  '/features/identity/ui/AuthScreen.tsx',
+  '/features/identity/ui/PasswordInput.tsx',
+  '/features/identity/ui/useIdentityNotify.ts',
+  '/platform/react/useZodForm.ts',
+  '/platform/ui/InvokeMark.tsx',
   // The boot load-error panels and lazy empty states share it; alone it costs a startup request.
   '/platform/ui/EmptyState.tsx',
   // Boot notifications and the lazy queue item details share the toaster, tabs and copy controls; alone they cost a
@@ -218,6 +231,7 @@ const EDITOR_BOOT_SHARED_MODULES = [
 // routes) reach it through the same store, while the Launchpad palette does not. Without the group Rolldown splits it
 // by importer set, costing the editor boot one request per piece.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  '/platform/react/draftRegistry.ts',
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
   '/features/queue/core/deviceLabels.ts',
@@ -241,7 +255,6 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/video/ui/VideoUiContext.tsx',
   '/features/workflow/core/buildGraph.ts',
   '/features/workflow/core/formFieldSettings.ts',
-  '/platform/react/draftRegistry.ts',
   '/platform/react/useDebouncedValue.ts',
 ] as const;
 
