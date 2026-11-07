@@ -209,14 +209,15 @@ these `diffusion_model.` files set the LoRA scale.
 LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr operand may be stored whole
 or as a factorized `_a` / `_b` pair.
 
-For BFL and kohya DoRA adapters, fused image/text QKV projections support output-axis magnitudes
-(`dora_scale` shaped `(out_features, 1)`) with dense floating-point base weights. Their normalization is
-preserved when Q, K and V are split. Input-axis magnitudes (`(1, in_features)`, including one-dimensional
-`dora_scale` vectors) require the combined QKV base weights and are refused during conversion, including
-when the fused weight is square. Use an adapter trained with output-axis DoRA or a plain LoRA.
+For BFL and kohya DoRA adapters, fused image/text QKV projections support both input-axis magnitudes
+(`dora_scale` shaped `(1, in_features)`, including one-dimensional vectors) and output-axis magnitudes
+(`(out_features, 1)`) with dense floating-point base weights, including native FP8 storage. Input-axis
+normalization uses all Q, K and V base rows together before applying strength. OneTrainer uses the input
+axis by default; its **Apply on output axis (DoRA Only)** setting is off by default. Both orientations
+preserve their normalization when Q, K and V are split, including when the fused weight is square.
 
 DoRA is incompatible with target layers kept in packed int8 or NVFP4 modules. Conversion of the adapter
-can succeed, but the first patched forward stops with a base-model quantization compatibility error because
+can succeed, but applying the adapter stops with a base-model quantization compatibility error because
 these modules expose only the base weight's shape to DoRA. Use dense floating-point base weights for these
 adapters; the QKV split does not add packed inference support.
 

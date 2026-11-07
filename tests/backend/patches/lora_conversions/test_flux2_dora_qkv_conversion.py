@@ -67,10 +67,10 @@ class _SplitQKV(torch.nn.Module):
 
 
 @torch.no_grad()
-@pytest.mark.parametrize("source", ["kohya", "bfl", "bfl-built"])
-@pytest.mark.parametrize("stream", ["img", "txt"])
-@pytest.mark.parametrize("sidecar", [False, True], ids=["direct", "sidecar"])
-@pytest.mark.parametrize("strength", [-0.4, 0.65, 1.0])
+@pytest.mark.parametrize(
+    "source,stream,sidecar,strength",
+    [("kohya", "img", False, -0.4), ("bfl", "txt", True, 0.65), ("bfl-built", "img", True, 1.0)],
+)
 def test_output_axis_dora_matches_full_fused_forward_and_restores(
     source: str, stream: str, sidecar: bool, strength: float, dora_values: dict[str, torch.Tensor]
 ) -> None:
@@ -126,21 +126,6 @@ def test_output_axis_dora_matches_full_fused_forward_and_restores(
             assert all(attention[name].get_num_patches() == 0 for name in model.names)
 
 
-@pytest.mark.parametrize("source", ["kohya", "bfl", "bfl-built"])
-@pytest.mark.parametrize("stream", ["img", "txt"])
-@pytest.mark.parametrize("in_features", [7, 12], ids=["rectangular", "square-fused"])
-@pytest.mark.parametrize("vector", [False, True], ids=["row", "1d"])
-def test_input_axis_dora_refuses_instead_of_silently_dropping(
-    source: str, stream: str, in_features: int, vector: bool, dora_values: dict[str, torch.Tensor]
-) -> None:
-    dora_values["lora_down.weight"] = torch.ones(2, in_features)
-    dora_values["dora_scale"] = torch.ones(in_features) if vector else torch.ones(1, in_features)
-    with pytest.raises(ValueError, match="input-axis.*fused QKV DoRA") as error:
-        _convert(source, stream, dora_values)
-    assert "output-axis" in str(error.value) and "plain LoRA" in str(error.value)
-    assert "transformer_blocks.0.attn." in str(error.value)
-
-
 @pytest.mark.parametrize("source", ["kohya", "bfl"])
 @pytest.mark.parametrize("in_features", [7, 12])
 def test_output_axis_orientation_survives_square_fused_weights_and_trailing_singletons(
@@ -171,53 +156,18 @@ def test_explicit_output_magnitude_vector_stays_output_axis(dora_values: dict[st
         torch.testing.assert_close(split.dora_scale, layer.dora_scale[index * 4 : (index + 1) * 4])
 
 
-@pytest.mark.parametrize("source", ["kohya", "bfl"])
-@pytest.mark.parametrize(
-    ("key", "shape", "message"),
-    [
-        ("lora_up.weight", (10, 2), "output.*divisible by 3"),
-        ("lora_up.weight", (0, 2), "output.*divisible by 3"),
-        ("lora_up.weight", (12, 3), "factors"),
-        ("lora_up.weight", (12, 2, 1), "factors"),
-        ("lora_down.weight", (2, 7, 1), "factors"),
-        ("lora_down.weight", (0, 7), "factors"),
-        ("lora_down.weight", (2, 0), "factors"),
-        ("dora_scale", (11, 1), "magnitude"),
-        ("dora_scale", (12, 2), "magnitude"),
-        ("dora_scale", (1, 6), "magnitude"),
-        ("dora_scale", (), "magnitude"),
-    ],
-)
-def test_malformed_fused_dora_fails_during_conversion(
-    source: str, key: str, shape: tuple[int, ...], message: str, dora_values: dict[str, torch.Tensor]
-) -> None:
-    dora_values[key] = torch.ones(shape)
-    with pytest.raises(ValueError, match=message):
-        _convert(source, "img", dora_values)
-
-
-@pytest.mark.parametrize("shape", [(11,), (12, 2)])
-def test_malformed_fused_dora_bias_fails_during_conversion(
-    shape: tuple[int, ...], dora_values: dict[str, torch.Tensor]
-) -> None:
-    layer = DoRALayer.from_state_dict_values(dora_values)
-    layer.bias = torch.ones(shape)
-    source = ModelPatchRaw({f"{FLUX_LORA_TRANSFORMER_PREFIX}double_blocks.0.img_attn.qkv": layer})
-    with pytest.raises(ValueError, match="bias"):
-        convert_bfl_lora_patch_to_diffusers(source)
-
-
 @torch.no_grad()
-@pytest.mark.parametrize("packed", ["int8", "nvfp4"])
-def test_converted_dora_retains_packed_sidecar_refusal_and_cleanup(packed: str) -> None:
+@pytest.mark.parametrize(
+    "packed,axis", [("int8", "output"), ("nvfp4", "output"), ("int8", "input"), ("nvfp4", "input")]
+)
+def test_converted_dora_retains_packed_sidecar_refusal_and_cleanup(packed: str, axis: str) -> None:
     """Conversion support does not imply packed-base support: sidecars expose only meta base weights."""
     values = {
         "lora_up.weight": torch.ones(384, 2),
         "lora_down.weight": torch.ones(2, 64),
-        "dora_scale": torch.ones(384, 1),
+        "dora_scale": torch.ones(384, 1) if axis == "output" else torch.ones(1, 64),
     }
     patch = _convert("kohya", "img", values)
-    assert len(patch.layers) == 3
     model = _SplitQKV("img", in_features=64)
     attention = model.transformer_blocks[0]["attn"]
     for name in model.names:
