@@ -163,7 +163,15 @@ const zFormElement = z.discriminatedUnion('type', [
     type: z.literal('node-field'),
   }),
   z.object({
-    data: z.looseObject({ content: z.string().catch('') }),
+    data: z
+      .looseObject({
+        collapsible: z.boolean().optional().catch(undefined),
+        content: z.string().catch(''),
+      })
+      .transform(({ collapsible, content }) => ({
+        content,
+        ...(collapsible ? { collapsible: true } : {}),
+      })),
     id: z.string(),
     parentId: z.string().optional(),
     type: z.literal('heading'),
