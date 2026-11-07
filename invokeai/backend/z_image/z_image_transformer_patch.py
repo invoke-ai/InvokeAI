@@ -133,6 +133,8 @@ def create_regional_forward(
         #
         use_regional = any(mask is not None for mask in regional_masks)
 
+        # Rebuilt on every forward rather than cached per CFG pass: caching both passes' (S, S) biases keeps them
+        # resident (hundreds of MB at 2048 px), while the rebuild costs only a few milliseconds per forward.
         float_mask = None
         if use_regional:
             # Build a per-item additive float mask. Start from the plain padding mask (0 where a

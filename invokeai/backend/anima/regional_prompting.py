@@ -129,8 +129,9 @@ class AnimaRegionalPromptingExtension:
                 cross_attn_mask[:, ctx_start:ctx_end] = background_region_mask.view(img_seq_len, 1)
 
         cross_attn_mask = cross_attn_mask > 0.5
-        # A list of only masked conditionings leaves uncovered image tokens with no allowed context token, where
-        # SDPA returns NaN. Leave those tokens unrestricted.
+        # A list of only masked conditionings leaves uncovered image tokens with no allowed context token. SDPA backends
+        # are not guaranteed to agree on such a row (zeros vs NaN), so leave those tokens unrestricted: they then see
+        # every regional prompt, as they do on the unmasked odd blocks.
         cross_attn_mask |= ~cross_attn_mask.any(dim=1, keepdim=True)
         return cross_attn_mask
 
