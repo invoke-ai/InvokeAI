@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { wheelScrollsHorizontally } from './wheelScrollsHorizontally';
+import { forwardWheelToStrip, wheelScrollsHorizontally } from './wheelScrollsHorizontally';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -96,5 +96,27 @@ describe('wheelScrollsHorizontally', () => {
     const strip = await render(1000);
     await act(() => root!.unmount());
     expect(wheel(strip, { deltaY: 40 }).defaultPrevented).toBe(false);
+  });
+  it('scrolls a strip for a wheel forwarded from something laid over it, horizontal gestures included', async () => {
+    const strip = await render(1000, 'rtl');
+    const forward = (init: WheelEventInit) => {
+      const event = new WheelEvent('wheel', { cancelable: true, ...init });
+      forwardWheelToStrip(strip, event);
+      return event;
+    };
+
+    // A vertical wheel maps as on the strip itself: toward the end, negative in right-to-left.
+    expect(forward({ deltaY: 40 }).defaultPrevented).toBe(true);
+    expect(strip.scrollLeft).toBe(-40);
+    // A trackpad swipe moves by its own physical delta, which the browser cannot do for an element outside the strip.
+    forward({ deltaX: 16, deltaY: 40 });
+    expect(strip.scrollLeft).toBe(-24);
+  });
+
+  it('passes a forwarded wheel through when the content fits', async () => {
+    const strip = await render(100);
+    const event = new WheelEvent('wheel', { cancelable: true, deltaY: 40 });
+    forwardWheelToStrip(strip, event);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

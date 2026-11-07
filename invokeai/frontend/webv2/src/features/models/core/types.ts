@@ -13,6 +13,7 @@ export type ModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
@@ -55,6 +56,7 @@ export type ModelTaxonomyType =
   | 'gemma4_encoder'
   | 'pid_decoder'
   | 'ltx2_duration_head'
+  | 'tiny_autoencoder'
   | 'siglip'
   | 'spandrel_image_to_image'
   | 'flux_redux'
@@ -304,6 +306,7 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  previous_sources?: string[];
 }
 
 export interface StarterModelBundle {

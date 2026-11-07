@@ -245,6 +245,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
         image_path: Optional[Path] = None
         thumbnail_path: Optional[Path] = None
@@ -270,6 +271,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if graph is not None:
                 info_dict["invokeai_graph"] = graph
                 pnginfo.add_text("invokeai_graph", graph)
+            if resolved_inputs is not None:
+                info_dict["invokeai_resolved_inputs"] = resolved_inputs
+                pnginfo.add_text("invokeai_resolved_inputs", resolved_inputs)
 
             thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
             thumbnail_existed = thumbnail_path.exists()
@@ -282,6 +286,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # PNG has no 32-bit integer mode, and Pillow 13 no longer clips "I" to 16 bits on save: do it here.
             if image.mode == "I":
                 image = image.convert("I;16")
+            else:
+                # The object cached below must be ours alone: the caller keeps mutating its image, and the info
+                # assignment must not reach it.
+                image = image.copy()
 
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
@@ -298,8 +306,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             thumbnail_image.save(thumbnail_path)
 
-            self.__set_cache(image_path, image)
-            self.__set_cache(thumbnail_path, thumbnail_image)
+            self.__replace_cache({image_path: image, thumbnail_path: thumbnail_image})
         except Exception as e:
             # A thumbnail failure must not leave a full-size image with no thumbnail. The
             # names are normally new, but preserve any pre-existing files when save() is
@@ -688,6 +695,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
             return graph
         return None
 
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> str | None:
+        image = self.get(image_name, image_subfolder=image_subfolder)
+        resolved_inputs = image.info.get("invokeai_resolved_inputs", None)
+        if isinstance(resolved_inputs, str):
+            return resolved_inputs
+        return None
+
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
@@ -770,10 +784,28 @@ class DiskImageFileStorage(ImageFileStorageBase):
         with self.__cache_lock:
             if generation is not None and generation != self.__cache_generation:
                 return
-            if image_name not in self.__cache:
-                self.__cache[image_name] = image
-                self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
-                if len(self.__cache) > self.__max_cache_size:
-                    cache_id = self.__cache_ids.get()
-                    if cache_id in self.__cache:
-                        del self.__cache[cache_id]
+            if image_name in self.__cache:
+                return
+            self.__insert_cache_locked(image_name, image)
+
+    def __replace_cache(self, items: dict[Path, PILImageType]) -> None:
+        """Caches freshly written files, replacing entries of an earlier file under the same path.
+
+        The generation bump discards any `get` that read the old file and has not cached it yet. An existing
+        entry is overwritten in place, so its id is not queued twice.
+        """
+        with self.__cache_lock:
+            self.__cache_generation += 1
+            for path, image in items.items():
+                self.__insert_cache_locked(path, image)
+
+    def __insert_cache_locked(self, image_name: Path, image: PILImageType) -> None:
+        if image_name in self.__cache:
+            self.__cache[image_name] = image
+            return
+        self.__cache[image_name] = image
+        self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
+        if len(self.__cache) > self.__max_cache_size:
+            cache_id = self.__cache_ids.get()
+            if cache_id in self.__cache:
+                del self.__cache[cache_id]

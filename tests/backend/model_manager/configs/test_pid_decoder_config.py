@@ -195,6 +195,21 @@ def test_a_v1_5_student_in_a_folder_named_like_a_comfy_file_is_accepted() -> Non
     assert config.base is BaseModelType.QwenImage
 
 
+def test_a_moved_v1_5_student_installed_from_a_folder_named_like_a_comfy_file_is_accepted() -> None:
+    """Re-identified after the install moved it into a folder named for its key, the folder it was installed from is
+    known only from its source path, and is still a folder name, not a file name to read the teacher spelling off."""
+    file_name = "pid_1.5_qwenimage_1024_to_4096_4step_bf16.safetensors"
+    with TemporaryDirectory() as tmpdir:
+        mod = _mock_mod(
+            Path(tmpdir), _pid_state_dict(version=PiDVersion.V1_5), dir_name="0123abcd", file_name=file_name
+        )
+        config = PiDDecoder_Checkpoint_QwenImage_Config.from_model_on_disk(
+            mod,
+            dict(_OVERRIDE_FIELDS, base="qwen-image", source=f"D:/dl/pid_1.5_decoders/{file_name}", source_type="path"),
+        )
+    assert config.base is BaseModelType.QwenImage
+
+
 def test_a_v1_5_file_whose_name_names_no_preset_is_2k_to_4k() -> None:
     """v1.5 exists only as 2K-to-4K, so a renamed FLUX.1 file must not take the v1 FLUX default of 2K."""
     with TemporaryDirectory() as tmpdir:
@@ -667,10 +682,10 @@ class TestNameEvidence:
             with pytest.raises(NotAMatchError, match="ambiguous 16-channel"):
                 PiDDecoder_Checkpoint_SD3_Config.from_model_on_disk(mod, dict(fields))
 
-    def test_a_local_path_source_is_not_name_evidence(self) -> None:
-        """The model manager sets `source` to the file's own path when there is no remote one, so
-        trusting it would mean matching against arbitrary ancestor directories of the user's model
-        library. Nothing is lost: a local install is identified before it is moved."""
+    def test_the_ancestors_of_a_local_path_source_are_not_name_evidence(self) -> None:
+        """A local install's `source` is the path it was installed from. Only its file and folder name
+        count: trusting the whole path would mean matching against arbitrary ancestor directories of
+        the user's model library."""
         with TemporaryDirectory() as tmpdir:
             mod = _mock_mod(Path(tmpdir), _pid_state_dict())
             fields = {k: v for k, v in _OVERRIDE_FIELDS.items() if k != "base"} | {

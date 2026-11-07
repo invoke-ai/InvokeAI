@@ -1,5 +1,31 @@
 export const PROMPT_TEMPLATE_PLACEHOLDER = '{prompt}';
 
+// Same pattern as the backend layout node: the whole prompt is one fenced block, as language models write JSON.
+const PROMPT_FENCE = /^```[A-Za-z0-9_+-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/;
+
+/** The trimmed prompt, or the body of the one ``` block it consists of. */
+export const unwrapPromptFence = (prompt: string): string => {
+  const trimmed = prompt.trim();
+  return PROMPT_FENCE.exec(trimmed)?.[1] ?? trimmed;
+};
+
+/**
+ * Whether the prompt (unwrapped) is a JSON object or array, such as a MOSS-Image layout or a structured prompt. Its
+ * braces are data, never dynamic-prompt syntax.
+ */
+export const isJsonPrompt = (prompt: string): boolean => {
+  const body = unwrapPromptFence(prompt).trim();
+  if (!body.startsWith('{') && !body.startsWith('[')) {
+    return false;
+  }
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return typeof parsed === 'object' && parsed !== null;
+  } catch {
+    return false;
+  }
+};
+
 export interface PromptTemplateSnapshot {
   id: string;
   name: string;
@@ -24,6 +50,21 @@ export const applyPromptTemplate = (templatePrompt: string, prompt: string): str
     ? templatePrompt.replace(PROMPT_TEMPLATE_PLACEHOLDER, () => prompt)
     : `${prompt} ${templatePrompt}`;
 
+/**
+ * The template's positive side as it applies to `prompt`. Text around a JSON prompt (a MOSS-Image layout, a structured
+ * prompt) would stop it parsing, so a JSON prompt gets the bare placeholder and stays whole.
+ */
+const getPositiveTemplatePrompt = (template: PromptTemplateSnapshot, prompt: string): string =>
+  isJsonPrompt(prompt) ? PROMPT_TEMPLATE_PLACEHOLDER : template.positivePrompt;
+
+/**
+ * The positive prompt that generates: the authored prompt inside the template's positive side. Submission, the prompt
+ * box's merged view and dynamic-prompt previews and counts all read it, so they cannot disagree. Layout-draft
+ * validation checks it and the authored prompt, as template text around a broken draft would hide it.
+ */
+export const getEffectivePositivePrompt = (prompt: string, template: PromptTemplateSnapshot | null): string =>
+  template ? applyPromptTemplate(getPositiveTemplatePrompt(template, prompt), prompt) : prompt;
+
 export const getEffectivePrompts = (settings: AuthoredPrompts): EffectivePrompts => {
   const { negativePrompt, positivePrompt, promptTemplate } = settings;
 
@@ -33,7 +74,7 @@ export const getEffectivePrompts = (settings: AuthoredPrompts): EffectivePrompts
 
   return {
     negativePrompt: applyPromptTemplate(promptTemplate.negativePrompt, negativePrompt),
-    positivePrompt: applyPromptTemplate(promptTemplate.positivePrompt, positivePrompt),
+    positivePrompt: getEffectivePositivePrompt(positivePrompt, promptTemplate),
   };
 };
 
@@ -66,6 +107,12 @@ export const getPromptTemplateChunks = (prompt: string, templatePrompt: string):
 
   return [before ?? '', prompt, after.join(PROMPT_TEMPLATE_PLACEHOLDER)];
 };
+
+/** {@link getEffectivePositivePrompt} split around the authored prompt, for the merged view. */
+export const getPositivePromptTemplateChunks = (
+  prompt: string,
+  template: PromptTemplateSnapshot
+): [string, string, string] => getPromptTemplateChunks(prompt, getPositiveTemplatePrompt(template, prompt));
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

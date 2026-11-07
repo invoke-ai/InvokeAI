@@ -1,9 +1,12 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
 import inspect
+import os
+import stat
 import threading
 import time
 import weakref
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable, Iterator
@@ -98,6 +101,13 @@ def _fake_encode(images: list[Image.Image]) -> np.ndarray:
 def db() -> Database:
     config = InvokeAIAppConfig(use_memory_db=True)
     return create_mock_sqlite_database(config=config, logger=InvokeAILogger.get_logger())
+
+
+@pytest.fixture(autouse=True)
+def isolate_index_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Migrations and cache retirement touch files even when the records database is in-memory.
+    monkeypatch.setattr(InvokeAIAppConfig, "root_path", property(lambda self: tmp_path))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
 
 
 @pytest.fixture
@@ -1291,6 +1301,163 @@ def test_disabled_service_does_not_discard_embeddings(
         service.stop()
 
 
+@pytest.mark.parametrize("late_activation", [False, True], ids=["startup", "late-activation"])
+def test_activation_prunes_only_obsolete_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    late_activation: bool,
+) -> None:
+    model_id = "blake3:613228c1fd904fb8e0123456789abcdef"
+    # Literal expected writer names catch using the full hash instead of its truncated tag.
+    kept_names = ["cluster_vocab_blake3_613228c1fd904fb8e.npz", "cluster_vocab_custom_blake3_613228c1fd904fb8e.npz"]
+    stale_names = ["cluster_vocab_old.npz", "cluster_vocab_custom_old.npz"]
+    other_names = [
+        "cluster_vocab_old.npz123.tmp.npz",
+        "cluster_vocab_old.npz.random.tmp.npz",
+        "cluster_vocab_custom_old.npz.random.tmp.npz",
+        "cluster_vocab_old.npz.uppercase.TMP.NPZ",
+        "cluster_vocab_old.npz.bak",
+        "other-cache.npz",
+        "invokeai.db",
+    ]
+    preserved = {}
+    for name in kept_names + stale_names + other_names:
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        if name not in stale_names:
+            preserved[path] = path.read_bytes()
+    directory = tmp_path / "cluster_vocab_directory.npz"
+    directory.mkdir()
+    nested_cache = directory / "cluster_vocab_old.npz"
+    nested_cache.write_bytes(b"not owned by this database directory")
+
+    if late_activation:
+        service = ImageIndexService()
+        resolved = SimpleNamespace(key="encoder-key", hash=model_id)
+        model_manager = SimpleNamespace(
+            store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES
+        )
+        with patch.object(service, "_resolve_model_config", side_effect=[None, resolved]):
+            try:
+                service.start(_make_invoker(images_service, index_records, model_manager=model_manager))
+                assert all((tmp_path / name).exists() for name in stale_names)
+                service._last_activation_attempt = 0
+                assert service.try_activate()
+                assert service._worker is not None and service._worker.is_alive()
+                assert all(not (tmp_path / name).exists() for name in stale_names)
+            finally:
+                service.stop()
+    else:
+        service = ImageIndexService(encode_fn=_fake_encode, model_id=model_id)
+        try:
+            service.start(_make_invoker(images_service, index_records))
+            assert service._worker is not None and service._worker.is_alive()
+            assert all(not (tmp_path / name).exists() for name in stale_names)
+        finally:
+            service.stop()
+
+    assert all(path.read_bytes() == contents for path, contents in preserved.items())
+    assert nested_cache.read_bytes() == b"not owned by this database directory"
+
+
+def test_vocabulary_pruning_continues_after_one_file_cannot_be_deleted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    caches = {tmp_path / "cluster_vocab_old.npz", tmp_path / "cluster_vocab_custom_old.npz"}
+    for cache in caches:
+        cache.write_bytes(b"obsolete archive")
+    attempted: list[Path] = []
+    original_unlink = Path.unlink
+
+    def unlink(path: Path, *args, **kwargs) -> None:
+        if path in caches:
+            attempted.append(path)
+            if len(attempted) == 1:
+                raise PermissionError("simulated cache sharing violation")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert len(attempted) == 2
+    assert attempted[0].read_bytes() == b"obsolete archive"
+    assert not attempted[1].exists()
+    assert "Could not remove stale cluster vocabulary cache" in caplog.text
+
+
+def test_vocabulary_pruning_scan_failure_does_not_prevent_indexing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    original_glob = Path.glob
+
+    def glob(path: Path, pattern: str, *args, **kwargs):
+        if path == tmp_path and pattern == "cluster_vocab_*.npz":
+            raise PermissionError("simulated unreadable cache directory")
+        return original_glob(path, pattern, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "glob", glob)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert "Could not prune obsolete cluster vocabulary caches" in caplog.text
+
+
+@pytest.mark.parametrize("enabled", [False, True], ids=["disabled", "missing-model"])
+def test_inactive_service_preserves_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    enabled: bool,
+) -> None:
+    path = tmp_path / "cluster_vocab_old.npz"
+    path.write_bytes(b"preserved until a replacement model is active")
+    service = ImageIndexService()
+    model_manager = SimpleNamespace(store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES)
+    with patch.object(service, "_resolve_model_config", return_value=None):
+        try:
+            service.start(_make_invoker(images_service, index_records, enabled=enabled, model_manager=model_manager))
+            assert path.read_bytes() == b"preserved until a replacement model is active"
+            assert service._worker is None
+        finally:
+            service.stop()
+
+
+def test_vocabulary_pruning_preserves_symlinks_and_their_targets(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    target = tmp_path / "unrelated.npz"
+    target.write_bytes(b"not a service-owned archive")
+    link = tmp_path / "cluster_vocab_link.npz"
+    try:
+        link.symlink_to(target)
+    except OSError as error:
+        pytest.skip(f"Host cannot create symlinks: {error}")
+
+    service.start(_make_invoker(images_service, index_records))
+
+    assert link.is_symlink()
+    assert target.read_bytes() == b"not a service-owned archive"
+
+
 def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
     image_records: ImageRecordStorage,
     images_service: ImageService,
@@ -2361,6 +2528,184 @@ def test_projection_job_is_popped_before_running(service: ImageIndexService) -> 
     assert service._next_projection_job() is None
 
 
+class _CoolingScope:
+    """A started service whose "system" scope has had one fit, on a clock the test moves (`skew`)."""
+
+    def __init__(self, image_records, images_service, index_records, monkeypatch, fit_seconds: float = 0.0) -> None:
+        self.skew = 0.0
+        self.fits = 0
+        self.image_records = image_records
+        self.images_service = images_service
+        self.index_records = index_records
+
+        def counting_umap(matrix: np.ndarray) -> np.ndarray:
+            # A stub, as in test_unchanged_scope_does_not_recompute_the_projection. It takes
+            # `fit_seconds` of the service's clock.
+            self.fits += 1
+            self.skew += fit_seconds
+            return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+        # The module's own clock only: patching time.monotonic itself would skew every thread in the process.
+        monkeypatch.setattr(
+            image_index_default, "time", SimpleNamespace(monotonic=lambda: time.monotonic() + self.skew)
+        )
+        monkeypatch.setattr(image_index_default, "compute_umap", counting_umap)
+        self.service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        self.invoker = _make_invoker(images_service, index_records)
+        self.service.start(self.invoker)
+        _wait_until(lambda: not self.service._backfill_pending.is_set())
+        # The first fit of a scope has nothing to cool down from.
+        self.service.request_projection("system")
+        _wait_until(lambda: "system" in self.service._projection_not_before, timeout=30.0)
+        assert self.fits == 1
+
+    def ready_count(self) -> int:
+        from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+        return sum(isinstance(e, ImageMapProjectionReadyEvent) for e in self.invoker.services.events.events)
+
+    def change_scope(self) -> None:
+        _save_image(self.image_records, "new.png")
+        self.images_service._on_changed(_dto_for(self.image_records, "new.png"))
+        _wait_until(
+            lambda: self.index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"), timeout=30.0
+        )
+
+    def refit_stored(self) -> bool:
+        record = self.index_records.get_projection("system", MODEL_ID)
+        return record is not None and record.point_count == 4
+
+
+@pytest.mark.parametrize(
+    ("floor", "multiplier", "fit_seconds", "still_cooling_at", "due_at"),
+    [(100.0, 0.0, 0.0, 50.0, 101.0), (0.0, 2.0, 100.0, 250.0, 301.0)],
+    ids=["floor", "multiplier"],
+)
+def test_a_polled_refit_waits_out_the_cooldown_of_the_last_fit(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+    floor: float,
+    multiplier: float,
+    fit_seconds: float,
+    still_cooling_at: float,
+    due_at: float,
+) -> None:
+    """On a busy server something embeds during almost every fit, so a client refetching /points on
+    projection_ready would otherwise queue the next full fit at once, and the worker would fit forever.
+    The multiplier case's fit ends at clock 100, so its cooldown runs to 300."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", floor)
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_MULTIPLIER", multiplier)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch, fit_seconds)
+    try:
+        scope.change_scope()
+        scope.service.request_projection("system")
+        scope.skew = still_cooling_at
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1, "a refit nobody asked for must wait out the cooldown"
+        assert "system" in scope.service._projection_requests, "the deferred refit stays promised"
+
+        scope.skew = due_at
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def test_a_short_circuited_refresh_keeps_the_cooldown(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A refresh over an unchanged scope fits nothing, so it must not free the next poll to refit at once."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        cooldown = scope.service._projection_not_before["system"]
+        _wait_until(lambda: scope.ready_count() == 1)
+
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(lambda: scope.ready_count() == 2)
+        assert scope.service._projection_not_before == {"system": cooldown}
+
+        scope.change_scope()
+        scope.service.request_projection("system")
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1
+    finally:
+        scope.service.stop()
+
+
+def test_a_refresh_whose_read_fails_during_a_cooldown_is_retried_at_once(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The refresh lost its exemption when it was taken; the requeue must not leave it to the cooldown."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        scope.change_scope()
+        real_list = index_records.list_accessible_embedded_items
+        failures = {"n": 0}
+
+        def fails_once(user_id, model_id):
+            if failures["n"] == 0:
+                failures["n"] += 1
+                raise LockTimeoutError("database is locked")
+            return real_list(user_id, model_id)
+
+        index_records.list_accessible_embedded_items = fails_once  # type: ignore[method-assign]
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert failures["n"] == 1
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def _fake_running_worker(service: ImageIndexService) -> None:
+    """Make request_projection accept jobs without a worker that would take them. It lives until the
+    service fixture's stop()."""
+    service._model_id = MODEL_ID
+    service._worker = threading.Thread(target=service._stop_event.wait, daemon=True)
+    service._worker.start()
+
+
+def test_a_user_requested_refit_skips_the_cooldown_even_when_a_poll_follows(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["u1"] = time.monotonic() + 1000
+
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+    assert service.request_projection("u1", user_initiated=True)
+    # A poll landing before the worker takes the job must not turn it back into a deferred one.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() == ("u1", False)
+
+    # The exemption went with the job it came with.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+
+def test_a_cooling_scope_does_not_block_another_users_due_refit(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["a"] = time.monotonic() + 1000
+
+    assert service.request_projection("a", all_images=True)
+    assert service.request_projection("b")
+
+    assert service._next_projection_job() == ("b", False)
+    assert service._projection_requests == {"a": True}, "the deferred job stays queued"
+    assert service._next_projection_job() is None
+
+
 def test_embed_text_unavailable_without_model_config(
     images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:
@@ -3323,6 +3668,144 @@ def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.n
     return svc
 
 
+@pytest.mark.parametrize("build_fails", [False, True], ids=["successful-build", "failed-build"])
+def test_vocab_requests_do_not_wait_for_an_in_flight_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, build_fails: bool
+) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    entered = threading.Event()
+    release = threading.Event()
+    request_done = threading.Event()
+    build_errors: list[Exception] = []
+    request_errors: list[Exception] = []
+    builds = 0
+
+    def _embed(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        nonlocal builds
+        builds += 1
+        entered.set()
+        if not release.wait(timeout=15):
+            raise TimeoutError("The test did not release the vocabulary encoder")
+        if build_fails:
+            raise RuntimeError("simulated encoder failure")
+        return matrix
+
+    def _build() -> None:
+        try:
+            service._build_vocab_embeddings()
+        except Exception as error:
+            build_errors.append(error)
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            request_errors.append(error)
+        finally:
+            request_done.set()
+
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _embed)
+    builder = threading.Thread(target=_build)
+    caller = threading.Thread(target=_request)
+    builder.start()
+    try:
+        assert entered.wait(timeout=5), "The worker never reached the vocabulary encoder"
+        assert service.get_vocab_build_state() == ("building", None)
+        caller.start()
+        # A hang ceiling, not a throughput budget: the encoder cannot finish
+        # until this test releases it, but the request must already be done.
+        assert request_done.wait(timeout=5), "The labels request waited for the vocabulary build"
+        assert len(request_errors) == 1
+        assert isinstance(request_errors[0], TextSearchUnavailableError)
+        assert "still being prepared" in str(request_errors[0])
+        assert not service._vocab_build_requested.is_set()
+    finally:
+        release.set()
+        builder.join(timeout=5)
+        if caller.ident is not None:
+            caller.join(timeout=5)
+
+    assert not builder.is_alive() and not caller.is_alive()
+    assert not build_errors
+    failed_at = service._vocab_failed_at
+    service._build_vocab_embeddings()
+    assert builds == 1
+    if build_fails:
+        with pytest.raises(RuntimeError, match="simulated encoder failure"):
+            service.get_vocab_embeddings()
+        assert service._vocab_failed_at == failed_at
+        assert service.get_vocab_build_state() == ("error", "simulated encoder failure")
+    else:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+        assert vocabulary == ["a cat", "a dog", "a car"]
+        assert np.array_equal(embeddings, matrix)
+        assert service.get_vocab_build_state() == ("ready", None)
+
+
+def test_a_ready_vocabulary_answers_while_another_reader_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    service._build_vocab_embeddings()
+    # Stands in for a concurrent get_vocab_embeddings / get_vocab_build_state.
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+    finally:
+        service._vocab_lock.release()
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(embeddings, matrix)
+
+    service._stop_event.set()
+    with pytest.raises(TextSearchUnavailableError, match="The image index is not running"):
+        service.get_vocab_embeddings()
+
+
+@pytest.mark.parametrize("unavailable", ["stopped", "no-model", "no-invoker"])
+def test_a_busy_vocabulary_reports_unavailability_during_shutdown(service: ImageIndexService, unavailable: str) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+    if unavailable == "stopped":
+        service._stop_event.set()
+    elif unavailable == "no-model":
+        service._model_id = None
+    else:
+        service._invoker = None
+    done = threading.Event()
+    errors: list[Exception] = []
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            errors.append(error)
+        finally:
+            done.set()
+
+    caller = threading.Thread(target=_request)
+    try:
+        with service._vocab_lock:
+            caller.start()
+            assert done.wait(timeout=5), "The unavailable index waited for the vocabulary lock"
+    finally:
+        if caller.ident is not None:
+            caller.join(timeout=5)
+    assert not caller.is_alive()
+    assert len(errors) == 1
+    assert isinstance(errors[0], TextSearchUnavailableError)
+    assert str(errors[0]) == "The image index is not running"
+    assert not service._vocab_build_requested.is_set()
+
+
 def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     # np.savez appends `.npz` to a path that lacks it, so a staging name ending
     # in `.tmp` produced `.tmp.npz` on disk and the rename that followed looked
@@ -3389,6 +3872,146 @@ def test_a_failed_cache_write_says_what_went_wrong(tmp_path, monkeypatch: pytest
     assert exc_info is True
     # The run itself is unaffected — which is why the warning has to carry it.
     assert service._vocab_cache is not None
+
+
+def test_overlapping_vocabulary_writers_cannot_modify_a_published_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Separate services model processes sharing a directory. Their PID-based
+    # staging names collide even though their in-process locks are independent.
+    first_matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    second_matrix = -first_matrix
+    first = _vocab_build_service(tmp_path, monkeypatch, first_matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    opened = threading.Event()
+    second_published = threading.Event()
+    first_written = threading.Event()
+    finish_first = threading.Event()
+    errors: list[BaseException] = []
+    save = np.savez
+
+    def _save(file, **arrays) -> None:
+        if threading.current_thread() is not writer:
+            save(file, **arrays)
+            return
+        # Keep the actual handle open across the other writer's publication.
+        # Accept either np.savez's path or file interface, without pinning the
+        # staging-name implementation. Windows refuses to rename a shared open
+        # path; POSIX publishes an inode that the first writer can still alter.
+        context = open(file, "wb") if isinstance(file, (str, Path)) else nullcontext(file)
+        with context as handle:
+            opened.set()
+            # Production swallows exceptions raised here, so record them.
+            try:
+                assert second_published.wait(10), "The second writer did not finish"
+                save(handle, **arrays)
+                handle.flush()
+                first_written.set()
+                assert finish_first.wait(10), "The first writer was not released"
+            except AssertionError as error:
+                errors.append(error)
+                raise
+
+    def _build_first() -> None:
+        try:
+            first._build_vocab_embeddings()
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(image_index_default.np, "savez", _save)
+    writer = threading.Thread(target=_build_first)
+    writer.start()
+    try:
+        assert opened.wait(10), "The first writer did not open its staging file"
+        second = _vocab_build_service(tmp_path, monkeypatch, second_matrix)
+        second._build_vocab_embeddings()
+        assert cache_path.exists(), "A concurrent writer could not publish its cache"
+        with np.load(cache_path, allow_pickle=False) as cached:
+            assert np.array_equal(cached["embeddings"], second_matrix)
+        published = cache_path.read_bytes()
+        second_published.set()
+        assert first_written.wait(10), "The first writer did not finish serialization"
+        assert cache_path.read_bytes() == published, "An unpublished writer altered the live cache"
+    finally:
+        second_published.set()
+        finish_first.set()
+        writer.join(timeout=10)
+
+    assert not writer.is_alive()
+    assert not errors
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], first_matrix)
+    assert sorted(tmp_path.iterdir()) == [cache_path]
+
+
+@pytest.mark.parametrize("existing_cache", [False, True], ids=["first-build", "replacement"])
+@pytest.mark.parametrize("failure", ["serialization", "publication"])
+def test_failed_vocabulary_publication_cleans_only_its_staging_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, existing_cache: bool, failure: str
+) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    previous: bytes | None = None
+    if existing_cache:
+        np.savez(cache_path, embeddings=-matrix, fingerprint=np.str_("older vocabulary"))
+        previous = cache_path.read_bytes()
+    # Another writer's staging file must not be swept on failure.
+    other_staging = tmp_path / f"{cache_path.name}.other.tmp.npz"
+    other_staging.write_bytes(b"another writer's incomplete cache")
+    recorded: list[tuple[str, object]] = []
+    service._invoker.services.logger = SimpleNamespace(  # type: ignore[union-attr]
+        warning=lambda message, exc_info=False: recorded.append((str(message), exc_info))
+    )
+
+    def _fail_save(file, **arrays) -> None:
+        if isinstance(file, (str, Path)):
+            Path(file).write_bytes(b"partial archive")
+        else:
+            file.write(b"partial archive")
+        raise OSError("simulated serialization failure")
+
+    def _fail_replace(src: object, dst: object) -> None:
+        raise PermissionError("simulated publication failure")
+
+    if failure == "serialization":
+        monkeypatch.setattr(image_index_default.np, "savez", _fail_save)
+    else:
+        monkeypatch.setattr(image_index_default.os, "replace", _fail_replace)
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    assert service._vocab_failure is None
+    vocabulary, cached_matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(cached_matrix, matrix)
+    assert len(recorded) == 1
+    assert "Could not write cluster vocabulary cache" in recorded[0][0]
+    assert recorded[0][1] is True
+    assert other_staging.read_bytes() == b"another writer's incomplete cache"
+    if previous is not None:
+        assert cache_path.read_bytes() == previous
+    else:
+        assert not cache_path.exists()
+    expected_files = {other_staging}
+    if existing_cache:
+        expected_files.add(cache_path)
+    assert set(tmp_path.iterdir()) == expected_files
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes are not supported on this platform")
+def test_vocabulary_cache_uses_normal_file_mode(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    reference_path = tmp_path / "reference.npz"
+    np.savez(reference_path, embeddings=matrix, fingerprint=np.str_("reference vocabulary"))
+
+    service._build_vocab_embeddings()
+
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    assert stat.S_IMODE(cache_path.stat().st_mode) == stat.S_IMODE(reference_path.stat().st_mode)
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], matrix)
 
 
 def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:

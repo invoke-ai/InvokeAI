@@ -267,7 +267,7 @@ const VocabularyStatusLine = ({
   const { t } = useTranslation();
   // Explain that rebuild waits behind indexing. Omit age-based stall text here; the map owns the ticking stall
   // display.
-  const progress = isIndexing(indexCounts) ? describeIndexProgress(indexCounts) : null;
+  const progress = isIndexing(indexCounts) ? describeIndexProgress(indexCounts, t) : null;
 
   return (
     <Stack gap="1">

@@ -17,8 +17,11 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 #   lora_unet_double_blocks_0_img_attn_proj.alpha
 #   lora_unet_double_blocks_0_img_attn_proj.lora_down.weight
 #   lora_unet_double_blocks_0_img_attn_proj.lora_up.weight
+# FLUX's own block names only: Qwen-Image's Kohya keys (`lora_unet_transformer_blocks_N_img_mlp_...`) would match a
+# bare `\w+_blocks`, and a LoRA whose every key is on that MLP would read as FLUX.
 FLUX_KOHYA_TRANSFORMER_KEY_REGEX = (
-    r"lora_unet_(\w+_blocks)_(\d+)_(img_attn|img_mlp|img_mod|txt_attn|txt_mlp|txt_mod|linear1|linear2|modulation)_?(.*)"
+    r"lora_unet_(double_blocks|single_blocks)_(\d+)_"
+    r"(img_attn|img_mlp|img_mod|txt_attn|txt_mlp|txt_mod|linear1|linear2|modulation)_?(.*)"
 )
 
 # A regex pattern that matches all of the last layer keys in the Kohya FLUX LoRA format.

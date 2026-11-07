@@ -25,6 +25,7 @@ import type {
 import {
   ALL_READABLE_BOARDS_ID,
   DATE_BOARD_ID_PREFIX,
+  getGalleryViewCategories,
   isDateBoardId,
   parseGalleryItemKey,
 } from '@features/gallery/core/items';
@@ -111,9 +112,8 @@ interface ListImagesResponse {
   total: number;
 }
 
-/** Mirror backend gallery categories; canvas-owned `other` pixels belong to neither Images nor Assets. */
-const imageCategories = ['general'];
-const assetCategories = ['control', 'mask', 'user'];
+const imageCategories = getGalleryViewCategories('images');
+const assetCategories = getGalleryViewCategories('assets');
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -482,6 +482,8 @@ export const getGalleryVideoMetadata = async (
 /** The workflow and graph a piece of media embeds, each as stringified JSON, when it has them. */
 export interface GalleryMediaWorkflow {
   graph: string | null;
+  /** Image inputs resolved for this output; the full source graph remains available for workflow loading. */
+  resolved_inputs?: string | null;
   workflow: string | null;
 }
 

@@ -319,6 +319,36 @@ cannot be checked by InvokeAI. Do not enable `allow_private_download_urls` merel
 make an untrusted proxy work. The two settings are independent: `download_proxy` is
 honored whether or not `allow_private_download_urls` is enabled.
 
+### Node Filesystem Access
+
+Workflow nodes that read or write files are confined to directories you
+designate, and the confinement holds in both single-user and multi-user mode.
+
+The **Prompts from File** node reads prompt lists from the prompt files
+directory — `prompt_files_dir`, by default `<root>/prompt_files`. Its
+`file_path` input is interpreted relative to that directory, and absolute
+paths, `..` traversal and symlinks pointing out of the directory are refused.
+Place a prompt list at `<root>/prompt_files/lists/fantasy.txt` and the node
+addresses it as `lists/fantasy.txt`.
+
+In multi-user mode the node is additionally **restricted to administrators**,
+because the prompt files directory is shared by every account: a non-admin
+reading from it would be reading prompt lists belonging to other users.
+Unprivileged users should use wildcards instead, which are stored per account
+and can be imported from the prompt panel.
+
+If you do not want the node available at all, deny it in `invokeai.yaml`:
+
+```yaml
+deny_nodes:
+  - prompt_from_file
+```
+
+The **Save Image (Gallery + File Export)** node is confined to the outputs
+directory on the same terms. Its filename prefix and suffix cannot contain
+path separators or `..`, so they cannot steer the exported file out of the
+chosen directory.
+
 :::note[Strict Password Checking]
 It is recommended that you enable strict password checking. This will
 force all users to select good passwords that follow the

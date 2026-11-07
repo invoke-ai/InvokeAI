@@ -13,7 +13,18 @@ import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 /** The backend sizes the model cache in binary gigabytes (GiB). */
 export const formatModelCacheBytes = (bytes: number | null | undefined): string => formatBytes(bytes, { binary: true });
 
-/** Cache statistics have no socket stream; refresh on mount, model load, and clear. */
+/** `used/total` sharing one unit when both sizes read in the same one ("6.2/12.0 GiB"), each with its own otherwise. */
+export const formatModelCacheRange = (used: number, total: number): string => {
+  const usedText = formatModelCacheBytes(used);
+  const totalText = formatModelCacheBytes(total);
+  const unitStart = usedText.lastIndexOf('\u00a0');
+
+  return unitStart >= 0 && totalText.endsWith(usedText.slice(unitStart))
+    ? `${usedText.slice(0, unitStart)}/${totalText}`
+    : `${usedText}/${totalText}`;
+};
+
+/** Cache statistics have no socket stream; they refresh while watched (on watch and model load) and after a clear. */
 
 export interface ModelCacheStats {
   hits: number;
@@ -121,6 +132,22 @@ export const refreshModelCacheStats = (): Promise<void> => {
   inflight = refresh;
   return inflight;
 };
+
+let watchers = 0;
+
+/** Marks the stats as on screen and reads them; returns the release. */
+export const watchModelCacheStats = (): (() => void) => {
+  watchers += 1;
+  void refreshModelCacheStats();
+
+  return () => {
+    watchers -= 1;
+  };
+};
+
+/** The realtime runtime's model-load hook: a reading nobody shows is not worth a request. */
+export const refreshWatchedModelCacheStats = (): Promise<void> =>
+  watchers > 0 ? refreshModelCacheStats() : Promise.resolve();
 
 export const clearModelCache = async (): Promise<ModelCacheClearResult> => {
   const owner = captureAccountScope();

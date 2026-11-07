@@ -117,7 +117,8 @@ const RecallItem = ({
   kind: ImageRecallKind;
   onRecall: (kind: ImageRecallKind) => void;
 }) => {
-  const verb = getImageRecallVerb(kind);
+  const { t } = useTranslation();
+  const verb = getImageRecallVerb(kind, t);
   const onSelect = useCallback(() => onRecall(kind), [kind, onRecall]);
   return <MenuActionItem disabled={disabled} icon={verb.icon} label={verb.label} value={kind} onSelect={onSelect} />;
 };

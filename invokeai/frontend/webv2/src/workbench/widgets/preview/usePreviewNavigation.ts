@@ -18,6 +18,7 @@ import type { QueueItem, QueueProgressSession } from '@features/queue/contracts'
 import {
   compareGalleryItems,
   gallerySemanticReferenceKey,
+  getGalleryItemView,
   getGalleryNavigationStep,
   getGallerySessionNavigationKey,
   toGalleryItemKey,
@@ -93,13 +94,6 @@ const getOrderedPreviewItems = (
     })
     .map(({ item }) => item);
 
-/**
- * Which gallery tab an item belongs to. Mirrors the category split the
- * gallery filters on: `general` is a gallery image, everything else (canvas
- * pixels, control layers, uploads) is an asset.
- */
-const getItemGalleryView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
-
 const getOrderedLocalItems = ({
   boardId,
   galleryView,
@@ -118,7 +112,7 @@ const getOrderedLocalItems = ({
     items.filter(
       (item) =>
         item.boardId === boardId &&
-        getItemGalleryView(item) === galleryView &&
+        getGalleryItemView(item) === galleryView &&
         (mediaKind === null || item.kind === mediaKind)
     ),
     imageOrderDir,

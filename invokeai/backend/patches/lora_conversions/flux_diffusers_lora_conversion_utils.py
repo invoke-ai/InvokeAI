@@ -4,6 +4,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
@@ -303,6 +304,10 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
 
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
+    # The modulation output halves are (scale, shift) in diffusers and (shift, scale) in BFL.
+    if "norm_out.linear" in grouped_state_dict:
+        values = get_lora_layer_values(grouped_state_dict.pop("norm_out.linear"))
+        layers["final_layer.adaLN_modulation.1"] = SwappedHalvesLayerPatch(any_lora_layer_from_state_dict(values))
 
     # Assert that all keys were processed.
     assert len(grouped_state_dict) == 0
@@ -399,13 +404,17 @@ def _group_by_layer_mixed_format(state_dict: Dict[str, torch.Tensor]) -> dict[st
 
 
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
-    """Groups the keys in the state dict by layer."""
+    """Groups LoRA weights and optional alpha values by layer."""
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key in state_dict:
-        # Split the 'lora_A.weight' or 'lora_B.weight' suffix from the layer name.
-        parts = key.rsplit(".", maxsplit=2)
-        layer_name = parts[0]
-        key_name = ".".join(parts[1:])
+        if key.endswith(".alpha"):
+            layer_name = key.removesuffix(".alpha")
+            key_name = "alpha"
+        else:
+            # Split a two-part weight suffix such as 'lora_A.weight' from the layer name.
+            parts = key.rsplit(".", maxsplit=2)
+            layer_name = parts[0]
+            key_name = ".".join(parts[1:])
         if layer_name not in layer_dict:
             layer_dict[layer_name] = {}
         layer_dict[layer_name][key_name] = state_dict[key]

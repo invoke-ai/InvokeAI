@@ -67,6 +67,7 @@ import { LayerStackHeader } from './LayerStackHeader';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
 import { createLayerTreeAutoScroller, type LayerTreeAutoScroller } from './layerTreeAutoScroll';
 import { outermostRowIds, projectLayerDrop, type LayerDropTarget } from './layerTreeDrop';
+import { LayerTreeGuides } from './LayerTreeGuides';
 
 export type LayersTreeEngine = LayerStackActionsEngine & LayerSurfaceEngine & Pick<CanvasEngineHandle, 'previews'>;
 
@@ -673,7 +674,10 @@ export const LayersTree = ({
           updates: [{ id, isEnabled }],
         }),
       setHidden: (id, isHidden) =>
-        runStructural(t('widgets.layers.actions.toggleHidden'), { type: 'set-hidden', updates: [{ id, isHidden }] }),
+        runStructural(t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'), {
+          type: 'set-hidden',
+          updates: [{ id, isHidden }],
+        }),
       setLocked: (id, isLocked) =>
         runStructural(t('widgets.layers.actions.toggleLock'), { type: 'set-locked', updates: [{ id, isLocked }] }),
       startRename: (id) => setRenamingId(id),
@@ -1209,6 +1213,7 @@ export const LayersTree = ({
               }
               return (
                 <VirtualSlot key={item.key} size={item.size} start={item.start}>
+                  {panelRow.kind !== 'header' && panelRow.guides ? <LayerTreeGuides guides={panelRow.guides} /> : null}
                   {panelRow.kind === 'node' ? (
                     <LayerRow
                       ancestorOfPrimary={primaryAncestorIds.has(panelRow.row.id)}
