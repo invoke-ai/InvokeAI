@@ -677,3 +677,54 @@ describe('antialiasProgressImages preference', () => {
     expect(store.normalizeWorkbenchPreferences({ antialiasProgressImages: true }).antialiasProgressImages).toBe(true);
   });
 });
+
+describe('updateSavedWorkbenchPreferences', () => {
+  const decideOnce = (saved: ReturnType<typeof storeModule.getWorkbenchPreferences>) =>
+    saved.canvasTrackpadNavigationDecided ? null : { canvasTrackpadNavigationDecided: true };
+
+  it('sees a choice another window saved after this window loaded, and writes nothing over it', async () => {
+    seedBackendPreferences({ themeId: 'osakaJade' });
+    await store.loadWorkbenchSettings();
+    // Another window decides and changes the theme; this window's snapshot still has neither.
+    seedBackendPreferences({ canvasTrackpadNavigationDecided: true, themeId: 'mono' });
+    api.setClientStateValue.mockClear();
+
+    await expect(store.updateSavedWorkbenchPreferences(decideOnce)).resolves.toBe(false);
+
+    expect(api.setClientStateValue).not.toHaveBeenCalled();
+    expect(store.getWorkbenchPreferences()).toMatchObject({ canvasTrackpadNavigationDecided: true, themeId: 'mono' });
+  });
+
+  it('writes its change over the saved preferences, keeping what another window saved', async () => {
+    seedBackendPreferences({ themeId: 'osakaJade' });
+    await store.loadWorkbenchSettings();
+    seedBackendPreferences({ themeId: 'mono' });
+
+    await expect(store.updateSavedWorkbenchPreferences(decideOnce)).resolves.toBe(true);
+
+    expect(readBackendPreferences()).toMatchObject({ canvasTrackpadNavigationDecided: true, themeId: 'mono' });
+    expect(store.getWorkbenchPreferences()).toMatchObject({ canvasTrackpadNavigationDecided: true, themeId: 'mono' });
+  });
+});
+
+describe('areWorkbenchPreferencesHydrated', () => {
+  it('stays true after a write fails to reach the backend, so choices made meanwhile still count', async () => {
+    seedBackendPreferences({ themeId: 'osakaJade' });
+    await store.loadWorkbenchSettings();
+    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.areWorkbenchPreferencesReady()).toBe(false);
+    expect(store.areWorkbenchPreferencesHydrated()).toBe(true);
+  });
+
+  it('is false before loading and after a first load that failed with no local copy', async () => {
+    expect(store.areWorkbenchPreferencesHydrated()).toBe(false);
+    api.getClientStateValue.mockRejectedValue(new Error('offline'));
+
+    await store.loadWorkbenchSettings();
+
+    expect(store.areWorkbenchPreferencesHydrated()).toBe(false);
+  });
+});

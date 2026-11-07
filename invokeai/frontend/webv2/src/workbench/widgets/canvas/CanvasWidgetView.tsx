@@ -63,6 +63,7 @@ import { CanvasStagedRegionsFeed } from './CanvasStagedRegionsFeed';
 import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
 import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCommands';
+import { CanvasTrackpadDetection, useTrackpadDetectionArmed } from './CanvasTrackpadDetection';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
@@ -116,6 +117,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const trackpadDetectionArmed = useTrackpadDetectionArmed();
   const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const { document, stagingArea } = canvas;
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
@@ -599,6 +601,9 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       <CanvasColorFeed engine={engine} />
       {engine ? <CanvasFrameLockFeed key={projectId} engine={engine} projectId={projectId} /> : null}
       {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
+      {engine && trackpadDetectionArmed ? (
+        <CanvasTrackpadDetection key={projectId} engine={engine} projectId={projectId} />
+      ) : null}
       {engine ? <CanvasStagedRegionsFeed key={projectId} engine={engine} projectId={projectId} /> : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>

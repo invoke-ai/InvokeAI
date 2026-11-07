@@ -42,6 +42,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   antialiasProgressImages: false,
   autoSwitchInvocationRoute: true,
   canvasToolMemory: {},
+  canvasTrackpadNavigationDecided: false,
   confirmImageDeletion: true,
   controlModelMemory: {},
   customHotkeys: {},
@@ -448,6 +449,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.alphaNoticeAcknowledged
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
   galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
+  canvasTrackpadNavigationDecided: preferences?.canvasTrackpadNavigationDecided === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
@@ -739,6 +741,16 @@ export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnap
 /** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
 export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
 
+/**
+ * Whether `snapshot` holds the account's preferences: loaded, including after a later write failed to reach the
+ * backend (`error` with the hydrated key kept), but not the defaults a failed first load leaves in place.
+ */
+export const hasHydratedWorkbenchPreferences = (snapshot: WorkbenchSettingsSnapshot): boolean =>
+  snapshot.status === 'ready' || (snapshot.status === 'error' && snapshot.hydratedStorageKey !== null);
+
+/** {@link hasHydratedWorkbenchPreferences} for the current snapshot. */
+export const areWorkbenchPreferencesHydrated = (): boolean => hasHydratedWorkbenchPreferences(store.getSnapshot());
+
 /** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {
   listener(store.getSnapshot().preferences);
@@ -785,6 +797,70 @@ export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPr
       });
     }
   });
+};
+
+/**
+ * Applies `update` to the account's preferences as last saved rather than to this window's snapshot, so a choice another
+ * window or device saved meanwhile is seen before writing over it. Runs after this window's queued writes and reads the
+ * backend (an unsent local copy outranks it, as at load). `update` returns the fields to change from the preferences it
+ * is given, or null to write nothing; either way this window adopts what it read. Resolves whether it wrote.
+ */
+export const updateSavedWorkbenchPreferences = async (
+  update: (saved: WorkbenchPreferences) => Partial<WorkbenchPreferences> | null
+): Promise<boolean> => {
+  const owner = captureAccountScope();
+  const storageSuffix = owner.accountId === null ? getUserStorageScope() : owner.storageSuffix;
+  const storageKey = getSettingsStorageKey(storageSuffix);
+  let wrote = false;
+
+  await enqueueSettingsMutation(owner, async (queue, revision) => {
+    const local = readLocalSettings(storageKey);
+    let saved = local?.pendingPush ? local.preferences : null;
+    if (!saved) {
+      try {
+        saved = parsePreferences(await getClientStateValue(SETTINGS_CLIENT_STATE_KEY, owner.signal));
+      } catch {
+        // Offline: the local copy is the freshest this browser has.
+      }
+      saved ??= local?.preferences ?? store.getSnapshot().preferences;
+    }
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+    // Edits this window made while the read was in flight are queued behind; adopting or pushing `saved` here would
+    // drop them, so the change goes on top of this window's snapshot and is pushed after them.
+    if (queue.latestRevision !== revision) {
+      const patch = update(saved) && update(store.getSnapshot().preferences);
+      if (patch) {
+        wrote = true;
+        void patchWorkbenchPreferences(patch);
+      }
+      return;
+    }
+    const patch = update(saved);
+    const next = patch ? normalizeWorkbenchPreferences({ ...saved, ...patch }) : saved;
+    replaceSnapshot(next, 'ready', store.getSnapshot().hydratedStorageKey, storageSuffix);
+    if (!patch) {
+      return;
+    }
+    wrote = true;
+    writeLocalSettings(storageKey, next, true);
+    try {
+      await pushPreferences(next, owner.signal);
+      if (isAccountScopeCurrent(owner) && queue.latestRevision === revision) {
+        writeLocalSettings(storageKey, next);
+      }
+    } catch (error) {
+      if (isAccountScopeCurrent(owner) && queue.latestRevision === revision) {
+        store.patchSnapshot({
+          error: error instanceof Error ? error.message : 'Failed to save settings.',
+          status: 'error',
+        });
+      }
+    }
+  });
+
+  return wrote;
 };
 
 /** Remembers (or, with null, forgets) the control model picked for `key` (see `controlModelMemoryKey`). */

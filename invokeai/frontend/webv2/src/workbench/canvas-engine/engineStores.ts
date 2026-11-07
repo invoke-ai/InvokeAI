@@ -530,6 +530,8 @@ export interface EngineStores {
   showGrid: ScalarStore<boolean>;
   /** Inverts ctrl+wheel sizing; default wheel-up grows. Input-only preference. */
   invertBrushSizeScroll: ScalarStore<boolean>;
+  /** Wheel pans and ctrl+wheel (pinch) zooms instead of zooming and brush sizing. Input-only preference. */
+  trackpadNavigation: ScalarStore<boolean>;
   /** Passive bbox frame defaults on. The active bbox tool always draws its editable frame and handles. */
   showBbox: ScalarStore<boolean>;
   /** Optional shade outside the generation bbox. Overlay-only toggling never recomposites document pixels. */
@@ -740,6 +742,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   snapToGrid: createScalarStore<boolean>(true),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
+  trackpadNavigation: createScalarStore<boolean>(false),
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
