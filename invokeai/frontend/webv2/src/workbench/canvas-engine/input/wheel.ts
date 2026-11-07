@@ -3,10 +3,11 @@
  * otherwise swallowed. Trackpad navigation (a user setting, since browsers cannot tell a trackpad from a mouse):
  * plain wheel pans on both axes for every tool, and ctrl+wheel, which is how browsers deliver a pinch, zooms
  * continuously around the cursor instead of sizing the brush. While the setting is off, a run of small ctrl+wheel steps
- * with the physical Control key known to be up can only be a pinch: it is reported before routing, so the frontend may
- * turn the setting on for that event. Earlier candidates are swallowed rather than sizing the brush. Once nobody listens
- * (the setting was decided), candidates are plain ctrl+wheel again.
- * Injected dependencies keep routing testable without DOM setup.
+ * with the physical Control key known to be up can only be a pinch: the step completing the run is reported before
+ * routing, so the frontend may turn the setting on for that event, which then zooms by the whole run, its earlier
+ * steps included. Those earlier candidates are swallowed rather than sizing the brush, so a pinch too short to complete
+ * a run does nothing while the setting is undecided. Once nobody listens (the setting was decided), candidates are plain
+ * ctrl+wheel again. Injected dependencies keep routing testable without DOM setup.
  */
 
 import type { ControlKeyState } from '@workbench/canvas-engine/input/pointerPipeline';
@@ -64,8 +65,8 @@ const PINCH_ZOOM_GAIN = 0.01;
 const MAX_PINCH_ZOOM_STEP = 1.25;
 
 /**
- * Pinch steps are a few pixels; a mouse notch is about 100-120 pixels or line units. Only steps under this count toward
- * detecting a pinch.
+ * Pinch steps are a few pixels; a mouse notch is about 100-120 pixels, or 3 lines (48px). Only steps under this, in
+ * pixels, count toward detecting a pinch, whatever `deltaMode` the browser reports them in.
  */
 const PINCH_DELTA_LIMIT_PX = 40;
 
@@ -85,63 +86,67 @@ const wheelDeltaPixels = (event: WheelEvent, viewport: Viewport): Vec2 => {
   return { x: event.deltaX, y: event.deltaY };
 };
 
+/** The zoom factor of one ctrl+wheel step of `deltaY` pixels: wheel-up (negative) zooms in, bounded per step. */
+const pinchZoomFactor = (deltaY: number): number =>
+  Math.min(MAX_PINCH_ZOOM_STEP, Math.max(1 / MAX_PINCH_ZOOM_STEP, Math.exp(-deltaY * PINCH_ZOOM_GAIN)));
+
 /** Creates the canvas wheel handler. See module docs for routing. */
 export const createWheelHandler = (deps: WheelHandlerDeps): ((event: WheelEvent) => void) => {
-  // Pinch-shaped events in the current run; any other wheel event ends it.
+  // Pinch-shaped events in the current run, when it began, and the zoom its swallowed steps would have applied (each
+  // bounded like a live step, so the run zooms exactly as far as it would have with the setting on). Any other wheel
+  // event ends the run.
   let pinchRun = 0;
   let pinchRunStart = 0;
+  let pinchRunZoom = 1;
+
+  const endPinchRun = (): void => {
+    pinchRun = 0;
+    pinchRunZoom = 1;
+  };
 
   /**
-   * A pinch candidate: a small pixel-mode ctrl+wheel step with the Control key known to be up. An unknown key state (a
-   * press may have gone unseen) or a mouse notch never is one.
+   * A pinch candidate: a small ctrl+wheel step with the Control key known to be up. An unknown key state (a press may
+   * have gone unseen) or a mouse notch, in pixels or lines, never is one.
    */
-  const isPinchCandidate = (event: WheelEvent): boolean =>
-    event.ctrlKey &&
-    deps.getControlKeyState() === 'up' &&
-    event.deltaMode === 0 &&
-    Math.abs(event.deltaY) < PINCH_DELTA_LIMIT_PX;
-
-  /** Counts a candidate into the current run; true when it completes a run, so a stray event never counts alone. */
-  const completesPinchRun = (event: WheelEvent): boolean => {
-    if (pinchRun === 0 || event.timeStamp - pinchRunStart > PINCH_DETECTION_WINDOW_MS) {
-      pinchRun = 0;
-      pinchRunStart = event.timeStamp;
-    }
-    pinchRun += 1;
-    if (pinchRun < PINCH_DETECTION_EVENTS) {
-      return false;
-    }
-    pinchRun = 0;
-    return true;
-  };
+  const isPinchCandidate = (event: WheelEvent, delta: Vec2): boolean =>
+    event.ctrlKey && deps.getControlKeyState() === 'up' && Math.abs(delta.y) < PINCH_DELTA_LIMIT_PX;
 
   return (event: WheelEvent): void => {
     event.preventDefault();
 
     const rect = deps.getInputElement()?.getBoundingClientRect();
     const screenAnchor: Vec2 = { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
+    const delta = wheelDeltaPixels(event, deps.viewport);
+    // The zoom of a just-detected run's earlier steps, which this step applies along with its own.
+    let carriedZoom = 1;
 
     if (!deps.getTrackpadNavigation() && deps.isPinchDetectionArmed()) {
-      const candidate = isPinchCandidate(event);
-      if (!candidate) {
-        pinchRun = 0;
-      } else if (completesPinchRun(event)) {
+      if (!isPinchCandidate(event, delta)) {
+        endPinchRun();
+      } else {
+        if (pinchRun === 0 || event.timeStamp - pinchRunStart > PINCH_DETECTION_WINDOW_MS) {
+          endPinchRun();
+          pinchRunStart = event.timeStamp;
+        }
+        pinchRun += 1;
+        if (pinchRun < PINCH_DETECTION_EVENTS) {
+          // Swallowed: almost surely a pinch, not a brush resize. Its zoom waits for the run to complete.
+          pinchRunZoom *= pinchZoomFactor(delta.y);
+          return;
+        }
+        carriedZoom = pinchRunZoom;
+        endPinchRun();
         deps.reportTrackpadPinch();
-      }
-      // A candidate that did not turn the setting on is swallowed: it is almost surely a pinch, not a brush resize.
-      if (candidate && !deps.getTrackpadNavigation()) {
-        return;
+        // A completed run that did not turn the setting on is swallowed too.
+        if (!deps.getTrackpadNavigation()) {
+          return;
+        }
       }
     }
 
     if (deps.getTrackpadNavigation()) {
-      const delta = wheelDeltaPixels(event, deps.viewport);
       if (event.ctrlKey) {
-        const factor = Math.min(
-          MAX_PINCH_ZOOM_STEP,
-          Math.max(1 / MAX_PINCH_ZOOM_STEP, Math.exp(-delta.y * PINCH_ZOOM_GAIN))
-        );
-        deps.viewport.zoomAtPoint(deps.viewport.getZoom() * factor, screenAnchor);
+        deps.viewport.zoomAtPoint(deps.viewport.getZoom() * carriedZoom * pinchZoomFactor(delta.y), screenAnchor);
       } else {
         // Content follows the fingers, as native scrolling moves a page.
         deps.viewport.panBy({ x: -delta.x, y: -delta.y });

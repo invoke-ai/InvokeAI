@@ -9,11 +9,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 const makeWheelEvent = (
   deltaY: number,
-  opts: { ctrlKey?: boolean; deltaX?: number; deltaMode?: number; timeStamp?: number } = {}
+  opts: { clientX?: number; ctrlKey?: boolean; deltaX?: number; deltaMode?: number; timeStamp?: number } = {}
 ): WheelEvent =>
   ({
     altKey: false,
-    clientX: 10,
+    clientX: opts.clientX ?? 10,
     clientY: 10,
     ctrlKey: opts.ctrlKey ?? false,
     deltaMode: opts.deltaMode ?? 0,
@@ -161,23 +161,61 @@ describe('wheel handler: trackpad navigation', () => {
 });
 
 describe('wheel handler: trackpad pinch detection', () => {
-  const pinch = (timeStamp: number, deltaY = -8) => makeWheelEvent(deltaY, { ctrlKey: true, timeStamp });
+  const pinch = (timeStamp: number, deltaY = -8, clientX = 10) =>
+    makeWheelEvent(deltaY, { clientX, ctrlKey: true, timeStamp });
   const pinchHarness = (controlKey: ControlKeyState = 'up', enableOnPinch = true, armed = true) =>
     createHarness(toolWithId('brush'), false, false, { armed, controlKey, enableOnPinch });
 
-  it('swallows the start of a pinch run, then reports it and zooms from the step that completes it', () => {
+  it('swallows the start of a pinch run, then zooms by the whole run at the pointer of the step that completes it', () => {
     const h = pinchHarness();
-    h.handler(pinch(0));
-    h.handler(pinch(16));
+    h.handler(pinch(0, -8, 10));
+    h.handler(pinch(16, -6, 20));
     // Candidates are neither a brush resize nor, yet, a zoom.
     expect(h.state.pinchReports).toBe(0);
     expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
     expect(h.viewport.getZoom()).toBe(1);
 
-    h.handler(pinch(32));
+    const anchor = { x: 30, y: 10 };
+    const documentUnderPointer = h.viewport.screenToDocument(anchor);
+    h.handler(pinch(32, -10, anchor.x));
     expect(h.state.pinchReports).toBe(1);
     expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
-    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.08), 10);
+    // 8 + 6 + 10 pixels of spreading at the 0.01 pinch gain: the first steps are not lost.
+    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.24), 10);
+    const after = h.viewport.screenToDocument(anchor);
+    expect(after.x).toBeCloseTo(documentUnderPointer.x, 10);
+    expect(after.y).toBeCloseTo(documentUnderPointer.y, 10);
+  });
+
+  it('bounds each step of the detected run as a live pinch step is bounded', () => {
+    const h = pinchHarness();
+    // 30px steps would each zoom by e^0.3; one ctrl+wheel step zooms by at most 1.25x.
+    for (const t of [0, 16, 32]) {
+      h.handler(pinch(t, -30));
+    }
+    expect(h.viewport.getZoom()).toBeCloseTo(1.25 ** 3, 10);
+  });
+
+  it('starts a fresh run, without the expired steps, once the time window has passed', () => {
+    const h = pinchHarness();
+    h.handler(pinch(0, -20));
+    h.handler(pinch(400));
+    h.handler(pinch(416));
+    expect(h.state.pinchReports).toBe(0);
+    h.handler(pinch(432));
+    expect(h.state.pinchReports).toBe(1);
+    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.24), 10);
+  });
+
+  it('detects a pinch delivered in lines, measuring its steps in pixels', () => {
+    const h = pinchHarness();
+    // Half a line is 8px, far below a mouse notch.
+    for (const t of [0, 16, 32]) {
+      h.handler(makeWheelEvent(-0.5, { ctrlKey: true, deltaMode: 1, timeStamp: t }));
+    }
+    expect(h.state.pinchReports).toBe(1);
+    expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
+    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.24), 10);
   });
 
   it('keeps swallowing candidates while a listener that leaves the setting off still listens', () => {
@@ -211,7 +249,7 @@ describe('wheel handler: trackpad pinch detection', () => {
     }
   });
 
-  it('treats mouse-sized and line-mode steps as a brush resize, never a pinch', () => {
+  it('treats mouse notches, in pixels or 3-line steps, as a brush resize, never a pinch', () => {
     const notch = pinchHarness();
     const lines = pinchHarness();
     for (let i = 0; i < 10; i++) {

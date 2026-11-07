@@ -731,8 +731,8 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
   /**
    * A trackpad pinch (a quick run of small ctrl+wheel steps with the physical Control key known to be up) while
    * trackpad navigation is off. Listeners run before that event is routed, so one that sets `trackpadNavigation` on
-   * has it zoom as a pinch. While any listener is subscribed, candidate steps are swallowed instead of sizing the
-   * brush, so subscribe only while a pinch could still change the setting.
+   * has it zoom as a pinch, by the whole run. While any listener is subscribed, candidate steps are swallowed instead
+   * of sizing the brush, so subscribe only while a pinch could still change the setting.
    */
   onTrackpadPinch(listener: () => void): () => void;
   /**
