@@ -221,6 +221,8 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
   '/features/queue/core/deviceLabels.ts',
+  // The shared device entry otherwise becomes an imports-only boot request beside its labels and hook.
+  '/features/queue/devices.ts',
   '/features/queue/core/graphInputMedia.ts',
   '/features/queue/data/activeProgressTargetStore.ts',
   '/features/queue/data/progressImageStore.ts',
@@ -321,6 +323,15 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/ui/useGalleryData.ts',
   '/features/gallery/ui/useGalleryUploadAction.ts',
   '/features/gallery/ui/useGalleryUploadInput.ts',
+] as const;
+
+// The backend and its URL helpers load together for recent outputs. Keep picker UI out of that lazy Launchpad read.
+const GALLERY_BACKEND_MODULES = [
+  '/features/gallery/core/imagePaths.ts',
+  '/features/gallery/core/videoPaths.ts',
+  '/features/gallery/data/backend.ts',
+  '/features/gallery/data/imageUrls.ts',
+  '/features/gallery/data/videoUrls.ts',
 ] as const;
 
 // Gallery's shared state projection and UI port travel together.
@@ -507,6 +518,12 @@ export default defineConfig({
               name: 'gallery-picker',
               priority: 30,
               test: (id) => matchesAnySuffix(id, GALLERY_PICKER_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'gallery-backend',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, GALLERY_BACKEND_MODULES),
             },
             {
               includeDependenciesRecursively: false,

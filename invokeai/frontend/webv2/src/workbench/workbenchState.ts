@@ -15,6 +15,7 @@ import type {
   ExpandedPositivePrompts,
   InvocationRoute,
   InvocationSourceId,
+  ResolvedInvocationRoute,
   ResultDestination,
   UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
@@ -96,6 +97,7 @@ import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
 import { createProjectId } from '@workbench/projects/ids';
 
+import type { InvocationRuntimeInputs } from './invocationContracts';
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
 import {
@@ -139,7 +141,6 @@ import { applyWidgetDefaults, getProjectWidgetValues, getResolvedProjectWidgetVa
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
-import { canAddToCachedGalleryBoard } from '@features/gallery/queries';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
@@ -161,7 +162,6 @@ import {
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
-import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
@@ -191,7 +191,6 @@ import {
   type VideoWidgetValues,
 } from '@features/video';
 import { planWorkflowSubmission } from '@features/workflow/graph';
-import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import {
   hasMultipleWorkflowReturnNodes,
   projectGraphReducer,
@@ -423,9 +422,9 @@ type WorkbenchReducerAction =
     }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
-  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
   | ({
       type: 'submitResolvedInvocationSnapshot';
+      runtime: InvocationRuntimeInputs;
       backendSupportsCancellation: boolean;
       /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
       prepend?: boolean;
@@ -443,6 +442,7 @@ type WorkbenchReducerAction =
   | {
       /** The image menu's one-click upscale: queued at once, leaving the Upscale widget and the route as they are. */
       type: 'submitModelOnlyUpscale';
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       projectId: string;
       image: ImageWithDims;
       upscaleModel: SpandrelModelConfig;
@@ -579,6 +579,7 @@ type WorkbenchReducerAction =
   | { type: 'commitCanvasEdit'; projectId: string; intent: CanvasEditIntent }
   | ({
       type: 'submitCanvasInvocationSnapshot';
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       backendSupportsCancellation: boolean;
       canvas: CanvasStateContractV3;
       destination: ResultDestination;
@@ -3129,6 +3130,7 @@ const compileInvocationSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   route: InvocationRoute,
+  runtime: InvocationRuntimeInputs,
   models?: readonly ModelConfig[],
   workflowGenerators?: WorkflowGeneratorResolutions,
   workflowDocument: ProjectGraphState = getActiveProjectGraph(project),
@@ -3143,11 +3145,10 @@ const compileInvocationSnapshot = (
 } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
   const projectSettings = getEffectiveProjectSettings(project.settings, defaults[PROJECT_SETTINGS_OWNER]);
-  const randDevice = resolveRandDeviceMetadata(projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options);
+  const randDevice = projectSettings.useCpuNoise ? 'cpu' : runtime.noiseDevice;
 
   if (route.sourceId === 'workflow') {
-    // Route validation guarantees templates are loaded before this imperative read.
-    const templatesSnapshot = getInvocationTemplatesSnapshot();
+    const templatesSnapshot = runtime.templates;
 
     if (templatesSnapshot.status !== 'loaded') {
       return null;
@@ -3156,12 +3157,12 @@ const compileInvocationSnapshot = (
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
       autoBoardId: getGalleryAutoAddBoardId(
         getResolvedProjectWidgetValues(project, 'gallery', defaults),
-        canAddToCachedGalleryBoard
+        (boardId: string) => runtime.boardDestinationIds.includes(boardId)
       ),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
       // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
-      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
+      isBoardDestination: (boardId) => runtime.boardDestinationIds.includes(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
@@ -3949,6 +3950,7 @@ const enqueueCompiledSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   route: InvocationRoute,
+  runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>,
   compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
     graph: GraphContract;
@@ -4032,7 +4034,7 @@ const enqueueCompiledSnapshot = (
       ? null
       : getGalleryAutoAddBoardId(
           applyWidgetDefaults(widgetStates.gallery?.values ?? {}, 'gallery', defaults),
-          canAddToCachedGalleryBoard
+          (boardId: string) => runtime.boardDestinationIds.includes(boardId)
         );
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
@@ -4191,6 +4193,7 @@ const submitModelOnlyUpscale = (
   defaults: ScopedDefaults,
   {
     backendSupportsCancellation,
+    runtime,
     image,
     scale,
     sourceMetadata,
@@ -4222,6 +4225,7 @@ const submitModelOnlyUpscale = (
     project,
     defaults,
     route,
+    runtime,
     { graph: compiled.graph, widgetStates },
     backendSupportsCancellation,
     undefined,
@@ -4234,7 +4238,8 @@ const submitInvocationSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   backendSupportsCancellation: boolean,
-  route = resolveInvocationRoute(project),
+  runtime: InvocationRuntimeInputs,
+  route: ResolvedInvocationRoute,
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
@@ -4250,6 +4255,7 @@ const submitInvocationSnapshot = (
     project,
     defaults,
     route,
+    runtime,
     models,
     workflowGenerators,
     workflowDocument,
@@ -4264,6 +4270,7 @@ const submitInvocationSnapshot = (
     project,
     defaults,
     route,
+    runtime,
     { ...compiledSnapshot, ...expansion },
     backendSupportsCancellation,
     undefined,
@@ -5460,21 +5467,6 @@ const reduceWorkbenchAction = (
         redoProjectWorkflow(project, action.workflowId ?? project.workflows.activeWorkflowId, now())
       );
     }
-    case 'submitInvocationSnapshot': {
-      return withEnqueueNotification(
-        state,
-        updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(
-            project,
-            state.scopedDefaults,
-            action.backendSupportsCancellation,
-            undefined,
-            action.models
-          )
-        ),
-        state.activeProjectId
-      );
-    }
     case 'submitResolvedInvocationSnapshot': {
       const target = state.projects.find((project) => project.id === action.projectId);
       const workflow =
@@ -5547,7 +5539,15 @@ const reduceWorkbenchAction = (
             project,
             state.scopedDefaults,
             action.backendSupportsCancellation,
-            resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
+            action.runtime,
+            resolveInvocationRoute(
+              project,
+              'global',
+              action.route,
+              action.models,
+              workflow?.document,
+              action.runtime.templates
+            ),
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
@@ -6165,6 +6165,7 @@ const reduceWorkbenchAction = (
             project,
             state.scopedDefaults,
             { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
+            action.runtime,
             {
               generate: action.generate,
               graph: action.graph,

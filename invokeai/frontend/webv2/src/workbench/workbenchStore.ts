@@ -8,6 +8,7 @@ import {
   type GalleryImage,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
+import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
 import { recordLogEvent } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { createExternalStore } from '@platform/state/externalStore';
@@ -309,8 +310,18 @@ const createCommands = (
       setSource: command('setInvocationSource', (sourceId: ActionPayload<'setInvocationSource'>['sourceId']) => ({
         sourceId,
       })),
-      submitCanvas: command('submitCanvasInvocationSnapshot'),
-      submitModelOnlyUpscale: command('submitModelOnlyUpscale'),
+      submitCanvas: (payload: Omit<ActionPayload<'submitCanvasInvocationSnapshot'>, 'runtime'>) =>
+        dispatch({
+          ...payload,
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
+          type: 'submitCanvasInvocationSnapshot',
+        }),
+      submitModelOnlyUpscale: (payload: Omit<ActionPayload<'submitModelOnlyUpscale'>, 'runtime'>) =>
+        dispatch({
+          ...payload,
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
+          type: 'submitModelOnlyUpscale',
+        }),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),
