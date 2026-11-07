@@ -1,7 +1,9 @@
 """Tests for Qwen Image LoRA conversion utilities."""
 
+import accelerate
 import pytest
 import torch
+from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
 
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
@@ -11,11 +13,17 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils 
     is_state_dict_likely_kohya_qwen_image,
     lora_model_from_qwen_image_state_dict,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_aitoolkit_loha_format import (
+    state_dict_keys as aitoolkit_loha_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_diffusers_format import (
     state_dict_keys as diffusers_state_dict_keys,
 )
 from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_kohya_format import (
     state_dict_keys as kohya_state_dict_keys,
+)
+from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_lycoris_lokr_format import (
+    state_dict_keys as lycoris_lokr_state_dict_keys,
 )
 from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
@@ -167,3 +175,167 @@ def test_peft_dora_magnitude_is_kept_as_a_dora_layer():
     assert isinstance(layer, DoRALayer)
     assert layer.magnitude_is_out_dim
     assert torch.equal(layer.dora_scale, magnitude)
+
+
+# ---- LyCORIS layouts: lycoris_ / ai-toolkit's lora_transformer_ prefixes, dotted LoKr/LoHa, scalar ----
+
+_ATTENTION_MODULES = (
+    "attn.add_k_proj",
+    "attn.add_q_proj",
+    "attn.add_v_proj",
+    "attn.to_add_out",
+    "attn.to_k",
+    "attn.to_out.0",
+    "attn.to_q",
+    "attn.to_v",
+)
+_MLP_MODULES = ("img_mlp.net.0.proj", "img_mlp.net.2", "txt_mlp.net.0.proj", "txt_mlp.net.2")
+
+
+@pytest.fixture(scope="module")
+def tiny_transformer() -> QwenImageTransformer2DModel:
+    with accelerate.init_empty_weights():
+        return QwenImageTransformer2DModel(
+            patch_size=2,
+            in_channels=64,
+            out_channels=16,
+            num_layers=1,
+            attention_head_dim=8,
+            num_attention_heads=2,
+            joint_attention_dim=8,
+            axes_dims_rope=(2, 4, 2),
+        )
+
+
+def _layer_keys(*modules: str) -> set[str]:
+    return {f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.{m}" for m in modules}
+
+
+def _assert_layers_address_the_transformer(model, transformer: QwenImageTransformer2DModel) -> None:
+    for key in model.layers:
+        module = transformer.get_submodule(key.removeprefix(QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX))
+        assert isinstance(module, torch.nn.Linear)
+
+
+def test_lycoris_prefixed_lokr_converts_to_transformer_modules(tiny_transformer):
+    """A trained `lycoris_transformer_blocks_` LoKr has no modulation layers; every other module maps."""
+    model = lora_model_from_qwen_image_state_dict(keys_to_mock_state_dict(lycoris_lokr_state_dict_keys))
+
+    assert set(model.layers) == _layer_keys(*_ATTENTION_MODULES, *_MLP_MODULES)
+    _assert_layers_address_the_transformer(model, tiny_transformer)
+
+
+def test_lora_transformer_prefixed_loha_converts_to_transformer_modules(tiny_transformer):
+    """ai-toolkit's `lora_transformer_transformer_blocks_` spelling, with its modulation layers, maps too."""
+    state_dict = keys_to_mock_state_dict(
+        {k: v for k, v in aitoolkit_loha_state_dict_keys.items() if not k.endswith((".dora_scale", ".scalar"))}
+    )
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    assert set(model.layers) == _layer_keys(*_ATTENTION_MODULES, *_MLP_MODULES, "img_mod.1", "txt_mod.1")
+    _assert_layers_address_the_transformer(model, tiny_transformer)
+
+
+@pytest.mark.parametrize("prefix", ["transformer.", "diffusion_model.", "base_model.model."])
+def test_dotted_lokr_groups_by_full_module_path(prefix: str):
+    """Dotted LoKr keys group per module: cutting at the last two dots merged every projection of a block."""
+    state_dict = {}
+    for module in ("attn.to_q", "attn.to_k"):
+        state_dict[f"{prefix}transformer_blocks.0.{module}.lokr_w1"] = torch.zeros(4, 4)
+        state_dict[f"{prefix}transformer_blocks.0.{module}.lokr_w2_a"] = torch.zeros(8, 2)
+        state_dict[f"{prefix}transformer_blocks.0.{module}.lokr_w2_b"] = torch.zeros(2, 8)
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    assert set(model.layers) == _layer_keys("attn.to_q", "attn.to_k")
+
+
+def test_dotted_loha_groups_by_full_module_path():
+    state_dict = {}
+    for module in ("attn.to_q", "attn.to_out.0"):
+        for param in ("hada_w1_a", "hada_w2_a"):
+            state_dict[f"transformer.transformer_blocks.0.{module}.{param}"] = torch.zeros(32, 4)
+        for param in ("hada_w1_b", "hada_w2_b"):
+            state_dict[f"transformer.transformer_blocks.0.{module}.{param}"] = torch.zeros(4, 32)
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    assert set(model.layers) == _layer_keys("attn.to_q", "attn.to_out.0")
+
+
+@pytest.mark.parametrize(
+    "prefix", ["lycoris_transformer_blocks_0_attn_to_q", "transformer.transformer_blocks.0.attn.to_q"]
+)
+@pytest.mark.parametrize("factorized", [False, True])
+def test_lokr_scalar_scales_the_update(prefix: str, factorized: bool):
+    """LyCORIS multiplies a LoKr's whole update by its learned `scalar`; the layer must apply the same delta."""
+    generator = torch.Generator().manual_seed(0)
+    w1 = torch.randn(4, 4, generator=generator)
+    w2 = torch.randn(4, 4, generator=generator)
+    scalar = torch.tensor(0.25)
+    state_dict = {f"{prefix}.scalar": scalar, f"{prefix}.alpha": torch.tensor(8.0)}
+    if factorized:
+        w1_a, w1_b = torch.randn(4, 2, generator=generator), torch.randn(2, 4, generator=generator)
+        w1 = w1_a @ w1_b
+        state_dict[f"{prefix}.lokr_w1_a"] = w1_a
+        state_dict[f"{prefix}.lokr_w1_b"] = w1_b
+    else:
+        state_dict[f"{prefix}.lokr_w1"] = w1
+    state_dict[f"{prefix}.lokr_w2"] = w2
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    (layer,) = model.layers.values()
+    delta = layer.get_parameters({"weight": torch.zeros(16, 16)}, weight=1.0)["weight"]
+    # LyCORIS scales by alpha / rank, and a LoKr with whole factors has no rank (scale 1); w1_b's rows are the rank.
+    lycoris_scale = 8.0 / 2 if factorized else 1.0
+    assert torch.allclose(delta, torch.kron(w1, w2) * lycoris_scale * 0.25, atol=1e-5)
+
+
+def test_loha_scalar_scales_the_update():
+    generator = torch.Generator().manual_seed(1)
+    w1_a, w2_a = torch.randn(16, 4, generator=generator), torch.randn(16, 4, generator=generator)
+    w1_b, w2_b = torch.randn(4, 16, generator=generator), torch.randn(4, 16, generator=generator)
+    prefix = "lora_transformer_transformer_blocks_0_attn_to_q"
+    state_dict = {
+        f"{prefix}.hada_w1_a": w1_a,
+        f"{prefix}.hada_w1_b": w1_b,
+        f"{prefix}.hada_w2_a": w2_a,
+        f"{prefix}.hada_w2_b": w2_b,
+        f"{prefix}.alpha": torch.tensor(2.0),
+        f"{prefix}.scalar": torch.tensor(-0.5),
+    }
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    (layer,) = model.layers.values()
+    delta = layer.get_parameters({"weight": torch.zeros(16, 16)}, weight=1.0)["weight"]
+    # LyCORIS: ((w1_a @ w1_b) * (w2_a @ w2_b)) * (alpha / rank) * scalar
+    assert torch.allclose(delta, (w1_a @ w1_b) * (w2_a @ w2_b) * (2.0 / 4) * -0.5, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    ("prefix", "form"),
+    [
+        ("lycoris_transformer_blocks_0_attn_to_q", "lora_down_up"),
+        ("transformer.transformer_blocks.0.attn.to_q", "lora_down_up"),
+        ("transformer.transformer_blocks.0.attn.to_q", "lora_A_B"),
+    ],
+)
+def test_lora_scalar_scales_the_update(prefix: str, form: str):
+    """LyCORIS folds `scalar` into its weights on save, but raw writers such as ai-toolkit keep the key; the update
+    is multiplied by it."""
+    generator = torch.Generator().manual_seed(2)
+    down, up = torch.randn(4, 16, generator=generator), torch.randn(16, 4, generator=generator)
+    names = ("lora_down.weight", "lora_up.weight") if form == "lora_down_up" else ("lora_A.weight", "lora_B.weight")
+    state_dict = {
+        f"{prefix}.{names[0]}": down,
+        f"{prefix}.{names[1]}": up,
+        f"{prefix}.scalar": torch.tensor(0.01),
+    }
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    (layer,) = model.layers.values()
+    delta = layer.get_parameters({"weight": torch.zeros(16, 16)}, weight=1.0)["weight"]
+    assert torch.allclose(delta, (up @ down) * 0.01, atol=1e-6)
