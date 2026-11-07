@@ -5,6 +5,7 @@ import type { PointerInput, ToolId } from '@workbench/canvas-engine/types';
 
 import { registerModalPresence } from '@platform/ui/modalPresence';
 import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
+import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,6 +54,7 @@ const makeKeyEvent = (init: {
   repeat?: boolean;
   shiftKey?: boolean;
   target?: unknown;
+  type?: 'keydown' | 'keyup';
 }): KeyboardEvent =>
   ({
     altKey: init.altKey ?? false,
@@ -65,6 +67,7 @@ const makeKeyEvent = (init: {
     repeat: init.repeat ?? false,
     shiftKey: init.shiftKey ?? false,
     target: init.target ?? null,
+    type: init.type ?? 'keydown',
   }) as unknown as KeyboardEvent;
 
 /** A key target inside the canvas surface; the harness keyboard root claims it through `contains`. */
@@ -76,6 +79,7 @@ const createHarness = (
   opts: {
     tools?: ToolId[];
     handleEscape?: (o: { gestureWasActive: boolean }) => void;
+    hasFocus?: () => boolean;
     maybeCommitModalSession?: () => boolean;
     replaying?: () => boolean;
     resolveKeyOwner?: (event: KeyboardEvent) => CanvasKeyOwner;
@@ -130,6 +134,7 @@ const createHarness = (
     getKeyOwnerResolver: () => opts.resolveKeyOwner ?? null,
     getToolContext: () => ctx,
     handleEscape: opts.handleEscape,
+    hasFocus: opts.hasFocus,
     hasTool: (id) => registered.has(id),
     isReplaying: () => opts.replaying?.() ?? false,
     maybeCommitModalSession: opts.maybeCommitModalSession,
@@ -305,18 +310,19 @@ describe('pointer pipeline: middle-mouse pan', () => {
 });
 
 describe('pointer pipeline: physical Control key', () => {
-  const control = (ctrlKey: boolean) => makeKeyEvent({ code: 'ControlLeft', ctrlKey, key: 'Control' });
+  const control = (type: 'keydown' | 'keyup', ctrlKey: boolean) =>
+    makeKeyEvent({ code: 'ControlLeft', ctrlKey, key: 'Control', type });
 
   it('is unknown until a key or pointer event shows it, then follows presses and releases', () => {
     const h = createHarness();
     expect(h.pipeline.controlKeyState()).toBe('unknown');
-    h.pipeline.onKeyDown(control(true));
+    h.pipeline.onKeyCapture(control('keydown', true));
     expect(h.pipeline.controlKeyState()).toBe('down');
     // Another key while Control stays down keeps it down.
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyZ', ctrlKey: true, key: 'z' }));
+    h.pipeline.onKeyCapture(makeKeyEvent({ code: 'KeyZ', ctrlKey: true, key: 'z', type: 'keyup' }));
     expect(h.pipeline.controlKeyState()).toBe('down');
     // Browsers may still report ctrlKey on the Control key's own release.
-    h.pipeline.onKeyUp(control(true));
+    h.pipeline.onKeyCapture(control('keyup', true));
     expect(h.pipeline.controlKeyState()).toBe('up');
   });
 
@@ -328,12 +334,96 @@ describe('pointer pipeline: physical Control key', () => {
     expect(h.pipeline.controlKeyState()).toBe('up');
   });
 
-  it('becomes unknown again on reset (window blur, hidden page, detach)', () => {
+  it('becomes unknown whenever focus may have changed hands: window focus, and reset on blur or a hidden page', () => {
+    const focused = createHarness();
+    focused.pipeline.onKeyCapture(control('keyup', false));
+    expect(focused.pipeline.controlKeyState()).toBe('up');
+    focused.pipeline.onWindowFocus();
+    expect(focused.pipeline.controlKeyState()).toBe('unknown');
+
+    const reset = createHarness();
+    reset.pipeline.onKeyCapture(control('keyup', false));
+    reset.pipeline.reset();
+    expect(reset.pipeline.controlKeyState()).toBe('unknown');
+  });
+
+  /** The engine's wheel routing over this pipeline's Control state, with pinch detection armed. */
+  const wheelOver = (h: ReturnType<typeof createHarness>) => {
+    const reports = { pinches: 0 };
+    const stepActiveBrushSize = vi.fn();
+    const onWheel = createWheelHandler({
+      getActiveTool: () => h.tool,
+      getControlKeyState: () => h.pipeline.controlKeyState(),
+      getInputElement: () => null,
+      getInvertBrushSizeScroll: () => false,
+      getTrackpadNavigation: () => false,
+      invalidate: vi.fn(),
+      isPinchDetectionArmed: () => true,
+      reportTrackpadPinch: () => {
+        reports.pinches += 1;
+      },
+      stepActiveBrushSize,
+      viewport: createViewport(),
+    });
+    /** Three small pixel ctrl+wheel steps within the detection window, as a high-resolution mouse wheel sends. */
+    const smallCtrlWheelRun = (start: number): void => {
+      for (const t of [start, start + 16, start + 32]) {
+        onWheel({
+          clientX: 0,
+          clientY: 0,
+          ctrlKey: true,
+          deltaMode: 0,
+          deltaX: 0,
+          deltaY: -4,
+          preventDefault: vi.fn(),
+          timeStamp: t,
+        } as unknown as WheelEvent);
+      }
+    };
+    return { reports, smallCtrlWheelRun, stepActiveBrushSize };
+  };
+
+  it('never lets a ctrl+mouse-wheel turn into a pinch after focus came back with Control held unseen', () => {
     const h = createHarness();
-    h.pipeline.onKeyUp(control(false));
-    expect(h.pipeline.controlKeyState()).toBe('up');
+    const wheel = wheelOver(h);
+
+    // Control was last seen up; it was then pressed in another window, which handed focus back with it held.
+    h.pipeline.onKeyCapture(control('keyup', false));
+    h.pipeline.onWindowFocus();
+    wheel.smallCtrlWheelRun(0);
+    // The same after a blur or hidden page, which reset the pipeline.
+    h.pipeline.onKeyCapture(control('keyup', false));
     h.pipeline.reset();
+    wheel.smallCtrlWheelRun(100);
+    expect(wheel.reports.pinches).toBe(0);
+    // A high-resolution wheel with Control held sizes the brush, step by step.
+    expect(wheel.stepActiveBrushSize).toHaveBeenCalledTimes(6);
+  });
+
+  it('takes Control as released from a pointer event only while the document has focus', () => {
+    const focus = { has: true };
+    const h = createHarness({ hasFocus: () => focus.has });
+    const wheel = wheelOver(h);
+
+    // Focus went to another app, the address bar or DevTools; the pointer then crossed the still-visible canvas without
+    // Control, which was pressed afterwards where the page could not see it.
+    h.pipeline.reset();
+    focus.has = false;
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0 }));
     expect(h.pipeline.controlKeyState()).toBe('unknown');
+    wheel.smallCtrlWheelRun(0);
+    expect(wheel.reports.pinches).toBe(0);
+    expect(wheel.stepActiveBrushSize).toHaveBeenCalledTimes(3);
+    // A pointer carrying Control shows it down, focused or not.
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, ctrlKey: true }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+
+    // Focused, the same Control-free move shows the key up, so a pinch is detected.
+    focus.has = true;
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0 }));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+    wheel.smallCtrlWheelRun(1000);
+    expect(wheel.reports.pinches).toBe(1);
   });
 });
 
@@ -355,6 +445,23 @@ describe('pointer pipeline: hover refresh after a view change', () => {
     expect(last.input.modifiers.ctrl).toBe(true);
     expect(last.input.pointerType).toBe('pen');
     expect(last.batch).toEqual([last.input]);
+  });
+
+  it('sends hover pressure, not the pressure of the stroke that ended under the still pen', () => {
+    const h = createHarness();
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerDown(makePointerEvent({ clientX: 40, pointerType: 'pen', pressure: 0.9 }));
+    h.pipeline.onPointerMove(makePointerEvent({ clientX: 41, pointerType: 'pen', pressure: 0.8 }));
+    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, clientX: 41, pointerType: 'pen', pressure: 0 }));
+    h.deps.viewport.panBy({ x: 10, y: 0 });
+    h.pipeline.refreshHover();
+
+    const refreshed = h.tool.moves.at(-1)!.input;
+    expect(h.tool.moves).toHaveLength(2);
+    // A hovering pen reports no pressure, which tool input carries as the 0.5 default.
+    expect(refreshed.pressure).toBe(0.5);
+    expect(refreshed.buttons).toBe(0);
+    expect(refreshed.pointerType).toBe('pen');
   });
 
   it('delivers nothing off the canvas, during a gesture, or during a middle-button pan', () => {

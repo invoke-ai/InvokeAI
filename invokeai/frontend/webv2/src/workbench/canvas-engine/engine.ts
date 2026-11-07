@@ -2038,6 +2038,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getKeyOwnerResolver: () => renderController.getKeyOwnerResolver(),
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
+    hasFocus: () => typeof document === 'undefined' || document.hasFocus(),
     hasTool: (id) => tools.has(id),
     isReplaying: () => history.isReplaying(),
     // A primary-button pointerdown while a text-edit session is open commits it

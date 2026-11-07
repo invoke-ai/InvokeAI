@@ -15942,9 +15942,9 @@ describe('masks while a result is staged', () => {
       }
     );
     // The window key listeners attach adds, so a test can hold Space as the browser would deliver it.
-    const windowListeners = new Map<string, (event: unknown) => void>();
+    const windowListeners = new Map<string, Set<(event: unknown) => void>>();
     vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
-      windowListeners.set(type, listener)
+      windowListeners.set(type, (windowListeners.get(type) ?? new Set()).add(listener))
     );
     vi.stubGlobal('removeEventListener', () => {});
     const composite = vi.spyOn(compositor, 'compositeDocument');
@@ -15999,7 +15999,11 @@ describe('masks while a result is staged', () => {
       raf.flush();
     };
     const key = (type: 'keydown' | 'keyup', code: string): void =>
-      windowListeners.get(type)?.({ code, key: code === 'Space' ? ' ' : code, preventDefault: () => {}, target: null });
+      windowListeners
+        .get(type)
+        ?.forEach((listener) =>
+          listener({ code, key: code === 'Space' ? ' ' : code, preventDefault: () => {}, target: null, type })
+        );
     /** A press that must leave the masks hidden, whatever else its frames repaint. */
     const expectPressHidden = (): void => {
       overlay.fire('pointerdown', pointerAt(5, 5));
@@ -16259,11 +16263,13 @@ describe('beginTransform', () => {
       }
     );
     // The window key listeners attach adds, so a test can hold Space as the browser would deliver it.
-    const windowListeners = new Map<string, (event: unknown) => void>();
+    const windowListeners = new Map<string, Set<(event: unknown) => void>>();
     vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
-      windowListeners.set(type, listener)
+      windowListeners.set(type, (windowListeners.get(type) ?? new Set()).add(listener))
     );
-    vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
+    vi.stubGlobal('removeEventListener', (type: string, listener: (event: unknown) => void) =>
+      windowListeners.get(type)?.delete(listener)
+    );
     const existing: CanvasLayerContract = {
       ...(rasterLayer('paint') as CanvasRasterLayerContractV2),
       source: { bitmap: null, type: 'paint' },
@@ -16298,7 +16304,11 @@ describe('beginTransform', () => {
     expect(engine.stores.transformSession.get()).toBeNull();
     expect(engine.interaction.get('pendingTransformLayerId')).toBe(stroke.layerId);
     const key = (type: 'keydown' | 'keyup', code: string) =>
-      windowListeners.get(type)?.({ code, key: code === 'Space' ? ' ' : code, preventDefault: () => {}, target: null });
+      windowListeners
+        .get(type)
+        ?.forEach((listener) =>
+          listener({ code, key: code === 'Space' ? ' ' : code, preventDefault: () => {}, target: null, type })
+        );
     const persist = () =>
       dispatch({
         id: stroke.layerId,
@@ -20498,11 +20508,13 @@ describe('edit feedback on the surface', () => {
         quadraticCurveTo() {}
       }
     );
-    const windowListeners = new Map<string, (event: unknown) => void>();
+    const windowListeners = new Map<string, Set<(event: unknown) => void>>();
     vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
-      windowListeners.set(type, listener)
+      windowListeners.set(type, (windowListeners.get(type) ?? new Set()).add(listener))
     );
-    vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
+    vi.stubGlobal('removeEventListener', (type: string, listener: (event: unknown) => void) =>
+      windowListeners.get(type)?.delete(listener)
+    );
     const { dispatch, projectId, store } = createReducerBackedStore(document);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -20516,7 +20528,9 @@ describe('edit feedback on the surface', () => {
     const refusals: CanvasEditRefusal[] = [];
     engine.tools.onEditRefused((refusal) => refusals.push(refusal));
     const key = (type: 'keydown' | 'keyup', code: string) =>
-      windowListeners.get(type)?.({ code, key: code, preventDefault: () => {}, target: null });
+      windowListeners
+        .get(type)
+        ?.forEach((listener) => listener({ code, key: code, preventDefault: () => {}, target: null, type }));
     return { dispatch, engine, key, overlay, refusals };
   };
 
