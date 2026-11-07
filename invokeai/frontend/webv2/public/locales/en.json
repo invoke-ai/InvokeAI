@@ -4298,7 +4298,8 @@
         "showBbox": "Show generation frame",
         "showProgressOnCanvas": "Show progress on canvas",
         "snapToGrid": "Snap to grid",
-        "trackpadNavigation": "Scroll to pan, pinch to zoom"
+        "trackpadNavigation": "Scroll to pan, pinch to zoom",
+        "trackpadNavigationDescription": "Two-finger scroll pans and pinch zooms. With a mouse, the wheel pans; hold Ctrl to zoom."
       },
       "showStagedResultPreview": "Show staged result preview",
       "showStagingThumbnails": "Show staging thumbnails",

@@ -52,6 +52,8 @@ export interface CanvasBooleanSetting {
   defaultValue: boolean;
   /** i18n key for the popover label. */
   labelKey: string;
+  /** i18n key for a hint under the label, where the settings surface shows one. */
+  descriptionKey?: string;
   /** Which popover section the setting belongs to. */
   section: CanvasSettingSection;
 }
@@ -62,6 +64,7 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
   {
     // Browsers cannot reliably tell a trackpad from a mouse, so this is opt-in rather than detected.
     defaultValue: false,
+    descriptionKey: 'widgets.canvas.settings.trackpadNavigationDescription',
     key: CANVAS_TRACKPAD_NAVIGATION_KEY,
     labelKey: 'widgets.canvas.settings.trackpadNavigation',
     section: 'behavior',
