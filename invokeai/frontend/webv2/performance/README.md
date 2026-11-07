@@ -76,3 +76,9 @@ Failures name an owner and a remediation ticket: structural work that would reti
 | `seal-canvas-engine-seam`        | Importers of `@workbench/canvas-engine/contracts`                             |
 | `finish-queue-ownership`         | Importers of `@features/queue`                                                |
 | `define-gallery-feature`         | Importers of `./GalleryWidgetView`                                            |
+
+## Workflow-library scaling fixture
+
+The mock backend accepts `POST /__workflow-library` with JSON `{"scenario":"large"}`. This opt-in workload replaces library records with 1,000 user workflows, each containing 40 integer nodes; normal route fixtures and resource budgets are unchanged. Scenarios `empty`, `failed-page`, `slow-detail`, and `changed-revision` respectively empty the library, fail page 2 once (retry succeeds), delay detail reads by 300 ms, and advance each record's revision on its first detail read. `POST /__reset` restores ordinary fixtures. `GET /__workflow-requests` records list/detail requests since seeding.
+
+For a comparison, seed the same scenario on base and candidate with identical viewport, zoom, browser and hardware. Open Yours, select a detail, traverse the library in both directions, switch search/tag views repeatedly, and return. Count `[data-workflow-card]` elements and workflow detail/list GETs at each position. Record long tasks and force-GC retained heap with the same browser profiling procedure on both builds; heap and wall time are observations, not deterministic counts. Run the normal timing profile only against its corresponding fresh performance build, with exclusive use of the machine. Owner resource observations and unit-fixture reads are not substitutes for this browser comparison.

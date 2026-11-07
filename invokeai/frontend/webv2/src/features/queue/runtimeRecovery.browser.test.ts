@@ -34,6 +34,7 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
     markBackendCancelled: vi.fn(),
     markBackendSubmitted: vi.fn(),
     recordError: vi.fn(),
+    recordSubmissionRetry: vi.fn(),
     refreshBackendData: vi.fn(),
     refreshBoardDestinations: vi.fn(),
     reopenForRetry: vi.fn(),

@@ -19,7 +19,8 @@ from invokeai.backend.model_manager.configs.identification_utils import InvalidM
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
-from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelType, Qwen35VariantType
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS
+from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelSourceType, ModelType, Qwen35VariantType
 from tests.backend.model_manager.load.state_dicts import (
     flux3_pup_bf16_keys,
     flux3_pup_int8_convrot_keys,
@@ -182,3 +183,120 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
         result = _identify(write_header_only_safetensors(path, qwen3_vl_4b_comfy_keys.state_dict_keys))
 
         assert _matches(result) == [Qwen3VLEncoder_Checkpoint_Config.__name__]
+
+
+class TestQuantizedQwen3_5Encoders:
+    """ComfyUI's int8 build of the Qwen3.5-9B text encoder has the key set of the FLUX.3 upsampler's, so only an explicit
+    type (the starter model's) tells the two apart; the quantization schemes the encoder loader cannot build are refused
+    at install, as the Text LLM config refuses them."""
+
+    @staticmethod
+    def _starter_fields() -> dict[str, Any]:
+        """What the install dialog sends for the starter model, from the starter as registered."""
+        starter = next(m for m in STARTER_MODELS if m.name == "Qwen3.5 9B Encoder (int8)")
+        return {
+            "base": starter.base,
+            "description": starter.description,
+            "name": starter.name,
+            "type": starter.type,
+            "format": starter.format,
+            "variant": starter.variant,
+            "source": starter.source,
+            "source_type": ModelSourceType.Url,
+        }
+
+    def _int8_file(self, tmp_path: Path) -> Path:
+        return write_header_only_safetensors(
+            tmp_path / "qwen3.5_9b_int8_convrot.safetensors", _INT8, flux3_pup_int8_convrot_keys.markers
+        )
+
+    def test_the_starter_installs_the_int8_build_as_a_9b_encoder(self, tmp_path: Path) -> None:
+        result = _identify(self._int8_file(tmp_path), self._starter_fields())
+
+        assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
+        assert isinstance(result.config, Qwen35Encoder_Checkpoint_Config)
+        assert result.config.variant is Qwen35VariantType.Qwen35_9B
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_int8_convrot.safetensors",
+            "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/2929efe3/text_encoders/qwen3.5_9b_bf16.safetensors?download=true",
+            "Comfy-Org/MOSS-Image::text_encoders/qwen3.5_9b_int8_convrot.safetensors",
+        ],
+        ids=["main", "pinned bf16", "repo id"],
+    )
+    def test_comfy_orgs_source_alone_makes_its_file_an_encoder_and_never_a_text_llm(
+        self, tmp_path: Path, source: str
+    ) -> None:
+        result = _identify(self._int8_file(tmp_path), {"source": source, "source_type": ModelSourceType.Url})
+
+        assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
+
+    @pytest.mark.parametrize(
+        ("source", "source_type"),
+        [
+            # A local copy and another repository's identical file carry no such evidence.
+            ("D:/models/Comfy-Org/MOSS-Image/text_encoders/qwen3.5_9b_int8_convrot.safetensors", ModelSourceType.Path),
+            (
+                "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/text_encoders/"
+                "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
+                ModelSourceType.Url,
+            ),
+            (
+                "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/diffusion_models/moss.safetensors",
+                ModelSourceType.Url,
+            ),
+        ],
+        ids=["local path", "flux3 upsampler", "other folder of the repo"],
+    )
+    def test_any_other_source_leaves_the_file_a_text_llm(
+        self, tmp_path: Path, source: str, source_type: ModelSourceType
+    ) -> None:
+        result = _identify(self._int8_file(tmp_path), {"source": source, "source_type": source_type})
+
+        assert _matches(result) == [TextLLM_Checkpoint_Config.__name__]
+
+    def test_the_int8_build_without_an_lm_head_is_an_encoder_unprompted(self, tmp_path: Path) -> None:
+        keys = {key: value for key, value in _INT8.items() if not key.startswith("lm_head.")}
+        markers = {path: marker for path, marker in flux3_pup_int8_convrot_keys.markers.items() if path != "lm_head"}
+
+        result = _identify(write_header_only_safetensors(tmp_path / "encoder.safetensors", keys, markers))
+
+        assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
+
+    @pytest.mark.parametrize(
+        ("keys", "scheme"),
+        [
+            (flux3_pup_w4a8_keys.state_dict_keys, "asym_w4a8_int8"),
+            (_with_layer(_BF16, weight=([12288, 4096], "F8_E4M3"), weight_scale=([], "F32")), "scaled fp8"),
+            (
+                _with_layer(
+                    _BF16,
+                    weight=([12288, 2048], "U8"),
+                    weight_scale=([12288, 256], "F8_E4M3"),
+                    weight_scale_2=([], "F32"),
+                    input_scale=([], "F32"),
+                ),
+                "nvfp4",
+            ),
+            (
+                {key: value for key, value in _INT8.items() if not key.endswith(".comfy_quant")},
+                "int8 without an int8_tensorwise marker",
+            ),
+        ],
+        ids=["w4a8", "scaled fp8", "nvfp4", "unmarked int8"],
+    )
+    def test_a_build_the_loader_cannot_decode_is_refused_naming_its_scheme(
+        self, tmp_path: Path, keys: Keys, scheme: str
+    ) -> None:
+        result = ModelConfigFactory.from_model_on_disk(
+            write_header_only_safetensors(tmp_path / "encoder.safetensors", keys),
+            self._starter_fields(),
+            allow_unknown=True,
+        )
+
+        assert result.config is None
+        refusal = result.details[Qwen35Encoder_Checkpoint_Config.__name__]
+        assert isinstance(refusal, InvalidMatchError)
+        assert scheme in str(refusal)

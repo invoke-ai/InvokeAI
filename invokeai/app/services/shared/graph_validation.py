@@ -242,6 +242,36 @@ def extract_collection_item_types(t: Any) -> set[Any]:
     return item_types
 
 
+def _is_subtype(sub: Any, sup: Any) -> bool:
+    """Whether every value of type form `sub` is a value of `sup`, for any form collector types resolve to.
+
+    issubclass() raises TypeError for a union first argument and a parameterized-generic second argument; an
+    escaped TypeError turns graph validation into a 500 instead of a validation error.
+    """
+    if sub == sup:
+        return True
+    sub_origin = get_origin(sub)
+    if sub_origin in (Union, UnionType):
+        return all(_is_subtype(arg, sup) for arg in get_args(sub))
+    if sub_origin is Literal and len(get_args(sub)) > 1:
+        # A Literal is the union of its values; check each, so `Literal["a", 1]` fits `str | int`.
+        return all(_is_subtype(Literal[value], sup) for value in get_args(sub))
+    if get_origin(sup) in (Union, UnionType):
+        return any(_is_subtype(sub, arg) for arg in get_args(sup))
+    if sub_origin is Literal:
+        (value,) = get_args(sub)
+        if get_origin(sup) is Literal:
+            # Compare by equality, as pydantic does: it accepts `True` for `Literal[1]`.
+            return value in get_args(sup)
+        # As `_resolve_item_input_types` does, a value is of its own type: `Literal[True]` fits `int`.
+        return _is_subtype(type(value), sup)
+    try:
+        return issubclass(sub, sup)
+    except TypeError:
+        # Parameterized generics and other non-class forms match only themselves.
+        return False
+
+
 def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
     implementation = _get_facade_override("are_connection_types_compatible", are_connection_types_compatible)
     if implementation is not are_connection_types_compatible:
@@ -1682,7 +1712,7 @@ class Graph(BaseModel):
     def _get_type_tree_root_types(self, input_types: set[Any]) -> list[Any]:
         type_tree = nx.DiGraph()
         type_tree.add_nodes_from(input_types)
-        type_tree.add_edges_from([e for e in itertools.permutations(input_types, 2) if issubclass(e[1], e[0])])
+        type_tree.add_edges_from([e for e in itertools.permutations(input_types, 2) if _is_subtype(e[1], e[0])])
         type_degrees = type_tree.in_degree(type_tree.nodes)
         return [t[0] for t in type_degrees if t[1] == 0]  # type: ignore
 
@@ -1823,12 +1853,12 @@ class Graph(BaseModel):
             return "Collector output must connect to a collection input"
 
         # Read item types from the list branch: the first type argument of `Union[list[X], X]` or
-        # `Optional[list[X]]` is `list[X]` itself, which issubclass() rejects with a TypeError.
+        # `Optional[list[X]]` is `list[X]` itself, not the item type.
         if input_root_type is not None:
             if not all(
                 is_any(t)
                 or any(
-                    self._collector_item_matches(input_root_type, item_type)
+                    is_any(item_type) or _is_subtype(input_root_type, item_type)
                     for item_type in extract_collection_item_types(t)
                 )
                 for t in output_field_types
@@ -1838,16 +1868,6 @@ class Graph(BaseModel):
             return "Collector outputs must connect to a collection input with a matching type"
 
         return None
-
-    @staticmethod
-    def _collector_item_matches(input_root_type: Any, item_type: Any) -> bool:
-        if is_any(item_type) or is_union_subtype(input_root_type, item_type):
-            return True
-        if not isinstance(input_root_type, type):
-            return False
-        # A union item type (e.g. `list[Union[Base, str]]`) matches a subclass of any of its members.
-        candidates = get_args(item_type) if get_origin(item_type) in (Union, UnionType) else (item_type,)
-        return any(isinstance(c, type) and issubclass(input_root_type, c) for c in candidates)
 
     def _validate_downstream_collector_outputs(
         self,

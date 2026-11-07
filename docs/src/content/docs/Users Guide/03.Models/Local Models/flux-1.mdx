@@ -1,7 +1,7 @@
 ---
 title: FLUX.1
 description: Generate and edit images with FLUX.1 dev, schnell, Krea dev and Kontext, plus FLUX Fill, Redux, IP-Adapter, ControlNets and Control LoRAs.
-lastUpdated: 2026-11-02
+lastUpdated: 2026-11-06
 sidebar:
   order: 4
 ---
@@ -62,8 +62,10 @@ Individual starter models for the main model:
 | FLUX.1 dev / FLUX.1 schnell | bfloat16 single file | ~33 GB with dependencies (bf16 T5) |
 | FLUX.1 dev (quantized) / schnell (quantized) | bitsandbytes NF4 | ~12 GB with dependencies (int8 T5) |
 | FLUX.1 dev (int8) | int8 single file (community repack) | ~18 GB with dependencies; half the memory of bf16 on every supported GPU |
+| FLUX.1 dev (fp8) / schnell (fp8) | Kijai's fp8 (e4m3fn) casts, without scales | ~22 GB with dependencies (bf16 T5); the transformer is ~11.9 GB; FP8 Storage is switched on at install |
 | FLUX.1 schnell (SDNQ uint4 + SVD) | [SDNQ](/configuration/optimization/sdnq-quantization/) Diffusers pipeline | ~15 GB, self-contained |
 | FLUX.1 Kontext dev (quantized) | GGUF Q4_K_M | ~12 GB with dependencies |
+| FLUX.1 Kontext dev (fp8) | Comfy-Org scaled fp8 single file | ~22 GB with dependencies (bf16 T5); the transformer is ~11.9 GB; FP8 Storage is switched on at install |
 | FLUX.1 Krea dev / Krea dev (quantized) | single file / GGUF Q4_K_M | ~29 GB / ~12 GB with dependencies |
 | FLUX.1 Krea dev (fp8) | Comfy-Org scaled fp8 single file | ~18 GB with dependencies; FP8 Storage is switched on at install, about 11.9 GB once loaded |
 | FLUX.1 Krea dev (int8) | int8 single file (community repack) | ~20 GB with dependencies; stays int8 on every supported GPU, about 14.1 GB once loaded |
