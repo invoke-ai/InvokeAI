@@ -9,9 +9,11 @@ import type {
 import type { BackendConnectionStatus } from '@platform/transport/types';
 import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
+import { getQueueStagedResults } from '@app/queueStagedResults';
 import { collectSubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
 import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createInitialWorkbenchState, type WorkbenchAction, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -20,6 +22,7 @@ import {
   createQueueItemBackendSubmission,
   createQueueRuntime,
   type QueueHistoryCommands,
+  type QueueHistoryPort,
   type QueueRunJournalPort,
   type QueueRunLock,
   type QueueRunLockPort,
@@ -84,7 +87,7 @@ const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBack
   pauseProcessor: vi.fn(),
   readCurrent: vi.fn(),
   readItemIds: vi.fn(),
-  readItemsById: vi.fn(),
+  readItemsById: vi.fn().mockResolvedValue([]),
   readNext: vi.fn(),
   readStatus: vi.fn(),
   resumeProcessor: vi.fn(),
@@ -376,7 +379,7 @@ describe('queue runtime', () => {
       pauseProcessor: vi.fn(),
       readCurrent: vi.fn(),
       readItemIds: vi.fn(),
-      readItemsById: vi.fn(),
+      readItemsById: vi.fn().mockResolvedValue([]),
       readNext: vi.fn(),
       readStatus: vi.fn(),
       resumeProcessor: vi.fn(),
@@ -411,6 +414,7 @@ describe('queue runtime', () => {
       ensureTemplatesLoaded: vi.fn(),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -462,6 +466,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate }),
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -503,6 +508,7 @@ describe('queue runtime', () => {
       ensureProjectPersisted,
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -537,6 +543,7 @@ describe('queue runtime', () => {
         ensureProjectPersisted: vi.fn().mockResolvedValue('refused'),
         history: {
           commands,
+          listStagedResults: () => [],
           getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
           subscribe: vi.fn(() => vi.fn()),
         },
@@ -571,6 +578,7 @@ describe('queue runtime', () => {
       ensureProjectPersisted: vi.fn().mockResolvedValue(outcome),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -609,6 +617,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -640,6 +649,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -688,6 +698,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -743,6 +754,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -790,6 +802,7 @@ describe('queue runtime', () => {
               queueItem.localRecoveryState = state;
             },
           }),
+          listStagedResults: () => [],
           getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
           subscribe: (listener) => {
             listeners.add(listener);
@@ -831,6 +844,7 @@ describe('queue runtime', () => {
             queueItem.localRecoveryState = state;
           },
         }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'disconnected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -869,6 +883,7 @@ describe('queue runtime', () => {
             queueItem.localRecoveryState = state;
           },
         }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -927,6 +942,7 @@ describe('queue runtime', () => {
             queueItem.localRecoveryState = state;
           },
         }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -959,6 +975,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1012,6 +1029,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1080,6 +1098,7 @@ describe('queue runtime', () => {
             }
           },
         }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1132,6 +1151,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ getItem, getResultImages }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1179,6 +1199,7 @@ describe('queue runtime', () => {
       backend: createTestBackend(),
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1226,6 +1247,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1272,6 +1294,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ cancelQueueItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1332,6 +1355,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ cancelQueueItems: vi.fn().mockResolvedValue(undefined) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1395,6 +1419,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1448,6 +1473,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1502,6 +1528,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1566,6 +1593,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1674,6 +1702,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ cancelQueueItems, cancelQueueItemsByBatchIds, enqueueGenerate }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1724,6 +1753,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1749,6 +1779,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1794,6 +1825,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -1839,6 +1871,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1881,6 +1914,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1914,6 +1948,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1943,6 +1978,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -1977,6 +2013,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus, isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2029,6 +2066,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'disconnected', isHydrated: true, projects }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2069,6 +2107,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2120,6 +2159,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ enqueueGenerate, listItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2186,6 +2226,7 @@ describe('queue runtime', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2222,6 +2263,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ listItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2256,6 +2298,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands: createTestCommands({ restoreFromJournal }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2308,6 +2351,7 @@ describe('queue runtime', () => {
       backend: createTestBackend({ listItems }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2364,6 +2408,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2420,6 +2465,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2472,6 +2518,7 @@ describe('queue runtime', () => {
       backend,
       history: {
         commands: createTestCommands(),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -2529,6 +2576,7 @@ describe('queue runtime', () => {
             listeners.forEach((listener) => listener());
           },
         }),
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -2687,6 +2735,7 @@ describe('queue runtime video board routing', () => {
       ensureTemplatesLoaded: vi.fn(),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
@@ -3158,7 +3207,12 @@ describe('queue runtime retries', () => {
   const createRetryHarness = (
     queueItem: QueueItem,
     backendOverrides: Partial<QueueBackendPort> = {},
-    services: { journal?: QueueRunJournalPort; locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
+    services: {
+      journal?: QueueRunJournalPort;
+      locks?: QueueRunLockPort;
+      viewerUserId?: string | null;
+      listStagedResults?: QueueHistoryPort['listStagedResults'];
+    } = {}
   ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const projects = [project];
@@ -3178,8 +3232,26 @@ describe('queue runtime retries', () => {
       }),
       ...backendOverrides,
     });
+    const staged: Array<{ backendItemId: number; projectId: string; queueItemId: string }> = [];
+    const stageImages = (payload: {
+      images: QueueResultImage[];
+      backendItemId?: number;
+      projectId: string;
+      queueItemId: string;
+    }) => {
+      for (const image of payload.images) {
+        const backendItemId = image.sourceBackendItemId ?? payload.backendItemId;
+        if (backendItemId !== undefined) {
+          staged.push({ backendItemId, projectId: payload.projectId, queueItemId: payload.queueItemId });
+        }
+      }
+      notify();
+    };
     const commands = createTestCommands({
-      routeResults: vi.fn(() => {
+      routePartialResults: vi.fn(stageImages),
+      stageRetriedCanvasResults: vi.fn(stageImages),
+      routeResults: vi.fn((payload) => {
+        stageImages(payload);
         queueItem.status = 'completed';
         notify();
       }),
@@ -3190,6 +3262,7 @@ describe('queue runtime retries', () => {
       backend,
       history: {
         commands,
+        listStagedResults: services.listStagedResults ?? (() => staged),
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -3357,6 +3430,7 @@ describe('queue runtime retries', () => {
       history: {
         commands,
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+        listStagedResults: () => getQueueStagedResults(state.projects),
         subscribe: (listener) => {
           listeners.add(listener);
           return () => listeners.delete(listener);
@@ -3570,7 +3644,8 @@ describe('queue runtime retries', () => {
     });
     return { claimItemDelivery, claims };
   };
-  const rerunImages = (itemId: number) => Promise.resolve([{ imageName: `rerun-${itemId}.png` } as QueueResultImage]);
+  const rerunImages = (itemId: number) =>
+    Promise.resolve([{ imageName: `rerun-${itemId}.png`, sourceBackendItemId: itemId } as QueueResultImage]);
   const openCanvasTab = (
     server: ReturnType<typeof createDeliveryServer>,
     getResultImages: QueueBackendPort['getResultImages'] = vi.fn(rerunImages),
@@ -3625,6 +3700,606 @@ describe('queue runtime retries', () => {
       setTimeout(resolve);
     });
 
+  it.each(['empty', 'filtered', 'delivered elsewhere'] as const)(
+    'retains backend provenance through full Workbench routing when the first adopted item is %s',
+    async (firstResult) => {
+      const { getResultImages } = await import('./data/submissionApi');
+      const imageNames = firstResult === 'empty' ? ['first.png'] : ['first.png', 'second.png'];
+      let state = createInitialWorkbenchState();
+      const projectId = state.activeProjectId;
+      const { canvas } = state.projects.find((project) => project.id === projectId)!;
+      const queueItem: WorkbenchQueueItem = {
+        ...createPendingQueueItem(),
+        backendItemIds: [41, 42],
+        snapshot: {
+          ...createPendingQueueItem().snapshot,
+          filterIntermediateResults: firstResult === 'filtered',
+          canvas: {
+            document: { bbox: canvas.document.bbox, height: canvas.document.height, width: canvas.document.width },
+            documentRevision: canvas.documentRevision,
+          },
+        },
+        status: 'failed',
+      };
+      state = { ...state, projects: state.projects.map((project) => ({ ...project, queue: { items: [queueItem] } })) };
+      const listeners = new Set<() => void>();
+      const dispatch = (action: WorkbenchAction): void => {
+        state = workbenchReducer(state, action);
+        listeners.forEach((listener) => listener());
+      };
+      const server = createDeliveryServer();
+      if (firstResult === 'delivered elsewhere') {
+        server.claims.set(99, { claimant: 'other-browser', claimedAt: Date.now(), isDelivered: true });
+      }
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = String(input);
+        const data = url.includes('/queue/default/i/')
+          ? {
+              item_id: Number(url.split('/').at(-1)),
+              status: 'completed',
+              session: {
+                results: url.endsWith('/99')
+                  ? firstResult === 'filtered'
+                    ? { canvas_output: { image: { image_name: 'filtered.png' } } }
+                    : {}
+                  : { canvas_output: { collection: imageNames.map((image_name) => ({ image_name })) } },
+              },
+            }
+          : {
+              image_name: url.split('/').at(-1),
+              image_url: '/result.png',
+              thumbnail_url: '/result.png',
+              width: 64,
+              height: 64,
+              is_intermediate: url.endsWith('/filtered.png'),
+            };
+        return Promise.resolve(new Response(JSON.stringify(data)));
+      });
+      // A slow partial-route lease check must not force the full route to infer ids by image position.
+      let completePartialClaim!: (claim: { kind: 'claimed' }) => void;
+      const partialClaim = new Promise<{ kind: 'claimed' }>((resolve) => {
+        completePartialClaim = resolve;
+      });
+      let claimChecks = 0;
+      const handlers = new Map<string, (payload: never) => void>();
+      const backend = createTestBackend({
+        claimItemDelivery: (id, action, claimant) => {
+          if (id === 100 && action === 'claim' && ++claimChecks === 2) {
+            return partialClaim;
+          }
+          return server.claimItemDelivery(id, action, claimant);
+        },
+        getItem: (id) =>
+          Promise.resolve({
+            id,
+            batchId: 'batch',
+            origin: buildQueueItemOrigin(queueItem.id, projectId),
+            status: 'completed',
+          }),
+        getResultImages,
+        on: (event, handler) => {
+          handlers.set(event, handler as (payload: never) => void);
+          return () => handlers.delete(event);
+        },
+      });
+      const runtime = createQueueRuntime({
+        ...runtimeServices,
+        backend,
+        history: {
+          commands: createTestCommands({
+            reopenForRetry: (payload) => dispatch({ ...payload, type: 'reopenQueueItemForRetry' }),
+            routePartialResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemPartialResults' }),
+            routeResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemResults' }),
+            setStatus: (payload) => dispatch({ ...payload, type: 'setQueueItemStatus' }),
+          }),
+          getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+          listStagedResults: () => getQueueStagedResults(state.projects),
+          subscribe: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      });
+      try {
+        runtime.start();
+        handlers.get('queue_items_retried')?.(
+          retriedEvent([
+            { item_id: 99, source_item_id: 41 },
+            { item_id: 100, source_item_id: 42 },
+          ]) as never
+        );
+        await vi.waitFor(() => expect(server.claims.get(100)?.isDelivered).toBe(true));
+        const candidates = state.projects.find((project) => project.id === projectId)!.canvas.stagingArea.pendingImages;
+        expect(candidates.map(({ imageName, sourceBackendItemId }) => ({ imageName, sourceBackendItemId }))).toEqual(
+          imageNames.map((imageName) => ({ imageName, sourceBackendItemId: 100 }))
+        );
+        expect(
+          vi.mocked(server.claimItemDelivery).mock.calls.some(([id, action]) => id === 100 && action === 'release')
+        ).toBe(false);
+        completePartialClaim({ kind: 'claimed' });
+        expect(vi.mocked(server.claimItemDelivery).mock.calls).toContainEqual([100, 'confirm', expect.any(String)]);
+        if (firstResult !== 'delivered elsewhere') {
+          await vi.waitFor(() => expect(server.claims.has(99)).toBe(false));
+          expect(vi.mocked(server.claimItemDelivery).mock.calls).toContainEqual([99, 'release', expect.any(String)]);
+        }
+        const stale = openCanvasTab(server);
+        stale.runtime.start();
+        emitReruns(stale, [100]);
+        stale.emit(
+          'queue_item_status_changed',
+          completedEvent(100, buildQueueItemOrigin('gone', stale.project.id), 'canvas')
+        );
+        await settleEvents();
+        expect(stagedItemIds(stale)).toEqual([]);
+        await stale.runtime.dispose();
+      } finally {
+        completePartialClaim({ kind: 'claimed' });
+        await runtime.dispose();
+        fetch.mockRestore();
+      }
+    }
+  );
+
+  it.each([false, true])(
+    'bounds staging projection work for a completed retry batch when routing throws after mutation: %s',
+    async (throwsAfterMutation) => {
+      const server = createDeliveryServer(120_000);
+      const backendItemIds = Array.from({ length: 16 }, (_, index) => 100 + index);
+      const foreignBackendItemId = backendItemIds.at(-2)!;
+      const unstagedBackendItemId = backendItemIds.at(-1)!;
+      let state = createInitialWorkbenchState();
+      const projectId = state.activeProjectId;
+      const { canvas } = state.projects.find((project) => project.id === projectId)!;
+      const queueItem: WorkbenchQueueItem = {
+        ...createPendingQueueItem(),
+        backendItemIds: backendItemIds.map((id) => id - 100),
+        snapshot: {
+          ...createPendingQueueItem().snapshot,
+          canvas: {
+            document: { bbox: canvas.document.bbox, height: canvas.document.height, width: canvas.document.width },
+            documentRevision: canvas.documentRevision,
+          },
+        },
+        status: 'failed',
+      };
+      state = { ...state, projects: state.projects.map((project) => ({ ...project, queue: { items: [queueItem] } })) };
+      state = workbenchReducer(state, {
+        type: 'stageRetriedCanvasResults',
+        backendItemId: foreignBackendItemId,
+        projectId,
+        queueItemId: 'other-run',
+        images: [
+          { imageName: 'other-run.png', sourceQueueItemId: 'other-run', width: 64, height: 64 } as QueueResultImage,
+        ],
+      });
+      const listeners = new Set<() => void>();
+      const dispatch = (action: WorkbenchAction): void => {
+        state = workbenchReducer(state, action);
+        listeners.forEach((listener) => listener());
+      };
+      let isRouting = false;
+      let projectedEntries = 0;
+      const handlers = new Map<string, (payload: never) => void>();
+      const runtime = createQueueRuntime({
+        ...runtimeServices,
+        backend: createTestBackend({
+          claimItemDelivery: server.claimItemDelivery,
+          getItem: (id) =>
+            Promise.resolve({
+              id,
+              batchId: 'batch',
+              origin: buildQueueItemOrigin(queueItem.id, projectId),
+              status: 'completed',
+            }),
+          getResultImages: (id) =>
+            Promise.resolve([
+              {
+                imageName: `rerun-${id}.png`,
+                sourceBackendItemId: id,
+                sourceQueueItemId: queueItem.id,
+                width: 64,
+                height: 64,
+              } as QueueResultImage,
+            ]),
+          on: (event, handler) => {
+            handlers.set(event, handler as (payload: never) => void);
+            return () => handlers.delete(event);
+          },
+        }),
+        history: {
+          commands: createTestCommands({
+            reopenForRetry: (payload) => dispatch({ ...payload, type: 'reopenQueueItemForRetry' }),
+            // Exercise full-batch confirmation rather than confirming each item's partial route first.
+            routePartialResults: () => undefined,
+            routeResults: (payload) => {
+              isRouting = true;
+              dispatch({
+                ...payload,
+                images: payload.images.filter(
+                  (image) =>
+                    image.sourceBackendItemId !== unstagedBackendItemId &&
+                    image.sourceBackendItemId !== foreignBackendItemId
+                ),
+                type: 'routeQueueItemResults',
+              });
+              if (throwsAfterMutation) {
+                throw new Error('after staging');
+              }
+            },
+            setStatus: (payload) => dispatch({ ...payload, type: 'setQueueItemStatus' }),
+          }),
+          getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+          listStagedResults: () => {
+            const results = getQueueStagedResults(state.projects);
+            if (isRouting) {
+              projectedEntries += results.length;
+            }
+            return results;
+          },
+          subscribe: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      });
+      try {
+        runtime.start();
+        handlers.get('queue_items_retried')?.(
+          retriedEvent(backendItemIds.map((id) => ({ item_id: id, source_item_id: id - 100 }))) as never
+        );
+        const stagedBackendItemIds = backendItemIds.slice(0, -2);
+        await vi.waitFor(() => expect(isRouting).toBe(true));
+        await vi.waitFor(() => {
+          expect(stagedBackendItemIds.filter((id) => !server.claims.get(id)?.isDelivered)).toEqual([]);
+          expect(server.claims.has(unstagedBackendItemId)).toBe(false);
+        });
+        expect(server.claims.get(foreignBackendItemId)?.isDelivered).not.toBe(true);
+        expect(getQueueStagedResults(state.projects)).toEqual([
+          { backendItemId: foreignBackendItemId, projectId, queueItemId: 'other-run' },
+          ...stagedBackendItemIds.map((backendItemId) => ({ backendItemId, projectId, queueItemId: queueItem.id })),
+        ]);
+        // Recovery notifications, confirmation and unstaged release each project at most once per pass.
+        expect(projectedEntries).toBeLessThanOrEqual(6 * backendItemIds.length);
+      } finally {
+        await runtime.dispose();
+      }
+    }
+  );
+
+  it('retries a lost confirmation response without staging again, including after the run ends', async () => {
+    vi.useFakeTimers();
+    const server = createDeliveryServer(120_000);
+    const original = server.claimItemDelivery;
+    let confirmations = 0;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>(async (id, action, claimant) => {
+      if (action === 'confirm' && ++confirmations === 1) {
+        await original(id, action, claimant);
+        throw new TypeError('successful response lost');
+      }
+      return original(id, action, claimant);
+    });
+    const adopting = openAdoptingTab(server);
+    adopting.runtime.start();
+    adopting.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedImageNames(adopting)).toContain('rerun-99.png');
+    expect(server.claims.get(99)?.isDelivered).toBe(true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'confirm')).toHaveLength(2);
+    const later = openCanvasTab(server);
+    later.runtime.start();
+    emitReruns(later, [99]);
+    later.emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin('gone', later.project.id), 'canvas')
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(later)).toEqual([]);
+    await adopting.runtime.dispose();
+    await later.runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('confirms an already staged candidate recovered from the project without staging it again', async () => {
+    const server = createDeliveryServer();
+    const tab = createRetryHarness(
+      { ...createPendingQueueItem(), backendItemIds: [99], retriedBackendItemIds: [41], status: 'completed' },
+      {
+        claimItemDelivery: server.claimItemDelivery,
+        readItemsById: vi.fn().mockResolvedValue([
+          {
+            id: 99,
+            retriedFromItemId: 41,
+            destination: 'canvas',
+            origin: buildQueueItemOrigin('recovered-run', 'project-1'),
+          },
+        ]),
+      },
+      { listStagedResults: () => [{ backendItemId: 99, projectId: 'project-1', queueItemId: 'recovered-run' }] }
+    );
+    tab.runtime.start();
+    await vi.waitFor(() => expect(server.claims.get(99)?.isDelivered).toBe(true));
+    expect(stagedItemIds(tab)).toEqual([]);
+    await tab.runtime.dispose();
+  });
+
+  it('keeps an unadopted staged delivery pending after confirmation failure and stops retries on disposal', async () => {
+    vi.useFakeTimers();
+    const server = createDeliveryServer(120_000);
+    const original = server.claimItemDelivery;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) =>
+      action === 'confirm' ? Promise.reject(new TypeError('offline')) : original(id, action, claimant)
+    );
+    const tab = openCanvasTab(server);
+    tab.runtime.start();
+    emitReruns(tab, [99]);
+    tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(0);
+    await tab.runtime.dispose();
+    const requests = vi.mocked(server.claimItemDelivery).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(server.claimItemDelivery).toHaveBeenCalledTimes(requests);
+    vi.useRealTimers();
+  });
+
+  it.each([403, 422, 503] as const)(
+    'bounds unsuccessful confirmation retries (%s) without releasing staged work',
+    async (failure) => {
+      vi.useFakeTimers();
+      const server = createDeliveryServer(120_000);
+      const original = server.claimItemDelivery;
+      server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) => {
+        if (action === 'confirm') {
+          return Promise.reject(new ApiError('confirmation failed', failure));
+        }
+        return original(id, action, claimant);
+      });
+      const tab = openCanvasTab(server);
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+      tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+      await vi.advanceTimersByTimeAsync(180_000);
+      const confirmations = vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'confirm');
+      expect(confirmations).toHaveLength(failure === 403 || failure === 422 ? 1 : 5);
+      const requests = vi.mocked(server.claimItemDelivery).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(server.claimItemDelivery).toHaveBeenCalledTimes(requests);
+      expect(stagedItemIds(tab)).toEqual([99]);
+      expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(
+        0
+      );
+      await tab.runtime.dispose();
+      vi.useRealTimers();
+    }
+  );
+
+  it.each(['close', 'dispose', 'account change'] as const)(
+    'returns a late unadopted grant after %s, with account fencing',
+    async (ending) => {
+      const server = createDeliveryServer(120_000);
+      const original = server.claimItemDelivery;
+      let grant!: () => void;
+      server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) =>
+        action === 'claim'
+          ? new Promise((resolve) => {
+              grant = () => {
+                void original(id, action, claimant).then(resolve);
+              };
+            })
+          : original(id, action, claimant)
+      );
+      const tab = openCanvasTab(server);
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+      tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+      await vi.waitFor(() => expect(grant).toBeDefined());
+      let disposal: Promise<void> | undefined;
+      if (ending === 'close') {
+        tab.closeProject();
+      }
+      if (ending === 'dispose') {
+        disposal = tab.runtime.dispose();
+      }
+      if (ending === 'account change') {
+        accountLifecycle.activate('replacement-grant-account');
+      }
+      grant();
+      await settleEvents();
+      await disposal;
+      expect(stagedItemIds(tab)).toEqual([]);
+      const releases = vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release');
+      if (ending === 'account change') {
+        expect(releases).toHaveLength(0);
+      } else {
+        expect(releases).toHaveLength(1);
+        expect(server.claims.has(99)).toBe(false);
+      }
+      await tab.runtime.dispose();
+    }
+  );
+
+  it.each(['adopted', 'unadopted'] as const)(
+    'releases owned unstaged %s claims during disposal while reads are in flight',
+    async (kind) => {
+      const server = createDeliveryServer(120_000);
+      const finishers: Array<(images: QueueResultImage[]) => void> = [];
+      const tab = kind === 'adopted' ? openAdoptingTab(server) : openCanvasTab(server);
+      vi.mocked(tab.backend.getResultImages).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishers.push(resolve);
+          })
+      );
+      tab.runtime.start();
+      if (kind === 'adopted') {
+        tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+      } else {
+        emitReruns(tab, [99]);
+        tab.emit(
+          'queue_item_status_changed',
+          completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas')
+        );
+      }
+      await vi.waitFor(() => expect(finishers.length).toBeGreaterThan(0));
+      const disposal = tab.runtime.dispose();
+      await vi.waitFor(() => expect(server.claims.has(99)).toBe(false));
+      vi.mocked(tab.backend.getResultImages).mockResolvedValue([]);
+      finishers
+        .splice(0)
+        .forEach((finish) => finish([{ imageName: 'late.png', sourceBackendItemId: 99 } as QueueResultImage]));
+      await disposal;
+      expect(stagedImageNames(tab)).toEqual([]);
+    }
+  );
+
+  it.each(['routeResults', 'routePartialResults'] as const)('releases unstaged work when %s throws', async (route) => {
+    const server = createDeliveryServer(120_000);
+    const tab = openAdoptingTab(server);
+    vi.mocked(tab.commands.routePartialResults).mockImplementation(() => undefined);
+    vi.mocked(tab.commands.routeResults).mockImplementation(() => undefined);
+    vi.mocked(tab.commands[route]).mockImplementation(() => {
+      throw new Error('routing failed');
+    });
+    tab.runtime.start();
+    tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    await vi.waitFor(() => expect(tab.commands[route]).toHaveBeenCalled());
+    await vi.waitFor(() => expect(server.claims.has(99)).toBe(false));
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.some(([, action]) => action === 'confirm')).toBe(false);
+    if (route === 'routeResults') {
+      expect(tab.commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', error: 'routing failed' })
+      );
+    } else {
+      expect(tab.commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 'routing failed' }));
+    }
+    await tab.runtime.dispose();
+  });
+
+  it.each(['routeResults', 'routePartialResults'] as const)(
+    'keeps and confirms actual staging when %s throws after mutation',
+    async (route) => {
+      const server = createDeliveryServer(120_000);
+      const tab = openAdoptingTab(server);
+      const stage = vi.mocked(tab.commands[route]).getMockImplementation()!;
+      let releasesBeforeStaging = 0;
+      const other = route === 'routeResults' ? 'routePartialResults' : 'routeResults';
+      vi.mocked(tab.commands[other]).mockImplementation(() => undefined);
+      vi.mocked(tab.commands[route]).mockImplementation((payload) => {
+        releasesBeforeStaging = vi
+          .mocked(server.claimItemDelivery)
+          .mock.calls.filter(([, action]) => action === 'release').length;
+        stage(payload as Parameters<typeof stage>[0]);
+        throw new Error('after staging');
+      });
+      tab.runtime.start();
+      tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+      await vi.waitFor(() => expect(server.claims.get(99)?.isDelivered).toBe(true));
+      expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(
+        releasesBeforeStaging
+      );
+      await tab.runtime.dispose();
+    }
+  );
+
+  it('confirms actual unadopted staging even if the stage callback throws after the mutation', async () => {
+    const server = createDeliveryServer(120_000);
+    const tab = openCanvasTab(server);
+    const stage = vi.mocked(tab.commands.stageRetriedCanvasResults).getMockImplementation()!;
+    vi.mocked(tab.commands.stageRetriedCanvasResults).mockImplementation((payload) => {
+      stage(payload);
+      throw new Error('after staging');
+    });
+    tab.runtime.start();
+    emitReruns(tab, [99]);
+    tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.waitFor(() => expect(server.claims.get(99)?.isDelivered).toBe(true));
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.some(([, action]) => action === 'release')).toBe(false);
+    await tab.runtime.dispose();
+  });
+
+  it('never reclaims or releases previously staged work when cancellation interrupts a failing confirmation', async () => {
+    vi.useFakeTimers();
+    const server = createDeliveryServer(120_000);
+    const original = server.claimItemDelivery;
+    server.claimItemDelivery = vi.fn((id, action, claimant) =>
+      action === 'confirm' ? Promise.reject(new TypeError('offline')) : original(id, action, claimant)
+    );
+    const tab = openAdoptingTab(server);
+    // Partial routing leaves the run alive, as another item of its batch would.
+    vi.mocked(tab.commands.routeResults).mockImplementation(() => undefined);
+    tab.runtime.start();
+    tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedImageNames(tab)).toContain('rerun-99.png');
+    const claims = vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'claim').length;
+    tab.notify();
+    tab.run.status = 'cancelled';
+    tab.notify();
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'claim')).toHaveLength(
+      claims
+    );
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'confirm')).toHaveLength(5);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(0);
+    await tab.runtime.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it('removes settled retry-wait listeners and aborts the pending wait on disposal', async () => {
+    vi.useFakeTimers();
+    const added = vi.spyOn(AbortSignal.prototype, 'addEventListener');
+    const removed = vi.spyOn(AbortSignal.prototype, 'removeEventListener');
+    const server = createDeliveryServer();
+    const original = server.claimItemDelivery;
+    let waits = 0;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) => {
+      if (action === 'claim' && waits++ < 25) {
+        return Promise.resolve({ kind: 'held', retryInMs: 1 } as const);
+      }
+      return original(id, action, claimant);
+    });
+    const tab = openCanvasTab(server);
+    tab.runtime.start();
+    const initialRegistrations = added.mock.calls.length;
+    emitReruns(tab, [99]);
+    tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    const waitRegistrations = () =>
+      added.mock.calls.flatMap(([event, listener, options], index) =>
+        index >= initialRegistrations && event === 'abort' && typeof options === 'object' && options.once
+          ? [{ signal: added.mock.contexts[index], listener }]
+          : []
+      );
+    const unremovedWaits = () =>
+      waitRegistrations().filter(
+        ({ signal, listener }) =>
+          !(signal as AbortSignal).aborted &&
+          !removed.mock.calls.some(
+            ([event, removedListener], index) =>
+              event === 'abort' && removedListener === listener && removed.mock.contexts[index] === signal
+          )
+      );
+    expect(waitRegistrations().length).toBeGreaterThanOrEqual(25);
+    expect(unremovedWaits()).toHaveLength(0);
+    vi.mocked(server.claimItemDelivery).mockResolvedValue({ kind: 'held', retryInMs: 10_000 });
+    emitReruns(tab, [100]);
+    tab.emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(unremovedWaits()).toHaveLength(1);
+    await tab.runtime.dispose();
+    expect(unremovedWaits()).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+    added.mockRestore();
+    removed.mockRestore();
+    vi.useRealTimers();
+  });
+
   it('stages a Canvas rerun once across tabs and browsers, however late another sees it and after the first closed', async () => {
     const server = createDeliveryServer();
     const first = openCanvasTab(server);
@@ -3674,13 +4349,14 @@ describe('queue runtime retries', () => {
 
   it('stages a Canvas rerun after the tab that claimed it closed before staging, once the claim expires', async () => {
     const server = createDeliveryServer();
-    // This tab closes while it reads the results, so it neither stages nor gives the claim back.
+    // A lost page cannot run cleanup; this abandoned claimant leaves its lease to expire.
+    let finishAbandoned!: (images: QueueResultImage[]) => void;
     const closing = openCanvasTab(
       server,
       vi.fn(
         () =>
-          new Promise<QueueResultImage[]>(() => {
-            // Never settles: the tab is gone.
+          new Promise<QueueResultImage[]>((resolve) => {
+            finishAbandoned = resolve;
           })
       )
     );
@@ -3699,6 +4375,9 @@ describe('queue runtime retries', () => {
 
     await vi.waitFor(() => expect(stagedItemIds(open)).toEqual([99]));
 
+    const disposal = closing.runtime.dispose();
+    finishAbandoned([{ imageName: 'late.png' } as QueueResultImage]);
+    await disposal;
     await open.runtime.dispose();
   });
 
@@ -4272,6 +4951,7 @@ describe('run outcomes', () => {
       }),
       history: {
         commands,
+        listStagedResults: () => [],
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: (listener) => {
           listeners.add(listener);

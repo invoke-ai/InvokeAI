@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 817495,
+        "brotliBytes": 818363,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 816818,
+        "gzipBytes": 817815,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2109541,
+        "initialRawBytes": 2114925,
         "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110927,
-        "requestCount": 35,
-        "scriptRequestCount": 19,
+        "ownedRawBytes": 112542,
+        "requestCount": 34,
+        "scriptRequestCount": 18,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -363,15 +363,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1254258,
+        "brotliBytes": 1263388,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1247521,
+        "gzipBytes": 1256291,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3460233,
+        "initialRawBytes": 3491783,
         "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 172801,
+        "ownedRawBytes": 172868,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -511,6 +511,7 @@
           "source:src/app/accountLifecycle.ts",
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
+          "source:src/app/queueStagedResults.ts",
           "source:src/app/router.tsx",
           "source:src/app/startupRedirect.ts",
           "source:src/app/workbenchPorts.tsx",
@@ -703,6 +704,7 @@
           "source:src/features/queue/runtime.ts",
           "source:src/features/queue/runtime/cancelRequests.ts",
           "source:src/features/queue/runtime/coordinator.ts",
+          "source:src/features/queue/runtime/deliveryClaims.ts",
           "source:src/features/queue/runtime/receiptAcknowledgements.ts",
           "source:src/features/queue/ui/QueueUiContext.tsx",
           "source:src/features/queue/ui/currentBatchItems.ts",
@@ -1169,7 +1171,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-29",
+  "capturedAt": "2026-11-07",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
