@@ -20,7 +20,7 @@ that :class:`CustomLinear` can decide per forward what to do with it.
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Literal, Mapping
 
 import torch
 
@@ -97,6 +97,30 @@ def read_safetensors_metadata(path: Path, logger: Logger | None = None) -> dict[
                 f"Could not read safetensors metadata from {path.name} ({e}); per-layer quantization hints unavailable."
             )
         return None
+
+
+def safetensors_backend(path: Path | str) -> Literal["pread", "mmap"]:
+    """The ``backend`` to read ``path``'s tensors with, so that widening its float8 weights releases the file.
+
+    The default mmap backend maps the whole file and every tensor is a slice of that mapping. A loader that
+    widens float8 weights to bf16 replaces the float8 sources, but tensors already in the target dtype (norms,
+    biases) stay views because ``.to`` is a no-op for them, and those few views pin the entire file for the
+    model's lifetime, uncounted by the RAM cache. A float8 ``.weight`` is the trigger because that is what gets
+    widened while its neighbours stay views. Float8 scales (nvfp4 block scales under ``.weight_scale``) and the
+    empty ``scaled_fp8`` marker are not widened, so a file with only those keeps the lazy mmap load. With
+    ``pread`` every tensor owns its storage.
+    """
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    header = read_safetensors_header(Path(path))
+    return "pread" if any(k.endswith(".weight") and v["dtype"].startswith("F8_") for k, v in header.items()) else "mmap"
+
+
+def load_safetensors_checkpoint(path: Path | str) -> dict[str, torch.Tensor]:
+    """Load a single-file checkpoint with the backend :func:`safetensors_backend` picks for it."""
+    from safetensors.torch import load_file
+
+    return load_file(path, backend=safetensors_backend(path))
 
 
 def parse_quantization_metadata(metadata: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:

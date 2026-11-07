@@ -32,7 +32,11 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader, _model
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower, normalize_qwen3vl_rope_config
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    cast_state_dict,
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.load_plan import reserve_for_load
@@ -68,7 +72,11 @@ def flux3_transformer_from_native(
     """The transformer of a native single-file FLUX.3 state dict in `dtype`, on the device its tensors are on, the QK
     norms in float32. Empties `sd`. `reserve` asks the RAM cache for room before the cast, as `reserve_for_load` does;
     None asks nothing, for a caller that loads outside the cache (the working-memory calibration script)."""
-    sd = CheckpointPrefix.detect(sd).strip(sd)
+    stripped = CheckpointPrefix.detect(sd).strip(sd)
+    if stripped is not sd:
+        # The caller still holds `sd`; emptied, it cannot keep the sources alive through the cast.
+        sd.clear()
+    sd = stripped
     # Identification refuses quantized builds already; this catches a record made before it did.
     reject_quantized_side_channel(sd, "a FLUX.3 single-file checkpoint")
 
@@ -163,10 +171,10 @@ class Flux3CheckpointModel(ModelLoader):
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A single-file FLUX.3 model holds only the transformer.")
 
-        from safetensors.torch import load_file
-
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
-        model = flux3_transformer_from_native(load_file(Path(config.path)), model_dtype, self._ram_cache.make_room)
+        model = flux3_transformer_from_native(
+            load_safetensors_checkpoint(Path(config.path)), model_dtype, self._ram_cache.make_room
+        )
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 
 

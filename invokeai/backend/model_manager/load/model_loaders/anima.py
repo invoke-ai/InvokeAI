@@ -40,6 +40,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -96,8 +97,6 @@ class AnimaCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
-
         from invokeai.backend.anima.anima_transformer import AnimaTransformer
         from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
 
@@ -116,7 +115,7 @@ class AnimaCheckpointModel(ModelLoader):
             )
 
         # Load the state dict from safetensors
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
 
         # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
         sd = strip_anima_bundle_prefix(sd)

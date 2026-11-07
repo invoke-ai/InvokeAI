@@ -104,7 +104,6 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     `tests/backend/model_manager` and `tests/backend/anima` suites green — nothing else observes
     it — so the dead toggle can come straight back with CI passing.
     """
-    import safetensors.torch
 
     import invokeai.backend.anima.anima_transformer as anima_transformer_module
 
@@ -118,7 +117,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     )
 
     monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.load_safetensors_checkpoint",
+        lambda _path: {"weight": torch.ones(2, 2)},
+    )
     # The stand-in state dict has no DiT blocks to read a depth from, and the tiny model takes no config.
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}

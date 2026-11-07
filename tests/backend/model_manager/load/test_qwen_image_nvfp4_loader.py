@@ -13,7 +13,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-import safetensors.torch
 import torch
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
@@ -54,8 +53,6 @@ ENCODER_SEAM = Seam(
     loader=QwenVLEncoderCheckpointLoader,
     module=qwen_image,
     entry="_load_text_encoder_from_singlefile",
-    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-    load_file_host=safetensors.torch,
     patches_device=True,
     sets_torch_dtype=False,
     casts_fp8_storage=False,
@@ -64,9 +61,11 @@ ENCODER_SEAM = Seam(
 
 def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: dict) -> list[bool]:
     """Patch file access and devices; return a log for `_record_fold`."""
-    import safetensors.torch
 
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.qwen_image.load_safetensors_checkpoint",
+        lambda _path: state_dict,
+    )
     monkeypatch.setattr(qwen_image, "read_safetensors_metadata", lambda _path, _logger: metadata)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: COMPUTE_DTYPE)
@@ -371,7 +370,6 @@ def test_the_transformer_refuses_an_nvfp4_layer_missing_its_global_scale_before_
         loader=QwenImageCheckpointModel,
         module=qwen_image,
         entry="_load_from_singlefile",
-        load_file_host=safetensors.torch,
         compute_dtype=COMPUTE_DTYPE,
         patches_device=True,
         # This entry reads neither: `_torch_dtype` is read nowhere in `qwen_image`, and the fp8

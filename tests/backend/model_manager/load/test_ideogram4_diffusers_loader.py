@@ -63,6 +63,8 @@ QUANTIZED = "layers.0.feed_forward.w1"
 TRANSFORMER_SEAM = Seam(
     loader=Ideogram4DiffusersModel,
     module=ideogram4,
+    # The folder loader reads with a raw `load_file`; only the single-file loader goes through the helper.
+    load_file_host=ideogram4,
     entry="_load_one_transformer",
     patches_device=True,
     sets_torch_dtype=False,
@@ -72,6 +74,8 @@ TRANSFORMER_SEAM = Seam(
 ENCODER_SEAM = Seam(
     loader=Ideogram4DiffusersModel,
     module=ideogram4,
+    # The folder loader reads with a raw `load_file`; only the single-file loader goes through the helper.
+    load_file_host=ideogram4,
     entry="_load_text_encoder",
     patches_device=True,
     sets_torch_dtype=False,
@@ -332,6 +336,8 @@ def test_an_nf4_text_encoder_gets_past_the_guards(monkeypatch: pytest.MonkeyPatc
 VAE_SEAM = Seam(
     loader=Ideogram4DiffusersModel,
     module=ideogram4,
+    # The folder loader reads with a raw `load_file`; only the single-file loader goes through the helper.
+    load_file_host=ideogram4,
     entry="_load_vae",
     patches_device=True,
     sets_torch_dtype=False,

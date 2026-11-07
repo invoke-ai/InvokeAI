@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Optional
 
 import accelerate
 import torch
-from safetensors.torch import load_file
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -31,7 +30,11 @@ from invokeai.backend.model_manager.configs.text_llm import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    cast_state_dict,
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+)
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -142,7 +145,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                 path = Path(config.path)
                 what = f"Qwen3.5 checkpoint {path.name}"
                 model = qwen3_5_vl_from_state_dict(
-                    load_file(path),
+                    load_safetensors_checkpoint(path),
                     self._compute_dtype(config.cpu_only, avoid_float16=True),
                     reserve=self._ram_cache.make_room,
                     what=what,
