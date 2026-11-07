@@ -80,6 +80,14 @@ _MAX_BACKOFF_SECONDS = 60.0
 # everything in between, at one rebuild attempt per window rather than one per points refresh.
 _VOCAB_FAILURE_RETRY_SECONDS = 600.0
 
+# A refit nobody asked for (a /points staleness check) waits this long after the scope's last fit:
+# the floor, or the multiplier times that fit's duration. On a busy server something embeds during
+# almost every fit, so without it one scope refits back to back forever; the multiplier caps it at
+# about a third of the worker's time. The floor stays short because a small gallery's map waits
+# it out after every generation. /refresh is exempt.
+_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS = 10.0
+_PROJECTION_REFIT_COOLDOWN_MULTIPLIER = 2.0
+
 
 def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
     """L2-normalize one query embedding, refusing anything that would poison a search.
@@ -283,6 +291,12 @@ class ImageIndexService(ImageIndexServiceBase):
         # user_id -> the scope hash whose failed fit has already been retried
         # this process; see _failed_scope_retry_available.
         self._failed_projection_scopes: dict[str, str] = {}
+        # user_id -> time.monotonic() before which a queued request for that
+        # scope may not start a fit; set once a fit's result is cached.
+        self._projection_not_before: dict[str, float] = {}
+        # Users whose queued request came from a person (/refresh). Kept apart
+        # from _projection_requests so a later poll cannot downgrade it.
+        self._projection_user_initiated: set[str] = set()
         self._projection_lock = threading.Lock()
 
         self._invoker: Optional["Invoker"] = None
@@ -796,6 +810,7 @@ class ImageIndexService(ImageIndexServiceBase):
                 # and is driven by polling, so clearing there would hand a
                 # poller the unlimited retries the budget exists to deny.
                 self._failed_projection_scopes.pop(user_id, None)
+                self._projection_user_initiated.add(user_id)
             # Last writer wins: the scope reflects the requester's most recent
             # admin status, so a promotion/demotion between requests cannot
             # pin a stale scope.
@@ -820,6 +835,8 @@ class ImageIndexService(ImageIndexServiceBase):
         with self._projection_lock:
             self._failed_projection_scopes.clear()
             self._projection_requests.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
 
         device_override = config.image_index_device
         if device_override and not _is_cpu_override(device_override):
@@ -1020,6 +1037,8 @@ class ImageIndexService(ImageIndexServiceBase):
         with self._projection_lock:
             self._projection_requests.clear()
             self._failed_projection_scopes.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
         self._attempts.clear()
         self._failed.clear()
         self._pending_pokes.clear()
@@ -1602,11 +1621,17 @@ class ImageIndexService(ImageIndexServiceBase):
             return self._failed_projection_scopes.get(user_id) != current_hash
 
     def _next_projection_job(self) -> Optional[tuple[str, bool]]:
+        """Take the first queued job that is not cooling down; jobs that are stay queued (/points still reports them
+        stale) and are taken once due."""
+        now = time.monotonic()
         with self._projection_lock:
-            if not self._projection_requests:
-                return None
-            user_id = next(iter(self._projection_requests))
-            return user_id, self._projection_requests.pop(user_id)
+            for user_id in self._projection_requests:
+                if user_id in self._projection_user_initiated or now >= self._projection_not_before.get(user_id, now):
+                    # The cooldown stays: a taken job that short-circuits on an
+                    # unchanged scope must not free the next poll to refit.
+                    self._projection_user_initiated.discard(user_id)
+                    return user_id, self._projection_requests.pop(user_id)
+            return None
 
     def _process_projection(self, user_id: str, all_images: bool) -> None:
         assert self._invoker is not None
@@ -1661,6 +1686,7 @@ class ImageIndexService(ImageIndexServiceBase):
             )
             return
 
+        fit_started = time.monotonic()
         try:
             # Read after the short-circuit, not before: this materializes every
             # accessible embedding (hundreds of MB on a large gallery), which is
@@ -1698,6 +1724,7 @@ class ImageIndexService(ImageIndexServiceBase):
             # per process, and the next gallery change flips the hash anyway.
             found_items = []
             coords = np.empty((0, 2), dtype=EMBEDDING_DTYPE)
+        fit_finished = time.monotonic()
 
         # Hash the scope the projection was computed against (on failure the
         # empty cache still claims the current scope, so staleness detection —
@@ -1740,6 +1767,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._failed_projection_scopes.pop(user_id, None)
             elif retrying_failed_scope:
                 self._failed_projection_scopes[user_id] = current_hash
+            self._projection_not_before[user_id] = fit_finished + max(
+                _PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS,
+                _PROJECTION_REFIT_COOLDOWN_MULTIPLIER * (fit_finished - fit_started),
+            )
         try:
             self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_items))
         except Exception:
@@ -1762,9 +1793,13 @@ class ImageIndexService(ImageIndexServiceBase):
         self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=point_count)
 
     def _requeue_projection(self, user_id: str, all_images: bool) -> None:
-        """Put a popped job back, without clobbering a newer request for that user."""
+        """Put a popped job back, without clobbering a newer request for that user.
+
+        The cooldown is dropped so the retry is immediate: every caller's fit either never ran or its result was not
+        cached, and a user-initiated job lost its exemption when it was taken."""
         with self._projection_lock:
             self._projection_requests.setdefault(user_id, all_images)
+            self._projection_not_before.pop(user_id, None)
 
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.
