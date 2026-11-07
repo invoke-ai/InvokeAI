@@ -4053,9 +4053,21 @@ const enqueueCompiledSnapshot = (
       : route.sourceId === 'generate'
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
+  const recordedCanvas =
+    route.sourceId === 'canvas'
+      ? Object.values(backendGraph?.nodes ?? {}).find((node) => node.type === 'core_metadata')?.canvas_v3_metadata
+      : undefined;
   const recalledSampleSeed = expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed };
   const recall = generateRecallValues
-    ? { generateValues: { ...cloneGenerateWidgetValues(generateRecallValues), ...recalledSampleSeed } }
+    ? {
+        ...(recordedCanvas && typeof recordedCanvas === 'object' && !Array.isArray(recordedCanvas)
+          ? { canvasMetadata: { canvas_v3_metadata: structuredClone(recordedCanvas) } }
+          : {}),
+        generateValues: {
+          ...cloneGenerateWidgetValues(generateRecallValues),
+          ...recalledSampleSeed,
+        },
+      }
     : videoSettings
       ? { videoValues: { ...cloneVideoWidgetValues(videoSettings), ...recalledSampleSeed } }
       : undefined;

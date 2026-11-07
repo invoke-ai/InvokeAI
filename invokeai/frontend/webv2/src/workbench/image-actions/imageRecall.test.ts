@@ -24,7 +24,12 @@ import { compileGenerateGraph } from '@features/generation/graph';
 import { normalizeReferenceImages } from '@features/generation/settings';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
+import {
+  buildImageRecallSettings,
+  getImageRecallCapabilities,
+  readMetadataReferenceImages,
+  type ImageRecallKind,
+} from './imageRecall';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
@@ -2797,3 +2802,272 @@ describe('legacy records', () => {
     });
   });
 });
+
+describe('legacy family metadata parity', () => {
+  it('restores recorded Ideogram sampler overrides and explicit preset defaults', () => {
+    const model: MainModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram',
+      name: 'Ideogram',
+      type: 'main',
+      format: 'diffusers',
+    };
+    const recall = (metadata: unknown) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key, ideogram4Steps: 70, ideogram4Mu: 3 }),
+        image,
+        kind: 'all',
+        metadata,
+        models: [model],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const metadata = {
+      model,
+      ideogram4_sampler_preset: 'V4_TURBO_12',
+      ideogram4_steps: 26,
+      ideogram4_guidance_scale: 4.5,
+      ideogram4_mu: -1.5,
+      ideogram4_color_palette: ['green', 'gold'],
+    };
+    expect(recall(metadata)?.values).toMatchObject({
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 26,
+      ideogram4GuidanceScale: 4.5,
+      ideogram4Mu: -1.5,
+      ideogram4ColorPalette: ['green', 'gold'],
+    });
+    expect(
+      recall({ model, ideogram4_steps: null, ideogram4_guidance_scale: null, ideogram4_mu: null })?.values
+    ).toMatchObject({ ideogram4Steps: null, ideogram4GuidanceScale: null, ideogram4Mu: null });
+    expect(recall({ model, generation_mode: 'ideogram4_txt2img' })?.values).toMatchObject({
+      ideogram4Steps: null,
+      ideogram4GuidanceScale: null,
+      ideogram4Mu: null,
+    });
+    expect(recall({ model, ideogram4_steps: 2.5, ideogram4_mu: 100 })?.values).toMatchObject({
+      ideogram4Steps: 70,
+      ideogram4Mu: 3,
+    });
+  });
+
+  it('restores legacy Wan VAE and low-noise guidance without applying them to another family', () => {
+    const model: MainModelConfig = { base: 'wan', key: 'wan', name: 'Wan', type: 'main', format: 'diffusers' };
+    const vae: VaeModelConfig = { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae', latent_channels: 16 };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model, modelKey: model.key }),
+      image,
+      kind: 'remix',
+      metadata: { model, wan_vae_model: vae, wan_guidance_scale_low_noise: 23.5 },
+      models: [model, vae],
+      supportedModels: [model],
+      vaeModels: [vae],
+    });
+    expect(result?.values).toMatchObject({ vae, wanGuidanceScaleLowNoise: 23.5 });
+  });
+});
+
+it.each(['controlnets', 't2iAdapters', 'ipAdapters'] as const)(
+  'enables All/Remix for standalone name-only %s before asset hydration',
+  (key) => {
+    const adapter = {
+      ip_adapter_model: { key: 'ip', name: 'IP', base: 'sdxl', type: 'ip_adapter' },
+      image: { image_name: 'portrait.png' },
+      weight: 0.5,
+      clip_vision_model: 'ViT-H',
+      method: 'full',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+    };
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues(),
+      image,
+      metadata: { [key]: [adapter] },
+      models: [sdxlModel],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+    expect(capabilities).toMatchObject({ all: true, remix: true });
+  }
+);
+
+it.each(['array', 'entities'] as const)(
+  'restores historical Canvas referenceImages %s through Generate recall',
+  (shape) => {
+    const ip = { base: 'sdxl', type: 'ip_adapter', key: 'ip', name: 'IP' } as ComponentModelConfig;
+    const entry = {
+      id: 'old',
+      isEnabled: false,
+      ipAdapter: {
+        type: 'ip_adapter',
+        model: ip,
+        image: { image_name: 'portrait.png', width: 320, height: 200 },
+        weight: 0.3,
+        method: 'composition',
+        clipVisionModel: 'ViT-L',
+        beginEndStepPct: [0.1, 0.8],
+      },
+    };
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { canvas_v2_metadata: { referenceImages: shape === 'array' ? [entry] : { entities: [entry] } } },
+      models: [sdxlModel, ip],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+    expect(result?.values.referenceImages).toEqual([
+      {
+        id: 'old',
+        isEnabled: false,
+        config: { ...entry.ipAdapter, image: { original: { image: entry.ipAdapter.image } } },
+      },
+    ]);
+  }
+);
+
+it.each([false, true])('keeps modern references authoritative over v4 aliases (empty=%s)', (empty) => {
+  const ip = { base: 'sdxl', type: 'ip_adapter', key: 'ip', name: 'IP' } as ComponentModelConfig;
+  const legacy = {
+    ip_adapter_model: ip,
+    image: [{ image_name: 'legacy.png', width: 200, height: 100 }],
+    weight: 0.5,
+    clip_vision_model: 'ViT-G',
+    method: 'style',
+    begin_step_percent: 0.2,
+    end_step_percent: 0.8,
+  };
+  const modern = {
+    id: 'modern',
+    isEnabled: true,
+    config: {
+      type: 'ip_adapter',
+      model: ip,
+      image: { image_name: 'modern.png', width: 400, height: 200 },
+      weight: 0.4,
+      clipVisionModel: 'ViT-H',
+      method: 'full',
+      beginEndStepPct: [0, 1],
+    },
+  };
+  const input = {
+    currentValues: createValues({ referenceImages: normalizeReferenceImages([modern]) }),
+    image,
+    kind: 'all' as const,
+    models: [sdxlModel, ip],
+    supportedModels: [sdxlModel],
+    vaeModels: [],
+  };
+  const result = buildImageRecallSettings({
+    ...input,
+    metadata: { ref_images: empty ? [] : [modern], ipAdapters: [legacy] },
+  });
+  expect(result?.values.referenceImages.map(({ id }) => id)).toEqual(empty ? [] : ['modern']);
+  const legacyResult = buildImageRecallSettings({ ...input, metadata: { ipAdapters: [legacy] } });
+  expect(legacyResult?.values.referenceImages).toEqual([
+    expect.objectContaining({
+      config: expect.objectContaining({
+        model: ip,
+        image: { original: { image: { image_name: 'legacy.png', width: 200, height: 100 } } },
+        clipVisionModel: 'ViT-G',
+        method: 'style',
+        weight: 0.5,
+        beginEndStepPct: [0.2, 0.8],
+      }),
+    }),
+  ]);
+});
+
+it('preserves a valid zero-width legacy IP step window instead of inventing a wider schedule', () => {
+  const adapter = { base: 'sdxl', key: 'ip', name: 'IP', type: 'ip_adapter' } as ComponentModelConfig;
+  const result = buildImageRecallSettings({
+    currentValues: createValues(),
+    image,
+    kind: 'all',
+    metadata: {
+      ipAdapters: [
+        {
+          ip_adapter_model: adapter,
+          image: { image_name: 'portrait.png', width: 100, height: 100 },
+          weight: -0.5,
+          clip_vision_model: 'ViT-H',
+          method: 'full',
+          begin_step_percent: 0.2,
+          end_step_percent: 0.2,
+        },
+      ],
+    },
+    models: [sdxlModel, adapter],
+    supportedModels: [sdxlModel],
+    vaeModels: [],
+  });
+  expect(result?.values.referenceImages[0]?.config).toMatchObject({
+    model: adapter,
+    weight: -0.5,
+    beginEndStepPct: [0.2, 0.2],
+  });
+});
+
+it.each(['array', 'entities'] as const)(
+  'reports refused historical %s references after fallback selection, preserving existing references',
+  (shape) => {
+    const adapter = { base: 'sdxl', key: 'ip', name: 'IP', type: 'ip_adapter' } as ComponentModelConfig;
+    const current = normalizeReferenceImages([
+      {
+        id: 'current',
+        config: {
+          type: 'ip_adapter',
+          model: adapter,
+          image: { image_name: 'current.png', width: 100, height: 100 },
+          weight: 0.5,
+        },
+      },
+    ]);
+    const reference = { id: 'old', ipAdapter: { type: 'ip_adapter', image: null } };
+    const metadata = {
+      positive_prompt: 'still recallable',
+      canvas_v2_metadata: {
+        rasterLayers: [],
+        controlLayers: [],
+        inpaintMasks: [],
+        regionalGuidance: [],
+        referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+      },
+    };
+    const input = {
+      currentValues: createValues({ referenceImages: current }),
+      image,
+      kind: 'all' as const,
+      models: [sdxlModel, adapter],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    };
+    expect(readMetadataReferenceImages(metadata)).toEqual({ images: null, names: [], partial: true });
+    const refused = buildImageRecallSettings({ ...input, metadata });
+    expect(refused?.values.referenceImages).toEqual(current);
+    expect(refused?.fields).not.toContain('referenceImages');
+    const fallback = {
+      ip_adapter_model: adapter,
+      image: { image_name: 'fallback.png', width: 100, height: 100 },
+      weight: 0.4,
+      clip_vision_model: 'ViT-H',
+      method: 'full',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+    };
+    const recovered = { ...metadata, ipAdapters: [fallback] };
+    expect(readMetadataReferenceImages(recovered).partial).toBe(false);
+    expect(
+      buildImageRecallSettings({ ...input, metadata: recovered })?.values.referenceImages[0]?.config.image
+    ).toEqual({ original: { image: fallback.image } });
+    expect(readMetadataReferenceImages({ ...recovered, ref_images: [] })).toEqual({
+      images: [],
+      names: [],
+      partial: false,
+    });
+    expect(
+      buildImageRecallSettings({ ...input, metadata: { ...recovered, ref_images: [] } })?.values.referenceImages
+    ).toEqual([]);
+  }
+);

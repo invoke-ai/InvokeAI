@@ -731,8 +731,17 @@
           true
         ],
         "ideogram4_color_palette": [],
+        "ideogram4_guidance_scale": [
+          null
+        ],
+        "ideogram4_mu": [
+          null
+        ],
         "ideogram4_sampler_preset": [
           "V4_QUALITY_48"
+        ],
+        "ideogram4_steps": [
+          null
         ],
         "ideogram4_unconditional_model": [],
         "is_intermediate": [
@@ -831,6 +840,9 @@
         ],
         "vae": [],
         "wan_component_source": [],
+        "wan_guidance_scale_low_noise": [
+          null
+        ],
         "wan_t5_encoder_model": [],
         "width": [
           1024,
