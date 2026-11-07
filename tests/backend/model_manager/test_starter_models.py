@@ -109,6 +109,26 @@ def test_krea2_transformer_only_entries_declare_vae_and_encoder_dependencies() -
         assert ModelType.Qwen3VLEncoder in dep_types, f"{model.name} is missing a Qwen3-VL encoder dependency"
 
 
+def test_moss_image_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Single-file and GGUF MOSS-Image mains hold only the transformer; the loader requires a standalone FLUX.2 VAE and
+    # a Qwen3.5 encoder, so an entry without them installs but cannot generate.
+    transformer_only = [
+        m
+        for m in STARTER_MODELS
+        if m.type is ModelType.Main and m.base is BaseModelType.MossImage and m.source.startswith("https://")
+    ]
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert any(dep.type is ModelType.VAE and dep.base is BaseModelType.Flux2 for dep in dependencies), (
+            f"{model.name} is missing the FLUX.2 VAE dependency"
+        )
+        assert any(dep.type is ModelType.Qwen35Encoder for dep in dependencies), (
+            f"{model.name} is missing a Qwen3.5 encoder dependency"
+        )
+
+
 def test_krea2_bundle_models_are_registered_in_starter_models() -> None:
     starter_sources = {m.source for m in STARTER_MODELS}
     for model in STARTER_BUNDLES[BaseModelType.Krea2].models:

@@ -1,4 +1,4 @@
-import type { CanvasDocumentSnapshot, PsdExportResult } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentSnapshot, PsdExportResult, PsdExportStatus } from '@workbench/canvas-engine/capabilities';
 import type { CanvasNodeContract } from '@workbench/canvas-engine/contracts';
 import type {
   CanvasDetachedLayerSurface,
@@ -31,6 +31,7 @@ type RasterMemoryReservationResult =
 
 export interface PsdExportControllerOptions {
   readonly backend: RasterBackend;
+  readonly onStatus?: (status: PsdExportStatus) => void;
   readonly captureDocumentSnapshot: () => CanvasDocumentSnapshot | null;
   readonly captureRasterSnapshot: (
     snapshot: CanvasDocumentSnapshot,
@@ -46,9 +47,6 @@ export interface PsdExportControllerOptions {
 }
 
 export const PSD_ALLOCATION_BYTES_PER_PIXEL = 8;
-
-export const derivePsdPixelAreaLimit = (availableBytes: number): number =>
-  Math.max(0, Math.floor(availableBytes / PSD_ALLOCATION_BYTES_PER_PIXEL));
 
 const countIsolatedFolders = (nodes: readonly PsdPlanNode[]): number =>
   nodes.reduce(
@@ -71,21 +69,74 @@ const getRequiredAllocationPixelArea = (plan: Extract<PsdExportPlan, { status: '
     0
   );
 
+/** Raster preparation remains under the engine cache budget. Serialization has its own bounded lifetime. */
+export const getPsdRequiredBytes = (plan: Extract<PsdExportPlan, { status: 'ok' }>): number =>
+  getRequiredAllocationPixelArea(plan) * PSD_ALLOCATION_BYTES_PER_PIXEL;
+
+/** One private worker per engine, including uncollected writer growth buffers; not a browser RSS limit. */
+export const PSD_SERIALIZATION_ALLOWANCE_BYTES = 1280 * 1024 * 1024;
+
+/**
+ * Installed PackBits: full literal packets add one byte per 128 samples. An interrupted literal header is
+ * paid for by the following >=3-sample run's saving. A final 1/2-sample packet can add one more header.
+ * Add the two-byte row length table for each of four channels.
+ */
+export const getPsdRleBound = (width: number, height: number): number =>
+  4 * height * (width + Math.ceil(width / 128) + 3);
+
+export const getPsdSerializationBudget = (plan: Extract<PsdExportPlan, { status: 'ok' }>) => {
+  const compositeArea = plan.width * plan.height;
+  const layerArea = plan.layers.reduce((sum, layer) => sum + layer.worldRect.width * layer.worldRect.height, 0);
+  let encodedLayers = 0;
+  let metadata = 4096;
+  const visit = (nodes: readonly PsdPlanNode[]): void => {
+    for (const node of nodes) {
+      metadata += (node.kind === 'folder' ? 2 : 1) * (1024 + 6 * node.name.length);
+      if (node.kind === 'folder') {
+        visit(node.children);
+      } else {
+        encodedLayers += getPsdRleBound(node.worldRect.width, node.worldRect.height);
+      }
+    }
+  };
+  visit(plan.tree);
+  const encodedComposite = getPsdRleBound(plan.width, plan.height);
+  const outputBound = metadata + encodedLayers + encodedComposite;
+  // Retain every geometric growth allocation (<4B), plus writePsd's exact slice (B): no GC assumption.
+  const workerBytes =
+    4 * (layerArea + compositeArea) +
+    encodedLayers +
+    encodedComposite +
+    12 * compositeArea +
+    2 * plan.height +
+    5 * outputBound;
+  // Worker terminates before download; exact bytes + Blob can overlap without any writer heap.
+  return { outputBound, requiredBytes: Math.max(workerBytes, 2 * outputBound) };
+};
+
 /** Owns immutable PSD snapshot capture, budget reservation, execution, and cancellation. */
 export class PsdExportController {
   private disposed = false;
-  private readonly active = new Set<AbortController>();
+  private active: AbortController | null = null;
+  private status: PsdExportStatus = 'idle';
+
+  private setStatus(status: PsdExportStatus): void {
+    this.status = status;
+    this.deps.onStatus?.(status);
+  }
 
   constructor(private readonly deps: PsdExportControllerOptions) {}
 
-  async export(fileName: string, options: { signal?: AbortSignal } = {}): Promise<PsdExportResult> {
-    if (this.disposed || options.signal?.aborted) {
+  async export(fileName: string): Promise<PsdExportResult> {
+    if (this.disposed) {
       return 'aborted';
     }
+    if (this.active) {
+      return 'busy';
+    }
     const abortController = new AbortController();
-    const abort = (): void => abortController.abort(options.signal?.reason);
-    options.signal?.addEventListener('abort', abort, { once: true });
-    this.active.add(abortController);
+    this.active = abortController;
+    this.setStatus('preparing');
     try {
       const documentSnapshot = this.deps.captureDocumentSnapshot();
       if (!documentSnapshot) {
@@ -112,6 +163,13 @@ export class PsdExportController {
         return capture.status;
       }
       const rasterSnapshot = capture.snapshot;
+      let snapshotReleased = false;
+      const releaseSnapshot = (): void => {
+        if (!snapshotReleased) {
+          snapshotReleased = true;
+          rasterSnapshot.release();
+        }
+      };
       try {
         if (abortController.signal.aborted) {
           return 'aborted';
@@ -186,15 +244,25 @@ export class PsdExportController {
         if (plan.status === 'too-large') {
           return 'too-large';
         }
-        const requestedPixelArea = getRequiredAllocationPixelArea(plan);
-        const requestedBytes = requestedPixelArea * PSD_ALLOCATION_BYTES_PER_PIXEL;
-        if (requestedPixelArea > derivePsdPixelAreaLimit(this.deps.getAvailableBytes())) {
+        if (getPsdSerializationBudget(plan).requiredBytes > PSD_SERIALIZATION_ALLOWANCE_BYTES) {
+          return 'too-large';
+        }
+        const requestedBytes = getPsdRequiredBytes(plan);
+        if (requestedBytes > this.deps.getAvailableBytes()) {
           return 'over-budget';
         }
         const reservation = this.deps.reserve(requestedBytes);
         if (reservation.status === 'over-budget') {
           return 'over-budget';
         }
+        let reservationReleased = false;
+        const releasePreparation = (): void => {
+          if (!reservationReleased) {
+            reservationReleased = true;
+            reservation.lease.release();
+            releaseSnapshot();
+          }
+        };
         try {
           const getLayerSurface = (layerId: string): Promise<CanvasDetachedLayerSurface> => {
             const detached = rasterSnapshot.layerSurfaces.get(layerId);
@@ -209,6 +277,12 @@ export class PsdExportController {
               /\.psd$/i.test(fileName) ? fileName : `${fileName}.psd`,
               {
                 backend: this.deps.backend,
+                onStage: (stage) => {
+                  if (stage === 'serializing') {
+                    releasePreparation();
+                  }
+                  this.setStatus(abortController.signal.aborted ? 'cancelling' : stage);
+                },
                 getLayerSurface,
                 runSpatial: this.deps.runSpatial,
                 signal: abortController.signal,
@@ -223,22 +297,23 @@ export class PsdExportController {
             }
             throw error;
           }
-          return abortController.signal.aborted ? 'aborted' : 'exported';
+          return 'exported';
         } finally {
-          reservation.lease.release();
+          releasePreparation();
         }
       } finally {
-        rasterSnapshot.release();
+        releaseSnapshot();
       }
     } finally {
-      this.active.delete(abortController);
-      options.signal?.removeEventListener('abort', abort);
+      this.active = null;
+      this.setStatus('idle');
     }
   }
 
   cancel(): void {
-    for (const controller of this.active) {
-      controller.abort();
+    if (this.active && this.status !== 'downloading') {
+      this.setStatus('cancelling');
+      this.active.abort();
     }
   }
 

@@ -331,7 +331,6 @@ const buildSDGraph = (
   const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
-  const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
   const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
@@ -362,8 +361,9 @@ const buildSDGraph = (
           hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
           ...(settings.hiDiffusionEnabled
             ? {
-                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
-                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+                hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
+                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio ?? 0,
+                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio ?? 0,
               }
             : {}),
         }
@@ -451,7 +451,7 @@ const buildSDGraph = (
   const output = addDecodeOutput({
     denoise: refinerDenoise ?? denoise,
     graph,
-    l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
+    l2iProps: { fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
     model,
     outputIsIntermediate,
@@ -466,6 +466,7 @@ const buildSDGraph = (
       ? {
           hidiffusion: settings.hiDiffusionEnabled,
           hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
           hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
           hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
           hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,

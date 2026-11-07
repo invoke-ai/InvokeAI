@@ -1080,6 +1080,23 @@ const createWorkflows = (count) =>
     };
   });
 
+/** Opt-in library workload; ordinary route fixtures and their budgets stay unchanged. */
+export const createLargeWorkflowLibraryFixture = () =>
+  createWorkflows(1000).map((record, index) => ({
+    ...record,
+    category: 'user',
+    workflow_id: `large-workflow-${String(index).padStart(4, '0')}`,
+    workflow: {
+      ...record.workflow,
+      nodes: range(40, (node) => ({
+        id: `node-${node}`,
+        type: 'invocation',
+        position: { x: node * 100, y: 0 },
+        data: { type: 'integer', inputs: { value: { name: 'value', value: node, label: '' } } },
+      })),
+    },
+  }));
+
 /** Per-project intermediates rows for the Settings manager; ids match the projects fixture so entry points preselect. */
 const createIntermediates = () => [
   {
