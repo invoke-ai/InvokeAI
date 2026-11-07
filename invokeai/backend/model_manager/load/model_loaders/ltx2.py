@@ -303,7 +303,7 @@ class _LTX2ComponentLoading:
         from safetensors.torch import load_file
 
         assert isinstance(self, ModelLoader)
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
         what = "LTX-2 transformer"
 
         reject_formats_declared_in_the_header(
@@ -405,6 +405,8 @@ class _LTX2ComponentLoading:
 class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
     """Loader for an LTX-2 component folder (and its transformer, when the folder has one)."""
 
+    _bfloat16_safe = True
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -457,6 +459,8 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class LTX2CheckpointModel(_LTX2ComponentLoading, ModelLoader):
     """Loader for LTX-2 single-file transformers (bf16, Comfy int8-convrot or header-named nvfp4)."""
+
+    _bfloat16_safe = True
 
     def _load_model(
         self,

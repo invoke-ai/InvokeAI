@@ -53,6 +53,8 @@ class WanDiffusersModel(GenericDiffusersLoader):
     class for each submodel via the parent loader's ``get_hf_load_class``.
     """
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -94,11 +96,12 @@ class WanDiffusersModel(GenericDiffusersLoader):
 
         # bfloat16 across the board: matches Diffusers WanPipeline reference and
         # avoids the fp16 instability seen in the Wan VAE.
+        dtype = self._decision(config, submodel_type).dtype
         try:
-            result: AnyModel = _load_with_variant_fallback({"dtype": torch.bfloat16})
+            result: AnyModel = _load_with_variant_fallback({"dtype": dtype})
         except TypeError:
             # Older diffusers releases use torch_dtype instead of dtype.
-            result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
+            result = _load_with_variant_fallback({"torch_dtype": dtype})
 
         # This override exists to force bfloat16, and in doing so it replaced the parent's whole
         # `_load_model` -- including the cast at `GenericDiffusersLoader._load_model`, which every
@@ -475,6 +478,8 @@ class WanCheckpointModel(ModelLoader):
     WanModelLoaderInvocation layer.
     """
 
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -501,8 +506,7 @@ class WanCheckpointModel(ModelLoader):
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         model_path = Path(config.path)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         sd = load_file(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)

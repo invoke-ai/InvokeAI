@@ -8,6 +8,8 @@ whose ``tokenizer/`` lost its vocabulary — vendoring cannot repair somebody el
 import json
 from pathlib import Path
 
+import torch
+
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_tokenizer,
     tokenizer_can_encode,
@@ -123,6 +125,8 @@ def test_the_diffusers_main_loader_serves_a_usable_tokenizer(tmp_path: Path) -> 
     )
 
     loader = object.__new__(QwenImageDiffusersModel)
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     config = Main_Diffusers_QwenImage_Config.model_construct(path=str(tmp_path), name="qwen-image", repo_variant=None)
 
     tokenizer = loader._load_model(config, SubModelType.Tokenizer)

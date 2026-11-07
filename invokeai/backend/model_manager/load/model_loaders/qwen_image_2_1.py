@@ -74,6 +74,8 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
     cached encoder while they encode. The language model's weights are cached once for both.
     """
 
+    _bfloat16_safe = True
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -108,7 +110,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
             # device has it, float32 otherwise.
             dtype = self._torch_dtype_avoiding_float16()
         else:
-            dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+            dtype = self._decision(config, submodel_type).dtype
 
         if submodel_type is SubModelType.VisionEncoder:
             tower = _load_vision_tower(model_path / SubModelType.TextEncoder.value, dtype)
@@ -204,6 +206,8 @@ class QwenImage21CheckpointModel(ModelLoader):
     quantization side channel is read, so every quantized layer names a diffusers Linear.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_QwenImage21_Config):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage21_Config, got {type(config).__name__}.")
@@ -213,7 +217,7 @@ class QwenImage21CheckpointModel(ModelLoader):
         from safetensors.torch import load_file
 
         model_path = Path(config.path)
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd = load_file(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)

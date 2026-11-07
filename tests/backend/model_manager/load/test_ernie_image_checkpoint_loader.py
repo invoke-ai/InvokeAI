@@ -83,6 +83,7 @@ def test_the_released_geometry_still_builds_a_model() -> None:
 def _loader(monkeypatch: pytest.MonkeyPatch) -> tuple[ErnieImageCheckpointModel, MagicMock]:
     ram_cache = MagicMock()
     loader = object.__new__(ErnieImageCheckpointModel)
+    loader._torch_device = torch.device("cpu")
     loader._ram_cache = ram_cache
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     monkeypatch.setattr(loader_module.TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))

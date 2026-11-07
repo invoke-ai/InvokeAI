@@ -188,7 +188,7 @@ def _checkpoint_loader(monkeypatch, te_config) -> Qwen3VLEncoderCheckpointLoader
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2._device_supports_fp8_storage",
+        "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage",
         lambda _device, _logger: False,
     )
     return loader
@@ -292,6 +292,7 @@ def test_the_bundled_pipeline_encoder_drops_the_tower(monkeypatch, tmp_path: Pat
     encoder = _tiny_encoder()
     config = Main_Diffusers_Krea2_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(Krea2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loader.get_hf_load_class = lambda _path, _submodel: SimpleNamespace(from_pretrained=MagicMock(return_value=encoder))
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     monkeypatch.setattr(
@@ -355,6 +356,7 @@ def _qwen_image_2_1_pipeline(
     )
     config = Main_Diffusers_QwenImage21_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(QwenImage21DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     encoder = saved.model if conditional_generation else saved
     return loader, config, encoder

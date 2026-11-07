@@ -85,6 +85,7 @@ def loader(monkeypatch: pytest.MonkeyPatch) -> Qwen35EncoderCheckpointLoader:
     loader = object.__new__(Qwen35EncoderCheckpointLoader)
     loader._ram_cache = MagicMock()
     loader._logger = logging.getLogger(__name__)
+    loader._torch_device = torch.device("cpu")
     return loader
 
 

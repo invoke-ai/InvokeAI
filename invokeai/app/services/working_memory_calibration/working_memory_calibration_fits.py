@@ -28,7 +28,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationModelLine,
     WorkingMemoryCalibrationPixelRange,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.cache_key import model_key_from_cache_key
 from invokeai.backend.working_memory import fragmentation, user_fit
 from invokeai.backend.working_memory.coefficients import shipped_coefficients
 from invokeai.backend.working_memory.fingerprint import Environment
@@ -191,15 +191,11 @@ def _changed(old: Mapping[str, Optional[str]], new: Mapping[str, Optional[str]])
     return sorted(key for key in set(old) | set(new) if old.get(key) != new.get(key))
 
 
-_SUBMODEL_TYPES: Final = frozenset(submodel.value for submodel in SubModelType)
-
-
 def measured_models(point: CalibrationPoint, run_models: Mapping[str, str]) -> frozenset[str]:
     """The models a window is attributed to: the model its run calibrated (`run_models`, by run id), and the model it
     measured, where a submodel's window (`<key>:vae`) counts for its model. The summary shows a model's windows by
     this, and resetting the model removes exactly these."""
-    head, separator, tail = point.model_key.rpartition(":")
-    measured = head if separator and tail in _SUBMODEL_TYPES else point.model_key
+    measured = model_key_from_cache_key(point.model_key)
     run_model = run_models.get(point.run_id)
     return frozenset({measured} if run_model is None else {measured, run_model})
 

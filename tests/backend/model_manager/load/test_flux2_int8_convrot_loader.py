@@ -15,7 +15,9 @@ import json
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux2_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import flux
 from invokeai.backend.model_manager.load.model_loaders.flux import Flux2CheckpointModel
 from invokeai.backend.model_manager.taxonomy import Flux2VariantType, SubModelType
@@ -136,22 +138,30 @@ SEAM = Seam(
 )
 
 
-def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None, observe: tuple[str, ...] = ()):
+def _driver(
+    monkeypatch,
+    tmp_path,
+    state_dict: dict,
+    header: dict | None = None,
+    observe: tuple[str, ...] = (),
+    *,
+    fp8_storage: bool = False,
+):
     checkpoint = tmp_path / "flux-2-klein-9b-int8-convrot.safetensors"
     checkpoint.touch()
     config = Main_Checkpoint_Flux2_Config.model_construct(
-        path=str(checkpoint), name="klein-9b-int8", variant=Flux2VariantType.Klein9B
+        path=str(checkpoint),
+        name="klein-9b-int8",
+        variant=Flux2VariantType.Klein9B,
+        default_settings=MainModelDefaultSettings(fp8_storage=fp8_storage),
     )
 
-    def geometry(patch):
-        # Both spellings of the same decision: the module-level helper, and the loader method that
-        # supersedes it once FP8 Storage counts as a consumer too. `raising=False` tolerates the
-        # module symbol being gone.
-        patch.setattr(flux, "should_keep_fp8_weights", lambda _device: False, raising=False)
-
-    run = prepare(SEAM, monkeypatch, state_dict=state_dict, metadata=header, geometry=geometry, observe=observe)
-    # An instance attribute shadows the method, which is what keeps this working either way.
-    run.loader._keep_fp8_weights = lambda _config, _submodel=None: False
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda _device, _logger: fp8_storage)
+    run = prepare(SEAM, monkeypatch, state_dict=state_dict, metadata=header, observe=observe)
+    if fp8_storage:
+        # Simulate capability only; the native constructor and all tensor operations still run on CPU.
+        run.loader._torch_device = torch.device("cuda:0")
     return run, config
 
 
@@ -490,11 +500,12 @@ def test_a_header_hint_reaches_every_projection_the_fused_qkv_became(monkeypatch
     # whichever test this worker runs next.
     monkeypatch.setattr(fp8_scaled, "_full_precision_hints_override", True)
 
-    run, config = _driver(monkeypatch, tmp_path, state_dict, header)
-    # The scales only stay attached where something keeps the weights quantized.
-    run.loader._keep_fp8_weights = lambda _config, _submodel=None: True
+    run, config = _driver(monkeypatch, tmp_path, state_dict, header, fp8_storage=True)
+    assert state_dict[STORED_FP32].dtype is torch.float32
     model = run.load(config)
 
+    assert model.x_embedder.weight.dtype is torch.bfloat16
+    assert run.loader._get_cache_key(config, SubModelType.Transformer).endswith("storage=fp8-bfloat16-layerwise")
     for projection in ("to_q", "to_k", "to_v"):
         marked = model.get_submodule(f"transformer_blocks.0.attn.{projection}")
         assert marked._fp8_full_precision_matmul is True, projection

@@ -39,7 +39,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
     read_safetensors_metadata,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -151,6 +150,8 @@ def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
 class QwenImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Qwen Image Edit main models."""
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -170,7 +171,8 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
 
         # We force bfloat16 for Qwen Image Edit models.
         # Use `dtype` (newer) with fallback to `torch_dtype` (older diffusers).
-        dtype_kwarg = {"dtype": torch.bfloat16}
+        dtype = self._decision(config, submodel_type).dtype
+        dtype_kwarg = {"dtype": dtype}
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -180,7 +182,7 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
             )
         except TypeError:
             # Older diffusers uses torch_dtype instead of dtype
-            dtype_kwarg = {"torch_dtype": torch.bfloat16}
+            dtype_kwarg = {"torch_dtype": dtype}
             result = load_class.from_pretrained(
                 model_path,
                 **dtype_kwarg,
@@ -250,6 +252,8 @@ class QwenImageCheckpointModel(ModelLoader):
     `default_settings.fp8_storage` is on (which then also casts the dense remainder to fp8);
     otherwise they are dequantized to bf16 at load time."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -279,8 +283,7 @@ class QwenImageCheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_checkpoint_fp8, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd = load_file(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
@@ -307,7 +310,7 @@ class QwenImageCheckpointModel(ModelLoader):
         # storage the checkpoint's own scale is exact, where the layerwise cast of a folded weight has none. Without
         # either, a dequantize per forward would cost speed for memory nobody asked to save, so they are folded.
         use_fp8_storage = bool(fp8_layers) and self._should_use_fp8(config, SubModelType.Transformer)
-        keep_fp8 = bool(fp8_layers) and (should_keep_fp8_weights(target_device) or use_fp8_storage)
+        keep_fp8 = bool(fp8_layers) and keep_checkpoint_fp8
 
         is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
         model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
