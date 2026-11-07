@@ -777,6 +777,27 @@ describe('dimension helpers', () => {
     expect(wide.width / wide.height).toBeCloseTo(16 / 9, 1);
   });
 
+  it('keeps the ratio at the size limits, scaling both sides instead of clamping one', () => {
+    // 6144² at 16:9 is 8192×4608; halved to fit 4096.
+    expect(calculateNewSize(16 / 9, 6144 * 6144)).toEqual({ height: 2304, width: 4096 });
+    // 2048² at 8:1 is 5792.6×724.1; scaled to fit 4096 wide, the height is exactly 512.
+    expect(calculateNewSize(8, 2048 * 2048)).toEqual({ height: 512, width: 4096 });
+    // 32² is below the 64px minimum on both sides.
+    expect(calculateNewSize(1, 32 * 32)).toEqual({ height: 64, width: 64 });
+    // 48² at 4:1 is 96×24; scaled so the short side is 64, then 256×64.
+    expect(calculateNewSize(4, 48 * 48)).toEqual({ height: 64, width: 256 });
+    // 64:1 is the widest ratio both limits allow: 4096×64 exactly.
+    expect(calculateNewSize(64, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+  });
+
+  it('caps the long side and holds the short side at the minimum for a ratio past 64:1', () => {
+    // 2000:1 at 1024² would be about 45795×23; no in-range size has that ratio, so the result is the closest corner.
+    expect(calculateNewSize(2000, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+    expect(calculateNewSize(1 / 2000, 1024 * 1024)).toEqual({ height: 4096, width: 64 });
+    // A tiny area goes up the same way: the short side reaches 64 and the long side stops at 4096.
+    expect(calculateNewSize(2000, 16 * 16)).toEqual({ height: 64, width: 4096 });
+  });
+
   it('moves a reference image one step through the stack, and no-ops at the ends', () => {
     const referenceImages = ['a', 'b', 'c'].map((id) => ({
       config: { image: null, model: null, type: 'flux_kontext_reference_image' as const },
