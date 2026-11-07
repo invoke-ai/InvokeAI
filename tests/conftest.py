@@ -218,6 +218,9 @@ def _fast_service_polling(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(download_default, "_QUEUE_POLL_SECONDS", 0.02)
     monkeypatch.setattr(model_install_default, "_INSTALL_QUEUE_POLL_SECONDS", 0.02)
     monkeypatch.setattr(image_index_default, "_POLL_SECONDS", 0.02)
+    # Tests drive back-to-back fits of one scope; the refit cooldown would park them.
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 0.0)
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_MULTIPLIER", 0.0)
 
 
 @pytest.fixture(autouse=True)

@@ -38,11 +38,14 @@ flux3_klein_base = StarterModel(
     variant=Flux3VariantType.KleinBase,
 )
 
+# Both single-file builds are pinned to a commit: the repository renamed their files once, which broke the `main` URLs.
 flux3_klein_single_file = StarterModel(
     name="FLUX.3 Klein (single file)",
     base=BaseModelType.Flux3,
-    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/"
-    "flux3_image_klein_sd_bf16.safetensors",
+    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-bf16.safetensors",
+    previous_sources=[
+        "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/flux3_image_klein_sd_bf16.safetensors"
+    ],
     description="FLUX.3 Image Klein transformer as one bf16 file; the FLUX.2 VAE and Qwen3-VL 4B encoder are "
     f"installed as dependencies and shared with other models. ~11GB. {_LICENSE}",
     type=ModelType.Main,
@@ -54,8 +57,10 @@ flux3_klein_single_file = StarterModel(
 flux3_klein_base_single_file = StarterModel(
     name="FLUX.3 Klein Base (single file)",
     base=BaseModelType.Flux3,
-    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/"
-    "flux3_image_klein_bf16.safetensors",
+    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-base-bf16.safetensors",
+    previous_sources=[
+        "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/flux3_image_klein_bf16.safetensors"
+    ],
     description="FLUX.3 Image Klein Base transformer as one bf16 file; the FLUX.2 VAE and Qwen3-VL 4B encoder are "
     f"installed as dependencies. ~11GB. {_LICENSE}",
     type=ModelType.Main,
@@ -86,4 +91,36 @@ flux3_klein_gguf_q8_0 = StarterModel(
     format=ModelFormat.GGUFQuantized,
     variant=Flux3VariantType.Klein,
     dependencies=[flux2_vae, qwen3_vl_encoder_4b],
+)
+
+# The prompt upsampler: a Qwen3.5-9B vision-language fine-tune that rewrites a short request into the caption FLUX.3 is
+# trained on. A Text LLM, so it serves Expand Prompt, which sends it the system prompt the user picks. Its own
+# repository is Apache-2.0 and not gated; the int8 file comes from the gated Comfy repository, under that repository's
+# license.
+_UPSAMPLER_SYSTEM_PROMPT = "Use it with the 't2i' system prompt from the model's system_prompts.json."
+
+flux3_prompt_upsampler = StarterModel(
+    name="FLUX.3 Prompt Upsampler",
+    base=BaseModelType.Any,
+    source="black-forest-labs/flux-3-image-klein-pup",
+    description="FLUX.3 Image Klein's prompt upsampler (Qwen3.5-9B): a Text LLM for Expand Prompt that rewrites a "
+    f"short prompt into a detailed FLUX.3 caption. {_UPSAMPLER_SYSTEM_PROMPT} bf16, ~17.5GB. Apache-2.0.",
+    type=ModelType.TextLLM,
+)
+
+# Pinned to the Comfy repository commit the int8 layout was checked against (the bf16 single files of FLUX.3 moved
+# within this repository once already). The file's `comfy_quant` markers drive the decode, so a re-upload at the same
+# path could change how it loads.
+flux3_prompt_upsampler_int8 = StarterModel(
+    name="FLUX.3 Prompt Upsampler (int8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/"
+    "feef60b0aaf63a4773ace96636ebbcf43b881312/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
+    description="The FLUX.3 prompt upsampler as one ComfyUI int8_convrot file, a Text LLM for Expand Prompt. It "
+    "needs about 10.7GB of memory instead of 17.5GB, but dequantizes its int8 language-model weights for every generated "
+    "token unless int8 Compute runs them on int8 kernels; use the bf16 model where it fits. "
+    f"{_UPSAMPLER_SYSTEM_PROMPT} ~9.1GB. The Comfy repository is gated under the FLUX Kommunity License: accept it on "
+    "Hugging Face first.",
+    type=ModelType.TextLLM,
+    format=ModelFormat.Checkpoint,
 )

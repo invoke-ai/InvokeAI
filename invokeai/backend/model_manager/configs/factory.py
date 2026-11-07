@@ -135,6 +135,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
     Main_GGUF_LTX2_Config,
+    Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
@@ -184,11 +185,12 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_BnBLLMint8_Config,
+    T5Encoder_Checkpoint_Config,
     T5Encoder_GGUF_Config,
     T5Encoder_SDNQ_Config,
     T5Encoder_T5Encoder_Config,
 )
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
     TI_File_SD2_Config,
@@ -334,8 +336,9 @@ def _identified_default_settings(
 
 app_config = get_config()
 
-# Known model file extensions for sanity checking
-_MODEL_EXTENSIONS = {
+#: The suffixes of the files the factory identifies as single-file models, and looks for in a folder without a
+#: recognized model config.
+SINGLE_FILE_MODEL_SUFFIXES = {
     ".safetensors",
     ".ckpt",
     ".pt",
@@ -482,6 +485,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
         Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
@@ -593,6 +597,7 @@ AnyModelConfig = Annotated[
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
         Annotated[T5Encoder_SDNQ_Config, T5Encoder_SDNQ_Config.get_tag()],
         Annotated[T5Encoder_GGUF_Config, T5Encoder_GGUF_Config.get_tag()],
+        Annotated[T5Encoder_Checkpoint_Config, T5Encoder_Checkpoint_Config.get_tag()],
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
@@ -663,6 +668,7 @@ AnyModelConfig = Annotated[
         Annotated[LTX2DurationHead_Checkpoint_Config, LTX2DurationHead_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
         Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
+        Annotated[TextLLM_Checkpoint_Config, TextLLM_Checkpoint_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],
         # Unknown model (fallback)
         Annotated[Unknown_Config, Unknown_Config.get_tag()],
@@ -841,10 +847,10 @@ class ModelConfigFactory:
         """
         if path.is_file():
             # For files, just check the extension
-            if path.suffix.lower() not in _MODEL_EXTENSIONS:
+            if path.suffix.lower() not in SINGLE_FILE_MODEL_SUFFIXES:
                 raise ValueError(
                     f"File extension {path.suffix} is not a recognized model format. "
-                    f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
+                    f"Expected one of: {', '.join(sorted(SINGLE_FILE_MODEL_SUFFIXES))}"
                 )
         else:
             # Recognized Diffusers/Transformers configs are safe model markers. A generic config.json
@@ -891,7 +897,7 @@ class ModelConfigFactory:
                     return False
                 try:
                     for item in current_path.iterdir():
-                        if item.is_file() and item.suffix.lower() in _MODEL_EXTENSIONS:
+                        if item.is_file() and item.suffix.lower() in SINGLE_FILE_MODEL_SUFFIXES:
                             return True
                         elif item.is_dir() and find_model_files(item, depth + 1):
                             return True
@@ -902,7 +908,7 @@ class ModelConfigFactory:
             if not find_model_files(path, 0):
                 raise ValueError(
                     f"No model files or config files found in directory {path}. "
-                    f"Expected to find model files with extensions: {', '.join(sorted(_MODEL_EXTENSIONS))} "
+                    f"Expected to find model files with extensions: {', '.join(sorted(SINGLE_FILE_MODEL_SUFFIXES))} "
                     f"or config files: {', '.join(sorted(_CONFIG_FILES))}"
                 )
 
