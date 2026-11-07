@@ -21,7 +21,14 @@ from invokeai.app.invocations.fields import (
     UIType,
     VideoField,
 )
-from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.model import (
+    ModelIdentifierField,
+    PiDDecoderField,
+    TransformerField,
+    UNetField,
+    VAEField,
+    WanTransformerField,
+)
 from invokeai.app.invocations.primitives import LatentsOutput, StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
@@ -96,14 +103,54 @@ _SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = ("vae", "text_encoder", "unet", "tran
 def unwrap_metadata_value(val: Any) -> Any:
     """Unwrap model loader submodel fields (VAEField, encoder fields, UNetField, TransformerField, PiDDecoderField)
     into their inner ModelIdentifierField (or ModelIdentifierField-shaped dict) when stored in metadata."""
+    if isinstance(val, UNetField):
+        if val.loras or getattr(val, "seamless_axes", None):
+            return val
+        return val.unet
+    if isinstance(val, (TransformerField, WanTransformerField)):
+        if getattr(val, "loras", None) or getattr(val, "loras_low_noise", None):
+            return val
+        return val.transformer
+    if isinstance(val, VAEField):
+        return val.vae
+    if isinstance(val, PiDDecoderField):
+        return val.decoder
     if isinstance(val, BaseModel) and not isinstance(val, ModelIdentifierField):
-        for attr in _SUBMODEL_WRAPPER_ATTRS:
-            inner = getattr(val, attr, None)
+        for attr in ("text_encoder", "clip", "transformer", "unet", "vae", "decoder"):
+            if hasattr(val, attr):
+                if getattr(val, "loras", None):
+                    return val
+                inner = getattr(val, attr)
+                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                    return inner
+    elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
+        keys = set(val.keys())
+        if keys.issubset({"tokenizer", "text_encoder", "loras", "skipped_layers"}) and "text_encoder" in val:
+            if not val.get("loras"):
+                inner = val["text_encoder"]
+                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                    return inner
+        elif keys.issubset({"tokenizer", "clip", "loras", "skipped_layers"}) and "clip" in val:
+            if not val.get("loras"):
+                inner = val["clip"]
+                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                    return inner
+        elif "vae" in val and keys.issubset({"vae", "seamless_axes"}):
+            inner = val["vae"]
             if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
                 return inner
-    elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
-        for attr in _SUBMODEL_WRAPPER_ATTRS:
-            inner = val.get(attr)
+        elif keys.issubset({"transformer", "loras"}) and "transformer" in val:
+            if not val.get("loras"):
+                inner = val["transformer"]
+                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                    return inner
+        elif keys.issubset({"unet", "loras", "seamless_axes", "freeu_config"}) and "unet" in val:
+            if not val.get("loras") and not val.get("seamless_axes"):
+                inner = val["unet"]
+                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                    return inner
+        elif keys.issubset({"decoder"}) and "decoder" in val:
+            inner = val["decoder"]
             if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
                 return inner
     return val
@@ -117,7 +164,9 @@ class MetadataItemInvocation(BaseInvocation):
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
     def _validate_invoke_fields(self) -> None:
-        if self.label is None or self.value is not None:
+        if "value" not in self.model_fields_set:
+            super()._validate_invoke_fields()
+        elif self.label is None:
             super()._validate_invoke_fields()
 
     def invoke(self, context: InvocationContext) -> MetadataItemOutput:
@@ -390,13 +439,26 @@ def serialize_ip_adapter_ref_images(
                 continue
         else:
             raw_weight = 1.0
-        weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
+        if isinstance(raw_weight, (list, tuple)):
+            weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+        else:
+            weight = float(raw_weight)
         begin_step_percent = float(
             item.get("begin_step_percent", 0.0) if isinstance(item, dict) else getattr(item, "begin_step_percent", 0.0)
         )
         end_step_percent = float(
             item.get("end_step_percent", 1.0) if isinstance(item, dict) else getattr(item, "end_step_percent", 1.0)
         )
+
+        raw_mask = item.get("mask") if isinstance(item, dict) else getattr(item, "mask", None)
+        serialized_mask = None
+        if raw_mask is not None:
+            if hasattr(raw_mask, "model_dump"):
+                serialized_mask = raw_mask.model_dump(exclude_none=True)
+            elif isinstance(raw_mask, dict):
+                serialized_mask = dict(raw_mask)
+            else:
+                serialized_mask = raw_mask
 
         for img in img_list:
             img_name = img.get("image_name") if isinstance(img, dict) else getattr(img, "image_name", None)
@@ -413,27 +475,30 @@ def serialize_ip_adapter_ref_images(
                 except Exception:
                     pass
             idx += 1
+            config_entry: dict[str, Any] = {
+                "type": "ip_adapter",
+                "image": {
+                    "original": {
+                        "image": {
+                            "image_name": img_name,
+                            "width": img_width,
+                            "height": img_height,
+                        }
+                    }
+                },
+                "model": model_dict,
+                "clipVisionModel": clip_vision_model,
+                "method": method,
+                "weight": weight,
+                "beginEndStepPct": [begin_step_percent, end_step_percent],
+            }
+            if serialized_mask is not None:
+                config_entry["mask"] = serialized_mask
             ref_images.append(
                 {
                     "id": f"ip_adapter_{idx}",
                     "isEnabled": True,
-                    "config": {
-                        "type": "ip_adapter",
-                        "image": {
-                            "original": {
-                                "image": {
-                                    "image_name": img_name,
-                                    "width": img_width,
-                                    "height": img_height,
-                                }
-                            }
-                        },
-                        "model": model_dict,
-                        "clipVisionModel": clip_vision_model,
-                        "method": method,
-                        "weight": weight,
-                        "beginEndStepPct": [begin_step_percent, end_step_percent],
-                    },
+                    "config": config_entry,
                 }
             )
     return ref_images
@@ -468,23 +533,21 @@ def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str,
     """Build a new MetadataField by copying existing metadata and merging denoise updates without mutating input."""
     md: dict[str, Any] = {} if existing is None else existing.root.copy()
     existing_gen_mode = md.get("generation_mode")
-    existing_ref_images = md.get("ref_images")
     md.update(updates)
     if existing_gen_mode is not None and "generation_mode" in updates:
         md["generation_mode"] = existing_gen_mode
-    if "ref_images" in updates and isinstance(existing_ref_images, list) and isinstance(updates["ref_images"], list):
-        merged_refs: list[Any] = []
-        seen_keys: set[tuple[Any, Any, Any]] = set()
-        for entry in [*existing_ref_images, *updates["ref_images"]]:
-            dedup_key = _ref_image_dedup_key(entry)
-            if dedup_key is not None:
-                if dedup_key in seen_keys:
-                    continue
-                seen_keys.add(dedup_key)
-            merged_refs.append(entry)
-        md["ref_images"] = merged_refs
+
+    # Denoise execution lists must be authoritative to the executing denoise node.
+    authoritative_lists = ("loras", "controlnets", "t2iAdapters", "ref_images")
+    for key in authoritative_lists:
+        if key in updates:
+            if updates[key]:
+                md[key] = updates[key]
+            else:
+                md.pop(key, None)
+
     md["app_version"] = __version__
-    md["metadata_version"] = CORE_METADATA_VERSION
+    md.setdefault("metadata_version", CORE_METADATA_VERSION)
     return MetadataField.model_validate(md)
 
 

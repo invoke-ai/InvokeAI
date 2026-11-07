@@ -19527,7 +19527,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.9.0",
+        "version": "1.10.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -33704,7 +33704,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -40694,7 +40694,7 @@
         "tags": ["image", "flux3", "flux", "denoise"],
         "title": "Denoise - FLUX.3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -48892,11 +48892,15 @@
                 "$ref": "#/components/schemas/TensorField"
               },
               {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True."
+            "description": "The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.",
+            "title": "Mask"
           }
         },
         "required": ["image", "ip_adapter_model", "image_encoder_model"],
@@ -49049,6 +49053,9 @@
                 "$ref": "#/components/schemas/TensorField"
               },
               {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -49057,7 +49064,8 @@
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
-            "orig_required": false
+            "orig_required": false,
+            "title": "Mask"
           },
           "type": {
             "const": "ip_adapter",
@@ -66526,7 +66534,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }

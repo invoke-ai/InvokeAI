@@ -19230,10 +19230,11 @@ export type components = {
              */
             end_step_percent?: number;
             /**
+             * Mask
              * @description The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.
              * @default null
              */
-            mask?: components["schemas"]["TensorField"] | null;
+            mask?: components["schemas"]["TensorField"] | components["schemas"]["ImageField"] | null;
         };
         /**
          * IP-Adapter - SD1.5, SDXL
@@ -19302,10 +19303,11 @@ export type components = {
              */
             end_step_percent?: number;
             /**
+             * Mask
              * @description A mask defining the region that this IP-Adapter applies to.
              * @default null
              */
-            mask?: components["schemas"]["TensorField"] | null;
+            mask?: components["schemas"]["TensorField"] | components["schemas"]["ImageField"] | null;
             /**
              * type
              * @default ip_adapter

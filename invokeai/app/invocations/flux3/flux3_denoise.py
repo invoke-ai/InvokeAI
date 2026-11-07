@@ -56,7 +56,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - FLUX.3",
     tags=["image", "flux3", "flux", "denoise"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):
@@ -131,9 +131,7 @@ class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):
             "model": self.transformer.transformer,
             "vae": self.vae.vae,
         }
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 
     @torch.no_grad()

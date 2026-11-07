@@ -22,6 +22,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     MetadataField,
     OutputField,
+    TensorField,
     UIType,
     WithMetadata,
 )
@@ -482,7 +483,7 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
     def _validate_invoke_fields(self) -> None:
         # Upstream optional output ports (e.g. anima_model_loader.qwen3_5_encoder or sd3_model_loader.t5_encoder)
         # resolve to None when the selected model omits that submodel; allow value=None and skip it in invoke().
-        if self.value is not None:
+        if "value" not in self.model_fields_set:
             super()._validate_invoke_fields()
 
     def invoke(self, context: InvocationContext) -> MetadataOutput:
@@ -1310,18 +1311,22 @@ def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, A
                 continue
             begin_end = cfg.get("beginEndStepPct") or [0.0, 1.0]
             raw_weight = cfg.get("weight", 1.0)
-            weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
-            result.append(
-                {
-                    "image": img,
-                    "ip_adapter_model": model,
-                    "weight": weight,
-                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
-                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
-                    "clip_vision_model": cfg.get("clipVisionModel", "ViT-H"),
-                    "method": cfg.get("method", "full"),
-                }
-            )
+            if isinstance(raw_weight, (list, tuple)):
+                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+            else:
+                weight = float(raw_weight)
+            entry: dict[str, Any] = {
+                "image": img,
+                "ip_adapter_model": model,
+                "weight": weight,
+                "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                "clip_vision_model": cfg.get("clipVisionModel", "ViT-H"),
+                "method": cfg.get("method", "full"),
+            }
+            if cfg.get("mask") is not None:
+                entry["mask"] = cfg["mask"]
+            result.append(entry)
     if not result:
         canvas_v2 = data.get("canvas_v2_metadata")
         ref_imgs = canvas_v2.get("referenceImages") if isinstance(canvas_v2, dict) else None
@@ -1344,18 +1349,22 @@ def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, A
                 continue
             begin_end = ipa_cfg.get("beginEndStepPct") or [0.0, 1.0]
             raw_weight = ipa_cfg.get("weight", 1.0)
-            weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
-            result.append(
-                {
-                    "image": img,
-                    "ip_adapter_model": model,
-                    "weight": weight,
-                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
-                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
-                    "clip_vision_model": ipa_cfg.get("clipVisionModel", "ViT-H"),
-                    "method": ipa_cfg.get("method", "full"),
-                }
-            )
+            if isinstance(raw_weight, (list, tuple)):
+                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+            else:
+                weight = float(raw_weight)
+            entry = {
+                "image": img,
+                "ip_adapter_model": model,
+                "weight": weight,
+                "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                "clip_vision_model": ipa_cfg.get("clipVisionModel", "ViT-H"),
+                "method": ipa_cfg.get("method", "full"),
+            }
+            if ipa_cfg.get("mask") is not None:
+                entry["mask"] = ipa_cfg["mask"]
+            result.append(entry)
     if not result:
         for x in data.get("ipAdapters") or []:
             if not isinstance(x, dict):
@@ -1375,7 +1384,10 @@ def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, A
                 else:
                     cvm = "ViT-H"
             raw_weight = x.get("weight", 1.0)
-            weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
+            if isinstance(raw_weight, (list, tuple)):
+                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+            else:
+                weight = float(raw_weight)
             for img in img_list:
                 normalized = dict(x)
                 normalized["image"] = img
@@ -1567,6 +1579,18 @@ class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
             if model.base not in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL):
                 continue
 
+            raw_mask = x.get("mask")
+            mask_field: Optional[Union[ImageField, TensorField]] = None
+            if raw_mask is not None:
+                if isinstance(raw_mask, (ImageField, TensorField)):
+                    mask_field = raw_mask
+                elif isinstance(raw_mask, dict) and "image_name" in raw_mask:
+                    mask_field = ImageField.model_validate(raw_mask)
+                elif isinstance(raw_mask, dict) and "tensor_name" in raw_mask:
+                    mask_field = TensorField.model_validate(raw_mask)
+                else:
+                    mask_field = raw_mask
+
             ipa = IPAdapterInvocation(
                 image=x["image"],
                 ip_adapter_model=model,
@@ -1575,8 +1599,11 @@ class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
                 weight=x.get("weight", 1.0),
                 begin_step_percent=x.get("begin_step_percent", 0.0),
                 end_step_percent=x.get("end_step_percent", 1.0),
+                mask=mask_field,
             )
             i = ipa.invoke(context)
+            if mask_field is not None and getattr(i.ip_adapter, "mask", None) is None:
+                i.ip_adapter.mask = mask_field
 
             adapters = append_list(IPAdapterField, i.ip_adapter, adapters)
 

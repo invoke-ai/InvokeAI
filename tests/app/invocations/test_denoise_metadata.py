@@ -6,7 +6,12 @@ import pytest
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField
 from invokeai.app.invocations.anima.anima_lllite import AnimaLLLiteField
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, InvocationRegistry
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    Classification,
+    InvocationRegistry,
+    MissingInputException,
+)
 from invokeai.app.invocations.cogview4.cogview4_denoise import CogView4DenoiseInvocation
 from invokeai.app.invocations.ernie_image.ernie_image_denoise import ErnieImageDenoiseInvocation
 from invokeai.app.invocations.fields import (
@@ -14,6 +19,7 @@ from invokeai.app.invocations.fields import (
     ImageField,
     LatentsField,
     MetadataField,
+    MiniMaxH3FrameConditioningField,
     WithBoard,
     WithMetadata,
 )
@@ -30,6 +36,7 @@ from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     MetadataInvocation,
     MetadataItemField,
+    MetadataItemInvocation,
     MetadataOutput,
     build_denoise_metadata,
     serialize_adapter_metadata,
@@ -49,6 +56,7 @@ from invokeai.app.invocations.metadata_linked import (
     AnimaDenoiseMetaInvocation,
     DenoiseLatentsMetaInvocation,
     FluxDenoiseLatentsMetaInvocation,
+    MetadataItemLinkedInvocation,
     MetadataToControlnetsInvocation,
     MetadataToIPAdaptersInvocation,
     MetadataToT2IAdaptersInvocation,
@@ -364,7 +372,8 @@ def test_flux_and_flux2_denoise_build_metadata() -> None:
     assert flux_md["dype_scale"] == 2.5
     assert flux_md["dype_exponent"] == 1.8
     assert flux_md["vae"] == flux_cn_vae_id
-    assert len(flux_md["loras"]) == 2
+    assert len(flux_md["loras"]) == 1
+    assert flux_md["loras"][0]["model"]["key"] == "flux-lora"
     assert len(flux_md["controlnets"]) == 1
     assert len(flux_md["ref_images"]) == 1
     assert "ipAdapters" not in flux_md
@@ -1474,7 +1483,7 @@ def test_ref_images_serialization_and_metadata_to_adapters_multi_format() -> Non
     assert cfg["weight"] == 0.75
     assert cfg["beginEndStepPct"] == [0.1, 0.9]
 
-    # Merging upstream ref_images with denoise ref_images deduplicates identical (type, image_name, model_key)
+    # Authoritative replace: executing denoise ref_images replaces upstream ref_images
     flux_ref = {
         "id": "kontext_1",
         "isEnabled": True,
@@ -1486,7 +1495,8 @@ def test_ref_images_serialization_and_metadata_to_adapters_multi_format() -> Non
     }
     existing_md = MetadataField.model_validate({"ref_images": [flux_ref, refs[0]]})
     merged_md = build_denoise_metadata(existing_md, {"ref_images": refs})
-    assert len(merged_md.root["ref_images"]) == 2
+    assert len(merged_md.root["ref_images"]) == 1
+    assert merged_md.root["ref_images"] == refs
 
     # MetadataToIPAdaptersInvocation: Format 1 (v7 ref_images)
     md_to_ipa_v7 = MetadataToIPAdaptersInvocation.model_construct(
@@ -1869,3 +1879,312 @@ def test_metadata_item_linked_unwraps_submodel_fields_and_does_not_mutate_input(
     assert none_out.metadata.root["positive_prompt"] == "astronaut"
     assert none_out.metadata.root["qwen3_encoder"]["key"] == "qwen3-vl-key"
     assert "qwen3_5_encoder" not in none_out.metadata.root
+
+
+def test_ip_adapter_weight_schedules_and_mask_roundtrip() -> None:
+    """Task 1 & 2: IP-Adapter list weights [0.8, 0.4, 0.2] and mask=ImageField round-trip."""
+    ipa_model = _make_model_id(key="ipa-sdxl-1", base=BaseModelType.StableDiffusionXL, model_type=ModelType.IPAdapter)
+    enc_model = _make_model_id(key="enc-sdxl-1", base=BaseModelType.StableDiffusionXL, model_type=ModelType.CLIPVision)
+
+    from pydantic import ConfigDict
+
+    from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Config_Base
+
+    class _MockIPAConfig(IPAdapter_Checkpoint_Config_Base):
+        model_config = ConfigDict(extra="allow")
+
+    def _get_config(key: str):
+        if key == "ipa-sdxl-1":
+            return _MockIPAConfig.model_validate(
+                {
+                    "key": ipa_model.key,
+                    "hash": ipa_model.hash,
+                    "name": ipa_model.name,
+                    "base": ipa_model.base,
+                    "type": ipa_model.type,
+                    "image_encoder_model_id": "enc-sdxl-1",
+                }
+            )
+        return SimpleNamespace(
+            key=enc_model.key,
+            hash=enc_model.hash,
+            name=enc_model.name,
+            base=enc_model.base,
+            type=enc_model.type,
+            image_encoder_model_id="",
+        )
+
+    mock_ctx = SimpleNamespace(
+        models=SimpleNamespace(
+            get_config=_get_config,
+            exists=lambda key: True,
+            search_by_attrs=lambda **kwargs: [
+                SimpleNamespace(
+                    key=enc_model.key,
+                    hash=enc_model.hash,
+                    name=kwargs.get("name", enc_model.name),
+                    base=BaseModelType.Any,
+                    type=ModelType.CLIPVision,
+                )
+            ],
+        ),
+        images=SimpleNamespace(get_dto=lambda name: SimpleNamespace(width=1024, height=768)),
+    )
+
+    weight_schedule = [0.8, 0.4, 0.2]
+    mask_field = ImageField(image_name="test_mask.png")
+    ipa_field = IPAdapterField(
+        image=ImageField(image_name="test_ref.png"),
+        ip_adapter_model=ipa_model,
+        image_encoder_model=enc_model,
+        weight=weight_schedule,
+        method="style",
+        begin_step_percent=0.15,
+        end_step_percent=0.85,
+        mask=mask_field,
+    )
+
+    refs = serialize_ip_adapter_ref_images(ipa_field, context=mock_ctx, default_width=1024, default_height=768)
+    assert len(refs) == 1
+    cfg = refs[0]["config"]
+    assert cfg["weight"] == weight_schedule
+    assert cfg["mask"] == {"image_name": "test_mask.png"}
+    assert cfg["image"]["original"]["image"]["width"] == 1024
+    assert cfg["image"]["original"]["image"]["height"] == 768
+
+    md = MetadataField.model_validate({"ref_images": refs})
+    out = MetadataToIPAdaptersInvocation.model_construct(metadata=md, ip_adapter_list=None).invoke(mock_ctx)
+    assert isinstance(out.ip_adapter_list, list)
+    assert len(out.ip_adapter_list) == 1
+    rec = out.ip_adapter_list[0]
+    assert rec.weight == weight_schedule
+    assert isinstance(rec.mask, ImageField)
+    assert rec.mask.image_name == "test_mask.png"
+    assert rec.method == "style"
+    assert rec.begin_step_percent == 0.15
+    assert rec.end_step_percent == 0.85
+
+
+def test_flux_control_lora_excluded_from_loras() -> None:
+    """Task 4: Flux control_lora is excluded from updates['loras']."""
+    tf_id = _make_model_id(key="flux-tf", base=BaseModelType.Flux)
+    ctrl_lora_id = _make_model_id(key="flux-ctrl-lora", base=BaseModelType.Flux, model_type=ModelType.ControlLoRa)
+
+    flux_node = FluxDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[]),
+        control_lora=ControlLoRAField(lora=ctrl_lora_id, weight=0.85, img=ImageField(image_name="ctrl.png")),
+        control=None,
+        controlnet_vae=None,
+        ip_adapter=None,
+        latents=None,
+        noise=None,
+        add_noise=True,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        width=1024,
+        height=1024,
+        num_steps=20,
+        guidance=3.5,
+        cfg_scale=1.0,
+        cfg_scale_start_step=0,
+        cfg_scale_end_step=20,
+        seed=42,
+        dype_preset="none",
+        dype_scale=None,
+        dype_exponent=None,
+        metadata=None,
+    )
+    md = flux_node._build_metadata().root
+    assert "loras" not in md
+
+
+def test_chained_denoise_parameter_isolation() -> None:
+    """Task 5: Chained denoise pass where upstream has LoRAs and downstream has no LoRAs clears LoRAs."""
+    lora_id = _make_model_id(key="sdxl-lora", base=BaseModelType.StableDiffusionXL, model_type=ModelType.LoRA)
+    unet_id = _make_model_id(key="sdxl-unet", base=BaseModelType.StableDiffusionXL, model_type=ModelType.Main)
+
+    upstream_pass = DenoiseLatentsInvocation.model_construct(
+        unet=UNetField.model_construct(unet=unet_id, loras=[LoRAField(lora=lora_id, weight=0.75)]),
+        control=None,
+        ip_adapter=None,
+        t2i_adapter=None,
+        steps=20,
+        cfg_scale=7.5,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="euler",
+        cfg_rescale_multiplier=0.0,
+        hidiffusion=False,
+        hidiffusion_raunet=True,
+        hidiffusion_window_attn=True,
+        hidiffusion_auto_ratios=True,
+        hidiffusion_t1_ratio=0.0,
+        hidiffusion_t2_ratio=0.0,
+        noise=None,
+        latents=None,
+        denoise_mask=None,
+        metadata=None,
+    )
+    upstream_md = upstream_pass._build_metadata(width=1024, height=1024)
+    assert len(upstream_md.root["loras"]) == 1
+
+    downstream_pass = DenoiseLatentsInvocation.model_construct(
+        unet=UNetField.model_construct(unet=unet_id, loras=[]),
+        control=None,
+        ip_adapter=None,
+        t2i_adapter=None,
+        steps=10,
+        cfg_scale=5.0,
+        denoising_start=0.5,
+        denoising_end=1.0,
+        scheduler="euler",
+        cfg_rescale_multiplier=0.0,
+        hidiffusion=False,
+        hidiffusion_raunet=True,
+        hidiffusion_window_attn=True,
+        hidiffusion_auto_ratios=True,
+        hidiffusion_t1_ratio=0.0,
+        hidiffusion_t2_ratio=0.0,
+        noise=None,
+        latents=None,
+        denoise_mask=None,
+        metadata=upstream_md,
+    )
+    downstream_md = downstream_pass._build_metadata(width=1024, height=1024)
+    assert "loras" not in downstream_md.root
+    assert "controlnets" not in downstream_md.root
+    assert "ref_images" not in downstream_md.root
+    assert "t2iAdapters" not in downstream_md.root
+
+
+def test_chained_reference_images_authoritative_replace() -> None:
+    """Task 6: Chained denoise passes replace upstream reference images without collisions."""
+    mock_ctx = SimpleNamespace(
+        models=SimpleNamespace(get_config=lambda key: SimpleNamespace(base="sdxl", image_encoder_model_id="sdxl_enc")),
+        images=SimpleNamespace(get_dto=lambda name: SimpleNamespace(width=1024, height=1024)),
+    )
+    ipa_id = _make_model_id(key="ipa-1", base=BaseModelType.StableDiffusionXL, model_type=ModelType.IPAdapter)
+    ipa_1 = IPAdapterField(
+        image=ImageField(image_name="ref_1.png"),
+        ip_adapter_model=ipa_id,
+        image_encoder_model=ipa_id,
+        weight=0.9,
+    )
+    ipa_2 = IPAdapterField(
+        image=ImageField(image_name="ref_2.png"),
+        ip_adapter_model=ipa_id,
+        image_encoder_model=ipa_id,
+        weight=0.4,
+    )
+
+    refs_1 = serialize_ip_adapter_ref_images(ipa_1, context=mock_ctx, default_width=1024, default_height=1024)
+    assert refs_1[0]["id"] == "ip_adapter_1"
+    md_pass_1 = build_denoise_metadata(None, {"ref_images": refs_1})
+    assert len(md_pass_1.root["ref_images"]) == 1
+    assert md_pass_1.root["ref_images"][0]["config"]["image"]["original"]["image"]["image_name"] == "ref_1.png"
+
+    refs_2 = serialize_ip_adapter_ref_images(ipa_2, context=mock_ctx, default_width=1024, default_height=1024)
+    assert refs_2[0]["id"] == "ip_adapter_1"
+    md_pass_2 = build_denoise_metadata(md_pass_1, {"ref_images": refs_2})
+    assert len(md_pass_2.root["ref_images"]) == 1
+    assert md_pass_2.root["ref_images"][0]["id"] == "ip_adapter_1"
+    assert md_pass_2.root["ref_images"][0]["config"]["image"]["original"]["image"]["image_name"] == "ref_2.png"
+
+    md_pass_3 = build_denoise_metadata(md_pass_2, {"ref_images": []})
+    assert "ref_images" not in md_pass_3.root
+
+
+def test_anima_inpaint_adapter_stamped_in_metadata() -> None:
+    """Task 7: Anima inpaint denoise stamps anima_inpaint_adapter and anima_inpaint_adapter_weight."""
+    tf_id = _make_model_id(key="anima-tf", base=BaseModelType.Anima)
+    adapter_id = _make_model_id(key="anima-inpaint-adapter", base=BaseModelType.Anima, model_type=ModelType.ControlLoRa)
+
+    lllite_field = AnimaLLLiteField(
+        image_name="init.png",
+        mask_name="mask.png",
+        control_model=adapter_id,
+        weight=0.75,
+    )
+
+    anima_inpaint = AnimaDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[]),
+        control_lllite=lllite_field,
+        ip_adapter=None,
+        denoise_mask=DenoiseMaskField(mask_name="mask.png"),
+        latents=LatentsField(latents_name="init_lat"),
+        noise=None,
+        add_noise=False,
+        width=1024,
+        height=1024,
+        steps=25,
+        guidance_scale=4.0,
+        scheduler="euler",
+        denoising_start=0.0,
+        denoising_end=1.0,
+        seed=123,
+        metadata=None,
+    )
+    md = anima_inpaint._build_metadata().root
+    assert md["generation_mode"] == "anima_inpaint"
+    assert md["anima_inpaint_adapter"] == adapter_id
+    assert md["anima_inpaint_adapter_weight"] == 0.75
+
+
+def test_metadata_item_unconnected_validation_and_metadata_version_defense() -> None:
+    """Task 8: MetadataItemInvocation rejects truly unconnected inputs, and metadata_version is preserved."""
+    # 1. Truly unconnected MetadataItemInvocation raises MissingInputException
+    unconnected_item = MetadataItemInvocation.model_validate({"id": "item-unconnected", "label": "test_label"})
+    with pytest.raises(MissingInputException):
+        unconnected_item._validate_invoke_fields()
+
+    # Connected but evaluating to None passes validation
+    connected_none_item = MetadataItemInvocation.model_validate(
+        {"id": "item-connected-none", "label": "test_label", "value": None}
+    )
+    connected_none_item._validate_invoke_fields()
+
+    # 2. Truly unconnected MetadataItemLinkedInvocation raises MissingInputException
+    unconnected_linked = MetadataItemLinkedInvocation.model_validate(
+        {"id": "linked-unconnected", "label": "positive_prompt"}
+    )
+    with pytest.raises(MissingInputException):
+        unconnected_linked._validate_invoke_fields()
+
+    # 3. Existing metadata_version is preserved in build_denoise_metadata
+    upstream_md = MetadataField.model_validate({"metadata_version": "0.9.0", "steps": 20})
+    merged = build_denoise_metadata(upstream_md, {"steps": 30})
+    assert merged.root["metadata_version"] == "0.9.0"
+    assert merged.root["steps"] == 30
+
+
+def test_minimax_h3_generation_mode_inspection() -> None:
+    """Task 8: MiniMax H3 denoise inspects keyframe_anchors for flf2v, lf2v, i2v, and extend_video."""
+    tf_id = _make_model_id(key="minimax-tf")
+    cond_id = SimpleNamespace(conditioning_name="pos_cond")
+
+    def _make_mm(anchors: list[str], existing_md: MetadataField | None = None) -> str:
+        mm = MiniMaxH3DenoiseInvocation.model_construct(
+            transformer=MiniMaxH3TransformerField(transformer=tf_id, loras=[]),
+            positive_conditioning=cond_id,
+            frame_conditioning=MiniMaxH3FrameConditioningField(
+                condition_rows_name="rows",
+                keyframe_anchors=anchors,
+                width=1344,
+                height=768,
+            ),
+            reference_conditioning=None,
+            width=1344,
+            height=768,
+            num_frames="124",
+            steps=50,
+            seed=42,
+            metadata=existing_md,
+        )
+        return mm._build_metadata().root["generation_mode"]
+
+    assert _make_mm(["first", "last"]) == "minimax_h3_flf2v"
+    assert _make_mm(["last"]) == "minimax_h3_lf2v"
+    assert _make_mm(["first"]) == "minimax_h3_i2v"
+
+    extend_md = MetadataField.model_validate({"generation_mode": "minimax_h3_extend_video"})
+    assert _make_mm(["first"], existing_md=extend_md) == "minimax_h3_extend_video"

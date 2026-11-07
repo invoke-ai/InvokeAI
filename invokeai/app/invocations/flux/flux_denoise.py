@@ -244,24 +244,14 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata):
         if self.dype_exponent is not None:
             updates["dype_exponent"] = self.dype_exponent
 
-        loras = serialize_lora_metadata(
-            getattr(self.transformer, "loras", None),
-            [self.control_lora] if self.control_lora is not None else None,
-        )
-        if loras:
-            updates["loras"] = loras
-
-        controlnets = serialize_adapter_metadata(self.control)
-        if controlnets:
-            updates["controlnets"] = controlnets
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
         existing = getattr(self, "metadata", None)
         if getattr(self, "controlnet_vae", None) is not None and (existing is None or "vae" not in existing.root):
             updates["vae"] = self.controlnet_vae.vae
-        ref_images = serialize_ip_adapter_ref_images(
+        updates["ref_images"] = serialize_ip_adapter_ref_images(
             self.ip_adapter, context=context, default_width=self.width, default_height=self.height
         )
-        if ref_images:
-            updates["ref_images"] = ref_images
 
         if (
             self.noise is not None

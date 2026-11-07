@@ -322,12 +322,22 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
         )
 
     def _build_metadata(self) -> MetadataField:
+        existing = getattr(self, "metadata", None)
+        existing_mode = existing.root.get("generation_mode") if isinstance(existing, MetadataField) else None
         if int(self.num_frames) == 5:
             gen_mode = "minimax_h3_txt2img"
+        elif existing_mode == "minimax_h3_extend_video":
+            gen_mode = "minimax_h3_extend_video"
         elif getattr(self, "reference_conditioning", None) is not None:
             gen_mode = "minimax_h3_ref2v"
         elif getattr(self, "frame_conditioning", None) is not None:
-            gen_mode = "minimax_h3_i2v"
+            anchors = set(getattr(self.frame_conditioning, "keyframe_anchors", []) or [])
+            if "first" in anchors and "last" in anchors:
+                gen_mode = "minimax_h3_flf2v"
+            elif "last" in anchors and "first" not in anchors:
+                gen_mode = "minimax_h3_lf2v"
+            else:
+                gen_mode = "minimax_h3_i2v"
         else:
             gen_mode = "minimax_h3_t2v"
         updates: dict[str, Any] = {

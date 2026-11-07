@@ -189,7 +189,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.9.0",
+    version="1.10.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
@@ -270,19 +270,20 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
             "add_noise": self.add_noise,
             "model": self.transformer.transformer,
         }
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
-
-        controlnets = serialize_adapter_metadata(self.control_lllite)
-        if controlnets:
-            updates["controlnets"] = controlnets
-
-        ref_images = serialize_ip_adapter_ref_images(
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control_lllite)
+        updates["ref_images"] = serialize_ip_adapter_ref_images(
             getattr(self, "ip_adapter", None), context=context, default_width=self.width, default_height=self.height
         )
-        if ref_images:
-            updates["ref_images"] = ref_images
+
+        if getattr(self, "denoise_mask", None) is not None and getattr(self, "control_lllite", None) is not None:
+            lllite_list = self.control_lllite if isinstance(self.control_lllite, list) else [self.control_lllite]
+            if lllite_list:
+                adapter = lllite_list[0]
+                model = getattr(adapter, "control_model", getattr(adapter, "model", None))
+                if model is not None:
+                    updates["anima_inpaint_adapter"] = model
+                    updates["anima_inpaint_adapter_weight"] = float(adapter.weight)
 
         if (
             self.noise is not None

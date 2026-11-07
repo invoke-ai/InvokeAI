@@ -134,7 +134,7 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
@@ -244,8 +244,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["krea2_style_strength"] = self.style_reference.style_strength
 
         loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = loras
         if getattr(self, "reference_latents", None) is not None and self._reference_latent_fields() and loras:
             updates["krea2_reference_kv_cache"] = self.reference_kv_cache
 

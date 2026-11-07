@@ -204,18 +204,11 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation, WithMetadata):
             updates["freeu_b1"] = self.unet.freeu_config.b1
             updates["freeu_b2"] = self.unet.freeu_config.b2
 
-        loras = serialize_lora_metadata(getattr(self.unet, "loras", None))
-        if loras:
-            updates["loras"] = loras
-
-        controlnets = serialize_adapter_metadata(self.control)
-        if controlnets:
-            updates["controlnets"] = controlnets
-        ref_images = serialize_ip_adapter_ref_images(
+        updates["loras"] = serialize_lora_metadata(getattr(self.unet, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
+        updates["ref_images"] = serialize_ip_adapter_ref_images(
             getattr(self, "ip_adapter", None), context=context, default_width=width, default_height=height
         )
-        if ref_images:
-            updates["ref_images"] = ref_images
 
         if self.noise and self.noise.seed is not None:
             updates["seed"] = self.noise.seed
