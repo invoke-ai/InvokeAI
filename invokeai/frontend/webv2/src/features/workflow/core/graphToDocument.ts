@@ -10,6 +10,7 @@ import {
   migrateMiniMaxH3NumFramesValue,
   nodeAcceptsExtraInputs,
 } from './document';
+import { isHiDiffusionNode, normalizeHiDiffusionInputs } from './fields';
 import { getLayeredPositions } from './graphLayout';
 import { isInvocationNode } from './types';
 
@@ -97,6 +98,13 @@ export const previewGraphToDocument = (
       }
     }
 
+    if (isHiDiffusionNode(node.data.type) && template.inputs.hidiffusion_auto_ratios) {
+      normalizeHiDiffusionInputs(
+        node.data.inputs,
+        Object.fromEntries(Object.entries(graphNode.inputs).map(([name, value]) => [name, { name, value }])),
+        new Set(graph.edges.filter((edge) => edge.targetNodeId === graphNode.id).map((edge) => edge.targetField))
+      );
+    }
     nodes.push(node);
   }
 
