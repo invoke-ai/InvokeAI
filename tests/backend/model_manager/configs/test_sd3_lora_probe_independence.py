@@ -331,6 +331,25 @@ def test_a_file_that_only_names_sd3_modules_without_a_width_is_refused_with_a_re
     assert _accepting_lora_configs(sd, layout) == []
 
 
+_TOP_LEVEL_ONLY = {
+    "proj_out": _pair("transformer.proj_out", 64, 1536, peft=True),
+    "context-embedder": _pair("transformer.context_embedder", 1536, 4096, peft=True),
+    "norm-out": _pair("transformer.norm_out.linear", 3072, 1536, peft=True),
+    "pos-embed": _pair("transformer.pos_embed.proj", 1536, 16, peft=True),
+    "time-embed": _pair("transformer.time_text_embed.timestep_embedder.linear_1", 1536, 256, peft=True),
+    "half-of-a-top-level-layer": {"transformer.proj_out.lora_A.weight": [4, 1536]},
+}
+
+
+@pytest.mark.parametrize("layout", list(_TOP_LEVEL_ONLY))
+def test_a_file_that_trains_only_top_level_modules_stays_unidentified(layout: str) -> None:
+    """Their names are generic, no evidence of SD 3: not refused with an SD 3 message, so it can install as unknown."""
+    mod, overrides = _mod(_state_dict(_TOP_LEVEL_ONLY[layout]), layout)
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides)
+
+
 def _refusal(keys: dict) -> str:
     mod, overrides = _mod(_state_dict(keys), "refused")
     with pytest.raises(InvalidMatchError) as error:

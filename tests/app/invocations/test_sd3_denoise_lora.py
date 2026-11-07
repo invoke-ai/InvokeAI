@@ -159,6 +159,57 @@ def test_the_fit_check_reads_factor_shapes_and_never_builds_a_delta(
         _fit_check(sd35_medium, _patch({"transformer_blocks.0.attn2.to_k": split_lokr}), None)
 
 
+def test_a_lokr_with_a_one_dimensional_factor_fits_a_linear_layer(sd35_medium: SD3Transformer2DModel) -> None:
+    """`context_embedder` is (1536, 4096); a 1-D full factor is a single row, as `torch.kron` pads it."""
+    layer = LoKRLayer(torch.zeros(1536, 1), None, None, torch.zeros(4096), None, None, None, None, None)
+
+    _fit_check(sd35_medium, _patch({"context_embedder": layer}), None)
+
+
+def test_one_by_one_kernel_factors_fit_a_linear_layer(sd35_medium: SD3Transformer2DModel) -> None:
+    """They build a correct (1536, 4096) weight, so a trainer that writes 1x1 kernels is not refused."""
+    z = torch.zeros
+    lokr = LoKRLayer(z(2, 2), None, None, z(768, 2048, 1, 1), None, None, None, None, None)
+    loha = LoHALayer(z(1536, 4, 1, 1), z(4, 4096, 1, 1), z(1536, 4, 1, 1), z(4, 4096, 1, 1), None, None, None, None)
+
+    _fit_check(sd35_medium, _patch({"context_embedder": lokr}), None)
+    _fit_check(sd35_medium, _patch({"context_embedder": loha}), None)
+
+
+def _linear_misfits() -> dict[str, LoKRLayer | LoHALayer]:
+    z = torch.zeros
+    return {
+        # Same element count as the (1536, 4096) weight, the factors the wrong way round: reshaped silently otherwise.
+        "transposed-lokr": _lokr((1, 1), (4096, 1536)),
+        "lokr-with-a-kernel-factor": LoKRLayer(z(2, 2), None, None, z(768, 1024, 2, 2), None, None, None, None, None),
+        "lokr-with-a-tucker-core": LoKRLayer(
+            z(2, 2), None, None, None, z(4, 768), z(4, 2048), z(4, 4, 2, 2), None, None
+        ),
+        "loha-with-a-tucker-core": LoHALayer(
+            z(4, 1536), z(4, 4096), z(4, 1536), z(4, 4096), z(4, 4, 2, 2), z(4, 4, 2, 2), None, None
+        ),
+        "loha-with-a-mismatched-second-pair": LoHALayer(
+            z(1536, 4), z(4, 4096), z(1536, 4), z(4, 1024), None, None, None, None
+        ),
+        "loha-with-mismatched-inner-ranks": LoHALayer(
+            z(1536, 4), z(8, 4096), z(1536, 4), z(4, 4096), None, None, None, None
+        ),
+        "lokr-with-mismatched-inner-ranks": LoKRLayer(
+            None, z(2, 4), z(8, 2), None, z(768, 4), z(4, 2048), None, None, None
+        ),
+    }
+
+
+@pytest.mark.parametrize("name", list(_linear_misfits()))
+def test_a_factorization_that_does_not_give_the_linear_weights_shape_is_refused(
+    sd35_medium: SD3Transformer2DModel, name: str
+) -> None:
+    patch = _patch({"context_embedder": _linear_misfits()[name]})
+
+    with pytest.raises(ValueError, match=r"does not fit this SD 3 model: `context_embedder` is \(1536, 4096\)"):
+        _fit_check(sd35_medium, patch, None)
+
+
 def _conv_layers() -> dict[str, LoKRLayer | LoHALayer]:
     """Factorizations of `pos_embed.proj`'s (1536, 16, 2, 2) kernel, each building exactly that delta."""
     z = torch.zeros

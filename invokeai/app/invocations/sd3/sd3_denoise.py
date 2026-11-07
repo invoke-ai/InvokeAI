@@ -28,7 +28,6 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.model_manager.taxonomy import BaseModelType, SD3VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
@@ -59,30 +58,57 @@ def _is_conv_factorization(layer: LoKRLayer | LoHALayer) -> bool:
     return has_core or any(t.ndim > 2 for t in tensors)
 
 
+def _squeezed_kernel(t: torch.Tensor) -> torch.Tensor | None:
+    """A factor with only 1x1 kernel dimensions as the 2-D matrix it is, a plain factor as itself, else ``None``."""
+    if t.ndim <= 2:
+        return t
+    return t.reshape(t.shape[0], t.shape[1]) if all(d == 1 for d in t.shape[2:]) else None
+
+
 def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
     """Whether the layer's weight delta can be applied to `weight`.
 
     Low-rank layers are compared by their factors' dimensions. A LoKR or LoHA delta is not built here (that costs a
-    CPU matmul per layer on every run): its shape follows from its factors' shapes, and the patcher reshapes a delta
-    to the target's shape, so it fits when it has as many elements. Convolution factorizations (kernel dimensions or a Tucker core,
-    which only `pos_embed.proj` has) and other
-    layer kinds are not checked.
+    CPU matmul per layer on every run): its shape follows from its factors' shapes, and a low-rank pair's inner
+    dimensions must agree. On a Linear target the delta must have exactly the weight's shape -- the patcher would
+    reshape transposed factors with the same element count into a wrong delta without complaint. Factors with 1x1
+    kernel dimensions count as the matrices they are; a real kernel or a Tucker core does not fit a Linear. On a
+    convolution kernel (`pos_embed.proj`) 2-D factors over the folded kernel are decided by element count, and a
+    factorization with kernel dimensions or a Tucker core is not checked. A LoHA's two factor pairs must give the
+    same delta shape.
     """
     if isinstance(layer, LoRALayer):
         return layer.up.shape[0] == weight.shape[0] and layer.down.shape[1] == weight.shape[1]
-    if isinstance(layer, FullLayer):
-        return layer.weight.numel() == weight.numel()
-    if isinstance(layer, (LoKRLayer, LoHALayer)) and _is_conv_factorization(layer):
+    if not isinstance(layer, (LoKRLayer, LoHALayer)):
+        return True
+    is_conv = weight.ndim > 2
+    if is_conv and _is_conv_factorization(layer):
         return True  # `pos_embed.proj`'s kernel: a factor with kernel dims or a Tucker core; no shape rule here
+    if getattr(layer, "t1", None) is not None or getattr(layer, "t2", None) is not None:
+        return False
     if isinstance(layer, LoKRLayer):
         names = ("w1", "w1_a", "w1_b", "w2", "w2_a", "w2_b")
-        values = {f"lokr_{n}": getattr(layer, n) for n in names if getattr(layer, n) is not None}
-    elif isinstance(layer, LoHALayer):
-        values = {f"hada_{n}": getattr(layer, n) for n in ("w1_a", "w1_b", "w2_a", "w2_b")}
+        prefix = "lokr_"
     else:
-        return True
+        names = ("w1_a", "w1_b", "w2_a", "w2_b")
+        prefix = "hada_"
+    factors = {n: getattr(layer, n) for n in names if getattr(layer, n) is not None}
+    squeezed = {n: _squeezed_kernel(t) for n, t in factors.items()}
+    if any(t is None for t in squeezed.values()):
+        return False
+    for first in ("w1", "w2"):
+        a, b = squeezed.get(f"{first}_a"), squeezed.get(f"{first}_b")
+        if a is not None and b is not None and (a.ndim < 2 or b.ndim < 2 or a.shape[1] != b.shape[0]):
+            return False
+    values = {f"{prefix}{n}": t for n, t in squeezed.items()}
+    if isinstance(layer, LoHALayer):
+        w1, w2 = squeezed["w1_a"], squeezed["w2_a"]
+        if (w2.shape[0], squeezed["w2_b"].shape[1]) != (w1.shape[0], squeezed["w1_b"].shape[1]):
+            return False
     shape = layer_delta_shape(values)
-    return shape is None or shape[0] * shape[1] == weight.numel()
+    if shape is None:
+        return True
+    return shape[0] * shape[1] == weight.numel() if is_conv else shape == tuple(weight.shape)
 
 
 @invocation(

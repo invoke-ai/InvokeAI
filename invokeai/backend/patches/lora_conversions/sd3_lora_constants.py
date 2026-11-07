@@ -297,14 +297,18 @@ def _reads_model_width(module: str) -> bool:
     return ".attn" in module or module.endswith(_WIDTH_MODULE_SUFFIXES)
 
 
+def _reads_width(layer_path: str) -> bool:
+    """Whether a layer sits on a module that reads the hidden state, in either naming (kohya's fused `qkv` included)."""
+    module = resolve_sd3_transformer_module(layer_path)
+    kohya = kohya_mmdit_targets(layer_path)
+    target = module if module is not None else (kohya[0] if kohya is not None else None)
+    return target is not None and _reads_model_width(target)
+
+
 def _attention_width(grouped: dict[str, dict[str, torch.Tensor]]) -> int | None:
-    """The input width of the first attention, MLP-in or modulation layer a LoRA trains: the model's width, in either
-    naming (kohya's fused `qkv` included)."""
+    """The input width of the first attention, MLP-in or modulation layer a LoRA trains: the model's width."""
     for layer_path, values in grouped.items():
-        module = resolve_sd3_transformer_module(layer_path)
-        kohya = kohya_mmdit_targets(layer_path)
-        target = module if module is not None else (kohya[0] if kohya is not None else None)
-        if target is not None and _reads_model_width(target) and (shape := layer_delta_shape(values)) is not None:
+        if _reads_width(layer_path) and (shape := layer_delta_shape(values)) is not None:
             return shape[1]
     return None
 
@@ -323,8 +327,8 @@ def is_sd3_lora(state_dict: dict[str | int, Any]) -> bool:
 
 
 def is_sd3_named_without_width(state_dict: dict[str | int, Any]) -> bool:
-    """True if every tensor names an SD 3 transformer module but no complete width-bearing layer says
-    what width it is trained at: half of a layer that reads the hidden state. Only transformer
+    """True if every tensor names an SD 3 transformer module and some layer on a width-bearing module is incomplete, but
+    no complete one says what width it is trained at: half of a layer that reads the hidden state. Only transformer
     modules count; a file with anything else in it is left to the other families.
 
     Such a file cannot be told from Qwen-Image's or others' by width, so it is refused instead of installed.
@@ -338,7 +342,8 @@ def is_sd3_named_without_width(state_dict: dict[str | int, Any]) -> bool:
     # Text encoders are no evidence: SD 1 and SDXL LoRAs name theirs the same way.
     if not all(resolve_sd3_transformer_module(path) is not None for path in grouped):
         return False
-    return _attention_width(grouped) is None
+    # Top-level modules (`proj_out`, `context_embedder`, ...) are generic names, no evidence of SD 3 either.
+    return _attention_width(grouped) is None and any(_reads_width(path) for path in grouped)
 
 
 def sd3_lora_variant(state_dict: dict[str | int, Any]) -> SD3VariantType | None:
