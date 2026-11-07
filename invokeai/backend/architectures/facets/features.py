@@ -129,7 +129,7 @@ class FeaturesFacet(Facet):
 
     supports_regional_guidance: bool = False
     regional_negative: bool = False
-    """Regional *negative* prompts, which only the SD family has."""
+    """Whether regional negative conditionings retain their spatial masks."""
 
     clip_skip_max: int | None = None
     supports_seamless: bool = False
