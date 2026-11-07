@@ -303,7 +303,27 @@
     "decreaseValue": "Decrease value",
     "increaseValue": "Increase value",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "videoPlayer": {
+      "buffering": "Buffering",
+      "exitFullscreen": "Exit full screen",
+      "frame": "Frame {{frame}}",
+      "frameOfLast": "Frame {{frame}}, last {{last}}",
+      "fullscreen": "Full screen",
+      "loop": "Loop",
+      "mute": "Mute",
+      "nextFrame": "Next frame",
+      "pause": "Pause",
+      "play": "Play",
+      "playbackSpeed": "Playback speed",
+      "playbackSpeedValue": "Playback speed: {{rate}}",
+      "previousFrame": "Previous frame",
+      "rate": "{{rate, number}}×",
+      "seek": "Seek",
+      "timeOfDuration": "{{current}} of {{duration}}",
+      "unmute": "Unmute",
+      "volume": "Volume"
+    }
   },
   "app": {
     "name": "Invoke"
@@ -2030,6 +2050,11 @@
     "nodeVersion": "Version: {{version}}",
     "nodeClassification": "Classification: {{classification}}",
     "seedModeTooltip": "Applies between queued runs of the workflow; a loop inside one run reuses that run's seed.",
+    "framePreview": "Frame preview",
+    "framePreviewPlaybackError": "Frame preview unavailable — the video could not be played.",
+    "useThisFrame": "Use this frame",
+    "useThisFrameTooltip": "Set Frame Index to the frame shown",
+    "useThisFrameUnavailable": "Pause on a different frame to use it",
     "providedByConnection": "Provided by connection.",
     "savedWorkflowChoose": "Choose a saved workflow",
     "savedWorkflowMissing": "Saved workflow unavailable",
@@ -4066,6 +4091,27 @@
       "processorPausedDescription_other": "{{count}} items wait until you resume.",
       "unavailableWhileDisconnected": "Not available while the server is disconnected.",
       "reconnecting": "Reconnecting…",
+      "localRuns": {
+        "title": "Submitting",
+        "untitled": "Untitled run",
+        "cancel": "Cancel {{name}}",
+        "errorLabel": "Why {{name}} is retrying",
+        "loadFailed": "Couldn't load the runs waiting to be submitted.",
+        "state": {
+          "submitting": "Sending to the server…",
+          "serverError": "Server error, retrying (attempt {{attempt, number}})",
+          "unavailable": "Server busy or unavailable, retrying (attempt {{attempt, number}})",
+          "unreachable": "Can't reach the server, retrying (attempt {{attempt, number}})",
+          "error": "Couldn't submit, retrying (attempt {{attempt, number}})",
+          "offline": "Offline, waiting for the connection…"
+        },
+        "announcement": {
+          "serverError": "{{name}}: Server error, retrying",
+          "unavailable": "{{name}}: Server busy or unavailable, retrying",
+          "unreachable": "{{name}}: Can't reach the server, retrying",
+          "error": "{{name}}: Couldn't submit, retrying"
+        }
+      },
       "itemNumber": "#{{id}}",
       "loadingModel": "Loading {{model}}…",
       "viewError": "View error",
@@ -5439,13 +5485,20 @@
         "expand": "Expand group",
         "exportNothing": "No raster layer content to export",
         "exportNotReady": "Layers are still loading — try exporting again in a moment",
-        "exportOverBudget": "Not enough raster memory is available to export this PSD",
+        "exportOverBudget": "Not enough raster memory is available to prepare this PSD",
         "exportStale": "The canvas changed during export — try again",
         "exportUnreadable": "“{{name}}” could not be read, so nothing was exported. Delete or replace that layer, then export again",
         "exportAborted": "PSD export was canceled",
         "exportFailed": "PSD export failed",
         "exportPsd": "Export to PSD",
-        "exportTooLarge": "Canvas is too large to export to PSD",
+        "cancelExportPsd": "Cancel PSD export",
+        "psdExportStatus": {
+          "preparing": "Preparing PSD…",
+          "serializing": "Writing PSD…",
+          "downloading": "Downloading PSD…",
+          "cancelling": "Cancelling PSD…"
+        },
+        "exportTooLarge": "PSD export is too large. Reduce the canvas size or number of layers.",
         "hideAll": "Hide all",
         "mergeNotReady": "Layers are still loading — try merging again in a moment",
         "mergeOverBudget": "Not enough canvas memory to merge these layers",
