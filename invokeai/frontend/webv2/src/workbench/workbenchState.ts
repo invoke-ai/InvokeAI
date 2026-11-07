@@ -1,6 +1,11 @@
 import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { QueueCompiledSubmission, QueueHistoryItemStatus, QueueRunErrorCode } from '@features/queue/contracts';
+import type {
+  QueueCompiledSubmission,
+  QueueHistoryItemStatus,
+  QueueRunErrorCode,
+  QueueSubmissionRetry,
+} from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { WorkflowSubmissionPlan } from '@features/workflow/graph';
 import type { LogNamespace } from '@platform/logging/contracts';
@@ -461,6 +466,13 @@ type WorkbenchReducerAction =
       queueItemId: string;
       backendItemIds: number[];
       backendBatchId?: string;
+    }
+  | {
+      /** The latest failed submission of a pending run the backend has not accepted; ignored for any other run. */
+      type: 'recordQueueItemSubmissionRetry';
+      projectId: string;
+      queueItemId: string;
+      retry: QueueSubmissionRetry;
     }
   | {
       type: 'setQueueItemStatus';
@@ -3689,6 +3701,25 @@ const reopenQueueItemForRetry = (
   });
 };
 
+const isSameSubmissionRetry = (left: QueueSubmissionRetry | undefined, right: QueueSubmissionRetry): boolean =>
+  left !== undefined &&
+  left.reason === right.reason &&
+  left.failureCount === right.failureCount &&
+  left.serverErrorCount === right.serverErrorCount &&
+  left.serverErrorSince === right.serverErrorSince &&
+  left.status === right.status &&
+  left.message === right.message &&
+  left.failedAt === right.failedAt;
+
+/** A run the backend accepted, or one that ended, has no submission left to retry. */
+const withoutSubmissionRetry = (item: QueueItem): QueueItem => {
+  if (item.submissionRetry === undefined) {
+    return item;
+  }
+  const { submissionRetry: _, ...rest } = item;
+  return rest;
+};
+
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
   ids?.includes(backendItemId) ? ids : [...(ids ?? []), backendItemId];
 
@@ -5577,13 +5608,32 @@ const reduceWorkbenchAction = (
             item.backendItemIds?.length === action.backendItemIds.length &&
             item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
 
-          return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
+          return item.backendBatchId === action.backendBatchId &&
+            hasSameBackendItemIds &&
+            item.status === status &&
+            item.submissionRetry === undefined
             ? item
-            : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
+            : {
+                ...withoutSubmissionRetry(item),
+                backendBatchId: action.backendBatchId,
+                backendItemIds: action.backendItemIds,
+                status,
+              };
         });
 
         return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
       });
+    }
+    case 'recordQueueItemSubmissionRetry': {
+      return updateProjectById(state, action.projectId, (project) =>
+        updateQueueItem(project, action.queueItemId, (item) =>
+          item.status !== 'pending' ||
+          item.backendItemIds?.length ||
+          isSameSubmissionRetry(item.submissionRetry, action.retry)
+            ? item
+            : { ...item, submissionRetry: { ...action.retry } }
+        )
+      );
     }
     case 'setQueueItemStatus': {
       const project = state.projects.find((project) => project.id === action.projectId);
@@ -5593,6 +5643,7 @@ const reduceWorkbenchAction = (
         return state;
       }
 
+      // Only a pending run holds a submission retry, so an unchanged status has none to clear.
       if (queueItem?.status === action.status && queueItem.error === action.error) {
         return state;
       }
@@ -5600,7 +5651,7 @@ const reduceWorkbenchAction = (
       const nextState = updateProjectById(state, action.projectId, (project) => {
         const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
         const nextProject = updateQueueItem(project, action.queueItemId, (item) => ({
-          ...item,
+          ...(action.status === 'pending' ? item : withoutSubmissionRetry(item)),
           error: action.error,
           status: action.status,
         }));
@@ -6195,7 +6246,7 @@ const reduceWorkbenchAction = (
                 return item;
               }
 
-              return { ...item, cancellationPending: true, status: 'cancelled' };
+              return { ...withoutSubmissionRetry(item), cancellationPending: true, status: 'cancelled' };
             }),
           },
         };
@@ -6247,7 +6298,9 @@ const reduceWorkbenchAction = (
             ...project,
             queue: {
               items: project.queue.items.map((item) =>
-                isUnsubmittedQueueItem(item) ? { ...item, cancellationPending: true, status: 'cancelled' } : item
+                isUnsubmittedQueueItem(item)
+                  ? { ...withoutSubmissionRetry(item), cancellationPending: true, status: 'cancelled' }
+                  : item
               ),
             },
           };
