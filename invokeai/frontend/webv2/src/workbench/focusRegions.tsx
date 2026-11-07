@@ -4,6 +4,7 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { getModalOpenGeneration } from '@platform/ui/modalPresence';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 
 import { useWorkbenchPreferenceSelector } from './settings/store';
@@ -37,7 +38,7 @@ export interface WorkbenchFocusController {
    * Move keyboard focus into the region a control just opened a widget in, once that widget shows. Without a
    * widget, focus moves into the region as it stands. An instance id waits for that widget's visible frame,
    * including when another instance of the same type is still mounted but hidden. A recovery resource may defer
-   * the frame wait until loading settles; navigation and scope changes still cancel the original request.
+   * the frame wait until loading settles; navigation, scope changes and newer modals still cancel the original request.
    */
   focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId, ready?: Promise<unknown>): void;
   /**
@@ -123,7 +124,12 @@ export const createWorkbenchFocusController = ({
     const move = ++focusMove;
     const projectId = getProjectId();
     const owner = captureAccountScope();
-    const isCurrent = () => move === focusMove && projectId === getProjectId() && isAccountScopeCurrent(owner);
+    const modalGeneration = getModalOpenGeneration();
+    const isCurrent = () =>
+      move === focusMove &&
+      modalGeneration === getModalOpenGeneration() &&
+      projectId === getProjectId() &&
+      isAccountScopeCurrent(owner);
     let deadline: number;
 
     moveTarget = target;
