@@ -607,6 +607,43 @@ describe('image recall', () => {
     expect(result?.fields).toContain('hiDiffusion');
   });
 
+  it.each([null, undefined, 0])('recalls automatic or explicit zero ratios (%s)', (ratio) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_t1_ratio: ratio,
+        hidiffusion_t2_ratio: ratio,
+        model: { key: sd1Model.key },
+      },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(result?.values.hiDiffusionT1Ratio).toBe(ratio === undefined ? null : ratio);
+    expect(result?.values.hiDiffusionT2Ratio).toBe(ratio === undefined ? null : ratio);
+  });
+
+  it.each([
+    [{ hidiffusion_t1_ratio: 0.4, hidiffusion_t2_ratio: null }, 0.4, 0],
+    [{ hidiffusion_t1_ratio: null, hidiffusion_t2_ratio: 0.2 }, 0, 0.2],
+    [{ hidiffusion_auto_ratios: true, hidiffusion_t1_ratio: 0.4, hidiffusion_t2_ratio: 0 }, null, null],
+    [{ hidiffusion_auto_ratios: false, hidiffusion_t1_ratio: null, hidiffusion_t2_ratio: null }, 0, 0],
+  ] as const)('recalls a coherent pair with explicit mode taking precedence', (ratios, t1, t2) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { hidiffusion: true, ...ratios, model: { key: sd1Model.key } },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(result?.values).toMatchObject({ hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 });
+  });
+
   it('ignores HiDiffusion metadata for unsupported models', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),

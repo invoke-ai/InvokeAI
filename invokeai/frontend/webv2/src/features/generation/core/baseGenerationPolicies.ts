@@ -1479,6 +1479,7 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'anima',
   'flux',
   'flux2',
+  'flux3',
   'krea-2',
   'qwen-image',
   'qwen-image-2-1',
@@ -2718,6 +2719,22 @@ export const getGenerationValidationIssues = (
     ...getReferenceImageValidationIssues(model, settings),
     ...getPidValidationIssues(model, settings),
   ];
+
+  if (
+    getGenerationUiPolicy(model).hiDiffusionVisible &&
+    settings.hiDiffusionEnabled &&
+    settings.hiDiffusionRauNetEnabled
+  ) {
+    const t1 = settings.hiDiffusionT1Ratio;
+    const t2 = settings.hiDiffusionT2Ratio;
+    if (t1 !== null && t2 !== null && t1 < t2) {
+      issues.push(
+        createUntranslatedGenerationIssue('HiDiffusion T1 ratio must be greater than or equal to T2.', {
+          section: 'advanced',
+        })
+      );
+    }
+  }
 
   if (model.type === 'external_image_generator') {
     const modeReason = getExternalModeReason(model, mode);

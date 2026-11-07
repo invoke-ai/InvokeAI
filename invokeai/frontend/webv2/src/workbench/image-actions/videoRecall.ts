@@ -22,6 +22,7 @@ import {
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,
+  getVideoValidationReasons,
   isConditioningClipExcludingFrames,
   isSupportedVideoModel,
   isValidVideoNumFrames,
@@ -78,13 +79,14 @@ const VIDEO_GENERATION_MODE_IDS: ReadonlySet<string> = new Set([
   'ltx2_extend_video',
 ]);
 
-export type VideoRecallKind = 'all' | 'remix' | 'prompts' | 'seed';
+export type VideoRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'size';
 
 export interface VideoRecallCapabilities {
   all: boolean;
   remix: boolean;
   prompts: boolean;
   seed: boolean;
+  size: boolean;
 }
 
 export const EMPTY_VIDEO_RECALL_CAPABILITIES: VideoRecallCapabilities = {
@@ -92,6 +94,7 @@ export const EMPTY_VIDEO_RECALL_CAPABILITIES: VideoRecallCapabilities = {
   prompts: false,
   remix: false,
   seed: false,
+  size: false,
 };
 
 export type VideoRecalledField =
@@ -414,18 +417,25 @@ export const parseVideoRecallRecord = (metadata: unknown): VideoRecallRecord | n
   };
 };
 
+interface VideoSizePreset {
+  aspectRatioId: VideoAspectRatioId;
+  targetResolution: VideoTargetResolution;
+}
+
 /**
  * Recall aspect/resolution presets only on exact dimension matches; other dimensions came from conditioning media
- * and remain media-controlled.
+ * and remain media-controlled. Returns every match: presets that agree without media can differ under held media.
  */
-export const getVideoSizeRecall = (
+export const getVideoSizeRecalls = (
   model: MainModelConfig,
   width: number | null,
   height: number | null
-): { aspectRatioId: VideoAspectRatioId; targetResolution: VideoTargetResolution } | null => {
+): VideoSizePreset[] => {
   if (width === null || height === null || width <= 0 || height <= 0) {
-    return null;
+    return [];
   }
+
+  const recalls: VideoSizePreset[] = [];
 
   for (const aspectRatioId of getVideoAspectRatioOptions(model)) {
     for (const option of getVideoTargetResolutionOptions(model)) {
@@ -439,12 +449,58 @@ export const getVideoSizeRecall = (
       });
 
       if (derived && derived.width === width && derived.height === height) {
-        return { aspectRatioId, targetResolution: option.id };
+        recalls.push({ aspectRatioId, targetResolution: option.id });
       }
     }
   }
 
-  return null;
+  return recalls;
+};
+
+export type VideoSizeRecallFit =
+  /** No model, or no preset of it reproduces the size. */
+  | { outcome: 'unavailable' }
+  /** A preset fits, but the panel's media has no usable frame on this model. */
+  | { outcome: 'media-unresolvable' }
+  /** The panel's media owns the frame, and the run would get this size instead. */
+  | { outcome: 'media-conflict'; effective: { height: number; width: number } }
+  /** The preset would leave the panel unable to run, for this reason it did not already have. */
+  | { outcome: 'invalid'; reason: string }
+  | { outcome: 'fits'; sizeRecall: VideoSizePreset };
+
+/**
+ * Whether a recorded size can be applied to the panel as it stands, shared by the recall and its failure notice. The
+ * first preset that fits wins; if none does, the first preset's failure is reported.
+ */
+export const resolveVideoSizeRecall = (
+  values: VideoWidgetValues,
+  width: number | null,
+  height: number | null
+): VideoSizeRecallFit => {
+  const { model } = values;
+
+  if (!model) {
+    return { outcome: 'unavailable' };
+  }
+
+  const existingReasons = new Set(getVideoValidationReasons(model, values));
+  const fits = getVideoSizeRecalls(model, width, height).map((sizeRecall): VideoSizeRecallFit => {
+    const next = { ...values, ...sizeRecall };
+    const effective = getVideoDimensions(model, next);
+
+    if (!effective) {
+      return { outcome: 'media-unresolvable' };
+    }
+    if (effective.width !== width || effective.height !== height) {
+      return { effective, outcome: 'media-conflict' };
+    }
+
+    const reason = getVideoValidationReasons(model, next).find((candidate) => !existingReasons.has(candidate));
+
+    return reason ? { outcome: 'invalid', reason } : { outcome: 'fits', sizeRecall };
+  });
+
+  return fits.find((fit) => fit.outcome === 'fits') ?? fits[0] ?? { outcome: 'unavailable' };
 };
 
 /**
@@ -488,6 +544,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
   // A recorded null negative prompt is applied too: it switches the negative prompt off.
   const prompts = record.positivePrompt !== null || record.negativePrompt !== undefined;
   const seed = record.seed !== null;
+  const size = record.width !== null && record.height !== null;
   const { media } = record;
   const remix =
     prompts ||
@@ -499,7 +556,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
     record.stgScale !== null ||
     record.modalityScale !== null ||
     record.fps !== null ||
-    (record.width !== null && record.height !== null) ||
+    size ||
     record.components.length > 0 ||
     record.loras.length > 0 ||
     record.hybridStartBlock !== null ||
@@ -510,7 +567,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
     record.conditioningClip !== null ||
     record.references.length > 0;
 
-  return { all: remix || seed, prompts, remix, seed };
+  return { all: remix || seed, prompts, remix, seed, size };
 };
 
 const createEmptyMediaNames = (): VideoRecallMediaNames => ({
@@ -626,6 +683,13 @@ export const buildVideoRecallSettings = ({
     return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
   }
 
+  if (kind === 'size') {
+    // Fitted to the panel's own model and media: a size recall leaves both alone, so a size they refuse writes nothing.
+    const fit = resolveVideoSizeRecall(values, record.width, record.height);
+
+    return fit.outcome === 'fits' ? { fields: ['size'], mediaNames, values: { ...values, ...fit.sizeRecall } } : null;
+  }
+
   // all / remix from here on.
   const installedModel = resolveVideoModel(record.model, models);
   const recalledModel =
@@ -735,7 +799,7 @@ export const buildVideoRecallSettings = ({
     fields.push('fps');
   }
 
-  const sizeRecall = getVideoSizeRecall(model, record.width, record.height);
+  const [sizeRecall] = getVideoSizeRecalls(model, record.width, record.height);
 
   if (sizeRecall) {
     values = { ...values, ...sizeRecall };

@@ -14,7 +14,7 @@ from fastapi.routing import APIRouter
 from fontTools.ttLib import TTFont
 from PIL import ImageFont
 from pydantic import BaseModel, Field
-from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
+from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -34,7 +34,12 @@ from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, ProgressCallback, TextLLMPipeline
+from invokeai.backend.text_llm_pipeline import (
+    DEFAULT_SYSTEM_PROMPT,
+    ProgressCallback,
+    TextLLMPipeline,
+    load_text_llm_tokenizer_and_processor,
+)
 from invokeai.backend.util.device_pool import idle_device_borrowed
 from invokeai.backend.util.devices import TorchDevice
 
@@ -458,15 +463,12 @@ def _run_expand_prompt(
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
-    # Loaded before the model so the disk reads do not hold it on the device. A processor carries its own
-    # tokenizer; loading another would parse the (for Gemma, ~30 MB) vocabulary twice.
-    model_abs_path = _resolve_model_path(model_config.path)
-    processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True) if image is not None else None
-    tokenizer = (
-        processor.tokenizer
-        if processor is not None
-        else AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
-    )
+    # Loaded before the model so the disk reads do not hold it on the device.
+    with _model_load_lock:
+        tokenizer, processor = load_text_llm_tokenizer_and_processor(
+            lambda submodel: model_manager.load.load_model(model_config, submodel, user_id=user_id),
+            with_processor=image is not None,
+        )
 
     # Outside the session queue: take an idle GPU (and its lock) for the load and the run. The borrow is
     # taken once the load lock is ours, so a request queued behind another's load holds no GPU meanwhile;

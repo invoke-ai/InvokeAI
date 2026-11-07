@@ -12,7 +12,11 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
+import {
+  getDefaultGenerateSettings,
+  getGenerationValidationIssues,
+  isSupportedGenerateModel,
+} from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
 import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
 import { getReferenceImagePromptTags } from './referenceImage';
@@ -268,6 +272,39 @@ describe('compileGenerateGraph', () => {
       hidiffusion_t2_ratio: 0.15,
       hidiffusion_window_attn: true,
     });
+  });
+
+  it.each([sd1Model, sdxlModel])('preserves automatic ratios and explicit zero for $base', (model) => {
+    const automatic = compile(model, { hiDiffusionEnabled: true, hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 } });
+    expect(getNodeByType(automatic, 'denoise_latents')).toMatchObject({
+      hidiffusion_auto_ratios: true,
+      hidiffusion_t1_ratio: 0,
+      hidiffusion_t2_ratio: 0,
+    });
+    expect(getNodeByType(automatic, 'core_metadata')).toMatchObject({
+      hidiffusion_t1_ratio: null,
+      hidiffusion_t2_ratio: null,
+    });
+    const zero = compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0, hiDiffusionT2Ratio: 0 });
+    expect(getNodeByType(zero, 'denoise_latents')).toMatchObject({ hidiffusion_t1_ratio: 0, hidiffusion_t2_ratio: 0 });
+    expect(() =>
+      compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0.2, hiDiffusionT2Ratio: 0.4 })
+    ).toThrow('HiDiffusion T1');
+    expect(
+      getGenerationValidationIssues(model, {
+        ...getDefaultGenerateSettings(model),
+        hiDiffusionEnabled: true,
+        hiDiffusionT1Ratio: 0.2,
+        hiDiffusionT2Ratio: 0.4,
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'HiDiffusion T1 ratio must be greater than or equal to T2.',
+          target: { section: 'advanced' },
+        }),
+      ])
+    );
   });
 
   it('omits HiDiffusion ratios from denoise while disabled but records all metadata settings', () => {
@@ -1587,6 +1624,18 @@ describe('FLUX.3 graphs', () => {
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
 
+  it('wires a variant-less FLUX.3 LoRA on Klein to the transformer alone', () => {
+    // FLUX.3 LoRAs carry no variant: Klein and Klein Base share the transformer they change.
+    const lora: LoraModelConfig = { base: 'flux3', key: 'flux3-lora', name: 'A LoRA', type: 'lora' };
+    const graph = compile(kleinModel, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+    const loader = getNodeByType(graph, 'flux3_lora_collection_loader');
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+  });
+
   it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
     const plain = compile(kleinModel);
     const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
@@ -2092,7 +2141,7 @@ describe('SDXL Refiner', () => {
     expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
   });
 
-  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+  it('keeps HiDiffusion off the refiner pass and coerces its scheduler', () => {
     const graph = compile(sdxlModel, {
       ...refinerSettings,
       hiDiffusionEnabled: true,
@@ -2101,10 +2150,9 @@ describe('SDXL Refiner', () => {
     });
 
     expect(graph.nodes.refiner_denoise_latents).toMatchObject({
-      hidiffusion: true,
-      hidiffusion_t1_ratio: 0.3,
       scheduler: 'euler_a',
     });
+    expect(graph.nodes.refiner_denoise_latents).not.toHaveProperty('hidiffusion');
     expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
   });
 

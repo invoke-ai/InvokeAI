@@ -59,6 +59,15 @@ _TEXT_CONFIG_FILES = {
 @lru_cache(maxsize=1)
 def load_bundled_qwen3_5_tokenizer() -> PreTrainedTokenizerBase:
     """Load the vendored Qwen3.5 fast tokenizer. Result is cached for the process."""
+    return load_qwen3_5_tokenizer()
+
+
+def load_qwen3_5_tokenizer() -> PreTrainedTokenizerBase:
+    """Load a new instance of the vendored Qwen3.5 fast tokenizer, for a caller that must not share one.
+
+    A fast tokenizer is not safe to share across threads: an encode that truncates or pads reconfigures the Rust
+    object it runs on, and a concurrent encode on the same object fails with "Already borrowed".
+    """
     return load_gzipped_tokenizer_dir(_TOKENIZER_DIR)
 
 

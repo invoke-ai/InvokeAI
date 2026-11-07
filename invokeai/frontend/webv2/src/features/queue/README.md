@@ -10,6 +10,8 @@ Retry re-runs failed or canceled backend items under new ids; the run owning the
 
 `submitUtilityGraph` (`@features/queue/utility`) returns once the backend accepts the graph; its `settled` watch ends on the first of: a terminal status event for its origin; a re-read of its accepted items that finds a terminal status or answers 404 (`removed`), triggered by `queue_cleared`, a reconnect after a disconnect, `queue_items_canceled` naming an accepted id, or the periodic reconcile read, which re-arms while the item stays open; or an abort of its signal (`aborted`), which stops watching and leaves the backend item alone.
 
+Gallery owns coalesced socket-completion invalidation for the account across tabs; Queue retains its connection reconciliation refresh. Completion invalidation does not depend on whether this tab tracks the run.
+
 ## Actions
 
 `ui/queueMenuActions.tsx` is the one queue action model: the top bar's button and menu, the widget header and its menu, and shortcuts (`requestQueueAction` in `@features/queue/reveal`, taken by the queue's always-mounted host once the read model has loaded) all call an action's `trigger`, never its runner. Its policy: cancelling the running item never asks, since Retry brings it back; cancelling all, cancelling all but the current item, and clearing failed, finished or all items always confirm, naming the scope and how many items they reach, with a way out that never reads "Cancel". Results report the same scope and counts. Pause and resume are one toggle that states what waits on the processor.

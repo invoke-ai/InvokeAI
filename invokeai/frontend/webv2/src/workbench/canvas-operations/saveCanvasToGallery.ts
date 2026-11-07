@@ -158,13 +158,15 @@ export const resolveCanvasSaveBoardId = async (
 export const saveCanvasToGallery = async (options: {
   engine: CanvasCompositeExportEngine;
   region: CanvasGallerySaveRegion;
+  /** The originating project's current immutable state, read after export to pair metadata with its document. */
+  getProject: (projectId: string) => Project | null;
   project: Project;
   /** The user's defaults captured with `project`: the destination follows the Gallery's resolved settings. */
   scopedDefaults: ScopedDefaults;
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<SaveCanvasToGalleryResult> => {
   const owner = captureAccountScope();
-  const { engine, project, region, scopedDefaults, uploadImage = uploadCanvasImage } = options;
+  const { engine, getProject, project, region, scopedDefaults, uploadImage = uploadCanvasImage } = options;
 
   try {
     const boardId = await resolveCanvasSaveBoardId(project, scopedDefaults);
@@ -175,10 +177,13 @@ export const saveCanvasToGallery = async (options: {
     if (exported.status !== 'ok') {
       return exported;
     }
-
-    const canvasValues = getProjectWidgetValues(project, 'canvas');
+    const capturedProject = getProject(project.id);
+    if (!capturedProject || capturedProject.canvas.document !== exported.document) {
+      return { status: 'stale' };
+    }
+    const canvasValues = getProjectWidgetValues(capturedProject, 'canvas');
     const metadata = {
-      ...buildCanvasSaveMetadata(project, exported.rect),
+      ...buildCanvasSaveMetadata(capturedProject, exported.rect),
       canvas_v3_metadata: recordCanvasMetadata(exported.document, {
         models: getModelsSnapshot().models,
         settings: {
