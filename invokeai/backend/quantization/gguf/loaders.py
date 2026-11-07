@@ -394,7 +394,7 @@ def gguf_sd_loader(
 
 # GGUF's unquantized storage types. `gguf_sd_loader` wraps BF16 like a quantized type (torch has no
 # GGML-side view for it), so here it is as packed as Q4_0 -- but dequantizing it changes no byte count.
-UNQUANTIZED_GGML_TYPES = frozenset(
+_UNQUANTIZED_GGML_TYPES = frozenset(
     {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
 )
 
@@ -429,7 +429,7 @@ def unpack_ggml_at_load(
     its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
     the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
-    replaces and, for a quantized tensor, the temporaries of one row slice (see `unpack_ggml_tensor`).
+    replaces and, for a quantized tensor, the temporaries of one row slice (see `_unpack`).
     """
     linear_params = {
         f"{module_name}.{param_name}"
@@ -442,7 +442,7 @@ def unpack_ggml_at_load(
         for key, value in sd.items()
         if isinstance(value, GGMLTensor)
         and (
-            value._ggml_quantization_type in UNQUANTIZED_GGML_TYPES
+            value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES
             or key not in linear_params
             or any(pattern in key for pattern in skip_patterns)
         )
@@ -457,7 +457,7 @@ def unpack_ggml_at_load(
     reserve(kept + sum(unpacked.values()) + in_flight)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
-        sd[key] = unpack_ggml_tensor(sd[key])
+        sd[key] = _unpack(sd[key])
     return len(keys)
 
 
@@ -472,13 +472,13 @@ def _in_flight_bytes(value: GGMLTensor) -> int:
     """What replacing `value` holds beside its result: the packed original, released only once the result
     lands, and for a quantized tensor the decode temporaries of one slice."""
     packed = value.quantized_data.nbytes
-    if value._ggml_quantization_type in UNQUANTIZED_GGML_TYPES:
+    if value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES:
         return packed
     rows, per_row, step = _row_slices(value)
     return packed + HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
 
 
-def unpack_ggml_tensor(value: GGMLTensor) -> torch.Tensor:
+def _unpack(value: GGMLTensor) -> torch.Tensor:
     """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode.
 
     A quantized tensor is decoded a slice of rows at a time into its preallocated result. GGML blocks
@@ -487,7 +487,7 @@ def unpack_ggml_tensor(value: GGMLTensor) -> torch.Tensor:
     qtype = value._ggml_quantization_type
     if qtype is gguf.GGMLQuantizationType.BF16:
         return value.quantized_data.view(torch.bfloat16).reshape(value.tensor_shape).to(value.compute_dtype)
-    if qtype in UNQUANTIZED_GGML_TYPES:
+    if qtype in _UNQUANTIZED_GGML_TYPES:
         return value.get_dequantized_tensor()
     rows, per_row, step = _row_slices(value)
     out = torch.empty(value.tensor_shape.numel(), dtype=value.compute_dtype, device=value.quantized_data.device)
