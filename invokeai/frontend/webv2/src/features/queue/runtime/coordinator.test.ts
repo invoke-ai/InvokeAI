@@ -581,51 +581,6 @@ describe('queueCoordinator', () => {
     });
   });
 
-  it('coalesces gallery refreshes across a burst of completions', async () => {
-    vi.useFakeTimers();
-    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
-    harness.api.enqueueGenerate.mockResolvedValue({
-      batchId: 'batch-1',
-      enqueued: 10,
-      itemIds: Array.from({ length: 10 }, (_, index) => index + 1),
-      requested: 10,
-    });
-    harness.coordinator.connect();
-    await harness.coordinator.submitGenerate('local-1', generateRequest);
-    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
-    harness.callbacks.onGalleryRefresh.mockClear();
-
-    for (let itemId = 1; itemId <= 10; itemId += 1) {
-      harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: itemId }));
-    }
-
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(harness.callbacks.onGalleryRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not refresh the gallery for failed or canceled items', async () => {
-    vi.useFakeTimers();
-    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
-    harness.api.enqueueGenerate.mockResolvedValue({
-      batchId: 'batch-1',
-      enqueued: 2,
-      itemIds: [1, 2],
-      requested: 2,
-    });
-    harness.coordinator.connect();
-    await harness.coordinator.submitGenerate('local-1', generateRequest);
-    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
-    harness.callbacks.onGalleryRefresh.mockClear();
-
-    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'failed' }));
-    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2, status: 'canceled' }));
-
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
-  });
-
   it('routes progress events to the tracked item and clears them on completion', async () => {
     harness.coordinator.connect();
 

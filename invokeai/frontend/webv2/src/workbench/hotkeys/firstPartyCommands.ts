@@ -1,4 +1,7 @@
+import type { GalleryVideoItem } from '@features/gallery';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
+import type { VideoRecallKind } from '@workbench/image-actions/videoRecall';
 import type { ResultDestination } from '@workbench/invocationContracts';
 
 import {
@@ -49,6 +52,15 @@ const imageRecallCommands: Record<string, ImageRecallKind> = {
   'viewer.recallSeed': 'seed',
   'viewer.remix': 'remix',
   'viewer.useSize': 'dimensions',
+};
+
+/** The same keys on a selected video; it has no CLIP skip, and its size verb is `size`. */
+const videoRecallKinds: Partial<Record<ImageRecallKind, VideoRecallKind>> = {
+  all: 'all',
+  dimensions: 'size',
+  prompts: 'prompts',
+  remix: 'remix',
+  seed: 'seed',
 };
 
 export const FIRST_PARTY_APP_COMMAND_IDS = [
@@ -137,8 +149,8 @@ export const useRegisterFirstPartyCommands = () => {
     notifications.add({
       actions: [{ kind: 'open-widget', widgetId: 'gallery' }],
       kind: 'info',
-      message: 'Select an image in Gallery or Preview first.',
-      title: 'No image selected',
+      message: t('widgets.generate.selectImageOrVideoFirst'),
+      title: t('widgets.generate.nothingSelected'),
     });
 
   const loadSelectedItemWorkflow = async () => {
@@ -179,7 +191,7 @@ export const useRegisterFirstPartyCommands = () => {
     const owner = captureAccountScope();
 
     try {
-      const [{ executeImageRecall }, { getSelectedGalleryImage }] = await Promise.all([
+      const [{ executeImageRecall }, { getSelectedGalleryImage, getSelectedGalleryItem }] = await Promise.all([
         import('@workbench/image-actions/executeImageRecall'),
         import('@workbench/image-actions/selectedImage'),
       ]);
@@ -189,7 +201,14 @@ export const useRegisterFirstPartyCommands = () => {
       const image = getSelectedGalleryImage(activeProject);
 
       if (!image) {
-        notifyNoImageSelected();
+        const item = getSelectedGalleryItem(activeProject);
+        const videoKind = videoRecallKinds[kind];
+
+        if (item?.kind === 'video' && videoKind) {
+          await recallSelectedVideo(item, videoKind, owner, activeProject.id);
+        } else {
+          notifyNoImageSelected();
+        }
         return;
       }
 
@@ -227,6 +246,40 @@ export const useRegisterFirstPartyCommands = () => {
       }
 
       throw error;
+    }
+  };
+
+  const recallSelectedVideo = async (
+    item: GalleryVideoItem,
+    kind: VideoRecallKind,
+    owner: AccountScope,
+    projectId: string
+  ) => {
+    // Through the entry the gallery's actions already load on every editor route: naming the module itself would split
+    // it out of their chunk, at two more boot requests.
+    const { executeVideoRecall } = await import('@workbench/image-actions');
+
+    assertAccountScopeCurrent(owner);
+    const didRecall = await executeVideoRecall({
+      commands,
+      // Re-read on every call, as for images: recall awaits the video's metadata.
+      getVideoValues: () => {
+        const project = queries.getProject(projectId);
+
+        return project ? getProjectWidgetValues(project, 'video') : {};
+      },
+      item,
+      kind,
+      models: getAvailableModels() ?? [],
+      owner,
+      projectId,
+      queryClient,
+      t,
+    });
+
+    assertAccountScopeCurrent(owner);
+    if (didRecall && queries.isActiveProject(projectId)) {
+      openWidgetPlacement({ getWidgetsForRegion, options: { preferredRegions: ['left'] }, typeId: 'video', widgets });
     }
   };
 

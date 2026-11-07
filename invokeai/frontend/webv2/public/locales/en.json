@@ -171,6 +171,7 @@
     }
   },
   "common": {
+    "requestTimedOut": "The request timed out. Retry the operation.",
     "donateToInvokeAI": "Donate to Invoke",
     "actions": "Actions",
     "active": "Active",
@@ -391,8 +392,16 @@
       "failedItems_one": "{{count}} of {{total}} items failed in {{project}}",
       "failedItems_other": "{{count}} of {{total}} items failed in {{project}}",
       "failedMessage": "“{{label}}”: {{reason}}",
+      "invalidSubmissionMessage": "“{{label}}” could not be submitted because its queued request is invalid: {{reason}}",
+      "invalidSubmissionMessageUnlabeled": "The run could not be submitted because its queued request is invalid: {{reason}}",
+      "notAcceptedMessage": "The server queue did not accept “{{label}}”. The queue may be full.",
+      "notAcceptedMessageUnlabeled": "The server queue did not accept the run. The queue may be full.",
+      "projectNotSavedMessage": "“{{label}}” was not submitted because its project cannot be saved.",
+      "projectNotSavedMessageUnlabeled": "The run was not submitted because its project cannot be saved.",
       "removedMessage": "“{{label}}” is no longer on the server queue; it may have been cleared.",
       "removedMessageUnlabeled": "The run is no longer on the server queue; it may have been cleared.",
+      "serverErrorMessage": "The server kept failing to queue “{{label}}”: {{reason}}",
+      "serverErrorMessageUnlabeled": "The server kept failing to queue the run: {{reason}}",
       "unexplainedMessage": "“{{label}}” failed without a reason from the server.",
       "unexplainedMessageUnlabeled": "The server gave no reason."
     },
@@ -470,6 +479,7 @@
       "serverDisconnected": "The server is disconnected.",
       "batchNotReady": "The batch is not ready",
       "expansionFailed": "The prompt could not be expanded",
+      "expansionStale": "The prompt changed while it was being expanded, so nothing was queued. Invoke again.",
       "expansionUnreachable": "The server could not be reached to expand the prompt. Check the connection and try again, or turn dynamic prompts off to use the prompt as typed.",
       "generatorFailed": "The batch generator could not be resolved"
     },
@@ -1071,18 +1081,25 @@
         "Can improve structure and detail at higher resolutions."
       ]
     },
+    "hidiffusionRatiosAuto": {
+      "heading": "HiDiffusion: Automatic ratios",
+      "paragraphs": [
+        "Uses the model- and resolution-specific T1 and T2 ratios recommended by HiDiffusion.",
+        "Disable this to set explicit ratio overrides below. Manual T1 must be at least T2; zero is an explicit override."
+      ]
+    },
     "hidiffusionT1Ratio": {
       "heading": "HiDiffusion: T1 Ratio",
       "paragraphs": [
-        "Controls the early switch point for HiDiffusion (T1).",
-        "Lower values switch earlier; higher values preserve global structure longer."
+        "Controls how long the primary HiDiffusion RAU-Net stage remains active (T1).",
+        "Lower values end the primary stage sooner; at extreme resolutions this is the later of the two RAU-Net cutoffs."
       ]
     },
     "hidiffusionT2Ratio": {
       "heading": "HiDiffusion: T2 Ratio",
       "paragraphs": [
-        "Controls the late switch point for HiDiffusion (T2).",
-        "Higher values keep window attention active longer."
+        "Controls the duration of the additional HiDiffusion RAU-Net stage (T2).",
+        "This is the earlier cutoff at extreme resolutions. It cannot exceed T1 and does not control Window Attention."
       ]
     },
     "hidiffusionWindowAttn": {
@@ -3023,7 +3040,7 @@
         "selectedWildcardCount_other": "{{count}} selected",
         "title": "Dynamic prompts",
         "showPrompts": "Show dynamic prompts",
-        "noDynamicSyntax": "Wrap alternatives in braces to generate one image per combination, e.g. a {red|green} ball",
+        "noDynamicSyntax": "Wrap alternatives in braces to generate one result per combination, e.g. a {red|green} ball",
         "summary": "{{prompts}} × {{iterations}} → {{generations}}",
         "expanding": "Expanding…",
         "allCombinations": "All combinations",
@@ -3059,9 +3076,9 @@
         "deleteWildcardBody": "Delete __{{name}}__ and its values? This cannot be undone.",
         "resizeWildcardValues": "Resize wildcard values",
         "mode": "Mode",
-        "newSeedPerImage": "New seed for every image",
+        "newSeedPerImage": "New seed for every generation",
         "newSampleEveryInvoke": "New sample for every Invoke",
-        "seedHeldForEveryImage": "A fixed seed is used for every image.",
+        "seedHeldForEveryImage": "A fixed seed is used for every generation.",
         "import": "Import",
         "export": "Export",
         "exportAsYaml": "As YAML",
@@ -3123,6 +3140,8 @@
       "height": "Height",
       "hiDiffusion": "HiDiffusion",
       "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+      "hiDiffusionRatiosAuto": "HiDiffusion: Automatic ratios",
+      "hiDiffusionRatioAutoValue": "Automatic",
       "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
       "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
       "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
@@ -3357,6 +3376,8 @@
       "searchPromptTriggers": "Search prompt triggers",
       "selectComponent": "Select a component model…",
       "selectImageFirst": "Select an image in Gallery or Preview first.",
+      "nothingSelected": "Nothing selected",
+      "selectImageOrVideoFirst": "Select an image or video in Gallery or Preview first.",
       "selectMainModelBeforeConcepts": "Select a main model before adding concepts.",
       "selectModel": "Select a model…",
       "selectModelFirst": "Select a model first",
@@ -3790,6 +3811,7 @@
       "unstarVideo": "Unstar video",
       "use": "Use",
       "useInGenerate": "Use this image in Generate",
+      "useThisVideo": "Use this video",
       "showGallery": "Show Gallery"
     },
     "queue": {
@@ -3941,6 +3963,27 @@
       "processorPausedDescription_other": "{{count}} items wait until you resume.",
       "unavailableWhileDisconnected": "Not available while the server is disconnected.",
       "reconnecting": "Reconnecting…",
+      "localRuns": {
+        "title": "Submitting",
+        "untitled": "Untitled run",
+        "cancel": "Cancel {{name}}",
+        "errorLabel": "Why {{name}} is retrying",
+        "loadFailed": "Couldn't load the runs waiting to be submitted.",
+        "state": {
+          "submitting": "Sending to the server…",
+          "serverError": "Server error, retrying (attempt {{attempt, number}})",
+          "unavailable": "Server busy or unavailable, retrying (attempt {{attempt, number}})",
+          "unreachable": "Can't reach the server, retrying (attempt {{attempt, number}})",
+          "error": "Couldn't submit, retrying (attempt {{attempt, number}})",
+          "offline": "Offline, waiting for the connection…"
+        },
+        "announcement": {
+          "serverError": "{{name}}: Server error, retrying",
+          "unavailable": "{{name}}: Server busy or unavailable, retrying",
+          "unreachable": "{{name}}: Can't reach the server, retrying",
+          "error": "{{name}}: Couldn't submit, retrying"
+        }
+      },
       "itemNumber": "#{{id}}",
       "loadingModel": "Loading {{model}}…",
       "viewError": "View error",
@@ -5314,13 +5357,20 @@
         "expand": "Expand group",
         "exportNothing": "No raster layer content to export",
         "exportNotReady": "Layers are still loading — try exporting again in a moment",
-        "exportOverBudget": "Not enough raster memory is available to export this PSD",
+        "exportOverBudget": "Not enough raster memory is available to prepare this PSD",
         "exportStale": "The canvas changed during export — try again",
         "exportUnreadable": "“{{name}}” could not be read, so nothing was exported. Delete or replace that layer, then export again",
         "exportAborted": "PSD export was canceled",
         "exportFailed": "PSD export failed",
         "exportPsd": "Export to PSD",
-        "exportTooLarge": "Canvas is too large to export to PSD",
+        "cancelExportPsd": "Cancel PSD export",
+        "psdExportStatus": {
+          "preparing": "Preparing PSD…",
+          "serializing": "Writing PSD…",
+          "downloading": "Downloading PSD…",
+          "cancelling": "Cancelling PSD…"
+        },
+        "exportTooLarge": "PSD export is too large. Reduce the canvas size or number of layers.",
         "hideAll": "Hide all",
         "mergeNotReady": "Layers are still loading — try merging again in a moment",
         "mergeOverBudget": "Not enough canvas memory to merge these layers",
@@ -5508,7 +5558,7 @@
       "modifiers": {
         "disable": "Disable",
         "enable": "Enable",
-        "parentDisabled": "Layer is disabled",
+        "parentDisabled": "The layer is hidden, so this has no effect.",
         "toggleActive": "Enable/disable",
         "denoise": "Denoise limit",
         "denoiseHelp": "Caps how strongly generation may repaint the masked area.",
@@ -5743,16 +5793,22 @@
         "recall": {
           "appliedFields": "Applied {{fields, list}}.",
           "cannotRecallImage": "Cannot recall image data",
+          "cannotRecallVideo": "Cannot recall video data",
           "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
           "fieldsApplied_one": "{{count}} field applied to Generate.",
           "fieldsApplied_other": "{{count}} fields applied to Generate.",
           "imageMetadataUnsupported": "This image does not include supported Generate metadata.",
+          "modelsUnavailableForVideoRecall": "The model library has not loaded. Try again once it has.",
           "nothingRecalled": "No recallable image data",
           "nothingRecalledVideo": "No recallable video data",
+          "nothingRecalledVideoSize": "Size not recalled",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
           "videoMetadataUnsupported": "This video does not include supported Video metadata.",
+          "videoSizeMediaConflict": "Media in the Video panel sets the output to {{effectiveWidth}}×{{effectiveHeight}}, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
+          "videoSizeMediaUnresolvable": "Media in the Video panel has a shape this model can't use, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
+          "videoSizeUnavailable": "This video's size ({{width}}×{{height}}) isn't available for the current Video model, or no model is selected.",
           "fields": {
             "cfg": "CFG",
             "components": "components",
@@ -5773,7 +5829,8 @@
             "dimensions": "Recalled image size",
             "prompts": "Recalled prompts",
             "remix": "Recalled remix settings",
-            "seed": "Recalled seed"
+            "seed": "Recalled seed",
+            "size": "Recalled size"
           },
           "parameters": {
             "applied": "Recalled parameters",
@@ -6068,7 +6125,8 @@
         "useAsReferenceImage": "Use as reference image",
         "useAsReferenceImageHint": "Adds it to Generate's references",
         "useAsReferenceVideo": "Use as reference video",
-        "useImageAs": "Use image as"
+        "useImageAs": "Use image as",
+        "useVideoAs": "Use video as"
       },
       "mediaCountsTwo": "{{first}} and {{second}}",
       "mediaCountsThree": "{{first}}, {{second}}, and {{third}}",

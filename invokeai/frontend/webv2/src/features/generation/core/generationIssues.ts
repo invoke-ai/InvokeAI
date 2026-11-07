@@ -41,7 +41,7 @@ export type GenerationIssueFix =
 
 /** Settings that hold one model reference and can be cleared on their own. */
 export type GenerationIssueModelSlotKey = {
-  [Key in keyof GenerateSettings]: GenerateSettings[Key] extends { key: string } | null ? Key : never;
+  [Key in keyof GenerateSettings]-?: GenerateSettings[Key] extends { key: string } | null ? Key : never;
 }[keyof GenerateSettings];
 
 /**
