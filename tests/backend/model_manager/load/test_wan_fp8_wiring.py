@@ -176,7 +176,12 @@ class TestTheDiffusersLoader:
         )[1]
 
         transformer = object()
-        load_class = SimpleNamespace(from_pretrained=lambda *_args, **_kwargs: transformer)
+
+        class load_class:
+            @staticmethod
+            def from_pretrained(*_args, **_kwargs):
+                return transformer
+
         loader.get_hf_load_class = lambda *_args, **_kwargs: load_class
 
         config = SimpleNamespace(path=str(tmp_path), repo_variant=None)

@@ -1,19 +1,23 @@
 """Tests for Wan loader helpers (native -> diffusers key conversion)."""
 
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import gguf
 import pytest
+import safetensors.torch
 import torch
 
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.load.model_loaders.wan import (
+    WanDiffusersModel,
     WanGGUFCheckpointModel,
     _convert_wan_native_to_diffusers,
     _unwrap_unquantized_to_compute_dtype,
 )
-from invokeai.backend.model_manager.taxonomy import WanVariantType
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SubModelType, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
@@ -337,3 +341,87 @@ def test_gguf_loader_rejects_missing_model_parameter() -> None:
         pytest.raises(RuntimeError, match="missing"),
     ):
         loader._load_from_singlefile(config)
+
+
+class TestDiffusersFolderLoad:
+    """`WanDiffusersModel` against a real tiny transformer folder written at the fp32 Wan ships."""
+
+    @staticmethod
+    def _folder(tmp_path: Path) -> Path:
+        from diffusers import WanTransformer3DModel
+
+        model = WanTransformer3DModel(
+            patch_size=(1, 2, 2),
+            in_channels=16,
+            out_channels=16,
+            num_layers=1,
+            attention_head_dim=128,
+            num_attention_heads=1,
+            ffn_dim=64,
+            text_dim=32,
+        )
+        model.save_pretrained(tmp_path / "transformer")
+        return tmp_path
+
+    @staticmethod
+    def _loader(load_class: object) -> WanDiffusersModel:
+        loader = object.__new__(WanDiffusersModel)
+        loader.get_hf_load_class = lambda *_args, **_kwargs: load_class
+        loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+        return loader
+
+    @staticmethod
+    def _load_trapping_mmap(config: object) -> tuple[object, list[str]]:
+        """Load through the real class with the mmap reader trapped and the in-memory reader spied on."""
+        from diffusers import WanTransformer3DModel
+
+        read_into_memory: list[str] = []
+        real_load = safetensors.torch.load
+
+        def mapped(*_args, **_kwargs):
+            raise AssertionError("the shard was memory-mapped; fp32-kept tensors would pin it")
+
+        def load(data, *args, **kwargs):
+            read_into_memory.append("read")
+            return real_load(data, *args, **kwargs)
+
+        loader = TestDiffusersFolderLoad._loader(WanTransformer3DModel)
+        with patch("safetensors.torch.load_file", mapped), patch("safetensors.torch.load", load):
+            return loader._load_model(config, SubModelType.Transformer), read_into_memory
+
+    def test_fp32_shards_are_read_into_memory_not_mapped(self, tmp_path: Path) -> None:
+        from diffusers import WanTransformer3DModel
+
+        config = SimpleNamespace(path=str(self._folder(tmp_path)), repo_variant=None)
+
+        model, read_into_memory = self._load_trapping_mmap(config)
+
+        assert read_into_memory
+        keep_fp32 = WanTransformer3DModel._keep_in_fp32_modules
+        for name, param in model.state_dict().items():
+            expected = torch.float32 if any(part in name for part in keep_fp32) else torch.bfloat16
+            assert param.dtype == expected, name
+
+    def test_the_variant_fallback_also_avoids_mmap(self, tmp_path: Path) -> None:
+        """The folder has no fp16 files, so the first attempt fails and the retry does the loading."""
+        config = MagicMock(spec=Diffusers_Config_Base)
+        config.path = str(self._folder(tmp_path))
+        config.repo_variant = ModelRepoVariant.FP16
+
+        _, read_into_memory = self._load_trapping_mmap(config)
+
+        assert read_into_memory
+
+    def test_a_non_diffusers_class_does_not_receive_disable_mmap(self, tmp_path: Path) -> None:
+        received: list[dict] = []
+
+        class TransformersLike:
+            @classmethod
+            def from_pretrained(cls, _path, **kwargs):
+                received.append(kwargs)
+                return object()
+
+        config = SimpleNamespace(path=str(tmp_path), repo_variant=None)
+        self._loader(TransformersLike)._load_model(config, SubModelType.Transformer)
+
+        assert "disable_mmap" not in received[0]
