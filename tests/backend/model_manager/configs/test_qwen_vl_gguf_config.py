@@ -208,7 +208,7 @@ def test_the_qwen3_vl_mmproj_gets_only_its_own_refusal(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("omit", "reason"),
     [
-        # A later part of a multi-part quant: complete metadata, only some of the blocks.
+        # The first part of a multi-part quant: complete metadata, only some of the blocks.
         ([f"blk.27.{name}" for name in _BLOCK_TENSORS], "incomplete"),
         (["blk.5.attn_q.bias"], "incomplete"),
         (["token_embd.weight"], "must contain 'token_embd.weight'"),

@@ -223,8 +223,9 @@ def _raise_if_qwen2_vl(mod: ModelOnDisk) -> None:
 def _raise_if_not_a_complete_qwen_image_encoder(state_dict: dict[str | int, Any]) -> None:
     """Refuse a qwen2vl GGUF that is not, in full, the 7B encoder Qwen-Image conditions on.
 
-    Judged from the tensors rather than the `block_count`/`embedding_length` metadata: a later part of a
-    multi-part quant and an interrupted download both carry the complete metadata and only some of the tensors.
+    Judged from the tensors rather than the `block_count`/`embedding_length` metadata: the first part of a
+    multi-part quant carries the complete metadata and only some of the tensors. Its later parts carry only the
+    `split.*` keys and a truncated file no readable metadata, so neither reaches this check.
 
     `InvalidMatchError`: the architecture metadata already identified the file, so "recognised but unusable" is
     the verdict, and it is the only one the user sees. A `NotAMatchError` would register the file as an Unknown
@@ -234,7 +235,7 @@ def _raise_if_not_a_complete_qwen_image_encoder(state_dict: dict[str | int, Any]
     if embed is None:
         raise InvalidMatchError(
             f"a Qwen2.5-VL encoder GGUF must contain '{_GGUF_EMBED_KEY}'; this file does not. Multi-part quants "
-            "('...-00002-of-00003.gguf') must be joined before installing."
+            "('...-00001-of-00003.gguf') must be joined before installing."
         )
     shape = tuple(getattr(embed, "shape", ()))
     vocab_size, hidden_size = shape if len(shape) == 2 else (None, None)
@@ -263,8 +264,7 @@ def _raise_if_not_a_complete_qwen_image_encoder(state_dict: dict[str | int, Any]
     if missing:
         raise InvalidMatchError(
             f"this Qwen2.5-VL encoder GGUF is incomplete: {len(missing)} tensor(s) are missing, e.g. "
-            f"{missing[:3]}. Multi-part quants must be joined before installing, and an interrupted download "
-            "must be re-fetched."
+            f"{missing[:3]}. Multi-part quants must be joined before installing."
         )
 
 
