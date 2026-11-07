@@ -13,7 +13,7 @@ import { mapWithConcurrency } from '@platform/core/concurrency';
 import { addOutputImageNames, getOutputImageNames } from '@platform/core/outputImages';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
-import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson, sleep } from '@platform/transport/http';
 
 import type { QueueImageDTO, QueueServerItemDTO, QueueVideoDTO } from './serverTypes';
 
@@ -128,8 +128,9 @@ export const enqueueUtility = async (request: {
   prepend?: boolean;
 }): Promise<{ enqueued: number; itemIds: number[]; acknowledge: () => void }> => {
   const owner = captureAccountScope();
+  const { idempotencyKey } = request;
   const body = JSON.stringify({
-    batch: { graph: request.graph, origin: request.origin, idempotency_key: request.idempotencyKey, runs: 1 },
+    batch: { graph: request.graph, origin: request.origin, idempotency_key: idempotencyKey, runs: 1 },
     prepend: request.prepend === true,
   });
   const requestSignal = () => AbortSignal.any([owner.signal, AbortSignal.timeout(10_000)]);
@@ -145,28 +146,20 @@ export const enqueueUtility = async (request: {
         assertAccountScopeCurrent(owner);
         try {
           await apiFetch('/api/v1/queue/default/enqueue_batch/acknowledge', {
-            body: JSON.stringify({ idempotency_key: request.idempotencyKey }),
+            body: JSON.stringify({ idempotency_key: idempotencyKey }),
             headers: { 'Content-Type': 'application/json' },
             method: 'POST',
             signal: requestSignal(),
           });
           return;
-        } catch {
-          if (attempt === 4) {
+        } catch (error) {
+          if (
+            attempt === 4 ||
+            (error instanceof ApiError && error.status < 500 && error.status !== 408 && error.status !== 429)
+          ) {
             return;
           }
-          await new Promise<void>((resolve) => {
-            const finish = () => {
-              clearTimeout(timer);
-              owner.signal.removeEventListener('abort', finish);
-              resolve();
-            };
-            const timer = setTimeout(finish, 1_000 * 2 ** attempt);
-            owner.signal.addEventListener('abort', finish, { once: true });
-            if (owner.signal.aborted) {
-              finish();
-            }
-          });
+          await sleep(1_000 * 2 ** attempt, owner.signal);
         }
       }
     })().catch(() => undefined);
@@ -192,7 +185,7 @@ export const enqueueUtility = async (request: {
         throw cause;
       }
       try {
-        const query = new URLSearchParams({ idempotency_key: request.idempotencyKey });
+        const query = new URLSearchParams({ idempotency_key: idempotencyKey });
         const receipt = mapEnqueueResult(
           await apiFetchJson<unknown>(`/api/v1/queue/default/enqueue_batch/receipt?${query}`, {
             signal: requestSignal(),
@@ -204,8 +197,12 @@ export const enqueueUtility = async (request: {
       } catch {
         assertAccountScopeCurrent(owner);
         if (attempt >= 2) {
-          throw cause;
+          throw new Error(
+            'Utility admission could not be confirmed. Backend work may still be running; trying again creates a new operation.',
+            { cause }
+          );
         }
+        await sleep(1_000 * 2 ** attempt, owner.signal);
         // Even a 404 can race the original commit. Replay the frozen payload with its original key.
       }
     }

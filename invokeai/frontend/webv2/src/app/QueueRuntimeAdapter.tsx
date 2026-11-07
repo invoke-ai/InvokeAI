@@ -1,3 +1,4 @@
+import { getQueueStagedResults } from '@app/queueStagedResults';
 import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
 import { getAuthSession } from '@features/identity';
 import { modelLoadActivitySink } from '@features/models';
@@ -124,20 +125,7 @@ export const QueueRuntimeAdapter = () => {
             refreshBackendData: () => void invalidateGallery(queryClient),
             refreshBoardDestinations: () => void invalidateGalleryBoardDestinations(queryClient),
           },
-          listStagedResults: () =>
-            queries.getSnapshot().projects.flatMap((project) =>
-              project.canvas.stagingArea.pendingImages.flatMap((candidate) =>
-                candidate.sourceBackendItemId === undefined
-                  ? []
-                  : [
-                      {
-                        backendItemId: candidate.sourceBackendItemId,
-                        projectId: project.id,
-                        queueItemId: candidate.sourceQueueItemId,
-                      },
-                    ]
-              )
-            ),
+          listStagedResults: () => getQueueStagedResults(queries.getSnapshot().projects),
           getSnapshot: () => {
             const snapshot = queries.getSnapshot();
 

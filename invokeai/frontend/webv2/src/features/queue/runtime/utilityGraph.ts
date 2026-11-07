@@ -227,8 +227,7 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
 
 /**
  * Active watches read every 15 seconds, coalescing overlapping reads. An open item re-arms the timer;
- * the watch ends only on a terminal status,
- * the item's removal, or an abort.
+ * the watch ends on a terminal status, removal, persistent read failure, or an abort.
  */
 export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 15_000;
 
@@ -312,12 +311,14 @@ const watchUtilityItems = ({
   let pendingRead: Promise<void> | undefined;
   let readAgain = false;
   const reads = new AbortController();
+  const readFailures = new Map<number, { count: number; firstAt: number }>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const detachers: Array<() => void> = [];
 
   const detach = (): void => {
     detached = true;
     reads.abort();
+    readFailures.clear();
     clearTimeout(timer);
     for (const detachListener of detachers.splice(0)) {
       try {
@@ -335,6 +336,7 @@ const watchUtilityItems = ({
       }
       try {
         const item = await readItemStatus(itemId, reads.signal);
+        readFailures.delete(itemId);
         const outcome = detached ? undefined : toTerminalUtilityOutcome(item.status, item.errorMessage, item.errorType);
         if (outcome !== undefined) {
           onOutcome(outcome);
@@ -350,7 +352,22 @@ const watchUtilityItems = ({
           onOutcome(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.', cause));
           return;
         }
-        // Unreadable now; the socket or a later read can still settle it.
+        if (!detached) {
+          const previous = readFailures.get(itemId);
+          const failures = { count: (previous?.count ?? 0) + 1, firstAt: previous?.firstAt ?? Date.now() };
+          readFailures.set(itemId, failures);
+          // Event bursts cannot exhaust the health budget before two polling intervals have elapsed.
+          if (failures.count >= 3 && Date.now() - failures.firstAt >= 2 * DEFAULT_UTILITY_RECONCILE_INTERVAL_MS) {
+            onOutcome(
+              new UtilityQueueError(
+                'reconcile',
+                'Utility status could not be read repeatedly. Backend work may still be running.',
+                cause
+              )
+            );
+            return;
+          }
+        }
       }
     }
   };

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { QueueBackendPort } from './core/types';
+import type { QueueBackendPort, QueueItemReadModel } from './core/types';
 import type { QueueHistoryCommands, QueueHistoryPort } from './runtime';
 
 import { buildQueueItemOrigin } from './data/events';
@@ -12,11 +12,24 @@ afterEach(async () => {
   await Promise.all(disposers.splice(0).map((dispose) => dispose()));
 });
 
-type Candidate = ReturnType<NonNullable<QueueHistoryPort['listStagedResults']>>[number];
+type Candidate = ReturnType<QueueHistoryPort['listStagedResults']>[number];
 
 /** Separate browser-runtime snapshots share only the server's account-wide delivery state. */
 const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDelivery'], candidates: Candidate[] = []) => {
   const handlers = new Map<string, Set<(event: never) => void>>();
+  const historyListeners = new Set<() => void>();
+  const rerun: QueueItemReadModel = {
+    batchId: 'retry-batch',
+    createdAt: '2026-07-17T00:00:00Z',
+    destination: 'canvas',
+    id: 99,
+    origin: buildQueueItemOrigin('retired-run', 'project'),
+    resultImageNames: ['recovered.png'],
+    retriedFromItemId: 41,
+    sessionId: 'retry-session',
+    status: 'completed',
+    updatedAt: '2026-07-17T00:00:00Z',
+  };
   const commands: QueueHistoryCommands = {
     markBackendCancelled: vi.fn(),
     markBackendSubmitted: vi.fn(),
@@ -33,6 +46,7 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
     setStatus: vi.fn(),
     stageRetriedCanvasResults: vi.fn(({ backendItemId, projectId, queueItemId }) => {
       candidates.push({ backendItemId, projectId, queueItemId });
+      historyListeners.forEach((listener) => listener());
     }),
   };
   const backend: QueueBackendPort = {
@@ -79,7 +93,7 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
     readCurrent: vi.fn(),
     readItemDetail: vi.fn(),
     readItemIds: vi.fn(),
-    readItemsById: vi.fn(),
+    readItemsById: vi.fn((ids) => Promise.resolve(ids.includes(rerun.id) ? [rerun] : [])),
     readNext: vi.fn(),
     readStatus: vi.fn(),
     resumeProcessor: vi.fn(),
@@ -97,7 +111,10 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
         projects: [{ id: 'project', queue: { items: [] } }],
       }),
       listStagedResults: () => candidates,
-      subscribe: () => () => undefined,
+      subscribe: (listener) => {
+        historyListeners.add(listener);
+        return () => historyListeners.delete(listener);
+      },
     },
     modelLoads: { completed: vi.fn(), reset: vi.fn(), started: vi.fn() },
     nodeExecution: {

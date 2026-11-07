@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
 }));
 
-vi.mock('@platform/transport/http', () => ({
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   absolutizeApiUrl: (url: string) => url,
   ApiError: class ApiError extends Error {
     status: number;
@@ -467,6 +468,7 @@ describe('enqueueUtility', () => {
   });
 
   it('replays the same frozen payload when an absent receipt races the original admission', async () => {
+    vi.useFakeTimers();
     const { enqueueUtility } = await import('./submissionApi');
     const { ApiError } = await import('@platform/transport/http');
     mocks.apiFetchJson.mockReset();
@@ -474,9 +476,19 @@ describe('enqueueUtility', () => {
       .mockRejectedValueOnce(new TypeError('lost response'))
       .mockRejectedValueOnce(new ApiError('not committed yet', 404))
       .mockResolvedValueOnce({ enqueued: 1, item_ids: [42] });
-    await expect(enqueueUtility(request)).resolves.toMatchObject({ itemIds: [42] });
+    const mutableRequest = { ...request, graph: structuredClone(request.graph) };
+    const result = enqueueUtility(mutableRequest);
+    mutableRequest.idempotencyKey = 'replacement-key';
+    mutableRequest.graph.id = 'mutated-graph';
+    await vi.advanceTimersByTimeAsync(999);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(result).resolves.toMatchObject({ itemIds: [42] });
     const posts = mocks.apiFetchJson.mock.calls.filter(([url]) => url.endsWith('/enqueue_batch'));
     expect(posts).toHaveLength(2);
+    expect(mocks.apiFetchJson.mock.calls[1]![0]).toBe(
+      '/api/v1/queue/default/enqueue_batch/receipt?idempotency_key=utility%3Aoperation'
+    );
     expect(posts[0]![1].body).toBe(posts[1]![1].body);
     expect(JSON.parse(posts[0]![1].body)).toMatchObject({
       batch: { idempotency_key: request.idempotencyKey, origin: request.origin },
@@ -485,9 +497,12 @@ describe('enqueueUtility', () => {
   });
 
   it('bounds admission recovery when both admission and receipts are unavailable', async () => {
+    vi.useFakeTimers();
     const { enqueueUtility } = await import('./submissionApi');
     mocks.apiFetchJson.mockRejectedValue(new TypeError('offline'));
-    await expect(enqueueUtility(request)).rejects.toThrow('offline');
+    const assertion = expect(enqueueUtility(request)).rejects.toThrow('Backend work may still be running');
+    await vi.advanceTimersByTimeAsync(3_000);
+    await assertion;
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(6);
   });
 
@@ -519,6 +534,30 @@ describe('enqueueUtility', () => {
     result.acknowledge();
     await vi.advanceTimersByTimeAsync(15_000);
     expect(mocks.apiFetch).toHaveBeenCalledTimes(5);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([403, 422])('stops acknowledgement after a definitive rejection (%s)', async (status) => {
+    vi.useFakeTimers();
+    const { enqueueUtility } = await import('./submissionApi');
+    const { ApiError } = await import('@platform/transport/http');
+    mocks.apiFetch.mockReset().mockRejectedValue(new ApiError('rejected', status));
+    const result = await enqueueUtility(request);
+    result.acknowledge();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts the admission backoff on an account change', async () => {
+    vi.useFakeTimers();
+    const { enqueueUtility } = await import('./submissionApi');
+    mocks.apiFetchJson.mockRejectedValue(new TypeError('offline'));
+    const assertion = expect(enqueueUtility(request)).rejects.toBeDefined();
+    await vi.advanceTimersByTimeAsync(0);
+    accountLifecycle.activate('replacement-account');
+    await assertion;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });
 

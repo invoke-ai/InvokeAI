@@ -1682,6 +1682,90 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
 describe('utility recovery lifetimes', () => {
   const graph = { edges: [], id: 'utility-recovery', nodes: {} };
 
+  it.each(['submit', 'run'] as const)(
+    'surfaces persistent status-read failure for %s without exhausting on event bursts',
+    async (api) => {
+      vi.useFakeTimers();
+      const fake = createFakeHub();
+      const readItemStatus = vi.fn<UtilityItemStatusReader>().mockRejectedValue(new TypeError('backend down'));
+      const operation =
+        api === 'submit'
+          ? (await submitUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue, readItemStatus })).settled
+          : runUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue, readItemStatus });
+      const assertion = expect(operation).rejects.toMatchObject({
+        reason: 'reconcile',
+        message: expect.stringContaining('Backend work may still be running'),
+      });
+      for (let i = 0; i < 10; i += 1) {
+        fake.emit('queue_cleared', {});
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('surfaces repeated hung production status requests after their TimeoutError signals', async () => {
+    const realDelay = globalThis.setTimeout;
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => timeout(Math.min(ms, 5)));
+    const failures: unknown[] = [];
+    const fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init!.signal!.addEventListener(
+            'abort',
+            () => {
+              failures.push(init!.signal!.reason);
+              reject(init!.signal!.reason);
+            },
+            { once: true }
+          );
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+    const submission = await submitUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue });
+    const assertion = expect(submission.settled).rejects.toMatchObject({
+      reason: 'reconcile',
+      message: expect.stringContaining('Backend work may still be running'),
+    });
+    for (let i = 0; i < 3; i += 1) {
+      await vi.advanceTimersByTimeAsync(15_000);
+      await new Promise<void>((resolve) => {
+        realDelay(resolve, 20);
+      });
+    }
+    await assertion;
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(failures).toEqual(Array.from({ length: 3 }, () => expect.objectContaining({ name: 'TimeoutError' })));
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('resets consecutive read failures on healthy waiting states for jobs lasting hours', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>();
+    let reads = 0;
+    readItemStatus.mockImplementation(() =>
+      ++reads % 3 === 0 ? Promise.resolve({ status: 'waiting' }) : Promise.reject(new TypeError('intermittent outage'))
+    );
+    const submission = await submitUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue, readItemStatus });
+    const settled = vi.fn();
+    void submission.settled.then(settled, settled);
+    await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1_000);
+    expect(settled).not.toHaveBeenCalled();
+    readItemStatus.mockResolvedValue({ status: 'completed' });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(submission.settled).resolves.toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('keeps a workflow waiting for a child active through production status reads and recovers its completion', async () => {
     vi.useFakeTimers();
     const fake = createFakeHub();
