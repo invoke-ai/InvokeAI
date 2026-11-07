@@ -1012,12 +1012,12 @@ describe('stale cached view revalidation', () => {
       total: items.length,
     });
   };
-  const seed = async () => {
+  const seed = async (sort: libraryBrowseStoreModule.WorkflowLibrarySort = 'name') => {
     api.listLibraryWorkflows.mockImplementation(
       ({ query = '', page: index, perPage }: { query?: string; page: number; perPage: number }) =>
         Promise.resolve(page(query, index, perPage, false))
     );
-    await browse.ensureWorkflowLibraryBrowseLoaded('name');
+    await browse.ensureWorkflowLibraryBrowseLoaded(sort);
     await browse.loadWorkflowLibraryRange(0, 59);
     browse.setWorkflowLibraryBrowseFilter({ search: 'other' });
     await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
@@ -1134,6 +1134,133 @@ describe('stale cached view revalidation', () => {
       now.mockRestore();
     }
   });
+  it.each(['cache invalidation', 'opened notification'] as const)(
+    'fences an existing partial range before a queued refresh after %s',
+    async (change) => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+      try {
+        const held = await seed(change === 'opened notification' ? 'opened' : 'name');
+        now.mockReturnValue(110_000);
+        const previousFilterRefresh = browse.refreshWorkflowLibraryBrowse();
+        browse.setWorkflowLibraryBrowseFilter({ search: '' });
+        const range = browse.loadWorkflowLibraryRange(20, 79);
+        const partialSignal = api.listLibraryWorkflows.mock.calls[1]?.[0].signal;
+        expect(held.map((read) => [read.query, read.page])).toEqual([
+          ['other', 0],
+          ['', 3],
+        ]);
+        if (change === 'cache invalidation') {
+          invalidate();
+        } else {
+          api.notifyOpened();
+        }
+        await flushAsyncWork();
+        answer(held.filter((read) => read.query === ''));
+        expect(await range).toBe(false);
+        expect(partialSignal.aborted).toBe(true);
+        expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.name).toBe('Original 000');
+        await leaveForThird(held);
+        answer(held.filter((read) => read.query === 'other'));
+        await previousFilterRefresh;
+        await vi.waitFor(() => expect(held.filter((read) => read.query === 'third')).toHaveLength(2));
+        answer(held.filter((read) => read.query === 'third'));
+        await flushAsyncWork();
+        now.mockReturnValue(110_001);
+        browse.setWorkflowLibraryBrowseFilter({ search: '' });
+        const returned = held.filter((read) => read.query === '').slice(1);
+        expect(returned.map((read) => read.page)).toEqual([0]);
+        answer(returned);
+        await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+        expect(
+          browse
+            .getWorkflowLibraryBrowseSnapshot()
+            .entries.map(({ item }) => [item.workflow_id, item.name, item.revision])
+        ).toEqual(
+          Array.from({ length: 20 }, (_, index) => [
+            `all-${124 - index}`,
+            `Renamed ${String(index).padStart(3, '0')}`,
+            2,
+          ])
+        );
+        expect(held.map((read) => [read.query, read.page])).toEqual([
+          ['other', 0],
+          ['', 3],
+          ['third', 0],
+          ['third', 0],
+          ['', 0],
+        ]);
+      } finally {
+        now.mockRestore();
+      }
+    }
+  );
+  it('fences pre-mutation refresh rows while its next refresh is still queued', async () => {
+    const held = await seed();
+    browse.setWorkflowLibraryBrowseFilter({ search: '' });
+    const tags = createDeferred<Record<string, number>>();
+    api.getAllWorkflowTags.mockResolvedValue(['hold-refresh']);
+    api.getWorkflowTagCounts.mockReturnValue(tags.promise);
+    const refreshing = browse.refreshWorkflowLibraryBrowse();
+    expect(held.map((read) => [read.query, read.page])).toEqual([
+      ['', 0],
+      ['', 1],
+      ['', 2],
+    ]);
+    invalidate();
+    await flushAsyncWork();
+    answer(held);
+    await flushAsyncWork();
+    expect(api.getWorkflowTagCounts).toHaveBeenCalled();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.map(({ item }) => item.name)).toEqual(
+      Array.from({ length: 60 }, (_, index) => `Original ${String(index).padStart(3, '0')}`)
+    );
+    tags.resolve({});
+    await refreshing;
+    await vi.waitFor(() => expect(held).toHaveLength(6));
+    answer(held.slice(3));
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.name).toBe('Renamed 000'));
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2);
+  });
+  it.each(['success', 'error'] as const)(
+    'fences an uncached first-page %s when its post-mutation refresh queues',
+    async (completion) => {
+      const held = await seed();
+      const previousFilterRefresh = browse.refreshWorkflowLibraryBrowse();
+      browse.setWorkflowLibraryBrowseFilter({ search: 'third' });
+      expect(held.map((read) => [read.query, read.page])).toEqual([
+        ['other', 0],
+        ['third', 0],
+      ]);
+      invalidate();
+      await flushAsyncWork();
+      const oldFirstPage = held.find((read) => read.query === 'third')!;
+      if (completion === 'success') {
+        oldFirstPage.response.resolve(page('third', 0, 20, false));
+      } else {
+        oldFirstPage.response.reject(new Error('obsolete first-page failure'));
+      }
+      await flushAsyncWork();
+      expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({ status: 'loading', error: null, entries: [] });
+      answer(held.filter((read) => read.query === 'other'));
+      await previousFilterRefresh;
+      await vi.waitFor(() => expect(held.filter((read) => read.query === 'third')).toHaveLength(2));
+      answer(held.filter((read) => read.query === 'third').slice(1));
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+      expect(
+        browse
+          .getWorkflowLibraryBrowseSnapshot()
+          .entries.map(({ item }) => [item.workflow_id, item.name, item.revision])
+      ).toEqual(
+        Array.from({ length: 20 }, (_, index) => [`third-${index}`, `Renamed ${String(index).padStart(3, '0')}`, 2])
+      );
+      expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBeNull();
+      expect(held.map((read) => [read.query, read.page])).toEqual([
+        ['other', 0],
+        ['third', 0],
+        ['third', 0],
+      ]);
+    }
+  );
 });
 
 describe('large library retention fixture', () => {
@@ -1512,6 +1639,192 @@ describe('overlapping metadata windows', () => {
   };
   const requests = () => api.listLibraryWorkflows.mock.calls.map(([params]) => params.page);
   const ids = () => browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id);
+  const serveRevision = (revision: number) => {
+    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) =>
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: Math.min(perPage, 125 - page * perPage) }, (_, index) => {
+            const position = page * perPage + index;
+            return buildItem(`wf-${position}`, { name: `Renamed ${revision}: ${position}`, revision });
+          }),
+          { page, pages: Math.ceil(125 / perPage), total: 125 }
+        )
+      )
+    );
+  };
+  const expectRevisionWindow = (start: number, revision: number) => {
+    expect(
+      browse.getWorkflowLibraryBrowseSnapshot().entries.map(({ item }) => [item.workflow_id, item.name, item.revision])
+    ).toEqual(
+      Array.from({ length: 60 }, (_, index) => [
+        `wf-${start + index}`,
+        `Renamed ${revision}: ${start + index}`,
+        revision,
+      ])
+    );
+  };
+  it.each([
+    { start: 0, end: 59, pages: [0, 1, 2] },
+    { start: 20, end: 79, pages: [1, 2, 3] },
+  ])('rereads expired metadata for positions $start..$end', async ({ start, end, pages }) => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      api.listLibraryWorkflows.mockClear();
+      serveRevision(2);
+      now.mockReturnValue(130_001);
+      expect(await browse.loadWorkflowLibraryRange(start, end)).toBe(true);
+      expectRevisionWindow(start, 2);
+      expect(requests()).toEqual(pages);
+      browse.setWorkflowLibraryBrowseFilter({ search: 'other' });
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+      api.listLibraryWorkflows.mockClear();
+      now.mockReturnValue(130_002);
+      browse.setWorkflowLibraryBrowseFilter({ search: '' });
+      await flushAsyncWork();
+      expectRevisionWindow(start, 2);
+      expect(requests()).toEqual([]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it('does not extend the freshness of reused rows through successive partial scrolls', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      api.listLibraryWorkflows.mockClear();
+      serveRevision(2);
+      now.mockReturnValue(110_000);
+      expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+      expect(requests()).toEqual([3]);
+      now.mockReturnValue(120_000);
+      expect(await browse.loadWorkflowLibraryRange(40, 99)).toBe(true);
+      expect(requests()).toEqual([3, 4]);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item).toEqual(buildItem('wf-40'));
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.at(-1)?.item.name).toBe('Renamed 2: 99');
+      now.mockReturnValue(130_000);
+      expect(await browse.loadWorkflowLibraryRange(40, 99)).toBe(true);
+      expect(requests()).toEqual([3, 4]);
+      api.listLibraryWorkflows.mockClear();
+      serveRevision(3);
+      now.mockReturnValue(130_001);
+      expect(await browse.loadWorkflowLibraryRange(60, 119)).toBe(true);
+      expectRevisionWindow(60, 3);
+      expect(requests()).toEqual([3, 4, 5]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it('preserves the reused cohort age when a partial read finishes after expiry', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      const pending = createDeferred<WorkflowLibraryPage>();
+      api.listLibraryWorkflows.mockClear().mockReturnValueOnce(pending.promise);
+      now.mockReturnValue(129_999);
+      const loading = browse.loadWorkflowLibraryRange(20, 79);
+      expect(requests()).toEqual([3]);
+      now.mockReturnValue(130_001);
+      pending.resolve(
+        buildPage(
+          Array.from({ length: 20 }, (_, index) => buildItem(`wf-${60 + index}`, { revision: 2 })),
+          { page: 3, pages: 7, total: 125 }
+        )
+      );
+      expect(await loading).toBe(true);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item).toEqual(buildItem('wf-20'));
+      api.listLibraryWorkflows.mockClear();
+      serveRevision(3);
+      expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+      expectRevisionWindow(20, 3);
+      expect(requests()).toEqual([1, 2, 3]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it('supersedes a partial flight when a same-window caller arrives after expiry', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      const pending = createDeferred<WorkflowLibraryPage>();
+      api.listLibraryWorkflows.mockClear().mockReturnValueOnce(pending.promise);
+      now.mockReturnValue(129_999);
+      const partial = browse.loadWorkflowLibraryRange(20, 79);
+      now.mockReturnValue(130_001);
+      serveRevision(2);
+      const expired = browse.loadWorkflowLibraryRange(20, 79);
+      pending.resolve(
+        buildPage(
+          Array.from({ length: 20 }, (_, index) => buildItem(`wf-${60 + index}`)),
+          { page: 3, pages: 7, total: 125 }
+        )
+      );
+      const ready = await Promise.all([partial, expired]);
+      expectRevisionWindow(20, 2);
+      expect(ready).toEqual([false, true]);
+      expect(requests()).toEqual([3, 1, 2, 3]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it('keeps sharing an all-server flight when its caller arrives after the old window expires', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      serveRevision(2);
+      const serve = api.listLibraryWorkflows.getMockImplementation()!;
+      const pending = createDeferred<void>();
+      api.listLibraryWorkflows.mockClear().mockImplementation(async (params) => {
+        await pending.promise;
+        return serve(params);
+      });
+      now.mockReturnValue(129_999);
+      const first = browse.loadWorkflowLibraryRange(80, 85);
+      now.mockReturnValue(130_001);
+      const joined = browse.loadWorkflowLibraryRange(90, 95);
+      pending.resolve();
+      expect(await Promise.all([first, joined])).toEqual([true, true]);
+      expect(requests()).toEqual([4, 5, 6]);
+      expect(
+        browse
+          .getWorkflowLibraryBrowseSnapshot()
+          .entries.map(({ item }) => [item.workflow_id, item.name, item.revision])
+      ).toEqual(Array.from({ length: 45 }, (_, index) => [`wf-${80 + index}`, `Renamed 2: ${80 + index}`, 2]));
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it('revalidates an expired window on return after a failed range read', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      api.listLibraryWorkflows.mockClear();
+      serveRevision(2);
+      api.listLibraryWorkflows.mockRejectedValueOnce(new Error('expired range offline'));
+      now.mockReturnValue(130_001);
+      expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(false);
+      expect(requests()).toEqual([1, 2, 3]);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBe('expired range offline');
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item).toEqual(buildItem('wf-0'));
+      browse.setWorkflowLibraryBrowseFilter({ search: 'other' });
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+      api.listLibraryWorkflows.mockClear();
+      now.mockReturnValue(130_002);
+      browse.setWorkflowLibraryBrowseFilter({ search: '' });
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2));
+      expectRevisionWindow(0, 2);
+      expect(requests()).toEqual([0, 1, 2]);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBeNull();
+    } finally {
+      now.mockRestore();
+    }
+  });
   it('fetches only missing complete pages when moving forward and back', async () => {
     await seed();
     expect(await browse.loadWorkflowLibraryRange(0, 59)).toBe(true);
@@ -1544,22 +1857,32 @@ describe('overlapping metadata windows', () => {
     expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${19 + i}`));
   });
   it('rereads reused offsets when a missing page reveals a deletion and changed total', async () => {
-    await seed();
-    await browse.loadWorkflowLibraryRange(0, 59);
-    api.listLibraryWorkflows.mockClear().mockImplementation(({ page }: { page: number }) =>
-      Promise.resolve(
-        buildPage(
-          Array.from({ length: Math.min(20, 124 - page * 20) }, (_, index) =>
-            buildItem(`wf-${page * 20 + index + 1}`, { revision: 2 })
-          ),
-          { page, pages: 7, total: 124 }
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      await seed();
+      await browse.loadWorkflowLibraryRange(0, 59);
+      now.mockReturnValue(130_000);
+      api.listLibraryWorkflows.mockClear().mockImplementation(({ page }: { page: number }) =>
+        Promise.resolve(
+          buildPage(
+            Array.from({ length: Math.min(20, 124 - page * 20) }, (_, index) =>
+              buildItem(`wf-${page * 20 + index + 1}`, { revision: 2 })
+            ),
+            { page, pages: 7, total: 124 }
+          )
         )
-      )
-    );
-    expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
-    expect(requests()).toEqual([3, 1, 2]);
-    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${21 + i}`));
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.item.revision === 2)).toBe(true);
+      );
+      expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+      expect(requests()).toEqual([3, 1, 2]);
+      expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${21 + i}`));
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.item.revision === 2)).toBe(true);
+      api.listLibraryWorkflows.mockClear();
+      now.mockReturnValue(130_001);
+      expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+      expect(requests()).toEqual([]);
+    } finally {
+      now.mockRestore();
+    }
   });
   it('does not join a forced retry to an ordinary flight that reused resident pages', async () => {
     await seed();

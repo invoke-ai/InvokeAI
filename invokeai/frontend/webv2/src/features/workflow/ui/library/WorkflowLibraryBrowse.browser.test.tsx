@@ -14,7 +14,7 @@ import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act, StrictMode, Profiler, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import type * as DetailModule from './WorkflowLibraryDetailPanel';
@@ -447,6 +447,10 @@ it.each([
 ])(
   'returns to the measured deep row at %ix%i (%i columns) through the real browse owner',
   async (width, height, columns) => {
+    // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
+    const freshAt = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
+    onTestFinished(() => clock.mockRestore());
     await open();
     const scroll = viewport()!;
     for (let top = 0; top <= 39600; top += 1200) {
