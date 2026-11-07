@@ -2,15 +2,12 @@
 
 Two platforms are covered:
 
-- linux/aarch64. Three separate mechanisms in `pyproject.toml` conspire to make torch resolve from PyPI
-  there instead of from the PyTorch WHL indexes (which ship no aarch64 torchvision wheel):
-  `tool.uv.environments`, the `[tool.uv.sources]` platform markers, and the aarch64 fallback pins in each
-  torch extra. Break the sources markers and `uv lock` fails loudly, but break either of the other two and
-  the lockfile simply stops mentioning torch on aarch64 while `uv lock --locked` stays green -- which is how
-  aarch64 support was silently lost once before, when a ROCm bump narrowed `tool.uv.environments`. No CI job
-  installs on aarch64, so this check is its only coverage. Each extra must carry its own aarch64 torch edge:
-  the base dependencies also resolve a torch there today, but that is incidental to how uv forks the
-  resolution, so it must not be what keeps an extra installable.
+- linux/aarch64. The `cuda` extra must resolve the pinned cu130 torch pair from PyTorch's index; the `cpu` extra
+  must keep its PyPI fallback. Each extra must carry its own aarch64 torch edge: the base dependencies also
+  resolve a torch there today, but that is incidental to how uv forks the resolution, so it must not be what
+  keeps an extra installable. Break the sources markers and `uv lock` fails loudly, but break either of the
+  other mechanisms (`tool.uv.environments` or the extra pins) and the lockfile can stop mentioning torch while
+  `uv lock --locked` stays green. No CI job installs on aarch64, so this check is its only coverage.
 - win32/ARM64 (Windows on ARM, NVIDIA RTX Spark). torch and torchvision must come from NVIDIA's
   out-of-tree index with `win_arm64` wheels whichever extra is selected, and -- because most of the
   platform's wheel gaps are papered over with version forks in `pyproject.toml` rather than enforced by
@@ -40,6 +37,8 @@ from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 ROOT_NAME = "invokeai"
 REQUIRED = ("torch", "torchvision")
 NVIDIA_WIN_ARM64_REGISTRY = "https://pypi.nvidia.com/nvtorch_oot/"
+PYPI_REGISTRY = "https://pypi.org/simple"
+PYTORCH_CU130_REGISTRY = "https://download.pytorch.org/whl/cu130"
 
 
 @dataclass(frozen=True)
@@ -54,6 +53,8 @@ class Platform:
     python_versions: tuple[str, ...] | None = None
     # torch/torchvision must resolve from this registry (None: any registry with acceptable wheels).
     torch_registry: str | None = None
+    # Exact (version, registry) requirements for selected extras on platforms with distinct backend routes.
+    expected_torch_packages: dict[str, dict[str, tuple[str, str]]] = field(default_factory=dict)
     # Also check torch/torchvision with no extra selected (platforms whose torch does not come from an extra).
     check_no_extra: bool = False
     # Count the base dependencies' torch edges toward each extra's torch (False: the extra must carry its own).
@@ -69,7 +70,7 @@ class Platform:
 PLATFORMS: dict[str, Platform] = {
     "aarch64": Platform(
         name="linux/aarch64",
-        description="torch and torchvision from a registry with aarch64 wheels, per extra",
+        description="CUDA pins from PyTorch's cu130 index; CPU fallbacks from PyPI",
         env={
             "sys_platform": "linux",
             "platform_machine": "aarch64",
@@ -81,6 +82,16 @@ PLATFORMS: dict[str, Platform] = {
         # Only linux aarch64 counts -- macOS arm64 wheels (`macosx_11_0_arm64`) are a different platform.
         accepts_tag=lambda tag: "aarch64" in tag.platform,
         torch_from_base=False,
+        expected_torch_packages={
+            "cuda": {
+                "torch": ("2.13.0+cu130", PYTORCH_CU130_REGISTRY),
+                "torchvision": ("0.28.0+cu130", PYTORCH_CU130_REGISTRY),
+            },
+            "cpu": {
+                "torch": ("2.7.1", PYPI_REGISTRY),
+                "torchvision": ("0.22.1", PYPI_REGISTRY),
+            },
+        },
     ),
     "win_arm64": Platform(
         name="win32/ARM64",
@@ -229,7 +240,14 @@ def check_torch(
                         reported.add(ident)
                         registry = (package.get("source") or {}).get("registry", "?")
                         where = f"{name}=={package.get('version')} from {registry}"
-                        if platform.torch_registry is not None and registry != platform.torch_registry:
+                        expected = platform.expected_torch_packages.get(label, {}).get(name)
+                        if expected is not None and (package.get("version"), registry) != expected:
+                            expected_version, expected_registry = expected
+                            problems.append(
+                                f"  [{label}] py{python_version}: {where} -- expected "
+                                f"{name}=={expected_version} from {expected_registry}"
+                            )
+                        elif platform.torch_registry is not None and registry != platform.torch_registry:
                             problems.append(
                                 f"  [{label}] py{python_version}: {where} -- expected {platform.torch_registry}"
                             )
