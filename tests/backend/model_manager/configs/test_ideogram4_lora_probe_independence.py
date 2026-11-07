@@ -281,6 +281,15 @@ def test_an_ideogram4_lora_folder_the_conversion_cannot_apply_is_refused() -> No
         LoRA_Diffusers_Ideogram4_Config.from_model_on_disk(mod, overrides)
 
 
+def test_a_kohya_flattened_ideogram4_lora_with_top_level_modules_is_claimed_by_no_family() -> None:
+    """Kohya names are unflattened for the block modules only, so Ideogram 4 does not recognise a flattened file that
+    also trains `input_proj` & co. Its blocks still patch Ideogram 4 widths, which must keep Z-Image -- whose kohya
+    names match those blocks -- from claiming it."""
+    sd = _state_dict(_kohya_flattened(ideogram4_lora_aitoolkit_unconditional_format.state_dict_keys))
+
+    assert _accepting_lora_configs(sd, "ideogram4-kohya-top-level") == []
+
+
 def test_a_kohya_flattened_z_image_lora_is_still_z_image_alone() -> None:
     """Z-Image's kohya files flatten the very same block names (`layers_0_feed_forward_w1`); only their width
     (3840, against Ideogram 4's 4608) tells them apart."""

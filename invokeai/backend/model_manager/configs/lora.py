@@ -59,6 +59,7 @@ from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is
 from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
     has_ideogram4_lora_keys,
     ideogram4_lora_refusal,
+    patches_ideogram4_width,
     split_ideogram4_lora_key,
 )
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
@@ -808,9 +809,10 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
 
         # Ideogram 4 names its blocks like Z-Image (`layers.N.attention`, `feed_forward.w1..3`), so the prefixes
-        # below admit its LoRAs too; its widths (4608, not 3840) are what tell the two apart.
-        if has_ideogram4_lora_keys(state_dict):
-            raise NotAMatchError("model looks like an Ideogram 4 LoRA, not a Z-Image LoRA")
+        # below admit its LoRAs too; its widths (4608, not 3840) are what tell the two apart. Checked on the widths
+        # alone, so an Ideogram 4 file that Ideogram 4's probe does not recognise is not taken for Z-Image either.
+        if patches_ideogram4_width(state_dict):
+            raise NotAMatchError("model patches Ideogram 4 widths, not a Z-Image LoRA")
 
         # Check for Kohya format first
         if is_state_dict_likely_z_image_kohya_lora(state_dict):

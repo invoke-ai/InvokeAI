@@ -152,20 +152,24 @@ def group_ideogram4_lora_layers(state_dict: dict[str | int, Any]) -> dict[str, d
     return grouped
 
 
-def has_ideogram4_lora_keys(state_dict: dict[str | int, Any]) -> bool:
-    """True if the state dict names Ideogram 4 modules and patches at least one of them at an Ideogram 4 width."""
-    str_keys = [k for k in state_dict if isinstance(k, str)]
-    grouped = group_ideogram4_lora_layers(state_dict)
-    if not any(_IDEOGRAM4_MODULE_RE.search(path + ".") for path in grouped):
-        return False
-    if any(anti.search(k) for k in str_keys for anti in _NON_IDEOGRAM4_ANTI_RES):
-        return False
-    for layer_path, values in grouped.items():
+def patches_ideogram4_width(state_dict: dict[str | int, Any]) -> bool:
+    """True if a layer on an Ideogram 4 module name patches a weight at an Ideogram 4 width, whatever else the file
+    holds. A neighbour sharing the block names refuses on this, so it also refuses Ideogram 4 files that Ideogram 4's
+    own probe does not recognise (a kohya-flattened file that also trains `input_proj`, say)."""
+    for layer_path, values in group_ideogram4_lora_layers(state_dict).items():
         if _IDEOGRAM4_MODULE_RE.search(layer_path + "."):
             shape = layer_delta_shape(values)
             if shape is not None and (shape[0] in IDEOGRAM4_WIDTHS or shape[1] in IDEOGRAM4_WIDTHS):
                 return True
     return False
+
+
+def has_ideogram4_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict names Ideogram 4 modules, patches at least one of them at an Ideogram 4 width, and has
+    no key that only another family uses."""
+    if any(anti.search(k) for k in state_dict if isinstance(k, str) for anti in _NON_IDEOGRAM4_ANTI_RES):
+        return False
+    return patches_ideogram4_width(state_dict)
 
 
 def ideogram4_lora_refusal(state_dict: dict[str | int, Any]) -> str | None:
