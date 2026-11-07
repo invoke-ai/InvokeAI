@@ -284,3 +284,15 @@ export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditS
 
 export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
   useCanvasInteractionState(engine, 'transformOptions');
+
+/** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
+export const usePsdExportStatus = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['psdExportStatus'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('psdExportStatus', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};

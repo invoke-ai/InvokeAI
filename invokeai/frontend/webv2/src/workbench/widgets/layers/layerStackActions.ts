@@ -3,7 +3,7 @@ import type { CanvasLayerContract, LayerStackKind, SemanticNode } from '@workben
 import { isExportableRasterLayer, isNodeHidden } from '@workbench/canvas-engine/api';
 
 /** A stack-header action id. Extend this + `getStackActions` to add a new action. */
-export type StackActionId = 'mergeVisible' | 'exportPsd' | 'toggleVisibility' | 'new';
+export type StackActionId = 'mergeVisible' | 'cancelExportPsd' | 'exportPsd' | 'toggleVisibility' | 'new';
 
 /**
  * Offer merge/export only for raster stacks and hide/show only for overlays, where visibility must not disable
