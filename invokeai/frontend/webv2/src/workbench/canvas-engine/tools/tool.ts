@@ -9,7 +9,7 @@ import type {
   ColorSamplePhase,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/capabilities';
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasBezierPathContract, CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
@@ -90,6 +90,8 @@ export interface PaintLineEnds {
 
 /** Everything a tool is allowed to reach, injected by the engine. */
 export interface ToolContext {
+  appendVectorEditPath?(layerId: string, path: CanvasBezierPathContract): boolean;
+  applyVectorEdit?(): void;
   /** The pan/zoom viewport. */
   viewport: Viewport;
   /** The current mirrored document, or `null` when none is available. */
@@ -215,6 +217,8 @@ export interface ToolActivationOptions {
 /** A stateless-to-the-engine interaction handler. Implementations may hold private drag state. */
 export interface Tool {
   readonly id: ToolId;
+  /** A multi-press creation session may remain active between pointer gestures. */
+  hasSession?(): boolean;
   /** Called when the tool becomes active. */
   onActivate?(ctx: ToolContext, opts?: ToolActivationOptions): void;
   /** Called when the tool is deactivated (also on engine dispose). */
@@ -234,6 +238,10 @@ export interface Tool {
    * separate.
    */
   onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): void;
+  /** Owned modifier changes; returning true keeps a modifier from activating a temporary tool. */
+  onModifierKey?(ctx: ToolContext, code: 'Space' | 'Alt' | 'Shift', pressed: boolean): boolean;
+  /** Drop or reconcile an unfinished gesture when its document target changes. Never dispatch from this hook. */
+  onDocumentChanged?(ctx: ToolContext): void;
   /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
   onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   /** The CSS cursor to show while this tool is active. */

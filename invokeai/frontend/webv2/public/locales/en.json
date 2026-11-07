@@ -1151,6 +1151,10 @@
         "Layers apply top to bottom, and each can carry a stack of non-destructive adjustments such as levels, curves, or hue."
       ]
     },
+    "layerStackVector": {
+      "heading": "Vector Layers",
+      "paragraphs": ["Layers that hold editable vector guide paths."]
+    },
     "layerStackRegionalGuidance": {
       "heading": "Regional Guidance",
       "paragraphs": [
@@ -4418,6 +4422,8 @@
         "shapeFreehand": "Freehand",
         "shapeMaskHint": "Shapes add to the selected mask; fill and stroke set which parts, not their colors.",
         "shapePolygon": "Polygon",
+        "vectorShapePolyline": "Polygon / Polyline",
+        "vectorPolylineHint": "Click to place points. Enter or double-click finishes an open path; click the first point to close it.",
         "shapeRect": "Rectangle",
         "shapeStar": "Star",
         "shapeTarget": "Place on",
@@ -4725,6 +4731,7 @@
         "addControlLayer": "Control layer",
         "addInpaintMask": "Inpaint mask",
         "addRasterLayer": "Raster layer",
+        "addVectorLayer": "Vector layer",
         "addRegionalGuidance": "Regional guidance",
         "addRegionalReferenceImage": "Regional reference image",
         "actionFailed": "Layer action failed",
@@ -5385,7 +5392,8 @@
         "control": "Control Layers",
         "inpaint_mask": "Inpaint Masks",
         "raster": "Raster Layers",
-        "regional_guidance": "Regional Guidance"
+        "regional_guidance": "Regional Guidance",
+        "vector": "Vector Layers"
       },
       "maskFill": {
         "color": "Fill color",
@@ -5475,6 +5483,7 @@
         "shape": "Shape",
         "text": "Text",
         "regional_guidance": "Region",
+        "vector": "Vector layer",
         "group": "Group"
       },
       "groupSummary_one": "{{count}} layer",
@@ -5482,9 +5491,33 @@
       "groupEmpty": "Empty group",
       "groupSelectedHint": "Select a layer inside this group to paint.",
       "tree": "Layer tree",
+      "vector": {
+        "edit": "Edit",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "undo": "Undo",
+        "redo": "Redo",
+        "corner": "Corner",
+        "smooth": "Smooth",
+        "symmetric": "Symmetric",
+        "smoothPath": "Smooth path",
+        "smoothPoints": "Smooth points",
+        "split": "Split",
+        "join": "Join",
+        "copy": "Copy path",
+        "delete": "Delete",
+        "hint": "Drag points or handles. Drag empty space to select points; Ctrl/Cmd adds to selection. Shift-click a segment to insert a point.",
+        "unavailable": "Cannot edit right now. Check that the layer is visible and unlocked and finish any active operation.",
+        "exitTitle": "Finish editing vector paths?",
+        "exitBody": "Apply your changes, discard them, or continue editing.",
+        "discard": "Discard"
+      },
       "summary": {
         "referenceImages_one": "{{count}} reference image",
         "referenceImages_other": "{{count}} reference images",
+        "vectorPaths_one": "{{count}} path",
+        "vectorPaths_other": "{{count}} paths",
         "denoiseLimit": "Denoise ≤ {{value}}%",
         "noise": "Noise {{value}}%"
       },

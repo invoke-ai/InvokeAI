@@ -16,6 +16,11 @@ import { TRANSFORM_ROTATE_NUB_PX } from '@workbench/canvas-engine/transform/tran
 
 import type { RgbaSample } from './colorSample';
 import type { RasterSurface } from './raster';
+import type { VectorGuideLayer, VectorShapePreview } from './vectorGuides';
+
+import { drawVectorGuides } from './vectorGuides';
+import { drawVectorEditOverlay, type VectorEditOverlay } from './vectorEditOverlay';
+import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './shapePreview';
 
 /** Minimum screen-space grid spacing (px) below which the grid is too dense to draw. */
 export const MIN_GRID_SPACING_PX = 8;
@@ -94,6 +99,9 @@ export interface RectShapePreview {
 
 /** Everything the overlay needs to draw a frame. */
 export interface OverlayState {
+  vectorEdit?: VectorEditOverlay | null;
+  vectorGuides?: readonly VectorGuideLayer[];
+  vectorShapePreview?: VectorShapePreview | null;
   /** Document→CSS-pixel transform. */
   view: Mat2d;
   /** Backing-store pixels per CSS pixel. */
@@ -405,12 +413,6 @@ const drawTransformFrame = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-const LASSO_PREVIEW_COLOR = '#38bdf8';
-const LASSO_PREVIEW_DASH: readonly number[] = [4, 4];
-
-/** Screen-space half-size of a placed polygon vertex knob. */
-const LASSO_VERTEX_HALF_PX = 2;
-
 /** Dashed lasso preview; polygons add vertices and a first-vertex close-radius cue filled on hover. */
 const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
   const preview = state.lassoPreview;
@@ -422,10 +424,10 @@ const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
     return;
   }
   ctx.save();
-  ctx.strokeStyle = LASSO_PREVIEW_COLOR;
-  ctx.fillStyle = LASSO_PREVIEW_COLOR;
+  ctx.strokeStyle = SHAPE_PREVIEW_COLOR;
+  ctx.fillStyle = SHAPE_PREVIEW_COLOR;
   ctx.lineWidth = 1;
-  ctx.setLineDash([...LASSO_PREVIEW_DASH]);
+  ctx.setLineDash([...SHAPE_PREVIEW_DASH]);
   ctx.beginPath();
   outline.forEach((point, index) => {
     const p = applyToPoint(state.view, point);
@@ -440,24 +442,7 @@ const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
   ctx.stroke();
   ctx.setLineDash([]);
   if (preview.kind === 'polygon') {
-    preview.points.forEach((point, index) => {
-      const p = applyToPoint(state.view, point);
-      if (index === 0 && preview.closeRadiusPx !== null) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, preview.closeRadiusPx, 0, Math.PI * 2);
-        if (preview.closeArmed) {
-          ctx.fill();
-        }
-        ctx.stroke();
-      } else {
-        ctx.fillRect(
-          p.x - LASSO_VERTEX_HALF_PX,
-          p.y - LASSO_VERTEX_HALF_PX,
-          LASSO_VERTEX_HALF_PX * 2,
-          LASSO_VERTEX_HALF_PX * 2
-        );
-      }
-    });
+    drawPolylineVertices(ctx, state.view, preview.points, preview.closeRadiusPx, preview.closeArmed);
   }
   ctx.restore();
 };
@@ -468,9 +453,9 @@ const drawRectShapePreview = (ctx: Ctx, state: OverlayState, preview: RectShapeP
   }
   const screen = transformBounds(state.view, preview.rect);
   ctx.save();
-  ctx.strokeStyle = LAYER_OUTLINE_COLOR;
+  ctx.strokeStyle = SHAPE_PREVIEW_COLOR;
   ctx.lineWidth = 1;
-  ctx.setLineDash([...BBOX_DASH]);
+  ctx.setLineDash([...SHAPE_PREVIEW_DASH]);
   // The same path the rasterizer commits, so the outline is the shape it makes.
   buildParametricShapePath(ctx, preview.kind, screen.x, screen.y, Math.abs(screen.width), Math.abs(screen.height), 0);
   ctx.stroke();
@@ -692,6 +677,8 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
 
   drawSamPreview(ctx, state, base);
   drawSamGeometry(ctx, state);
+  drawVectorGuides(ctx, state.view, state.vectorGuides ?? [], state.vectorShapePreview ?? null);
+  drawVectorEditOverlay(ctx, state.view, state.vectorEdit ?? null);
   drawLayerOutline(ctx, state);
   drawBboxHandles(ctx, state);
   drawTransformFrame(ctx, state);

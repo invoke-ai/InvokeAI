@@ -12,6 +12,8 @@ import type {
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
+import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -494,6 +496,9 @@ export interface EngineStores {
   textEditSession: ScalarStore<TextEditSession | null>;
   /** Document-space shape preview replaces dispatch during drag; null when idle, cleared on commit/cancel. */
   shapePreview: ScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>;
+  /** Vector creation preview is guide geometry, never a rasterization source. */
+  vectorShapePreview: ScalarStore<VectorShapePreview | null>;
+  vectorEditSession: ScalarStore<VectorEditSession | null>;
   /** Document-space gradient drag vector; overlay shows a linear ramp or radial circle. Cleared on commit/cancel. */
   gradientPreview: ScalarStore<GradientPreview | null>;
   hasSelection: ScalarStore<boolean>;
@@ -738,6 +743,8 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
+  vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
+  vectorEditSession: createScalarStore<VectorEditSession | null>(null),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),

@@ -34,8 +34,9 @@ Do not run automated validation simply because a file was modified or an impleme
 ## 3. Implementation Strategy
 
 - Focus on functional compatibility with the InvokeAI v7 Canvas architecture.
-- Use the existing v6 Vector Layers & Splines implementation as the behavioral reference: [`DustyShoe/InvokeAI`, branch `feat(canvas)--Splines-tool`](https://github.com/DustyShoe/InvokeAI/tree/feat%28canvas%29--Splines-tool).
+- Use the existing v6 Vector Layers & Splines implementation in the local Git branch `feat(canvas)--Splines-tool` as the behavioral reference.
 - Use [the rough integration plan](.scratch/agents/splines-port/PLAN.md) as a starting point; adapt it to the current v7 architecture and implementation findings.
+- Track agreed requirements in [DECISIONS.md](.scratch/agents/splines-port/DECISIONS.md) and update it as decisions are made or revised in chat. These agreements take precedence over the rough integration plan; keep open questions distinct from confirmed requirements.
 - Port functionality incrementally in logical, manageable stages.
 - Preserve existing behavior wherever practical.
 - Adapt implementation details when required by architectural differences between v6 and v7.

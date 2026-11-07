@@ -1,5 +1,6 @@
 /**
- * Shapes use box drags, polygon clicks or closed freehand. Commit pixels to an eligible selected paint layer or
+ * Vector targets use the v6 guide-creation gestures. Raster targets use box drags, polygon clicks or closed freehand.
+ * Commit pixels to an eligible selected paint layer or
  * mask (as opaque mask coverage) with selection/bbox clipping, otherwise create a parametric layer.
  * Locked/disabled/unready paint or masks refuse. Shift constrains box aspect; previews/cancellation do not
  * dispatch, and nonzero shapes produce one structural or stroke commit.
@@ -28,6 +29,7 @@ import type { Tool, ToolContext } from './tool';
 
 import { layerMatrix } from './moveHitTest';
 import { MASK_PAINT_COLOR } from './paintConstants';
+import { createVectorShapeTool } from './vectorShapeTool';
 import {
   extendFreehandTrace,
   finishFreehandTrace,
@@ -132,6 +134,11 @@ const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): bool
 /** Creates a fresh shape tool with its own gesture state. */
 export const createShapeTool = (): Tool => {
   let session: Session | null = null;
+  const vectorTool = createVectorShapeTool();
+  const selectsVector = (ctx: ToolContext): boolean => {
+    const doc = ctx.getDocument();
+    return !!doc?.selectedLayerId && lookupDocumentLeaf(doc, doc.selectedLayerId)?.layer.type === 'vector';
+  };
 
   const clearPreview = (ctx: ToolContext): void => {
     ctx.stores.shapePreview.set(null);
@@ -324,7 +331,12 @@ export const createShapeTool = (): Tool => {
   };
 
   return {
-    cursor: () => (session?.kind === 'polyline' && session.session.closeArmed ? 'pointer' : 'crosshair'),
+    cursor: (ctx) => {
+      if (selectsVector(ctx)) {
+        return vectorTool.cursor!(ctx);
+      }
+      return session?.kind === 'polyline' && session.session.closeArmed ? 'pointer' : 'crosshair';
+    },
     // Box and freehand drags draw into a selected paint layer or mask that accepts pixels, when aimed at the
     // selection; anything else gets a new layer. A polygon's vertex presses are separate gestures that write nothing
     // until it closes, so they leave a staged view alone instead of blinking.
@@ -338,14 +350,24 @@ export const createShapeTool = (): Tool => {
       return !!leaf && pixelTargetOf(leaf.layer) !== null && isLeafPaintable(leaf);
     },
     id: 'shape',
+    hasSession: () => session !== null || vectorTool.hasSession(),
+    onDocumentChanged: (ctx) => vectorTool.onDocumentChanged?.(ctx),
+    onModifierKey: (ctx, code, pressed) =>
+      selectsVector(ctx) ? vectorTool.onModifierKey!(ctx, code, pressed) : false,
     onDeactivate: (ctx, opts) => {
+      vectorTool.onDeactivate?.(ctx, opts);
       // A modifier-hold switch (space → view to pan mid-polygon) keeps the session.
       if (!opts?.temporary) {
         reset(ctx);
       }
     },
     onKeyCommand: (ctx, command) => {
+      if (vectorTool.hasSession()) {
+        vectorTool.onKeyCommand?.(ctx, command);
+        return;
+      }
       if (!session) {
+        if (command === 'apply') { ctx.applyVectorEdit?.(); }
         return;
       }
       if (command === 'cancel') {
@@ -354,9 +376,18 @@ export const createShapeTool = (): Tool => {
         closePolyline(ctx, session.session);
       }
     },
-    onPointerCancel: (ctx) => reset(ctx),
+    onPointerCancel: (ctx) => {
+      reset(ctx);
+      vectorTool.onPointerCancel?.(ctx);
+    },
     onPointerDown: (ctx, input) => {
-      if ((input.buttons & PRIMARY_BUTTON) === 0 || !ctx.getDocument()) {
+      const doc = ctx.getDocument();
+      if ((input.buttons & PRIMARY_BUTTON) === 0 || !doc) {
+        return;
+      }
+      if (selectsVector(ctx)) {
+        reset(ctx);
+        vectorTool.onPointerDown?.(ctx, input);
         return;
       }
       const kind = ctx.stores.shapeOptions.get().kind;
@@ -383,6 +414,10 @@ export const createShapeTool = (): Tool => {
           : { kind: 'drag', moved: false, startDoc: input.documentPoint, startScreen: input.screenPoint };
     },
     onPointerMove: (ctx, input, batch) => {
+      if (vectorTool.hasSession() || selectsVector(ctx)) {
+        vectorTool.onPointerMove?.(ctx, input, batch);
+        return;
+      }
       if (!session) {
         return;
       }
@@ -420,6 +455,10 @@ export const createShapeTool = (): Tool => {
       }
     },
     onPointerUp: (ctx, input) => {
+      if (vectorTool.hasSession() || selectsVector(ctx)) {
+        vectorTool.onPointerUp?.(ctx, input);
+        return;
+      }
       if (!session || session.kind === 'polyline') {
         return;
       }

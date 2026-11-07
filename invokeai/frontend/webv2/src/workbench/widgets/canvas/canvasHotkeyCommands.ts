@@ -166,6 +166,10 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
+  if (commandId === 'canvas.deleteSelected' && engine?.interaction.get('vectorEditSession')) {
+    engine.layers.vectorEdit.deleteSelection();
+    return;
+  }
   const { selectedLayerId } = document;
   const index = getDocumentIndex(document);
   const selected = selectedLayerId ? index.byId.get(selectedLayerId) : undefined;

@@ -7,6 +7,7 @@ import type {
   CanvasMaskFillContract,
   CanvasPixelSourceContract,
   CanvasRegionalGuidanceLayerContract,
+  CanvasVectorLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -39,6 +40,19 @@ const nextNumberedName = (prefix: string, existingNames: readonly string[]): str
 
 export const nextInpaintMaskName = (names: readonly string[]): string => nextNumberedName('Inpaint Mask', names);
 export const nextControlLayerName = (names: readonly string[]): string => nextNumberedName('Control Layer', names);
+export const nextVectorLayerName = (names: readonly string[]): string => nextNumberedName('Vector Layer', names);
+
+export const createVectorLayer = (input: { id: string; name: string }): CanvasVectorLayerContract => ({
+  blendMode: 'normal',
+  id: input.id,
+  isEnabled: true,
+  isLocked: false,
+  name: input.name,
+  opacity: 1,
+  paths: [],
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'vector',
+});
 export const nextRegionalGuidanceName = (names: readonly string[]): string =>
   nextNumberedName('Regional Guidance', names);
 export const nextRegionalGuidanceFillColor = (count: number): string =>

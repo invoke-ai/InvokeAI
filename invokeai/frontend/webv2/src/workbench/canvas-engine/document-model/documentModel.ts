@@ -639,7 +639,7 @@ export const createDocumentModel = (
     const removedSet = new Set(removedIds);
     const remaining = { ...stacks };
     for (const stack of new Set(outer.map((entry) => entry.stack))) {
-      remaining[stack] = stacks[stack]
+      remaining[stack] = (stacks[stack] ?? [])
         .filter((node) => !removedSet.has(node.id))
         .map((node) => stripRemoved(node, removedSet));
     }
@@ -1098,7 +1098,7 @@ export const createDocumentModel = (
       touchedIds.push(group.id, ...childIds);
       expected = {
         ...expected,
-        [entry.stack]: dissolve(expected[entry.stack], dissolved),
+        [entry.stack]: dissolve(expected[entry.stack] ?? [], dissolved),
       };
     }
     for (const key of unique(
@@ -1142,7 +1142,7 @@ export const createDocumentModel = (
       if (unsupported) {
         return {
           actual: 'group',
-          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
           status: 'wrong-type',
         };
       }
@@ -1189,7 +1189,7 @@ export const createDocumentModel = (
     if (isGroupNode(entry.node)) {
       return {
         actual: 'group',
-        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
         status: 'wrong-type',
       };
     }

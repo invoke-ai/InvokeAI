@@ -66,7 +66,7 @@ export interface CreateCompositeFrameDeps {
  * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
  * would be accepted; control layers stay.
  */
-const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
+const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false, vector: true } as const;
 
 const isStagingHiddenStack = (stack: CanvasLayerStackKind): boolean =>
   isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];

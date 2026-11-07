@@ -250,6 +250,25 @@ const zLayerBase = z.object({
 });
 const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
+    isHidden: z.boolean().optional(),
+    paths: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string().nullable(),
+        isClosed: z.boolean(),
+        points: z.array(
+          z.object({
+            anchor: zCoordinate,
+            inHandle: zCoordinate.nullable(),
+            outHandle: zCoordinate.nullable(),
+            type: z.enum(['corner', 'smooth', 'symmetric']),
+          })
+        ),
+      })
+    ),
+    type: z.literal('vector'),
+  }),
+  zLayerBase.extend({
     // A pre-stack adjustments OBJECT is dropped rather than failing the document.
     adjustments: zAdjustments.optional().catch(undefined),
     inpaint: z
@@ -473,6 +492,9 @@ export const writableCanvasSchemaVersion = (
   document: Pick<CanvasDocumentContractV3, 'stacks'>
 ): CanvasSchemaVersion => {
   let version = newestCanvasSchemaVersion(declaredVersions);
+  if (document.stacks.vector !== undefined) {
+    return 7;
+  }
   for (const roots of Object.values(document.stacks)) {
     for (const root of roots) {
       if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
@@ -706,6 +728,9 @@ const parseStacks = (value: unknown, path: string): ParsedStacks => {
     }
   }
   for (const stack of LAYER_STACK_ORDER) {
+    if (stack === 'vector' && value.vector === undefined) {
+      continue;
+    }
     const roots = value[stack] === undefined ? [] : value[stack];
     if (!Array.isArray(roots)) {
       context.diagnostics.push({ message: `${stack} stack is not an array`, path: `${path}.${stack}` });

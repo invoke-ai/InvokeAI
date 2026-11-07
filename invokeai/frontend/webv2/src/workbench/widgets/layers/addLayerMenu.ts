@@ -9,6 +9,7 @@ import { canAddRegionalReferenceImage } from './layerOps';
 
 /** The distinct "add a layer" actions offered across the panel's add surfaces. */
 export type AddLayerItemId =
+  | 'vector'
   | 'inpaint_mask'
   | 'regional_guidance'
   | 'regional_reference_image'
@@ -41,6 +42,7 @@ export const ADD_LAYER_MENU: readonly AddLayerMenuGroup[] = [
     items: [
       { id: 'control', labelKey: 'widgets.layers.actions.addControlLayer' },
       { id: 'raster', labelKey: 'widgets.layers.actions.addRasterLayer' },
+      { id: 'vector', labelKey: 'widgets.layers.actions.addVectorLayer' },
       { id: 'group', labelKey: 'widgets.layers.actions.newGroup' },
     ],
     titleKey: 'widgets.layers.menuGroups.layers',

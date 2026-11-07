@@ -570,7 +570,7 @@ export const LayersTree = ({
             const parent = lookupDocumentNodeState(currentDocument, vm.parentId)!;
             const grandSiblings =
               parent.parentId === null
-                ? currentDocument.stacks[parent.stack]
+                ? (currentDocument.stacks[parent.stack] ?? [])
                 : (getDocumentNode(currentDocument, parent.parentId) as { children: readonly { id: string }[] })
                     .children;
             const beforeId = grandSiblings[parent.siblingIndex + 1]?.id ?? null;
@@ -584,7 +584,7 @@ export const LayersTree = ({
           }
           const siblings =
             vm.parentId === null
-              ? currentDocument.stacks[vm.stack]
+              ? (currentDocument.stacks[vm.stack] ?? [])
               : (getDocumentNode(currentDocument, vm.parentId) as { children: readonly { id: string; type: string }[] })
                   .children;
           const above = siblings[vm.siblingIndex - 1];

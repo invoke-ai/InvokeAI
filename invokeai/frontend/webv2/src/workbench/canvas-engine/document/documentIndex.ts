@@ -272,7 +272,7 @@ const build = (stacks: CanvasStackForests): CanvasDocumentIndex => {
     });
   };
   for (const stack of LAYER_STACKS_TOP_FIRST) {
-    visit(stacks[stack], stack, null, [], true, false, false);
+    visit(stacks[stack] ?? [], stack, null, [], true, false, false);
   }
   return { byId, leaves, maxDepth, nodes, stacks };
 };
@@ -317,7 +317,7 @@ const deriveIndexForValueEdit = (
   // Ancestors were rebuilt along each changed path; find their new objects from the new roots.
   for (const id of changed.keys()) {
     const entry = previous.byId.get(id)!;
-    let siblings: readonly CanvasNodeContract[] = nextStacks[entry.stack];
+    let siblings: readonly CanvasNodeContract[] = nextStacks[entry.stack] ?? [];
     for (const ancestorId of entry.path) {
       const ancestor = replacedNodes.get(ancestorId) ?? siblings[previous.byId.get(ancestorId)!.siblingIndex];
       if (!ancestor || ancestor.id !== ancestorId || !isGroupNode(ancestor)) {
@@ -495,7 +495,11 @@ export const updateNodeValues = (
   };
   let result = stacks;
   for (const stack of LAYER_STACKS_TOP_FIRST) {
-    const roots = rebuild(rootKey(stack), stacks[stack]);
+    const current = stacks[stack];
+    if (!current) {
+      continue;
+    }
+    const roots = rebuild(rootKey(stack), current);
     if (roots !== stacks[stack]) {
       result = result === stacks ? { ...stacks } : result;
       result[stack] = roots as CanvasNodeContract[];
@@ -567,7 +571,7 @@ export const childrenAt = (
   parentId: string | null
 ): readonly CanvasNodeContract[] | null => {
   if (parentId === null) {
-    return index.stacks[stack];
+    return index.stacks[stack] ?? [];
   }
   const parent = index.byId.get(parentId);
   return parent && parent.stack === stack && isGroupNode(parent.node) ? parent.node.children : null;

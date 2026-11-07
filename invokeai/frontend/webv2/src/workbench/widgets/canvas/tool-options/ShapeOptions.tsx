@@ -162,7 +162,7 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
   };
 };
 
-const ShapeSettings = ({ engine }: ToolFormProps) => {
+const RasterShapeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const editor = useShapeEditor(engine);
   const selectsMask = useActiveProjectSelector((project) => {
@@ -276,6 +276,62 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
         onChangeEnd={widthGesture.onChangeEnd}
       />
     </>
+  );
+};
+
+const VectorShapeSettings = ({ engine, layerName }: ToolFormProps & { layerName: string }) => {
+  const { t } = useTranslation();
+  const options = useShapeOptions(engine);
+  const kind = options.kind;
+  const setOptions = useCallback((patch: Partial<ShapeToolOptions>) => {
+    engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
+  }, [engine]);
+  const kindOptions = useMemo(() => [
+    { label: t('widgets.canvas.toolOptions.shapeRect'), value: 'rect' as const },
+    { label: t('widgets.canvas.toolOptions.shapeEllipse'), value: 'ellipse' as const },
+    { label: t('widgets.canvas.toolOptions.shapeTriangle'), value: 'triangle' as const },
+    { label: t('widgets.canvas.toolOptions.shapeStar'), value: 'star' as const },
+    { label: t('widgets.canvas.toolOptions.vectorShapePolyline'), value: 'polygon' as const },
+    { label: t('widgets.canvas.toolOptions.shapeFreehand'), value: 'freehand' as const },
+  ], [t]);
+  const targetOptions = useMemo(() => [
+    { label: t('widgets.canvas.toolOptions.shapeTargetSelected'), value: 'selected' as const },
+    { label: t('widgets.canvas.toolOptions.shapeTargetNew'), value: 'new' as const },
+  ], [t]);
+  return (
+    <>
+      <EditTargetChip layerName={options.target === 'selected' ? layerName : null} />
+      <PropertySegmentedRow
+        label={t('widgets.properties.rows.kind')}
+        options={kindOptions}
+        value={kind}
+        onValueChange={(next) => setOptions({ kind: next })}
+      />
+      <PropertySegmentedRow
+        label={t('widgets.canvas.toolOptions.shapeTarget')}
+        options={targetOptions}
+        value={options.target}
+        onValueChange={(next) => setOptions({ target: next })}
+      />
+      {kind === 'polygon' ? (
+        <Text color="fg.muted" fontSize="sm">
+          {t('widgets.canvas.toolOptions.vectorPolylineHint')}
+        </Text>
+      ) : null}
+    </>
+  );
+};
+
+const ShapeSettings = (props: ToolFormProps) => {
+  const vectorName = useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const layer = getDocumentLayer(document, document.selectedLayerId);
+    return layer?.type === 'vector' ? layer.name : null;
+  });
+  return vectorName !== null ? (
+    <VectorShapeSettings {...props} layerName={vectorName} />
+  ) : (
+    <RasterShapeSettings {...props} />
   );
 };
 

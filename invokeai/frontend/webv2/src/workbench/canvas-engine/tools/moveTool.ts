@@ -96,7 +96,7 @@ interface GestureState {
 }
 
 /** Creates a fresh move tool with its own gesture state. */
-export const createMoveTool = (): Tool => {
+export const createMoveTool = (getVectorEditor?: () => Tool & { hasSession(): boolean }): Tool => {
   let state: GestureState | null = null;
 
   const clearOverride = (ctx: ToolContext): void => {
@@ -201,6 +201,8 @@ export const createMoveTool = (): Tool => {
   return {
     // Not-allowed over a selected leaf that is locked or hidden: a press there moves nothing.
     cursor: (ctx) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { return editor.cursor?.(ctx) ?? 'crosshair'; }
       const doc = ctx.getDocument();
       const leaf = doc?.selectedLayerId && !state ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
       return leaf && leafEditRefusal(leaf) ? 'not-allowed' : 'move';
@@ -209,16 +211,22 @@ export const createMoveTool = (): Tool => {
     // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
     usesAltKey: true,
     onDeactivate: (ctx) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onPointerCancel?.(ctx); }
       clearOverride(ctx);
       endGesture();
     },
     onKeyCommand: (ctx, command) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onKeyCommand?.(ctx, command); return; }
       // Enter commits the float; engine Escape abandons it regardless of active tool.
       if (command === 'apply' && !state) {
         ctx.commitFloatingSelection?.();
       }
     },
     onPointerCancel: (ctx) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onPointerCancel?.(ctx); return; }
       if (state?.mode.kind === 'float') {
         // Revert just this drag; the float itself survives (Escape's own
         // float-cancel is a separate, engine-level step).
@@ -229,6 +237,8 @@ export const createMoveTool = (): Tool => {
       endGesture();
     },
     onPointerDown: (ctx, input) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onPointerDown?.(ctx, input); return; }
       if (state || (input.buttons & PRIMARY_BUTTON) === 0 || !ctx.getDocument()) {
         return;
       }
@@ -240,6 +250,8 @@ export const createMoveTool = (): Tool => {
       };
     },
     onPointerMove: (ctx, input) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onPointerMove?.(ctx, input, [input]); return; }
       if (!state) {
         return;
       }
@@ -261,6 +273,8 @@ export const createMoveTool = (): Tool => {
       applyDelta(ctx, state, input);
     },
     onPointerUp: (ctx, input) => {
+      const editor = getVectorEditor?.();
+      if (editor?.hasSession()) { editor.onPointerUp?.(ctx, input); return; }
       if (!state) {
         return;
       }

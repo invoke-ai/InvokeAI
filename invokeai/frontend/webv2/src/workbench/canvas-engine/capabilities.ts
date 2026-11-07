@@ -12,6 +12,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
@@ -189,6 +190,7 @@ export type CommitMaskImageResult = { status: 'committed'; layerId: string } | {
 export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloading' | 'cancelling';
 
 export interface CanvasInteractionState {
+  vectorEditSession: VectorEditSession | null;
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
@@ -746,7 +748,26 @@ export type BeginTransformResult =
   | 'ineligible'
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
+export interface CanvasVectorEditCapability {
+  begin(layerId: string): boolean;
+  apply(): StructuralCommitResult | null;
+  cancel(): void;
+  reset(): void;
+  undo(): boolean;
+  redo(): boolean;
+  setPointType(type: 'corner' | 'smooth' | 'symmetric'): void;
+  smooth(selectedOnly: boolean): void;
+  deleteSelection(): void;
+  copyPath(): void;
+  split(): void;
+  join(): void;
+  canSplit(): boolean;
+  canJoin(): boolean;
+  resolveExit(decision: 'apply' | 'discard' | 'cancel'): StructuralCommitResult | null;
+}
+
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
+  readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
   /**
    * Selects `layerId`, switches to the transform tool and opens its session, even when transform is already active.

@@ -2,9 +2,11 @@ import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
 import {
   createControlLayer,
+  createVectorLayer,
   getDocumentIndex,
   getDocumentLeaves,
   nextControlLayerName,
+  nextVectorLayerName,
 } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
@@ -58,6 +60,11 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           model.prepare({ aboveId: model.document.selectedLayerId, nodes: [node], type: 'insert' })
         );
       switch (id) {
+        case 'vector': {
+          const layer = createVectorLayer({ id: createLayerId(), name: nextVectorLayerName(layerNames) });
+          add(t('widgets.layers.actions.addVectorLayer'), layer);
+          return;
+        }
         case 'group': {
           // An empty group has no stack of its own: it joins the selected node's stack, else raster.
           const groupId = createLayerId();

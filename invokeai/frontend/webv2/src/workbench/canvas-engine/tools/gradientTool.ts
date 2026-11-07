@@ -75,7 +75,12 @@ export const createGradientTool = (): Tool => {
   };
 
   return {
-    cursor: () => 'crosshair',
+    cursor: (ctx) => {
+      const doc = ctx.getDocument();
+      return doc?.selectedLayerId && lookupDocumentLeaf(doc, doc.selectedLayerId)?.layer.type === 'vector'
+        ? 'not-allowed'
+        : 'crosshair';
+    },
     id: 'gradient',
     onDeactivate: (ctx) => {
       state = null;
@@ -100,6 +105,9 @@ export const createGradientTool = (): Tool => {
         return;
       }
       const selected = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId)?.layer : null;
+      if (selected?.type === 'vector') {
+        return;
+      }
       const kind =
         selected?.type === 'raster' && selected.source.type === 'gradient'
           ? selected.source.kind

@@ -129,6 +129,7 @@ const predictRefusal = (
   tool: PaintToolSpec['id']
 ): CanvasLayerEditRefusal['status'] | null => {
   const selected = leaf?.layer;
+
   if (!leaf || !selected || !paintsInPlace(selected)) {
     return null;
   }
@@ -147,6 +148,10 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
   }
   const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
   const selected = leaf?.layer;
+
+  if (selected?.type === 'vector') {
+    return null;
+  }
 
   if (leaf && selected && selected.type === 'raster' && selected.source.type === 'paint') {
     // Locked/hidden paint targets refuse rather than silently creating another layer.
@@ -300,7 +305,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
     cursor: (ctx) => {
       const doc = ctx.getDocument();
       const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
-      return !session && predictRefusal(leaf, spec.id) ? 'not-allowed' : 'crosshair';
+      return !session && (leaf?.layer.type === 'vector' || predictRefusal(leaf, spec.id)) ? 'not-allowed' : 'crosshair';
     },
     // A press paints the selected leaf in place unless it is refused up front; any other selection gets a new layer.
     editsSelectedLayer: (ctx) => {

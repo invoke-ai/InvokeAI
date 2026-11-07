@@ -20,6 +20,7 @@ import { useLayerChildSelection } from '@workbench/widgets/layers/layerChildSele
 import { LayerRegionSettings } from '@workbench/widgets/layers/LayerRegionSettings';
 import { MaskModifierSettings } from '@workbench/widgets/layers/MaskModifierSettings';
 import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerFilterSection';
+import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -157,6 +158,8 @@ const LayerTypeSettings = ({
   layer: CanvasLayerContract;
 }) => {
   switch (layer.type) {
+    case 'vector':
+      return <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'inpaint_mask':
       return <InpaintMaskSettings key={layer.id} engine={engine} layer={layer} />;
     case 'regional_guidance':

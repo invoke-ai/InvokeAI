@@ -8,12 +8,10 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 
+import { polygonShapeVertices } from '@workbench/canvas-engine/math/shapeGeometry';
+
 type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
 type Ctx = RasterSurface['ctx'];
-
-/** Pentagram inner/outer radius ratio: sin(18°) / sin(54°). */
-const STAR_INNER_RATIO = 0.382;
-const STAR_SPIKES = 5;
 
 /**
  * Shared raster/preview path inside an inset box, with round joins for sharp corners. Inset rescales the box
@@ -55,25 +53,14 @@ export const buildParametricShapePath = (
     ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
     return;
   }
-  if (kind === 'triangle') {
-    ctx.moveTo(cx, cy - h / 2);
-    ctx.lineTo(cx + w / 2, cy + h / 2);
-    ctx.lineTo(cx - w / 2, cy + h / 2);
-    ctx.closePath();
-    return;
-  }
-  if (kind === 'star') {
-    const rx = w / 2;
-    const ry = h / 2;
-    for (let i = 0; i < STAR_SPIKES * 2; i += 1) {
-      const radius = i % 2 === 0 ? 1 : STAR_INNER_RATIO;
-      const angle = -Math.PI / 2 + (i * Math.PI) / STAR_SPIKES;
-      const px = cx + Math.cos(angle) * rx * radius;
-      const py = cy + Math.sin(angle) * ry * radius;
-      if (i === 0) {
-        ctx.moveTo(px, py);
+  if (kind === 'triangle' || kind === 'star') {
+    const vertices = polygonShapeVertices(kind, { x: x + inset, y: y + inset, width: w, height: h });
+    for (let index = 0; index < vertices.length; index += 1) {
+      const point = vertices[index]!;
+      if (index === 0) {
+        ctx.moveTo(point.x, point.y);
       } else {
-        ctx.lineTo(px, py);
+        ctx.lineTo(point.x, point.y);
       }
     }
     ctx.closePath();

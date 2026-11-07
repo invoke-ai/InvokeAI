@@ -29,6 +29,8 @@ export const layerContract = (
 ): CanvasLayerContract => {
   const contract = ((): CanvasLayerContract => {
     switch (type) {
+      case 'vector':
+        return { ...base(id), paths: [], type };
       case 'raster':
         return { ...base(id), source: { bitmap: null, type: 'paint' }, type };
       case 'control':
@@ -87,7 +89,7 @@ const stackOfNode = (node: CanvasNodeContract): CanvasLayerContract['type'] | nu
 export const stacksFrom = (nodes: readonly CanvasNodeContract[]): CanvasStackForests => {
   const stacks = createEmptyStacks();
   for (const node of nodes) {
-    stacks[stackOfNode(node) ?? 'raster'].push(node);
+    (stacks[stackOfNode(node) ?? 'raster'] ??= []).push(node);
   }
   return stacks;
 };
@@ -155,7 +157,7 @@ export const createLargeTreeDocument = (
   };
   const perStack = Math.ceil(count / LAYER_STACK_ORDER.length);
   for (const stack of LAYER_STACK_ORDER) {
-    stacks[stack].push(...build(stack, perStack, 0));
+    (stacks[stack] ??= []).push(...build(stack, perStack, 0));
   }
   return documentFrom(stacks, selectedLayerId);
 };

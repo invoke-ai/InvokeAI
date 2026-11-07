@@ -12,6 +12,7 @@ import type {
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { getBezierPathBounds } from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
@@ -26,6 +27,17 @@ export const hittableLayerRect = (
   doc: CanvasDocumentContractV3,
   liveRect?: Rect
 ): Rect | null => {
+  if (layer.type === 'vector') {
+    let bounds: Rect | null = null;
+    for (const path of layer.paths) {
+      if (path.points.length < 2) {
+        continue;
+      }
+      const rect = getBezierPathBounds(path.points, path.isClosed);
+      bounds = bounds ? union(bounds, rect) : rect;
+    }
+    return bounds ? { ...bounds, width: Math.max(1, bounds.width), height: Math.max(1, bounds.height) } : null;
+  }
   if (!renderableSourceOf(layer)) {
     return null;
   }

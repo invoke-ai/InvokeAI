@@ -22,6 +22,7 @@ const STACK_HINTS: Record<LayerStackKind, FeatureHintId> = {
   inpaint_mask: 'layerStackInpaintMask',
   raster: 'layerStackRaster',
   regional_guidance: 'layerStackRegionalGuidance',
+  vector: 'layerStackVector',
 };
 
 interface LayerStackHeaderProps {

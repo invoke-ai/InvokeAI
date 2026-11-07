@@ -264,7 +264,7 @@ export interface LayerContextAction {
 
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
-const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
+const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance', 'vector'] as const;
 type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
@@ -386,7 +386,7 @@ const siblingPosition = (context: LayerContextActionState): { index: number; cou
   }
   const parent = entry.parentId === null ? null : index.byId.get(entry.parentId)!.node;
   const count =
-    parent && parent.type === 'group' ? parent.children.length : context.document.stacks[entry.stack].length;
+    parent && parent.type === 'group' ? parent.children.length : (context.document.stacks[entry.stack]?.length ?? 0);
   return { count, index: entry.siblingIndex };
 };
 

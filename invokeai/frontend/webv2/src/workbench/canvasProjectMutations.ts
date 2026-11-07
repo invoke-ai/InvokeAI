@@ -295,7 +295,7 @@ const replaceLeaf = (
   const stacks = removeNodes(document.stacks, new Set([layer.id]));
   return withStacks(
     document,
-    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...stacks[target]] }
+    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...(stacks[target] ?? [])] }
   );
 };
 
@@ -603,6 +603,9 @@ const isConfigTargetValid = (
 const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPatch): CanvasNodeContract => {
   if (layer.type !== config.layerType) {
     return layer;
+  }
+  if (layer.type === 'vector' && config.layerType === 'vector') {
+    return { ...layer, paths: config.paths };
   }
   if (layer.type === 'group' && config.layerType === 'group') {
     return {

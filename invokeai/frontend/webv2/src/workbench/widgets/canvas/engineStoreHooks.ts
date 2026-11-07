@@ -42,6 +42,12 @@ const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
+export const useVectorEditSession = (engine: CanvasCoreStoreCapability | null): CanvasInteractionState['vectorEditSession'] => {
+  const subscribe = useCallback((listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => {}), [engine]);
+  const read = useCallback(() => engine?.interaction.get('vectorEditSession') ?? null, [engine]);
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /**
  * Subscribe only to one layer's thumbnail version; null engines return undefined without subscribing for fallback
  * rendering.
@@ -292,4 +298,11 @@ export const usePsdExportStatus = (
   );
   const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
+
+/** The engine-local vector draft; never persisted before Apply. */
+export const useVectorEditSession = (engine: CanvasCoreStoreCapability | null): CanvasInteractionState['vectorEditSession'] => {
+  const subscribe = useCallback((listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => undefined), [engine]);
+  const read = useCallback(() => engine?.interaction.get('vectorEditSession') ?? null, [engine]);
+  return useSyncExternalStore(subscribe, read, read);
 };
