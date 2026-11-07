@@ -42,7 +42,7 @@ Others are recognized by their layer names and fail, or misbehave, only when the
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
 | [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | L | ✗ | ✓ | ✗ | ✗ |
 | [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | R | ✓ | R | R | R | ✓ | ✗ | ✗ |
-| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | L | ✓ | ✗ | ✗ |
+| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | ✓ | R | L | L | ✓ | ✗ | ✗ |
 | [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | L | ✓ | ✗ | ✓ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | L | ✗ | ✗ | ✗ | ✗ |
 
@@ -53,7 +53,7 @@ Others are recognized by their layer names and fail, or misbehave, only when the
   exports such as unsloth's FP8 build are refused at install. MOSS-Image loads Comfy-Org's int8 build and GGUFs;
   its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao builds, are refused at install, unscaled fp8
   included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported;
-  Krea-2 refuses them at install.
+  Krea-2 and Wan 2.2 refuse them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
