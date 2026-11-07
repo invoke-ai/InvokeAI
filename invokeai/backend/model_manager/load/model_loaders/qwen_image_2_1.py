@@ -27,6 +27,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
@@ -210,12 +211,10 @@ class QwenImage21CheckpointModel(ModelLoader):
         if submodel_type is not SubModelType.Transformer:
             raise ValueError(f"Only the transformer is in a single file. Received: {submodel_type}")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
 
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         header_layers = split_fused_layer_names(
             strip_layer_path_prefix(parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)))

@@ -607,3 +607,60 @@ class TestGGUFLoader:
 
         with pytest.raises(ValueError, match="holds only the transformer"):
             loader._load_model(config, SubModelType.VAE)
+
+
+def test_a_float8_shard_read_by_its_index_does_not_pin_the_file(tmp_path: Path) -> None:
+    """The sharded read picks keys per shard; the bf16 norms beside a float8 weight would otherwise stay views of
+    the whole shard."""
+    shard = tmp_path / "diffusion_pytorch_model-00001-of-00001.safetensors"
+    save_file(
+        {
+            "blocks.0.norm.weight": torch.arange(65, dtype=torch.float32).to(torch.bfloat16),
+            "blocks.0.proj.weight": torch.ones(256, 256).to(torch.float8_e4m3fn),
+        },
+        str(shard),
+        metadata={"format": "pt"},
+    )
+    _write_index(tmp_path / "diffusion_pytorch_model.safetensors.index.json", {shard.name: ["blocks.0.norm.weight"]})
+
+    sd = loader_module._read_component_state_dict(tmp_path)
+
+    assert list(sd) == ["blocks.0.norm.weight"]
+    shard.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
+    assert sd["blocks.0.norm.weight"].tolist() == list(range(65))
+
+
+def _float8_file(path: Path) -> Path:
+    save_file(
+        {
+            "blocks.0.norm.weight": torch.arange(65, dtype=torch.float32).to(torch.bfloat16),
+            "blocks.0.proj.weight": torch.ones(256, 256).to(torch.float8_e4m3fn),
+        },
+        str(path),
+        metadata={"format": "pt"},
+    )
+    return path
+
+
+def test_an_unsharded_float8_component_does_not_pin_the_file(tmp_path: Path) -> None:
+    path = _float8_file(tmp_path / "diffusion_pytorch_model.safetensors")
+
+    sd = loader_module._read_component_state_dict(tmp_path)
+
+    path.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
+    assert sd["blocks.0.norm.weight"].tolist() == list(range(65))
+
+
+def test_a_single_file_float8_checkpoint_does_not_pin_the_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = _float8_file(tmp_path / "moss-image-dit.safetensors")
+    loader = _loader(MossImageCheckpointModel, monkeypatch)
+    # The read is what is under test; the transformer build one call further is covered by the loads above.
+    read: dict[str, torch.Tensor] = {}
+    monkeypatch.setattr(loader_module, "moss_image_transformer_config", lambda _sd: {})
+    monkeypatch.setattr(loader, "_load_transformer", lambda _config, sd, _geometry, _what: read.update(sd))
+    config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+
+    loader._load_model(config, SubModelType.Transformer)
+
+    path.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
+    assert read["blocks.0.norm.weight"].tolist() == list(range(65))

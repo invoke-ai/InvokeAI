@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import diffusers
-import safetensors.torch
 import torch
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config
@@ -33,7 +32,10 @@ def _prepare_loader(monkeypatch, tmp_path, state_dict: dict[str, torch.Tensor]):
     )
 
     monkeypatch.setattr(diffusers, "ZImageTransformer2DModel", _TinyZImageTransformer, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.z_image.load_safetensors_checkpoint",
+        lambda _path: state_dict,
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.z_image.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
