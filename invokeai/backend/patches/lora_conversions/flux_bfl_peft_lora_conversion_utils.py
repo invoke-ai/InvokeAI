@@ -25,6 +25,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
@@ -305,8 +306,8 @@ def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
 def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -> list[tuple[str, BaseLayerPatch]]:
     """Convert a single BFL-named LoRA layer patch to one or more diffusers-named patches.
 
-    For simple renames, the layer object is reused. Fused QKV LoRA, LoHa, and LoKr patches keep
-    their factorized representation after splitting.
+    For simple renames, the layer object is reused. Fused QKV LoRA, output-axis DoRA, LoHa, and LoKr
+    patches keep their factorized representation after splitting.
     """
     # Double blocks
     m = _DOUBLE_BLOCK_RE.match(bfl_key)
@@ -393,6 +394,62 @@ def _split_qkv_bias(
             f"Expected a fused QKV bias with {out_features} output rows, got shape {tuple(dense_bias.shape)}."
         )
     return dense_bias.chunk(3, dim=0)
+
+
+def _split_qkv_dora_layer(
+    layer: DoRALayer,
+    q_key: str,
+    k_key: str,
+    v_key: str,
+) -> list[tuple[str, DoRALayer]]:
+    """Split output-axis DoRA: each direction norm depends only on its own output row."""
+    if layer.up.ndim != 2 or layer.down.ndim != 2:
+        raise ValueError(
+            "Expected linear fused QKV DoRA factors, "
+            f"got up {tuple(layer.up.shape)} and down {tuple(layer.down.shape)}."
+        )
+    out_features, rank = layer.up.shape
+    if out_features == 0 or out_features % 3 != 0:
+        raise ValueError(f"Expected fused QKV DoRA output rows to be positive and divisible by 3, got {out_features}.")
+    if rank == 0 or rank != layer.down.shape[0] or layer.down.shape[1] == 0:
+        raise ValueError(
+            "Expected compatible nonempty fused QKV DoRA factors, "
+            f"got up {tuple(layer.up.shape)} and down {tuple(layer.down.shape)}."
+        )
+
+    # Honor the orientation already parsed by DoRALayer, including the input-axis convention for 1-D dora_scale.
+    axis = "output" if layer.magnitude_is_out_dim else "input"
+    magnitude_size = out_features if layer.magnitude_is_out_dim else layer.down.shape[1]
+    if layer.dora_scale.numel() != magnitude_size:
+        raise ValueError(
+            f"Expected fused QKV DoRA {axis}-axis magnitude with {magnitude_size} entries, "
+            f"got shape {tuple(layer.dora_scale.shape)}."
+        )
+    if not layer.magnitude_is_out_dim:
+        raise ValueError(
+            f"Cannot split input-axis fused QKV DoRA for '{q_key}': normalization spans all Q/K/V output rows "
+            "and requires their base weights together. Use an adapter trained with output-axis DoRA, or a plain LoRA."
+        )
+    if layer.bias is not None and (layer.bias.ndim == 0 or layer.bias.numel() != out_features):
+        raise ValueError(f"Expected a fused QKV DoRA bias with {out_features} entries, got {tuple(layer.bias.shape)}.")
+
+    up_parts = layer.up.chunk(3, dim=0)
+    magnitude_parts = layer.dora_scale.reshape(-1).chunk(3)
+    bias_parts = _split_qkv_bias(layer.bias, out_features)
+    return [
+        (
+            key,
+            DoRALayer(
+                up=up,
+                down=layer.down,
+                dora_scale=magnitude,
+                alpha=layer._alpha,
+                bias=bias,
+                magnitude_is_out_dim=True,
+            ),
+        )
+        for key, up, magnitude, bias in zip((q_key, k_key, v_key), up_parts, magnitude_parts, bias_parts, strict=True)
+    ]
 
 
 def _split_qkv_loha_layer(
@@ -588,6 +645,8 @@ def _split_qkv_layer_patch(
     k_key: str,
     v_key: str,
 ) -> list[tuple[str, BaseLayerPatch]]:
+    if isinstance(layer, DoRALayer):
+        return _split_qkv_dora_layer(layer, q_key=q_key, k_key=k_key, v_key=v_key)
     if isinstance(layer, LoRALayer):
         return _split_qkv_lora_layer(layer, q_key=q_key, k_key=k_key, v_key=v_key)
     if isinstance(layer, LoHALayer):
