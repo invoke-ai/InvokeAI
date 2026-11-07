@@ -2643,6 +2643,99 @@ class TestBulkDownloadAccessControl:
         )
         assert r.status_code == status.HTTP_202_ACCEPTED
 
+    @staticmethod
+    def _download_zip_names(
+        client: TestClient, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path, token: str, board_id: str
+    ) -> set[str]:
+        """Request a board download, run the queued job, fetch the ZIP as the caller and list its images."""
+        import io
+        import zipfile
+
+        from fastapi import BackgroundTasks
+
+        queued: list[tuple[Any, tuple[Any, ...], dict[str, Any]]] = []
+        monkeypatch.setattr(
+            BackgroundTasks, "add_task", lambda _self, fn, *args, **kwargs: queued.append((fn, args, kwargs))
+        )
+
+        def image_path(image_name: str, thumbnail: bool = False) -> str:
+            path = tmp_path / image_name
+            path.write_bytes(image_name.encode())
+            return str(path)
+
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", image_path)
+
+        r = client.post("/api/v1/images/download", json={"board_id": board_id}, headers=_auth(token))
+        assert r.status_code == status.HTTP_202_ACCEPTED
+        fn, args, kwargs = queued.pop()
+        fn(*args, **kwargs)
+
+        r = client.get(f"/api/v1/images/download/{r.json()['bulk_download_item_name']}", headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        with zipfile.ZipFile(io.BytesIO(r.content)) as archive:
+            return {Path(name).name for name in archive.namelist()}
+
+    def test_uncategorized_download_contains_only_callers_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """Downloading "none" must not bundle another account's uncategorized images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-uncategorized-dl", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-dl", user2.user_id)
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, user2_token, "none")
+
+        assert names == {"user2-uncategorized-dl"}
+
+    def test_admin_uncategorized_download_contains_every_users_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        admin_token: str,
+        user1_token: str,
+        user2_token: str,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-uncategorized-admin-dl", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-admin-dl", user2.user_id)
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, admin_token, "none")
+
+        assert names == {"user1-uncategorized-admin-dl", "user2-uncategorized-admin-dl"}
+
+    def test_shared_board_download_contains_owners_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """Scoping uncategorized downloads must not filter a shared board down to the caller's own images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "Shared Contents DL Board")
+        _share_board(client, user1_token, board_id)
+        _save_image(mock_invoker, "user1-shared-board-dl", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-shared-board-dl")
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, user2_token, board_id)
+
+        assert names == {"user1-shared-board-dl"}
+
     def test_bulk_download_events_carry_user_id(self):
         """BulkDownloadEventBase must carry user_id so events can be routed privately."""
         from invokeai.app.services.events.events_common import (

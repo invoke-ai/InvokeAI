@@ -171,6 +171,7 @@
     }
   },
   "common": {
+    "requestTimedOut": "The request timed out. Retry the operation.",
     "donateToInvokeAI": "Donate to Invoke",
     "actions": "Actions",
     "active": "Active",
@@ -301,7 +302,27 @@
     "decreaseValue": "Decrease value",
     "increaseValue": "Increase value",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "videoPlayer": {
+      "buffering": "Buffering",
+      "exitFullscreen": "Exit full screen",
+      "frame": "Frame {{frame}}",
+      "frameOfLast": "Frame {{frame}}, last {{last}}",
+      "fullscreen": "Full screen",
+      "loop": "Loop",
+      "mute": "Mute",
+      "nextFrame": "Next frame",
+      "pause": "Pause",
+      "play": "Play",
+      "playbackSpeed": "Playback speed",
+      "playbackSpeedValue": "Playback speed: {{rate}}",
+      "previousFrame": "Previous frame",
+      "rate": "{{rate, number}}×",
+      "seek": "Seek",
+      "timeOfDuration": "{{current}} of {{duration}}",
+      "unmute": "Unmute",
+      "volume": "Volume"
+    }
   },
   "app": {
     "name": "Invoke"
@@ -1080,18 +1101,25 @@
         "Can improve structure and detail at higher resolutions."
       ]
     },
+    "hidiffusionRatiosAuto": {
+      "heading": "HiDiffusion: Automatic ratios",
+      "paragraphs": [
+        "Uses the model- and resolution-specific T1 and T2 ratios recommended by HiDiffusion.",
+        "Disable this to set explicit ratio overrides below. Manual T1 must be at least T2; zero is an explicit override."
+      ]
+    },
     "hidiffusionT1Ratio": {
       "heading": "HiDiffusion: T1 Ratio",
       "paragraphs": [
-        "Controls the early switch point for HiDiffusion (T1).",
-        "Lower values switch earlier; higher values preserve global structure longer."
+        "Controls how long the primary HiDiffusion RAU-Net stage remains active (T1).",
+        "Lower values end the primary stage sooner; at extreme resolutions this is the later of the two RAU-Net cutoffs."
       ]
     },
     "hidiffusionT2Ratio": {
       "heading": "HiDiffusion: T2 Ratio",
       "paragraphs": [
-        "Controls the late switch point for HiDiffusion (T2).",
-        "Higher values keep window attention active longer."
+        "Controls the duration of the additional HiDiffusion RAU-Net stage (T2).",
+        "This is the earlier cutoff at extreme resolutions. It cannot exceed T1 and does not control Window Attention."
       ]
     },
     "hidiffusionWindowAttn": {
@@ -2021,6 +2049,11 @@
     "nodeVersion": "Version: {{version}}",
     "nodeClassification": "Classification: {{classification}}",
     "seedModeTooltip": "Applies between queued runs of the workflow; a loop inside one run reuses that run's seed.",
+    "framePreview": "Frame preview",
+    "framePreviewPlaybackError": "Frame preview unavailable — the video could not be played.",
+    "useThisFrame": "Use this frame",
+    "useThisFrameTooltip": "Set Frame Index to the frame shown",
+    "useThisFrameUnavailable": "Pause on a different frame to use it",
     "providedByConnection": "Provided by connection.",
     "savedWorkflowChoose": "Choose a saved workflow",
     "savedWorkflowMissing": "Saved workflow unavailable",
@@ -3132,6 +3165,8 @@
       "height": "Height",
       "hiDiffusion": "HiDiffusion",
       "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+      "hiDiffusionRatiosAuto": "HiDiffusion: Automatic ratios",
+      "hiDiffusionRatioAutoValue": "Automatic",
       "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
       "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
       "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
@@ -3366,6 +3401,8 @@
       "searchPromptTriggers": "Search prompt triggers",
       "selectComponent": "Select a component model…",
       "selectImageFirst": "Select an image in Gallery or Preview first.",
+      "nothingSelected": "Nothing selected",
+      "selectImageOrVideoFirst": "Select an image or video in Gallery or Preview first.",
       "selectMainModelBeforeConcepts": "Select a main model before adding concepts.",
       "selectModel": "Select a model…",
       "selectModelFirst": "Select a model first",
@@ -3799,6 +3836,7 @@
       "unstarVideo": "Unstar video",
       "use": "Use",
       "useInGenerate": "Use this image in Generate",
+      "useThisVideo": "Use this video",
       "showGallery": "Show Gallery"
     },
     "queue": {
@@ -3950,6 +3988,27 @@
       "processorPausedDescription_other": "{{count}} items wait until you resume.",
       "unavailableWhileDisconnected": "Not available while the server is disconnected.",
       "reconnecting": "Reconnecting…",
+      "localRuns": {
+        "title": "Submitting",
+        "untitled": "Untitled run",
+        "cancel": "Cancel {{name}}",
+        "errorLabel": "Why {{name}} is retrying",
+        "loadFailed": "Couldn't load the runs waiting to be submitted.",
+        "state": {
+          "submitting": "Sending to the server…",
+          "serverError": "Server error, retrying (attempt {{attempt, number}})",
+          "unavailable": "Server busy or unavailable, retrying (attempt {{attempt, number}})",
+          "unreachable": "Can't reach the server, retrying (attempt {{attempt, number}})",
+          "error": "Couldn't submit, retrying (attempt {{attempt, number}})",
+          "offline": "Offline, waiting for the connection…"
+        },
+        "announcement": {
+          "serverError": "{{name}}: Server error, retrying",
+          "unavailable": "{{name}}: Server busy or unavailable, retrying",
+          "unreachable": "{{name}}: Can't reach the server, retrying",
+          "error": "{{name}}: Couldn't submit, retrying"
+        }
+      },
       "itemNumber": "#{{id}}",
       "loadingModel": "Loading {{model}}…",
       "viewError": "View error",
@@ -5323,13 +5382,20 @@
         "expand": "Expand group",
         "exportNothing": "No raster layer content to export",
         "exportNotReady": "Layers are still loading — try exporting again in a moment",
-        "exportOverBudget": "Not enough raster memory is available to export this PSD",
+        "exportOverBudget": "Not enough raster memory is available to prepare this PSD",
         "exportStale": "The canvas changed during export — try again",
         "exportUnreadable": "“{{name}}” could not be read, so nothing was exported. Delete or replace that layer, then export again",
         "exportAborted": "PSD export was canceled",
         "exportFailed": "PSD export failed",
         "exportPsd": "Export to PSD",
-        "exportTooLarge": "Canvas is too large to export to PSD",
+        "cancelExportPsd": "Cancel PSD export",
+        "psdExportStatus": {
+          "preparing": "Preparing PSD…",
+          "serializing": "Writing PSD…",
+          "downloading": "Downloading PSD…",
+          "cancelling": "Cancelling PSD…"
+        },
+        "exportTooLarge": "PSD export is too large. Reduce the canvas size or number of layers.",
         "hideAll": "Hide all",
         "mergeNotReady": "Layers are still loading — try merging again in a moment",
         "mergeOverBudget": "Not enough canvas memory to merge these layers",
@@ -5752,16 +5818,22 @@
         "recall": {
           "appliedFields": "Applied {{fields, list}}.",
           "cannotRecallImage": "Cannot recall image data",
+          "cannotRecallVideo": "Cannot recall video data",
           "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
           "fieldsApplied_one": "{{count}} field applied to Generate.",
           "fieldsApplied_other": "{{count}} fields applied to Generate.",
           "imageMetadataUnsupported": "This image does not include supported Generate metadata.",
+          "modelsUnavailableForVideoRecall": "The model library has not loaded. Try again once it has.",
           "nothingRecalled": "No recallable image data",
           "nothingRecalledVideo": "No recallable video data",
+          "nothingRecalledVideoSize": "Size not recalled",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
           "videoMetadataUnsupported": "This video does not include supported Video metadata.",
+          "videoSizeMediaConflict": "Media in the Video panel sets the output to {{effectiveWidth}}×{{effectiveHeight}}, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
+          "videoSizeMediaUnresolvable": "Media in the Video panel has a shape this model can't use, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
+          "videoSizeUnavailable": "This video's size ({{width}}×{{height}}) isn't available for the current Video model, or no model is selected.",
           "fields": {
             "cfg": "CFG",
             "components": "components",
@@ -5782,7 +5854,8 @@
             "dimensions": "Recalled image size",
             "prompts": "Recalled prompts",
             "remix": "Recalled remix settings",
-            "seed": "Recalled seed"
+            "seed": "Recalled seed",
+            "size": "Recalled size"
           },
           "parameters": {
             "applied": "Recalled parameters",
@@ -6077,7 +6150,8 @@
         "useAsReferenceImage": "Use as reference image",
         "useAsReferenceImageHint": "Adds it to Generate's references",
         "useAsReferenceVideo": "Use as reference video",
-        "useImageAs": "Use image as"
+        "useImageAs": "Use image as",
+        "useVideoAs": "Use video as"
       },
       "mediaCountsTwo": "{{first}} and {{second}}",
       "mediaCountsThree": "{{first}}, {{second}}, and {{third}}",
