@@ -3059,6 +3059,7 @@
       "source:src/workbench/widgets/canvas/CanvasStagedRegionsFeed.tsx",
       "source:src/workbench/widgets/canvas/CanvasSurface.tsx",
       "source:src/workbench/widgets/canvas/CanvasSurfaceContextLayout.tsx",
+      "source:src/workbench/widgets/canvas/CanvasTrackpadDetection.tsx",
       "source:src/workbench/widgets/canvas/CanvasWidgetView.tsx",
       "source:src/workbench/widgets/canvas/ControlLayerCanvasOverlay.tsx",
       "source:src/workbench/widgets/canvas/DenoisingStrengthWave.tsx",

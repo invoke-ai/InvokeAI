@@ -5,7 +5,8 @@ import { CANVAS_SETTINGS } from './canvasSettings';
 export const canvasSettingsContribution: SettingsContribution = {
   id: 'canvas',
   label: (t) => t('widgets.labels.canvas'),
-  fields: CANVAS_SETTINGS.map((setting) => ({
+  fields: CANVAS_SETTINGS.map(({ descriptionKey, ...setting }) => ({
+    description: descriptionKey ? (t) => t(descriptionKey) : undefined,
     group: (t) => t(`widgets.canvas.settings.sections.${setting.section}`),
     id: setting.key,
     kind: 'boolean',

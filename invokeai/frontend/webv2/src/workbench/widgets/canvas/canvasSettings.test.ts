@@ -12,6 +12,7 @@ import {
   CANVAS_SHOW_GRID_KEY,
   CANVAS_SHOW_PROGRESS_KEY,
   CANVAS_SNAP_TO_GRID_KEY,
+  CANVAS_TRACKPAD_NAVIGATION_KEY,
   canvasSettingsEqual,
   readCanvasBooleanSetting,
   resolveCanvasSettings,
@@ -38,6 +39,8 @@ const DEFAULTS = {
   [CANVAS_SHOW_GRID_KEY]: false,
   [CANVAS_SHOW_PROGRESS_KEY]: true,
   [CANVAS_SNAP_TO_GRID_KEY]: true,
+  // Opt-in: browsers cannot tell a trackpad from a mouse wheel.
+  [CANVAS_TRACKPAD_NAVIGATION_KEY]: false,
 };
 
 describe('canvasSettings persistence mapping', () => {
@@ -58,6 +61,7 @@ describe('canvasSettings persistence mapping', () => {
       [CANVAS_SHOW_GRID_KEY]: true,
       [CANVAS_SHOW_PROGRESS_KEY]: false,
       [CANVAS_SNAP_TO_GRID_KEY]: false,
+      [CANVAS_TRACKPAD_NAVIGATION_KEY]: true,
     });
     expect(resolved).toEqual({
       [CANVAS_BBOX_OVERLAY_KEY]: true,
@@ -70,6 +74,7 @@ describe('canvasSettings persistence mapping', () => {
       [CANVAS_SHOW_GRID_KEY]: true,
       [CANVAS_SHOW_PROGRESS_KEY]: false,
       [CANVAS_SNAP_TO_GRID_KEY]: false,
+      [CANVAS_TRACKPAD_NAVIGATION_KEY]: true,
     });
   });
 

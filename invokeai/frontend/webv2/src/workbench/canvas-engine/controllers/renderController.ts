@@ -49,7 +49,10 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
     onPointerLeave: (event: PointerEvent) => void;
     onKeyDown: (event: KeyboardEvent) => void;
     onKeyUp: (event: KeyboardEvent) => void;
+    /** Both key events in the capture phase, so no handler that stops propagation hides them. */
+    onKeyCapture: (event: KeyboardEvent) => void;
     onFocusIn: (event: FocusEvent) => void;
+    onWindowFocus: () => void;
     onWheel: (event: WheelEvent) => void;
     reset(): void;
   };
@@ -126,7 +129,10 @@ export class RenderController {
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('keydown', handlers.onKeyDown);
       globalThis.addEventListener('keyup', handlers.onKeyUp);
+      globalThis.addEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.addEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.addEventListener('focusin', handlers.onFocusIn);
+      globalThis.addEventListener('focus', handlers.onWindowFocus);
       globalThis.addEventListener('pagehide', this.options.onPageHide);
       globalThis.addEventListener('blur', this.options.onWindowBlur);
     }
@@ -155,7 +161,10 @@ export class RenderController {
     if (typeof globalThis.removeEventListener === 'function') {
       globalThis.removeEventListener('keydown', handlers.onKeyDown);
       globalThis.removeEventListener('keyup', handlers.onKeyUp);
+      globalThis.removeEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.removeEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.removeEventListener('focusin', handlers.onFocusIn);
+      globalThis.removeEventListener('focus', handlers.onWindowFocus);
       globalThis.removeEventListener('pagehide', this.options.onPageHide);
       globalThis.removeEventListener('blur', this.options.onWindowBlur);
     }

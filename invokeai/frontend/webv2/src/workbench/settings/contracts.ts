@@ -91,6 +91,11 @@ export interface WorkbenchPreferences {
   confirmImageDeletion: boolean;
   /** The note that browsing a board no longer changes where new results go was shown; once per account. */
   galleryDestinationNoticeShown: boolean;
+  /**
+   * The canvas's trackpad navigation was chosen, by the user toggling it or by the first detected pinch turning it on;
+   * a pinch never turns it on again, so an explicit off stays off.
+   */
+  canvasTrackpadNavigationDecided: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';

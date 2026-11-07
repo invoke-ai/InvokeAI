@@ -24,6 +24,8 @@ const SPACE_TEMP_TOOL: ToolId = 'view';
 const BBOX_TEMP_TOOL: ToolId = 'bbox';
 /** Key-up before this threshold keeps the bbox tool selected, preserving the old tap behavior. */
 const BBOX_QUICK_TAP_MS = 180;
+/** Tool pressure for a pointer that reports none: a mouse, and any pointer while it hovers (the DOM reports 0). */
+const UNREPORTED_PRESSURE = 0.5;
 
 /** Dependencies injected by the engine. */
 export interface PointerPipelineDeps {
@@ -65,7 +67,16 @@ export interface PointerPipelineDeps {
    * pans are not gestures.
    */
   onGestureChange?(active: boolean): void;
+  /**
+   * Whether the document has focus. Absent (tests, detached engines), it is taken as focused. Pointer events still
+   * reach a visible page while another app, the address bar or DevTools has focus, and their modifier state then says
+   * nothing about a Control press the page cannot see.
+   */
+  hasFocus?(): boolean;
 }
+
+/** Whether the physical Control key is down, as far as the pipeline has seen; see `controlKeyState`. */
+export type ControlKeyState = 'down' | 'up' | 'unknown';
 
 /** The pipeline handle: DOM handlers plus lifecycle reset. */
 export interface PointerPipeline {
@@ -78,6 +89,13 @@ export interface PointerPipeline {
   onPointerLeave(): void;
   onKeyDown(event: KeyboardEvent): void;
   onKeyUp(event: KeyboardEvent): void;
+  /**
+   * Window keydown and keyup in the capture phase, which tracks the physical Control key: a handler that stops a key
+   * event's propagation cannot hide it from the window's capture listeners.
+   */
+  onKeyCapture(event: KeyboardEvent): void;
+  /** The window regained focus: a Control press or release made while it was away went unseen. */
+  onWindowFocus(): void;
   /** Window focus moves; records whether focus arrived by pointer, which decides hold-key ownership. */
   onFocusIn(event: FocusEvent): void;
   /** Primary gesture state blocks undo/redo from injecting pixels during live strokes. */
@@ -87,6 +105,22 @@ export interface PointerPipeline {
    * once it left (outside a gesture) or the pipeline reset.
    */
   hoverPoint(): Vec2 | null;
+  /**
+   * The physical Control key, from window key events (seen in the capture phase) and the modifier state pointer events
+   * carry. A pointer event shows it `down` whenever it carries Control, but `up` only while the document has focus;
+   * an unfocused one leaves it `unknown`. `unknown` until the first such event, and again whenever focus may have
+   * changed hands (window focus, and reset on blur, hidden page or detach), since a key pressed meanwhile (in another
+   * window, Ctrl+Tab, remote desktop) is never seen. A trackpad pinch reports `ctrlKey` on wheel events with it `up`.
+   */
+  controlKeyState(): ControlKeyState;
+  /**
+   * The view moved under a still pointer (wheel pan, zoom, fit, resize): delivers a hover move at the unchanged screen
+   * point, so hover-derived tool state (brush ring, bbox handle hover) follows the new document point. It is a hover:
+   * no buttons and hover pressure, with the hovering pointer's type and the modifiers of its last move. Skipped off the
+   * canvas and during a middle-button pan. Skipped during a gesture too: a move synthesized from a view change would
+   * paint stroke segments the user never drew, and the gesture's next real move continues it.
+   */
+  refreshHover(): void;
   /**
    * Cancels capture/tool state and refreshes the cursor. Used on document replacement so a later release cannot
    * commit stale drag state; idle calls do nothing.
@@ -184,6 +218,9 @@ const isDocumentRootTarget = (target: EventTarget | null): boolean => {
 export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipeline => {
   let hovered = false;
   let hoverPoint: Vec2 | null = null;
+  let controlKey: ControlKeyState = 'unknown';
+  // The last move a tool received, so a hover refresh keeps its pointer type and modifiers.
+  let lastToolMove: PointerInput | null = null;
   // Primary-button paint/drag gesture in progress.
   let gestureActive = false;
   let activePointerId: number | null = null;
@@ -217,6 +254,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   const inputOrigin = (): { left: number; top: number } =>
     deps.getInputElement()?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
+  /** Control as a pointer event shows it; see `controlKeyState`. */
+  const observePointerControl = (event: PointerEvent): void => {
+    controlKey = event.ctrlKey ? 'down' : deps.hasFocus?.() === false ? 'unknown' : 'up';
+  };
+
   const buildPointerInput = (event: PointerEvent, origin = inputOrigin()): PointerInput => {
     const screenPoint: Vec2 = { x: event.clientX - origin.left, y: event.clientY - origin.top };
     return {
@@ -224,7 +266,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       documentPoint: deps.viewport.screenToDocument(screenPoint),
       modifiers: { alt: event.altKey, ctrl: event.ctrlKey, meta: event.metaKey, shift: event.shiftKey },
       pointerType: toPointerType(event.pointerType),
-      pressure: event.pressure > 0 ? event.pressure : 0.5,
+      pressure: event.pressure > 0 ? event.pressure : UNREPORTED_PRESSURE,
       screenPoint,
       timeStamp: event.timeStamp,
     };
@@ -422,6 +464,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
     },
+    onKeyCapture: (event) => {
+      // Browsers may still report ctrlKey on the Control key's own release.
+      const released = event.type === 'keyup' && event.key === 'Control';
+      controlKey = !released && (event.key === 'Control' || event.ctrlKey) ? 'down' : 'up';
+    },
     onKeyDown: (event) => {
       if (event.key === 'Escape') {
         // Cancel the gesture before the engine Escape ladder. Editable fields keep Escape; gesture-consuming
@@ -476,6 +523,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         beginBboxTempTool();
       }
     },
+    controlKeyState: () => controlKey,
     heldRestoreToolId: () => (tempHold && tempSwitched ? priorToolId : null),
     hoverPoint: () => hoverPoint,
     isGestureActive: () => gestureActive,
@@ -515,6 +563,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       cancelGesture();
     },
     onPointerDown: (event) => {
+      observePointerControl(event);
       // Ignore extra/secondary buttons pressed during an active gesture or pan.
       if (gestureActive || middlePanning) {
         return;
@@ -577,6 +626,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (activePointerId !== null && event.pointerId !== activePointerId) {
         return;
       }
+      observePointerControl(event);
       const origin = inputOrigin();
       hoverPoint = { x: event.clientX - origin.left, y: event.clientY - origin.top };
       if (middlePanning && middleLast) {
@@ -598,6 +648,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (!last) {
         return;
       }
+      lastToolMove = last;
       deps.getActiveTool()?.onPointerMove?.(deps.getToolContext(), last, batch);
     },
     onPointerUp: (event) => {
@@ -626,10 +677,26 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
     },
+    onWindowFocus: () => {
+      controlKey = 'unknown';
+    },
     replaceTemporaryRestoreTool: (current, replacement) => {
       if (tempHold && priorToolId === current) {
         priorToolId = replacement;
       }
+    },
+    refreshHover: () => {
+      if (!hovered || !hoverPoint || !lastToolMove || gestureActive || middlePanning) {
+        return;
+      }
+      const input: PointerInput = {
+        ...lastToolMove,
+        buttons: 0,
+        documentPoint: deps.viewport.screenToDocument(hoverPoint),
+        pressure: UNREPORTED_PRESSURE,
+        screenPoint: hoverPoint,
+      };
+      deps.getActiveTool()?.onPointerMove?.(deps.getToolContext(), input, [input]);
     },
     reset: () => {
       // Cancel through the tool that owns the gesture before a held temporary tool is restored.
@@ -642,6 +709,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       altClaimed = false;
       hovered = false;
       hoverPoint = null;
+      lastToolMove = null;
+      controlKey = 'unknown';
       gestureActive = false;
       activePointerId = null;
       cancelledPointerId = null;

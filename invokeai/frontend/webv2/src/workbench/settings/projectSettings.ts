@@ -77,6 +77,7 @@ export const getLayeredSettings = (): LayeredSettingsTable =>
         showGrid: typedBoolean(false),
         showProgressOnCanvas: typedBoolean(true),
         snapToGrid: typedBoolean(true),
+        trackpadNavigation: typedBoolean(false),
       },
       gallery: {
         boardOrderBy: oneOf('created_at', ['board_name']),
