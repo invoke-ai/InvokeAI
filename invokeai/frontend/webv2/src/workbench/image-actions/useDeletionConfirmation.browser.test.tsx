@@ -37,6 +37,9 @@ vi.mock('react-i18next', () => ({
           count === 1 ? 'Permanently delete the item.' : 'Permanently delete these items.',
         'widgets.gallery.deleteItemsConfirmTitle': count === 1 ? 'Delete item?' : `Delete ${count} items?`,
         'widgets.gallery.deleteInUse.heading': 'Still used in this project:',
+        'widgets.gallery.deleteStarredNoticeSingle': 'This item is starred.',
+        'widgets.gallery.deleteStarredNotice':
+          count === 1 ? '1 of these is starred.' : `${count} of these are starred.`,
         'widgets.gallery.deleteInUse.surface.canvasRaster': 'Canvas raster layers',
         'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
         'widgets.gallery.deleteInUse.usedCount': count === 1 ? '1 selected item' : `${count} selected items`,
@@ -152,7 +155,7 @@ describe('useDeletionConfirmation', () => {
 
     expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull();
     // Confirming without the skip option leaves confirmation on.
-    expect(getWorkbenchPreferences().confirmImageDeletion).toBe(true);
+    expect(getWorkbenchPreferences().confirmImageDeletion).toBe('always');
   });
 
   it('lists where the project still uses the items, with the count each surface loses', async () => {
@@ -193,20 +196,56 @@ describe('useDeletionConfirmation', () => {
     consoleError.mockRestore();
   });
 
-  it('offers no opt-out when routine confirmations are already off and the media is in use', async () => {
-    await patchWorkbenchPreferences({ confirmImageDeletion: false });
+  it.each(['starred', 'never'] as const)(
+    'offers no opt-out when routine confirmations are already off (%s) and the media is in use',
+    async (mode) => {
+      await patchWorkbenchPreferences({ confirmImageDeletion: mode });
 
+      await act(() => {
+        void confirmationRef.current!.requestDeletionConfirmation(
+          imageRefs,
+          vi.fn(async () => {}),
+          { canSkipFutureConfirmations: true, usage: [{ names: ['image.png'], surface: 'canvasRaster' }] }
+        );
+      });
+
+      expect(openDialog()?.textContent).toContain('Still used in this project:');
+      expect(skipCheckbox()).toBeNull();
+      expect(openDialog()?.textContent).not.toContain('You can turn this confirmation back on in Settings.');
+    }
+  );
+
+  it.each([
+    [0, null],
+    [1, '1 of these is starred.'],
+    [2, '2 of these are starred.'],
+  ])('says how many of the items are starred when %i of them are', async (starredCount, notice) => {
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        mixedRefs,
+        vi.fn(async () => {}),
+        { starredCount }
+      );
+    });
+
+    if (notice) {
+      expect(openDialog()?.textContent).toContain(notice);
+    } else {
+      expect(openDialog()?.textContent).not.toContain('starred');
+    }
+  });
+
+  it('says it plainly when the one item is starred', async () => {
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
         vi.fn(async () => {}),
-        { canSkipFutureConfirmations: true, usage: [{ names: ['image.png'], surface: 'canvasRaster' }] }
+        { starredCount: 1 }
       );
     });
 
-    expect(openDialog()?.textContent).toContain('Still used in this project:');
-    expect(skipCheckbox()).toBeNull();
-    expect(openDialog()?.textContent).not.toContain('You can turn this confirmation back on in Settings.');
+    expect(openDialog()?.textContent).toContain('This item is starred.');
+    expect(openDialog()?.textContent).not.toContain('of these');
   });
 
   it('offers no opt-out to a request that cannot skip it, such as a batch or an item off screen', async () => {
@@ -353,12 +392,13 @@ describe('useDeletionConfirmation', () => {
     });
     await act(() => userEvent.click(skipLabel()!));
     expect(skipCheckbox()?.checked).toBe(true);
-    expect(getWorkbenchPreferences().confirmImageDeletion).toBe(true);
+    expect(getWorkbenchPreferences().confirmImageDeletion).toBe('always');
 
     await clickButton('Delete');
 
     expect(executeDeletion).toHaveBeenCalledOnce();
-    expect(getWorkbenchPreferences().confirmImageDeletion).toBe(false);
+    // Starred media keeps asking: the opt-out covers routine deletions only.
+    expect(getWorkbenchPreferences().confirmImageDeletion).toBe('starred');
   });
 
   it.each(['Cancel', 'Escape', 'the close button'] as const)(
@@ -385,7 +425,7 @@ describe('useDeletionConfirmation', () => {
       await request;
 
       expect(executeDeletion).not.toHaveBeenCalled();
-      expect(getWorkbenchPreferences().confirmImageDeletion).toBe(true);
+      expect(getWorkbenchPreferences().confirmImageDeletion).toBe('always');
     }
   );
 

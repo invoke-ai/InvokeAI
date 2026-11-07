@@ -1,5 +1,6 @@
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type {
+  ImageDeletionConfirmation,
   ProjectSortId,
   ProjectsViewId,
   ScopedDefaults,
@@ -37,12 +38,14 @@ export const DEVELOPER_LOG_LEVELS: readonly LogLevel[] = LOG_LEVELS;
 
 export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
+const IMAGE_DELETION_CONFIRMATIONS: readonly ImageDeletionConfirmation[] = ['always', 'starred', 'never'];
+
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
   antialiasProgressImages: false,
   autoSwitchInvocationRoute: true,
   canvasToolMemory: {},
-  confirmImageDeletion: true,
+  confirmImageDeletion: 'always',
   controlModelMemory: {},
   customHotkeys: {},
   developerConsoleOutputEnabled: false,
@@ -377,9 +380,8 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       : DEFAULT_PREFERENCES.autoSwitchInvocationRoute,
   canvasToolMemory: normalizeCanvasToolMemoryRecord(preferences?.canvasToolMemory),
   confirmImageDeletion:
-    typeof preferences?.confirmImageDeletion === 'boolean'
-      ? preferences.confirmImageDeletion
-      : DEFAULT_PREFERENCES.confirmImageDeletion,
+    IMAGE_DELETION_CONFIRMATIONS.find((mode) => mode === preferences?.confirmImageDeletion) ??
+    DEFAULT_PREFERENCES.confirmImageDeletion,
   controlModelMemory: normalizeControlModelMemory(preferences?.controlModelMemory),
   customHotkeys: normalizeCustomHotkeys(preferences?.customHotkeys),
   developerLogEnabled:

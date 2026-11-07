@@ -59,6 +59,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardMediaDeleted': `Deleted ${String(values?.media)}.`,
         'widgets.gallery.deleteBoardMediaFailed': `${String(values?.media)} could not be deleted.`,
         'widgets.gallery.deleteBoardMoveOutcome': `Moved ${String(values?.media)} to Uncategorized.`,
+        'widgets.gallery.deleteBoardStarredKept': `${String(values?.media)} starred kept in Uncategorized.`,
         'widgets.gallery.deleteBoardPartialTitle': `Deleted board "${String(values?.name)}" with partial media cleanup`,
         'widgets.gallery.deleteBoardSuccessTitle': `Deleted board "${String(values?.name)}"`,
         'widgets.gallery.downloadReady': 'Download ready',
@@ -291,6 +292,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: [],
       failedImageNames: [],
       failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     };
     mocks.deleteGalleryBoard.mockResolvedValue(outcome);
 
@@ -316,6 +319,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: [],
       failedImageNames: [],
       failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     });
 
     await act(async () => {
@@ -357,6 +362,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: [],
       failedImageNames: [],
       failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     });
     await act(() => deletion);
 
@@ -377,6 +384,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: ['one.mp4'],
       failedImageNames: ['locked.png'],
       failedVideoNames: ['locked.mp4'],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     });
 
     await act(async () => {
@@ -387,6 +396,61 @@ describe('deleteBoard', () => {
       kind: 'success',
       message: 'Deleted 2 images and 1 video. 1 image and 1 video could not be deleted.',
       title: 'Deleted board "Board 1" with partial media cleanup',
+    });
+  });
+});
+
+describe('deleteBoard with starred media', () => {
+  it('deletes starred media with the board unless asked to keep them', async () => {
+    mocks.deleteGalleryBoard.mockResolvedValue({
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: ['plain.png', 'starred.png'],
+      deletedVideoNames: [],
+      failedImageNames: [],
+      failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
+    });
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', true);
+    });
+
+    expect(mocks.deleteGalleryBoard).toHaveBeenCalledWith('board-1', true, expect.any(AbortSignal), {
+      deleteStarred: true,
+    });
+  });
+
+  it('keeps the starred items when asked to, and says they moved to Uncategorized', async () => {
+    const outcome = {
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: ['plain.png'],
+      deletedVideoNames: [],
+      failedImageNames: [],
+      failedVideoNames: [],
+      protectedImageNames: ['starred.png', 'starred-too.png'],
+      protectedVideoNames: ['starred.mp4'],
+    };
+    mocks.deleteGalleryBoard.mockResolvedValue(outcome);
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', true, true);
+    });
+
+    expect(mocks.deleteGalleryBoard).toHaveBeenCalledWith('board-1', true, expect.any(AbortSignal), {
+      deleteStarred: false,
+    });
+    expect(reconcileDeletedBoardOutcome).toHaveBeenCalledWith(outcome);
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Deleted 1 image. 2 images and 1 video starred kept in Uncategorized.',
+      title: 'Deleted board "Board 1"',
     });
   });
 });

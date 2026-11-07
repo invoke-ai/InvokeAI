@@ -249,18 +249,19 @@ describe('buildSettingsEntries', () => {
     expect(openSettingsSection).toHaveBeenCalledWith('workflow');
   });
 
-  it('links deletion confirmation to Gallery while keeping its direct toggle', () => {
+  it('links deletion confirmation to Gallery and picks its mode in a stage', () => {
     const openSettingsSection = vi.fn();
     const patchPreferences = vi.fn();
     const entries = buildSettingsEntries(
-      { ...DEFAULT_PREFERENCES, confirmImageDeletion: true },
+      { ...DEFAULT_PREFERENCES, confirmImageDeletion: 'always' },
       { ...settingsEntryDeps, openSettingsSection, patchPreferences },
       t
     );
     const confirmation = entries.find((entry) => entry.id === 'setting.confirmImageDeletion');
 
-    confirmation?.run();
-    expect(patchPreferences).toHaveBeenCalledWith({ confirmImageDeletion: false });
+    expect(confirmation?.stage?.options.find(({ isCurrent }) => isCurrent)?.id).toBe('always');
+    confirmation?.stage?.options.find(({ id }) => id === 'starred')?.apply();
+    expect(patchPreferences).toHaveBeenCalledWith({ confirmImageDeletion: 'starred' });
     confirmation?.secondary?.run();
     expect(openSettingsSection).toHaveBeenCalledWith({ entryId: 'confirmImageDeletion', sectionId: 'gallery' });
   });

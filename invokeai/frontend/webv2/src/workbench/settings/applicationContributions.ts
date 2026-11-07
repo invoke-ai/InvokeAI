@@ -86,7 +86,19 @@ export const hotkeysSettings = section('hotkeys', 'Keyboard shortcuts', [
   custom('hotkeys', 'Keyboard shortcuts', 'preference', { fill: true }),
 ]);
 export const galleryPreferenceSettings = section('gallery', 'Gallery', [
-  preference('confirmImageDeletion', 'Confirm image deletion', 'delete safety'),
+  {
+    id: 'confirmImageDeletion',
+    label: text('confirmImageDeletion.label', 'Confirm image deletion'),
+    description: text('confirmImageDeletion.description'),
+    keywords: 'delete safety star starred favorite ask',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'always', label: text('options.confirmAlways', 'Always') },
+      { value: 'starred', label: text('options.confirmStarredOnly', 'Only for starred media') },
+      { value: 'never', label: text('options.confirmNever', 'Never') },
+    ],
+  },
 ]);
 export const previewPreferenceSettings = section('preview', 'Preview', [
   preference('antialiasProgressImages', 'Antialias progress images'),

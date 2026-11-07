@@ -70,6 +70,65 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     });
   });
 
+  it('sends the protection flag only when starred media must be kept, and reports the items it kept', async () => {
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({
+        affected_boards: ['board-a'],
+        deleted_images: ['plain.png'],
+        failed_images: [],
+        starred_skipped: ['star.png'],
+      })
+      .mockResolvedValueOnce({
+        affected_boards: [],
+        deleted_videos: [],
+        failed_videos: [],
+        starred_skipped: ['star.mp4'],
+      });
+
+    await expect(
+      galleryItemOrganization.delete([imageRef('plain.png'), imageRef('star.png')], undefined, {
+        deleteStarred: false,
+      })
+    ).resolves.toEqual({
+      affectedBoardIds: ['board-a'],
+      failed: [imageRef('star.png')],
+      starredSkipped: [imageRef('star.png')],
+      succeeded: [imageRef('plain.png')],
+    });
+    await expect(
+      galleryItemOrganization.delete([videoRef('star.mp4')], undefined, { deleteStarred: false })
+    ).resolves.toEqual({
+      affectedBoardIds: [],
+      failed: [videoRef('star.mp4')],
+      starredSkipped: [videoRef('star.mp4')],
+      succeeded: [],
+    });
+
+    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(1, '/api/v1/images/delete', {
+      body: JSON.stringify({ delete_starred: false, image_names: ['plain.png', 'star.png'] }),
+      method: 'POST',
+      signal: undefined,
+    });
+    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/videos/delete', {
+      body: JSON.stringify({ delete_starred: false, video_names: ['star.mp4'] }),
+      method: 'POST',
+      signal: undefined,
+    });
+  });
+
+  it('ignores a kept name it never asked to delete', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      affected_boards: [],
+      deleted_images: [],
+      failed_images: [],
+      starred_skipped: ['other.png'],
+    });
+
+    await expect(
+      galleryItemOrganization.delete([imageRef('asked.png')], undefined, { deleteStarred: false })
+    ).resolves.toEqual({ affectedBoardIds: [], failed: [imageRef('asked.png')], succeeded: [] });
+  });
+
   it('uses the video bulk star, unstar, and delete DTOs without inferring success', async () => {
     mocks.apiFetchJson
       .mockResolvedValueOnce({ affected_boards: ['board-a'], failed_videos: [], starred_videos: ['clip.mp4'] })
