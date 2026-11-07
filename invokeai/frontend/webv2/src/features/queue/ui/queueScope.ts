@@ -3,9 +3,9 @@ import type { QueueItemReadModel, QueueQueryScope, QueueReadModel } from '@featu
 import type { TFunction } from 'i18next';
 
 import { buildProjectQueueItemOriginPrefix, parseQueueItemOrigin } from '@features/queue/data/events';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
-import { useQueueUi, type QueueViewer } from './QueueUiContext';
+import { useQueueUi, type QueueLocalRun, type QueueViewer } from './QueueUiContext';
 
 export type QueueJobsScope = 'active-project' | 'all';
 
@@ -76,6 +76,94 @@ export const useQueueQueryScope = (): QueueQueryScope => {
   const { activeProjectId: projectId, queueJobsScope } = useQueueUi();
 
   return useMemo(() => getQueueQueryScope({ projectId, queueJobsScope }), [projectId, queueJobsScope]);
+};
+
+/**
+ * This tab's runs the backend has not accepted, within the queue scope setting: the active project's alone, or every
+ * open project's. The same reach as the query scope and the bulk actions; cancel-all counts all of them, shown or not
+ * (`useShownLocalRuns`).
+ */
+export const useScopedLocalRuns = (): readonly QueueLocalRun[] => {
+  const { activeProjectId, localRuns, queueJobsScope } = useQueueUi();
+  const projectId = queueJobsScope === 'active-project' ? activeProjectId : null;
+
+  return useMemo(
+    () => (projectId === null ? localRuns : localRuns.filter((run) => run.projectId === projectId)),
+    [localRuns, projectId]
+  );
+};
+
+/**
+ * A first enqueue usually lands well within this. Showing it sooner would flash a row, and a count, on every Invoke
+ * before the backend's row replaces it.
+ */
+export const LOCAL_RUN_REVEAL_DELAY_MS = 1000;
+
+const NO_LOCAL_RUNS: readonly QueueLocalRun[] = [];
+
+/** When a run earns its row: at once after a failure or while offline, otherwise once its enqueue outlasts the delay. */
+const getRevealAt = (run: QueueLocalRun, isConnected: boolean): number =>
+  run.retry !== null || !isConnected ? Number.NEGATIVE_INFINITY : run.submittedAt + LOCAL_RUN_REVEAL_DELAY_MS;
+
+/**
+ * The scoped runs the queue widget lists and counts: those `getRevealAt` has reached. A run restored from storage is old,
+ * so it shows at once; a hung first request shows after the delay. Its caller re-renders as each one comes due, on one
+ * timer at a time, cleared when it unmounts.
+ */
+export const useShownLocalRuns = (): readonly QueueLocalRun[] => {
+  const { isConnected } = useQueueUi();
+  const runs = useScopedLocalRuns();
+  const revealTimes = useMemo(
+    () => runs.map((run) => getRevealAt(run, isConnected)).sort((left, right) => left - right),
+    [isConnected, runs]
+  );
+  // How many reveal times have passed: it changes only as one comes due, so the clock is read outside render.
+  const getDueCount = useCallback(() => {
+    const now = Date.now();
+    const next = revealTimes.findIndex((time) => time > now);
+
+    return next === -1 ? revealTimes.length : next;
+  }, [revealTimes]);
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const schedule = () => {
+        const now = Date.now();
+        const next = revealTimes.find((time) => time > now);
+
+        if (next !== undefined) {
+          // At most the delay: a reveal further off means the clock moved back since the run was queued, and a delay
+          // past setTimeout's 2^31-1 ms range would fire at once, again and again.
+          timer = setTimeout(
+            () => {
+              notify();
+              schedule();
+            },
+            Math.min(next - now, LOCAL_RUN_REVEAL_DELAY_MS)
+          );
+        }
+      };
+
+      schedule();
+      return () => clearTimeout(timer);
+    },
+    [revealTimes]
+  );
+  const dueCount = useSyncExternalStore(subscribe, getDueCount, getDueCount);
+
+  return useMemo(() => {
+    if (dueCount === runs.length) {
+      return runs;
+    }
+
+    if (dueCount === 0) {
+      return NO_LOCAL_RUNS;
+    }
+
+    const latestDue = revealTimes[dueCount - 1]!;
+
+    return runs.filter((run) => getRevealAt(run, isConnected) <= latestDue);
+  }, [dueCount, isConnected, revealTimes, runs]);
 };
 
 /**

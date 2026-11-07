@@ -256,6 +256,7 @@ export interface CanvasEngineErrorReport {
   /** The raw failure; notifications show its message and diagnostics keep its stack. */
   context: { error: unknown; layerId?: string; label?: string };
   message:
+    | 'PSD export failed'
     | 'Layer thumbnail rasterization failed'
     | 'Bitmap persistence failed'
     | 'Bitmap persistence suspended'
@@ -399,6 +400,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     colorPair: stores.colorPair,
     controlLayerView: stores.controlLayerView,
     documentEditingLocked: stores.documentEditingLocked,
+    psdExportStatus: stores.psdExportStatus,
     eraserOptions: stores.eraserOptions,
     gradientOptions: stores.gradientOptions,
     hasFloatingSelection: stores.hasFloatingSelection,
@@ -2508,15 +2510,28 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const psdExportController = new PsdExportController({
     backend,
+    onStatus: (status) => stores.psdExportStatus.set(status),
     captureDocumentSnapshot,
     captureRasterSnapshot,
     getAvailableBytes: () => rasterController.memory.getAvailableBytes(),
     isDocumentSnapshotCurrent,
-    reserve: (bytes) =>
-      rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' }),
+    reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'psd-export' }),
     runSpatial: (request) => rasterController.spatial.run(request),
   });
-  const exportRasterLayersToPsd = (fileName: string): Promise<PsdExportResult> => psdExportController.export(fileName);
+  const exportRasterLayersToPsd = async (fileName: string): Promise<PsdExportResult> => {
+    try {
+      return await psdExportController.export(fileName);
+    } catch (error) {
+      opts.reportError({
+        namespace: 'canvas',
+        area: 'canvas-engine',
+        projectId,
+        message: 'PSD export failed',
+        context: { error },
+      });
+      throw error;
+    }
+  };
 
   const rasterizeLayer = (layerId: string): Promise<RasterizeLayerResult> =>
     layerController.rasterize.rasterize(layerId);
@@ -2944,6 +2959,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     exportLayerPixels: rasterizeLayerPixels,
     exportRasterComposite,
     exportRasterLayersToPsd,
+    cancelPsdExport: () => psdExportController.cancel(),
     extractMaskedArea,
     getCompositeExecutorDeps,
     hasExportableLayerContent,

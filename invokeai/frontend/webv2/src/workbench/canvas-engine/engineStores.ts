@@ -3,6 +3,7 @@
  * them to React without coupling the engine to UI.
  */
 
+import type { PsdExportStatus } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasLayerSourceContract,
   CanvasTextFontRef,
@@ -539,6 +540,7 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
+  psdExportStatus: ScalarStore<PsdExportStatus>;
   /** The layer targeted by that operation, or null when no operation is active. */
   documentEditingLayerId: ScalarStore<string | null>;
   /** The control layer displayed as its original (or original under map); null displays every map. */
@@ -713,6 +715,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLayerId: createScalarStore<string | null>(null),
   documentEditingLocked: createScalarStore<boolean>(false),
+  psdExportStatus: createScalarStore<PsdExportStatus>('idle'),
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),

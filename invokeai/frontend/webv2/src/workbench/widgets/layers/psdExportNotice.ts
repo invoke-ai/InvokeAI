@@ -21,6 +21,7 @@ export const getPsdExportNotice = (result: Exclude<PsdExportResult, AdjustmentRe
     return { key: 'widgets.layers.groupActions.exportUnreadable', options: { name: result.layerName } };
   }
   switch (result) {
+    case 'busy':
     case 'exported':
       return null;
     case 'not-ready':

@@ -24,7 +24,13 @@ import type { QueueUiNotificationPort, QueueViewer } from './QueueUiContext';
 
 import { requestQueueConfirmation, type QueueConfirmation } from './queueConfirmationStore';
 import { refreshQueue, useIsProcessorPaused, useNowNextItems, useQueueCounts } from './queueDataStore';
-import { translateScoped, useQueueActionScope, useQueueQueryScope, type QueueActionScope } from './queueScope';
+import {
+  translateScoped,
+  useQueueActionScope,
+  useQueueQueryScope,
+  useScopedLocalRuns,
+  type QueueActionScope,
+} from './queueScope';
 import { useQueueUi } from './QueueUiContext';
 
 export type QueueActionId =
@@ -290,9 +296,8 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
     activeProjectId,
     canManageItem,
     canManageProcessor,
-    cancelLocalUnsubmittedRuns,
+    cancelLocalRuns,
     isConnected,
-    localUnsubmittedRuns,
     notify,
     openQueue,
     viewer,
@@ -300,8 +305,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   const counts = useMemo(() => getQueueActionCounts(serverCounts, scope, viewer), [scope, serverCounts, viewer]);
   const hasRunningItem = current?.status === 'in_progress' && canManageItem(current);
   const localProjectId = scope.kind === 'project' ? activeProjectId : null;
-  const localUnsubmitted =
-    localProjectId === null ? localUnsubmittedRuns.allProjects : localUnsubmittedRuns.activeProject;
+  const localUnsubmitted = useScopedLocalRuns().length;
 
   const runners = useMemo<Record<QueueActionId, () => Promise<void>>>(() => {
     // Each result repeats the counts its confirmation named: both come from the model the trigger was built with.
@@ -315,7 +319,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
       cancelOnServer: () => Promise<void>,
       describeRequested: (count: number) => string
     ): Promise<void> => {
-      cancelLocalUnsubmittedRuns(localProjectId);
+      cancelLocalRuns(localProjectId);
       await (serverCount > 0 ? cancelOnServer().then(() => refreshQueue()) : Promise.resolve())
         .then(() =>
           notify.success(
@@ -446,7 +450,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
     };
   }, [
     canManageItem,
-    cancelLocalUnsubmittedRuns,
+    cancelLocalRuns,
     counts,
     current,
     hasRunningItem,

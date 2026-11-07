@@ -63,6 +63,7 @@ const LayerStackHeaderComponent = ({
 }: LayerStackHeaderProps) => {
   const { t } = useTranslation();
   const actions = useLayerStackActions(stack, document, engine, editingLocked);
+  const exportStatus = actions.find((action) => action.status)?.status;
   const handleToggle = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -152,6 +153,11 @@ const LayerStackHeaderComponent = ({
           </Text>
           <FeatureHintExclusion>
             <HStack gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepFocus}>
+              {exportStatus && (
+                <Text role="status" color="fg.muted" fontSize="xs" maxW="7rem" truncate>
+                  {exportStatus}
+                </Text>
+              )}
               {actions.map((action) => (
                 <Tooltip key={action.id} content={action.label}>
                   <IconButton

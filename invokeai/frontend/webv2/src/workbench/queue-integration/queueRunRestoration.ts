@@ -1,7 +1,8 @@
+import type { QueueSubmissionRetry } from '@features/queue/contracts';
 import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
 import { cloneGenerateWidgetValues, normalizeGenerateWidgetValues } from '@features/generation/settings';
-import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { boundSubmissionRetryMessage, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { cloneVideoWidgetValues, normalizeVideoWidgetValues } from '@features/video';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -13,6 +14,44 @@ const isBackendItemIdList = (value: unknown): value is number[] =>
   value.length <= MAX_QUEUE_BATCH_ITEMS &&
   new Set(value).size === value.length &&
   value.every((item) => Number.isSafeInteger(item) && item > 0);
+
+/**
+ * A retry record only means something with its invariants intact; anything else, including a reason a later build
+ * added, is dropped, never the run. Its message is bounded again, as records from before the bound may hold a whole
+ * response body.
+ */
+const normalizeSubmissionRetry = (value: unknown): QueueSubmissionRetry | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const { failedAt, failureCount, message, reason, serverErrorCount, serverErrorSince, status } = value;
+  if (
+    (reason !== 'error' && reason !== 'server-error' && reason !== 'unavailable' && reason !== 'unreachable') ||
+    typeof message !== 'string' ||
+    !isFiniteNumber(failedAt) ||
+    (status !== null && !(Number.isSafeInteger(status) && (status as number) >= 100 && (status as number) <= 599)) ||
+    !Number.isSafeInteger(serverErrorCount) ||
+    (serverErrorCount as number) < 0 ||
+    // Server errors are among the consecutive failures, and the latest failure is one of them.
+    !Number.isSafeInteger(failureCount) ||
+    (failureCount as number) < Math.max(serverErrorCount as number, 1) ||
+    (reason === 'server-error') !== (serverErrorCount as number) > 0 ||
+    (serverErrorCount === 0
+      ? serverErrorSince !== null
+      : !isFiniteNumber(serverErrorSince) || serverErrorSince > failedAt)
+  ) {
+    return undefined;
+  }
+  return {
+    failedAt,
+    failureCount: failureCount as number,
+    message: boundSubmissionRetryMessage(message),
+    reason,
+    serverErrorCount: serverErrorCount as number,
+    serverErrorSince: serverErrorSince as number | null,
+    status: status as number | null,
+  };
+};
 
 export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem | null => {
   if (
@@ -102,6 +141,10 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
     return null;
   }
 
+  // Only a run the backend has not accepted is still being submitted.
+  const submissionRetry =
+    value.status === 'pending' && !backendItemIds?.length ? normalizeSubmissionRetry(value.submissionRetry) : undefined;
+
   let recall: WorkbenchQueueItem['snapshot']['recall'];
   try {
     const rawRecall = isRecord(snapshot.recall) ? snapshot.recall : null;
@@ -166,5 +209,6 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
       submittedAt: snapshot.submittedAt,
     },
     status: value.status,
+    ...(submissionRetry ? { submissionRetry } : {}),
   };
 };

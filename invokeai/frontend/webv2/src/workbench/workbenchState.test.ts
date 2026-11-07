@@ -1534,6 +1534,60 @@ describe('adopting a project from another realm', () => {
     expect(normalized.queue).toBe(project.queue);
   });
 
+  it('keeps the failed submission of a run until the backend accepts it or the run ends', () => {
+    let state = submitGenerate(primeGenerate());
+    const projectId = state.activeProjectId;
+    const queueItemId = getActiveProject(state).queue.items[0]!.id;
+    const recordRetry = (current: WorkbenchState) =>
+      workbenchReducer(current, {
+        projectId,
+        queueItemId,
+        retry: {
+          failedAt: 2_000,
+          failureCount: 1,
+          message: 'unavailable',
+          reason: 'unavailable',
+          serverErrorCount: 0,
+          serverErrorSince: null,
+          status: 503,
+        },
+        type: 'recordQueueItemSubmissionRetry',
+      });
+
+    state = recordRetry(state);
+    expect(getActiveProject(state).queue.items[0]?.submissionRetry).toMatchObject({
+      reason: 'unavailable',
+      status: 503,
+    });
+    expect(recordRetry(state)).toBe(state);
+
+    const accepted = workbenchReducer(state, {
+      backendItemIds: [42],
+      projectId,
+      queueItemId,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    expect(getActiveProject(accepted).queue.items[0]).not.toHaveProperty('submissionRetry');
+    // A late answer to an earlier attempt does not bring it back.
+    expect(recordRetry(accepted)).toBe(accepted);
+
+    const failed = workbenchReducer(state, {
+      error: 'graph validation crashed',
+      projectId,
+      queueItemId,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    const cancelled = workbenchReducer(state, { notice: null, projectId, queueItemId, type: 'cancelQueueItem' });
+    for (const [ended, status] of [
+      [failed, 'failed'],
+      [cancelled, 'cancelled'],
+    ] as const) {
+      expect(getActiveProject(ended).queue.items[0]).toMatchObject({ status });
+      expect(getActiveProject(ended).queue.items[0]).not.toHaveProperty('submissionRetry');
+    }
+  });
+
   it('preserves and routes live queue work when server content replaces a project', () => {
     let state = submitGenerate(primeGenerate());
     const liveProject = getActiveProject(state);
