@@ -324,3 +324,34 @@ def test_diffusers_text_encoder_layers_that_are_not_encoder_linears_are_skipped_
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert "Skipped 3 " in warnings[0]
+
+
+def test_onetrainer_comfy_text_encoder_keys_are_routed_beside_diffusion_model_transformer_keys(
+    caplog: pytest.LogCaptureFixture,
+):
+    """OneTrainer's COMFY_LORA export writes encoder layers as `text_encoders.qwen25_7b.transformer.<module>`."""
+    te = "text_encoders.qwen25_7b.transformer."
+    modules = {
+        f"{te}model.language_model.layers.0.mlp.down_proj": (18944, 3584),
+        f"{te}model.visual.blocks.0.attn.qkv": (1280, 3840),
+        f"{te}model.visual.merger.mlp.0": (5120, 5120),
+        f"{te}lm_head": (3584, 152064),
+        "diffusion_model.transformer_blocks.0.attn.to_k": (3072, 3072),
+    }
+    state_dict = {}
+    for layer, (in_features, out_features) in modules.items():
+        state_dict[f"{layer}.lora_down.weight"] = torch.empty(8, in_features)
+        state_dict[f"{layer}.lora_up.weight"] = torch.empty(out_features, 8)
+
+    with caplog.at_level(logging.WARNING):
+        model = lora_model_from_qwen_image_state_dict(state_dict, alpha=None)
+
+    t, v = QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX, QWEN_IMAGE_LORA_QWEN_VL_PREFIX
+    assert set(model.layers) == {
+        f"{t}transformer_blocks.0.attn.to_k",
+        f"{v}model.language_model.layers.0.mlp.down_proj",
+        f"{v}model.visual.blocks.0.attn.qkv",
+        f"{v}model.visual.merger.mlp.0",
+        f"{v}lm_head",
+    }
+    assert not [r for r in caplog.records if r.levelno == logging.WARNING]

@@ -101,7 +101,11 @@ def test_only_the_qwen_image_probe_claims_a_qwen_image_lora(prefix: str, tmp_pat
 
 @pytest.mark.parametrize(
     ("prefix", "text_encoder_prefix"),
-    [("", "text_encoder."), ("base_model.model.", "base_model.model.text_encoder.")],
+    [
+        ("", "text_encoder."),
+        ("base_model.model.", "base_model.model.text_encoder."),
+        ("diffusion_model.", "text_encoders.qwen25_7b.transformer."),
+    ],
 )
 def test_a_lora_with_text_encoder_layers_is_still_claimed_by_the_qwen_image_probe_alone(
     prefix: str, text_encoder_prefix: str, tmp_path: Path

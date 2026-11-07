@@ -7,7 +7,8 @@ Supports multiple LoRA formats:
 - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight (underscores instead of dots)
 
 Text-encoder layers are routed to the Qwen2.5-VL encoder under their own prefix:
-- Diffusers/PEFT: text_encoder.model.language_model.layers.0.mlp.down_proj.lora_A.weight (also base_model.model.)
+- Diffusers/PEFT: text_encoder.model.language_model.layers.0.mlp.down_proj.lora_A.weight (also base_model.model.,
+  and OneTrainer's ComfyUI export text_encoders.qwen25_7b.transformer.)
 - Kohya: lora_te_model_language_model_layers_0_mlp_down_proj.lora_down.weight
 """
 
@@ -32,7 +33,13 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util import InvokeAILogger
 
 _KOHYA_TEXT_ENCODER_PREFIX = "lora_te_"
-_DIFFUSERS_TEXT_ENCODER_PREFIXES = ("base_model.model.text_encoder.", "text_encoder.")
+# `text_encoders.qwen25_7b.transformer.` is OneTrainer's ComfyUI export (`QwenModel.lora_text_encoders`), written beside
+# `diffusion_model.` transformer keys.
+_DIFFUSERS_TEXT_ENCODER_PREFIXES = (
+    "base_model.model.text_encoder.",
+    "text_encoder.",
+    "text_encoders.qwen25_7b.transformer.",
+)
 
 _MLP: ParsingTree = {"gate_proj": {}, "up_proj": {}, "down_proj": {}}
 
