@@ -491,7 +491,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         transformer_config = context.models.get_config(self.transformer.transformer)
         # The forward's activations, which the cache keeps free by offloading as much of the transformer as that
-        # takes, plus the per-forward dequantization transient of an nvfp4 or GGUF build, alive alongside them and
+        # takes, plus the per-forward dequantization transient of an nvfp4, int8 or GGUF build, alive alongside them and
         # invisible to the estimate. All read from the unlocked model, before the lock; the transient is zero for a
         # dense build.
         text_seq_len = max(
