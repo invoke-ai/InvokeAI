@@ -305,17 +305,27 @@ class GalleryService(GalleryServiceABC):
         """Who uses the checked media: the caller's documents and queue work by name, everyone else's as counts."""
         by_kind: tuple[tuple[MediaKind, set[str]], ...] = (("image", checked.images), ("video", checked.videos))
 
-        def read(q: Queries) -> tuple[list[tuple[MediaKind, str, _Owner]], dict[_Owner, str]]:
+        def read(
+            q: Queries,
+        ) -> tuple[list[tuple[MediaKind, str, _Owner]], dict[_Owner, str], dict[str, tuple[int, Optional[int]]]]:
             rows = [
                 (kind, media, (owner_kind, owner_user, owner_id))
                 for kind, names in by_kind
                 if names
                 for media, owner_kind, owner_user, owner_id in q.media_references.owners(kind, names)
             ]
-            # Only the caller's own documents are named.
-            return rows, q.media_references.document_names({owner for _, _, owner in rows if owner[1] == user_id})
+            callers = {owner for _, _, owner in rows if owner[1] == user_id}
+            # Only the caller's own documents are named. A project's revisions are read in the same transaction as
+            # its references, which are written in the transaction that saves it: they describe the state the names
+            # were read from, which a client compares with the copy it holds.
+            projects = sorted(
+                {owner_id for owner_kind, _, owner_id in callers if _document_of(owner_kind, owner_id)[0] == "project"}
+            )
+            return rows, q.media_references.document_names(callers), q.projects.revisions(user_id, projects)
 
-        rows, document_names = self._queries.run(read, read_only=True) if not checked.is_empty() else ([], {})
+        rows, document_names, revisions = (
+            self._queries.run(read, read_only=True) if not checked.is_empty() else ([], {}, {})
+        )
         active = self.__invoker.services.intermediates.get_active_queue_uses(checked)
 
         in_use = MediaReferences()
@@ -350,19 +360,25 @@ class GalleryService(GalleryServiceABC):
                 names.images |= item.images
                 names.videos |= item.videos
 
-        documents = [
-            GalleryMediaUsageDocument(
-                kind=kind,
-                id=document_id,
-                # A project's own name before a workspace's: sorted owners put `project` first.
-                name=next((document_names[o] for o in sorted(use.owners) if o in document_names), None),
-                image_names=_capped(use.names.images),
-                video_names=_capped(use.names.videos),
-                image_count=len(use.names.images),
-                video_count=len(use.names.videos),
+        documents: list[GalleryMediaUsageDocument] = []
+        for (kind, document_id), use in mine.items():
+            revision, workspace_revision = (
+                revisions.get(document_id, (None, None)) if kind == "project" else (None, None)
             )
-            for (kind, document_id), use in mine.items()
-        ]
+            documents.append(
+                GalleryMediaUsageDocument(
+                    kind=kind,
+                    id=document_id,
+                    # A project's own name before a workspace's: sorted owners put `project` first.
+                    name=next((document_names[o] for o in sorted(use.owners) if o in document_names), None),
+                    image_names=_capped(use.names.images),
+                    video_names=_capped(use.names.videos),
+                    image_count=len(use.names.images),
+                    video_count=len(use.names.videos),
+                    revision=revision,
+                    workspace_revision=workspace_revision,
+                )
+            )
         documents.sort(key=lambda d: (d.kind, (d.name or "").casefold(), d.id))
         return GalleryMediaUsage(
             checked_image_count=len(checked.images),

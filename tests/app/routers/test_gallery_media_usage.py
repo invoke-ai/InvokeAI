@@ -428,6 +428,35 @@ def test_lists_are_capped_and_counts_are_exact(
     assert usage["queue"]["image_count"] == 3
 
 
+def test_projects_report_the_revisions_their_names_were_read_at(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user1: str
+) -> None:
+    _image(mock_invoker, "a.png", user1)
+    projects = mock_invoker.services.project_records
+    bare = _project(mock_invoker, user1, "Bare", _naming("a.png"))
+    worked = _project(mock_invoker, user1, "Worked", _naming("a.png"), workspace=_naming("a.png"))
+    _workflow(mock_invoker, user1, "Flow", "a.png")
+
+    def revisions() -> dict[Optional[str], tuple[Optional[int], Optional[int]]]:
+        usage = _usage(client, user1_token, image_names=["a.png"])
+        return {d["name"]: (d["revision"], d["workspace_revision"]) for d in usage["documents"]}
+
+    def as_read(project_id: str) -> tuple[int, Optional[int]]:
+        record = projects.get(user1, project_id, max_document_schema_version=4)
+        return record.revision, record.workspace.revision if record.workspace else None
+
+    assert revisions() == {"Bare": as_read(bare), "Worked": as_read(worked), "Flow": (None, None)}
+    assert as_read(bare) == (1, None)
+
+    projects.update(
+        user1, bare, 1, "Bare", _naming("a.png"), minimum_document_schema_version=4, max_document_schema_version=4
+    )
+    projects.save_workspace(user1, bare, None, _naming(), max_document_schema_version=4)
+    projects.save_workspace(user1, worked, 1, _naming("a.png"), max_document_schema_version=4)
+
+    assert revisions() == {"Bare": (2, 1), "Worked": (1, 2), "Flow": (None, None)}
+
+
 def test_an_empty_request_checks_nothing(client: TestClient, user1_token: str) -> None:
     assert client.post(URL, json={}).status_code == status.HTTP_401_UNAUTHORIZED
 

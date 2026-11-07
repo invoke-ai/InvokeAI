@@ -45510,10 +45510,44 @@
             "type": "integer",
             "title": "Video Count",
             "description": "How many checked videos the document names, past the list's cap too."
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "For a project: its content revision when the names were read, as the project read reports it (`revision`). Null for other kinds, and for a project the caller does not own."
+          },
+          "workspace_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Revision",
+            "description": "For a project: the caller's workspace revision when the names were read, as the project read reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds."
           }
         },
         "type": "object",
-        "required": ["kind", "id", "name", "image_names", "video_names", "image_count", "video_count"],
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "image_names",
+          "video_names",
+          "image_count",
+          "video_count",
+          "revision",
+          "workspace_revision"
+        ],
         "title": "GalleryMediaUsageDocument",
         "description": "One of the caller's saved documents that names checked media."
       },

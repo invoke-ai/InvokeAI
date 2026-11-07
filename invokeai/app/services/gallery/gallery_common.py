@@ -114,6 +114,14 @@ class GalleryMediaUsageDocument(BaseModel):
     )
     image_count: int = Field(description="How many checked images the document names, past the list's cap too.")
     video_count: int = Field(description="How many checked videos the document names, past the list's cap too.")
+    revision: Optional[int] = Field(
+        description="For a project: its content revision when the names were read, as the project read reports it "
+        "(`revision`). Null for other kinds, and for a project the caller does not own."
+    )
+    workspace_revision: Optional[int] = Field(
+        description="For a project: the caller's workspace revision when the names were read, as the project read "
+        "reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds."
+    )
 
 
 class GalleryMediaUsageQueue(BaseModel):

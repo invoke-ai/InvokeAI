@@ -18269,6 +18269,16 @@ export type components = {
              * @description How many checked videos the document names, past the list's cap too.
              */
             video_count: number;
+            /**
+             * Revision
+             * @description For a project: its content revision when the names were read, as the project read reports it (`revision`). Null for other kinds, and for a project the caller does not own.
+             */
+            revision: number | null;
+            /**
+             * Workspace Revision
+             * @description For a project: the caller's workspace revision when the names were read, as the project read reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds.
+             */
+            workspace_revision: number | null;
         };
         /**
          * GalleryMediaUsageOthers
