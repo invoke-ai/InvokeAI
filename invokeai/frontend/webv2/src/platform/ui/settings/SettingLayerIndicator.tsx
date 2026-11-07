@@ -17,8 +17,8 @@ const Dot = () => <Box as="span" boxSize="1.5" flexShrink={0} borderRadius="full
 
 /**
  * The dot after a setting's label: the row holds a value of its own, either this project's pin or a change from the
- * built-in. A 24px button opening a menu of its actions; a change with no reset (the row has its own way back) is a
- * plain glyph that only explains itself.
+ * built-in. A changed default resets on click; a project pin opens its menu of actions. A change with no reset
+ * (the row has its own way back) is a plain glyph that only explains itself.
  */
 export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: SettingLayer }) => {
   const { t } = useTranslation();
@@ -40,6 +40,15 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
     },
     []
   );
+  const handleResetClick = useCallback(
+    (event: MouseEvent) => {
+      event.preventDefault();
+      if (layer.state === 'default' && layer.onResetToBuiltIn) {
+        select(layer.onResetToBuiltIn)();
+      }
+    },
+    [layer, select]
+  );
   const pinned = layer.state === 'pinned';
   // The tooltip sits beside the label, so it stays short; the accessible name says which setting it belongs to, and
   // `aria-haspopup` announces the menu, so the name does not repeat "options".
@@ -55,6 +64,27 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
       </Tooltip>
     );
   }
+  if (layer.state === 'default') {
+    return (
+      <Tooltip content={t('settingsDialog.layer.resetToBuiltIn')}>
+        <IconButton
+          ref={trigger}
+          aria-label={accessibleName}
+          data-setting-layer=""
+          boxSize="6"
+          minW="6"
+          my="-1.5"
+          ms="-1.5"
+          size="xs"
+          variant="ghost"
+          flexShrink={0}
+          onClick={handleResetClick}
+        >
+          <Dot />
+        </IconButton>
+      </Tooltip>
+    );
+  }
 
   return (
     // Inline with fixed positioning, as the setting Select is: fixed escapes the gear popover's scroll area, and staying
@@ -62,12 +92,7 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
     // up front: a menu mounted on first open let the dialog's focus scope claim focus for a frame before the menu did.
     <Menu.Root ids={ids} positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       {/* Quiet while the menu is open: it opens below the dot, where the tooltip would cover its first item. */}
-      <Tooltip
-        content={t(pinned ? 'settingsDialog.layer.pinnedOptions' : 'settingsDialog.layer.changedOptions')}
-        disabled={isMenuOpen}
-        ids={ids}
-        keepsRootWhenDisabled
-      >
+      <Tooltip content={t('settingsDialog.layer.pinnedOptions')} disabled={isMenuOpen} ids={ids} keepsRootWhenDisabled>
         <Menu.Trigger asChild>
           <IconButton
             ref={trigger}
@@ -90,28 +115,20 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
           the switch. Preventing the click's default stops that activation; the item has already run its action. */}
       <Menu.Positioner onClick={preventLabelActivation}>
         <MenuContent minW="14rem" maxW="20rem">
-          {layer.state === 'pinned' ? (
-            <MenuHeadingGroup label={t('settingsDialog.layer.thisProjectOnly')}>
-              <MenuActionItem
-                value="use-as-default"
-                label={t('settingsDialog.layer.useAsDefault')}
-                hint={t('settingsDialog.layer.useAsDefaultHint')}
-                onSelect={select(layer.onUseAsDefault)}
-              />
-              <MenuActionItem
-                value="follow-default"
-                label={t('settingsDialog.layer.followDefault')}
-                hint={layer.defaultValueLabel}
-                onSelect={select(layer.onFollowDefault)}
-              />
-            </MenuHeadingGroup>
-          ) : layer.onResetToBuiltIn ? (
+          <MenuHeadingGroup label={t('settingsDialog.layer.thisProjectOnly')}>
             <MenuActionItem
-              value="reset-to-built-in"
-              label={t('settingsDialog.layer.resetToBuiltIn')}
-              onSelect={select(layer.onResetToBuiltIn)}
+              value="use-as-default"
+              label={t('settingsDialog.layer.useAsDefault')}
+              hint={t('settingsDialog.layer.useAsDefaultHint')}
+              onSelect={select(layer.onUseAsDefault)}
             />
-          ) : null}
+            <MenuActionItem
+              value="follow-default"
+              label={t('settingsDialog.layer.followDefault')}
+              hint={layer.defaultValueLabel}
+              onSelect={select(layer.onFollowDefault)}
+            />
+          </MenuHeadingGroup>
         </MenuContent>
       </Menu.Positioner>
     </Menu.Root>

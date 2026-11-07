@@ -27,7 +27,16 @@ const TAIL_UNDER_INVOKE_AFTER_CSS = {
   },
 } as const;
 
-export const IterationsField = () => {
+const TAIL_UNDER_INVOKE_BEFORE_CSS = {
+  '& input': { borderInlineStartColor: 'transparent' },
+  '&::after': {
+    ...TAIL_UNDER_INVOKE_AFTER_CSS['&::after'],
+    insetInlineStart: 'auto',
+    insetInlineEnd: 'calc(100% - 2px)',
+  },
+} as const;
+
+export const IterationsField = ({ invokeOnLeft = false }: { invokeOnLeft?: boolean }) => {
   const { t } = useTranslation();
   const { batchCount, isFixed, sourceId } = useActiveProjectSelector(
     (project) => {
@@ -71,7 +80,7 @@ export const IterationsField = () => {
           say why it cannot change. */}
       <NumberInput.Root
         allowMouseWheel
-        css={TAIL_UNDER_INVOKE_AFTER_CSS}
+        css={invokeOnLeft ? TAIL_UNDER_INVOKE_BEFORE_CSS : TAIL_UNDER_INVOKE_AFTER_CSS}
         cursor={isFixed ? 'not-allowed' : undefined}
         flexShrink={0}
         opacity={isFixed ? 0.55 : undefined}

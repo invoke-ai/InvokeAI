@@ -56,11 +56,15 @@ describe('setting layer indicator', () => {
       .toHaveAttribute('aria-haspopup', 'menu');
   });
 
-  it('names the setting a changed default belongs to', async () => {
-    await render({ onResetToBuiltIn: noop, state: 'default' });
-    await expect
-      .element(page.getByRole('button', { name: 'Show grid: changed from Invoke default', exact: true }))
-      .toHaveAttribute('aria-haspopup', 'menu');
+  it('names and resets the setting a changed default belongs to', async () => {
+    const onResetToBuiltIn = vi.fn();
+    const onChange = vi.fn();
+    await render({ onResetToBuiltIn, state: 'default' }, onChange);
+    const indicator = page.getByRole('button', { name: 'Show grid: changed from Invoke default', exact: true });
+    expect(indicator.element().getAttribute('aria-haspopup')).toBeNull();
+    await act(() => indicator.click());
+    expect(onResetToBuiltIn).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('marks a change it offers no action for with a named glyph instead of a button', async () => {

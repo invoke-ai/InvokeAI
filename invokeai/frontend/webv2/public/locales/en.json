@@ -2523,6 +2523,10 @@
         "label": "Highlight focused regions",
         "description": "Highlight the region receiving keyboard shortcuts."
       },
+      "showInvokeButtonOnLeft": {
+        "label": "Show Invoke button on the left",
+        "description": "Move the Invoke button and related controls to the left side of the top bar."
+      },
       "autoSwitchInvocationRoute": {
         "label": "Invoke follows what you edit",
         "description": "When you edit in Generate, Canvas, Upscale, Video or a workflow, the Invoke button switches to run that. A route you locked never changes."

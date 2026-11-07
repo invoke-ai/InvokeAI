@@ -76,6 +76,7 @@ export const behaviorSettings = section('behavior', 'Behavior', [
     ],
   },
   preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
+  preference('showInvokeButtonOnLeft', 'Show Invoke button on the left', 'topbar iterations routing position'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
   preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),
