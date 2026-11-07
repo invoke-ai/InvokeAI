@@ -35,6 +35,8 @@ class StarterModelWithoutDependencies(BaseModel):
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
+    # same for sources: installs made from a superseded URL stay recognized even if the user renamed the model
+    previous_sources: list[str] = []
 
 
 class StarterModel(StarterModelWithoutDependencies):
