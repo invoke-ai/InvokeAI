@@ -64,7 +64,7 @@ def _is_cpu_override(override: Optional[str]) -> bool:
 _POLL_SECONDS = 1.0
 
 # Soft budget for retained decoded matrices, not metadata, in-flight builds or caller-held arrays.
-# The most recent fill is retained even if it alone exceeds the budget.
+# The two most recent scopes always stay, even over budget, so two alternating scopes never evict each other.
 # Roughly the previous two-entry envelope at 100k x 768 float32 values per entry.
 _SEARCH_CACHE_MAX_BYTES = 600 * 1024**2
 
@@ -732,7 +732,10 @@ class ImageIndexService(ImageIndexServiceBase):
                     self._search_cache_bytes -= previous[2].nbytes
                 # Empty results must not accumulate owners that cost nothing against the budget.
                 if matrix_bytes:
-                    while self._search_cache and self._search_cache_bytes + matrix_bytes > _SEARCH_CACHE_MAX_BYTES:
+                    while (
+                        len(self._search_cache) >= 2
+                        and self._search_cache_bytes + matrix_bytes > _SEARCH_CACHE_MAX_BYTES
+                    ):
                         _, _, evicted_matrix = self._search_cache.pop(next(iter(self._search_cache)))
                         self._search_cache_bytes -= evicted_matrix.nbytes
                     self._search_cache[cache_key] = (fingerprint, found_items, matrix)

@@ -2810,11 +2810,9 @@ def test_search_cache_reuses_three_scopes_within_byte_budget(
         assert reads.call_count == 3, "warmed scopes within the byte budget must not re-read embedding BLOBs"
 
 
-@pytest.mark.parametrize("budget,retained_after_admin,final_reads", [(128, 128, 5), (160, 160, 4)])
+@pytest.mark.parametrize("budget", [128, 160])
 def test_search_cache_evicts_lru_by_matrix_bytes(
     budget: int,
-    retained_after_admin: int,
-    final_reads: int,
     search_scope_users: tuple[str, str],
     index_records: ImageIndexRecords,
     service: ImageIndexService,
@@ -2828,19 +2826,19 @@ def test_search_cache_evicts_lru_by_matrix_bytes(
         assert service._search_cache_bytes == 128
         service.get_accessible_embeddings(owner)  # Touch: the other owner is now LRU.
         assert reads.call_count == 2
-        service.get_accessible_embeddings(None)  # 128 bytes: evict one or both existing matrices.
+        service.get_accessible_embeddings(None)  # 128 bytes: evicts the other owner, keeps the touched one.
         assert reads.call_count == 3
-        assert service._search_cache_bytes == retained_after_admin
-        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == retained_after_admin
+        assert service._search_cache_bytes == 160
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 160
         service.get_accessible_embeddings(owner)
-        assert reads.call_count == (4 if budget == 128 else 3)
-        service.get_accessible_embeddings(other)
-        assert reads.call_count == final_reads
+        assert reads.call_count == 3
+        service.get_accessible_embeddings(other)  # Admin ALL is now LRU.
+        assert reads.call_count == 4
         assert service._search_cache_bytes == 128
         assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
 
 
-def test_search_cache_retains_latest_oversized_matrix_alone(
+def test_search_cache_alternating_scopes_over_budget_do_not_evict_each_other(
     search_scope_users: tuple[str, str],
     index_records: ImageIndexRecords,
     service: ImageIndexService,
@@ -2850,29 +2848,62 @@ def test_search_cache_retains_latest_oversized_matrix_alone(
     owner, other = search_scope_users
     monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 96)
     with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
-        service.get_accessible_embeddings(owner)
         for _ in range(3):
-            items, matrix = service.get_accessible_embeddings(None)
+            assert service.get_accessible_embeddings(owner)[0] == imgs("a.png")
+            items, matrix = service.get_accessible_embeddings(None)  # 128 bytes: over budget on its own.
             assert items == imgs("a.png", "b.png", "c.png", "d.png")
-            assert matrix.nbytes == 128
             np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[:4])
             assert service.search_similar(None, np.arange(DIM, 0, -1, dtype=np.float32), 10) == list(
                 zip(imgs("a.png", "b.png", "c.png", "d.png"), [8, 7, 6, 5], strict=True)
             )
-            assert service._search_cache_bytes == 128
-            assert len(service._search_cache) == 1
-            assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
+            assert service._search_cache_bytes == 160
             assert reads.call_count == len(embedding_blob_selects) == 2
-        service.get_accessible_embeddings(owner)
+        # A third scope replaces the LRU one, so at most two stay over budget.
+        assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
         assert reads.call_count == 3
-        assert service._search_cache_bytes == 32
-        # Equality with the cap is admissible and evicts the smaller old entry.
-        items, matrix = service.get_accessible_embeddings(other)
-        assert items == imgs("b.png", "c.png", "d.png")
-        assert matrix.nbytes == service._search_cache_bytes == 96
+        assert service._search_cache_bytes == 224
+        assert len(service._search_cache) == 2
+
+
+def test_search_cache_evicts_several_scopes_down_to_the_two_most_recent(
+    db: Database,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.users.users_common import UserCreateRequest
+    from invokeai.app.services.users.users_default import UserService
+
+    owner, other = search_scope_users
+    third = UserService(db).create(
+        UserCreateRequest(email="third@example.com", display_name="Third", password="TestPass123", is_admin=False)
+    )
+    image_records.save(
+        image_name="e.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=16,
+        height=16,
+        has_workflow=False,
+        user_id=third.user_id,
+    )
+    index_records.upsert_embedding(imgs("e.png")[0], MODEL_ID, np.eye(DIM, dtype=np.float32)[4])
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 160)
+    with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
+        for user_id in (owner, third.user_id, other):  # 32 + 32 + 96 bytes fit exactly.
+            service.get_accessible_embeddings(user_id)
+        assert service._search_cache_bytes == 160
+        assert len(service._search_cache) == 3
+        service.get_accessible_embeddings(None)  # 160 bytes: both older small scopes go.
+        assert reads.call_count == 4
+        assert service._search_cache_bytes == 256
         service.get_accessible_embeddings(other)
-        assert reads.call_count == len(embedding_blob_selects) == 4
-        assert len(service._search_cache) == 1
+        service.get_accessible_embeddings(None)
+        assert reads.call_count == 4
+        service.get_accessible_embeddings(third.user_id)
+        assert reads.call_count == 5
 
 
 def test_search_cache_does_not_retain_empty_matrices_after_embeddings_disappear(
