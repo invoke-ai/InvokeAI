@@ -31,5 +31,5 @@
 - Check queries for repeated lookups, full scans/materialization, missing bounds, serialization. Measure representative data and query counts before adding caches or indexes.
 - Transaction, migration, revision, ownership tests: real temporary SQLite. Cover affected malformed input, cross-user access, cancellation, repeated requests, partial failures. Database-fixture tests also run against MySQL and MariaDB when `INVOKEAI_TEST_DB_URL` is set (`tests/fixtures/database.py`).
 - Read `tests/AGENTS.md`. Use `tests/app/` or the existing owning suite. Run focused pytest and root Ruff. Milestones: broaden to relevant service/router/invocation suites.
-- Graph execution: read `services/shared/README.md`. Test scheduling and invocation lifecycles through owning interfaces.
+- Graph execution: read `services/shared/README.md`. Test scheduling and invocation lifecycles through owning interfaces. Changes to execution scheduling, materialization, or Collect/iteration grouping require the opt-in slow execution-engine fuzzer (`uv run --no-sync pytest tests/app/services/shared/test_execution_engine_fuzz.py -m slow --durations=10`).
 - Report schema generation, migration validation, unavailable integration/hardware checks.
