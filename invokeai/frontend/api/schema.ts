@@ -31686,7 +31686,12 @@ export type components = {
         };
         /**
          * Main_Checkpoint_Flux3_Config
-         * @description Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16).
+         * @description Model config for FLUX.3 Image single-file transformers.
+         *
+         *     BFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA
+         *     ModelOpt layout), Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages, and unsloth's torchao FP8 build (diffusers
+         *     key names, one scale per output row). The record is the same for all of them: the loader reads the scheme off the
+         *     file.
          */
         Main_Checkpoint_Flux3_Config: {
             /**
@@ -32266,7 +32271,7 @@ export type components = {
         };
         /**
          * Main_Checkpoint_QwenImage21_Config
-         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot).
+         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot).
          */
         Main_Checkpoint_QwenImage21_Config: {
             /**

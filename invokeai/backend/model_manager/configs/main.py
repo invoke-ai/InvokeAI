@@ -1,4 +1,5 @@
 import re
+import struct
 from abc import ABC
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Self
@@ -15,8 +16,10 @@ from invokeai.backend.anima.checkpoint_layout import (
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
+from invokeai.backend.flux3.checkpoint_quantization import flux3_header_layers, reject_unloadable_quantization
+from invokeai.backend.flux3.conversion import FLUX3_NATIVE_FLOW_MAP_KEY, flux3_native_key_to_diffusers
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
-from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
+from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES, CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import (
     Checkpoint_Config_Base,
     Config_Base,
@@ -74,7 +77,10 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    COMFY_QUANT_SUFFIX,
     FP8_WEIGHT_DTYPES,
+    TORCHAO_QDATA_SUFFIX,
+    find_torchao_fp8_problem,
     is_scale_metadata_key,
     parse_quantization_metadata,
 )
@@ -1678,7 +1684,12 @@ def _raise_for_undecodable_int8_weights(
 
 
 def _raise_for_unsupported_comfy_quantization(
-    mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str, *, supported: str | None = None
+    mod: ModelOnDisk,
+    state_dict: dict[str | int, Any],
+    family: str,
+    *,
+    supported: str | None = None,
+    accepts_torchao_fp8: bool = False,
 ) -> None:
     """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
 
@@ -1686,10 +1697,12 @@ def _raise_for_unsupported_comfy_quantization(
     right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
     registers it as a model nothing can load.
 
-    Three of them. torchao's serialized tensor subclasses (unsloth's Qwen-Image-2.1 FP8 build) store each quantized
+    Three of them. torchao's serialized tensor subclasses (unsloth's FP8 and INT8 builds) store each quantized
     weight as `<layer>._weight_qdata` beside its scale, with no `<layer>.weight` the transformer could load. Only
     a family whose fingerprint reads unquantized tensors gets here with such a file: Qwen-Image-2.1 does, while an
-    Ideogram 4 build that quantized its fingerprint Linears would not match at all.
+    Ideogram 4 build that quantized its fingerprint Linears would not match at all. A family whose loader
+    translates the fp8 form (`translate_torchao_fp8_layers`) passes `accepts_torchao_fp8`; it then refuses only
+    what `find_torchao_fp8_problem` names, which includes every INT8 build.
 
     nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
     the `comfy_quant` markers every repack carries -- including the two supported ones; the
@@ -1706,7 +1719,17 @@ def _raise_for_unsupported_comfy_quantization(
     is a header parse plus one seek per marker, and it only happens for a file that has int8
     weights to explain in the first place.
     """
-    if any(isinstance(key, str) and key.endswith("._weight_qdata") for key in state_dict):
+    if accepts_torchao_fp8:
+        problem = find_torchao_fp8_problem(state_dict)
+        if problem is not None:
+            raise InvalidMatchError(
+                f"this {family} transformer is saved as torchao-quantized tensors that InvokeAI cannot load: "
+                f"{problem}. Only torchao float8_e4m3fn weights with one scale per output row load, such as "
+                "unsloth's FP8 builds; other layouts, including INT8 builds, are not supported. A file that is "
+                "missing one half of a weight/scale pair is probably incomplete: download it again. Otherwise "
+                "install the bf16, fp8_scaled or int8_convrot build, or a GGUF."
+            )
+    elif any(isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX) for key in state_dict):
         raise InvalidMatchError(
             f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 and INT8 builds "
             f"are), which is not supported. {supported or 'Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead.'}"
@@ -2331,31 +2354,46 @@ _FLUX3_LORA_SUFFIXES = (
     ".alpha",
 )
 
-# A quantized side channel next to a weight, or a weight stored in a quantized dtype. FLUX.3 loads these
-# builds later; until it does, they are refused with a message rather than loaded wrongly.
-_FLUX3_QUANTIZATION_SUFFIXES = (".weight_scale", ".weight_scale_2", ".input_scale", ".scale_weight", ".comfy_quant")
-_FLUX3_QUANTIZED_DTYPES = (torch.float8_e4m3fn, torch.float8_e5m2, torch.uint8, torch.int8)
-
 
 def _has_flux3_keys(state_dict: dict[str | int, Any]) -> bool:
-    """True for a FLUX.3 Image transformer in Black Forest Labs' native layout, False for its LoRAs.
+    """True for a FLUX.3 Image transformer, False for its LoRAs.
 
-    The per-mode stage before the joint blocks is unique to FLUX.3: `content_mode_blocks.<mode>.N` and
-    `early_stream_modulations`. FLUX.1 and FLUX.2 have `double_blocks`, Krea-2 `text_fusion`. ComfyUI's key
-    prefixes are tolerated; the BFL file and the ComfyUI repackage are byte-identical and carry none.
+    Black Forest Labs' native layout is recognized by the per-mode stage before the joint blocks, which is unique to
+    FLUX.3: `content_mode_blocks.<mode>.N` and `early_stream_modulations`. FLUX.1 and FLUX.2 have `double_blocks`,
+    Krea-2 `text_fusion`. ComfyUI's key prefixes are tolerated; the BFL file and the ComfyUI repackage are
+    byte-identical and carry none. torchao's spelling of the modulation's weight is accepted too, so that an
+    export the loader cannot read reaches its refusal rather than installing as an unknown model.
+
+    unsloth's torchao FP8 build uses diffusers' names (`mode_blocks`, `early_stream_modulations.<mode>.linear`). That
+    layout is recognized only beside torchao payloads: no other single-file FLUX.3 build is saved that way, and the
+    loader reads it only on that route.
     """
     keys = [_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)]
     if any(key.endswith(_FLUX3_LORA_SUFFIXES) for key in keys):
         return False
-    return "early_stream_modulations.image.lin.weight" in set(keys) and any(
-        key.startswith("content_mode_blocks.image.") for key in keys
+    key_set = set(keys)
+    if any(
+        f"early_stream_modulations.image.lin.{parameter}" in key_set for parameter in ("weight", "_weight_qdata")
+    ) and any(key.startswith("content_mode_blocks.image.") for key in keys):
+        return True
+    return (
+        any(
+            f"early_stream_modulations.image.linear.{parameter}" in key_set for parameter in ("weight", "_weight_qdata")
+        )
+        and any(key.startswith("mode_blocks.image.") for key in keys)
+        and any(key.endswith(TORCHAO_QDATA_SUFFIX) for key in keys)
     )
 
 
 def _get_flux3_variant(state_dict: dict[str | int, Any]) -> Flux3VariantType:
     """The step-distilled checkpoint has a second timestep embedder; the Base model does not."""
     keys = {_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)}
-    return Flux3VariantType.Klein if "ref_time_in.in_layer.weight" in keys else Flux3VariantType.KleinBase
+    flow_map_weights = {FLUX3_NATIVE_FLOW_MAP_KEY, flux3_native_key_to_diffusers(FLUX3_NATIVE_FLOW_MAP_KEY)}
+    # torchao stores a quantized weight under `_weight_qdata`, in place of `.weight`.
+    flow_map_keys = flow_map_weights | {
+        f"{key.removesuffix('.weight')}{TORCHAO_QDATA_SUFFIX}" for key in flow_map_weights
+    }
+    return Flux3VariantType.Klein if keys & flow_map_keys else Flux3VariantType.KleinBase
 
 
 class Main_Diffusers_Flux3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -2406,7 +2444,13 @@ class Main_Diffusers_Flux3_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
 
 class Main_Checkpoint_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16)."""
+    """Model config for FLUX.3 Image single-file transformers.
+
+    BFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA
+    ModelOpt layout), Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages, and unsloth's torchao FP8 build (diffusers
+    key names, one scale per output row). The record is the same for all of them: the loader reads the scheme off the
+    file.
+    """
 
     base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
@@ -2426,24 +2470,35 @@ class Main_Checkpoint_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Con
             raise NotAMatchError("state dict does not look like a FLUX.3 model")
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict looks like GGUF quantized")
-        cls._raise_for_quantized_weights(state_dict)
+        cls._raise_for_unsupported_quantization(mod, state_dict)
 
         variant = override_fields.pop("variant", None) or _get_flux3_variant(state_dict)
 
         return cls(**override_fields, variant=variant)
 
     @classmethod
-    def _raise_for_quantized_weights(cls, state_dict: dict[str | int, Any]) -> None:
-        for key, value in state_dict.items():
-            if not isinstance(key, str):
-                continue
-            if key.endswith(_FLUX3_QUANTIZATION_SUFFIXES) or (
-                key.endswith(".weight") and getattr(value, "dtype", None) in _FLUX3_QUANTIZED_DTYPES
-            ):
+    def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+        """Refuse at install what the loader would refuse at the first render.
+
+        The rules are the loader's own (`flux3/checkpoint_quantization.py`), applied to the header: the tensors'
+        names, dtypes and shapes, the metadata, and the `.comfy_quant` markers, read from their bytes since a meta
+        tensor has none.
+        """
+        prefix = CheckpointPrefix.detect(state_dict)
+        native = prefix.strip({key: value for key, value in state_dict.items() if isinstance(key, str)})
+        markers: dict[str, dict[str, Any]] = {}
+        if any(key.endswith(COMFY_QUANT_SUFFIX) for key in native):
+            try:
+                markers = prefix.strip(read_comfy_quant_markers(mod.path))
+            except (OSError, ValueError, KeyError, struct.error) as e:
                 raise InvalidMatchError(
-                    "this FLUX.3 build is quantized (fp8, int8 or nvfp4), which is not supported yet; install the "
-                    "bf16 file or a GGUF build"
-                )
+                    f"the `.comfy_quant` markers of this FLUX.3 file could not be read ({e}), so its quantization "
+                    "cannot be identified"
+                ) from None
+        try:
+            reject_unloadable_quantization(native, flux3_header_layers(mod.metadata(), native), markers)
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
 
 
 class Main_GGUF_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -2701,7 +2756,7 @@ class Main_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Main_Config_Base,
 
 
 class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."""
+    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot)."""
 
     base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
@@ -2718,7 +2773,7 @@ class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Bas
             raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
-        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1")
+        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1", accepts_torchao_fp8=True)
 
         variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
 
