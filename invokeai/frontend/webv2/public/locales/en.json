@@ -4400,7 +4400,7 @@
         "shapeRect": "Rectangle",
         "shapeStar": "Star",
         "shapeTarget": "Place on",
-        "shapeTargetFallbackHint": "The selected layer can't take shape pixels, so shapes go on a new layer.",
+        "shapeTargetFallbackHint": "Select a paint layer or mask.",
         "shapeTargetNew": "New layer",
         "shapeTargetSelected": "Selected layer",
         "shapeTriangle": "Triangle",

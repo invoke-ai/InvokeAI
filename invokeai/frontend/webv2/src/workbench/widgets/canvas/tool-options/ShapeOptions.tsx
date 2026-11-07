@@ -1,4 +1,9 @@
-import type { CanvasLayerSourceContract, ShapeToolKind, ShapeToolOptions } from '@workbench/canvas-engine/api';
+import type {
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+  ShapeToolKind,
+  ShapeToolOptions,
+} from '@workbench/canvas-engine/api';
 import type { ToolFormProps, ToolPropertyForm } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { Text } from '@chakra-ui/react';
@@ -20,21 +25,15 @@ import {
   PropertyControlRow,
   PropertySegmentedRow,
 } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
-import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useColorSampler, type ColorSamplerEngine } from '@workbench/widgets/canvas/useColorSampler';
+import { usePreparedCommit, type CanvasPreparedEngine } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { PaintBucketIcon, SquareIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
 type ShapeStylePatch = Partial<Pick<ShapeSource, 'fill' | 'stroke' | 'strokeWidth'>>;
-
-interface SelectedShape {
-  id: string;
-  name: string;
-  source: ShapeSource;
-}
 
 const FALLBACK_COLOR = '#000000';
 const formatPx = (value: number): string => `${value}px`;
@@ -71,25 +70,28 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
     [t]
   );
   const onKindChange = useCallback((kind: ShapeToolKind) => setShapeOptions(engine, { kind }), [engine]);
+  const canPlaceSelected = placement === 'layer' || placement === 'mask';
   const targetOptions = useMemo(
     () => [
-      { label: t('widgets.canvas.toolOptions.shapeTargetSelected'), value: 'selected' as const },
+      {
+        disabled: !canPlaceSelected,
+        label: t('widgets.canvas.toolOptions.shapeTargetSelected'),
+        value: 'selected' as const,
+      },
       { label: t('widgets.canvas.toolOptions.shapeTargetNew'), value: 'new' as const },
     ],
-    [t]
+    [canPlaceSelected, t]
   );
   const onTargetChange = useCallback(
     (target: ShapeToolOptions['target']) => setShapeOptions(engine, { target }),
     [engine]
   );
-  const hintKey =
-    options.target !== 'selected'
-      ? null
-      : placement === 'mask'
-        ? 'widgets.canvas.toolOptions.shapeMaskHint'
-        : placement === 'new-layer'
-          ? 'widgets.canvas.toolOptions.shapeTargetFallbackHint'
-          : null;
+  const hintId = useId();
+  const hintKey = !canPlaceSelected
+    ? 'widgets.canvas.toolOptions.shapeTargetFallbackHint'
+    : options.target === 'selected' && placement === 'mask'
+      ? 'widgets.canvas.toolOptions.shapeMaskHint'
+      : null;
   return (
     <>
       <PropertySegmentedRow
@@ -99,13 +101,14 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
         onValueChange={onKindChange}
       />
       <PropertySegmentedRow
+        describedBy={hintKey ? hintId : undefined}
         label={t('widgets.canvas.toolOptions.shapeTarget')}
         options={targetOptions}
-        value={options.target}
+        value={canPlaceSelected ? options.target : 'new'}
         onValueChange={onTargetChange}
       />
       {hintKey ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="xs" id={hintId}>
           {t(hintKey)}
         </Text>
       ) : null}
@@ -113,127 +116,137 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/**
- * Edit the selected shape layer's fill and stroke, or the tool defaults with pair colors when no shape layer is
- * selected. Each gesture on a selected shape commits one undoable step.
- */
-const useShapeAppearance = (engine: ToolFormProps['engine']) => {
-  const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+/** Creation defaults stay independent of the selected shape's appearance. */
+const ShapeDefaultAppearanceSettings = ({ engine }: ToolFormProps) => {
   const options = useShapeOptions(engine);
   const pair = useActiveColorPair();
   const colorCommands = useActiveColorCommands();
-  const selected = useActiveProjectSelector(
-    (project): SelectedShape | null => {
-      const { document } = project.canvas;
-      const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
-      return layer && layer.type === 'raster' && layer.source.type === 'shape'
-        ? { id: layer.id, name: layer.name, source: layer.source }
-        : null;
-    },
-    (a, b) => a?.id === b?.id && a?.name === b?.name && a?.source === b?.source
+  const setStrokeWidth = useCallback((value: number) => setShapeOptions(engine, { strokeWidth: value }), [engine]);
+  const setFillEnabled = useCallback((checked: boolean) => setShapeOptions(engine, { fillEnabled: checked }), [engine]);
+  const setStrokeEnabled = useCallback(
+    (checked: boolean) => setShapeOptions(engine, { strokeEnabled: checked }),
+    [engine]
   );
-  const fill = selected ? selected.source.fill : options.fillEnabled ? pair.foreground : null;
-  const stroke = selected ? selected.source.stroke : options.strokeEnabled ? pair.background : null;
-  const strokeWidth = selected ? selected.source.strokeWidth : options.strokeWidth;
+  const setFillColor = useCallback((hex: string) => colorCommands.setPairColor('foreground', hex), [colorCommands]);
+  const setStrokeColor = useCallback((hex: string) => colorCommands.setPairColor('background', hex), [colorCommands]);
+  return (
+    <>
+      <EditTargetChip layerName={null} />
+      <ShapeAppearanceControls
+        engine={engine}
+        fill={options.fillEnabled ? pair.foreground : null}
+        previewStrokeWidth={setStrokeWidth}
+        setFillColor={setFillColor}
+        setFillEnabled={setFillEnabled}
+        setStrokeColor={setStrokeColor}
+        setStrokeEnabled={setStrokeEnabled}
+        setStrokeWidth={setStrokeWidth}
+        stroke={options.strokeEnabled ? pair.background : null}
+        strokeWidth={options.strokeWidth}
+      />
+    </>
+  );
+};
 
-  const selectedId = selected?.id ?? null;
-  // Scrubbers keep the handler a gesture started with, so writes patch the live source and options: an undo or
-  // hotkey landing mid-drag survives the release.
+/** Selected-layer appearance belongs to Layer properties, whichever canvas tool is active. */
+export const SelectedShapeAppearanceSettings = ({
+  engine,
+  layer,
+  source,
+}: {
+  engine: (CanvasPreparedEngine & ColorSamplerEngine) | null;
+  layer: Pick<CanvasLayerContract, 'id' | 'name'>;
+  source: ShapeSource;
+}) => {
+  const { t } = useTranslation();
+  const commitPrepared = usePreparedCommit(engine);
+  const pair = useActiveColorPair();
+  // A scrub keeps its starting callback. Patch the live source, and drop a release after selection changed.
   const commitSource = useCallback(
     (patch: ShapeStylePatch) => {
-      if (!selectedId) {
-        return;
-      }
       commitPrepared(t('widgets.canvas.toolOptions.shapeEdit'), (model) => {
-        const layer = model.getLayer(selectedId);
-        if (layer?.type !== 'raster' || layer.source.type !== 'shape') {
-          return { ids: [selectedId], status: 'missing' };
+        if (model.document.selectedLayerId !== layer.id) {
+          return { status: 'unchanged' };
         }
-        return model.prepare({ id: selectedId, source: { ...layer.source, ...patch }, type: 'patch-source' });
+        const current = model.getLayer(layer.id);
+        if (current?.type !== 'raster' || current.source.type !== 'shape') {
+          return { ids: [layer.id], status: 'missing' };
+        }
+        return model.prepare({ id: layer.id, source: { ...current.source, ...patch }, type: 'patch-source' });
       });
     },
-    [commitPrepared, selectedId, t]
-  );
-  const previewStrokeWidth = useCallback((value: number) => setShapeOptions(engine, { strokeWidth: value }), [engine]);
-  const setStrokeWidth = useCallback(
-    (value: number) => {
-      setShapeOptions(engine, { strokeWidth: value });
-      commitSource({ strokeWidth: value });
-    },
-    [commitSource, engine]
+    [commitPrepared, layer.id, t]
   );
   const setFillEnabled = useCallback(
-    (checked: boolean) => {
-      setShapeOptions(engine, { fillEnabled: checked });
-      commitSource({ fill: checked ? (selected?.source.fill ?? pair.foreground) : null });
-    },
-    [commitSource, engine, pair.foreground, selected]
+    (checked: boolean) => commitSource({ fill: checked ? (source.fill ?? pair.foreground) : null }),
+    [commitSource, pair.foreground, source.fill]
   );
   const setStrokeEnabled = useCallback(
-    (checked: boolean) => {
-      setShapeOptions(engine, { strokeEnabled: checked });
-      commitSource({ stroke: checked ? (selected?.source.stroke ?? pair.background) : null });
-    },
-    [commitSource, engine, pair.background, selected]
+    (checked: boolean) => commitSource({ stroke: checked ? (source.stroke ?? pair.background) : null }),
+    [commitSource, pair.background, source.stroke]
   );
+  const setStrokeWidth = useCallback((value: number) => commitSource({ strokeWidth: value }), [commitSource]);
   const setFillColor = useCallback(
     (hex: string, commit: boolean) => {
-      if (selected) {
-        if (commit) {
-          commitSource({ fill: hex });
-        }
-        return;
+      if (commit) {
+        commitSource({ fill: hex });
       }
-      colorCommands.setPairColor('foreground', hex);
     },
-    [colorCommands, commitSource, selected]
+    [commitSource]
   );
   const setStrokeColor = useCallback(
     (hex: string, commit: boolean) => {
-      if (selected) {
-        if (commit) {
-          commitSource({ stroke: hex });
-        }
-        return;
+      if (commit) {
+        commitSource({ stroke: hex });
       }
-      colorCommands.setPairColor('background', hex);
     },
-    [colorCommands, commitSource, selected]
+    [commitSource]
   );
-  return {
-    fill,
-    previewStrokeWidth,
-    selectedName: selected?.name ?? null,
-    setFillColor,
-    setFillEnabled,
-    setStrokeColor,
-    setStrokeEnabled,
-    setStrokeWidth,
-    stroke,
-    strokeWidth,
-  };
+  return (
+    <ShapeAppearanceControls
+      engine={engine}
+      fill={source.fill}
+      setFillColor={setFillColor}
+      setFillEnabled={setFillEnabled}
+      setStrokeColor={setStrokeColor}
+      setStrokeEnabled={setStrokeEnabled}
+      setStrokeWidth={setStrokeWidth}
+      stroke={source.stroke}
+      strokeWidth={source.strokeWidth}
+    />
+  );
 };
 
-/** Fill and stroke: the selected shape layer's own when one is selected (the chip names it), else the defaults. */
-const ShapeAppearanceSettings = ({ engine }: ToolFormProps) => {
+/** The same fill, stroke and width controls for defaults and selected content, with separate write paths. */
+const ShapeAppearanceControls = ({
+  engine,
+  ...editor
+}: {
+  engine: ColorSamplerEngine | null;
+  fill: string | null;
+  stroke: string | null;
+  strokeWidth: number;
+  setFillColor: (hex: string, commit: boolean) => void;
+  setStrokeColor: (hex: string, commit: boolean) => void;
+  setFillEnabled: (checked: boolean) => void;
+  setStrokeEnabled: (checked: boolean) => void;
+  setStrokeWidth: (value: number) => void;
+  previewStrokeWidth?: (value: number) => void;
+}) => {
   const { t } = useTranslation();
-  const editor = useShapeAppearance(engine);
   const sampleColor = useColorSampler(engine);
   const onFillChange = useCallback((hex: string) => editor.setFillColor(hex, false), [editor]);
   const onFillChangeEnd = useCallback((hex: string) => editor.setFillColor(hex, true), [editor]);
   const onStrokeChange = useCallback((hex: string) => editor.setStrokeColor(hex, false), [editor]);
   const onStrokeChangeEnd = useCallback((hex: string) => editor.setStrokeColor(hex, true), [editor]);
-  // Slider ticks preview through the options store; ONE document commit lands on release.
   const previewWidth = useCallback(
-    (value: number) => editor.previewStrokeWidth(Math.max(0, Math.round(value))),
+    (value: number) => editor.previewStrokeWidth?.(Math.max(0, Math.round(value))),
     [editor]
   );
   const setWidth = useCallback((value: number) => editor.setStrokeWidth(Math.max(0, Math.round(value))), [editor]);
   const widthGesture = useSliderGesture(Math.round(editor.strokeWidth), setWidth, previewWidth);
   return (
     <>
-      <EditTargetChip layerName={editor.selectedName} />
       {/* The chip stays enabled-looking but inert when the slot is off; the toggle owns enablement. */}
       <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeFill')}>
         <ColorPicker
@@ -286,7 +299,7 @@ const ShapeAppearanceSettings = ({ engine }: ToolFormProps) => {
 export const shapeForm: ToolPropertyForm = {
   groups: [
     { body: ShapeToolSettings, id: 'shape', labelKey: 'widgets.properties.groups.shape' },
-    { body: ShapeAppearanceSettings, id: 'shape-appearance', labelKey: 'widgets.properties.groups.appearance' },
+    { body: ShapeDefaultAppearanceSettings, id: 'shape-appearance', labelKey: 'widgets.properties.groups.appearance' },
   ],
   id: 'shape',
   paintsLeaf: true,

@@ -1,4 +1,9 @@
-import type { CanvasLayerContract, CanvasLayerSourceContract, ShapeToolOptions } from '@workbench/canvas-engine/api';
+import type {
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+  CanvasNodeContract,
+  ShapeToolOptions,
+} from '@workbench/canvas-engine/api';
 import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 import type { Project } from '@workbench/projectContracts';
 import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
@@ -7,7 +12,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { DEFAULT_SHAPE_OPTIONS, getDocumentLayer } from '@workbench/canvas-engine/api';
 import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
-import { layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -98,7 +103,7 @@ const formEngine = (): ToolFormProps['engine'] =>
   }) as unknown as ToolFormProps['engine'];
 
 /** Renders the form's groups the way the Properties pane does. */
-const mount = async (layers: readonly CanvasLayerContract[], selectedLayerId: string | null): Promise<void> => {
+const mount = async (layers: readonly CanvasNodeContract[], selectedLayerId: string | null): Promise<void> => {
   unsubscribe();
   stub = createStructuralEngineStub({ layers, selectedLayerId });
   unsubscribe = stub.subscribe(publish);
@@ -146,7 +151,7 @@ const clickToggle = (name: string) =>
   act(() =>
     appearanceGroup().element().querySelector<HTMLElement>(`button[aria-label="${name}"][aria-pressed]`)!.click()
   );
-const hint = "The selected layer can't take shape pixels, so shapes go on a new layer.";
+const hint = 'Select a paint layer or mask.';
 const maskHint = 'Shapes add to the selected mask; fill and stroke set which parts, not their colors.';
 
 afterEach(async () => {
@@ -192,56 +197,124 @@ describe('shape tool settings', () => {
     await expect.element(kindGroup().getByRole('radio', { name: 'Ellipse' })).toBeChecked();
   });
 
-  it('says when Place on = Selected layer falls back to a new layer, and keeps the mask hint', async () => {
+  it('shows the effective destination and restores the saved preference on an eligible selection', async () => {
     await mount([shapeLayer('s1'), layerContract('p1', 'raster'), layerContract('m1', 'inpaint_mask')], 's1');
+    const target = toolGroup().getByRole('radiogroup', { name: 'Place on' });
+    const selected = target.getByRole('radio', { name: 'Selected layer' });
+    const newLayer = target.getByRole('radio', { name: 'New layer' });
 
+    await expect.element(selected).toBeDisabled();
+    await expect.element(newLayer).toBeChecked();
     await expect.element(toolGroup().getByText(hint)).toBeVisible();
-
-    await userEvent.click(toolGroup().getByText('New layer'));
-    expect(shapeOptions.target).toBe('new');
-    await expect.element(toolGroup().getByText(hint)).not.toBeInTheDocument();
-
-    await userEvent.click(toolGroup().getByText('Selected layer'));
-    await expect.element(toolGroup().getByText(hint)).toBeVisible();
+    expect(target.element().getAttribute('aria-describedby')).toBe(toolGroup().getByText(hint).element().id);
+    expect(shapeOptions.target).toBe('selected');
+    await act(() => (newLayer.element() as HTMLElement).focus());
+    await userEvent.keyboard('{ArrowLeft}');
+    await expect.element(newLayer).toBeChecked();
+    expect(shapeOptions.target).toBe('selected');
 
     await selectLayer('p1');
+    await expect.element(selected).toBeEnabled();
+    await expect.element(selected).toBeChecked();
     await expect.element(toolGroup().getByText(hint)).not.toBeInTheDocument();
-    await expect.element(toolGroup().getByText(maskHint)).not.toBeInTheDocument();
-
+    await userEvent.click(target.getByText('New layer'));
+    expect(shapeOptions.target).toBe('new');
+    await selectLayer('s1');
     await selectLayer('m1');
-    await expect.element(toolGroup().getByText(maskHint)).toBeVisible();
-    await expect.element(toolGroup().getByText(hint)).not.toBeInTheDocument();
-
-    await selectLayer(null);
+    await expect.element(newLayer).toBeChecked();
     await expect.element(toolGroup().getByText(maskHint)).not.toBeInTheDocument();
-    await expect.element(toolGroup().getByText(hint)).not.toBeInTheDocument();
+    await userEvent.click(target.getByText('Selected layer'));
+    await expect.element(toolGroup().getByText(maskHint)).toBeVisible();
+    expect(target.element().getAttribute('aria-describedby')).toBe(toolGroup().getByText(maskHint).element().id);
   });
+
+  it.each([
+    ['nothing', [], null],
+    ['a group', [groupContract('g1')], 'g1'],
+    ['a shape', [shapeLayer('s1')], 's1'],
+    [
+      'an image',
+      [layerContract('i1', 'raster', { source: { image: { imageName: 'i', width: 1, height: 1 }, type: 'image' } })],
+      'i1',
+    ],
+    [
+      'a gradient',
+      [
+        layerContract('g1', 'raster', {
+          source: {
+            type: 'gradient',
+            kind: 'linear',
+            angle: 0,
+            width: 10,
+            height: 10,
+            stops: [
+              { color: '#000000', offset: 0 },
+              { color: '#ffffff', offset: 1 },
+            ],
+          },
+        }),
+      ],
+      'g1',
+    ],
+    [
+      'text',
+      [
+        layerContract('t1', 'raster', {
+          source: {
+            type: 'text',
+            content: 'Text',
+            color: '#000000',
+            fontFamily: 'sans-serif',
+            fontSize: 12,
+            fontWeight: 400,
+            lineHeight: 1,
+            align: 'left',
+          },
+        }),
+      ],
+      't1',
+    ],
+  ] as const)('disables Selected layer and explains New layer when %s is selected', async (_label, layers, id) => {
+    await mount(layers, id);
+    const target = toolGroup().getByRole('radiogroup', { name: 'Place on' });
+    await expect.element(target.getByRole('radio', { name: 'Selected layer' })).toBeDisabled();
+    await expect.element(target.getByRole('radio', { name: 'New layer' })).toBeChecked();
+    await expect.element(toolGroup().getByText(hint)).toBeVisible();
+    expect(shapeOptions.target).toBe('selected');
+  });
+
+  it.each([
+    ['locked', { isLocked: true }],
+    ['hidden', { isHidden: true }],
+    ['loading', { source: { bitmap: { imageName: 'paint.png', width: 10, height: 10 }, type: 'paint' } }],
+  ] as const)(
+    'keeps the selected destination for a %s paint layer so the engine can report its refusal',
+    async (_label, overrides) => {
+      await mount([layerContract('p1', 'raster', overrides)], 'p1');
+      const selected = toolGroup().getByRole('radio', { name: 'Selected layer' });
+      await expect.element(selected).toBeEnabled();
+      await expect.element(selected).toBeChecked();
+      await expect.element(toolGroup().getByText(hint)).not.toBeInTheDocument();
+    }
+  );
 });
 
 describe('shape appearance', () => {
-  it('edits the selected shape layer, one undoable step per gesture', async () => {
+  it('edits only creation defaults even with a shape layer selected', async () => {
     await mount([shapeLayer('s1')], 's1');
-    await expect.element(appearanceGroup().getByText('Editing: Rect')).toBeVisible();
-    await expect.element(toolGroup().getByText('Editing: Rect')).not.toBeInTheDocument();
-
+    await expect.element(appearanceGroup().getByText('Defaults')).toBeVisible();
     await clickToggle('Fill');
-    expect(source().fill).toBeNull();
-    expect(stub.commits).toHaveLength(1);
-
+    expect(shapeOptions.fillEnabled).toBe(false);
+    await clickToggle('Stroke');
+    expect(shapeOptions.strokeEnabled).toBe(true);
     const width = appearanceGroup().getByRole('slider', { name: 'Stroke width' });
     await act(async () => {
       (width.element() as HTMLElement).focus();
       await userEvent.keyboard('{ArrowRight>3/}');
     });
-    expect(source().strokeWidth).toBe(7);
-    expect(stub.commits).toHaveLength(2);
-
-    await act(() => stub.engine.history.undo());
-    expect(source().strokeWidth).toBe(4);
-    expect(source().fill).toBeNull();
-    // Kind and points stay the layer's own through every appearance edit.
-    expect(source().kind).toBe('rect');
-    expect(source().points).toBeUndefined();
+    expect(shapeOptions.strokeWidth).toBe(DEFAULT_SHAPE_OPTIONS.strokeWidth + 3);
+    expect(source()).toBe(RECT_SOURCE);
+    expect(stub.commits).toHaveLength(0);
   });
 
   it('edits the tool defaults with no shape layer selected', async () => {

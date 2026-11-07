@@ -150,16 +150,18 @@ export const PropertyGroup = ({
 
 /** A labelled choice row rendered as a full-width segmented control: up to 5 text options, or more as icons. */
 export const PropertySegmentedRow = <Value extends string>({
+  describedBy,
   disabled,
   label,
   onValueChange,
   options,
   value,
 }: {
+  describedBy?: string;
   disabled?: boolean;
   label: string;
   onValueChange: (value: Value) => void;
-  options: readonly { value: Value; label: string; icon?: ElementType }[];
+  options: readonly { value: Value; label: string; icon?: ElementType; disabled?: boolean }[];
   value: Value;
 }) => {
   const handleChange = useCallback(
@@ -173,6 +175,7 @@ export const PropertySegmentedRow = <Value extends string>({
   return (
     <PropertyControlRow label={label}>
       <SegmentedControl
+        aria-describedby={describedBy}
         ariaLabel={label}
         disabled={disabled}
         gridColumn="2 / -1"
