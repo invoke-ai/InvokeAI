@@ -16,6 +16,7 @@ import {
   SUPPORTED_GENERATE_BASES,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
+import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
 import {
   buildContext,
@@ -95,6 +96,38 @@ const refinerCase = () => {
     }).backendGraph,
     shape: SDXL_REFINER_SHAPE,
   };
+};
+
+// Canvas owns image encoding; both toggle values must reach the backend-validated literal contract.
+const sdxlCanvasCase = (colorCompensation: boolean) => {
+  const shape: ModelShape = {
+    label: `canvas-img2img-${colorCompensation ? 'compensated' : 'uncompensated'}`,
+    overrides: { format: 'diffusers' },
+  };
+  const { filled, model, settings } = satisfiedSettingsFor('sdxl', shape);
+  const { backendGraph: graph } = compileCanvasGraph({
+    bbox: { height: 1024, width: 1024, x: 0, y: 0 },
+    compositeImageName: 'canvas-input.png',
+    compositing: {
+      coherenceEdgeSize: 16,
+      coherenceMinDenoise: 0,
+      coherenceMode: 'Gaussian Blur',
+      infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+      infillMethod: 'lama',
+      infillPatchmatchDownscaleSize: 1,
+      infillTileSize: 32,
+      maskBlur: 16,
+      outputOnlyMaskedRegions: false,
+    },
+    destination: 'canvas',
+    mode: 'img2img',
+    model,
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+    settings: { ...settings, colorCompensation },
+    strength: 0.6,
+  });
+
+  return { base: 'sdxl' as const, filled, graph, shape };
 };
 
 // Edit references replace the style reference the tuned Krea-2 recipe carries, so they need their own case.
@@ -299,6 +332,8 @@ describe('generate graph coverage', () => {
         [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
       ),
       refinerCase(),
+      sdxlCanvasCase(false),
+      sdxlCanvasCase(true),
       krea2EditCase(),
     ];
 
