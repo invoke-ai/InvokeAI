@@ -803,7 +803,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
        // Mask-based regional guidance needs conditioning collectors, which this record then names.
        conditioning: null,
        denoise,
-       denoiseSize: size,
+       denoiseSize: { height: denoise.height, width: denoise.width },
        graph,
        // Null when the architecture has no image-to-latents node; Canvas then refuses the image modes.
        latents: { encodeType: 'new_model_i2l', vae: { field: 'vae', node: modelLoader } },
@@ -813,15 +813,17 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    ```
 
    The builder produces the **txt2img** graph only; the canvas grafts img2img, inpaint and outpaint onto it. It grafts onto the nodes the returned `FamilyGraph` (`familyGraph.ts`) names, not onto guessed ids:
-   - `denoise` and `denoiseSize`: the base denoise and the size it works at, which PiD native shrinks to a quarter.
+   - `denoise` and `denoiseSize`: the base denoise and the size it works at, which PiD native shrinks to a quarter. Read the size from that node; SD reads it from its noise node.
    - `latents`: the encode node type and the VAE the graph decodes with, the same source the decode reads. SD families also name the UNet and the fp32 switch.
-   - `conditioning`: the global prompt nodes and collectors regional guidance copies and joins, plus any reference-image collectors the builder wired.
+   - `conditioning`: the global prompt nodes and collectors regional guidance copies and joins, plus any reference-image collectors the builder wired. Mask-based regional guidance requires this record to be non-null.
    - `layoutPrompt`: the node a layout architecture places regions on.
 
    It still depends on these conventions:
    - Node ids `positive_prompt`, `negative_prompt` and `seed`.
    - An output node `canvas_output`.
    - `addDecodeOutput` if the architecture supports PiD decoding, otherwise `addImageOutputNode`.
+
+   `FamilyGraph` requires each fact field, but its types do not prove that a nullable fact is present for the family's capabilities or that a node reference names the right node. Verify that the new base and every graph-changing variant participate in `generateGraphCases` (`graphCoverage.testing.ts`), which derives its bases from `SUPPORTED_GENERATE_BASES`. Extend `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` as needed, and update the per-base expectations in `graph.test.ts`'s `family graph facts` tests. Those tests check the facts against emitted VAE, UNet, denoise and conditioning wiring.
 
    Validation that only one architecture needs belongs in `getModelFamilyValidationReasons` (`baseGenerationPolicies.ts`).
 
@@ -886,7 +888,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 - [ ] `contracts.ts`, `supportedBases.ts` and its test
 - [ ] Builder in `graph.ts` and registered in `GRAPH_BUILDERS`
 - [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
-- [ ] `latents` in the builder's `FamilyGraph`, and `BASE_CASES`
+- [ ] `FamilyGraph` facts checked through `generateGraphCases`, with `latents` and Canvas `BASE_CASES`
+- [ ] Non-null `conditioning` naming the global prompt nodes and collectors for mask-based regional guidance
 - [ ] Recall
 - [ ] Model registry, labels, `en.json`
 - [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
@@ -913,7 +916,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 ### Control and regional guidance
 
 - Control: set `FeaturesFacet.control_kinds`. Add the config (`configs/controlnet.py`, base class `ControlNet_Checkpoint_Config_Base`) and the node. In webv2, update `canvas/controlValidation.ts`, `canvas/addControlLayers.ts` and `src/workbench/widgets/layers/controlModelOptions.ts`.
-- Regional guidance: set `FeaturesFacet.supports_regional_guidance` and honor the conditioning `mask` in the denoise node. In webv2, update `canvas/addRegionalGuidance.ts`.
+- Regional guidance: set `FeaturesFacet.supports_regional_guidance` and honor the conditioning `mask` in the denoise node. In webv2, update `canvas/addRegionalGuidance.ts`. For mask-based regions, the builder must also return non-null `FamilyGraph.conditioning` naming the global prompt nodes and the collectors they join. Layout-based regions instead name `FamilyGraph.layoutPrompt`. Cover the new wiring through `generateGraphCases` and the `family graph facts` tests in `graph.test.ts`.
 
 ### PiD decoding
 

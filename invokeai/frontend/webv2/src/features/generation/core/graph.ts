@@ -342,7 +342,6 @@ const buildSDGraph = (
   const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
-  const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
   const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
@@ -464,7 +463,7 @@ const buildSDGraph = (
   const output = addDecodeOutput({
     denoise: refinerDenoise ?? denoise,
     graph,
-    l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
+    l2iProps: { fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
     model,
     outputIsIntermediate,
@@ -500,7 +499,7 @@ const buildSDGraph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: sdDenoiseSize,
+    denoiseSize: { height: noise.height, width: noise.width },
     graph,
     latents: {
       encodeType: 'i2l',
@@ -648,7 +647,7 @@ const buildSD3Graph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: sd3DenoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'sd3_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -771,7 +770,7 @@ const buildFluxGraph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'flux_vae_encode', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -901,7 +900,7 @@ const buildFlux2Graph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: flux2DenoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -944,7 +943,7 @@ const buildCogView4Graph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'cogview4_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1016,7 +1015,7 @@ const buildErnieImageGraph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: null,
     layoutPrompt: null,
@@ -1157,7 +1156,7 @@ const buildQwenImageGraph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: qwenDenoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1278,7 +1277,7 @@ const buildZImageGraph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: zImageDenoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'z_image_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1378,7 +1377,7 @@ const buildAnimaGraph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'anima_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1574,7 +1573,7 @@ const buildKrea2Graph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1650,7 +1649,7 @@ const buildQwenImage21Graph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: QWEN_IMAGE_2_1_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
@@ -1811,7 +1810,7 @@ const buildMossImageGraph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt,
@@ -1916,7 +1915,7 @@ const buildFlux3Graph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize,
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt,
@@ -2000,7 +1999,7 @@ const buildIdeogram4Graph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: null,
     layoutPrompt: captionBuilder,
@@ -2077,7 +2076,7 @@ const buildWanGraph = (
   return {
     conditioning: null,
     denoise,
-    denoiseSize: { height: settings.height, width: settings.width },
+    denoiseSize: { height: denoise.height, width: denoise.width },
     graph,
     latents: { encodeType: 'wan_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,

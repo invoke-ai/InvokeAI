@@ -341,6 +341,7 @@ const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: nu
 const addEncodeNode = (
   graph: BackendGraphContract,
   latents: FamilyLatentSpace,
+  settings: GenerateSettings,
   imageName: string | null
 ): BackendInvocationContract =>
   addNode(graph, {
@@ -348,6 +349,7 @@ const addEncodeNode = (
     ...(imageName ? { image: { image_name: imageName } } : {}),
     type: latents.encodeType,
     ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
+    ...(latents.encodeType === 'i2l' ? { color_compensation: settings.colorCompensation ? 'SDXL' : 'None' } : {}),
   });
 
 /** Encodes with the VAE the family decodes with and feeds the latents to its denoise. */
@@ -394,7 +396,7 @@ const graftImageToImage = (
   // native PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
   const encodeSize = family.denoiseSize;
   const needsResize = !sizesMatch(bbox, encodeSize);
-  const encode = addEncodeNode(graph, latents, needsResize ? null : compositeImageName);
+  const encode = addEncodeNode(graph, latents, settings, needsResize ? null : compositeImageName);
 
   if (needsResize) {
     const resize = addInputResizeNode(graph, 'canvas_resize_initial_to_processing', compositeImageName, encodeSize);
@@ -667,7 +669,7 @@ const graftInpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, latents, null);
+  const encode = addEncodeNode(graph, latents, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(
     graph,
     initialImageName,
@@ -767,7 +769,7 @@ const graftOutpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, latents, null);
+  const encode = addEncodeNode(graph, latents, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(graph, initialImageName, input.noiseMaskImageName, infill, noiseMaskResize);
   if (noiseResult.edgeFrom) {
     addEdge(graph, noiseResult.edgeFrom, 'image', encode, 'image');
