@@ -27,6 +27,13 @@ export interface GalleryMediaUsageDocument extends GalleryMediaUsageNames {
   id: string;
   kind: GalleryMediaUsageDocumentKind | 'other';
   name: string | null;
+  /** For a project: the content revision its names were read at; null for other kinds, or when not known. */
+  revision: number | null;
+  /**
+   * For a project whose `revision` is known: the caller's workspace revision its names were read at, null while the
+   * caller has none there. Null for other kinds.
+   */
+  workspaceRevision: number | null;
 }
 
 export interface GalleryMediaUsage {
@@ -68,8 +75,19 @@ export interface GalleryMediaUsageSurfaceRow {
 
 /** One line of the report; `count` is how many checked items the source uses. */
 export type GalleryMediaUsageGroup =
-  | { count: number; kind: 'openProject'; surfaces: GalleryMediaUsageSurfaceRow[] }
-  | { count: number; kind: 'project'; name: string | null; surfaces: GalleryMediaUsageSurfaceRow[] }
+  /** The project the deletion is made from; `savedCopyUnchecked` as for `project`. */
+  | { count: number; kind: 'openProject'; savedCopyUnchecked?: true; surfaces: GalleryMediaUsageSurfaceRow[] }
+  | {
+      count: number;
+      kind: 'project';
+      name: string | null;
+      /**
+       * The project is open, but its saved version, which the server says uses more of the media, could not be
+       * checked; `count` includes those uses, `surfaces` only what the open copy uses.
+       */
+      savedCopyUnchecked?: true;
+      surfaces: GalleryMediaUsageSurfaceRow[];
+    }
   /** A project the host could not open to see where it uses the media. */
   | { count: number; kind: 'projectUnchecked'; name: string | null }
   | { count: number; kind: 'quarantinedProject'; name: string | null }

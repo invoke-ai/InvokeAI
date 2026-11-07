@@ -1210,6 +1210,10 @@ const readUsageNames = (value: unknown, field: string): string[] => {
   return value;
 };
 
+/** A revision is only a hint for narrowing: one that is not a non-negative integer reads as unknown. */
+const readUsageRevision = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+
 const mapGalleryMediaUsageNames = (wire: GalleryMediaUsageNamesWire, field: string): GalleryMediaUsageNames => ({
   imageCount: readUsageCount(wire.image_count, `${field}.image_count`),
   imageNames: readUsageNames(wire.image_names, `${field}.image_names`),
@@ -1231,6 +1235,8 @@ const mapGalleryMediaUsage = (body: GalleryMediaUsageWire): GalleryMediaUsage =>
       // A kind added after this build still uses the media: it is listed, not dropped.
       kind: GALLERY_MEDIA_USAGE_DOCUMENT_KINDS[document.kind] ?? 'other',
       name: typeof document.name === 'string' && document.name.trim() !== '' ? document.name : null,
+      revision: readUsageRevision(document.revision),
+      workspaceRevision: readUsageRevision(document.workspace_revision),
     })),
     documentsTotal: readUsageCount(body.documents_total, 'documents_total'),
     inUseImageCount: readUsageCount(body.in_use_image_count, 'in_use_image_count'),

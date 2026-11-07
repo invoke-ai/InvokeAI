@@ -11,6 +11,7 @@ import {
   MEDIA_USAGE_MAX_PROJECT_READS,
   resolveMediaUsage,
   type MediaUsageHost,
+  type MediaUsageSyncBase,
 } from './mediaUsageReport';
 
 // The server and project reads are the external systems; the narrowing scan (`collectMediaUsage`) runs for real.
@@ -77,7 +78,17 @@ const usageDocument = (
   name: string | null,
   imageNames: string[],
   imageCount = imageNames.length
-): GalleryMediaUsageDocument => ({ id, imageCount, imageNames, kind, name, videoCount: 0, videoNames: [] });
+): GalleryMediaUsageDocument => ({
+  id,
+  imageCount,
+  imageNames,
+  kind,
+  name,
+  revision: null,
+  videoCount: 0,
+  videoNames: [],
+  workspaceRevision: null,
+});
 
 const answer = (overrides: Partial<GalleryMediaUsage> = {}): GalleryMediaUsage => {
   const documents = overrides.documents ?? [];
@@ -96,17 +107,35 @@ const answer = (overrides: Partial<GalleryMediaUsage> = {}): GalleryMediaUsage =
   };
 };
 
-/** Closed projects the server can return, by id. */
+/** The server's copies of projects, by id, each at revision 4 of its content and 2 of the caller's workspace. */
 const serveProjects = (projects: readonly TestProject[]) => {
   mocks.getProject.mockImplementation((projectId) => {
     const found = projects.find((candidate) => candidate.id === projectId);
 
-    return found ? Promise.resolve({ project: found }) : Promise.reject(new ApiError('Project not found', 404));
+    return found
+      ? Promise.resolve({ project: found, revision: 4, workspace: { revision: 2 } })
+      : Promise.reject(new ApiError('Project not found', 404));
   });
 };
 
-const host = (loaded: readonly TestProject[] = [], openProjectId: string | null = null): MediaUsageHost => ({
+/** What the server's copies in `serveProjects` build on. */
+const SERVED: MediaUsageSyncBase = { revision: 4, workspaceRevision: 2 };
+
+/** A project entry as the server reads it at the revisions `serveProjects` serves. */
+const atServed = (entry: GalleryMediaUsageDocument): GalleryMediaUsageDocument => ({
+  ...entry,
+  revision: 4,
+  workspaceRevision: 2,
+});
+
+/** This tab's projects, and by id the server revisions each copy builds on (unknown when absent). */
+const host = (
+  loaded: readonly TestProject[] = [],
+  openProjectId: string | null = null,
+  bases: Readonly<Record<string, MediaUsageSyncBase>> = {}
+): MediaUsageHost => ({
   getLoadedProjects: () => loaded as unknown as ReturnType<MediaUsageHost['getLoadedProjects']>,
+  getSyncBase: (projectId) => bases[projectId],
   openProjectId,
 });
 
@@ -225,11 +254,12 @@ describe('resolveMediaUsage', () => {
     expect(report.inUseCount).toBe(2);
   });
 
-  it("trusts this tab's copy of a project over the server's, and never reads it", async () => {
+  it("trusts this tab's copy without reading the server's when the server holds nothing newer", async () => {
     mocks.check.mockResolvedValue(
       answer({
         documents: [
-          usageDocument('project', 'open', 'Open', ['a.png']),
+          atServed(usageDocument('project', 'open', 'Open', ['a.png'])),
+          // What this copy builds on is unknown, but its scan reports every name the server found.
           usageDocument('project', 'tab-2', 'Second', ['b.png']),
         ],
       })
@@ -237,17 +267,33 @@ describe('resolveMediaUsage', () => {
     const loaded = [
       // Saved with a.png; since then the layer was replaced by an unsaved b.png.
       project('open', 'Open', { raster: ['b.png'] }),
-      project('tab-2', 'Second', { raster: ['a.png'] }),
+      // Saved with b.png; a.png added since, unsaved.
+      project('tab-2', 'Second', { raster: ['a.png', 'b.png'] }),
     ];
 
-    const report = await resolveMediaUsage(items('a.png', 'b.png'), host(loaded, 'open'));
+    const report = await resolveMediaUsage(items('a.png', 'b.png'), host(loaded, 'open', { open: SERVED }));
 
     expect(mocks.getProject).not.toHaveBeenCalled();
     expect(report.groups).toEqual([
       { count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
-      { count: 1, kind: 'project', name: 'Second', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
+      { count: 2, kind: 'project', name: 'Second', surfaces: [{ count: 2, surface: 'canvasRaster' }] },
     ]);
     expect(report.inUseCount).toBe(2);
+  });
+
+  it('drops a loaded project the server names only for its Gallery selection, without reading it', async () => {
+    // The common deletion: the image the user is looking at, saved as the selection and nothing else.
+    mocks.check.mockResolvedValue(
+      answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))] })
+    );
+
+    const report = await resolveMediaUsage(
+      items('a.png'),
+      host([project('open', 'Open', { selected: 'a.png' })], 'open', { open: SERVED })
+    );
+
+    expect(mocks.getProject).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ groups: [], inUseCount: 0, serverCheck: 'complete' });
   });
 
   it('narrows a board by the names the server found in each project', async () => {
@@ -255,15 +301,16 @@ describe('resolveMediaUsage', () => {
       answer({
         checkedImageCount: 5,
         checkedVideoCount: 1,
-        documents: [usageDocument('project', 'open', 'Open', ['a.png', 'b.png'])],
+        documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png', 'b.png']))],
       })
     );
 
     const report = await resolveMediaUsage(
       { boardId: 'board-1', kind: 'board' },
-      host([project('open', 'Open', { raster: ['b.png'], selected: 'a.png' })], 'open')
+      host([project('open', 'Open', { raster: ['b.png'], selected: 'a.png' })], 'open', { open: SERVED })
     );
 
+    expect(mocks.getProject).not.toHaveBeenCalled();
     expect(mocks.check).toHaveBeenCalledWith({ boardId: 'board-1', kind: 'board' }, expect.any(AbortSignal));
     expect(report).toMatchObject({
       checkedCount: 6,
@@ -279,7 +326,7 @@ describe('resolveMediaUsage', () => {
     // uses c.png too, so the count cannot be read off the names alone.
     mocks.check.mockResolvedValue(
       answer({
-        documents: [usageDocument('project', 'open', 'Open', ['a.png'])],
+        documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))],
         inUseImageCount: 2,
         otherAccounts: { documentCount: 1, imageCount: 1, queueItemCount: 0, videoCount: 0 },
       })
@@ -287,10 +334,143 @@ describe('resolveMediaUsage', () => {
 
     const report = await resolveMediaUsage(
       items('a.png', 'c.png'),
-      host([project('open', 'Open', { raster: ['c.png'], selected: 'a.png' })], 'open')
+      host([project('open', 'Open', { raster: ['c.png'], selected: 'a.png' })], 'open', { open: SERVED })
     );
 
     expect(report.inUseCount).toBe(1);
+  });
+
+  it.each([
+    ['its content is behind', { revision: 3, workspaceRevision: 2 }],
+    ['its workspace is behind', { revision: 4, workspaceRevision: 1 }],
+    ['what it builds on is unknown', undefined],
+  ] as const)(
+    "reads the server's copy and keeps a use it holds when this tab's copy may be older: %s",
+    async (_case, base) => {
+      // Another tab or device pinned a.png and saved; this tab's copy, unsaved since, uses only b.png.
+      mocks.check.mockResolvedValue(
+        answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png', 'b.png']))] })
+      );
+      serveProjects([project('open', 'Open', { pinned: 'a.png', raster: ['b.png'] })]);
+
+      const report = await resolveMediaUsage(
+        items('a.png', 'b.png'),
+        host([project('open', 'Open', { raster: ['b.png'] })], 'open', base ? { open: base } : {})
+      );
+
+      expect(mocks.getProject.mock.calls.map(([projectId]) => projectId)).toEqual(['open']);
+      expect(report.groups).toEqual([
+        {
+          count: 2,
+          kind: 'openProject',
+          surfaces: [
+            { count: 1, surface: 'canvasRaster' },
+            { count: 1, surface: 'otherProjectState' },
+          ],
+        },
+      ]);
+      expect(report.inUseCount).toBe(2);
+    }
+  );
+
+  it("reads the server's copy when the server did not say which revisions it read, and trusts this tab's if it builds on it", async () => {
+    mocks.check.mockResolvedValue(answer({ documents: [usageDocument('project', 'open', 'Open', ['a.png'])] }));
+    serveProjects([project('open', 'Open', { raster: ['a.png'] })]);
+
+    const report = await resolveMediaUsage(
+      items('a.png', 'b.png'),
+      host([project('open', 'Open', { raster: ['b.png'] })], 'open', { open: SERVED })
+    );
+
+    expect(mocks.getProject.mock.calls.map(([projectId]) => projectId)).toEqual(['open']);
+    expect(report.groups).toEqual([
+      { count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
+    ]);
+  });
+
+  it("keeps the server's count for an open project whose saved version cannot be read, beside what its copy uses", async () => {
+    mocks.check.mockResolvedValue(
+      answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))] })
+    );
+    mocks.getProject.mockRejectedValue(new ApiError('Service Unavailable', 503));
+
+    const report = await resolveMediaUsage(
+      items('a.png', 'b.png'),
+      host([project('open', 'Open', { raster: ['b.png'] })], 'open', { open: { revision: 3, workspaceRevision: 2 } })
+    );
+
+    // The server's a.png stands beside the b.png found here.
+    expect(report.groups).toEqual([
+      { count: 2, kind: 'openProject', savedCopyUnchecked: true, surfaces: [{ count: 1, surface: 'canvasRaster' }] },
+    ]);
+    expect(report.inUseCount).toBe(2);
+  });
+
+  it.each([
+    ['in conflict', { conflict: { detectedAt: '2026-01-01T00:00:00.000Z', kind: 'revision' as const } }],
+    [
+      'refused for its schema',
+      { schemaRefusal: { kind: 'canvas' as const, maxCanvasSchemaVersion: 3, minimumCanvasSchemaVersion: 4 } },
+    ],
+  ])(
+    "reads and joins the server's copy of a project %s, whose reported revisions its copy does not build on",
+    async (_case, decision) => {
+      // Saved from another device with a.png at the reported revisions; this tab shows a diverged draft without it.
+      mocks.check.mockResolvedValue(
+        answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))] })
+      );
+      serveProjects([project('open', 'Open', { raster: ['a.png'] })]);
+
+      const report = await resolveMediaUsage(
+        items('a.png'),
+        host([project('open', 'Open')], 'open', { open: { ...SERVED, ...decision } })
+      );
+
+      expect(mocks.getProject.mock.calls.map(([projectId]) => projectId)).toEqual(['open']);
+      expect(report.groups).toEqual([
+        { count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
+      ]);
+    }
+  );
+
+  it('reads a project open here that needs it before closed projects, within the read cap', async () => {
+    const closed = Array.from({ length: MEDIA_USAGE_MAX_PROJECT_READS }, (_, index) => `p-${index}`);
+    mocks.check.mockResolvedValue(
+      answer({
+        documents: [
+          ...closed.map((id) => usageDocument('project', id, id, ['a.png'])),
+          usageDocument('project', 'open', 'Open', ['a.png']),
+        ],
+      })
+    );
+    serveProjects([project('open', 'Open'), ...closed.map((id) => project(id, id))]);
+
+    await resolveMediaUsage(items('a.png'), host([project('open', 'Open')], 'open'));
+
+    expect(mocks.getProject.mock.calls.map(([projectId]) => projectId).sort()).toEqual(
+      ['open', ...closed.slice(0, -1)].sort()
+    );
+  });
+
+  it("keeps a board item the server's newer copy uses, listed once beside the uses found here", async () => {
+    mocks.check.mockResolvedValue(
+      answer({
+        checkedImageCount: 3,
+        documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png', 'b.png']))],
+      })
+    );
+    // Saved elsewhere: a.png on a layer and pinned. Here, unsaved: the a.png layer replaced by b.png.
+    serveProjects([project('open', 'Open', { pinned: 'a.png', raster: ['a.png'] })]);
+
+    const report = await resolveMediaUsage(
+      { boardId: 'board-1', kind: 'board' },
+      host([project('open', 'Open', { raster: ['b.png'] })], 'open', { open: { revision: 3, workspaceRevision: 2 } })
+    );
+
+    expect(report).toMatchObject({
+      groups: [{ count: 2, kind: 'openProject', surfaces: [{ count: 2, surface: 'canvasRaster' }] }],
+      inUseCount: 2,
+    });
   });
 
   it('reads no closed project past the size bound, listing it as the server counts it', async () => {

@@ -4,7 +4,7 @@ import type { CanvasNodeContract } from '@workbench/canvas-engine/contracts';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
-import { collectMediaUsage } from './mediaUsage';
+import { collectMediaUsage, mergeMediaUsage } from './mediaUsage';
 
 const widget = (typeId: string, values: Record<string, unknown>) => ({
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -287,5 +287,33 @@ describe('collectMediaUsage', () => {
 
     expect(JSON.stringify(ran.widgetInstances)).toContain('generated.png');
     expect(collectMediaUsage(ran, [image('generated.png')])).toEqual([]);
+  });
+});
+
+describe('mergeMediaUsage', () => {
+  it('joins two copies of a project by surface, workflows and snapshots by id, in panel order', () => {
+    const merged = mergeMediaUsage(
+      [
+        { refs: [image('a.png')], surface: 'canvasRaster' },
+        { label: 'Same name', refs: [image('b.png')], sourceId: 'wf-1', surface: 'workflow' },
+      ],
+      [
+        { label: 'Same name', refs: [image('b.png')], sourceId: 'wf-2', surface: 'workflow' },
+        // wf-1, renamed in the other copy.
+        { label: 'Renamed', refs: [image('d.png')], sourceId: 'wf-1', surface: 'workflow' },
+        { refs: [image('c.png')], surface: 'canvasRaster' },
+        { refs: [image('f.png')], surface: 'generateReferenceImages' },
+        // a.png is on a layer in the other copy: listed there, not also elsewhere.
+        { refs: [image('a.png'), image('e.png')], surface: 'otherProjectState' },
+      ]
+    );
+
+    expect(merged).toEqual([
+      { refs: [image('f.png')], surface: 'generateReferenceImages' },
+      { refs: [image('a.png'), image('c.png')], surface: 'canvasRaster' },
+      { label: 'Same name', refs: [image('b.png'), image('d.png')], sourceId: 'wf-1', surface: 'workflow' },
+      { label: 'Same name', refs: [image('b.png')], sourceId: 'wf-2', surface: 'workflow' },
+      { refs: [image('e.png')], surface: 'otherProjectState' },
+    ]);
   });
 });

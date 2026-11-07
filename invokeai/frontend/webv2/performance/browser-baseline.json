@@ -108,9 +108,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 84,
-        "scriptRawBytes": 4526560,
+        "scriptRawBytes": 4593749,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4897225
+        "totalRawBytes": 4972738
       },
       "routeReadyMedianMs": 360.90000009536743,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -146,9 +146,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 84,
-        "scriptRawBytes": 4526560,
+        "scriptRawBytes": 4593749,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4897225
+        "totalRawBytes": 4972738
       },
       "routeReadyMedianMs": 367.80000019073486,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -184,9 +184,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 92,
-        "scriptRawBytes": 5121466,
+        "scriptRawBytes": 5188468,
         "scriptRequestCount": 87,
-        "totalRawBytes": 5492131
+        "totalRawBytes": 5567457
       },
       "routeReadyMedianMs": 1095.3000001907349,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -222,9 +222,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 92,
-        "scriptRawBytes": 5121466,
+        "scriptRawBytes": 5188468,
         "scriptRequestCount": 87,
-        "totalRawBytes": 5492131
+        "totalRawBytes": 5567457
       },
       "routeReadyMedianMs": 1042.5,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -260,9 +260,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 90,
-        "scriptRawBytes": 4981491,
+        "scriptRawBytes": 5053151,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5367569
+        "totalRawBytes": 5447553
       },
       "routeReadyMedianMs": 1093.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -298,9 +298,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 90,
-        "scriptRawBytes": 4981491,
+        "scriptRawBytes": 5053151,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5367569
+        "totalRawBytes": 5447553
       },
       "routeReadyMedianMs": 1105.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -336,9 +336,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 84,
-        "scriptRawBytes": 4526560,
+        "scriptRawBytes": 4593749,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4897225
+        "totalRawBytes": 4972738
       },
       "routeReadyMedianMs": 1324.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -374,9 +374,9 @@
         "largestAssetRawBytes": 751084,
         "otherRawBytes": 305228,
         "requestCount": 84,
-        "scriptRawBytes": 4526560,
+        "scriptRawBytes": 4593749,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4897225
+        "totalRawBytes": 4972738
       },
       "routeReadyMedianMs": 1301.5,
       "scriptSourceOwnerSet": "editor-minimal-static",

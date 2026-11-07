@@ -5737,6 +5737,7 @@
         "projectUncheckedHint": "Couldn’t open it to see where.",
         "queueWarning_one": "Jobs that use it will fail.",
         "queueWarning_other": "Jobs that use them will fail.",
+        "savedCopyUncheckedHint": "Its saved version couldn’t be checked.",
         "summaryAll": "All {{media}} are still in use:",
         "summaryBoardAll": "All {{media}} this deletes are still in use:",
         "summaryBoard_one": "{{count}} of the {{media}} this deletes is still in use:",

@@ -134,6 +134,11 @@ const UsageGroup = ({ group, showCounts }: { group: GalleryMediaUsageGroup; show
       {group.kind === 'openProject' || group.kind === 'project' ? (
         <SurfaceRows showCounts={showCounts} surfaces={group.surfaces} />
       ) : null}
+      {(group.kind === 'openProject' || group.kind === 'project') && group.savedCopyUnchecked ? (
+        <Text color="fg.muted" fontSize="sm" ps="3">
+          {t(`${KEY}.savedCopyUncheckedHint`)}
+        </Text>
+      ) : null}
       {group.kind === 'projectUnchecked' ? (
         <Text color="fg.muted" fontSize="sm" ps="3">
           {t(`${KEY}.projectUncheckedHint`)}

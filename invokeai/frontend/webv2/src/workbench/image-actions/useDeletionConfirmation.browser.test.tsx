@@ -52,6 +52,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteInUse.listLabel': 'Where the media is used',
         'widgets.gallery.deleteInUse.none': 'Nothing uses this media.',
         'widgets.gallery.deleteInUse.projectUncheckedHint': 'Couldn’t open it to see where.',
+        'widgets.gallery.deleteInUse.savedCopyUncheckedHint': 'Its saved version couldn’t be checked.',
         'widgets.gallery.deleteInUse.queueWarning':
           count === 1 ? 'Jobs that use it will fail.' : 'Jobs that use them will fail.',
         'widgets.gallery.deleteInUse.summary': `${count} of these ${String(values?.media)} are still in use:`,
@@ -229,6 +230,8 @@ describe('useDeletionConfirmation', () => {
               ],
             },
             { count: 1, kind: 'projectUnchecked', name: 'Harbor Tower' },
+            // Open in this tab, its saved version unread: what it uses here, and a note.
+            { count: 1, kind: 'project', name: 'Atlas', savedCopyUnchecked: true, surfaces: [] },
             { count: 1, kind: 'workflow', name: 'Portraits' },
             { count: 1, jobCount: 2, kind: 'queue' },
           ],
@@ -256,10 +259,12 @@ describe('useDeletionConfirmation', () => {
       'Workflow “Upscale pass” · 2 items',
       'Workflow “Upscale pass” · 1 item',
       'Project “Harbor Tower” · 1 item',
+      'Project “Atlas” · 1 item',
       'Library workflow “Portraits” · 1 item',
       '2 queued or running jobs · 1 item',
     ]);
     expect(dialog?.textContent).toContain('Couldn’t open it to see where.');
+    expect(dialog?.textContent).toContain('Its saved version couldn’t be checked.');
     expect(dialog?.textContent).toContain(
       // Two items in use: the warnings speak of them, not it.
       'Work that uses them will point at missing media. Jobs that use them will fail.'

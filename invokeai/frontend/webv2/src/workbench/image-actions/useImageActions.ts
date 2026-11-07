@@ -65,6 +65,7 @@ import {
   sendGalleryImageAsControl,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
+import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -642,6 +643,7 @@ export const useImageActions = ({
 
       const usageHost: MediaUsageHost = {
         getLoadedProjects: () => queries.getSnapshot().projects,
+        getSyncBase: (targetProjectId) => getProjectSyncSnapshot().projects[targetProjectId],
         openProjectId: projectId ?? queries.getSnapshot().activeProject.id,
       };
       const request = { kind: 'items', refs: items } as const;

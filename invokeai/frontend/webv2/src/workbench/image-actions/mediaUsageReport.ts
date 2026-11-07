@@ -8,14 +8,22 @@
  * has no surface for keeps the project in the report. Workflows, the legacy editor, projects kept for repair, queued
  * jobs and other accounts are taken from the server as they are.
  *
- * Projects in memory are fresher than the server, which autosaves after a short debounce. For items that holds in
- * full: the requested refs are scanned. For a board it does not: only the server knows the board's members, so a
- * project in memory is scanned for the names the server attributed to it, and a use added since its last save is
- * missed.
+ * A project in memory is fresher than the server for edits made here, which autosave after a short debounce, but not
+ * for a save from another tab or device since it loaded. Its scan stands when it reports every name the server found
+ * in it (the server's copy can hold no checked name the server did not list), or when the server read those names at
+ * the very revisions of the content and of the caller's workspace that the copy here builds on: an edit here then
+ * removed what the scan dropped. A copy in conflict or refused for its schema builds on no reported revision: its
+ * revisions count as unknown. Otherwise (the server is ahead, or either side's revisions are unknown) the server's
+ * copy is read as a closed project is, and a ref either copy uses is in use. When that read cannot be made, the project
+ * keeps what its copy uses and the server's count, marked `savedCopyUnchecked`.
+ *
+ * For items, the requested refs are scanned. For a board, only the server knows the board's members, so a project in
+ * memory is scanned for the names the server attributed to it, and a use added here since its last save is missed.
  */
 
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { Project } from '@workbench/projectContracts';
+import type { ProjectSyncInfo } from '@workbench/projects/syncStore';
 
 import { toGalleryItemKey } from '@features/gallery/contracts';
 import {
@@ -31,27 +39,39 @@ import { captureAccountScope, assertAccountScopeCurrent } from '@platform/state/
 import { getProjectWithinSize } from '@workbench/projects/api';
 import { deserializeProjectRecord } from '@workbench/projects/projectHydration';
 
-import { collectMediaUsage, type MediaUsage } from './mediaUsage';
+import { collectMediaUsage, mergeMediaUsage, type MediaUsage } from './mediaUsage';
 
 /** The server checks at most this many names of each kind per request. */
 export const MEDIA_USAGE_MAX_NAMES_PER_KIND = 1000;
 /**
- * Closed projects read to narrow the server's answer, at most, a few at a time. Each read transfers a whole project
- * document; past the cap a project is listed as the server counts it.
+ * Projects read from the server to narrow its answer, at most, a few at a time: first projects in memory whose scan
+ * dropped a name the server found at revisions other than the ones the copy builds on, then closed projects. Each read
+ * transfers a whole project document; past the cap a project is listed as the server counts it.
  */
 export const MEDIA_USAGE_MAX_PROJECT_READS = 6;
 /**
- * A closed project larger than this is not read: fetching, parsing and migrating it would hold the main thread while
- * the user waits on a dialog. It is listed as the server counts it.
+ * A project larger than this is not read from the server: fetching, parsing and migrating it would hold the main thread
+ * while the user waits on a dialog. It is listed as the server counts it.
  */
 export const MEDIA_USAGE_MAX_PROJECT_READ_BYTES = 4 * 1024 * 1024;
 const PROJECT_READ_CONCURRENCY = 2;
 const DEFAULT_SERVER_TIMEOUT_MS = 10_000;
 const DEFAULT_PROJECT_READS_TIMEOUT_MS = 5_000;
 
+/**
+ * The server revisions a copy of a project builds on (its content's, and the caller's workspace's), and whether it
+ * awaits a decision: a copy in conflict or refused holds local work the reported revisions do not describe.
+ */
+export type MediaUsageSyncBase = Pick<ProjectSyncInfo, 'conflict' | 'revision' | 'schemaRefusal' | 'workspaceRevision'>;
+
 export interface MediaUsageHost {
-  /** Projects this tab holds in memory; their live state wins over the server's copy. */
+  /** Projects this tab holds in memory, scanned as they are now. */
   getLoadedProjects(): readonly Project[];
+  /**
+   * What this tab's copy of a loaded project builds on, as its persistence last learned it; undefined, or a null
+   * revision, when that is not known (never saved, no persistence). Its sync info as reported, conflict included.
+   */
+  getSyncBase(projectId: string): MediaUsageSyncBase | undefined;
   /** The project the deletion is made from, listed as "This project"; null without one. */
   openProjectId: string | null;
 }
@@ -59,7 +79,7 @@ export interface MediaUsageHost {
 export interface MediaUsageOptions {
   /** How long the server check may take before the report says it could not finish. */
   serverTimeoutMs?: number;
-  /** How long reading closed projects may take; projects not read by then are listed as the server counts them. */
+  /** How long reading projects from the server may take; any not read by then are listed as the server counts them. */
   projectReadsTimeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -111,16 +131,47 @@ const dedupeRefs = (refs: readonly GalleryItemRef[]): GalleryItemRef[] => {
   });
 };
 
+/** Whether a server document lists or counts a ref (by kind and name) that `used` lacks. */
+const dropsServerNames = (entry: GalleryMediaUsageDocument, used: ReadonlySet<string>): boolean =>
+  // A capped list hides names the scan may have dropped; more counted than the scan kept means some were.
+  refsOf(entry).some((ref) => !used.has(toGalleryItemKey(ref))) || entry.imageCount + entry.videoCount > used.size;
+
+interface ServerProject {
+  project: Project;
+  revision: number;
+  workspaceRevision: number | null;
+}
+
 /**
- * Reads a closed project the way the editor would load it, without opening it; null when it cannot be loaded or is
- * past the read bound.
+ * Reads the server's copy of a project the way the editor would load it, without opening it; null when it cannot be
+ * loaded or is past the read bound.
  */
-const readClosedProject = async (projectId: string, signal: AbortSignal): Promise<Project | null> => {
+const readServerProject = async (projectId: string, signal: AbortSignal): Promise<ServerProject | null> => {
   const record = await getProjectWithinSize(projectId, MEDIA_USAGE_MAX_PROJECT_READ_BYTES, signal);
   const loaded = record ? deserializeProjectRecord(record) : null;
 
-  return loaded?.status === 'loaded' ? loaded.project : null;
+  return record && loaded?.status === 'loaded'
+    ? { project: loaded.project, revision: record.revision, workspaceRevision: record.workspace?.revision ?? null }
+    : null;
 };
+
+/**
+ * Whether the server state at these revisions is exactly what `base` builds on: a copy built on it is that state plus
+ * edits here. Unknown on either side is not a match, nor is a copy awaiting a decision: a conflict or refusal keeps
+ * local work beside revisions it does not build on.
+ */
+const isServerCopyOf = (
+  base: MediaUsageSyncBase | undefined,
+  server: { revision: number | null; workspaceRevision: number | null }
+): boolean =>
+  base !== undefined &&
+  base.conflict === undefined &&
+  base.schemaRefusal === undefined &&
+  base.revision !== null &&
+  base.workspaceRevision !== undefined &&
+  server.revision !== null &&
+  base.revision === server.revision &&
+  base.workspaceRevision === server.workspaceRevision;
 
 const runLimited = async <Item>(
   items: readonly Item[],
@@ -151,7 +202,15 @@ const toSurfaceRows = (usage: readonly MediaUsage[]): GalleryMediaUsageSurfaceRo
 
 type ProjectOutcome =
   | { kind: 'scanned'; usage: MediaUsage[] }
-  | { kind: 'unchecked'; entry: GalleryMediaUsageDocument };
+  /** Listed as the server counts it, beside `local`, this tab's scan of its copy, when it has one. */
+  | { kind: 'unchecked'; entry: GalleryMediaUsageDocument; local?: MediaUsage[] };
+
+/** A project to read from the server, scanned for `refs`; `local` is this tab's scan of its copy, when it has one. */
+interface ProjectRead {
+  entry: GalleryMediaUsageDocument;
+  local?: { base: MediaUsageSyncBase | undefined; usage: MediaUsage[] };
+  refs: GalleryItemRef[];
+}
 
 /**
  * Where the requested media is used. For items, the server check failing (offline, an older server without the check,
@@ -205,6 +264,7 @@ export const resolveMediaUsage = async (
   );
   const outcomes = new Map<string, ProjectOutcome>();
   const loadedProjects = host.getLoadedProjects();
+  const reads: ProjectRead[] = [];
 
   // Projects in memory: the items' own refs, or for a board the names the server found in that project (a board's
   // members are known only to the server).
@@ -217,27 +277,49 @@ export const resolveMediaUsage = async (
     }
 
     const refs = request.kind === 'items' ? requestedRefs : entry ? refsOf(entry) : [];
-    outcomes.set(project.id, { kind: 'scanned', usage: collectMediaUsage(project, refs) });
+    const usage = collectMediaUsage(project, refs);
+    const localKeys = usedKeysOf(usage);
+
+    const base = host.getSyncBase(project.id);
+
+    if (entry && dropsServerNames(entry, localKeys) && !isServerCopyOf(base, entry)) {
+      // An edit here removed the name, or another tab or device saved a use this copy lacks: the server's copy decides.
+      outcomes.set(project.id, { entry, kind: 'unchecked', local: usage });
+      reads.push({ entry, local: { base, usage }, refs });
+    } else {
+      outcomes.set(project.id, { kind: 'scanned', usage });
+    }
   }
 
   const candidates = [...serverProjects.values()].filter((entry) => !outcomes.has(entry.id));
-  const readable = candidates.filter((entry) => !isTruncated(entry)).slice(0, MEDIA_USAGE_MAX_PROJECT_READS);
 
   for (const entry of candidates) {
     outcomes.set(entry.id, { entry, kind: 'unchecked' });
+    if (!isTruncated(entry)) {
+      reads.push({ entry, refs: refsOf(entry) });
+    }
   }
 
   const readsDeadline = withDeadline(signal, projectReadsTimeoutMs);
   const readsSignal = readsDeadline.signal;
 
-  await runLimited(readable, PROJECT_READ_CONCURRENCY, async (entry) => {
+  await runLimited(reads.slice(0, MEDIA_USAGE_MAX_PROJECT_READS), PROJECT_READ_CONCURRENCY, async (read) => {
     try {
       readsSignal.throwIfAborted();
-      const project = await readClosedProject(entry.id, readsSignal);
+      const server = await readServerProject(read.entry.id, readsSignal);
 
-      if (project) {
-        outcomes.set(entry.id, { kind: 'scanned', usage: collectMediaUsage(project, refsOf(entry)) });
+      if (!server) {
+        return;
       }
+
+      const { local } = read;
+      const usage = !local
+        ? collectMediaUsage(server.project, read.refs)
+        : isServerCopyOf(local.base, server)
+          ? local.usage
+          : mergeMediaUsage(local.usage, collectMediaUsage(server.project, read.refs));
+
+      outcomes.set(read.entry.id, { kind: 'scanned', usage });
     } catch {
       // Unreadable, refused, or past the deadline: listed as the server counts it.
     }
@@ -285,15 +367,8 @@ const buildReport = ({
       lowerBound = Math.max(lowerBound, entry.imageCount + entry.videoCount);
     }
   };
-  const dropsServerNames = (projectId: string, used: ReadonlySet<string>): boolean => {
-    const entry = documents.find((document) => document.kind === 'project' && document.id === projectId);
-
-    // A capped list hides names the scan may have dropped; more counted than the scan kept means some were.
-    return Boolean(
-      entry &&
-      (refsOf(entry).some((ref) => !used.has(toGalleryItemKey(ref))) || entry.imageCount + entry.videoCount > used.size)
-    );
-  };
+  const serverEntryOf = (projectId: string) =>
+    documents.find((document) => document.kind === 'project' && document.id === projectId);
   const projectGroup = (projectId: string, name: string | null): GalleryMediaUsageGroup | null => {
     const outcome = outcomes.get(projectId);
 
@@ -301,13 +376,31 @@ const buildReport = ({
       return null;
     }
     if (outcome.kind === 'unchecked') {
-      addNames(outcome.entry);
-      return { count: outcome.entry.imageCount + outcome.entry.videoCount, kind: 'projectUnchecked', name };
+      const { entry, local } = outcome;
+
+      addNames(entry);
+      if (!local) {
+        return { count: entry.imageCount + entry.videoCount, kind: 'projectUnchecked', name };
+      }
+
+      // A project open here: what its copy uses, beside the server's names its saved version could not be checked for.
+      const localKeys = usedKeysOf(local);
+      const count = Math.max(
+        entry.imageCount + entry.videoCount,
+        new Set([...refsOf(entry).map(toGalleryItemKey), ...localKeys]).size
+      );
+      const surfaces = toSurfaceRows(local);
+
+      localKeys.forEach((key) => inUse.add(key));
+      return projectId === host.openProjectId
+        ? { count, kind: 'openProject', savedCopyUnchecked: true, surfaces }
+        : { count, kind: 'project', name, savedCopyUnchecked: true, surfaces };
     }
 
     const used = usedKeysOf(outcome.usage);
+    const entry = serverEntryOf(projectId);
 
-    if (dropsServerNames(projectId, used)) {
+    if (entry && dropsServerNames(entry, used)) {
       narrowed = true;
     }
     if (used.size === 0) {

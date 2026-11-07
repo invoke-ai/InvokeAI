@@ -3,8 +3,11 @@
  * file under authored work, so the deletion flow must warn even when ordinary confirmations are turned off.
  *
  * The scan fails safe. The surfaces the panel names are listed below; whatever else in the project names a selected
- * item counts too, as `otherProjectState`, unless an exclusion below says it only shows or records media. A field added
- * later that stores a media name therefore warns until it is given a surface or an exclusion; it is never missed.
+ * item counts too, as `otherProjectState`, unless an exclusion below says it only shows or records media. A field this
+ * build hydrates into `Project` that stores a media name therefore warns until it is given a surface or an exclusion.
+ * The scan sees only what loading kept, though: a field only a newer build writes is dropped when this build loads the
+ * project (the document allowlist, and the workspace canvas, of which only the selected layer and staging area are
+ * kept), so it is not scanned here.
  */
 
 import type { GalleryItemRef } from '@features/gallery/contracts';
@@ -19,7 +22,9 @@ export interface MediaUsage {
   surface: GalleryMediaUsageSurface;
   /** The workflow's or snapshot's name, for the `workflow` and `canvasSnapshot` surfaces. */
   label?: string;
-  /** Selected items this surface uses, in selection order. */
+  /** The workflow document's or snapshot's id: what identifies it across copies of the project, as names need not. */
+  sourceId?: string;
+  /** Selected items this surface uses, in selection order as `collectMediaUsage` lists them. */
   refs: GalleryItemRef[];
 }
 
@@ -38,7 +43,6 @@ const STACK_KINDS = Object.keys(STACK_SURFACES) as StackKind[];
 /**
  * How the remainder treats each project field: `scanned`, or `excluded` because it only shows or records media, or is
  * session state that is never saved. Typed against `Project`, so a new field fails to compile until it is placed here.
- * A key a newer document carries that this build does not know is scanned.
  */
 const PROJECT_FIELDS = {
   // The listed surfaces read its layer stacks, staged results and each snapshot's document and staged results; the
@@ -123,12 +127,16 @@ export const collectMediaUsage = (project: Project, selected: readonly GalleryIt
 
   const usage: MediaUsage[] = [];
   const reported = new Set<string>();
-  const add = (surface: GalleryMediaUsageSurface, roots: readonly unknown[], label?: string): void => {
+  const add = (
+    surface: GalleryMediaUsageSurface,
+    roots: readonly unknown[],
+    source?: { id: string; label: string }
+  ): void => {
     const refs = selectedIn(scan(roots), selected);
 
     if (refs.length > 0) {
       refs.forEach((ref) => reported.add(toGalleryItemKey(ref)));
-      usage.push(label === undefined ? { refs, surface } : { label, refs, surface });
+      usage.push(source ? { label: source.label, refs, sourceId: source.id, surface } : { refs, surface });
     }
   };
 
@@ -140,14 +148,14 @@ export const collectMediaUsage = (project: Project, selected: readonly GalleryIt
   add('canvasStaging', [project.canvas.stagingArea.pendingImages]);
 
   for (const snapshot of project.canvas.snapshots) {
-    add('canvasSnapshot', [snapshot.document, snapshot.stagedImages], snapshot.name);
+    add('canvasSnapshot', [snapshot.document, snapshot.stagedImages], { id: snapshot.id, label: snapshot.name });
   }
 
   add('upscale', [getProjectWidgetValues(project, 'upscale').inputImage]);
   add('video', [getProjectWidgetValues(project, 'video')]);
 
   for (const entry of project.workflows.entries) {
-    add('workflow', [entry.document.nodes], entry.document.name);
+    add('workflow', [entry.document.nodes], { id: entry.document.id, label: entry.document.name });
   }
 
   const elsewhere = selectedIn(scan(remainderRoots(project)), selected).filter(
@@ -159,4 +167,57 @@ export const collectMediaUsage = (project: Project, selected: readonly GalleryIt
   }
 
   return usage;
+};
+
+/** Panel order, as `collectMediaUsage` lists the surfaces. */
+const SURFACE_ORDER = {
+  generateReferenceImages: 0,
+  canvasRaster: 1,
+  canvasControl: 2,
+  canvasRegionalGuidance: 3,
+  canvasInpaintMask: 4,
+  canvasStaging: 5,
+  canvasSnapshot: 6,
+  upscale: 7,
+  video: 8,
+  workflow: 9,
+  otherProjectState: 10,
+} as const satisfies Record<GalleryMediaUsageSurface, number>;
+
+/**
+ * Two scans of one project (two copies of it) as one, in panel order: a surface either uses keeps the refs of both (a
+ * workflow or snapshot matched by id, named as in `first`), and `otherProjectState` keeps only refs no listed surface
+ * of either reports.
+ */
+export const mergeMediaUsage = (first: readonly MediaUsage[], second: readonly MediaUsage[]): MediaUsage[] => {
+  const merged = new Map<string, MediaUsage>();
+
+  for (const entry of [...first, ...second]) {
+    const key = JSON.stringify([entry.surface, entry.sourceId ?? entry.label ?? null]);
+    const existing = merged.get(key);
+
+    if (!existing) {
+      merged.set(key, { ...entry, refs: [...entry.refs] });
+      continue;
+    }
+
+    const held = new Set(existing.refs.map(toGalleryItemKey));
+
+    existing.refs.push(...entry.refs.filter((ref) => !held.has(toGalleryItemKey(ref))));
+  }
+
+  const listed = new Set(
+    [...merged.values()]
+      .filter((entry) => entry.surface !== 'otherProjectState')
+      .flatMap((entry) => entry.refs.map(toGalleryItemKey))
+  );
+
+  return [...merged.values()]
+    .map((entry) =>
+      entry.surface === 'otherProjectState'
+        ? { ...entry, refs: entry.refs.filter((ref) => !listed.has(toGalleryItemKey(ref))) }
+        : entry
+    )
+    .filter((entry) => entry.refs.length > 0)
+    .sort((a, b) => SURFACE_ORDER[a.surface] - SURFACE_ORDER[b.surface]);
 };

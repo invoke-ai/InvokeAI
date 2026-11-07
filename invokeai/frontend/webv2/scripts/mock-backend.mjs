@@ -749,16 +749,20 @@ const galleryMediaUsage = (state, faults, body) => {
   }
 
   const documents = [];
-  const addDocument = (kind, id, name, roots) => {
+  // As the server: a project reports the content and workspace revisions its names were read at; other kinds none.
+  const addDocument = (kind, id, name, roots, revisions = { revision: null, workspace_revision: null }) => {
     const used = usedNamesOf(collectReferencedMedia(roots), checked);
 
     if (used.image_count + used.video_count > 0) {
-      documents.push({ id, kind, name, ...used });
+      documents.push({ id, kind, name, ...used, ...revisions });
     }
   };
 
   for (const project of state.projects.values()) {
-    addDocument('project', project.project_id, project.name, [project.data, project.workspace?.data]);
+    addDocument('project', project.project_id, project.name, [project.data, project.workspace?.data], {
+      revision: project.revision,
+      workspace_revision: project.workspace?.revision ?? null,
+    });
   }
   for (const workflow of state.workflows.values()) {
     if (workflow.category !== 'default') {
