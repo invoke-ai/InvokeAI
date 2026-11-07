@@ -1527,6 +1527,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -1743,6 +1746,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -1879,6 +1885,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -2084,6 +2093,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2300,6 +2312,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -2436,6 +2451,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -2641,6 +2659,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2857,6 +2878,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -2993,6 +3017,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -3242,6 +3269,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -3458,6 +3488,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -3594,6 +3627,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -3870,6 +3906,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -4086,6 +4125,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -4222,6 +4264,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -5373,6 +5418,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -5589,6 +5637,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
@@ -5725,6 +5776,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -21133,6 +21187,9 @@
             "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
           },
           {
@@ -21349,6 +21406,9 @@
             "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
           },
           {
+            "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+          },
+          {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
           },
           {
@@ -21485,6 +21545,9 @@
           },
           {
             "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
           },
           {
             "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -33541,9 +33604,19 @@
             "title": "HiDiffusion: Window Attention",
             "type": "boolean"
           },
+          "hidiffusion_auto_ratios": {
+            "default": false,
+            "description": "Use model- and resolution-specific presets for both HiDiffusion ratios",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion: Automatic Ratios",
+            "type": "boolean"
+          },
           "hidiffusion_t1_ratio": {
             "default": 0.4,
-            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "description": "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
@@ -33554,13 +33627,13 @@
             "type": "number"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
-            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "default": 0,
+            "description": "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
             "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": 0,
             "orig_required": false,
             "title": "HiDiffusion: T2 Ratio",
             "type": "number"
@@ -33611,7 +33684,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -33954,9 +34027,19 @@
             "title": "HiDiffusion: Window Attention",
             "type": "boolean"
           },
+          "hidiffusion_auto_ratios": {
+            "default": false,
+            "description": "Use model- and resolution-specific presets for both HiDiffusion ratios",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion: Automatic Ratios",
+            "type": "boolean"
+          },
           "hidiffusion_t1_ratio": {
             "default": 0.4,
-            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "description": "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
@@ -33967,13 +34050,13 @@
             "type": "number"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
-            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "default": 0,
+            "description": "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
             "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": 0,
             "orig_required": false,
             "title": "HiDiffusion: T2 Ratio",
             "type": "number"
@@ -34024,7 +34107,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -77676,7 +77759,7 @@
           "format"
         ],
         "title": "Main_Checkpoint_MossImage_Config",
-        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with\n`InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown\nmodel instead."
+        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both\nmay fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with\n`InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead."
       },
       "Main_Checkpoint_QwenImage21_Config": {
         "properties": {
@@ -83538,6 +83621,171 @@
         ],
         "title": "Main_GGUF_LTX2_Config",
         "description": "An LTX-2 single-file transformer in GGUF, in the official key layout.\n\nThe community builds are conversions of the official single files: the transformer's keys, bare or\nunder ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for\nthe official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``\nfor every generation, and some carry another model's metadata outright, so the keys identify them,\nexactly as they do the safetensors files. Some keep the official ``model_version`` string and some\ndrop it; the structure dates those. Dev and Distilled are told apart by the filename."
+      },
+      "Main_GGUF_MossImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "moss-image",
+            "title": "Base",
+            "default": "moss-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_GGUF_MossImage_Config",
+        "description": "Model config for GGUF-quantized MOSS-Image transformers (single-file).\n\nTwo layouts: unsloth's builds declare `general.architecture = moss_image` and keep `proj.q`, `proj.k`, `proj.v`;\nleejet's carry no metadata at all and fuse them into `proj.qkv`. The key fingerprint identifies both, so\nidentification does not depend on the metadata. ComfyUI-GGUF's own convrot quantization (`comfy.gguf.quant.*`) is\nrefused by the factory, since `DECODES_GGUF_CONVROT` stays empty."
       },
       "Main_GGUF_QwenImage21_Config": {
         "properties": {
@@ -92004,6 +92252,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -92220,6 +92471,9 @@
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
@@ -92356,6 +92610,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -92807,6 +93064,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                   },
                   {
@@ -93023,6 +93283,9 @@
                     "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                   },
                   {
@@ -93159,6 +93422,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                   },
                   {
                     "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -93540,6 +93806,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -93756,6 +94025,9 @@
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
@@ -93892,6 +94164,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -94084,6 +94359,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -94300,6 +94578,9 @@
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
@@ -94436,6 +94717,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -95113,6 +95397,9 @@
                   "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                 },
                 {
@@ -95329,6 +95616,9 @@
                   "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                 },
                 {
@@ -95465,6 +95755,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -110501,6 +110794,14 @@
             "title": "Previous Names",
             "default": []
           },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -110695,6 +110996,14 @@
             },
             "type": "array",
             "title": "Previous Names",
+            "default": []
+          },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
             "default": []
           }
         },
@@ -112890,6 +113199,155 @@
         "title": "T5Encoder_BnBLLMint8_Config",
         "description": "Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8."
       },
+      "T5Encoder_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "t5_encoder",
+            "title": "Type",
+            "default": "t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "T5Encoder_Checkpoint_Config",
+        "description": "Configuration for a T5 encoder in a single safetensors file with transformers key names.\n\nThis is how ComfyUI distributes T5-XXL (``t5xxl_fp16``, ``t5xxl_fp8_e4m3fn`` and\n``t5xxl_fp8_e4m3fn_scaled``): the ``T5EncoderModel`` state dict as is, with no config and no tokenizer."
+      },
       "T5Encoder_GGUF_Config": {
         "properties": {
           "key": {
@@ -114305,6 +114763,162 @@
           "$ref": "#/components/schemas/StringOutput"
         }
       },
+      "TextLLM_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "text_llm",
+            "title": "Type",
+            "default": "text_llm"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "supports_images": {
+            "type": "boolean",
+            "title": "Supports Images",
+            "description": "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "cpu_only",
+          "supports_images"
+        ],
+        "title": "TextLLM_Checkpoint_Config",
+        "description": "Model config for a single-file Qwen3.5 vision-language model, run as a text LLM.\n\nThe layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3\nprompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file\ncarries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,\nwhich exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are\n`Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source."
+      },
       "TextLLM_Diffusers_Config": {
         "properties": {
           "key": {
@@ -114451,7 +115065,7 @@
           "supports_images"
         ],
         "title": "TextLLM_Diffusers_Config",
-        "description": "Model config for text-only causal language models (e.g. Llama, Phi, Qwen, Mistral)."
+        "description": "Model config for a language model folder: a causal LM (Llama, Phi, Qwen, Mistral, ...) or an allow-listed\nvision-language model (Gemma-4, Qwen3.5)."
       },
       "TextureInvocation": {
         "category": "image",

@@ -1487,7 +1487,7 @@ def get_is_installed(
 
     for model in installed_models:
         # Check if source matches exactly
-        if model.source == starter_model.source:
+        if model.source == starter_model.source or model.source in starter_model.previous_sources:
             return True
         # Check if name (or previous names), base and type match
         if (
