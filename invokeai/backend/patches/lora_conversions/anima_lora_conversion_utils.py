@@ -262,7 +262,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if alpha is not None:
+        if "alpha" in layer_dict:
+            values["alpha"] = layer_dict["alpha"]
+        elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         return values
     elif "lora_down.weight" in layer_dict:
