@@ -23,7 +23,6 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
     _strip_quantization_metadata,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
-from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -561,7 +560,6 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
 # llama.cpp's name for the LM head. Conditioning reads hidden states and never runs it, so it is not read.
 _GGUF_LM_HEAD_KEY = "output.weight"
-_QWEN_VL_EMBED_KEY = "model.language_model.embed_tokens.weight"
 
 
 class _OmittedLMHead(torch.nn.Module):
@@ -631,20 +629,12 @@ class QwenVLEncoderGGUFLoader(ModelLoader):
         drop_qwen3vl_visual_tower(model.model)
         model.lm_head = _OmittedLMHead()
 
-        # Out of the unpacking below, which reserves for one unpacked tensor in flight: the embedding's dequantization
-        # kernels need several copies at once, and `materialize_quantized_embedding` reserves for those. That
-        # reservation leaves out the packed weights already held, so it falls short by about their size; fixing it
-        # belongs to the shared helper, not this loader.
-        embedding = sd.pop(_QWEN_VL_EMBED_KEY, None)
         unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
-        if embedding is not None:
-            sd[_QWEN_VL_EMBED_KEY] = embedding
 
         # Strict: with the vision tower and the LM head gone, every remaining parameter comes from the file, so a
         # missing one means an incomplete file and is named here rather than left on the meta device.
         load_state_dict_ignoring_extras(model, sd, source="Qwen2.5-VL encoder GGUF", assign=True)
         sd.clear()
-        materialize_quantized_embedding(model.model.language_model.embed_tokens, ram_cache=self._ram_cache)
 
         self._logger.info(
             f"Qwen2.5-VL encoder '{config.name}': loaded from GGUF, {unpacked} unquantized or non-Linear tensor(s) "

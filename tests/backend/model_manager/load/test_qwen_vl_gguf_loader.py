@@ -5,12 +5,15 @@ Nothing here mocks the GGUF layer: each test writes a real tiny qwen2vl GGUF fro
 loader has to handle and the dense model is an independent reference for what it must build.
 """
 
+import logging
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 
 import invokeai.backend.model_manager.load.model_loaders.qwen_image as qwen_image_loaders
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -18,10 +21,12 @@ from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import load_bundled_qwen2_5_vl_tokenizer
 from tests.backend.model_manager.load.qwen_vl_gguf_fixture import (
+    HIDDEN_SIZE,
     build_dense_model,
     gguf_config,
     load_text_encoder,
     make_loader,
+    tiny_qwen_vl_config,
     write_qwen_vl_gguf,
 )
 
@@ -145,3 +150,36 @@ def test_the_tokenizer_is_the_vendored_one(monkeypatch, gguf_path: Path) -> None
     tokenizer = make_loader(monkeypatch)._load_model(gguf_config(gguf_path), SubModelType.Tokenizer)
 
     assert tokenizer is load_bundled_qwen2_5_vl_tokenizer()
+
+
+def test_the_load_makes_room_for_the_packed_weights_it_already_holds(monkeypatch, gguf_path: Path) -> None:
+    """The embedding is dequantized with the other non-Linear tensors, so the one reservation the cache is asked for
+    covers the packed weights still held and the unpacked result, not only the dequantization temporaries.
+
+    Reserved separately, the embedding asked for 6 copies of itself (the kernel's peak) and nothing for what the load
+    already holds, so a cache with that much free kept a model that the load's real footprint would have pushed out. The
+    tiny embedding is a single slice, so that 6x term is present either way: what differs is the packed weights and the
+    result being counted. A real cache, holding a real model, is the judge of whether the reservation evicts it.
+    """
+    vocab_size = tiny_qwen_vl_config().text_config.vocab_size
+    embedding_decode_bytes = 6 * vocab_size * HIDDEN_SIZE * torch.float32.itemsize
+    logger = MagicMock()
+    logger.getEffectiveLevel.return_value = logging.INFO
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logger,
+    )
+    try:
+        cache.put("cached_model", torch.randn(1024))
+        # Free RAM is exactly what decoding the embedding alone takes, beside the model already cached.
+        cache._ram_cache_size_bytes = embedding_decode_bytes + cache._get_ram_in_use()
+
+        load_text_encoder(monkeypatch, gguf_path, ram_cache=cache)
+
+        assert "cached_model" not in cache._cached_models
+    finally:
+        cache.shutdown()
