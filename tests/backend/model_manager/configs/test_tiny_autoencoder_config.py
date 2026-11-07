@@ -213,7 +213,10 @@ _TAEW2_1_URL = (
 
 @pytest.mark.parametrize(
     ("layout", "twins"),
-    [(TAEW2_1, ("HunyuanVideo (taehv)", "CogVideoX (taecvx)")), (TAELTX2_3, ("LTX-2 (taeltx_2)",))],
+    [
+        (TAEW2_1, ("HunyuanVideo (taehv)", "CogVideoX (taecvx)", "Open-Sora (taeos1_3)")),
+        (TAELTX2_3, ("LTX-2 (taeltx_2)",)),
+    ],
     ids=["taew2_1", "taeltx2_3"],
 )
 def test_a_network_with_unsupported_twins_is_refused_unless_named_or_overridden(
@@ -229,7 +232,11 @@ def test_a_network_with_unsupported_twins_is_refused_unless_named_or_overridden(
 
 @pytest.mark.parametrize(
     ("filename", "refusal"),
-    [("taehv.safetensors", "HunyuanVideo preview decoder"), ("taecvx_decoder.pth", "CogVideoX preview decoder")],
+    [
+        ("taehv.safetensors", "HunyuanVideo preview decoder"),
+        ("taecvx_decoder.pth", "CogVideoX preview decoder"),
+        ("taeos1_3.safetensors", "Open-Sora 1.3 preview decoder"),
+    ],
 )
 @pytest.mark.parametrize("override", [{}, {"base": BaseModelType.Wan.value}], ids=["no-override", "wan-override"])
 def test_a_file_named_for_a_hunyuanvideo_or_cogvideox_twin_is_refused_whatever_the_override(
@@ -369,6 +376,45 @@ def test_taeltx_2_is_refused_by_name_with_the_decoder_to_install(
 
     assert result.config is None
     assert result.invalid_matches
+    assert all("LTX-2.5 needs taeltx2_3" in str(e) for e in result.invalid_matches)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "taeltx2_3.safetensors",
+        "taeltx2.3.safetensors",
+        "taeltx2-3.safetensors",
+        "taeltx_2_3.safetensors",
+        "TAELTX2.3.pth",
+    ],
+)
+def test_taeltx2_3_is_accepted_under_its_spellings(tmp_path: Path, filename: str) -> None:
+    path = tmp_path / filename
+    if path.suffix == ".pth":
+        torch.save(taehv_weights(TAELTX2_3), path)
+    else:
+        _write(path, TAELTX2_3)
+
+    assert _single_tae(_identify(path)).base is BaseModelType.LTX2
+
+
+def test_an_ltx_name_that_runs_the_digits_together_is_unnamed_not_taeltx_2(tmp_path: Path) -> None:
+    """`taeltx23` is neither TAELTX2.3's spelling nor taeltx_2: it is refused as unnamed unless a base is given."""
+    path = _write(tmp_path / "taeltx23.safetensors", TAELTX2_3)
+
+    result = _identify(path)
+
+    assert result.config is None
+    assert result.invalid_matches
+    assert all("nothing in its name says which it is" in str(e) for e in result.invalid_matches)
+    assert _single_tae(_identify(path, base=BaseModelType.LTX2.value)).base is BaseModelType.LTX2
+
+
+def test_taeltx2_followed_by_another_number_is_still_taeltx_2(tmp_path: Path) -> None:
+    result = _identify(_write(tmp_path / "taeltx2_30.safetensors", TAELTX2_3))
+
+    assert result.config is None
     assert all("LTX-2.5 needs taeltx2_3" in str(e) for e in result.invalid_matches)
 
 

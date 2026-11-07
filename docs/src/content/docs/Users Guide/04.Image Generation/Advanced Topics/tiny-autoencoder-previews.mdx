@@ -10,7 +10,7 @@ import { Steps, Aside } from '@astrojs/starlight/components'
 While a model denoises, InvokeAI shows a preview of the image after each step. By default the preview is a linear
 projection of the latents: one pixel per latent, upscaled, so it is blurry and its colours are approximate. A
 **Tiny AutoEncoder** (TAE) is a small decoder by [madebyollin](https://github.com/madebyollin/taesd) (MIT license)
-that turns the same latents into a preview close to the final image, in about 25 ms on an RTX 4090. It needs a GPU:
+that turns the same latents into a preview close to the final image, in a few tens of milliseconds on an RTX 4090. It needs a GPU:
 on CPU-only installs it is not recommended (see [Cost and fallback](#cost-and-fallback)).
 
 TAE previews change only what you see while a generation runs. The finished image is decoded by the model's VAE as

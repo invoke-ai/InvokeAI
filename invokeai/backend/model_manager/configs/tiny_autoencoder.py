@@ -6,7 +6,8 @@ Only single files are TAEs here: a diffusers `AutoencoderTiny` folder stays a VA
 
 The weights fix the latent width, the compression and the decoder architecture. Some networks are not
 specific to one base or one TAE: 4 channels serve SD 1 and SDXL, 16 serve SD3 and FLUX.1, taew2_1's network
-is also published as taehv (HunyuanVideo) and taecvx (CogVideoX), and taeltx2_3's as taeltx_2 (LTX-2).
+is also published as taehv (HunyuanVideo), taecvx (CogVideoX) and taeos1_3 (Open-Sora), and taeltx2_3's as
+taeltx_2 (LTX-2).
 There an explicit `base` override decides, else the TAE's published name. A file that names none of them
 is refused rather than guessed: a wrong guess would install cleanly and render every preview in wrong
 colours. A file named for one of the unsupported twins is refused whatever the override says.
@@ -64,7 +65,13 @@ def _name_pattern(name: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])")
 
 
-_TAE_NAME_PATTERNS = tuple(_name_pattern(name) for name, _, _ in _TAE_NAMES)
+# TAELTX2.3 is also spelled the way the starter displays it (`taeltx2.3`), with the underscore of `taeltx_2`
+# (`taeltx_2_3`), or with a dash. Anything else after the 2 (`taeltx23`, `taeltx2_30`) names nothing.
+_TAELTX2_3_SPELLINGS = r"taeltx_?2[_.\-]3"
+_TAE_NAME_PATTERNS = tuple(
+    re.compile(rf"(?<![a-z0-9]){_TAELTX2_3_SPELLINGS}(?![a-z0-9])") if name == "taeltx2_3" else _name_pattern(name)
+    for name, _, _ in _TAE_NAMES
+)
 
 
 @dataclass(frozen=True)
@@ -85,6 +92,12 @@ _TWINS: dict[TinyAutoencoderLayout, tuple[_Twin, ...]] = {
             "Krea-2 and Anima previews use taew2_1: install the TAEW2.1 starter model.",
         ),
         _Twin(
+            "Open-Sora (taeos1_3)",
+            _name_pattern("taeos1_3"),
+            "taeos1_3 is the Open-Sora 1.3 preview decoder, which InvokeAI does not support. Wan, Qwen-Image, "
+            "Krea-2 and Anima previews use taew2_1: install the TAEW2.1 starter model.",
+        ),
+        _Twin(
             "CogVideoX (taecvx)",
             _name_pattern("taecvx"),
             "taecvx is the CogVideoX preview decoder, which InvokeAI does not support. Wan, Qwen-Image, "
@@ -92,11 +105,11 @@ _TWINS: dict[TinyAutoencoderLayout, tuple[_Twin, ...]] = {
         ),
     ),
     # On LTX-2.5 latents taeltx_2 scored 11.0 dB against the VAE, below the linear preview's 26.6
-    # (taeltx2_3: 37.8). `taeltx2` without the `_3` counts as the same name.
+    # (taeltx2_3: 37.8). `taeltx2` without a 3 counts as the same name.
     TAELTX2_3: (
         _Twin(
             "LTX-2 (taeltx_2)",
-            re.compile(r"(?<![a-z0-9])taeltx_?2(?![a-z0-9])(?!_3(?![a-z0-9]))"),
+            re.compile(r"(?<![a-z0-9])taeltx_?2(?![a-z0-9])(?![_.\-]?3(?![a-z0-9]))"),
             "taeltx_2 targets the LTX-2 VAE; LTX-2.5 needs taeltx2_3. Install TAELTX2.3 from the starter models.",
         ),
     ),
