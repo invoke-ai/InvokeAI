@@ -1,11 +1,26 @@
 import type { SettingFieldProps, SettingLayer } from '@platform/ui/settings/contracts';
 
 import { SettingControl } from '@platform/ui/settings/SettingControl';
+import {
+  areWorkbenchPreferencesHydrated,
+  getWorkbenchPreferences,
+  patchWorkbenchPreferences,
+} from '@workbench/settings/store';
 import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useCallback, useMemo } from 'react';
 
 import { CANVAS_SETTINGS, CANVAS_TRACKPAD_NAVIGATION_KEY, readCanvasBooleanSetting } from './canvasSettings';
-import { recordTrackpadNavigationChoice } from './trackpadNavigation';
+
+/**
+ * Records that the user set trackpad navigation themselves, so no later pinch changes it (see
+ * `CanvasTrackpadDetection.tsx`). Kept here rather than shared with detection: a module both lazy chunks import would
+ * cost the canvas its own startup request.
+ */
+export const recordTrackpadNavigationChoice = (): void => {
+  if (areWorkbenchPreferencesHydrated() && !getWorkbenchPreferences().canvasTrackpadNavigationDecided) {
+    void patchWorkbenchPreferences({ canvasTrackpadNavigationDecided: true });
+  }
+};
 
 /** Every way the user changes the setting from a row, the layer menu's actions included, counts as their choice. */
 const recordingChoice = (layer: SettingLayer | undefined): SettingLayer | undefined => {

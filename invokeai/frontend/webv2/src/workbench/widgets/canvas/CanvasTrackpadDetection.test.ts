@@ -5,7 +5,7 @@ import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { subscribeTrackpadDetection } from './CanvasTrackpadDetection';
-import { recordTrackpadNavigationChoice } from './trackpadNavigation';
+import { recordTrackpadNavigationChoice } from './settingsBindings';
 
 type Preferences = Pick<WorkbenchPreferences, 'canvasTrackpadNavigationDecided' | 'scopedDefaults'>;
 
@@ -21,7 +21,8 @@ const account = vi.hoisted(() => ({
   saved: {} as Preferences,
   snapshot: {} as Preferences,
 }));
-vi.mock('@workbench/settings/store', () => ({
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   areWorkbenchPreferencesHydrated: () => account.hydrated,
   getWorkbenchPreferences: () => account.snapshot,
   patchWorkbenchPreferences: (patch: Partial<Preferences>) => {

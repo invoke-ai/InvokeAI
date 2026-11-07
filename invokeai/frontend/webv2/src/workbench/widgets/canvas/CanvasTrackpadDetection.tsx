@@ -1,23 +1,54 @@
+/**
+ * Trackpad navigation turns itself on, silently, at the first pinch the canvas detects, unless the user already decided
+ * it. Scrolling cannot tell a trackpad from a mouse, but a pinch only comes from a trackpad. It turns on as the user's
+ * default, since the device belongs to the user rather than a project; a project's own pin still wins.
+ * `canvasTrackpadNavigationDecided` records the decision for the account (the settings row records an explicit choice,
+ * `settingsBindings.tsx`), so an explicit off stays off; the write reads the saved preferences, so a window with a stale
+ * snapshot cannot override a choice made in another.
+ */
+
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
+import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { WorkbenchQueries } from '@workbench/workbenchStore';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { hasHydratedWorkbenchPreferences, useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import {
+  areWorkbenchPreferencesHydrated,
+  getWorkbenchPreferences,
+  hasHydratedWorkbenchPreferences,
+  updateSavedWorkbenchPreferences,
+  useWorkbenchSettingsSelector,
+} from '@workbench/settings/store';
 import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 
 import { CANVAS_TRACKPAD_NAVIGATION_KEY } from './canvasSettings';
-import { autoEnableTrackpadNavigation, isTrackpadNavigationUndecided } from './trackpadNavigation';
 
 type TrackpadEngine = Pick<CanvasEngineHandle, 'interaction' | 'tools'>;
 
+/** Whether a pinch may still turn the setting on, by this window's snapshot; the write re-checks the saved state. */
+const isUndecided = (): boolean =>
+  areWorkbenchPreferencesHydrated() && !getWorkbenchPreferences().canvasTrackpadNavigationDecided;
+
+/** The flag and the one default key, over `saved`; null once the setting was decided. */
+const enableOver = (saved: WorkbenchPreferences): Partial<WorkbenchPreferences> | null =>
+  saved.canvasTrackpadNavigationDecided
+    ? null
+    : {
+        canvasTrackpadNavigationDecided: true,
+        scopedDefaults: {
+          ...saved.scopedDefaults,
+          canvas: { ...saved.scopedDefaults.canvas, [CANVAS_TRACKPAD_NAVIGATION_KEY]: true },
+        },
+      };
+
 /**
- * Subscribes trackpad auto-enable (see `trackpadNavigation.ts`) to the engine's pinch reports. The engine store is set
- * at once, before the pinch is routed, so the pinch that triggered it already zooms; the saved default then feeds the
- * same value. A project that pins the setting is left alone. If the saved preferences say it was decided elsewhere,
- * the store goes back to the project's resolved value, even after unsubscribing: adopting that decision disarms
- * detection and unmounts the subscriber, while the settings feed sees no change to re-apply. Setting a store of a
- * disposed engine is harmless. Returns the unsubscribe.
+ * Subscribes trackpad auto-enable to the engine's pinch reports. The engine store is set at once, before the pinch is
+ * routed, so the pinch that triggered it already zooms; the saved default then feeds the same value. A project that
+ * pins the setting is left alone. If the saved preferences say it was decided elsewhere, the store goes back to the
+ * project's resolved value, even after unsubscribing: adopting that decision disarms detection and unmounts the
+ * subscriber, while the settings feed sees no change to re-apply. Setting a store of a disposed engine is harmless.
+ * Returns the unsubscribe.
  */
 export const subscribeTrackpadDetection = (
   engine: TrackpadEngine,
@@ -25,7 +56,7 @@ export const subscribeTrackpadDetection = (
   projectId: string
 ): (() => void) => {
   return engine.tools.onTrackpadPinch(() => {
-    if (!isTrackpadNavigationUndecided()) {
+    if (!isUndecided()) {
       return;
     }
     const project = queries.getProject(projectId);
@@ -33,7 +64,7 @@ export const subscribeTrackpadDetection = (
       return;
     }
     engine.interaction.set('trackpadNavigation', true);
-    void autoEnableTrackpadNavigation().then((enabled) => {
+    void updateSavedWorkbenchPreferences(enableOver).then((enabled) => {
       const current = queries.getProject(projectId);
       if (enabled || !current) {
         return;
