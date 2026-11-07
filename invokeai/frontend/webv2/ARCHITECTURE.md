@@ -63,6 +63,7 @@ Behavior specs live beside their owning code. Read the owner's document before c
 | Settings contributions and the settings dialog                | [workbench/settings/README.md](src/workbench/settings/README.md)                       |
 | Widget manifests and extension discovery                      | [workbench/extensions/README.md](src/workbench/extensions/README.md)                   |
 | Canvas engine                                                 | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md) |
+| Workflow library retention and demand                         | [features/workflow/data/README.md](src/features/workflow/data/README.md)               |
 | Performance gates and byte budgets                            | [performance/README.md](performance/README.md)                                         |
 
 ## Contract ownership

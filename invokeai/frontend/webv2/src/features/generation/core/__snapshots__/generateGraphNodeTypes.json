@@ -46,12 +46,15 @@
       "componentsFilled": {
         "diffusers": [],
         "standalone-components": [],
-        "diffusers-with-refiner": []
+        "diffusers-with-refiner": [],
+        "canvas-img2img-uncompensated": [],
+        "canvas-img2img-compensated": []
       },
       "nodeTypes": [
         "collect",
         "core_metadata",
         "denoise_latents",
+        "i2l",
         "img_nsfw",
         "img_watermark",
         "integer",
@@ -695,6 +698,7 @@
           "qwen_image_2_1_txt2img",
           "qwen_image_txt2img",
           "sd3_txt2img",
+          "sdxl_img2img",
           "sdxl_txt2img",
           "txt2img",
           "wan_txt2img",
@@ -825,6 +829,9 @@
           8,
           9
         ],
+        "strength": [
+          0.6
+        ],
         "t5_encoder": [],
         "use_cache": [
           true
@@ -880,6 +887,7 @@
         ],
         "denoising_start": [
           0,
+          0.4,
           0.8
         ],
         "hidiffusion": [
@@ -1411,6 +1419,30 @@
         "conditioning"
       ]
     },
+    "i2l": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "color_compensation": [
+          "None",
+          "SDXL"
+        ],
+        "fp32": [
+          true
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
     "ideogram4_caption_builder": {
       "inputs": [
         "prompt"
@@ -1730,9 +1762,6 @@
         "vae"
       ],
       "literalInputs": {
-        "color_compensation": [
-          "None"
-        ],
         "fp32": [
           true
         ],
