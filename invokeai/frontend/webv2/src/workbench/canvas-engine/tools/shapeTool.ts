@@ -5,7 +5,11 @@
  * dispatch, and nonzero shapes produce one structural or stroke commit.
  */
 
-import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { ShapeToolOptions } from '@workbench/canvas-engine/engineStores';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
@@ -102,6 +106,10 @@ export const polygonShapeFrom = (
 /** Where a finished shape went: pixels, nothing to draw, refused by the paint layer or mask, or neither at all. */
 type PixelPlacement = 'placed' | 'nothing' | 'refused' | 'unsupported';
 
+/** The pixels a shape aimed at `layer` draws into: a paint layer's, or a mask's alpha; null for any other layer. */
+const pixelTargetOf = (layer: CanvasLayerContract): Extract<CanvasLayerSourceContract, { type: 'paint' }> | null =>
+  layer.type === 'raster' && layer.source.type === 'paint' ? layer.source : maskAsPaintSource(layer);
+
 /** With fill off and no stroke to draw, a shape changes no pixel, so it records no step and uploads nothing. */
 const drawsNothing = (source: ShapeSource): boolean =>
   source.fill === null && (source.stroke === null || source.strokeWidth <= 0);
@@ -153,7 +161,7 @@ export const createShapeTool = (): Tool => {
    */
   const commitPixels = (ctx: ToolContext, leaf: SemanticLeaf, placed: PlacedShape): PixelPlacement => {
     const layer = leaf.layer;
-    const paint = layer.type === 'raster' && layer.source.type === 'paint' ? layer.source : maskAsPaintSource(layer);
+    const paint = pixelTargetOf(layer);
     if (!paint) {
       return 'unsupported';
     }
@@ -317,6 +325,18 @@ export const createShapeTool = (): Tool => {
 
   return {
     cursor: () => (session?.kind === 'polyline' && session.session.closeArmed ? 'pointer' : 'crosshair'),
+    // Box and freehand drags draw into a selected paint layer or mask that accepts pixels, when aimed at the
+    // selection; anything else gets a new layer. A polygon's vertex presses are separate gestures that write nothing
+    // until it closes, so they leave a staged view alone instead of blinking.
+    editsSelectedLayer: (ctx) => {
+      const options = ctx.stores.shapeOptions.get();
+      if (options.target !== 'selected' || options.kind === 'polygon') {
+        return false;
+      }
+      const doc = ctx.getDocument();
+      const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+      return !!leaf && pixelTargetOf(leaf.layer) !== null && isLeafPaintable(leaf);
+    },
     id: 'shape',
     onDeactivate: (ctx, opts) => {
       // A modifier-hold switch (space → view to pan mid-polygon) keeps the session.

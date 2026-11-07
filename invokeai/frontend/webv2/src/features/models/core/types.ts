@@ -306,6 +306,7 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  previous_sources?: string[];
 }
 
 export interface StarterModelBundle {

@@ -2521,6 +2521,184 @@ def test_projection_job_is_popped_before_running(service: ImageIndexService) -> 
     assert service._next_projection_job() is None
 
 
+class _CoolingScope:
+    """A started service whose "system" scope has had one fit, on a clock the test moves (`skew`)."""
+
+    def __init__(self, image_records, images_service, index_records, monkeypatch, fit_seconds: float = 0.0) -> None:
+        self.skew = 0.0
+        self.fits = 0
+        self.image_records = image_records
+        self.images_service = images_service
+        self.index_records = index_records
+
+        def counting_umap(matrix: np.ndarray) -> np.ndarray:
+            # A stub, as in test_unchanged_scope_does_not_recompute_the_projection. It takes
+            # `fit_seconds` of the service's clock.
+            self.fits += 1
+            self.skew += fit_seconds
+            return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+        # The module's own clock only: patching time.monotonic itself would skew every thread in the process.
+        monkeypatch.setattr(
+            image_index_default, "time", SimpleNamespace(monotonic=lambda: time.monotonic() + self.skew)
+        )
+        monkeypatch.setattr(image_index_default, "compute_umap", counting_umap)
+        self.service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        self.invoker = _make_invoker(images_service, index_records)
+        self.service.start(self.invoker)
+        _wait_until(lambda: not self.service._backfill_pending.is_set())
+        # The first fit of a scope has nothing to cool down from.
+        self.service.request_projection("system")
+        _wait_until(lambda: "system" in self.service._projection_not_before, timeout=30.0)
+        assert self.fits == 1
+
+    def ready_count(self) -> int:
+        from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+        return sum(isinstance(e, ImageMapProjectionReadyEvent) for e in self.invoker.services.events.events)
+
+    def change_scope(self) -> None:
+        _save_image(self.image_records, "new.png")
+        self.images_service._on_changed(_dto_for(self.image_records, "new.png"))
+        _wait_until(
+            lambda: self.index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"), timeout=30.0
+        )
+
+    def refit_stored(self) -> bool:
+        record = self.index_records.get_projection("system", MODEL_ID)
+        return record is not None and record.point_count == 4
+
+
+@pytest.mark.parametrize(
+    ("floor", "multiplier", "fit_seconds", "still_cooling_at", "due_at"),
+    [(100.0, 0.0, 0.0, 50.0, 101.0), (0.0, 2.0, 100.0, 250.0, 301.0)],
+    ids=["floor", "multiplier"],
+)
+def test_a_polled_refit_waits_out_the_cooldown_of_the_last_fit(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+    floor: float,
+    multiplier: float,
+    fit_seconds: float,
+    still_cooling_at: float,
+    due_at: float,
+) -> None:
+    """On a busy server something embeds during almost every fit, so a client refetching /points on
+    projection_ready would otherwise queue the next full fit at once, and the worker would fit forever.
+    The multiplier case's fit ends at clock 100, so its cooldown runs to 300."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", floor)
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_MULTIPLIER", multiplier)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch, fit_seconds)
+    try:
+        scope.change_scope()
+        scope.service.request_projection("system")
+        scope.skew = still_cooling_at
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1, "a refit nobody asked for must wait out the cooldown"
+        assert "system" in scope.service._projection_requests, "the deferred refit stays promised"
+
+        scope.skew = due_at
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def test_a_short_circuited_refresh_keeps_the_cooldown(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A refresh over an unchanged scope fits nothing, so it must not free the next poll to refit at once."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        cooldown = scope.service._projection_not_before["system"]
+        _wait_until(lambda: scope.ready_count() == 1)
+
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(lambda: scope.ready_count() == 2)
+        assert scope.service._projection_not_before == {"system": cooldown}
+
+        scope.change_scope()
+        scope.service.request_projection("system")
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1
+    finally:
+        scope.service.stop()
+
+
+def test_a_refresh_whose_read_fails_during_a_cooldown_is_retried_at_once(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The refresh lost its exemption when it was taken; the requeue must not leave it to the cooldown."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        scope.change_scope()
+        real_list = index_records.list_accessible_embedded_items
+        failures = {"n": 0}
+
+        def fails_once(user_id, model_id):
+            if failures["n"] == 0:
+                failures["n"] += 1
+                raise LockTimeoutError("database is locked")
+            return real_list(user_id, model_id)
+
+        index_records.list_accessible_embedded_items = fails_once  # type: ignore[method-assign]
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert failures["n"] == 1
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def _fake_running_worker(service: ImageIndexService) -> None:
+    """Make request_projection accept jobs without a worker that would take them. It lives until the
+    service fixture's stop()."""
+    service._model_id = MODEL_ID
+    service._worker = threading.Thread(target=service._stop_event.wait, daemon=True)
+    service._worker.start()
+
+
+def test_a_user_requested_refit_skips_the_cooldown_even_when_a_poll_follows(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["u1"] = time.monotonic() + 1000
+
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+    assert service.request_projection("u1", user_initiated=True)
+    # A poll landing before the worker takes the job must not turn it back into a deferred one.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() == ("u1", False)
+
+    # The exemption went with the job it came with.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+
+def test_a_cooling_scope_does_not_block_another_users_due_refit(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["a"] = time.monotonic() + 1000
+
+    assert service.request_projection("a", all_images=True)
+    assert service.request_projection("b")
+
+    assert service._next_projection_job() == ("b", False)
+    assert service._projection_requests == {"a": True}, "the deferred job stays queued"
+    assert service._next_projection_job() is None
+
+
 def test_embed_text_unavailable_without_model_config(
     images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:

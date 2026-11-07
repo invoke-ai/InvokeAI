@@ -14,7 +14,7 @@ Move, star and archive report an Undo (`notify.undoable`). Undo puts back each i
 
 ## Realtime refresh and external reveal
 
-Uploads, reconnects, and the signed-in user's completed queue items whose origin does not start with `webv2:` refresh the listings. This client's own items are refreshed by Queue, in the tab that tracks them only.
+Uploads, reconnects, and all of the signed-in user's completed queue items refresh the listings, including completions from other frontend tabs and devices. Gallery owns socket-completion invalidation; Queue does not also refresh for those events. Bursts coalesce for 250 ms and passes stay at least 1 second apart, with a trailing pass for later events. Hidden tabs keep one pending refresh until shown. Query invalidations serialize and await active refetches, so a slow listing read lands before a later pass begins. Frontend origins (`webv2:`) refresh only: they never select an item, change filters, board or page, or request external reveal. Image and video results share this completion path.
 
 An external client asks for its results to be revealed by enqueueing with `POST /api/v1/queue/default/enqueue_batch` and `batch.destination` set to `gallery:reveal`. The request is honored only for the signed-in user's items (any user's on a single-user server) whose origin does not start with `webv2:`. Every other destination only refreshes, `gallery` included: legacy web sends it on every workflow and upscale run.
 

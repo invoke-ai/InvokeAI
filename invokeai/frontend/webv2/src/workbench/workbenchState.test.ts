@@ -11,7 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
-import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
+import type { ExpandedPositivePrompts, InvocationSourceId } from '@workbench/invocationContracts';
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
@@ -32,6 +32,7 @@ import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
+import { createInstance } from 'i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
@@ -39,6 +40,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { createEmptyCanvasDocument } from './canvasMigration';
 import { MAX_CANVAS_SNAPSHOTS } from './canvasProjectMutations';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
+import { getDynamicPromptsExpansionSource } from './invocation';
 import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import {
   createLayoutPresetSnapshot,
@@ -65,6 +67,15 @@ import {
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
+
+/** What the caller would have expanded the project's prompt from, as it hands that to the resolved submission. */
+const preparedExpansionSource = (state: WorkbenchState, sourceId: InvocationSourceId) => {
+  const source = getDynamicPromptsExpansionSource(getActiveProject(state), sourceId);
+
+  return source
+    ? { combinatorial: source.combinatorial, maxPrompts: source.maxPrompts, positivePrompt: source.positivePrompt }
+    : undefined;
+};
 
 const generationDeviceMock = vi.hoisted(() => ({
   options: [] as { device: string; name: string }[],
@@ -1521,6 +1532,60 @@ describe('adopting a project from another realm', () => {
     const normalized = normalizeWorkbenchProject(project, { isArriving: false });
 
     expect(normalized.queue).toBe(project.queue);
+  });
+
+  it('keeps the failed submission of a run until the backend accepts it or the run ends', () => {
+    let state = submitGenerate(primeGenerate());
+    const projectId = state.activeProjectId;
+    const queueItemId = getActiveProject(state).queue.items[0]!.id;
+    const recordRetry = (current: WorkbenchState) =>
+      workbenchReducer(current, {
+        projectId,
+        queueItemId,
+        retry: {
+          failedAt: 2_000,
+          failureCount: 1,
+          message: 'unavailable',
+          reason: 'unavailable',
+          serverErrorCount: 0,
+          serverErrorSince: null,
+          status: 503,
+        },
+        type: 'recordQueueItemSubmissionRetry',
+      });
+
+    state = recordRetry(state);
+    expect(getActiveProject(state).queue.items[0]?.submissionRetry).toMatchObject({
+      reason: 'unavailable',
+      status: 503,
+    });
+    expect(recordRetry(state)).toBe(state);
+
+    const accepted = workbenchReducer(state, {
+      backendItemIds: [42],
+      projectId,
+      queueItemId,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    expect(getActiveProject(accepted).queue.items[0]).not.toHaveProperty('submissionRetry');
+    // A late answer to an earlier attempt does not bring it back.
+    expect(recordRetry(accepted)).toBe(accepted);
+
+    const failed = workbenchReducer(state, {
+      error: 'graph validation crashed',
+      projectId,
+      queueItemId,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    const cancelled = workbenchReducer(state, { notice: null, projectId, queueItemId, type: 'cancelQueueItem' });
+    for (const [ended, status] of [
+      [failed, 'failed'],
+      [cancelled, 'cancelled'],
+    ] as const) {
+      expect(getActiveProject(ended).queue.items[0]).toMatchObject({ status });
+      expect(getActiveProject(ended).queue.items[0]).not.toHaveProperty('submissionRetry');
+    }
   });
 
   it('preserves and routes live queue work when server content replaces a project', () => {
@@ -3982,6 +4047,53 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications[0]).not.toHaveProperty('actions');
   });
 
+  it.each([
+    ['invalid-submission', 'Queue item has malformed workflow seed metadata.', 'invalidSubmissionMessage'],
+    ['not-accepted', 'The backend queue did not accept this generation. The queue may be full.', 'notAcceptedMessage'],
+    ['project-not-saved', 'This run was not submitted because its project cannot be saved.', 'projectNotSavedMessage'],
+    ['server-error', 'graph validation crashed', 'serverErrorMessage'],
+  ] as const)(
+    'words a %s failure through a translation key, quoting the error as its reason',
+    (errorCode, error, key) => {
+      const englishCatalog = import.meta.glob('../../public/locales/en.json', { eager: true, import: 'default' });
+      const english = createInstance();
+      void english.init({
+        initAsync: false,
+        interpolation: { escapeValue: false },
+        lng: 'en',
+        resources: { en: { translation: Object.values(englishCatalog)[0] as Record<string, unknown> } },
+      });
+      const messageKey = `notifications.runOutcome.${key}`;
+      let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+      const project = getActiveProject(state);
+      const failRun = (queueItemId: string) =>
+        workbenchReducer(state, {
+          error,
+          errorCode,
+          projectId: project.id,
+          queueItemId,
+          status: 'failed',
+          type: 'setQueueItemStatus',
+        });
+
+      state = failRun(project.queue.items[0]!.id);
+      const labeled = state.notifications[0]!;
+      expect(labeled).toMatchObject({
+        messageKey,
+        messageValues: { label: 'A lighthouse in a storm', reason: error },
+        titleKey: 'notifications.runOutcome.failed',
+      });
+      // The English stand-in is what the catalog says, so the notice reads the same before and after translation.
+      expect(english.t(messageKey, labeled.messageValues)).toBe(labeled.message);
+
+      // A run that already left the project's queue has no prompt to name.
+      state = failRun('run-no-longer-in-the-queue');
+      const unlabeled = state.notifications[0]!;
+      expect(unlabeled).toMatchObject({ messageKey: `${messageKey}Unlabeled`, messageValues: { reason: error } });
+      expect(english.t(`${messageKey}Unlabeled`, unlabeled.messageValues)).toBe(unlabeled.message);
+    }
+  );
+
   it('reports a failure no backend item explains without follow-ups it cannot offer', () => {
     let state = submitGenerate(primeGenerate());
     const project = getActiveProject(state);
@@ -4366,6 +4478,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const submitResolvedTo = (primed: WorkbenchState, positivePrompts?: string[]) =>
       workbenchReducer(primed, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(primed, 'generate'),
         positivePrompts,
         projectId: primed.activeProjectId,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -4418,6 +4531,105 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
         positivePrompts: ['a cat, red tint', 'a cat, green tint'],
       });
+    });
+  });
+
+  describe('expanded Video prompts on the compiled submission', () => {
+    const wanModel: ModelConfig = {
+      base: 'wan',
+      file_size: 1,
+      format: 'diffusers',
+      hash: 'wan-t2v-hash',
+      key: 'wan-t2v_a14b-diffusers',
+      name: 'Wan 2.2 t2v_a14b',
+      path: 'wan-t2v_a14b-diffusers',
+      source: 'wan-t2v_a14b-diffusers',
+      source_type: 'path',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const submitVideo = (
+      values: Record<string, unknown>,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed: number | null = null
+    ) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        region: 'left',
+        type: 'toggleRegionWidget',
+        widgetId: 'video',
+      });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { model: wanModel, positivePrompt: 'a {red|green} fox', ...values },
+        widgetId: 'video',
+      });
+
+      return workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'video'),
+        models: [wanModel],
+        positivePrompts,
+        positivePromptsSampleSeed,
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+    };
+
+    it('queues one video per expanded prompt', () => {
+      const queueItem = getActiveProject(submitVideo({}, ['a red fox', 'a green fox'])).queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+        kind: 'generate',
+        positivePrompts: ['a red fox', 'a green fox'],
+      });
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(2);
+    });
+
+    it('drops an expansion and queues the prompt as typed with dynamic prompts off', () => {
+      const queueItem = getActiveProject(submitVideo({ dynamicPromptsEnabled: false }, ['a red fox', 'a green fox']))
+        .queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({ positivePrompt: 'a {red|green} fox' });
+      expect(queueItem?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(1);
+    });
+
+    it('recalls the random sample the expansion drew and rotates the widget to a new one', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: 7 },
+          ['a green fox'],
+          7
+        );
+        const project = getActiveProject(state);
+
+        expect(project.queue.items[0]?.snapshot.recall?.videoValues?.dynamicPromptsSampleSeed).toBe(7);
+        expect(getProjectWidgetValues(project, 'video').dynamicPromptsSampleSeed).toBe(Math.floor(0.5 * 4_294_967_295));
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    // A project saved before Video stored a sample seed draws with 0, the seed it normalizes to.
+    it('rotates a sample seed the stored values never held', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: undefined },
+          ['a green fox'],
+          0
+        );
+
+        expect(getProjectWidgetValues(getActiveProject(state), 'video').dynamicPromptsSampleSeed).toBe(
+          Math.floor(0.5 * 4_294_967_295)
+        );
+      } finally {
+        random.mockRestore();
+      }
     });
   });
 
@@ -4996,6 +5208,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'generate'),
         positivePrompts,
         positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -5293,7 +5506,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             positivePrompt: 'a {red|green} cat',
           });
           // Canvas is told the sample its expansion drew, as Generate is.
-          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const drawn = {
+            expandedFrom: { combinatorial: false, maxPrompts: 100, positivePrompt: 'a {red|green} cat' },
+            positivePrompts: ['a green cat'],
+            positivePromptsSampleSeed: 7,
+          };
           const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
           const rotated = Math.floor(0.5 * SEED_MAX);
 
