@@ -95,16 +95,31 @@ def test_a_lora_with_norm_diffs_is_qwen_image_2_1(tmp_path: Path) -> None:
     assert _probe(LoRA_LyCORIS_QwenImage21_Config, sd, tmp_path)
 
 
-def test_a_torchao_file_is_refused_at_install() -> None:
-    # unsloth's FP8 build: torchao Float8Tensors, saved as the payload and a per-row scale, no `.weight`.
+def _torchao_layer(payload: torch.dtype = torch.float8_e4m3fn, **extra: Any) -> dict[str, Any]:
+    """One layer as unsloth's torchao builds store it: the payload and a per-row scale, no `.weight`."""
     layer = "transformer_blocks.0.attn.to_q"
-    sd = _transformer(
-        **{
-            f"{layer}._weight_qdata": torch.zeros(8, 8, dtype=torch.float8_e4m3fn),
-            f"{layer}._weight_scale": torch.ones(8, 1),
-        }
-    )
-    with pytest.raises(InvalidMatchError, match="torchao"):
+    return {
+        f"{layer}._weight_qdata": torch.zeros(8, 8, dtype=payload),
+        f"{layer}._weight_scale": torch.ones(8, 1),
+        **{f"{layer}.{name}": value for name, value in extra.items()},
+    }
+
+
+def test_unsloths_torchao_fp8_build_installs() -> None:
+    config = _identify(_transformer(**_torchao_layer()), Path("Qwen-Image-2.1-FP8.safetensors"))
+    assert config.base is BaseModelType.QwenImage21
+
+
+def test_unsloths_torchao_int8_build_is_refused_at_install() -> None:
+    sd = _transformer(**_torchao_layer(torch.int8, _weight_zero_point=torch.zeros(8, 1, dtype=torch.int8)))
+    with pytest.raises(InvalidMatchError, match="INT8"):
+        _identify(sd, Path("Qwen-Image-2.1-INT8.safetensors"))
+
+
+def test_a_torchao_fp8_layout_the_loader_cannot_translate_is_refused_at_install() -> None:
+    sd = _transformer(**_torchao_layer())
+    sd["transformer_blocks.0.attn.to_q._weight_scale"] = torch.ones(8, 2)
+    with pytest.raises(InvalidMatchError, match="transformer_blocks.0.attn.to_q"):
         _identify(sd, Path("Qwen-Image-2.1-FP8.safetensors"))
 
 

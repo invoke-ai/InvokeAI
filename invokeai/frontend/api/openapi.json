@@ -77932,7 +77932,7 @@
           "variant"
         ],
         "title": "Main_Checkpoint_QwenImage21_Config",
-        "description": "Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."
+        "description": "Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot)."
       },
       "Main_Checkpoint_QwenImage_Config": {
         "properties": {
