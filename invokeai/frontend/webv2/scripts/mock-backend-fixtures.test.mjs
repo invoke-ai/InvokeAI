@@ -2404,3 +2404,33 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
     await backend.close();
   }
 });
+
+test('opt-in large library has pageable metadata, representative documents, retry and revision scenarios', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const seed = (scenario) =>
+      getJson(backend, '/__workflow-library', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scenario }),
+      });
+    assert.equal((await seed('large')).count, 1000);
+    const first = await getJson(backend, '/api/v1/workflows/?page=0&per_page=20');
+    assert.equal(first.total, 1000);
+    assert.equal(first.pages, 50);
+    assert.equal(first.items.length, 20);
+    assert.equal('workflow' in first.items[0], false);
+    const id = first.items[0].workflow_id;
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).workflow.nodes.length, 40);
+    await seed('failed-page');
+    const failedPath = '/api/v1/workflows/?page=2&per_page=20';
+    assert.equal((await fetch(`${backend.origin}${failedPath}`)).status, 503);
+    assert.equal((await getJson(backend, failedPath)).page, 2);
+    await seed('changed-revision');
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).revision, 2);
+    await seed('empty');
+    assert.equal((await getJson(backend, '/api/v1/workflows/')).total, 0);
+  } finally {
+    await backend.close();
+  }
+});

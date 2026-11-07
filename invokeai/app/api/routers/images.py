@@ -905,7 +905,7 @@ def download_images_from_list(
     # Validate that the caller can read every image they are requesting.
     # For a board_id request, check board visibility; for explicit image names,
     # check each image individually.
-    if board_id:
+    if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
     if image_names:
         for name in image_names:
@@ -921,6 +921,7 @@ def download_images_from_list(
         board_id,
         bulk_download_item_id,
         current_user.user_id,
+        uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
