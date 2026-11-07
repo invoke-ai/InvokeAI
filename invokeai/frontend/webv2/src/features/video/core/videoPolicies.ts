@@ -1304,6 +1304,21 @@ export const getAcceleratorToggleResult = (
   };
 };
 
+/** Switch H3 tasks without leaving Turbo's sampling recipe behind when its adapter is removed. */
+export const getH3ModeSwitchSettings = (
+  settings: VideoSettings,
+  model: MainModelConfig,
+  models: readonly ModelConfig[],
+  override: boolean
+): VideoSettings => {
+  const detected = model.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+  const task = override ? (detected === 'ref2va' ? 'fl2va' : 'ref2va') : detected;
+  const base = settings.acceleratorEnabled
+    ? getAcceleratorToggleResult(settings, { ...model, variant: task }, models, false).settings
+    : settings;
+  return { ...base, h3ModeOverride: override, h3SelectedTask: task };
+};
+
 export type AcceleratorLoraChangeOutcome = 'unchanged' | 'switched' | 'disabled';
 
 export interface AcceleratorLoraChangeResult {
@@ -1662,7 +1677,7 @@ export const getVideoComponentSectionPolicy = (
     },
     // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and
     // projections.
-    ...(model.variant === 'ref2va'
+    ...(model.variant === 'ref2va' && !_settings.h3ModeOverride
       ? [
           {
             filter: isH3HybridBaseCandidate,
@@ -1836,6 +1851,13 @@ export const getDefaultVideoSettings = (
           : null,
     firstFrameImage: null,
     fps: config.fps.defaultValue,
+    h3ModeOverride: false,
+    h3SelectedTask:
+      model?.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
     h3HybridBaseModel: null,
     h3HybridStartBlock: MINIMAX_H3_HYBRID_BLOCK_RANGE.defaultStart,
     h3TextEncoderModel: null,
@@ -1967,10 +1989,13 @@ export const getVideoModelSelectionResult = ({
   currentSettings,
   model,
   models,
+  h3TargetOverride,
 }: {
   currentSettings: VideoSettings;
   model: MainModelConfig;
   models: readonly ModelConfig[];
+  /** Task override for the incoming H3 model, applied before the loss preview. */
+  h3TargetOverride?: boolean;
 }): VideoModelSelectionResult => {
   const config = getVideoConfig(model);
   // Missing modelKey means healing defaults, not user choices; bootstrap selected-model defaults before
@@ -1978,7 +2003,17 @@ export const getVideoModelSelectionResult = ({
   const start = currentSettings.modelKey
     ? currentSettings
     : getVideoSettingsWithModelDefaults(currentSettings, model, models);
-  const next: VideoSettings = { ...start, modelKey: model.key };
+  const next: VideoSettings = {
+    ...start,
+    modelKey: model.key,
+    h3ModeOverride: h3TargetOverride ?? (model.key === currentSettings.modelKey ? start.h3ModeOverride : false),
+    h3SelectedTask:
+      model.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
+  };
   const losses: VideoModelSwitchLoss[] = [];
   const adjustments = new Set<VideoModelSwitchAdjustment>();
   const modes = config.modes;

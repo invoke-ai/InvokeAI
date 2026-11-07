@@ -38935,6 +38935,12 @@ export type components = {
              */
             text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Task Variant Override
+             * @description Override the detected transformer task variant for this invocation. The denoiser still validates conditioning against the selected variant.
+             * @default null
+             */
+            task_variant_override?: ("fl2va" | "ref2va") | null;
+            /**
              * type
              * @default minimax_h3_model_loader
              * @constant

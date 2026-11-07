@@ -26,6 +26,23 @@ import {
 // Shared empty array, so clearing already-clear keys keeps its identity.
 const EMPTY_ACCELERATOR_LORA_KEYS: string[] = [];
 
+// Old override records did not distinguish catalog snapshots from effective synthetic models. Media is
+// conclusive only when it uses one kind of conditioning; otherwise retain the stored model's identity.
+const resolveH3Task = (values: VideoWidgetValues, detected: 'fl2va' | 'ref2va'): 'fl2va' | 'ref2va' => {
+  if (values.h3SelectedTask) {
+    return values.h3SelectedTask;
+  }
+  if (!values.h3ModeOverride) {
+    return detected;
+  }
+  const hasReferences = values.references.length > 0;
+  const hasFrames = Boolean(values.firstFrameImage || values.lastFrameImage);
+  if (hasReferences !== hasFrames) {
+    return hasReferences ? 'ref2va' : 'fl2va';
+  }
+  return values.model?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+};
+
 export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = []): VideoWidgetValues => {
   const model = (models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null;
 
@@ -40,6 +57,17 @@ export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
 ): VideoWidgetValues => {
+  // Do not pick a task or replace the model while ambiguous legacy media needs a user decision.
+  const unresolvedLegacyConflict = Boolean(
+    values.h3ModeOverride &&
+    !values.h3SelectedTask &&
+    values.references.length &&
+    (values.firstFrameImage || values.lastFrameImage)
+  );
+  // No catalog reconciliation is safe until the user chooses which conditioning to keep.
+  if (unresolvedLegacyConflict) {
+    return values;
+  }
   // Promote only installed H3 checkpoint overrides before other reconciliation; retain the old Diffusers main as
   // components and drop invalid overrides without evicting it.
   if (values.model?.base === 'minimax-h3' && values.model.format === 'diffusers' && values.h3TransformerModel) {
@@ -65,10 +93,30 @@ export const syncVideoWidgetValuesWithModels = (
   const storedMain = values.model ? modelsByKey.get(values.model.key) : undefined;
   // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter
   // selectable filter.
-  const model: MainModelConfig | null =
+  const registered: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
+  const sameH3 =
+    registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
+  const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+  const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
+  const override = Boolean(sameH3 && effectiveVariant !== detected);
+  // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
+  // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
+  const candidate =
+    registered?.base === 'minimax-h3' && registered.format === 'checkpoint'
+      ? { ...registered, variant: effectiveVariant }
+      : registered;
+  const sameCandidate =
+    candidate &&
+    values.model &&
+    Object.keys(candidate).length === Object.keys(values.model).length &&
+    Object.entries(candidate).every(
+      ([key, value]) =>
+        JSON.stringify(value) === JSON.stringify((values.model as unknown as Record<string, unknown>)[key])
+    );
+  const model: MainModelConfig | null = sameCandidate ? values.model : candidate;
 
   // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution
   // cannot remain stale.
@@ -163,6 +211,13 @@ export const syncVideoWidgetValuesWithModels = (
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
+    h3ModeOverride: override,
+    h3SelectedTask:
+      model?.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
     vae: syncComponent('vae', base.vae),
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
@@ -175,7 +230,7 @@ export const syncVideoWidgetValuesWithModels = (
   }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
-  if (next.references.length > 0 && model && !getVideoModes(model).includes('reference')) {
+  if (next.references.length > 0 && model && !sameH3 && !getVideoModes(model).includes('reference')) {
     next.references = [];
   }
 
@@ -183,6 +238,8 @@ export const syncVideoWidgetValuesWithModels = (
     base === values &&
     next.model === values.model &&
     next.modelKey === values.modelKey &&
+    next.h3SelectedTask === values.h3SelectedTask &&
+    next.h3ModeOverride === values.h3ModeOverride &&
     next.acceleratorEnabled === values.acceleratorEnabled &&
     next.acceleratorLoraKeys === values.acceleratorLoraKeys &&
     next.vae === values.vae &&
@@ -211,10 +268,21 @@ export const getVideoWidgetValidationReasons = (
     return ['Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.'];
   }
 
-  const reasons = getVideoValidationReasons(values.model, values);
+  // Readiness may receive the persisted (classified) record before the view's catalog sync.
+  // Resolve the same effective H3 task the graph compiler will use, without changing any media.
+  const registered = models?.find((item) => item.key === values.model?.key);
+  const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
+  const effectiveModel =
+    source.base === 'minimax-h3' && source.format === 'checkpoint'
+      ? {
+          ...source,
+          variant: resolveH3Task(values, source.variant === 'ref2va' ? 'ref2va' : 'fl2va'),
+        }
+      : source;
+  const reasons = getVideoValidationReasons(effectiveModel, values);
 
   if (models) {
-    reasons.push(...getVideoModelAvailabilityReasons(values.model, values, models));
+    reasons.push(...getVideoModelAvailabilityReasons(effectiveModel, values, models));
   }
 
   return reasons;

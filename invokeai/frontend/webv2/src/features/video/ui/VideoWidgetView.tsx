@@ -9,6 +9,7 @@ import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/re
 import { GenerationSettingsSection, SeedField } from '@features/generation/components';
 import {
   getDynamicPromptsConfig,
+  isMainModelConfig,
   normalizeDynamicPromptsSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -36,6 +37,7 @@ import {
 import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
+  getH3ModeSwitchSettings,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getAutoDurationBounds,
@@ -45,6 +47,7 @@ import {
   isAutoDurationSupportedForMode,
 } from '@features/video/core/videoPolicies';
 import { createDefaultVideoWidgetValues, syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Field, IconButton, Select } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
@@ -177,6 +180,49 @@ export const VideoWidgetView = () => {
   );
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
+
+  const toggleH3Mode = useCallback(
+    ({ checked }: { checked: boolean }) => {
+      flushWorkbenchDrafts();
+      let blocked = false;
+      let removedTurbo = false;
+      patchValues((current) => {
+        if (
+          current.references.length ||
+          current.firstFrameImage ||
+          current.lastFrameImage ||
+          current.sourceVideo ||
+          current.h3HybridBaseModel
+        ) {
+          blocked = true;
+          return {};
+        }
+        const latest = modelsStatus === 'loaded' ? syncVideoWidgetValuesWithModels(current, models) : current;
+        if (latest.model?.base !== 'minimax-h3' || latest.model.format !== 'checkpoint') {
+          return {};
+        }
+        const registered = models.find((item) => item.key === latest.model?.key && item.type === 'main');
+        const detected = registered && isMainModelConfig(registered) ? registered : latest.model;
+        removedTurbo = latest.acceleratorEnabled;
+        const next = getH3ModeSwitchSettings(latest, detected, models, checked);
+        return { ...next, model: { ...latest.model, variant: next.h3SelectedTask } };
+      });
+      if (blocked) {
+        toaster.create({
+          title: t('widgets.video.h3ClearModeInputs'),
+          description: t('widgets.video.h3ClearModeInputsDescription'),
+          type: 'warning',
+        });
+      } else if (removedTurbo) {
+        toaster.create({
+          title: t('widgets.video.settingsAdjusted'),
+          description: t('widgets.video.h3TurboRemoved'),
+          type: 'info',
+        });
+      }
+    },
+    [models, modelsStatus, patchValues, t]
+  );
 
   // Async writes must use the latest committed list for this project while the sync effect is live. Hidden
   // Activity panels stop syncing, and old callbacks still target their original project; drop writes in either
@@ -537,6 +583,28 @@ export const VideoWidgetView = () => {
           values={values}
         />
       </Stack>
+
+      {values.model?.base === 'minimax-h3' && values.model.format === 'checkpoint' ? (
+        <HStack px="2" py="1" justify="space-between">
+          <Text fontSize="sm">
+            {t('widgets.video.h3Mode', {
+              mode: values.model.variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
+              source: values.h3ModeOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
+            })}
+          </Text>
+          <Switch.Root
+            checked={values.h3ModeOverride === true}
+            disabled={modelsStatus !== 'loaded'}
+            onCheckedChange={toggleH3Mode}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
+              <Switch.Thumb />
+            </Switch.Control>
+            <Switch.Label>{t('widgets.video.h3SwitchMode')}</Switch.Label>
+          </Switch.Root>
+        </HStack>
+      ) : null}
 
       <VideoPromptFields
         batchCount={values.batchCount}
