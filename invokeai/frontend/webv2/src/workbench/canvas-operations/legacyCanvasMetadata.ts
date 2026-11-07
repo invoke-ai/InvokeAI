@@ -200,7 +200,8 @@ const rasterizeLegacyObjects = async (
   owner: AccountScope,
   adjustments: unknown,
   isCurrent: () => boolean,
-  budget: { pixels: number; uploads: number; workUnits: number }
+  budget: { pixels: number; uploads: number; workUnits: number },
+  createdImageNames: string[]
 ): Promise<CanvasLayerSourceContract> => {
   if (objects.length === 0) {
     return { type: 'paint', bitmap: null };
@@ -468,8 +469,13 @@ const rasterizeLegacyObjects = async (
     if (!isCurrent()) {
       throw new Error('canvas-changed');
     }
-    const uploaded = await uploadCanvasImage(blob, { signal: owner.signal });
+    // Until the recall commits, even an upload whose response is lost must stay reclaimable.
+    const uploaded = await uploadCanvasImage(blob, { isIntermediate: true, signal: owner.signal });
+    createdImageNames.push(uploaded.imageName);
     assertAccountScopeCurrent(owner);
+    if (!isCurrent()) {
+      throw new Error('canvas-changed');
+    }
     return { type: 'paint', bitmap: uploaded, offset: { x: minX, y: minY } };
   } finally {
     canvas.width = 1;
@@ -481,10 +487,11 @@ export const convertLegacyCanvasMetadata = async (
   metadata: Record<string, unknown>,
   owner: AccountScope,
   isCurrent: () => boolean = () => true
-): Promise<{ record: Record<string, unknown> | null; problems: string[] }> => {
+): Promise<{ record: Record<string, unknown> | null; problems: string[]; createdImageNames: string[] }> => {
   const raw = metadata.canvas_v2_metadata;
   const budget = { pixels: 64 * 1024 * 1024, uploads: 128, workUnits: 64 * 1024 * 1024 };
   const problems: string[] = [];
+  const createdImageNames: string[] = [];
   const document = createEmptyCanvasDocument(
     typeof metadata.width === 'number' ? metadata.width : 1024,
     typeof metadata.height === 'number' ? metadata.height : 1024
@@ -493,7 +500,7 @@ export const convertLegacyCanvasMetadata = async (
   if (!isRecord(raw)) {
     // recall_parameters names already prepared control maps, unlike legacy authored object lists.
     if (!Array.isArray(metadata.control_layers)) {
-      return { record: null, problems: 'control_layers' in metadata ? ['invalid-control'] : [] };
+      return { record: null, problems: 'control_layers' in metadata ? ['invalid-control'] : [], createdImageNames };
     }
     for (const control of metadata.control_layers.slice(0, 10000)) {
       if (
@@ -563,7 +570,7 @@ export const convertLegacyCanvasMetadata = async (
       });
     }
     if (metadata.control_layers.length && !document.stacks.control.length) {
-      return { record: null, problems };
+      return { record: null, problems, createdImageNames };
     }
   } else {
     const stacks = {
@@ -576,7 +583,7 @@ export const convertLegacyCanvasMetadata = async (
       !Object.keys(stacks).every((key) => Array.isArray(raw[key])) ||
       Object.keys(stacks).reduce((sum, key) => sum + (raw[key] as unknown[]).length, 0) > 10000
     ) {
-      return { record: null, problems: ['invalid-legacy-document'] };
+      return { record: null, problems: ['invalid-legacy-document'], createdImageNames };
     }
     for (const [key, stack] of Object.entries(stacks)) {
       // Legacy arrays are bottom-first; current forests are top-first.
@@ -615,7 +622,14 @@ export const convertLegacyCanvasMetadata = async (
           ) {
             throw new Error('unsupported-blend');
           }
-          const source = await rasterizeLegacyObjects(item.objects, owner, item.adjustments, isCurrent, budget);
+          const source = await rasterizeLegacyObjects(
+            item.objects,
+            owner,
+            item.adjustments,
+            isCurrent,
+            budget,
+            createdImageNames
+          );
           assertAccountScopeCurrent(owner);
           const base = {
             id: item.id,
@@ -706,8 +720,8 @@ export const convertLegacyCanvasMetadata = async (
       }
     }
     if (Object.values(document.stacks).every((nodes) => nodes.length === 0)) {
-      return { record: null, problems };
+      return { record: null, problems, createdImageNames };
     }
   }
-  return { record: { version: 1, document, controlModels }, problems };
+  return { record: { version: 1, document, controlModels }, problems, createdImageNames };
 };

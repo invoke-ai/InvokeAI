@@ -96,6 +96,7 @@ export const useQueueItemRecall = (
       let canvasRecall: typeof CanvasRecallModule | null = null;
       let canvasPlan: CanvasRecallModule.CanvasRecallPlan | null = null;
       let canvasProblem: string | null = null;
+      let canvasApplied = false;
       const preparedModelKey = plan.values.model?.key;
       if ((kind === 'all' || kind === 'remix') && snapshot?.canvasMetadata) {
         try {
@@ -142,7 +143,7 @@ export const useQueueItemRecall = (
           if (preparedModelKey !== plan.values.model?.key) {
             canvasPlan.problems.push('model-changed');
           } else {
-            canvasRecall.commitCanvasRecall({
+            canvasApplied = canvasRecall.commitCanvasRecall({
               plan: canvasPlan,
               expectedDocument: originalProject.canvas.document,
               target: {
@@ -170,6 +171,20 @@ export const useQueueItemRecall = (
       generation.setSettings(plan.values, originalProject.id);
       openWidget('generate', { preferredRegions: ['left'] });
       notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledDescription'));
+      if (canvasApplied && canvasPlan && canvasRecall) {
+        const durable = await canvasRecall.finalizeCanvasRecallAssets(
+          canvasPlan,
+          {
+            commands,
+            projectId: originalProject.id,
+            getProject: () => queries.getProject(originalProject.id) ?? null,
+          },
+          owner
+        );
+        if (!durable && isAccountScopeCurrent(owner) && queries.isActiveProject(originalProject.id)) {
+          notify.info(getImageRecallTitle(kind, t), t('widgets.gallery.itemActions.recall.canvasImagesTemporary'));
+        }
+      }
     },
     [
       commands,

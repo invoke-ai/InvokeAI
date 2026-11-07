@@ -1,13 +1,19 @@
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const uploads = vi.hoisted(() => ({ blobs: [] as Blob[] }));
+const uploads = vi.hoisted(() => ({
+  blobs: [] as Blob[],
+  options: [] as { isIntermediate?: boolean }[],
+  onUpload: null as (() => Promise<void>) | null,
+}));
 vi.mock('./backend/canvasImages', () => ({
-  uploadCanvasImage: async (blob: Blob) => {
+  uploadCanvasImage: async (blob: Blob, options: { isIntermediate?: boolean }) => {
     uploads.blobs.push(blob);
+    uploads.options.push(options);
+    await uploads.onUpload?.();
     const bitmap = await createImageBitmap(blob);
     try {
-      return { imageName: 'legacy-paint.png', width: bitmap.width, height: bitmap.height };
+      return { imageName: `legacy-paint-${uploads.blobs.length}.png`, width: bitmap.width, height: bitmap.height };
     } finally {
       bitmap.close();
     }
@@ -30,7 +36,7 @@ const pixel = async (blob: Blob, x: number, y: number): Promise<number[]> => {
     canvas.height = 1;
   }
 };
-const convert = (objects: unknown[], extra = {}) =>
+const convert = (objects: unknown[], extra = {}, isCurrent?: () => boolean) =>
   convertLegacyCanvasMetadata(
     {
       canvas_v2_metadata: {
@@ -51,7 +57,8 @@ const convert = (objects: unknown[], extra = {}) =>
         regionalGuidance: [],
       },
     },
-    captureAccountScope()
+    captureAccountScope(),
+    isCurrent
   );
 const rectangle = {
   id: 'rect',
@@ -74,6 +81,8 @@ const pressureDot = {
 beforeEach(() => {
   accountLifecycle.activate('legacy-canvas-browser');
   uploads.blobs.length = 0;
+  uploads.options.length = 0;
+  uploads.onUpload = null;
 });
 
 describe('legacy canvas raster recall', () => {
@@ -390,4 +399,82 @@ it('stops a superseded project before raster uploads and bounds conversions in o
   } finally {
     encode.mockRestore();
   }
+});
+
+it.each(['project', 'account'] as const)(
+  'leaves in-flight uploads reclaimable and refuses a %s change during the last upload',
+  async (change) => {
+    let markStarted!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let current = true;
+    uploads.onUpload = () => {
+      markStarted();
+      return held;
+    };
+    const pending = convert([rectangle], {}, () => current);
+    const settled = pending.catch(() => undefined);
+    try {
+      await Promise.race([
+        started,
+        settled.then(() => {
+          throw new Error('Conversion ended before the upload started');
+        }),
+      ]);
+      expect(uploads.blobs).toHaveLength(1);
+      expect(uploads.options[0]).toMatchObject({ isIntermediate: true });
+      if (change === 'project') {
+        current = false;
+      } else {
+        accountLifecycle.activate('another-account');
+      }
+      const rejected = expect(pending).rejects.toThrow();
+      release();
+      await rejected;
+      expect(uploads.blobs).toHaveLength(1);
+    } finally {
+      release();
+      await settled;
+    }
+  }
+);
+
+it('keeps unanswered conversion uploads intermediate instead of leaving an unknown durable image', async () => {
+  uploads.onUpload = () => Promise.reject(new TypeError('Failed to fetch'));
+  const result = await convert([rectangle]);
+  expect(result.record).toBeNull();
+  expect(result.createdImageNames).toEqual([]);
+  expect(uploads.options).toEqual([expect.objectContaining({ isIntermediate: true })]);
+});
+
+it('tracks only newly rasterized paint during a partial conversion, excluding borrowed image assets', async () => {
+  const common = { name: 'Layer', isEnabled: true, isLocked: false, position: { x: 0, y: 0 }, opacity: 1 };
+  const result = await convertLegacyCanvasMetadata(
+    {
+      canvas_v2_metadata: {
+        rasterLayers: [
+          { ...common, id: 'paint', objects: [rectangle] },
+          {
+            ...common,
+            id: 'borrowed',
+            objects: [{ id: 'image', type: 'image', image: { image_name: 'borrowed.png', width: 320, height: 200 } }],
+          },
+          { ...common, id: 'invalid', objects: [{ type: 'unsupported' }] },
+        ],
+        controlLayers: [],
+        inpaintMasks: [],
+        regionalGuidance: [],
+      },
+    },
+    captureAccountScope()
+  );
+  expect(result.record).not.toBeNull();
+  expect(result.problems).toHaveLength(1);
+  expect(result.createdImageNames).toEqual(['legacy-paint-1.png']);
+  expect(uploads.options).toEqual([expect.objectContaining({ isIntermediate: true })]);
 });

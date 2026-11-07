@@ -5952,6 +5952,7 @@
             "seed": "Recalled seed"
           },
           "beforeCanvasRecall": "Before metadata recall",
+          "canvasImagesTemporary": "Canvas was recalled, but some restored paint images are still temporary. Keep the project open or save it before closing to protect them from intermediate cleanup.",
           "canvasRecalled": "Canvas layers and available settings recalled. Replaced canvases remain available in History restore points.",
           "canvasPartial": "Some canvas metadata could not be restored: {{items}}. Existing work was preserved.",
           "referenceImagesPartial": "Some recorded reference images are unavailable or unsupported. Existing references were kept when none could be restored.",

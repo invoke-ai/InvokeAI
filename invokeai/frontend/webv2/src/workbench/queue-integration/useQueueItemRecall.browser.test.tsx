@@ -1,10 +1,11 @@
 import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type * as ModelsModule from '@features/models';
 import type { QueueGenerationMeta } from '@features/queue/contracts';
+import type * as CanvasOperationsModule from '@workbench/canvas-operations/api';
 import type { ImageRecallKind } from '@workbench/image-actions';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
-import { galleryImages } from '@features/gallery';
+import { galleryDurability, galleryImages } from '@features/gallery';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
@@ -34,11 +35,16 @@ const mocks = vi.hoisted(() => ({
   openWidget: vi.fn(),
   patchValues: vi.fn(),
   setSettings: vi.fn(),
+  prepareLegacy: vi.fn(),
   models: [] as ModelsModule.ModelConfig[],
   store: null as ReturnType<typeof createWorkbenchStore> | null,
   snapshot: undefined as LocalRecallSnapshot | null | undefined,
 }));
 
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof CanvasOperationsModule>()),
+  prepareLegacyCanvasMetadata: mocks.prepareLegacy,
+}));
 vi.mock('./useLocalRecallSnapshot', () => ({ useLocalRecallSnapshot: () => mocks.snapshot }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
@@ -386,5 +392,101 @@ it.each(['account', 'project', 'canvas'] as const)(
       expect(mocks.notifySuccess).not.toHaveBeenCalled();
       expect(mocks.openWidget).not.toHaveBeenCalled();
     }
+  }
+);
+
+it.each(['project', 'account', 'promotion-failure', 'project-promotion-failure'] as const)(
+  'finishes Queue recall writes and navigation before adoption when %s changes during promotion',
+  async (change) => {
+    accountLifecycle.activate('queue-paint-adoption');
+    const main = { base: 'sdxl', key: 'main', name: 'SDXL', type: 'main' } as MainModelConfig;
+    mocks.models = [main as ModelsModule.ModelConfig];
+    mocks.store = createWorkbenchStore();
+    const projectId = mocks.store.queries.getSnapshot().activeProject.id;
+    const document = createEmptyCanvasDocument();
+    document.stacks.raster = ['created-a.png', 'created-b.png'].map((imageName, index) => ({
+      id: `paint-${index}`,
+      name: 'Paint',
+      type: 'raster',
+      isEnabled: true,
+      isLocked: false,
+      opacity: 1,
+      blendMode: 'normal',
+      transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+      source: { type: 'paint', bitmap: { imageName, width: 64, height: 64 } },
+    }));
+    mocks.prepareLegacy.mockResolvedValue({
+      record: { version: 1, document },
+      problems: [],
+      createdImageNames: ['created-a.png', 'created-b.png'],
+    });
+    vi.spyOn(galleryImages, 'resolveMany').mockResolvedValue(
+      ['created-a.png', 'created-b.png'].map((imageName) => ({ imageName })) as Awaited<
+        ReturnType<typeof galleryImages.resolveMany>
+      >
+    );
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const promote = vi
+      .spyOn(galleryDurability, 'makeCanvasAsset')
+      .mockResolvedValue(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((yes, no) => {
+            resolve = yes;
+            reject = no;
+          })
+      );
+    await render({
+      sourceId: 'canvas',
+      generateValues: {
+        ...getDefaultGenerateSettings(main),
+        positivePrompt: 'Queue recall',
+        model: main,
+        modelKey: main.key,
+      },
+      canvasMetadata: { canvas_v2_metadata: {} },
+    });
+    await act(async () => {
+      const pending = handle.current!.recall('all');
+      await vi.waitFor(() => expect(promote).toHaveBeenCalledExactlyOnceWith('created-a.png'));
+      expect(getResolvedProjectWidgetValues(mocks.store!.queries.getProject(projectId)!, 'generate', {})).toMatchObject(
+        { positivePrompt: 'Queue recall' }
+      );
+      expect(mocks.openWidget).toHaveBeenCalledOnce();
+      expect(mocks.notifySuccess).toHaveBeenCalledOnce();
+      mocks.store!.commands.generation.setSettings(
+        { ...getDefaultGenerateSettings(main), model: main, steps: 47 },
+        projectId
+      );
+      const infosBefore = mocks.notifyInfo.mock.calls.length;
+      if (change === 'project' || change === 'project-promotion-failure') {
+        mocks.store!.commands.projects.create();
+      } else if (change === 'account') {
+        accountLifecycle.activate('other-account');
+      }
+      if (change === 'promotion-failure' || change === 'project-promotion-failure') {
+        reject(new Error('Promotion unavailable'));
+      } else {
+        resolve();
+      }
+      await pending;
+      await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(change === 'account' ? 1 : 2));
+      expect(mocks.openWidget).toHaveBeenCalledOnce();
+      expect(mocks.notifySuccess).toHaveBeenCalledOnce();
+      expect(getResolvedProjectWidgetValues(mocks.store!.queries.getProject(projectId)!, 'generate', {})).toMatchObject(
+        { steps: 47 }
+      );
+      if (change === 'promotion-failure') {
+        await vi.waitFor(() =>
+          expect(mocks.notifyInfo).toHaveBeenCalledWith(
+            expect.any(String),
+            'widgets.gallery.itemActions.recall.canvasImagesTemporary'
+          )
+        );
+      } else {
+        expect(mocks.notifyInfo.mock.calls).toHaveLength(infosBefore);
+      }
+    });
   }
 );

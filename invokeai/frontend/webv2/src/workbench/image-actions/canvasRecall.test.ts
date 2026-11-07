@@ -16,17 +16,20 @@ import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
+import * as CanvasOperations from '@workbench/canvas-operations/api';
 import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createInstance } from 'i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ metadata: vi.fn(), resolveMany: vi.fn() }));
+const api = vi.hoisted(() => ({ metadata: vi.fn(), resolveMany: vi.fn(), makeCanvasAsset: vi.fn() }));
 vi.mock('@features/gallery', async (original) => ({
   ...(await original<typeof GalleryModule>()),
   galleryImages: api,
+  galleryDurability: { makeCanvasAsset: api.makeCanvasAsset },
 }));
 vi.mock('@features/gallery/data/backend', async (original) => ({
   ...(await original<typeof GalleryBackendModule>()),
@@ -137,8 +140,11 @@ beforeEach(() => {
   accountLifecycle.activate('canvas-recall-tests');
   setArchitectureCapabilities(architectureCapabilitiesFixture);
   api.metadata.mockReset();
+  api.makeCanvasAsset.mockReset().mockResolvedValue(undefined);
   api.resolveMany.mockImplementation((names: string[]) => Promise.resolve(names.map((imageName) => ({ imageName }))));
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('canvas record to recall', () => {
   it('recalls a compiled output with executed automatic controls, transformed sources, masks, regions and authored geometry', async () => {
@@ -1199,5 +1205,169 @@ it.each([
         message: 'widgets.gallery.itemActions.recall.referenceImagesPartial',
       })
     );
+  }
+);
+
+const convertedPaintRecall = (partial = true) => {
+  const recalled = createEmptyCanvasDocument();
+  const paint = (id: string) => ({
+    ...base,
+    id,
+    name: id,
+    type: 'raster' as const,
+    source: { type: 'paint' as const, bitmap: { imageName: `${id}.png`, width: 64, height: 64 } },
+  });
+  recalled.stacks.raster = [
+    paint('created-a'),
+    paint('created-b'),
+    {
+      ...base,
+      id: 'borrowed',
+      type: 'raster',
+      source: { type: 'image', image: { imageName: 'borrowed.png', width: 64, height: 64 } },
+    },
+  ];
+  if (partial) {
+    recalled.stacks.control = [
+      {
+        ...control(),
+        id: 'rejected',
+        adapter: { ...control().adapter, model: 'incompatible' },
+        source: { type: 'paint' as const, bitmap: { imageName: 'created-rejected.png', width: 64, height: 64 } },
+      },
+    ];
+  }
+  return {
+    record: {
+      version: 1,
+      document: recalled,
+      controlModels: { rejected: { ...controlModel, base: 'sd-1', key: 'incompatible' } },
+    },
+    problems: [],
+    createdImageNames: ['created-a.png', 'created-b.png', ...(partial ? ['created-rejected.png'] : [])],
+  };
+};
+
+it.each(['project', 'account', 'promotion-failure', 'project-promotion-failure'] as const)(
+  'adopts only retained conversion outputs after all recall writes when %s changes during promotion',
+  async (change) => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    const owner = captureAccountScope();
+    const localization = createInstance();
+    await localization.init({
+      initAsync: false,
+      lng: 'en',
+      resources: {
+        en: {
+          translation: Object.values(
+            import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+          )[0] as Record<string, unknown>,
+        },
+      },
+    });
+    vi.spyOn(CanvasOperations, 'prepareLegacyCanvasMetadata').mockResolvedValue(convertedPaintRecall());
+    api.metadata.mockResolvedValue({ positive_prompt: 'recalled prompt', canvas_v2_metadata: {} });
+    let resolve!: () => void;
+    let reject!: (reason: Error) => void;
+    api.makeCanvasAsset.mockImplementationOnce(
+      () =>
+        new Promise<void>((yes, no) => {
+          resolve = yes;
+          reject = no;
+        })
+    );
+    const add = vi.spyOn(store.commands.notifications, 'add');
+    const pending = executeImageRecall({
+      commands: store.commands,
+      canvasTarget: {
+        ...target,
+        getProject: () => (store.queries.isActiveProject(target.projectId) ? target.getProject() : null),
+      },
+      getGenerateValues: () => ({ modelKey: main.key, ...getProjectWidgetValues(target.getProject()!, 'generate') }),
+      image: { imageName: 'legacy.png', width: 512, height: 512 } as GalleryImage,
+      kind: 'all',
+      models,
+      queryClient: new QueryClient(),
+      projectId: target.projectId,
+      owner,
+      t: localization.t.bind(localization) as TFunction,
+    });
+    await vi.waitFor(() => expect(api.makeCanvasAsset).toHaveBeenCalledExactlyOnceWith('created-a.png'));
+    expect(target.getProject()!.canvas.document.stacks.raster).toHaveLength(3);
+    expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({
+      positivePrompt: 'recalled prompt',
+    });
+    // No recalled snapshot may overwrite an edit made during the durability request.
+    store.commands.generation.setSettings(
+      { ...getDefaultGenerateSettings(main), model: main, steps: 47 },
+      target.projectId
+    );
+    const noticesBefore = add.mock.calls.length;
+    if (change === 'project' || change === 'project-promotion-failure') {
+      store.commands.projects.create();
+    } else if (change === 'account') {
+      accountLifecycle.activate('another-account');
+    }
+    if (change === 'promotion-failure' || change === 'project-promotion-failure') {
+      reject(new Error('Promotion unavailable'));
+    } else {
+      resolve();
+    }
+    expect(await pending).toBe(true);
+    expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({ steps: 47 });
+    expect(api.makeCanvasAsset.mock.calls.map(([name]) => name)).toEqual(
+      change === 'account' ? ['created-a.png'] : ['created-a.png', 'created-b.png']
+    );
+    if (change === 'promotion-failure') {
+      expect(add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            'Canvas was recalled, but some restored paint images are still temporary. Keep the project open or save it before closing to protect them from intermediate cleanup.',
+        })
+      );
+    } else {
+      expect(add.mock.calls).toHaveLength(noticesBefore);
+    }
+  }
+);
+
+it.each(['validation', 'commit'] as const)(
+  'leaves prepared pixels reclaimable after a failed %s while recalling independent Generate fields',
+  async (failure) => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    const previous = target.getProject()!.canvas.document;
+    const converted = convertedPaintRecall(false);
+    vi.spyOn(CanvasOperations, 'prepareLegacyCanvasMetadata').mockResolvedValue(
+      failure === 'validation'
+        ? { ...converted, record: { ...converted.record, document: { ...converted.record.document, version: 999 } } }
+        : converted
+    );
+    if (failure === 'commit') {
+      const apply = store.commands.canvas.apply;
+      vi.spyOn(store.commands.canvas, 'apply').mockImplementation((projectId, mutation, origin) =>
+        mutation.type === 'replaceCanvasDocument' ? false : apply(projectId, mutation, origin)
+      );
+    }
+    api.metadata.mockResolvedValue({ positive_prompt: 'independent prompt', canvas_v2_metadata: {} });
+    expect(
+      await executeImageRecall({
+        commands: store.commands,
+        canvasTarget: target,
+        getGenerateValues: () => ({ modelKey: main.key }),
+        image: { imageName: 'legacy.png', width: 512, height: 512 } as GalleryImage,
+        kind: 'all',
+        models,
+        queryClient: new QueryClient(),
+        projectId: target.projectId,
+        t,
+      })
+    ).toBe(true);
+    expect(target.getProject()!.canvas.document).toBe(previous);
+    expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({
+      positivePrompt: 'independent prompt',
+    });
+    expect(api.makeCanvasAsset).not.toHaveBeenCalled();
   }
 );

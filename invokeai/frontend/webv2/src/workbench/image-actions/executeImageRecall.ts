@@ -554,6 +554,16 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.partiallyRecalled'),
       });
     }
+    if (canvasApplied && canvasPlan && canvasRecall && canvasTarget) {
+      const durable = await canvasRecall.finalizeCanvasRecallAssets(canvasPlan, canvasTarget, owner);
+      if (!durable && isAccountScopeCurrent(owner) && canvasTarget.getProject()) {
+        commands.notifications.add({
+          kind: 'info',
+          title: t('widgets.gallery.itemActions.recall.partiallyRecalled'),
+          message: t('widgets.gallery.itemActions.recall.canvasImagesTemporary'),
+        });
+      }
+    }
     return true;
   } catch (error: unknown) {
     if (!isAccountScopeCurrent(owner)) {

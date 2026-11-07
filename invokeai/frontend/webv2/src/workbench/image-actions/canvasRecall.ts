@@ -5,7 +5,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages } from '@features/gallery';
+import { galleryDurability, galleryImages } from '@features/gallery';
 import { galleryImageUrls } from '@features/gallery/utility';
 import {
   getRegionalGuidanceSupport,
@@ -13,7 +13,7 @@ import {
   getControlValidationReason,
 } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { prepareLegacyCanvasMetadata, getCanvasEngine } from '@workbench/canvas-operations/api';
 import { createEmptyCanvasState, isRecord, loadCanvasState } from '@workbench/canvasMigration';
@@ -38,6 +38,8 @@ export interface CanvasRecallTarget {
 
 export interface CanvasRecallPlan {
   document: CanvasDocumentContractV3 | null;
+  /** Only acknowledged intermediate uploads produced by this preparation, never borrowed assets. */
+  createdImageNames?: readonly string[];
   /** Partial recall merges instead of replacing authored work. */
   partial: boolean;
   controlsOnly?: boolean;
@@ -358,6 +360,7 @@ export const prepareCanvasRecall = async ({
     }
     assertAccountScopeCurrent(owner);
     plan.problems.push(...converted.problems);
+    plan.createdImageNames = converted.createdImageNames;
     if (!converted.record) {
       return plan;
     }
@@ -370,6 +373,7 @@ export const prepareCanvasRecall = async ({
       isCurrent,
     }).then((result) => ({
       ...result,
+      createdImageNames: converted.createdImageNames,
       partial: result.partial || plan.problems.length > 0,
       controlsOnly: !('canvas_v2_metadata' in metadata),
       fitControlsToFrame: standalone,
@@ -526,6 +530,50 @@ export const prepareCanvasRecall = async ({
 };
 
 export { commitCanvasRecall } from '@workbench/canvas-operations/api';
+
+/**
+ * Adopt only this preparation's pixels retained by a successful commit. Call after all synchronous Canvas/Generate
+ * writes. Capture the committed name set once: subsequent project navigation must not redirect or abandon adoption.
+ * Failed/unknown uploads and rejected layers remain intermediate, so server cleanup can reclaim them.
+ */
+export const finalizeCanvasRecallAssets = async (
+  plan: CanvasRecallPlan,
+  target: CanvasRecallTarget,
+  owner: AccountScope
+): Promise<boolean> => {
+  if (!plan.createdImageNames?.length) {
+    return true;
+  }
+  const document = target.getProject()?.canvas.document;
+  if (!document || !isAccountScopeCurrent(owner)) {
+    return false;
+  }
+  const retained = new Set<string>();
+  const visit = (nodes: CanvasNodeContract[]): void => {
+    for (const node of nodes) {
+      if (node.type === 'group') {
+        visit(node.children);
+      } else {
+        sourceNames(node).forEach((name) => retained.add(name));
+      }
+    }
+  };
+  Object.values(document.stacks).forEach(visit);
+  const adopted = [...new Set(plan.createdImageNames)].filter((name) => retained.has(name));
+  let complete = true;
+  for (const imageName of adopted) {
+    if (!isAccountScopeCurrent(owner)) {
+      return false;
+    }
+    try {
+      await galleryDurability.makeCanvasAsset(imageName);
+    } catch {
+      // The recall already applied; recent grace, open-project holds and saved references still protect these pixels.
+      complete = false;
+    }
+  }
+  return complete;
+};
 
 /** Persist pending paint before any replacement. A changed document then fails the captured-identity commit fence. */
 export const settleCanvasRecall = async (
