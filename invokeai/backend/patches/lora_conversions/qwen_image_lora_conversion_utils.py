@@ -1,10 +1,15 @@
 """Qwen Image LoRA conversion utilities.
 
-Qwen Image uses QwenImageTransformer2DModel architecture.
+Qwen Image uses QwenImageTransformer2DModel architecture, with a Qwen2.5-VL text encoder.
 Supports multiple LoRA formats:
 - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
 - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model./base_model.model.)
 - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight (underscores instead of dots)
+
+Text-encoder layers are routed to the Qwen2.5-VL encoder under their own prefix:
+- Diffusers/PEFT: text_encoder.model.language_model.layers.0.mlp.down_proj.lora_A.weight (also base_model.model.,
+  and OneTrainer's ComfyUI export text_encoders.qwen25_7b.transformer.)
+- Kohya: lora_te_model_language_model_layers_0_mlp_down_proj.lora_down.weight
 """
 
 import re
@@ -14,10 +19,49 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
+    INDEX_PLACEHOLDER,
+    ParsingTree,
+    insert_periods_into_kohya_key,
+    kohya_module_path_is_leaf,
+)
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
+    QWEN_IMAGE_LORA_QWEN_VL_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.util import InvokeAILogger
+
+_KOHYA_TEXT_ENCODER_PREFIX = "lora_te_"
+# `text_encoders.qwen25_7b.transformer.` is OneTrainer's ComfyUI export (`QwenModel.lora_text_encoders`), written beside
+# `diffusion_model.` transformer keys.
+_DIFFUSERS_TEXT_ENCODER_PREFIXES = (
+    "base_model.model.text_encoder.",
+    "text_encoder.",
+    "text_encoders.qwen25_7b.transformer.",
+)
+
+_MLP: ParsingTree = {"gate_proj": {}, "up_proj": {}, "down_proj": {}}
+
+# Linear modules of Qwen2_5_VLForConditionalGeneration (transformers >= 4.52 layout). Kohya keys flatten the dots to
+# underscores, and some module names contain underscores themselves, so the tree is what tells them apart.
+_KOHYA_TEXT_ENCODER_TREE: ParsingTree = {
+    "model": {
+        "language_model": {
+            "layers": {
+                INDEX_PLACEHOLDER: {
+                    "self_attn": {"q_proj": {}, "k_proj": {}, "v_proj": {}, "o_proj": {}},
+                    "mlp": _MLP,
+                }
+            }
+        },
+        "visual": {
+            "blocks": {INDEX_PLACEHOLDER: {"attn": {"qkv": {}, "proj": {}}, "mlp": _MLP}},
+            "merger": {"mlp": {"0": {}, "2": {}}},
+        },
+    },
+    "lm_head": {},
+}
 
 # Regex for Kohya-format Qwen Image LoRA keys.
 # Example: lora_unet_transformer_blocks_0_attn_to_k
@@ -77,12 +121,35 @@ def _convert_kohya_key(kohya_layer: str) -> str | None:
     return None
 
 
+def _convert_kohya_text_encoder_key(kohya_layer: str) -> str | None:
+    """Convert a `lora_te_*` layer name to a dotted Qwen2.5-VL module path, or None when it names no known Linear.
+
+    Example: lora_te_model_language_model_layers_0_mlp_down_proj -> model.language_model.layers.0.mlp.down_proj
+    """
+    try:
+        module_path = insert_periods_into_kohya_key(
+            kohya_layer[len(_KOHYA_TEXT_ENCODER_PREFIX) :], _KOHYA_TEXT_ENCODER_TREE
+        )
+    except ValueError:
+        return None
+    # A prefix of a real path (e.g. ...layers.0.mlp) parses cleanly without naming a module.
+    return module_path if kohya_module_path_is_leaf(module_path, _KOHYA_TEXT_ENCODER_TREE) else None
+
+
+def _warn_unmapped_layers(count: int) -> None:
+    if count:
+        InvokeAILogger.get_logger(__name__).warning(
+            f"Skipped {count} Qwen Image LoRA layer(s) whose key does not name a known transformer or "
+            "text-encoder module."
+        )
+
+
 def lora_model_from_qwen_image_state_dict(
     state_dict: Dict[str, torch.Tensor], alpha: float | None = None
 ) -> ModelPatchRaw:
     """Convert a Qwen Image LoRA state dict to a ModelPatchRaw.
 
-    Handles three key formats:
+    Handles three key formats (text-encoder layers are routed to the Qwen2.5-VL prefix in each):
     - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
     - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight
       (also diffusion_model., base_model.model.)
@@ -110,15 +177,21 @@ def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | No
             grouped[layer_name] = {}
         grouped[layer_name][param_name] = value
 
+    unmapped = 0
     for kohya_layer, layer_dict in grouped.items():
-        model_path = _convert_kohya_key(kohya_layer)
+        if kohya_layer.startswith(_KOHYA_TEXT_ENCODER_PREFIX):
+            model_path = _convert_kohya_text_encoder_key(kohya_layer)
+            prefix = QWEN_IMAGE_LORA_QWEN_VL_PREFIX
+        else:
+            model_path = _convert_kohya_key(kohya_layer)
+            prefix = QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX
         if model_path is None:
-            continue  # Skip unrecognized layers
+            unmapped += 1
+            continue
 
-        layer = any_lora_layer_from_state_dict(layer_dict)
-        final_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}{model_path}"
-        layers[final_key] = layer
+        layers[f"{prefix}{model_path}"] = any_lora_layer_from_state_dict(layer_dict)
 
+    _warn_unmapped_layers(unmapped)
     return ModelPatchRaw(layers=layers)
 
 
@@ -131,9 +204,21 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
 
     grouped = _group_by_layer(state_dict)
 
+    unmapped = 0
     for layer_key, layer_dict in grouped.items():
-        values = _normalize_lora_keys(layer_dict, alpha)
-        layer = any_lora_layer_from_state_dict(values)
+        # Text-encoder layers first: `base_model.model.` is also in the transformer strip list.
+        text_encoder_prefix = next((p for p in _DIFFUSERS_TEXT_ENCODER_PREFIXES if layer_key.startswith(p)), None)
+        if text_encoder_prefix is not None:
+            module_path = layer_key[len(text_encoder_prefix) :]
+            # Only Linears of the current transformers layout can take a patch: the patcher would otherwise reach
+            # layers it cannot patch (`patch_embed` is a Conv3d) or crash on them.
+            if not kohya_module_path_is_leaf(module_path, _KOHYA_TEXT_ENCODER_TREE):
+                unmapped += 1
+                continue
+            layer = any_lora_layer_from_state_dict(_normalize_lora_keys(layer_dict, alpha))
+            layers[f"{QWEN_IMAGE_LORA_QWEN_VL_PREFIX}{module_path}"] = layer
+            continue
+        layer = any_lora_layer_from_state_dict(_normalize_lora_keys(layer_dict, alpha))
         clean_key = layer_key
         for prefix in strip_prefixes:
             if clean_key.startswith(prefix):
@@ -142,6 +227,7 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
         final_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}{clean_key}"
         layers[final_key] = layer
 
+    _warn_unmapped_layers(unmapped)
     return ModelPatchRaw(layers=layers)
 
 

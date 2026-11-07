@@ -1003,6 +1003,7 @@ const buildQwenImageGraph = (
   const loraSource = activeLoras.length
     ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_lora_collection_loader', modelLoader, [
         'transformer',
+        'qwen_vl_encoder',
       ])
     : modelLoader;
   // The encoders default to `none`, so only an actual quantization choice reaches the graph.
@@ -1038,12 +1039,12 @@ const buildQwenImageGraph = (
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
-  addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
+  addEdge(graph, loraSource, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
-    addEdge(graph, modelLoader, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
+    addEdge(graph, loraSource, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
     addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
     addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
   }
