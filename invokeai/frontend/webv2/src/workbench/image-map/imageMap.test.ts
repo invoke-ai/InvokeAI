@@ -32,6 +32,7 @@ import {
   recordImageIndexStatus,
   refreshImageIndexStatus,
   refreshImageMapPoints,
+  requestImageMapRecompute,
   setClusterEps,
   attachImageMapViewer,
   setImageMapMediaKind,
@@ -739,6 +740,37 @@ describe('image map store', () => {
     // No runaway: the rerun found nothing to queue behind it.
     expect(pointsResolvers).toHaveLength(2);
     expect(imageMapStore.getSnapshot().loadState).toBe('loaded');
+  });
+
+  it('asks for a refit and fetches the points when a person requests a fresh map', async () => {
+    mockPointsWithForeignLabels();
+
+    await requestImageMapRecompute();
+
+    const calls = mocks.apiFetchJson.mock.calls;
+
+    expect(calls).toContainEqual(['/api/v1/image_map/refresh', { method: 'POST' }]);
+    expect(calls.some((call) => String(call[0]).startsWith('/api/v1/image_map/points'))).toBe(true);
+    expect(imageMapStore.getSnapshot().loadState).toBe('loaded');
+  });
+
+  it('still fetches the points when the refit request fails, and keeps that failure out of the store', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url === '/api/v1/image_map/refresh') {
+        return Promise.reject(new Error('refresh failed'));
+      }
+
+      return Promise.resolve(url.startsWith('/api/v1/image_map/points') ? BACKEND_RESPONSE : FOREIGN_LABELS_RESPONSE);
+    });
+
+    await requestImageMapRecompute();
+    // Vitest fails the run on an unhandled rejection, which Node reports once the microtask queue drains.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(imageMapStore.getSnapshot()).toMatchObject({ error: null, loadState: 'loaded' });
+    expect(imageMapStore.getSnapshot().data?.pointCount).toBe(BACKEND_RESPONSE.point_count);
   });
 
   it('still runs the queued rerun when the in-flight fetch fails', async () => {

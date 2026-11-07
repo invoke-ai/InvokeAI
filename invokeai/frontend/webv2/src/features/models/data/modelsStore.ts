@@ -52,9 +52,11 @@ const withModels = (models: ModelConfig[]): Pick<ModelsSnapshot, 'models' | 'mod
 const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
 const refreshFlight = createTrailingSingleFlight();
+let mutationGeneration = 0;
 
 registerAccountOwnedResource({
   clear: () => {
+    mutationGeneration = 0;
     refreshFlight.reset();
     store.setSnapshot(EMPTY_MODELS_SNAPSHOT);
   },
@@ -64,6 +66,7 @@ registerAccountOwnedResource({
 /** Re-fetch the library; concurrent calls share one request, and a call made mid-flight queues one trailing rerun. */
 export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> =>
   refreshFlight.run(() => {
+    const generation = mutationGeneration;
     store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
     return Promise.all([
@@ -78,6 +81,11 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
           return;
         }
 
+        if (generation !== mutationGeneration) {
+          void refreshModels(owner);
+          return;
+        }
+
         store.patchSnapshot({
           ...withModels(models),
           error: null,
@@ -89,6 +97,11 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
       })
       .catch((error: unknown) => {
         if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        if (generation !== mutationGeneration) {
+          void refreshModels(owner);
           return;
         }
 
@@ -117,6 +130,7 @@ export const subscribeModels = (listener: () => void): (() => void) => store.sub
 
 /** Patch one model in place after a successful update/convert. */
 export const replaceModelInStore = (model: ModelConfig): void => {
+  mutationGeneration += 1;
   store.patchSnapshot(
     withModels(store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)))
   );
@@ -124,12 +138,14 @@ export const replaceModelInStore = (model: ModelConfig): void => {
 
 /** Apply a narrow optimistic model patch without replacing unrelated server fields. */
 export const patchModelInStore = (key: string, changes: Partial<ModelConfig>): void => {
+  mutationGeneration += 1;
   store.patchSnapshot(
     withModels(store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)))
   );
 };
 
 export const removeModelsFromStore = (keys: string[]): void => {
+  mutationGeneration += 1;
   const removed = new Set(keys);
 
   store.patchSnapshot(withModels(store.getSnapshot().models.filter((model) => !removed.has(model.key))));
@@ -137,6 +153,7 @@ export const removeModelsFromStore = (keys: string[]): void => {
 
 /** Update cover presence and URL version without refetching; backend cover URLs remain stable. */
 export const markCoverImageChanged = (key: string, hasImage: boolean): void => {
+  mutationGeneration += 1;
   const { coverImageVersions, models } = store.getSnapshot();
 
   store.patchSnapshot({
