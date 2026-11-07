@@ -220,6 +220,7 @@
   "modelFamilies.format.singleFile": "Single file",
   "modelFamilies.externalProviders": "External providers, billed to your own account",
   "modelFamilies.flux-2.tagline": "Multi-reference image editing",
+  "modelFamilies.flux-3.tagline": "Edit from up to ten reference images",
   "modelFamilies.flux-1.tagline": "Generate and edit, with Fill and ControlNets",
   "modelFamilies.z-image.tagline": "Fast text-to-image in English and Chinese",
   "modelFamilies.qwen-image-2-1.tagline": "Strong text rendering, transparent output",

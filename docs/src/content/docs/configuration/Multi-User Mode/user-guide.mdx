@@ -16,7 +16,7 @@ In multi-user mode, several people share one InvokeAI server. Everyone signs in 
 
 Your administrator gives you an email address and a password. Open the server's address in your browser and enter them on **Welcome to Invoke**. Select **Keep me signed in for a week** on a computer only you use.
 
-You stay signed in for 24 hours after your last change, or a week with **Keep me signed in for a week**. You can sign in from several browsers and devices at once.
+You stay signed in for 24 hours after your last change, or a week with **Keep me signed in for a week**. Each change you make renews it, and five minutes before an idle session would end, Invoke shows **Your session ends soon** with the time. Signing back in with the same account returns you to the page you were on, with your open projects; signing in as someone else starts at Home. You can sign in from several browsers and devices at once.
 
 ### Your account
 
@@ -69,7 +69,7 @@ Boards others open to you appear in the Gallery under **Shared with me**, with t
 <details>
 <summary>Edge cases</summary>
 
-- **View-only boards.** You cannot add media to a board you can only view: it is not offered when moving media, dropping media on it does nothing, and uploads to it are refused. Its menu says whom to ask for access. If it is your selected or auto-add board, new results go to your project's **Inbox** instead, marked **Auto**.
+- **View-only boards.** You cannot add media to a board you can only view: it is not offered when moving media, dropping media on it does nothing, and uploads to it are refused. Its menu says whom to ask for access. If new results would go to it (it is the board named under **Saving to**, or the selected board while **Follow the selected board** is on), they go to your project's **Inbox** instead, marked **Auto**.
 - **Access changes while you work.** The board list catches up at its next refresh: a board you can no longer open leaves it, and new results stop going to it. Until then, changes you make from its menu, moves and uploads are refused with a notice. A board you lose and later regain access to comes back as it was.
 - **Deleting.** Only the person who added an image or video, or an administrator, can delete it permanently. When an owner or editor removes someone else's item from a board, it returns to that person's **Uncategorized** board. Deleting a board with its media deletes only your own media, even for an administrator; other people's items return to their Uncategorized boards. Only an administrator deleting another user's board deletes everything on it.
 - **Projects.** A project's **Inbox** stays restricted, and its access follows the project. Other boards in a project can have any general access, and keep it when they move between the Library and a project.
@@ -106,10 +106,10 @@ Switching modes does not change who owns what, but it changes who can see it. Th
 
 | Symptom | Fix |
 | --- | --- |
-| "Incorrect email or password" | Check the email address and Caps Lock. If you forgot your password, ask an administrator to reset it. |
+| "Incorrect email or password" | Check the email address and Caps Lock. If you forgot your password, ask an administrator to reset it; the sign-in screen says so under the form. |
 | "User account is disabled" | An administrator deactivated your account. Ask one to reactivate it. |
-| "Your session expired. Sign in again to continue." | You were inactive for 24 hours (a week with **Keep me signed in for a week**), your password was changed, or your account was deactivated or deleted. Sign in again; a deactivated account shows "User account is disabled". |
-| No **Models**, **Nodes** or **Users** in the Launchpad | They are for administrators. You can still generate with every installed model; ask an administrator to install or change one. |
+| "Your session expired. Sign in again to pick up where you left off." | You were inactive for 24 hours (a week with **Keep me signed in for a week**), your password was changed, or your account was deactivated or deleted. Sign in again; a deactivated account shows "User account is disabled". |
+| No **Models**, **Nodes** or **Users** in the Launchpad | They are for administrators. You can still generate with every installed model; ask an administrator to install or change one. A link to one of these pages opens **Projects**, with a notice that it needs permission you don't have. While no models are installed, **Home** tells you to ask an administrator, and the **Start something** tiles note that generating needs a model. |
 | A board is missing | Open **Filter & sort boards** in the Gallery and turn on **Archived boards** or **Other projects' boards**. Check that you are signed in to the right account. |
 | A shared board disappeared | Its owner changed its access or deleted it. |
 | Your job waits in the queue | Other users' jobs are running, or an administrator paused the queue. Your turn comes in rotation. |

@@ -1,10 +1,18 @@
-import type * as identityModule from '@features/identity';
-import type * as routerModule from '@tanstack/react-router';
+import type * as libraryModule from '@workbench/projects/library';
+import type { ProjectLibrarySnapshot } from '@workbench/projects/library';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { system } from '@theme/system';
-import { DEFAULT_PREFERENCES } from '@workbench/settings/store';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
 import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -12,16 +20,26 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-vi.mock('@tanstack/react-router', async (importOriginal) => ({
-  ...(await importOriginal<typeof routerModule>()),
-  useNavigate: () => () => Promise.resolve(),
-  useSearch: () => ({}),
+const library = vi.hoisted<ProjectLibrarySnapshot>(() => ({
+  status: 'ready',
+  summaries: [
+    {
+      createdAt: '2026-09-15T10:00:00.000Z',
+      id: 'p-city',
+      minimumCanvasSchemaVersion: 3,
+      name: 'Neon City Keyframes',
+      revision: 1,
+      updatedAt: '2026-10-29T12:00:00.000Z',
+    },
+  ],
 }));
-vi.mock('@features/identity', async (importOriginal) => ({
-  ...(await importOriginal<typeof identityModule>()),
-  useCapabilities: () => ({ canManageModels: false, canManageNodes: false, canManageUsers: false }),
+
+vi.mock('@workbench/projects/library', async (importOriginal) => ({
+  ...(await importOriginal<typeof libraryModule>()),
+  getProjectLibrary: () => library,
+  useProjectLibrary: () => library,
 }));
-vi.mock('@workbench/settings/useAvailableSettings', () => ({ useAvailableSettings: () => [] }));
+
 // A fixture index, so retitling the real docs cannot break this test; the provider still loads it through import().
 vi.mock('./docsSearchIndex.json', () => ({
   default: {
@@ -39,8 +57,6 @@ vi.mock('./docsSearchIndex.json', () => ({
 import LaunchpadCommandPaletteDialog from './LaunchpadCommandPaletteDialog';
 import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
-let host: HTMLDivElement | null = null;
-let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const i18nReady = fetch('/locales/en.json')
   .then((response) => response.json())
@@ -53,6 +69,23 @@ const i18nReady = fetch('/locales/en.json')
     })
   );
 
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+
+const PaletteHost = ({ onClose }: { onClose: () => void }) => (
+  <>
+    <LaunchpadCommandPaletteDialog
+      isOpen
+      modifierKeyLabel="ctrl"
+      preferences={useWorkbenchPreferences()}
+      settingsEntryDeps={SETTINGS_ENTRY_DEPS}
+      onClose={onClose}
+      onExitComplete={vi.fn()}
+    />
+    <Outlet />
+  </>
+);
+
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
@@ -61,47 +94,71 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+const renderLaunchpadPalette = async (onClose: () => void = vi.fn()) => {
+  await i18nReady;
+  const rootRoute = createRootRoute({ component: () => <PaletteHost onClose={onClose} /> });
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ['/projects'] }),
+    routeTree: rootRoute.addChildren(
+      ['/', '/app', '/projects'].map((path) => createRoute({ getParentRoute: () => rootRoute, path }))
+    ),
+  });
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+    await router.load();
+  });
+
+  const input = await vi.waitFor(() => {
+    const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
+    expect(node).not.toBeNull();
+    return node!;
+  });
+  return { input, router };
+};
+
 const docsOptions = () =>
   [...document.querySelectorAll<HTMLElement>('[role="option"]')].filter((option) =>
     option.textContent?.includes('Opens in a new tab')
   );
 
-const renderLaunchpadPalette = async (onClose: () => void) => {
-  await i18nReady;
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
-  await act(() =>
-    root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={new QueryClient()}>
-            <LaunchpadCommandPaletteDialog
-              isOpen
-              modifierKeyLabel="ctrl"
-              preferences={DEFAULT_PREFERENCES}
-              settingsEntryDeps={SETTINGS_ENTRY_DEPS}
-              onClose={onClose}
-              onExitComplete={vi.fn()}
-            />
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
-  );
+describe('LaunchpadCommandPaletteDialog', () => {
+  it('finds a project by name and opens it in the editor', async () => {
+    const { input, router } = await renderLaunchpadPalette();
+    await act(() => userEvent.fill(input, 'neon city'));
+    const option = await vi.waitFor(() => {
+      const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((candidate) =>
+        candidate.textContent?.includes('Neon City Keyframes')
+      );
+      expect(node).toBeDefined();
+      return node!;
+    });
 
-  return vi.waitFor(() => {
-    const input = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
-    expect(input).not.toBeNull();
-    return input!;
+    const sectionLabels = [...document.querySelectorAll('[role="presentation"]')].map((node) => node.textContent);
+    expect(sectionLabels).toContain('Projects');
+    expect(option.textContent).toContain('Edited');
+    await act(() => userEvent.click(option));
+
+    await vi.waitFor(() => {
+      expect(router.state.location.pathname).toBe('/app');
+      expect(router.state.location.search).toEqual({ project: 'p-city' });
+    });
   });
-};
 
-describe('Launchpad command palette docs search', () => {
   it('lists docs pages under Docs, marks them as opening a new tab, and opens the page on Enter', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     const onClose = vi.fn();
-    const input = await renderLaunchpadPalette(onClose);
+    const { input } = await renderLaunchpadPalette(onClose);
 
     await act(() => userEvent.fill(input, 'quick setup'));
     const option = await vi.waitFor(
@@ -129,7 +186,7 @@ describe('Launchpad command palette docs search', () => {
   });
 
   it('adds nothing on open, and browses the topics when the Docs scope opens empty', async () => {
-    const input = await renderLaunchpadPalette(vi.fn());
+    const { input } = await renderLaunchpadPalette();
     const scopeCommand = await vi.waitFor(() => {
       const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
         (option) => option.textContent === 'Search docs…'

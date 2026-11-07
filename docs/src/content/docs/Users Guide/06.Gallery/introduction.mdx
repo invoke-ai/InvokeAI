@@ -28,7 +28,7 @@ The Gallery has three parts:
   * **Media** — images and videos generated in InvokeAI.
   * **Uploads** — images, videos and audio you have uploaded.
 
-  Above the grid are the **Search items** field, the **Starred only** filter, the sort order (**Newest** or **Oldest**) and the upload button.
+  Above the grid are the **Search items** field, the **Starred only** filter, the **Filter & sort media** button and the upload button.
 
 When the Gallery is narrow, or docked in a side rail, the board list sits above the media grid. When it is wide, the board list becomes a column on the left. Drag the divider between them to resize the list.
 
@@ -46,15 +46,15 @@ The new board is selected straight away, so it also becomes the destination for 
 
 ### Choosing where new media goes
 
-**By default, new results go to the board that is selected in the Gallery**: select a board, press **Invoke**, and the results land on that board. The destination is fixed when you press Invoke, so you can select another board and queue more work while earlier jobs are still running, without redirecting them.
+**New results go to the board named under Saving to in the Gallery header**, by default the open project's **Inbox**, which the board list marks with a crosshair-style icon. While **Follow the selected board** is off, browsing other boards, **Find in Gallery**, a picker's **Open Gallery** and results revealed from other apps never change it. The destination is fixed when you press Invoke, so you can change it and queue more work while earlier jobs are still running, without redirecting them.
 
-* A new project starts with its Inbox selected. See [Projects](/users-guide/projects/introduction/#where-your-images-go).
-* If you select a date board (see below), results go to the project's Inbox, because date boards are only a view.
-* If you select a board someone else shares with you that you can only view, results go to the project's Inbox, which is marked **Auto** while that board is selected; the same goes for an auto-add board you can no longer add to.
-* Uploads go to the selected board; a board you can only view takes no uploads.
-* If you archive or delete the selected board, the selection, and with it the destination, moves to **Uncategorized**.
+* To send results somewhere else, open **Saving to** and choose a board, or choose **Save new results here** from a board's menu. New generations, Canvas saves, pasted media and the results of workflow nodes whose **Board** is set to **Auto** all go there. **Stop saving new results here** on that board's menu goes back to the Inbox.
+* To have results follow whichever board you are viewing, turn on **Follow the selected board** in the **Saving to** menu or in the [Gallery settings](/users-guide/gallery/gallery-reference/#gallery-settings). While it is on, a date board sends results to the project's Inbox, because date boards are only a view. Choosing a board under **Saving to** turns it off.
+* If the destination is a board someone else shares with you that you can only view, results go to the project's Inbox, which the board list marks with that icon instead.
+* If you archive or delete the board results go to, they go back to the Inbox.
+* The first time you browse away from the destination, a notice says that browsing does not move new results.
 
-To keep sending results to one board while you browse others, make it the **auto-add board**: choose **Auto-add to this board** from its menu. The board is marked **Auto**, and new generations, Canvas saves, pasted media and the results of workflow nodes whose **Board** is set to **Auto** all go there, whichever board you are viewing. Choose **Stop auto-adding here** from the same menu to go back to following the selected board. The setting behind this is **Send new results to the selected board**, in the [Gallery settings](/users-guide/gallery/gallery-reference/#gallery-settings).
+Uploads made in the Gallery go to the selected board; a board you can only view takes no uploads.
 
 ### Finding, filtering and sorting boards
 
@@ -115,9 +115,12 @@ Searching all boards changes neither the selected board nor where new results go
 
 ### Sorting and filtering
 
-The sort menu orders media by creation time, **Newest** first (the default) or **Oldest** first. The star button (**Starred only**) shows only starred items.
+The star button (**Starred only**) shows only starred items. The **Filter & sort media** button beside it opens a menu with two groups:
 
-The media type button between them chooses which kinds of media the Gallery shows: **Both** (the default), **Images only**, or **Videos only**. Its icon shows the current choice, and it is highlighted while it hides one kind. The choice is saved with the project and also applies to the [Image Map](/users-guide/image-map/introduction/). If a board has nothing of the chosen kind, the Gallery says so and offers **Show all media**. Revealing an item the filter hides, for example with **Find in Gallery** from the Preview, switches the filter back to **Both**. The Gallery picker that chooses media for other features always lists both kinds.
+* **Show** chooses which kinds of media the Gallery shows: **Both** (the default), **Images only**, or **Videos only**. The button is highlighted while it hides one kind.
+* **Sort by** orders media by creation time, **Newest** first (the default) or **Oldest** first.
+
+The media type choice is saved with the project and also applies to the [Image Map](/users-guide/image-map/introduction/). If a board has nothing of the chosen kind, the Gallery says so and offers **Show all media**. Revealing an item the filter hides, for example with **Find in Gallery** from the Preview, switches the filter back to **Both**. The Gallery picker that chooses media for other features always lists both kinds.
 
 ### Browsing large boards
 
@@ -133,7 +136,7 @@ Starred items are gathered in a **Starred** section at the top of the board, abo
 
 ## Uploading media
 
-Click the upload button at the right of the tab bar (**Upload media to …**) and choose files, or drag files from your computer onto the media grid. An empty board also shows **Drop media here or click to upload**. Uploads go to the selected board, on its **Uploads** tab. You cannot upload to a date board.
+Click the upload button at the right of the tab bar (**Upload media to …**) and choose files, or drag files from your computer onto the media grid. An empty board also shows **Drop media here or click to upload**. Uploads go to the selected board. Uploaded images appear on its **Uploads** tab and uploaded videos on **Media**; if nothing you uploaded lands on the tab you are viewing, the Gallery switches to the tab that received it and selects the newest upload. You cannot upload to a date board.
 
 You can upload:
 
@@ -145,19 +148,21 @@ You can also paste an image or video from the clipboard while no text field has 
 
 ## Selecting, moving and deleting media
 
-Click an item to select it, and double-click it (or press **Enter** while its thumbnail has keyboard focus) to open it in the Preview, in the center of the workbench. **Shift**-click selects a range, and **Ctrl**-click (**Cmd**-click on macOS) adds or removes single items. **Ctrl+A** selects everything loaded on the page, and **Escape** clears the selection.
+Click an item to select it, and double-click it (or press **Enter** while its thumbnail has keyboard focus) to open it in the Preview, in the center of the workbench. **Shift**-click selects a range, and **Ctrl**-click (**Cmd**-click on macOS) adds or removes single items. **Ctrl+A** selects everything loaded on the page. Hold **Alt** (**Option** on macOS) while clicking an image to compare it with the selected one.
 
-While anything is selected, a bar at the bottom of the Gallery shows how many items are selected, with buttons to star them, move them to another board, download them, or delete them.
+The selection belongs to what the Gallery shows: switching boards or tabs, typing or clearing a search, or changing the starred or media type filter clears it, while the item open in the Preview stays there. Keyboard actions such as **Delete** act only on items listed in the current view.
+
+While anything is selected, a bar at the bottom of the Gallery shows how many items are selected, with buttons to clear the selection, star the items, move them to another board, download them, or delete them. You can also clear the selection with the **×** after the item's name in the Preview's title. Starring, moving and archiving report what they did with an **Undo** button, which puts each item back as it was before that action, even if you changed it again since.
 
 <Image src={selection} alt="Three selected images with the selection bar at the bottom of the Gallery showing 3 selected." width={420} />
 
 ### Moving media to another board
 
-Drag items onto a board in the board list; if the list is hidden, it opens while you drag. You can also use **Change Board** in an item's menu, or the move button in the selection bar. Moving never copies: each item is on one board at a time. **Remove from Board** in the **Change Board** menu moves an item to **Uncategorized**.
+Drag items onto a board in the board list; if the list is hidden, it opens while you drag. You can also use **Move to board** in an item's menu, or the move button in the selection bar; both offer the same boards, leaving out archived boards and the board the items are already on. Moving never copies: each item is on one board at a time. **Move to Uncategorized** takes items off their board; it is offered while any of them is on one.
 
 ### Deleting media
 
-Press **Delete** (or **Backspace**), choose **Delete Image**, **Delete Video** or **Delete Selection** from the menu, or use the delete button in the selection bar. Deleting permanently removes the items from every board and from disk, and cannot be undone. A confirmation asks first. Tick **Don't ask me again** and confirm to stop asking for ordinary deletions (cancelling leaves it on); you can turn it back on, or off, with **Confirm image deletion** in Settings under Gallery.
+Press **Delete** (or **Backspace**), choose **Delete image**, **Delete video** or **Delete selection** from the menu, or use the delete button in the selection bar. Deleting permanently removes the items from every board and from disk, and cannot be undone. A confirmation asks first, counting the images and videos and showing their thumbnails. When you delete a single item you can see, you can tick **Don't ask again when deleting one item** and confirm to stop asking for those (cancelling leaves it on); deleting several items, or an item that is not on screen, always asks. You can turn the confirmation back on, or off, with **Confirm image deletion** in Settings under Gallery.
 
 When the open project still uses something you are deleting, for example as a canvas layer, a reference image, an upscale or video input, or in a workflow, the confirmation always appears and lists where, even if you turned confirmations off. Only the open project's current work is checked: other projects, undo history and canvas snapshots are not, so check before you delete media you still need there. If deleting is interrupted, InvokeAI cleans up any leftover files the next time it starts.
 

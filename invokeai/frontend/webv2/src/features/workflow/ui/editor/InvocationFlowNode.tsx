@@ -19,8 +19,17 @@ import {
   type WorkflowNodeOutcome,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNodeExecutionState } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  useOpenNodesManager,
+  useWorkflowCapabilitiesSelector,
+  useWorkflowNodeExecutionState,
+} from '@features/workflow/ui/WorkflowUiContext';
+import {
+  areHiDiffusionRatiosAutomatic,
+  getHiDiffusionRatioOrderIssue,
+  getHiDiffusionRatioTemplate,
+  isHiDiffusionNode,
+  isHiDiffusionRatioField,
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   cloneWorkflowFieldDefault,
   formatOutputFieldValue,
@@ -37,6 +46,7 @@ import {
   isWorkflowFieldValueDefault,
 } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
@@ -534,12 +544,14 @@ const ProvidedByConnectionNote = () => {
 };
 
 const InputFieldRow = ({
+  connectedFieldNames,
   isConnected,
   isExposed,
   isSkeleton,
   node,
   template,
 }: {
+  connectedFieldNames: ReadonlySet<string>;
   isConnected: boolean;
   isExposed: boolean;
   isSkeleton: boolean;
@@ -554,11 +566,15 @@ const InputFieldRow = ({
   const showsControl = !isConnected && isDirectInputField(template);
   const label = instance?.label || template.title;
   const description = getEffectiveWorkflowFieldDescription(instance, template);
-  const invalidReason = getWorkflowFieldInvalidReason({
-    isConnected,
-    template,
-    value: instance?.value,
-  });
+  const ratiosDisabled =
+    isHiDiffusionNode(node.data.type) && isHiDiffusionRatioField(template.name) && areHiDiffusionRatiosAutomatic(node);
+  const invalidReason =
+    (isHiDiffusionRatioField(template.name) ? getHiDiffusionRatioOrderIssue(node, connectedFieldNames) : null) ??
+    getWorkflowFieldInvalidReason({
+      isConnected,
+      template,
+      value: instance?.value,
+    });
   const isInvalid = invalidReason !== null;
   const showInvalid = isInvalid && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
@@ -717,12 +733,17 @@ const InputFieldRow = ({
           ) : (
             <Box mt="0.5" w="full">
               <WorkflowFieldInput
+                disabled={ratiosDisabled}
                 id={`${node.id}-${template.name}-value`}
                 invalid={isInvalid}
                 nodeId={node.id}
                 seedMode={getWorkflowFieldSeedMode(instance)}
-                template={template}
-                value={instance?.value}
+                template={getHiDiffusionRatioTemplate(node, template, connectedFieldNames)}
+                value={
+                  isHiDiffusionNode(node.data.type) && isHiDiffusionRatioField(template.name)
+                    ? (instance?.value ?? 0)
+                    : instance?.value
+                }
                 onChange={(value) =>
                   editGraph({ fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value })
                 }
@@ -931,6 +952,26 @@ const getTemplatelessNodeMessage = (
         ? t('nodes.unknownNodeType')
         : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
 
+/**
+ * Where a node type this backend lacks can come from: the Nodes Manager installs node packs, for an account that may;
+ * anyone else is told who can.
+ */
+const MissingNodeTypeAction = () => {
+  const { t } = useTranslation();
+  const canManageNodes = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canManageNodes);
+  const openNodesManager = useOpenNodesManager();
+
+  return canManageNodes ? (
+    <Button alignSelf="flex-start" className="nodrag" mt="1.5" size="xs" variant="outline" onClick={openNodesManager}>
+      {t('nodes.openNodesManager')}
+    </Button>
+  ) : (
+    <Text color="fg.subtle" fontSize="xs">
+      {t('nodes.unknownNodeTypeAskAdmin')}
+    </Text>
+  );
+};
+
 const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const { t } = useTranslation();
   const node = data.documentNode;
@@ -1009,6 +1050,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
                 {getTemplatelessNodeMessage(t, data, false)}
               </Text>
             ) : null}
+            {isMissing ? <MissingNodeTypeAction /> : null}
           </Stack>
         </HStack>
       </NodeShell>
@@ -1096,6 +1138,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           {inputTemplates.map((inputTemplate) => (
             <InputFieldRow
               key={inputTemplate.name}
+              connectedFieldNames={connectedFieldNames}
               isConnected={connectedFieldNames.has(inputTemplate.name)}
               isExposed={exposedFieldNames.has(inputTemplate.name)}
               isSkeleton={isZoomedOut}

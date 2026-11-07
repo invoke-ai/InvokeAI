@@ -15,7 +15,8 @@ import {
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useTranslation } from 'react-i18next';
 
-import { GenerateConceptsContent, isCompatibleLora } from './GenerateConceptsSection';
+import { GenerateConceptsContent, isCompatibleLora, isConceptInstalled } from './GenerateConceptsSection';
+import { useGenerationUi } from './GenerationUiContext';
 import { GenerateReferenceImagesContent } from './reference-images/GenerateReferenceImagesSection';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
@@ -51,8 +52,10 @@ export const GenerateGuidanceSection = ({
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
     : 0;
+  const catalogStatus = useGenerationUi().models.status;
   const activeConcepts = settings.loras.filter(
-    (lora) => lora.isEnabled && isCompatibleLora(lora, selectedModel)
+    (lora) =>
+      lora.isEnabled && isCompatibleLora(lora, selectedModel) && isConceptInstalled(lora, loraModels, catalogStatus)
   ).length;
   const hasIncompatible =
     (!referenceImagesSupported && referenceImageCount > 0) ||

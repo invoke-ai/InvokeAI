@@ -42,6 +42,15 @@ const modelFamilies: ModelFamily[] = [
     formats: ['GGUF', 'FP8', 'int8', 'SDNQ'],
   },
   {
+    slug: 'flux-3',
+    name: 'FLUX.3',
+    link: `${localModels}/flux-3/`,
+    kind: 'image',
+    license: { kind: 'community', label: 'FLUX Kommunity' },
+    vram: 12,
+    formats: ['GGUF', singleFile],
+  },
+  {
     slug: 'flux-1',
     name: 'FLUX.1',
     link: `${localModels}/flux-1/`,

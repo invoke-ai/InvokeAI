@@ -52,6 +52,12 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
     { label: 'klein-9b-standalone', overrides: { format: 'gguf_quantized', variant: 'klein_9b' } },
   ],
+  // FLUX.3 Klein samples without CFG; Klein Base compiles the negative branch at its CFG default.
+  flux3: [
+    { label: 'klein-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein' } },
+    { label: 'klein-standalone', overrides: { format: 'gguf_quantized', variant: 'flux3_klein' } },
+    { label: 'klein-base-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein_base' } },
+  ],
 };
 
 const shapesForBase = (base: SupportedGenerateBase): readonly ModelShape[] => SHAPE_OVERRIDES[base] ?? DEFAULT_SHAPES;
@@ -252,6 +258,10 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
       ...settings,
       // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
       cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
+      // Exercise explicit zero overrides as well as the default automatic metadata contract.
+      hiDiffusionEnabled: base === 'sd-1' || base === 'sdxl',
+      hiDiffusionT1Ratio: 0,
+      hiDiffusionT2Ratio: 0,
       fluxDypeExponent: 1,
       fluxDypePreset: 'manual' as const,
       fluxDypeScale: 3,

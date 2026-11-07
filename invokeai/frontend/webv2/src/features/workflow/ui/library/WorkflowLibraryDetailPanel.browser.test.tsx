@@ -1328,7 +1328,10 @@ describe('WorkflowLibraryDetailPanel', () => {
     const link = document.querySelector<HTMLElement>('[data-requirement-link]');
     expect(link?.textContent).toBe('Wan 2.2 I2V A14B');
     // Quiet affordance: a bare label, with the destination in its tooltip.
-    expect(link?.getAttribute('title')).toBe('Find Wan 2.2 I2V A14B in the model manager');
+    await act(() => link?.focus());
+    await expect
+      .poll(() => document.querySelector('[role="tooltip"]')?.textContent, { timeout: 3_000 })
+      .toBe('Find Wan 2.2 I2V A14B in the model manager');
 
     await act(async () => {
       link?.click();

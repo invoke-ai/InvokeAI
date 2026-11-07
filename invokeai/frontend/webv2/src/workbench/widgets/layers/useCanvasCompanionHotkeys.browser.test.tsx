@@ -1,8 +1,11 @@
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
+import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { IS_MAC_OS } from '@workbench/hotkeys/keys';
@@ -36,6 +39,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => mocks.store.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchInternalStore: () => mocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => mocks.store.queries,
   useWorkbenchSubscription: () => mocks.store.subscribe,
 }));
@@ -44,10 +49,10 @@ vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyC
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const createEngine = () => ({
-  document: { model: () => null },
+  document: { model: vi.fn(() => null as ReturnType<CanvasCompanionEngine['document']['model']> | null) },
   history: { redo: vi.fn(), undo: vi.fn() },
   interaction: { get: vi.fn(() => 'brush'), set: vi.fn() },
-  layers: { beginTransform: vi.fn(() => 'started') },
+  layers: { beginTransform: vi.fn(() => 'started'), mergeLayerDown: vi.fn(() => Promise.resolve('merged' as const)) },
   tools: { setTool: vi.fn(), stepBrushSize: vi.fn() },
 });
 
@@ -145,6 +150,46 @@ describe('useCanvasCompanionHotkeys', () => {
     await userEvent.keyboard(IS_MAC_OS ? '{Meta>}z{/Meta}' : '{Control>}z{/Control}');
 
     expect(engine.history.undo).toHaveBeenCalledOnce();
+  });
+
+  it('merges the selected raster down from a focused layer row and prevents the browser shortcut', async () => {
+    const raster = (id: string) =>
+      ({
+        blendMode: 'normal',
+        id,
+        isEnabled: true,
+        isLocked: false,
+        name: id,
+        opacity: 1,
+        source: { bitmap: null, type: 'paint' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'raster',
+      }) as CanvasLayerContract;
+    const canvasDocument = {
+      bbox: { height: 64, width: 64, x: 0, y: 0 },
+      height: 64,
+      stacks: stacksFrom([raster('upper'), raster('lower')]),
+      selectedLayerId: 'upper',
+      width: 64,
+    } as CanvasDocumentContractV3;
+    engine.document.model.mockReturnValue(
+      createDocumentModel(canvasDocument, { editRevision: 0, projectId: 'project' })
+    );
+    const row = host!.querySelector<HTMLElement>('[role="treeitem"]')!;
+    await userEvent.click(row);
+
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyE',
+      key: 'e',
+      ...(IS_MAC_OS ? { metaKey: true } : { ctrlKey: true }),
+    });
+    await act(() => row.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(engine.layers.mergeLayerDown).toHaveBeenCalledExactlyOnceWith('upper');
+    expect(document.activeElement).toBe(row);
   });
 
   it('leaves typing in a field alone', async () => {

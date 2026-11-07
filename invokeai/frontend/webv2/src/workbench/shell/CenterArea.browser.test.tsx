@@ -69,6 +69,8 @@ const centerAreaMocks = vi.hoisted(() => {
     focusRegion: vi.fn(),
     project,
     revealFloating: vi.fn(),
+    /** The fixed-size actions stand-in's width. */
+    trailingActionsWidth: '189px',
   };
 });
 
@@ -147,7 +149,7 @@ vi.mock('@workbench/widget-frame', () => ({
     }
 
     if (slot === 'actions') {
-      return <Box data-testid="trailing-actions" flexShrink={0} w="189px" />;
+      return <Box data-testid="trailing-actions" flexShrink={0} w={centerAreaMocks.trailingActionsWidth} />;
     }
 
     return (
@@ -172,6 +174,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
+        common: { scrollToEnd: 'Scroll to end', scrollToStart: 'Scroll to start' },
         widgets: {
           centerRegion: 'Center view',
           centerViewEmpty: 'No view',
@@ -235,6 +238,122 @@ describe('CenterArea chrome layout', () => {
       centerRegion.getBoundingClientRect().right
     );
   });
+
+  it('keeps the islands apart and inside the minimum center width, scrolling what does not fit', async () => {
+    // The center's own minimum width; both islands hold more than fits beside each other.
+    await render(<CenterArea />, 320);
+    // Resize observations, and the cues they set, land before the second frame.
+    await act(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        })
+    );
+
+    const centerRegion = host!.querySelector<HTMLElement>('section')!.getBoundingClientRect();
+    const [startIsland, endIsland] = [...host!.querySelectorAll<HTMLElement>('[data-center-chrome-island]')];
+    const start = startIsland!.getBoundingClientRect();
+    const end = endIsland!.getBoundingClientRect();
+    const viewMenu = startIsland!.querySelector('button[aria-label^="Center view"]')!.getBoundingClientRect();
+
+    expect(start.left).toBeGreaterThanOrEqual(centerRegion.left);
+    expect(start.right).toBeLessThanOrEqual(end.left);
+    expect(end.right).toBeLessThanOrEqual(centerRegion.right);
+    // The actions give way at the width that leaves the start island its floor: border, row padding, the view menu's
+    // 5rem, and the 2.75rem end cue.
+    expect(start.width).toBeGreaterThanOrEqual(2 + 4 + 80 + 44);
+    // The compact view menu, icon and chevron only, stays whole and clear of the cue covering the island's end.
+    expect(viewMenu.width).toBeGreaterThanOrEqual(30);
+    expect(viewMenu.right).toBeLessThanOrEqual(
+      startIsland!.querySelector('[data-overflow-cue="end"]')!.getBoundingClientRect().left
+    );
+    // Each island scrolls the rest, cueing the end that hides it.
+    for (const island of [startIsland!, endIsland!]) {
+      const row = island.firstElementChild!;
+      expect(row.scrollWidth).toBeGreaterThan(row.clientWidth);
+      expect(island.querySelector('[data-overflow-cue="end"]')).not.toBeNull();
+    }
+  });
+});
+
+describe('CenterArea view menu trigger', () => {
+  const trigger = () => host!.querySelector<HTMLButtonElement>('button[aria-label="Center view: Preview"]')!;
+  const viewName = () => [...trigger().querySelectorAll('p')].find((element) => element.textContent === 'Preview')!;
+  const tooltip = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')].find(
+      (candidate) => candidate.textContent === 'Center view: Preview'
+    );
+  const focusByKeyboard = async () => {
+    await act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }));
+      trigger().focus();
+      return Promise.resolve();
+    });
+  };
+
+  it('names the view at a wide center, without a tooltip repeating it', async () => {
+    await render(<CenterArea />, 560);
+
+    expect(viewName().getClientRects().length).toBeGreaterThan(0);
+    expect(viewName().getBoundingClientRect().width).toBeGreaterThan(0);
+    // The icon button's own px="0" must not win over the trigger's padding and 5rem floor.
+    expect(getComputedStyle(trigger()).paddingInline).toBe('8px');
+    expect(trigger().getBoundingClientRect().width).toBeGreaterThanOrEqual(80);
+
+    await focusByKeyboard();
+
+    expect(tooltip()?.dataset.state).not.toBe('open');
+  });
+
+  it('minimises to its icon and chevron below 560px, still named and still opening the view menu', async () => {
+    await render(<CenterArea />, 560);
+    await act(async () => {
+      host!.style.width = '559px';
+      await new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+      });
+    });
+
+    expect(viewName().getClientRects().length).toBe(0);
+    expect(getComputedStyle(trigger()).paddingInline).toBe('0px');
+    // The 14px icon, a small gap, and the 12px chevron, at the 2rem icon-button floor; no name, however short.
+    expect(trigger().getBoundingClientRect().width).toBeLessThanOrEqual(36);
+    expect(trigger().getAttribute('aria-label')).toBe('Center view: Preview');
+
+    await focusByKeyboard();
+
+    expect(tooltip()?.dataset.state).toBe('open');
+
+    await act(async () => {
+      trigger().click();
+      await Promise.resolve();
+    });
+
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent).toContain('Preview');
+  });
+});
+
+describe('CenterArea view menu beside wide actions', () => {
+  afterEach(() => {
+    centerAreaMocks.trailingActionsWidth = '189px';
+  });
+
+  it('minimises when the room left to the start island is below 18rem, even at a wide center', async () => {
+    // A 600px center, above the 560px rule, whose actions island leaves the start island under 288px.
+    centerAreaMocks.trailingActionsWidth = '320px';
+    await render(<CenterArea />, 600);
+
+    const trigger = host!.querySelector<HTMLButtonElement>('button[aria-label="Center view: Preview"]')!;
+    const startIsland = trigger.closest<HTMLElement>('[data-center-chrome-island]')!;
+    const name = [...trigger.querySelectorAll('p')].find((element) => element.textContent === 'Preview')!;
+
+    expect(startIsland.parentElement!.getBoundingClientRect().width).toBeLessThan(288);
+    expect(name.getClientRects().length).toBe(0);
+    expect(trigger.getBoundingClientRect().width).toBeLessThanOrEqual(36);
+    // The widget's label keeps the room the name gave up.
+    expect(startIsland.textContent).toContain('Panther and the Flask');
+  });
 });
 
 describe('CenterArea with its last view floating', () => {
@@ -294,7 +413,7 @@ describe('CenterArea with its last view floating', () => {
     centerAreaMocks.project.widgetRegions.center = { ...dockedCenter, instanceIds: [] };
     await render(<CenterArea />);
 
-    expect(host?.textContent).toContain('unavailable');
+    expect(host?.textContent).toContain('common.widgetViewUnavailable');
     expect(button('Show window')).toBeUndefined();
   });
 });

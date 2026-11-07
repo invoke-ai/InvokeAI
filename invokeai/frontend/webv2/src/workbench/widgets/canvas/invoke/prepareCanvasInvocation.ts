@@ -374,7 +374,9 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
                 ? `“${composed.layerName}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.`
                 : composed.status === 'not-ready'
                   ? 'Some layers are still loading. Wait a moment, then invoke again.'
-                  : `The canvas could not be captured for generation (${composed.status}).`
+                  : composed.status === 'over-budget'
+                    ? 'Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.'
+                    : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }

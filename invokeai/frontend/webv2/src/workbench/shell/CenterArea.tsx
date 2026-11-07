@@ -8,6 +8,7 @@ import type {
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { Button, IconButton, MenuContent } from '@platform/ui';
+import { ClippedTooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useFocusRegionProps, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
@@ -30,9 +31,10 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ChromeIsland, getChromeIslandMinWidth } from './ChromeIsland';
 import {
   areInstanceIdListsEqual,
   getActiveInstanceIdsOutside,
@@ -48,6 +50,38 @@ const CENTER_PREFERRED_REGIONS = ['center'] as const;
 const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
 // Reserve a usable center width; side panels shrink to honor this floor.
 const CENTER_MIN_WIDTH = '20rem';
+/** The view menu keeps its icon, a few letters of its name, and its chevron; the row scrolls past that. */
+const VIEW_MENU_MIN_WIDTH = '5rem';
+/** Below this center width the view menu shows only its icon and chevron. Matches the Preview's compact density. */
+const CENTER_COMPACT_MAX_WIDTH_PX = 560;
+/** The chrome row's inset on each side (`insetX="2"`); the query container is the row, not the whole center. */
+const CHROME_INSET_PX = 8;
+const CHROME_CONTAINER_CSS = { containerName: 'center-chrome', containerType: 'inline-size' } as const;
+const COMPACT_CHROME = `@container center-chrome (width < ${CENTER_COMPACT_MAX_WIDTH_PX - 2 * CHROME_INSET_PX}px)`;
+/**
+ * The view menu also minimises when the room left to the start island beside the end island is below this, so its name
+ * does not crowd the widget's label (the Preview's board and item name). Queried on a wrapper filling that room: a
+ * content-sized island cannot be its own inline-size container, since containment would collapse it to nothing.
+ */
+const START_ISLAND_ROOM_CSS = {
+  containerName: 'center-start',
+  containerType: 'inline-size',
+  display: 'flex',
+  flex: '1',
+  minW: '0',
+} as const;
+const COMPACT_START = '@container center-start (width < 18rem)';
+const compactViewMenu = <T extends object>(styles: T) => ({ [COMPACT_CHROME]: styles, [COMPACT_START]: styles });
+const VIEW_MENU_TRIGGER_CSS = compactViewMenu({ flexShrink: 0, minW: '8', px: '0' });
+const VIEW_MENU_CONTENT_CSS = { gap: '2', ...compactViewMenu({ gap: '1' }) };
+const VIEW_MENU_LABEL_CSS = compactViewMenu({ display: 'none' });
+/**
+ * The start island gives way first, down to this width: room for the view menu at its own floor, clear of the end cue.
+ * The compact icon-only menu is narrower than that floor, so the reserve also covers it.
+ * The end island's zoom and actions keep their full width up to what that leaves, then scroll.
+ */
+const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
+const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
 
 export const CenterArea = () => {
   const { t } = useTranslation();
@@ -180,11 +214,12 @@ export const CenterArea = () => {
               typeId={floatedInstance.typeId}
             />
           ) : (
-            <FallbackCenterView label="Center widget unavailable" />
+            <FallbackCenterView />
           )}
         </Box>
 
         <Flex
+          css={CHROME_CONTAINER_CSS}
           data-hotkey-widget-instance-id={activeItem?.id}
           data-hotkey-widget-region="center"
           data-hotkey-widget-type-id={activeItem?.typeId}
@@ -196,28 +231,30 @@ export const CenterArea = () => {
           top="2"
           zIndex="1"
         >
-          <ChromeIsland>
-            <CenterViewMenu
-              activeItem={activeItem}
-              availableItems={availableCenterItems}
-              isCloseDisabled={isActiveViewRequired}
-              items={centerViewItems}
-              onClose={closeActiveCenterView}
-              onOpen={openCenterWidget}
-              onSelect={selectCenterView}
-            />
-            {activeItem ? (
-              <>
-                <WidgetSourceLockBadge typeId={activeItem.typeId} />
-                <Suspense fallback={null}>
-                  <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
-                </Suspense>
-              </>
-            ) : null}
-          </ChromeIsland>
+          <Box css={START_ISLAND_ROOM_CSS}>
+            <ChromeIsland>
+              <CenterViewMenu
+                activeItem={activeItem}
+                availableItems={availableCenterItems}
+                isCloseDisabled={isActiveViewRequired}
+                items={centerViewItems}
+                onClose={closeActiveCenterView}
+                onOpen={openCenterWidget}
+                onSelect={selectCenterView}
+              />
+              {activeItem ? (
+                <>
+                  <WidgetSourceLockBadge typeId={activeItem.typeId} />
+                  <Suspense fallback={null}>
+                    <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
+                  </Suspense>
+                </>
+              ) : null}
+            </ChromeIsland>
+          </Box>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland flexShrink={0}>
+            <ChromeIsland flexShrink={0} maxW={END_ISLAND_MAX_WIDTH}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -238,25 +275,6 @@ export const CenterArea = () => {
   );
 };
 
-const ChromeIsland = ({ children, flexShrink = 1 }: { children: ReactNode; flexShrink?: 0 | 1 }) => (
-  <HStack
-    bg="bg.subtle"
-    borderColor="border.subtle"
-    borderWidth="1px"
-    flexShrink={flexShrink}
-    gap="0.5"
-    h="8"
-    minW="0"
-    pointerEvents="auto"
-    position="relative"
-    px="1"
-    rounded="md"
-    shadow="sm"
-  >
-    {children}
-  </HStack>
-);
-
 const CenterViewMenu = ({
   activeItem,
   availableItems,
@@ -276,7 +294,12 @@ const CenterViewMenu = ({
 }) => {
   const { t } = useTranslation();
   const label = activeItem?.label ?? t('widgets.centerViewEmpty');
+  const triggerLabel = t('widgets.centerViewLabel', { label });
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const labelRef = useRef<HTMLParagraphElement>(null);
+  const triggerIds = useTooltipTriggerIds();
+  // The tooltip names the view only while the container query hides its name.
+  const isLabelHidden = useCallback(() => labelRef.current?.getClientRects().length === 0, []);
   const selectAndRestoreFocus = useCallback(
     (instanceId: string) => {
       onSelect(instanceId);
@@ -288,30 +311,33 @@ const CenterViewMenu = ({
   );
 
   return (
-    <Menu.Root positioning={CENTER_MENU_POSITIONING}>
-      <Menu.Trigger asChild>
-        <IconButton
-          ref={triggerRef}
-          aria-label={t('widgets.centerViewLabel', { label })}
-          color="fg"
-          // The button recipe refuses to shrink; a narrow center truncates the view name beside the widget's label.
-          flexShrink={1}
-          minW="0"
-          overflow="hidden"
-          position="relative"
-          px="2"
-          size="sm"
-          variant="ghost"
-        >
-          <HStack gap="2" minW="0" position="relative" zIndex="1">
-            {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
-            <Text fontWeight="700" truncate>
-              {label}
-            </Text>
-            <ChevronDownIcon size={12} />
-          </HStack>
-        </IconButton>
-      </Menu.Trigger>
+    <Menu.Root ids={triggerIds} positioning={CENTER_MENU_POSITIONING}>
+      <ClippedTooltip content={triggerLabel} ids={triggerIds} isClipped={isLabelHidden}>
+        <Menu.Trigger asChild>
+          <IconButton
+            ref={triggerRef}
+            aria-label={triggerLabel}
+            color="fg"
+            // The button recipe refuses to shrink; a narrow center truncates the view name beside the widget's label,
+            // and a compact center hides it, leaving the icon and chevron.
+            css={VIEW_MENU_TRIGGER_CSS}
+            flexShrink={1}
+            minW={VIEW_MENU_MIN_WIDTH}
+            overflow="hidden"
+            px="2"
+            size="sm"
+            variant="ghost"
+          >
+            <HStack css={VIEW_MENU_CONTENT_CSS} minW="0">
+              {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
+              <Text ref={labelRef} css={VIEW_MENU_LABEL_CSS} fontWeight="700" truncate>
+                {label}
+              </Text>
+              <ChevronDownIcon size={12} />
+            </HStack>
+          </IconButton>
+        </Menu.Trigger>
+      </ClippedTooltip>
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="14rem">
@@ -424,7 +450,7 @@ const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
 
   if (!instance || !widget || widget.status !== 'enabled') {
-    return <FallbackCenterView label="Center widget unavailable" />;
+    return <FallbackCenterView />;
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
@@ -477,10 +503,14 @@ const FloatedCenterView = ({
   );
 };
 
-const FallbackCenterView = ({ label }: { label: string }) => (
-  <Flex align="center" h="full" justify="center" w="full">
-    <Text color="fg.subtle" fontSize="lg" textTransform="capitalize">
-      {label} view
-    </Text>
-  </Flex>
-);
+const FallbackCenterView = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" h="full" justify="center" w="full">
+      <Text color="fg.subtle" fontSize="lg">
+        {t('common.widgetViewUnavailable')}
+      </Text>
+    </Flex>
+  );
+};

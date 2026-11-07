@@ -89,7 +89,103 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
   });
 
-  it('keeps authored settings while replacing an unavailable selection with the default model', () => {
+  it('reads dynamic prompts as on for a project saved before the toggle, without writing the flag in', () => {
+    const model = createModel('current');
+    const { dynamicPromptsEnabled: _absent, ...storedValues } = createValues(model);
+    const result = resolveGenerateWidgetValues({ models: [model], storedValues });
+
+    expect(result?.values.dynamicPromptsEnabled).toBe(true);
+    expect(result?.systemPatch).toBeNull();
+  });
+
+  it('keeps dynamic prompts off once the user turned them off', () => {
+    const model = createModel('current');
+    const storedValues = createValues(model, { dynamicPromptsEnabled: false });
+    const result = resolveGenerateWidgetValues({ models: [model], storedValues });
+
+    expect(result?.values.dynamicPromptsEnabled).toBe(false);
+    expect(result?.systemPatch).toBeNull();
+  });
+
+  it('keeps a chosen model that is no longer installed, so the card can name it and Invoke waits', () => {
+    const removed = createModel('removed');
+    const available = createModel('available');
+    const storedValues = createValues(removed, { positivePrompt: 'keep this prompt' });
+    const result = resolveGenerateWidgetValues({ models: [available], storedValues });
+
+    expect(result?.values).toBe(storedValues);
+    expect(result?.values.model).toBe(removed);
+    expect(result?.systemPatch).toBeNull();
+  });
+
+  it('finds a reinstalled model again by its file hash, though it came back under a new key', () => {
+    const removed = createModel('removed', { hash: 'blake3:abc' });
+    const reinstalled = createModel('reinstalled', { hash: 'blake3:abc', name: 'Same file' });
+    const storedValues = createValues(removed, { positivePrompt: 'keep this prompt' });
+    const result = resolveGenerateWidgetValues({ models: [createModel('other'), reinstalled], storedValues });
+
+    expect(result?.values.model).toBe(reinstalled);
+    expect(result?.values.positivePrompt).toBe('keep this prompt');
+    expect(result?.systemPatch).toMatchObject({ model: reinstalled, modelKey: reinstalled.key });
+  });
+
+  it('does not take a file with the same hash registered under another base or variant for the saved model', () => {
+    const removed = createModel('removed', { hash: 'blake3:abc', variant: 'normal' });
+    const otherBase = createModel('other-base', { base: 'sd-1', hash: 'blake3:abc', variant: 'normal' });
+    const otherVariant = createModel('other-variant', { hash: 'blake3:abc', variant: 'inpaint' });
+    const storedValues = createValues(removed);
+    const result = resolveGenerateWidgetValues({ models: [otherBase, otherVariant], storedValues });
+
+    expect(result?.values.model).toBe(removed);
+  });
+
+  it('finds a reinstalled concept again by its file hash, unless the list already holds it', () => {
+    const model = createModel('current');
+    const removedLora = { base: 'sdxl', hash: 'blake3:lora', key: 'old-lora', name: 'Style', type: 'lora' as const };
+    const reinstalledLora = { ...removedLora, key: 'new-lora' };
+    const storedValues = createValues(model, { loras: [{ isEnabled: true, model: removedLora, weight: 0.7 }] });
+    const result = resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues });
+
+    expect(result?.values.loras).toEqual([{ isEnabled: true, model: reinstalledLora, weight: 0.7 }]);
+    expect(result?.systemPatch?.loras).toEqual(result?.values.loras);
+
+    const both = createValues(model, {
+      loras: [
+        { isEnabled: true, model: removedLora, weight: 0.7 },
+        { isEnabled: true, model: reinstalledLora, weight: 1 },
+      ],
+    });
+
+    expect(resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues: both })?.values.loras).toBe(
+      both.loras
+    );
+
+    // Two removed copies of one file: only the first takes the reinstalled concept; the other stays as saved.
+    const copy = { ...removedLora, key: 'old-lora-copy' };
+    const twice = createValues(model, {
+      loras: [
+        { isEnabled: true, model: removedLora, weight: 0.7 },
+        { isEnabled: true, model: copy, weight: 0.4 },
+      ],
+    });
+
+    expect(
+      resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues: twice })?.values.loras.map(
+        (lora) => lora.model.key
+      )
+    ).toEqual(['new-lora', 'old-lora-copy']);
+  });
+
+  it('defaults a choice that never named a model', () => {
+    const available = createModel('available');
+    const { model: _, ...withoutModel } = createValues(createModel('unknown'), { modelKey: '' });
+    const result = resolveGenerateWidgetValues({ models: [available], storedValues: withoutModel });
+
+    expect(result?.values.model).toBe(available);
+    expect(result?.systemPatch).toMatchObject({ model: available, modelKey: available.key });
+  });
+
+  it('keeps authored settings while replacing a selection of an unsupported family with the default model', () => {
     const unavailable = createModel('unavailable', { base: 'not-supported' });
     const available = createModel('available');
     const storedValues = createValues(unavailable, { positivePrompt: 'keep this prompt' });

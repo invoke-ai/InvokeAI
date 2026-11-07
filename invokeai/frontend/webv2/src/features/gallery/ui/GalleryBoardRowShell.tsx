@@ -5,9 +5,13 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
 import { useMemo, type MouseEvent, type ReactNode, type Ref } from 'react';
 
-/** On the container, not the row button: the `⋮` sibling must share the fill. */
+/**
+ * On the container, not the row button: the `⋮` sibling must share the fill. It shows on hover and focus, and always
+ * where there is no hover to reveal it (touch, pens and other coarse pointers).
+ */
 const ROW_CONTAINER_CSS = {
   '&:hover .board-row-actions, &:focus-within .board-row-actions': { opacity: 1 },
+  '@media (hover: none), (pointer: coarse)': { '& .board-row-actions': { opacity: 1 } },
   '&:hover .board-row-hover, &:focus-within .board-row-hover': { opacity: 1 },
   // A translucent tint, not an opaque surface: the picker popover's own background is bg.muted, which hid one there.
   _hover: { bg: 'bg.hover' },

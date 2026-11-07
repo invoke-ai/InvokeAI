@@ -34,7 +34,7 @@ from urllib3.util.ssl_match_hostname import CertificateError
 from invokeai.app.invocations.flux.flux_redux import FluxReduxInvocation
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterInvocation
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.config.config_default import URLRegexTokenPair
+from invokeai.app.services.config.config_default import URLRegexTokenPair, get_config
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
@@ -2979,6 +2979,108 @@ def test_download_authorization_while_logged_in_to_hf(
 
     assert job.complete, job.error
     assert adapter.authorizations == [expected_authorization]
+
+
+_GATED_MODULAR_REPO = "InvokeAI-test/gated-modular-pipeline"
+_GATED_MODULAR_COMMIT = "89abcdef0123456789abcdef0123456789abcdef"
+_GATED_MODULAR_FILES_URL = f"https://huggingface.co/{_GATED_MODULAR_REPO}/resolve/{_GATED_MODULAR_COMMIT}/"
+# A valid safetensors file that holds no tensors: an 8-byte header length, then the space-padded header `{}`.
+_EMPTY_SAFETENSORS = (8).to_bytes(8, "little") + b"{}      "
+# A FLUX.3 Modular Diffusers pipeline, as identification reads it.
+_GATED_MODULAR_COMPONENTS = {
+    "modular_model_index.json": json.dumps(
+        {
+            "_class_name": "Flux3DistilledModularPipeline",
+            "text_encoder": ["transformers", "Qwen3VLForConditionalGeneration", {"subfolder": "text_encoder"}],
+            "tokenizer": ["transformers", "Qwen3VLProcessor", {"subfolder": "text_encoder"}],
+            "transformer": ["diffusers", "Flux3Transformer2DModel", {"subfolder": "transformer"}],
+            "vae": ["diffusers", "AutoencoderKLFlux2", {"subfolder": "vae"}],
+        }
+    ).encode(),
+    "transformer/config.json": json.dumps({"_class_name": "Flux3Transformer2DModel", "flow_map": True}).encode(),
+    "transformer/diffusion_pytorch_model.safetensors": _EMPTY_SAFETENSORS,
+    "vae/config.json": json.dumps({"_class_name": "AutoencoderKLFlux2"}).encode(),
+    "vae/diffusion_pytorch_model.safetensors": _EMPTY_SAFETENSORS,
+    "text_encoder/config.json": json.dumps({"architectures": ["Qwen3VLForConditionalGeneration"]}).encode(),
+    "text_encoder/model.safetensors": _EMPTY_SAFETENSORS,
+    "text_encoder/tokenizer.json": b"{}",
+}
+
+
+def _serve_gated_modular_repo(session) -> _AuthorizationAdapter:
+    """Serve a gated Modular Diffusers repo that also holds BFL's single-file package at its root; return the adapter
+    of its modular_model_index.json. Like the hub, it lists its files to anyone and serves them only with the token
+    of a user who accepted its license."""
+    files = {
+        **_GATED_MODULAR_COMPONENTS,
+        "config.json": b'{"format_version": 1}',
+        "model.safetensors": _EMPTY_SAFETENSORS,
+    }
+    listing = json.dumps(
+        {
+            "id": _GATED_MODULAR_REPO,
+            "sha": _GATED_MODULAR_COMMIT,
+            "siblings": [{"rfilename": name, "size": len(data)} for name, data in files.items()],
+        }
+    ).encode()
+    session.mount(f"https://huggingface.co/api/models/{_GATED_MODULAR_REPO}", TestAdapter(listing))
+    adapters = {name: _AuthorizationAdapter(data, required_token="hf_granted") for name, data in files.items()}
+    for name, adapter in adapters.items():
+        session.mount(_GATED_MODULAR_FILES_URL + name, adapter)
+    return adapters["modular_model_index.json"]
+
+
+@pytest.mark.parametrize(
+    ("source", "explicit_token", "hf_login", "remote_api_token"),
+    [
+        (_GATED_MODULAR_REPO, "hf_granted", None, None),
+        (_GATED_MODULAR_REPO, None, "hf_granted", None),
+        (f"https://huggingface.co/{_GATED_MODULAR_REPO}", None, None, "hf_granted"),
+    ],
+    ids=["explicit_token", "hf_login", "url_source_with_remote_api_token"],
+)
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_a_gated_modular_repo_installs_its_components_with_the_token_its_downloads_send(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    explicit_token: str | None,
+    hf_login: str | None,
+    remote_api_token: str | None,
+) -> None:
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: hf_login)
+    if remote_api_token is not None:
+        # In production the installer and the download queue read one config; the fixtures give each its own.
+        for config in (mm2_installer.app_config, get_config()):
+            monkeypatch.setattr(
+                config, "remote_api_tokens", [URLRegexTokenPair(url_regex="huggingface.co", token=remote_api_token)]
+            )
+    _serve_gated_modular_repo(mm2_session)
+
+    job = mm2_installer.heuristic_import(source=source, access_token=explicit_token)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert job.config_out is not None
+    model_path = mm2_installer.app_config.models_path / job.config_out.path
+    assert {path.relative_to(model_path).as_posix() for path in model_path.rglob("*") if path.is_file()} == set(
+        _GATED_MODULAR_COMPONENTS
+    )
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_a_gated_modular_repo_without_a_token_is_refused_as_final_before_an_install_starts(
+    mm2_installer: ModelInstallServiceBase, mm2_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: None)
+    index = _serve_gated_modular_repo(mm2_session)
+
+    with pytest.raises(HTTPError) as refusal:
+        mm2_installer.heuristic_import(source=_GATED_MODULAR_REPO)
+
+    assert index.authorizations == [None]
+    assert refusal.value.response.status_code == 401
 
 
 _SDXL_TURBO_SOURCE = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)

@@ -1,0 +1,30 @@
+# Plumber overlay: inherits every control from the CLI's built-in
+# baseline, only the differences for this repository are written here.
+# Run 'plumber config resolve' to see the full effective config.
+extends: plumber:default
+version: '2.0'
+
+github:
+  controls:
+    githubActionMustComeFromAuthorizedSources:
+      # Keep the curated default list and trust the runner, change
+      # detection and release tooling this repository uses on top of
+      # it, all pinned by commit.
+      includePlumberDefaults: true
+      trustedGithubActions:
+        - dorny/paths-filter
+        - nschloe/action-cached-lfs-checkout
+        - ppremk/lfs-warning
+        - samuelcolvin/check-python-version
+        - tj-actions/changed-files
+        - useblacksmith/build-push-action
+        - useblacksmith/checkout
+        - useblacksmith/setup-docker-builder
+
+    # main is protected. The release/* branches are frozen history
+    # from earlier releases, keep the requirement on the branch
+    # releases are actually cut from.
+    branchMustBeProtected:
+      defaultMustBeProtected: true
+      namePatterns:
+        - main

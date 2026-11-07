@@ -294,7 +294,8 @@ on.
 - **What it changes**: decodes up to the largest size measured use the measured values, plus the same 5% margin the
   built-in values carry. Measurements that a fragmented GPU memory pool inflated, or taken while the VAE was only partly
   on the GPU, are left out, and the Model Manager shows those sizes as not counted. Larger decodes use whichever of the
-  measured and the built-in estimate is larger. Other models that decode the same way (for example, SD1.5 and SDXL
+  measured and the built-in estimate is larger. A tiled decode uses the measurements for each tile where they
+  need more than the built-in values, and keeps the built-in values for what tiling adds. Other models that decode the same way (for example, SD1.5 and SDXL
   models when you calibrate an SDXL model) use the measurements too. Because the estimate decides when a large decode is
   split into tiles up front, a calibration can change which large images are decoded in tiles.
 - **Where it applies**: on this kind of GPU only (identical cards share it), and only while the software that affects
@@ -333,8 +334,10 @@ GPU, and the cache subtracts the working memory and the reserve from it before l
 ## Tiled VAE decode and encode
 
 Without tiling, the memory a VAE needs grows with the square of the image size: for FLUX.1, an untiled 3072² encode
-peaks at about 18.8GiB on an RTX 4090, a tiled one at 0.8GiB, and tiled memory stays roughly flat as the image grows.
-Tiling costs some speed on smaller images, and a tiled result is not pixel-identical to an untiled one.
+peaks at about 18.8GiB on an RTX 4090, a tiled one at 0.8GiB, and tiled memory grows far more slowly. It does still grow: while the tiles are assembled, the
+decoded tiles and two copies of the image are held at once, about 23 bytes per pixel in bf16, and the node's latents and
+post-processing come on top. A 24576x24576 FLUX.1 decode at a 512 px tile measured 13.4 GiB on an RX 9060 XT and 16.5 GiB
+on an RTX 4090, and Invoke reserves at least that. Tiling costs some speed on smaller images, and a tiled result is not pixel-identical to an untiled one.
 
 | Model | Automatic (`auto_tiled_decode`) | Always (`force_tiled_decode`) | Per node (**Tiled** field) | Retried tiled after out of memory |
 | --- | --- | --- | --- | --- |

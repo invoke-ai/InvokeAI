@@ -56,7 +56,7 @@ Some models carry license terms that limit commercial use or use on public serve
 
 The Model Manager is for administrators: in [multi-user mode](/configuration/multi-user-mode/admin-guide/) other accounts don't see it. Open it from the Invoke menu at the top left (**Manage › Model Manager**) or from **Models** in the Launchpad. While no models are installed, the Launchpad's home page also shows the starter bundles.
 
-<ModelManagerSketch label="Sketch of the Model Manager: the installed model library on the left, and on the right the Add Models tab with a search field, a Scan models folder button, starter bundle chips, an Install bundle button and starter models with Install buttons, above the install queue. Numbered callouts mark the controls described below.">
+<ModelManagerSketch label="Sketch of the Model Manager: the installed model library on the left, and on the right the Add Models tab with a search field, a Scan models folder button, starter bundle chips, an Install button named after the bundle and starter models with Install buttons, above the install queue. Numbered callouts mark the controls described below.">
   <Callout x={24.2} y={40} labelSide="right" label="Library">Your installed models, with their base and format. Search, filter and sort them above the list; click one to open it in the model's tab.</Callout>
   <Callout x={28.4} y={4.25} labelSide="bottom" label="Library menu">**Refresh model list**, **Clean up orphaned models…** and **Empty model cache**, which unloads every model from RAM and VRAM.</Callout>
   <Callout x={61.9} y={4.25} labelSide="bottom" label="Add Models">Starter models and every other way to install. It opens here while the library is empty.</Callout>
@@ -64,7 +64,7 @@ The Model Manager is for administrators: in [multi-user mode](/configuration/mul
   <Callout x={83} y={14.75} labelSide="top" label="Search or add">Type to search the starter models, or paste a URL, a HuggingFace repo ID or a path on the server. See [Other ways to install](#other-ways-to-install).</Callout>
   <Callout x={74} y={22.5} labelSide="bottom" label="Scan models folder">Lists the model files in the server's models folder, whose path is shown beside the button, so you can register files copied there. The button turns into **Stop** while the scan runs. If the server can't report the folder, a message says so with **Retry**.</Callout>
   <Callout x={90} y={29.75} labelSide="top" label="Bundles">**All** lists every starter model; each bundle chip lists the recommended models for one family. A check mark means the whole bundle is installed. The menu at the end filters and sorts the list.</Callout>
-  <Callout x={81.25} y={37} labelSide="left" label="Install bundle">Queues every model of the chosen bundle that isn't installed yet.</Callout>
+  <Callout x={81.25} y={37} labelSide="left" label="Install bundle">**Install** followed by the bundle's name, such as **Install SDXL**. Queues every model of the chosen bundle that isn't installed yet.</Callout>
   <Callout x={87.2} y={47.25} labelSide="left" label="Install">Installs one starter model and any models it depends on, such as its VAE or text encoder.</Callout>
   <Callout x={82.5} y={94.5} labelSide="left" label="Install queue">Download and install progress. Expand it to pause, resume, retry or cancel installs and to clear finished ones.</Callout>
 </ModelManagerSketch>
@@ -75,11 +75,13 @@ The Model Manager is for administrators: in [multi-user mode](/configuration/mul
 
 2. Choose the bundle chip for the model family you want, such as **FLUX.2**, **SDXL** or **Z-Image**. The [model family pages](/users-guide/models/model-families/#model-families) list what each family needs.
 
-3. Press **Install bundle**, or **Install** on single models. Dependencies are queued with them.
+3. Press **Install** followed by the bundle's name, such as **Install SDXL**, or **Install** on single models. Dependencies are queued with them.
 
-4. Follow the downloads in the **Install queue**. Large models take a while. A finished model appears in the library and in every model picker.
+4. Follow the downloads in the **Install queue**. Large models take a while. A finished model appears in the library and in every model picker. Each row's stop button cancels its install; the **X** on a finished row only removes it from the list. Cancelling a download that has already fetched data asks first, since that data is discarded, and **Cancel all…** confirms how many installs it stops.
 
 </Steps>
+
+Until a model that can generate is installed, the Launchpad's **Home** page says so. Administrators can install the recommended starter bundle there in one click (it says what the bundle suits and links the hardware requirements) or open another bundle in the Model Manager; other users see a notice to ask an administrator. Home also counts installs that failed or need attention, with **Review** to open the install queue.
 
 ## Other ways to install
 

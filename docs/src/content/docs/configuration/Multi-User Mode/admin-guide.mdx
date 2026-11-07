@@ -248,6 +248,7 @@ Under **Settings → Server**, administrators can also choose **Generation devic
 | [Sessions](#sessions) | A sign-in lasts 24 hours after the last change, or a week. Changing a password ends the account's other sessions. |
 | [Signing key](#signing-key) | Anyone with a copy of the database can sign in as any user. Protect backups. |
 | [Model downloads](#model-downloads) | The server refuses to download from private-network addresses. |
+| [Node filesystem access](#node-filesystem-access) | Nodes that read or write files stay inside directories you designate. **Prompts from File** is for administrators only. |
 | [HTTPS and internet access](#https-and-internet-access) | Use HTTPS beyond `localhost`. Prefer a VPN to exposing InvokeAI to the internet. |
 
 ### Passwords
@@ -312,6 +313,31 @@ The server refuses to download from loopback, link-local and private-network add
 - **Local mirror:** set `allow_private_download_urls: true` to allow private addresses.
 - **Proxy:** downloads ignore `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`. Set `download_proxy` to a proxy that itself blocks private addresses, because InvokeAI cannot check the addresses the proxy resolves. Don't turn on `allow_private_download_urls` just to make a proxy work; the two settings are independent.
 - `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` and `.netrc` are still honored.
+
+### Node filesystem access
+
+Workflow nodes that read or write files are confined to directories you designate, in both single-user and multi-user
+mode.
+
+The **Prompts from File** node reads prompt lists from the prompt files directory: `prompt_files_dir`, by default
+`<root>/prompt_files`. Its `file_path` input is relative to that directory, and absolute paths, `..` traversal and
+symlinks pointing out of the directory are refused. Place a prompt list at `<root>/prompt_files/lists/fantasy.txt` and
+the node addresses it as `lists/fantasy.txt`.
+
+In multi-user mode the node is also **restricted to administrators**, because every account shares the prompt files
+directory: a non-admin reading from it would be reading prompt lists belonging to other users. Unprivileged users should
+use wildcards instead, which are stored per account and can be imported from the prompt panel.
+
+To turn the node off entirely, deny it in `invokeai.yaml`:
+
+```yaml
+deny_nodes:
+  - prompt_from_file
+```
+
+The **Save Image (Gallery + File Export)** node is confined to the outputs directory on the same terms. Its filename
+prefix and suffix cannot contain path separators or `..`, so they cannot steer the exported file out of the chosen
+directory.
 
 ### HTTPS and internet access
 

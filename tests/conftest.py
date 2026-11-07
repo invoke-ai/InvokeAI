@@ -7,9 +7,13 @@
 import logging
 import shutil
 import sys
+import warnings
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
+import torch
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from invokeai.app.services.auth import password_utils
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
@@ -66,6 +70,47 @@ from tests.test_nodes import TestEventService
 if is_windows_arm64():
     install_cuda_stream_capture_shim()
 
+# torch's own SDPA priority order, read as the session starts and before anything in it installs one. It is torch's
+# state, not code under test, and its layout differs by release, so `sdpa_orders` picks literal expectations by it.
+try:
+    _TORCH_SDPA_ORDER_AT_START: tuple[SDPBackend, ...] | None = tuple(
+        SDPBackend(backend) for backend in torch._C._get_sdp_priority_order()
+    )
+except Exception:  # a torch that renamed its private priority API; `sdpa_orders` skips
+    _TORCH_SDPA_ORDER_AT_START = None
+
+_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE = (
+    SDPBackend.FLASH_ATTENTION,
+    SDPBackend.EFFICIENT_ATTENTION,
+    SDPBackend.MATH,
+    SDPBackend.CUDNN_ATTENTION,
+    SDPBackend.OVERRIDEABLE,
+)
+# Each layout of torch's own order the suite knows -> the order once InvokeAI's ranking is installed on it.
+_INSTALLED_SDPA_ORDER_BY_TORCH_ORDER = {
+    # torch 2.8 and newer: all five backends.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE): (_FLASH, _CUDNN, _EFFICIENT, _MATH, _OVERRIDEABLE),
+    # torch 2.7 (macOS, Linux aarch64): a five-slot array initialised with four backends, so the last slot is 0,
+    # which is MATH again. The four ranked entries are written over the first four slots and the fifth stays.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _MATH): (_FLASH, _CUDNN, _EFFICIENT, _MATH, _MATH),
+}
+# The same layouts -> the order once `attention_backend` pins each kernel ahead of InvokeAI's ranking.
+_PINNED_SDPA_ORDERS_BY_TORCH_ORDER = {
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE): {
+        _FLASH: (_FLASH, _CUDNN, _EFFICIENT, _MATH, _OVERRIDEABLE),
+        _CUDNN: (_CUDNN, _FLASH, _EFFICIENT, _MATH, _OVERRIDEABLE),
+        _EFFICIENT: (_EFFICIENT, _FLASH, _CUDNN, _MATH, _OVERRIDEABLE),
+        _MATH: (_MATH, _FLASH, _CUDNN, _EFFICIENT, _OVERRIDEABLE),
+    },
+    # Here, too, only the four ranked slots are written, and the fifth stays MATH.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _MATH): {
+        _FLASH: (_FLASH, _CUDNN, _EFFICIENT, _MATH, _MATH),
+        _CUDNN: (_CUDNN, _FLASH, _EFFICIENT, _MATH, _MATH),
+        _EFFICIENT: (_EFFICIENT, _FLASH, _CUDNN, _MATH, _MATH),
+        _MATH: (_MATH, _FLASH, _CUDNN, _EFFICIENT, _MATH),
+    },
+}
+
 # Fixtures that put a test on the backend under test, which `-m uses_database` selects.
 _DATABASE_FIXTURES = {"empty_database", "database"}
 
@@ -90,6 +135,63 @@ def _clear_deferred_empty_cache():
     TorchDevice._empty_cache_deferred.clear()
     yield
     TorchDevice._empty_cache_deferred.clear()
+
+
+@pytest.fixture
+def preserve_sdpa_priority_order():
+    """torch's SDPA priority order is process-global, and an xdist worker runs arbitrary files in one process.
+
+    For tests that change it -- `apply_monkeypatches` and `install_default_sdpa_priority` do -- so a later test does
+    not pick kernels by an order it never asked for.
+    """
+    saved = torch._C._get_sdp_priority_order()
+    yield
+    torch._C._set_sdp_priority_order(saved)
+
+
+class SdpaOrders(NamedTuple):
+    # torch's own order, which demoting cuDNN gives back.
+    torch_own: list[SDPBackend]
+    # The order once `install_default_sdpa_priority` has ranked flash, cuDNN, memory-efficient and math first.
+    installed: list[SDPBackend]
+    # The order once `install_default_sdpa_priority(pinned)` has ranked each kernel ahead of that.
+    pinned: dict[SDPBackend, list[SDPBackend]]
+
+
+@pytest.fixture
+def sdpa_orders() -> SdpaOrders:
+    """The literal SDPA priority orders a test expects on this torch, chosen by the layout of torch's own order."""
+    installed = _INSTALLED_SDPA_ORDER_BY_TORCH_ORDER.get(_TORCH_SDPA_ORDER_AT_START)
+    pinned = _PINNED_SDPA_ORDERS_BY_TORCH_ORDER.get(_TORCH_SDPA_ORDER_AT_START)
+    if _TORCH_SDPA_ORDER_AT_START is None or installed is None or pinned is None:
+        layout = None if _TORCH_SDPA_ORDER_AT_START is None else [b.name for b in _TORCH_SDPA_ORDER_AT_START]
+        pytest.skip(
+            f"torch {torch.__version__} has an SDPA priority order the suite has no expectations for ({layout}); "
+            "add its layout to _INSTALLED_SDPA_ORDER_BY_TORCH_ORDER and _PINNED_SDPA_ORDERS_BY_TORCH_ORDER in "
+            "tests/conftest.py"
+        )
+    return SdpaOrders(
+        torch_own=list(_TORCH_SDPA_ORDER_AT_START),
+        installed=list(installed),
+        pinned={kernel: list(order) for kernel, order in pinned.items()},
+    )
+
+
+@pytest.fixture(scope="session")
+def cpu_flash_serves_grouped_query_attention() -> bool:
+    """Whether this torch's CPU flash kernel takes grouped-query attention. torch 2.7's does not.
+
+    Asked by running it, with only flash enabled, so the answer comes from torch and not from the code under
+    test. A refusal arrives as warnings ahead of the error; they are this probe's own, so they are muted.
+    """
+    query, key_value = torch.zeros(1, 4, 8, 16), torch.zeros(1, 2, 8, 16)
+    try:
+        with warnings.catch_warnings(), sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            warnings.simplefilter("ignore")
+            torch._C._nn.scaled_dot_product_attention(query, key_value, key_value, enable_gqa=True)
+    except RuntimeError:
+        return False
+    return True
 
 
 _PRODUCTION_BCRYPT_ROUNDS = password_utils.BCRYPT_ROUNDS

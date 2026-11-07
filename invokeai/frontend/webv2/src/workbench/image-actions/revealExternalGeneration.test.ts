@@ -94,6 +94,7 @@ const createContext = (): ExternalGenerationRevealContext => ({
         queue: { items: queueItems },
         widgetInstances: { gallery: { state: { values: galleryValues }, typeId: 'gallery' } },
       },
+      scopedDefaults: {},
     }),
     isActiveProject: (projectId: string) => projectId === activeProjectId,
   } as unknown as WorkbenchQueries,

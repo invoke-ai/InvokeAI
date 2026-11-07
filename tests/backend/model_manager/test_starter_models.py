@@ -1,15 +1,17 @@
-"""Tests for the Krea-2 and MiniMax H3 starter-model bundles and the LTX-2 GGUF transformers.
+"""Tests for the starter-model bundles and the LTX-2 GGUF transformers.
 
 A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
 bundle exists, exposes the diffusers, GGUF and nvfp4 options, and that each transformer-only entry declares the
-two standalone dependencies so installing it also pulls the pieces needed to run it.
+two standalone dependencies so installing it also pulls the pieces needed to run it. The FLUX.2 bundle installs from
+one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
     StarterModel,
+    StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -18,6 +20,42 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
 )
+
+
+def _hf_repo(source: str) -> str:
+    """The Hugging Face repo a starter source downloads from: `org/repo`, `org/repo::subpath` or a resolve URL."""
+    hf_url_prefix = "https://huggingface.co/"
+    if source.startswith(hf_url_prefix):
+        return "/".join(source.removeprefix(hf_url_prefix).split("/")[:2])
+    return source.split("::")[0]
+
+
+def _flux2_bundle_installs() -> list[StarterModelWithoutDependencies]:
+    """Everything installing the FLUX.2 bundle downloads: its members and each member's dependencies."""
+    installs: list[StarterModelWithoutDependencies] = []
+    for model in STARTER_BUNDLES[BaseModelType.Flux2].models:
+        installs.append(model)
+        installs.extend(model.dependencies or [])
+    return installs
+
+
+def test_flux2_bundle_installs_nothing_gated_or_non_commercial() -> None:
+    # Deliberately strict: Klein 4B is the only Apache 2.0, ungated FLUX.2 model, so anything else added to the
+    # bundle needs a license review before this allow-list grows.
+    offending = [m.name for m in _flux2_bundle_installs() if "klein-4b" not in _hf_repo(m.source).lower()]
+    assert offending == [], f"FLUX.2 bundle installs models from outside the Klein 4B repositories: {offending}"
+
+
+def test_flux2_bundle_runs_klein_4b_on_its_own() -> None:
+    installs = _flux2_bundle_installs()
+
+    assert any(
+        m.type is ModelType.Main and m.base is BaseModelType.Flux2 and "klein-4b" in m.source.lower() for m in installs
+    )
+    assert any(m.type is ModelType.VAE and m.base is BaseModelType.Flux2 for m in installs)
+    assert "black-forest-labs/FLUX.2-klein-4B::text_encoder+tokenizer" in {
+        m.source for m in installs if m.type is ModelType.Qwen3Encoder
+    }
 
 
 def _krea2_bundle_by_source() -> dict[str, StarterModel]:
@@ -69,6 +107,26 @@ def test_krea2_transformer_only_entries_declare_vae_and_encoder_dependencies() -
         # It ships only the transformer -> it must pull a VAE and a Qwen3-VL encoder.
         assert ModelType.VAE in dep_types, f"{model.name} is missing a VAE dependency"
         assert ModelType.Qwen3VLEncoder in dep_types, f"{model.name} is missing a Qwen3-VL encoder dependency"
+
+
+def test_moss_image_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Single-file and GGUF MOSS-Image mains hold only the transformer; the loader requires a standalone FLUX.2 VAE and
+    # a Qwen3.5 encoder, so an entry without them installs but cannot generate.
+    transformer_only = [
+        m
+        for m in STARTER_MODELS
+        if m.type is ModelType.Main and m.base is BaseModelType.MossImage and m.source.startswith("https://")
+    ]
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert any(dep.type is ModelType.VAE and dep.base is BaseModelType.Flux2 for dep in dependencies), (
+            f"{model.name} is missing the FLUX.2 VAE dependency"
+        )
+        assert any(dep.type is ModelType.Qwen35Encoder for dep in dependencies), (
+            f"{model.name} is missing a Qwen3.5 encoder dependency"
+        )
 
 
 def test_krea2_bundle_models_are_registered_in_starter_models() -> None:

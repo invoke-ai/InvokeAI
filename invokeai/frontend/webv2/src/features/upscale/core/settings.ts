@@ -18,14 +18,15 @@ import {
   hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isKrea2Qwen3VlEncoder,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
   isModelIdentifierConfig,
+  isQwen3Vl4bEncoder,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
   isZImageQwen3Encoder,
@@ -190,7 +191,7 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
 };
 // Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
 const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
-  accepts: isKrea2Qwen3VlEncoder,
+  accepts: isQwen3Vl4bEncoder,
   field: 'qwen3VlEncoderModel',
   label: 'Qwen3-VL 4B encoder',
 };
@@ -207,7 +208,7 @@ const flux2KleinQwen3Slot = (model: MainModelConfig): UpscaleComponentSlot => ({
   field: 'qwen3EncoderModel',
   label: (typeof model.variant === 'string' && FLUX2_KLEIN_QWEN3_LABELS[model.variant]) || 'Qwen3 encoder',
 });
-// FLUX.2 [dev] reads Mistral Small 3.1. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
+// FLUX.2 [dev] reads Mistral Small 3.2. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
 // trained on it.
 const FLUX2_MISTRAL_SLOT: UpscaleComponentSlot = {
   accepts: isFlux2MistralEncoder,
@@ -376,16 +377,11 @@ export const UPSCALE_ARCHITECTURES = {
     tileControlNet: null,
   },
   flux2: {
-    // Both loaders fall back to a bundled main model's own encoder and VAE; [dev]'s counts only a Diffusers
-    // install as bundled, Klein's a complete SDNQ pipeline too.
+    // Both loaders fall back to a bundled main model's own encoder and VAE.
     components: (model) =>
-      model.variant === 'dev'
-        ? model.format === 'diffusers'
-          ? NO_COMPONENTS
-          : { slots: [FLUX2_MISTRAL_SLOT], vae: true }
-        : isBundledMainForBase('flux2')(model)
-          ? NO_COMPONENTS
-          : { slots: [flux2KleinQwen3Slot(model)], vae: true },
+      isBundledFlux2Main(model)
+        ? NO_COMPONENTS
+        : { slots: [model.variant === 'dev' ? FLUX2_MISTRAL_SLOT : flux2KleinQwen3Slot(model)], vae: true },
     denoiseGrid: 16,
     // `flux2_denoise` clips by sigma value like FLUX.1, then re-spaces the window to the requested steps.
     indexClipping: null,

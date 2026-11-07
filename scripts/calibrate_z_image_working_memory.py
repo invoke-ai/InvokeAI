@@ -10,21 +10,26 @@ A forward whose allocations failed, or only succeeded after the allocator releas
 peak), or after which Windows keeps more than `measurement.SPILL_TOLERANCE_BYTES` of the process in shared memory, is
 invalid: it is recorded as such, not as a point.
 
-Every point runs in a fresh process, which first applies the server's runtime (`apply_server_runtime` in
-`invokeai/app/run_app.py`): the `MIOPEN_FIND_MODE` default, the integrated-GPU check, the allocator, the AOTriton
-decision and the monkeypatches, the ROCm SDPA guard among them, in the server's order. Its settings are those of a server
-without a config file, except the allocator configuration: `--alloc-conf`, or without one the platform default the
-server uses (expandable segments for ROCm on Windows, torch's native allocator elsewhere). This script's own process runs
-the integrated-GPU check once before the first point: the measuring processes inherit the `HIP_VISIBLE_DEVICES` it sets,
-which their own check keeps, as the server keeps an exported one.
+Every point runs in a fresh process (`scripts/working_memory/fresh_points.py`, which the calibration scripts share),
+which first applies the server's runtime (`apply_server_runtime` in `invokeai/app/run_app.py`): the `MIOPEN_FIND_MODE`
+default, the integrated-GPU check, the allocator, the AOTriton decision and the monkeypatches, the ROCm SDPA guard among
+them, in the server's order. Its settings are those of a server without a config file, except the allocator
+configuration: `--alloc-conf`, or without one the platform default the server uses (expandable segments for ROCm on
+Windows, torch's native allocator elsewhere). This script's own process runs the integrated-GPU check once before the
+first point: the measuring processes inherit the `HIP_VISIBLE_DEVICES` it sets, which their own check keeps, as the
+server keeps an exported one.
 
-The forward then runs twice. The first forward after a load is a real peak in a server (kernel modules, library
-workspaces), and so is a later one, so the point takes the larger demand. Where both forwards read the driver's figure
-the point is a `demand_peak`. Where one could not, the point falls back to torch's counters alone, as a `reserved_peak`.
+The forward then runs twice, cold and warm, and the point takes the larger demand (`measure_cold_and_warm` and
+`measured_bytes_and_method` in `measurement.py`, which every calibration script shares): a `demand_peak` where both
+forwards read the driver's figure, else a `reserved_peak` of torch's counters alone.
 
 The transformer has the real geometry (dim 3840, 30 heads of 128, caption features 2560 wide) and random weights in the
 measured dtype, because memory depends on shapes, not on weight values. It has 2 main blocks and one refiner block each:
-a no-grad forward frees each block's intermediates, which `--extra-blocks 4` re-checks at 1024px. A point carries the
+a no-grad forward frees each block's intermediates, which `--extra-blocks 4` re-checks at 1024px. A ControlNet point
+runs the control through the denoise's hooks (`install_fun_control`) with its main-stage hints on consecutive main
+blocks, and with the real transformer's two refiner blocks, on which its refiner chain lands its hints. The hints are all
+computed as the first main block starts and dropped after the last one they land on, so where in between they land does
+not move the peak, and packing them keeps the transformer at one main block per hint. A point carries the
 features of `estimate_z_image_denoise_working_memory`, taken in the measuring process after the runtime setup, so its
 `score_matrix_bytes` reflects the attention kernel this build really runs.
 
@@ -40,7 +45,7 @@ Modes
   1024px, in the first dtype.
 - `math`: SDPA forced onto the math kernel at 1024px, next to the default kernel, per dtype: what a materialized score
   matrix costs per element, against what the estimate charges for it.
-- `control`: a `--control-blocks` ControlNet adapter (15) at 1024px, next to no control, per dtype: how many
+- `control`: a `--control-variant` Fun ControlNet layout (2.1) at 1024px, next to no control, per dtype: how many
   hint-sized tensors it keeps, against the n + 4 the estimate charges.
 
 Only the fit grid's points are fit points (`"fit": true`). The checks' points, the extra-blocks forward included, test
@@ -87,11 +92,7 @@ RX 9060 XT (ROCm on Windows): the server's default expandable segments, then the
 import argparse
 import dataclasses
 import datetime
-import json
-import os
-import subprocess
 import sys
-import traceback
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -99,33 +100,39 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 # None of these imports torch: a measuring process has to configure the allocator before torch is imported.
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.app.util.rocm_aotriton import AOTRITON_EXPERIMENTAL_ENV
-from invokeai.app.util.torch_cuda_allocator import ALLOCATOR_CONF_ENV_VARS
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR  # noqa: E402
+from scripts.working_memory import fresh_points  # noqa: E402
 
 if TYPE_CHECKING:
     import torch
 
-    from invokeai.backend.working_memory.measurement import FreshWindow
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControlVariant
 
 GIB = 2**30
 MIB = 2**20
 
 CAP_FEAT_DIM = 2560
 PATCH_SIZE = 2
-CONTROL_IN_DIM = 33  # V2.0 adapters; the channel count only sizes the patch embedder
+CONTROL_VARIANTS = {
+    "1.0": "Z_IMAGE_FUN_CONTROL_1_0",
+    "2.0": "Z_IMAGE_FUN_CONTROL_2_0",
+    "2.1": "Z_IMAGE_FUN_CONTROL_2_1",
+    "2.1-lite": "Z_IMAGE_FUN_CONTROL_2_1_LITE",
+}
+"""The control check's layouts by `--control-variant`: the names of their `ZImageFunControlVariant`s in
+`invokeai.backend.fun_controlnet.z_image`, which imports torch."""
+CONTROL_REFINER_BLOCKS = 2
+"""The real transformer's refiner blocks, which a ControlNet point's transformer has: the control's refiner chain adds
+its hints after both."""
 CHECK_PX = 1024
 """The size the checks and the extra-blocks forward run at."""
 
 DTYPES = ("bfloat16", "float16", "float32")
 LOGGER_NAME = "calibrate_z_image_working_memory"
-RESULT_PREFIX = "RESULT "
-POINT_TIMEOUT_S = 1800
-"""How long one measuring process may take. Generous: it only keeps a driver that hangs from stalling a whole run."""
 
 Kind = Literal["fit", "blocks", "reference", "math", "control"]
 Mode = Literal["fit", "math", "control"]
-PointMethod = Literal["demand_peak", "reserved_peak"]
 
 
 @dataclass(frozen=True)
@@ -143,7 +150,8 @@ class Point:
     """A torch dtype name, one of `DTYPES`."""
     blocks: int
     force_math: bool = False
-    control_blocks: int = 0
+    control_variant: str | None = None
+    """A key of `CONTROL_VARIANTS`, for a ControlNet point."""
 
     @property
     def fit(self) -> bool:
@@ -160,7 +168,7 @@ def plan(
     short_text_sizes: Sequence[int],
     blocks: int,
     extra_blocks: int,
-    control_blocks: int,
+    control_variant: str,
 ) -> list[Point]:
     """The forwards a run measures, in order: per dtype, the fit grid or a check's pair of forwards."""
     points: list[Point] = []
@@ -178,7 +186,7 @@ def plan(
                 dtype,
                 blocks,
                 force_math=mode == "math",
-                control_blocks=control_blocks if mode == "control" else 0,
+                control_variant=control_variant if mode == "control" else None,
             )
         )
     if mode == "fit" and extra_blocks:
@@ -191,137 +199,50 @@ def image_tokens(px: int) -> int:
     return side * side
 
 
-def measured_bytes_and_method(windows: Sequence["FreshWindow"]) -> tuple[int, PointMethod]:
-    """A valid point's bytes and `MeasuredPoint.method`, from its forwards' windows.
-
-    `demand_peak` where every forward read the driver's figure: the largest demand. Otherwise `reserved_peak`, from
-    torch's counters alone, so that the method names what the bytes were read from.
-    """
-    if all(window.driver is not None for window in windows):
-        return max(window.demand for window in windows if window.demand is not None), "demand_peak"
-    torch_counters = [delta for window in windows for delta in (window.reserved, window.allocated) if delta is not None]
-    return max(torch_counters), "reserved_peak"
-
-
-def point_line(
-    point: Point,
-    *,
-    common: Mapping[str, Any],
-    provenance: str,
-    windows: Sequence["FreshWindow"],
-    raw: Mapping[str, Any],
-) -> dict[str, Any]:
-    """The output line of a measured point: a `point`, or `invalid` with the reasons of its forwards.
-
-    `common` holds the `MeasuredPoint` fields the measurement does not decide: estimator, version, platform, features
-    and device. `windows` are the forwards' fresh windows, cold first; `raw` the point's other facts.
-    """
-    reasons = list(dict.fromkeys(reason for window in windows for reason in window.reasons))
-    line = {"status": "invalid" if reasons else "point", "fit": point.fit, "point": dataclasses.asdict(point), **common}
-    raw = {**raw, **dict(zip(("cold", "warm"), map(dataclasses.asdict, windows), strict=False))}
-    if reasons:
-        return line | {"reasons": reasons, "raw": raw}
-    # Imports torch: a point line is taken in the measuring process, after `_apply_server_runtime`.
-    from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
-
-    measured, method = measured_bytes_and_method(windows)
-    on_line = Z_IMAGE_DENOISE_SPEC.line(common["features"])
-    return line | {
-        "measured_bytes": measured,
-        "method": method,
-        "provenance": provenance,
-        "in_fit": point.fit and on_line is not None and on_line.fits,
-        "raw": raw,
-    }
-
-
-def failed_line(point: Point, error: str) -> dict[str, Any]:
-    return {"status": "failed", "fit": point.fit, "point": dataclasses.asdict(point), "error": error}
-
-
-def file_record(line: Mapping[str, Any]) -> dict[str, Any] | None:
-    """What `--out` receives of a line: a measured point, without the status only the table reads. None for a forward
-    that is no point: the data builder refuses a point file record that is no `MeasuredPoint`."""
-    if line["status"] != "point":
+def _control_variant(point: Point) -> "ZImageFunControlVariant | None":
+    """The ControlNet layout of `point`, with its main-stage hints packed onto main blocks 0, 1, 2, ...: the same peak
+    on the fewest blocks. Imports torch."""
+    if point.control_variant is None:
         return None
-    return {key: value for key, value in line.items() if key != "status"}
+    from invokeai.backend.fun_controlnet import z_image
+
+    variant = getattr(z_image, CONTROL_VARIANTS[point.control_variant])
+    return dataclasses.replace(variant, main_layers=tuple(range(len(variant.main_layers))))
 
 
-def _alloc_conf(facts: Mapping[str, Any]) -> str:
-    return ", ".join(f"{var}={value}" for var, value in facts["alloc_conf"].items()) or "no allocator configuration"
+def _transformer_blocks(point: Point) -> tuple[int, int]:
+    """The main and refiner blocks of `point`'s transformer: for a ControlNet point, one main block per hint at least
+    and the real refiner blocks. Imports torch for a ControlNet point."""
+    variant = _control_variant(point)
+    if variant is None:
+        return point.blocks, 1
+    return max(point.blocks, len(variant.main_layers)), CONTROL_REFINER_BLOCKS
 
 
 def provenance(point: Point, facts: Mapping[str, Any], date: str) -> str:
     """A measured point's `provenance`: where and how it was measured."""
-    build = f"torch {facts['torch']}" + (f" (HIP {facts['hip']})" if facts["hip"] else "")
-    parts = [
-        facts["device"],
-        build,
-        facts["os"].capitalize(),
-        f"{_alloc_conf(facts)} (torch reports the {facts['allocator_backend']} allocator)",
-    ]
-    if facts["hip"]:
-        parts += [
-            f"MIOPEN_FIND_MODE={facts['miopen_find_mode'] or 'unset'}",
-            f"{AOTRITON_EXPERIMENTAL_ENV}={facts['aotriton_experimental'] or 'unset'}",
-            f"ROCm SDPA guard {'installed' if facts['rocm_sdpa_guard'] else 'not installed'}",
-        ]
-    regime = {"math": ", SDPA forced onto the math kernel", "control": f", a {point.control_blocks}-block ControlNet"}
-    blocks = f"{point.blocks} main block{'' if point.blocks == 1 else 's'}"
+    main_blocks, refiner_blocks = _transformer_blocks(point)
+    regime = {
+        "math": ", SDPA forced onto the math kernel",
+        "control": f", the {point.control_variant} Fun ControlNet through the denoise's hooks, its hints on consecutive "
+        "main blocks",
+    }
+    blocks = f"{main_blocks} main block{'' if main_blocks == 1 else 's'}"
+    refiners = "one refiner block" if refiner_blocks == 1 else f"{refiner_blocks} refiner blocks"
     return (
-        f"scripts/calibrate_z_image_working_memory.py ({date}): {', '.join(parts)}. Random-init Z-Image transformer "
-        f"with the real geometry, {blocks} and one refiner block each{regime.get(point.kind, '')}; "
+        f"scripts/calibrate_z_image_working_memory.py ({date}): {fresh_points.runtime_provenance(facts)}. Random-init "
+        f"Z-Image transformer with the real geometry, {blocks} and {refiners} each{regime.get(point.kind, '')}; "
         "memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a "
         "cold and a warm forward; no failed allocation, allocator retry or spill."
     )
 
 
-# The measuring process. Everything below imports torch, so it runs only after `_apply_server_runtime`.
+# The measuring process. Everything below imports torch, so it runs only after `fresh_points.apply_server_runtime`.
 
 
-def _apply_server_runtime(alloc_conf: str) -> None:
-    """Apply the server's runtime (`run_app.apply_server_runtime`) before torch is imported, with the settings of a
-    server without a config file and the allocator configuration this run measures: `alloc_conf`, or none for the
-    platform's default."""
-    from invokeai.app.run_app import apply_server_runtime
-    from invokeai.app.services.config.config_default import get_config
-    from invokeai.backend.util.logging import InvokeAILogger
-
-    config = get_config().model_copy(update={"pytorch_cuda_alloc_conf": alloc_conf or None})
-    apply_server_runtime(config, InvokeAILogger.get_logger(LOGGER_NAME, config=config))
-
-
-def _runtime_facts(device: "torch.device", os_name: str) -> dict[str, Any]:
-    """The runtime a point is measured in, as its provenance and `raw` record it."""
-    import torch
-
-    from invokeai.backend.util.attention import rocm_sdpa_chunks_math
-    from invokeai.backend.working_memory.counters import backend_for, method_verified
-    from invokeai.backend.z_image import denoise_working_memory
-
-    name = torch.cuda.get_device_name(device)
-    if torch.version.hip is not None:
-        name = f"{name} ({torch.cuda.get_device_properties(device).gcnArchName.split(':')[0]})"
-    backend = backend_for(device)
-    return {
-        "device": name,
-        "torch": torch.__version__,
-        "hip": torch.version.hip,
-        "os": os_name,
-        "allocator_backend": torch.cuda.get_allocator_backend(),
-        "alloc_conf": {var: os.environ[var] for var in ALLOCATOR_CONF_ENV_VARS if os.environ.get(var)},
-        "miopen_find_mode": os.environ.get("MIOPEN_FIND_MODE"),
-        "aotriton_experimental": os.environ.get(AOTRITON_EXPERIMENTAL_ENV),
-        "rocm_sdpa_guard": rocm_sdpa_chunks_math(device.type),
-        "driver_method_verified": backend is not None and method_verified(backend),
-        # The checkout the point was priced from. A module's file, not the package's: `invokeai` can be imported as a
-        # namespace package, whose `__file__` is None.
-        "estimator_module": str(Path(denoise_working_memory.__file__).resolve()),
-    }
-
-
-def _transformer(blocks: int) -> "torch.nn.Module":
-    """The Z-Image transformer's geometry with `blocks` main blocks and one refiner block each, on the meta device."""
+def _transformer(blocks: int, refiner_blocks: int) -> "torch.nn.Module":
+    """The Z-Image transformer's geometry with `blocks` main blocks and `refiner_blocks` refiner blocks each, on the
+    meta device."""
     import torch
     from diffusers import ZImageTransformer2DModel
 
@@ -334,7 +255,7 @@ def _transformer(blocks: int) -> "torch.nn.Module":
             in_channels=16,
             dim=Z_IMAGE_HIDDEN_SIZE,
             n_layers=blocks,
-            n_refiner_layers=1,
+            n_refiner_layers=refiner_blocks,
             n_heads=Z_IMAGE_ATTENTION_HEADS,
             n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
             norm_eps=1e-05,
@@ -347,25 +268,19 @@ def _transformer(blocks: int) -> "torch.nn.Module":
         )
 
 
-def _control_adapter(blocks: int) -> "torch.nn.Module":
-    """A ControlNet adapter with `blocks` control blocks at the transformer's width, on the meta device."""
+def _control(variant: "ZImageFunControlVariant") -> "torch.nn.Module":
+    """The Fun ControlNet of `variant` at the transformer's width, on the meta device."""
     import torch
 
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
     from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_ATTENTION_HEADS, Z_IMAGE_HIDDEN_SIZE
-    from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 
     with torch.device("meta"):
-        return ZImageControlAdapter(
-            num_control_blocks=blocks,
-            control_in_dim=CONTROL_IN_DIM,
-            dim=Z_IMAGE_HIDDEN_SIZE,
-            n_heads=Z_IMAGE_ATTENTION_HEADS,
-            n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
-        )
+        return ZImageFunControl(variant, hidden_size=Z_IMAGE_HIDDEN_SIZE, num_attention_heads=Z_IMAGE_ATTENTION_HEADS)
 
 
 def _materialize(module: "torch.nn.Module", device: "torch.device", dtype: "torch.dtype") -> "torch.nn.Module":
-    """A meta-device module allocated directly in `dtype` on `device`, randomly initialized: a 15-block adapter is ~3B
+    """A meta-device module allocated directly in `dtype` on `device`, randomly initialized: a 15-block control is ~3B
     parameters, which would otherwise pass through the host in float32 first."""
     import torch
 
@@ -376,24 +291,23 @@ def _materialize(module: "torch.nn.Module", device: "torch.device", dtype: "torc
 
 
 def _measure(point: Point, force: bool) -> dict[str, Any]:
-    """The output line of `point`, measured in this process after `_apply_server_runtime`."""
+    """The output line of `point`, measured in this process after `fresh_points.apply_server_runtime`."""
     import torch
     from torch.nn.attention import SDPBackend, sdpa_kernel
 
+    from invokeai.backend.fun_controlnet.hooks import install_fun_control
     from invokeai.backend.util.devices import TorchDevice
-    from invokeai.backend.working_memory.measurement import measure
+    from invokeai.backend.working_memory.measurement import measure_cold_and_warm
     from invokeai.backend.working_memory.platform import platform_for
+    from invokeai.backend.z_image import denoise_working_memory
     from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
-    from invokeai.backend.z_image.z_image_controlnet_extension import (
-        ZImageControlNetExtension,
-        z_image_forward_with_control,
-    )
 
     # The device the node itself takes.
     device = TorchDevice.choose_torch_device()
     if device.type != "cuda":
         raise SystemExit(f"Needs a CUDA or ROCm device; this process would run on {device}.")
     dtype = getattr(torch, point.dtype)
+    variant = _control_variant(point)
 
     def kernel():
         return sdpa_kernel(SDPBackend.MATH) if point.force_math else nullcontext()
@@ -407,14 +321,15 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
                 image_seq_len=image_tokens(point.px),
                 text_seq_len=point.text_tokens,
                 lora_count=0,
-                control_blocks=point.control_blocks,
-                # The ControlNet forward always builds a padding mask; the plain one passes none at batch size 1.
-                has_attention_mask=point.control_blocks > 0,
+                control_blocks=len(variant.main_layers) if variant is not None else 0,
+                # The forward passes no attention mask at batch size 1, and a ControlNet's blocks take exactly the
+                # arguments the base blocks take.
+                has_attention_mask=False,
                 device=device,
                 dtype=dtype,
             )
         platform = platform_for(device)
-        facts = _runtime_facts(device, platform.os)
+        facts = fresh_points.runtime_facts(device, platform.os, denoise_working_memory.__file__)
         common = {
             "estimator": estimate.estimator,
             "version": estimate.version,
@@ -423,9 +338,9 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
             "device": facts["device"],
         }
 
-        transformer = _transformer(point.blocks)
-        adapter = _control_adapter(point.control_blocks) if point.control_blocks else None
-        on_meta = [module for module in (transformer, adapter) if module is not None]
+        transformer = _transformer(*_transformer_blocks(point))
+        control = _control(variant) if variant is not None else None
+        on_meta = [module for module in (transformer, control) if module is not None]
         weight_bytes = sum(param.numel() for module in on_meta for param in module.parameters()) * dtype.itemsize
         free, _ = TorchDevice.cuda_mem_get_info(device)
         raw = {
@@ -436,111 +351,47 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
             "runtime": facts,
         }
         if raw["predicted_bytes"] > free and not force:
-            return {"status": "skipped", "fit": point.fit, "point": dataclasses.asdict(point), **common, "raw": raw}
+            return fresh_points.skipped_line(point, common, raw)
 
         transformer = _materialize(transformer, device, dtype)
         latent = point.px // LATENT_SCALE_FACTOR
         x = [torch.randn(16, 1, latent, latent, device=device, dtype=dtype)]
         t = torch.full((1,), 0.5, device=device, dtype=dtype)
         cap_feats = [torch.randn(point.text_tokens, CAP_FEAT_DIM, device=device, dtype=dtype)]
-        extension = None
-        if adapter is not None:
-            extension = ZImageControlNetExtension(
-                control_adapter=_materialize(adapter, device, dtype),
-                control_cond=torch.randn(CONTROL_IN_DIM, 1, latent, latent, device=device, dtype=dtype),
-            )
+        control_context = None
+        if control is not None:
+            control = _materialize(control, device, dtype)
+            control_context = torch.randn(1, image_tokens(point.px), control.control_in_dim, device=device, dtype=dtype)
 
         def forward() -> object:
-            with kernel():
-                if extension is None:
-                    return transformer(x=x, t=t, cap_feats=cap_feats)
-                return z_image_forward_with_control(
-                    transformer=transformer, x=x, t=t, cap_feats=cap_feats, control_extension=extension
-                )
+            hooks = (
+                install_fun_control(transformer, control, control_context, scale=0.75)
+                if control is not None and control_context is not None
+                else nullcontext()
+            )
+            with kernel(), hooks:
+                return transformer(x=x, t=t, cap_feats=cap_feats)
 
-        windows = [measure(device, forward)]
-        if "oom" not in windows[0].reasons:
-            windows.append(measure(device, forward))
+        windows = measure_cold_and_warm(device, forward)
     date = datetime.date.today().isoformat()
-    return point_line(point, common=common, provenance=provenance(point, facts, date), windows=windows, raw=raw)
+    return fresh_points.point_line(
+        point, common=common, provenance=provenance(point, facts, date), windows=windows, raw=raw
+    )
 
 
-def _measure_in_this_process(request: str) -> None:
-    """Measure one point in this fresh process and print its line.
-
-    Leaves without Python's shutdown, whose HIP teardown can hang on Windows while its DLLs unload (see
-    `invokeai/app/util/rocm_integrated_gpu.py`)."""
-    spec = json.loads(request)
-    try:
-        _apply_server_runtime(spec["alloc_conf"])
-        line = _measure(Point(**spec["point"]), spec["force"])
-    except BaseException:
-        traceback.print_exc()
-        sys.stderr.flush()
-        os._exit(1)
-    print(RESULT_PREFIX + json.dumps(line), flush=True)
-    sys.stderr.flush()
-    os._exit(0)
-
-
-# The driving process: plans the points, measures each in a fresh process, appends the lines, prints the table.
-
-
-def _run(point: Point, alloc_conf: str, force: bool) -> dict[str, Any]:
-    request = json.dumps({"point": dataclasses.asdict(point), "alloc_conf": alloc_conf, "force": force})
-    command = [sys.executable, str(Path(__file__).resolve()), "--single", request]
-    try:
-        done = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=POINT_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        return failed_line(point, f"no result within {POINT_TIMEOUT_S} s")
-    for output in done.stdout.splitlines():
-        if output.startswith(RESULT_PREFIX):
-            return json.loads(output[len(RESULT_PREFIX) :])
-    tail = done.stderr.strip().splitlines()[-1:] or ["no output"]
-    return failed_line(point, f"exit code {done.returncode}: {tail[0]}")
-
-
-_COLUMNS = f"{'kind':>9} {'dtype':>8} {'blocks':>6} {'control':>7} {'px':>5} {'text':>5} {'tokens':>7}"
+_COLUMNS = f"{'kind':>9} {'dtype':>8} {'blocks':>6} {'control':>8} {'px':>5} {'text':>5} {'tokens':>7}"
 
 
 def _grid(point: Mapping[str, Any]) -> str:
     return (
-        f"{point['kind']:>9} {point['dtype']:>8} {point['blocks']:>6} {point['control_blocks']:>7} "
+        f"{point['kind']:>9} {point['dtype']:>8} {point['blocks']:>6} {point['control_variant'] or '':>8} "
         f"{point['px']:>5} {point['text_tokens']:>5}"
     )
 
 
-def _gib(value: int | None) -> str:
-    return "" if value is None else f"{value / GIB:.3f}"
-
-
-def _row(line: Mapping[str, Any]) -> str:
-    head = f"{_grid(line['point'])} {line.get('features', {}).get('tokens', ''):>7}"
-    status = line["status"]
-    raw = line.get("raw", {})
-    cold, warm = (_gib(raw[run]["demand"]) if run in raw else "" for run in ("cold", "warm"))
-    if status == "point":
-        return f"{head} {_gib(line['measured_bytes']):>10} {cold:>8} {warm:>8}  {line['method']}"
-    if status == "invalid":
-        return f"{head} {'invalid':>10} {cold:>8} {warm:>8}  {', '.join(line['reasons'])}"
-    if status == "skipped":
-        raw = line["raw"]
-        return (
-            f"{head} {'skipped':>10}  needs ~{raw['predicted_bytes'] / GIB:.1f} GiB, {raw['free_bytes'] / GIB:.1f} GiB "
-            "free (--force runs it)"
-        )
-    return f"{head} {'FAILED':>10}  {line['error']}"
-
-
-def _runtime_header(facts: Mapping[str, Any], platform: Mapping[str, str]) -> str:
-    rocm = ""
-    if facts["hip"]:
-        guard = "installed" if facts["rocm_sdpa_guard"] else "NOT installed"
-        rocm = f" | {AOTRITON_EXPERIMENTAL_ENV}={facts['aotriton_experimental'] or 'unset'} | SDPA guard {guard}"
-    return (
-        f"{facts['device']} | torch {facts['torch']} | {'/'.join(platform.values())} | {_alloc_conf(facts)}{rocm} | "
-        f"estimator from {facts['estimator_module']}"
-    )
+def _head(line: Mapping[str, Any]) -> str:
+    """A line's grid columns in the table."""
+    return f"{_grid(line['point'])} {line.get('features', {}).get('tokens', ''):>7}"
 
 
 def _tokens(line: Mapping[str, Any]) -> int:
@@ -615,11 +466,11 @@ def _summarize_checks(lines: Sequence[Mapping[str, Any]]) -> None:
             )
         else:
             hint_bytes = tokens * Z_IMAGE_HIDDEN_SIZE * (4 if point["dtype"] == "float32" else 2)
-            blocks = point["control_blocks"]
+            blocks = line["features"]["control_blocks"]
             print(
-                f"control, {blocks} blocks, {point['dtype']}, {point['px']}px: {extra / GIB:.3f} GiB over no control, "
-                f"{extra / hint_bytes:.2f} hint-sized tensors; the estimate adds {charged / GIB:.3f} GiB "
-                f"({blocks} + 4 hints, and any score matrix the mask brings)"
+                f"control {point['control_variant']}, {blocks} blocks, {point['dtype']}, {point['px']}px: "
+                f"{extra / GIB:.3f} GiB over no control, {extra / hint_bytes:.2f} hint-sized tensors; the estimate "
+                f"adds {charged / GIB:.3f} GiB ({blocks} + 4 hints)"
             )
 
 
@@ -664,7 +515,12 @@ def main() -> None:
     )
     parser.add_argument("--blocks", type=int, default=2, help="Main transformer blocks. Default 2.")
     parser.add_argument("--extra-blocks", type=int, default=0, help="Fit mode: this block count at 1024px as well.")
-    parser.add_argument("--control-blocks", type=int, default=15, help="The control check's adapter. Default 15.")
+    parser.add_argument(
+        "--control-variant",
+        choices=list(CONTROL_VARIANTS),
+        default="2.1",
+        help="The control check's layout. Default 2.1.",
+    )
     parser.add_argument(
         "--alloc-conf",
         default="",
@@ -676,8 +532,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.single is not None:
-        _measure_in_this_process(args.single)
-        return
+        fresh_points.measure_in_this_process(args.single, point_type=Point, measure=_measure, logger_name=LOGGER_NAME)
     points = plan(
         args.mode,
         sizes=args.sizes,
@@ -687,49 +542,31 @@ def main() -> None:
         short_text_sizes=args.short_text_sizes,
         blocks=args.blocks,
         extra_blocks=args.extra_blocks,
-        control_blocks=args.control_blocks,
+        control_variant=args.control_variant,
     )
     if args.dry_run:
         _print_plan(points)
         return
     if args.out is None:
         parser.error("--out is required to measure")
-    exported = [var for var in ALLOCATOR_CONF_ENV_VARS if os.environ.get(var)]
-    if args.alloc_conf and exported:
-        # The server keeps an exported value and only warns; a measurement must not run another allocator than asked.
-        parser.error(f"--alloc-conf cannot apply while {', '.join(exported)} is set in the environment")
-
-    from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
-    from invokeai.backend.util.logging import InvokeAILogger
-
-    # The runtime's integrated-GPU check, once for the whole run, before torch is imported anywhere: the measuring
-    # processes inherit the HIP_VISIBLE_DEVICES it sets instead of each asking HIP in a child process of its own.
-    hide_integrated_gpus_on_rocm_windows(InvokeAILogger.get_logger(LOGGER_NAME))
-
-    print(f"{len(points)} forwards, one fresh process each")
-    lines: list[dict[str, Any]] = []
-    with args.out.open("a", encoding="utf-8") as out:
-        for point in points:
-            line = _run(point, args.alloc_conf, args.force)
-            if "raw" in line and not any("raw" in earlier for earlier in lines):
-                print(_runtime_header(line["raw"]["runtime"], line["platform"]))
-            if not lines:
-                print(f"{_COLUMNS} {'demand GiB':>10} {'cold':>8} {'warm':>8}")
-            record = file_record(line)
-            if record is not None:
-                out.write(json.dumps(record) + "\n")
-                out.flush()
-            print(_row(line), flush=True)
-            lines.append(line)
+    fresh_points.check_alloc_conf(parser, args.alloc_conf)
+    lines = fresh_points.measure_points(
+        points,
+        script=Path(__file__).resolve(),
+        out=args.out,
+        alloc_conf=args.alloc_conf,
+        force=args.force,
+        logger_name=LOGGER_NAME,
+        columns=_COLUMNS,
+        head=_head,
+    )
 
     print()
     if args.mode == "fit":
         _summarize_fit(lines, args.text_tokens)
     else:
         _summarize_checks(lines)
-    statuses = [line["status"] for line in lines]
-    counts = ", ".join(f"{statuses.count(status)} {status}" for status in ("point", "invalid", "skipped", "failed"))
-    print(f"{counts}; the points appended to {args.out}")
+    fresh_points.print_counts(lines, args.out)
 
 
 if __name__ == "__main__":

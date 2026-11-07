@@ -177,6 +177,9 @@ describe('WidgetPanelFrame resize', () => {
     const separator = await renderFrame();
     const divider = separator.parentElement!;
 
+    // The center holds focus at first, and its outline runs along this side divider too.
+    expect(divider.hasAttribute('data-line-hidden')).toBe(true);
+    await interact(() => focusController.activate({ kind: 'region', region: 'right' }));
     expect(divider.hasAttribute('data-line-hidden')).toBe(false);
     await interact(() =>
       host!.querySelector('aside')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))

@@ -45,10 +45,13 @@ import type {
 import { addControlLayers, getOrAddLliteCollector } from './addControlLayers';
 import {
   addRegionalGuidance,
+  getEffectiveLayoutKind,
   getLayoutPromptRejectionReason,
   getLayoutRegionIssue,
+  getRegionalGuidanceSupport,
   isLayoutRegionalGuidanceBase,
   isRegionalGuidanceSupportedForBase,
+  type LayoutRegionalGuidanceBase,
   type RegionalGuidanceInput,
   type RegionalLayoutKind,
 } from './addRegionalGuidance';
@@ -63,6 +66,8 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'sd-3': 'sd3_i2l',
   flux: 'flux_vae_encode',
   flux2: 'flux2_vae_encode',
+  // FLUX.3 encodes with the FLUX.2 VAE.
+  flux3: 'flux2_vae_encode',
   cogview4: 'cogview4_i2l',
   'qwen-image': 'qwen_image_i2l',
   'z-image': 'z_image_i2l',
@@ -77,15 +82,19 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
 };
 
 /**
- * SD-3, FLUX, FLUX.2 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in sigma space
- * like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
+ * SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in
+ * sigma space like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
  */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
   const usesOptimizedCurve =
-    model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2' || model.base === 'moss-image';
+    model.base === 'sd-3' ||
+    model.base === 'flux' ||
+    model.base === 'flux2' ||
+    model.base === 'flux3' ||
+    model.base === 'moss-image';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
@@ -209,7 +218,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     reasons.push('Canvas inpainting requires an inpaint mask.');
   }
 
-  // The layout node refuses regions around a blank prompt. A mask with pixels in the bbox has an area to place.
+  // A layout is built around the global prompt, so regions around a blank one are refused. A mask with pixels in the
+  // bbox has an area to place.
   const layoutPromptReason = getLayoutPromptRejectionReason({
     base: model.base,
     prompt: getEffectivePrompts(settings).positivePrompt,
@@ -380,7 +390,7 @@ const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: nu
   }
 };
 
-/** The SD `i2l` node carries fp32; every other family's encode node does not. */
+/** Only the SD `i2l` node supports precision and color compensation settings. */
 const isSdI2l = (i2lType: string): boolean => i2lType === 'i2l';
 
 /** Adds the base-appropriate image-to-latents encode node fed by `imageName`. */
@@ -394,7 +404,12 @@ const addEncodeNode = (
     id: 'canvas_i2l',
     ...(imageName ? { image: { image_name: imageName } } : {}),
     type: i2lType,
-    ...(isSdI2l(i2lType) ? { fp32: settings.vaePrecision === 'fp32' } : {}),
+    ...(isSdI2l(i2lType)
+      ? {
+          color_compensation: settings.colorCompensation ? 'SDXL' : 'None',
+          fp32: settings.vaePrecision === 'fp32',
+        }
+      : {}),
   });
 
 const addInputResizeNode = (
@@ -867,6 +882,8 @@ interface LayoutRegionElement {
 interface AddLayoutRegionsOptions {
   /** The generation bbox the regions' mask bounds are measured in. */
   bbox: Pick<Rect, 'width' | 'height'>;
+  /** The roles the base distinguishes. */
+  layoutKinds: readonly RegionalLayoutKind[];
   regions: readonly RegionalGuidanceInput[];
 }
 
@@ -875,11 +892,12 @@ const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0
 
 const toLayoutElement = (
   region: RegionalGuidanceInput,
+  layoutKinds: readonly RegionalLayoutKind[],
   scale: { x: number; y: number },
   size: { width: number; height: number }
 ): LayoutRegionElement | null => {
   const caption = region.positivePrompt;
-  if (caption === null || getLayoutRegionIssue(region) !== null) {
+  if (caption === null || getLayoutRegionIssue(region, layoutKinds) !== null) {
     return null;
   }
   const bounds = region.maskBounds;
@@ -891,7 +909,7 @@ const toLayoutElement = (
   if (x2 <= x1 || y2 <= y1) {
     return null;
   }
-  const kind = region.layout?.kind ?? 'object';
+  const kind = getEffectiveLayoutKind(layoutKinds, region.layout);
   return {
     bbox: [x1, y1, x2, y2],
     caption,
@@ -902,45 +920,124 @@ const toLayoutElement = (
 
 /**
  * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
- * (which PiD can shrink below the processing size) and clamped to it. A `layout_prompt` node between the global prompt
- * and the positive encoder assembles them at run time, so batch prompt variation still flows through
- * `positive_prompt`; core metadata records the assembled prompt. Regions the layout cannot place are left out, and
- * without any the graph stays untouched.
+ * (which PiD can shrink below the processing size) and clamped to it. The base graph's `layout_prompt` node assembles
+ * them with the global prompt at run time; regions the layout cannot place are left out.
  */
-const addLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
-  const posCond = graph.nodes.pos_cond;
-  if (!posCond) {
-    throw new Error('addLayoutRegions: base graph is missing the positive conditioning node.');
+const addMossImageLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const layoutPrompt = graph.nodes.layout_prompt;
+  if (!layoutPrompt) {
+    throw new Error('addMossImageLayoutRegions: base graph is missing the layout prompt node.');
   }
   const size = getDenoiseSize(graph, requireDenoise(graph));
   const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
-  const elements = options.regions.flatMap((region) => toLayoutElement(region, scale, size) ?? []);
-  if (elements.length === 0) {
+  // The frame and the boxes come from one size, so they cannot drift apart.
+  layoutPrompt.width = size.width;
+  layoutPrompt.height = size.height;
+  layoutPrompt.regions = options.regions.flatMap(
+    (region) => toLayoutElement(region, options.layoutKinds, scale, size) ?? []
+  );
+};
+
+/** A box `[y_min, x_min, y_max, x_max]` on the grid Ideogram 4 and FLUX.3 share. */
+type GridBox = [number, number, number, number];
+
+/** Grid boxes are whole numbers from 0 to 1000 across the image, origin top-left. */
+const GRID_COORD_MAX = 1000;
+
+const toGridCoord = (pixels: number, extent: number): number =>
+  clamp(Math.round((pixels / extent) * GRID_COORD_MAX), GRID_COORD_MAX);
+
+/** A mask's bounds on the grid over the bbox, or null when the mask misses the bbox or rounds to a line. */
+const toGridBox = (bounds: Rect, bbox: Pick<Rect, 'width' | 'height'>): GridBox | null => {
+  const yMin = toGridCoord(bounds.y, bbox.height);
+  const xMin = toGridCoord(bounds.x, bbox.width);
+  const yMax = toGridCoord(bounds.y + bounds.height, bbox.height);
+  const xMax = toGridCoord(bounds.x + bounds.width, bbox.width);
+  return yMax > yMin && xMax > xMin ? [yMin, xMin, yMax, xMax] : null;
+};
+
+/** One element of the `ideogram4_caption_builder` node's `regions` input. */
+interface Ideogram4RegionElement {
+  prompt: string;
+  bbox: GridBox;
+}
+
+const toIdeogram4Region = (
+  region: RegionalGuidanceInput,
+  options: AddLayoutRegionsOptions
+): Ideogram4RegionElement | null => {
+  const prompt = region.positivePrompt;
+  if (prompt === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  return bbox ? { bbox, prompt } : null;
+};
+
+/**
+ * Ideogram 4 regions: each becomes an object element of the structured caption, boxed around its mask. The output is
+ * the bbox, resized, so boxes are normalized to the bbox rather than the denoise size. The base graph's
+ * `caption_builder` assembles the caption around the global prompt at run time, so batch prompt variation still flows
+ * through `positive_prompt`, and core metadata already records its output. Regions the caption cannot place are left
+ * out, and without any the graph stays untouched.
+ */
+const addIdeogram4Regions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const captionBuilder = graph.nodes.caption_builder;
+  if (!captionBuilder) {
+    throw new Error('addIdeogram4Regions: base graph is missing the caption builder node.');
+  }
+  const regions = options.regions.flatMap((region) => toIdeogram4Region(region, options) ?? []);
+  if (regions.length > 0) {
+    captionBuilder.regions = regions;
+  }
+};
+
+/** One element of the `flux3_layout_prompt` node's `regions` input. */
+interface Flux3RegionElement {
+  desc: string;
+  bbox: GridBox;
+}
+
+const toFlux3Region = (region: RegionalGuidanceInput, options: AddLayoutRegionsOptions): Flux3RegionElement | null => {
+  const desc = region.positivePrompt;
+  if (desc === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  // FLUX.3 reads a box with no coordinate above 1 as 0–1 fractions, so the node refuses [0, 0, 1, 1].
+  return bbox && Math.max(...bbox) > 1 ? { bbox, desc } : null;
+};
+
+/**
+ * FLUX.3 regions: each becomes a row of the box table that ends the caption, boxed around its mask and normalized to
+ * the bbox like Ideogram 4's. The base graph's `layout_prompt` appends them at run time, as object rows or, when the
+ * builder wired reference images, as edit rows for the output; core metadata then records the caption encoded. Regions
+ * the table cannot place are left out, and without any the graph stays untouched.
+ */
+const addFlux3LayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const layoutPrompt = graph.nodes.layout_prompt;
+  if (!layoutPrompt) {
+    throw new Error('addFlux3LayoutRegions: base graph is missing the layout prompt node.');
+  }
+  const regions = options.regions.flatMap((region) => toFlux3Region(region, options) ?? []);
+  if (regions.length === 0) {
     return;
   }
-  const promptEdge = graph.edges.find(
-    (edge) =>
-      edge.source.node_id === 'positive_prompt' &&
-      edge.destination.node_id === posCond.id &&
-      edge.destination.field === 'prompt'
-  );
-  if (!promptEdge) {
-    throw new Error('addLayoutRegions: the positive prompt does not feed the positive conditioning.');
-  }
-
-  const layoutPrompt = addNode(graph, {
-    height: size.height,
-    id: 'layout_prompt',
-    regions: elements,
-    type: 'moss_image_layout_prompt',
-    width: size.width,
-  });
-  promptEdge.destination = { field: 'prompt', node_id: layoutPrompt.id };
-  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
+  layoutPrompt.regions = regions;
   const metadata = findMetadataNode(graph);
   if (metadata) {
-    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+    addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
   }
+};
+
+/** Each layout base places its regions through its own prompt node. */
+const LAYOUT_REGION_GRAFTS: Record<
+  LayoutRegionalGuidanceBase,
+  (graph: BackendGraphContract, options: AddLayoutRegionsOptions) => void
+> = {
+  flux3: addFlux3LayoutRegions,
+  'ideogram-4': addIdeogram4Regions,
+  'moss-image': addMossImageLayoutRegions,
 };
 
 /** Throw the first validation reason. */
@@ -1029,9 +1126,11 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // Regional masks and models must already be validated. Layout bases read only each mask's bounds.
   const regions = input.regionalGuidance ?? [];
   const regionalBase = model.base;
-  if (regions.length > 0 && isRegionalGuidanceSupportedForBase(regionalBase)) {
+  // The support row answers the layout roles; the base guards narrow the base to the graph tables' keys.
+  const regionalSupport = getRegionalGuidanceSupport(regionalBase);
+  if (regions.length > 0 && regionalSupport && isRegionalGuidanceSupportedForBase(regionalBase)) {
     if (isLayoutRegionalGuidanceBase(regionalBase)) {
-      addLayoutRegions(backendGraph, { bbox, regions });
+      LAYOUT_REGION_GRAFTS[regionalBase](backendGraph, { bbox, layoutKinds: regionalSupport.layoutKinds, regions });
     } else {
       addRegionalGuidance(backendGraph, {
         base: regionalBase,
