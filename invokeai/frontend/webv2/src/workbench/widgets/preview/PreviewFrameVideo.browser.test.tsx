@@ -5,7 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, Activity, createRef, type Ref } from 'react';
+import { act, Activity, createRef, type Ref, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -995,13 +995,15 @@ describe('PreviewFrame video span playback through the player', () => {
     await expect
       .poll(() => video.paused && !video.seeking && Math.abs(video.currentTime - 0.45) < 1e-6, { timeout: 3000 })
       .toBe(true);
-    const finishedWindowStart = getWindowStart();
     const seeks = recordSeeks(video);
-    // The window the player shows whenever playback is asked for. Its binding to the player's store commits with it.
-    const windowsAtPlay: string[] = [];
+    // The player judges the play event that `play()` queues against the window it holds by then. Firing that event at
+    // the call asks the same question of the window it holds now, whatever the browser's task order: the finished
+    // span's window would take the new span's start, past its rest, back to its own start at once.
+    const placementsAtPlay: number[] = [];
     const nativePlay = video.play.bind(video);
     vi.spyOn(video, 'play').mockImplementation(() => {
-      windowsAtPlay.push(getWindowStart());
+      video.dispatchEvent(new Event('play'));
+      placementsAtPlay.push(video.currentTime);
       return nativePlay();
     });
 
@@ -1009,9 +1011,9 @@ describe('PreviewFrame video span playback through the player', () => {
     // does.
     const token = requestVideoSpanPlayback({ endSeconds: 0.9, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.5 });
 
-    await expect.poll(() => getWindowStart()).not.toBe(finishedWindowStart);
     await expect.poll(() => getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
-    expect(windowsAtPlay).toEqual([getWindowStart()]);
+    expect(placementsAtPlay).toHaveLength(1);
+    expect(placementsAtPlay[0]).toBeCloseTo(0.5);
     // It plays the new span once, from its start, and rests on its last frame.
     await expect
       .poll(() => video.paused && !video.seeking && Math.abs(video.currentTime - 0.85) < 1e-6, { timeout: 3000 })
@@ -1081,19 +1083,120 @@ describe('PreviewFrame video keep-alive', () => {
     expect(getVideo()).toBe(video);
     expect(playback.pauseSpy).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { shownAfterMs: 0, starts: true },
+    { shownAfterMs: 16_000, starts: false },
+  ])(
+    'starts a span the view hid before it started once shown $shownAfterMs ms later: $starts',
+    async ({ shownAfterMs, starts }) => {
+      const options = { source: fixtureVideoSource };
+      await renderKeptVideo('visible', options);
+      const video = await loadedVideo();
+      const now = Date.now();
+
+      // The request arms the span while shown; the hide lands in the same commit, before the span can start.
+      await interact(() => {
+        requestVideoSpanPlayback({ endSeconds: 0.9, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.5 });
+        root?.render(
+          <I18nextProvider i18n={i18n}>
+            <ChakraProvider value={system}>
+              <Activity mode="hidden">
+                <VideoHarness source={fixtureVideoSource} />
+              </Activity>
+            </ChakraProvider>
+          </I18nextProvider>
+        );
+      });
+      expect(video.paused).toBe(true);
+      vi.spyOn(Date, 'now').mockReturnValue(now + shownAfterMs);
+      await renderKeptVideo('visible', options);
+      // Long enough for a start to have played past the span's first frame.
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 300);
+      });
+
+      expect(video.paused).toBe(!starts);
+      expect(video.currentTime >= 0.5).toBe(starts);
+      video.pause();
+    }
+  );
+
+  it('drops a held span for a newer request made while hidden, without playing it first', async () => {
+    const options = { source: fixtureVideoSource };
+    await renderKeptVideo('visible', options);
+    const video = await loadedVideo();
+
+    // Span A is armed while shown and held by a hide in the same commit; span B is requested while hidden.
+    let held = 0;
+    await interact(() => {
+      held = requestVideoSpanPlayback({ endSeconds: 0.9, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.5 });
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <Activity mode="hidden">
+              <VideoHarness source={fixtureVideoSource} />
+            </Activity>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+    const token = requestVideoSpanPlayback({ endSeconds: 0.4, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.2 });
+    const seeks = recordSeeks(video);
+    const playingTokens: number[] = [];
+    const unsubscribe = subscribeVideoSpanPlaybackState(() => {
+      const state = getVideoSpanPlaybackState();
+
+      if (state?.isPlaying) {
+        playingTokens.push(state.token);
+      }
+    });
+
+    try {
+      await renderKeptVideo('visible', options);
+
+      await expect.poll(() => getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
+      expect(playingTokens).not.toContain(held);
+      expect(seeks.some((time) => Math.abs(time - 0.5) < 1e-6)).toBe(false);
+    } finally {
+      unsubscribe();
+      video.pause();
+    }
+  });
+
+  it('plays a span requested while hidden once shown, under StrictMode', async () => {
+    const options = { source: fixtureVideoSource, strict: true };
+    await renderKeptVideo('visible', options);
+    const video = await loadedVideo();
+    await renderKeptVideo('hidden', options);
+
+    // The Video panel raises Preview and requests the span before the reveal renders.
+    const token = requestVideoSpanPlayback({ endSeconds: 0.9, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.5 });
+    await renderKeptVideo('visible', options);
+
+    await expect.poll(() => getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
+    expect(video.currentTime).toBeGreaterThanOrEqual(0.5);
+    video.pause();
+  });
 });
 
-const renderKeptVideo = async (mode: 'hidden' | 'visible'): Promise<void> => {
+/** Renders the player kept alive in an Activity; `strict` renders it as the app does in development. */
+const renderKeptVideo = async (
+  mode: 'hidden' | 'visible',
+  { source, strict = false }: { source?: VideoSource; strict?: boolean } = {}
+): Promise<void> => {
+  const app = (
+    <I18nextProvider i18n={i18n}>
+      <ChakraProvider value={system}>
+        <Activity mode={mode}>
+          <VideoHarness source={source} />
+        </Activity>
+      </ChakraProvider>
+    </I18nextProvider>
+  );
+
   await interact(() => {
-    root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <Activity mode={mode}>
-            <VideoHarness />
-          </Activity>
-        </ChakraProvider>
-      </I18nextProvider>
-    );
+    root?.render(strict ? <StrictMode>{app}</StrictMode> : app);
   });
   await waitForPlayer();
 };
@@ -1182,9 +1285,6 @@ const getScrubberRoot = (): Element => {
 
   return scrubber;
 };
-
-/** Where the scrubber shades the player's playback window from, as rendered. */
-const getWindowStart = (): string => (getScrubberRoot() as HTMLElement).style.getPropertyValue('--video-window-start');
 
 const getVideo = (): HTMLVideoElement => {
   const video = host?.querySelector<HTMLVideoElement>('video');

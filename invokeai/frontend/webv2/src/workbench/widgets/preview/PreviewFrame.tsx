@@ -573,8 +573,10 @@ const PreviewVideo = ({
   // Keep request identity through pause/hide while the span stays armed; retire it when the playhead leaves or a
   // newer request arrives.
   const spanTokenRef = useRef<number | null>(null);
-  // Where an armed span's playback starts once the player holds its window; see SpanPlaybackStart.
-  const pendingSpanStartRef = useRef<number | null>(null);
+  // Where an armed span's playback starts once the player holds its window (see SpanPlaybackStart), until the same
+  // deadline a parked span has: a start that a hide holds up still happens on show while the gesture is fresh, unless
+  // a newer request has superseded it meanwhile.
+  const pendingSpanStartRef = useRef<{ expiresAt: number; startSeconds: number; token: number } | null>(null);
   const [spanStartRequest, setSpanStartRequest] = useState(0);
   const armSpan = useCallback((next: VideoSpan | null) => {
     spanRef.current = next;
@@ -606,13 +608,14 @@ const PreviewVideo = ({
   const playSpan = useCallback(
     (request: VideoSpan, token: number, expiresAt?: number) => {
       const video = videoRef.current;
+      // The deadline belongs to the gesture, not to this attempt: minting a fresh one on
+      // every re-park would let hide/show cycles on a clip that never loads extend it
+      // indefinitely, which is the one thing the deadline exists to stop.
+      const deadline = expiresAt ?? Date.now() + PARKED_SPAN_TTL_MS;
 
       // Defer seeks until metadata and element attachment exist; resume from loadedmetadata or remount.
       if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-        // The deadline belongs to the gesture, not to this attempt: minting a fresh one on
-        // every re-park would let hide/show cycles on a clip that never loads extend it
-        // indefinitely, which is the one thing the deadline exists to stop.
-        parkedSpanRef.current = { expiresAt: expiresAt ?? Date.now() + PARKED_SPAN_TTL_MS, span: request, token };
+        parkedSpanRef.current = { expiresAt: deadline, span: request, token };
         return;
       }
 
@@ -632,22 +635,26 @@ const PreviewVideo = ({
         spanTokenRef.current = token;
       }
 
-      pendingSpanStartRef.current = startSeconds;
+      pendingSpanStartRef.current = { expiresAt: deadline, startSeconds, token };
       setSpanStartRequest((request) => request + 1);
     },
     [armSpan, retireSpanToken]
   );
   const startPendingSpan = useCallback(() => {
-    const startSeconds = pendingSpanStartRef.current;
+    const pending = pendingSpanStartRef.current;
     const video = videoRef.current;
 
     pendingSpanStartRef.current = null;
 
-    if (startSeconds === null || !video) {
+    // On show this runs before the show effect consumes a request made while hidden; tokens only grow, so a pending
+    // request newer than the held start supersedes it, and starting first would play the old span for a moment.
+    const request = getVideoSpanPlaybackRequest();
+
+    if (!pending || !video || Date.now() > pending.expiresAt || (request && request.token > pending.token)) {
       return;
     }
 
-    seekVideo(video, startSeconds);
+    seekVideo(video, pending.startSeconds);
     // Autoplay policy can refuse an unmuted play(). That leaves the clip parked on the first selected frame with
     // the span still armed, so pressing play there plays the selection rather than the whole clip.
     void video.play().catch(() => {});
@@ -717,8 +724,6 @@ const PreviewVideo = ({
 
     return () => {
       unsubscribe();
-      // A span hidden before it started stays armed but does not start on its own once shown again.
-      pendingSpanStartRef.current = null;
       // Report nothing stoppable while hidden, but retain span identity for playback after showing.
       const token = spanTokenRef.current;
 
@@ -1007,10 +1012,14 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
 };
 
 /**
- * Starts an armed span's playback, for one request: keyed by it, rendered after the player. The player binds its
- * playback window in an effect, and React runs a commit's passive effects in tree order, so the window this request
- * armed is in place before playback starts; started any earlier, the player would judge it against the previous window
- * (a finished span's rest would replay that span over the new one).
+ * Starts an armed span's playback, for one request: keyed by it, rendered after the player in the same boundary.
+ * Playback started before the player holds the span's window is judged against the previous window (a finished span's
+ * rest would replay that span over the new one), and the player binds its window in a passive effect.
+ *
+ * Correctness depends on React's commit order: a commit runs all its passive cleanups (unbinding the previous window)
+ * before any passive mount effect, and runs mount effects in tree order, children first, then later siblings. So this
+ * must stay a passive effect, rendered after `VideoPlayer`; a layout effect, or an earlier position, would start
+ * playback before the window. Re-runs (StrictMode, Activity showing again) do nothing: `onStart` consumes its start.
  */
 const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
   useMountEffect(() => {
