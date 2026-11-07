@@ -300,9 +300,3 @@ export const usePsdExportStatus = (
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/** The engine-local vector draft; never persisted before Apply. */
-export const useVectorEditSession = (engine: CanvasCoreStoreCapability | null): CanvasInteractionState['vectorEditSession'] => {
-  const subscribe = useCallback((listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => undefined), [engine]);
-  const read = useCallback(() => engine?.interaction.get('vectorEditSession') ?? null, [engine]);
-  return useSyncExternalStore(subscribe, read, read);
-};

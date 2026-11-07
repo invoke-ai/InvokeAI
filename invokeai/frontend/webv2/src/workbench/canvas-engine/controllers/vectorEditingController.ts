@@ -11,6 +11,7 @@ import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/docu
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { findNearestBezierPathSegment, getBezierPathHitSamplesPerSegment, getBezierPointPullHandleType, setBezierPointHandle, setBezierPointType, smoothBezierPathPoints, splitBezierSegmentAt } from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, getScale, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { vectorHandleLayout } from '@workbench/canvas-engine/math/vectorHandleLayout';
 import { canJoinVectorPathEndpoints, canSplitVectorPathAtPoints, deleteVectorPathPoints, joinVectorPathEndpoints, splitVectorPathAtPoints } from '@workbench/canvas-engine/math/vectorPathTopology';
 
 
@@ -37,9 +38,13 @@ type Drag = {
   ref?: VectorPointRef;
   additive?: boolean;
   missing?: 'inHandle' | 'outHandle';
+  handleOrigin?: Vec2;
 };
 const sameRef = (a: VectorPointRef, b: VectorPointRef): boolean => a.pathId === b.pathId && a.pointIndex === b.pointIndex;
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
+// Hit radii are CSS viewport pixels: project geometry through screenMatrix() before comparing.
+const ANCHOR_HIT_RADIUS_PX = 12;
+const HANDLE_HIT_RADIUS_PX = 12;
 const snapshot = (state: VectorEditSession): Snapshot => ({ paths: state.paths, activePathId: state.activePathId, selectedPoints: state.selectedPoints });
 const samePaths = (a: CanvasBezierPathContract[], b: CanvasBezierPathContract[]): boolean => a === b || JSON.stringify(a) === JSON.stringify(b);
 
@@ -292,11 +297,20 @@ export class VectorEditingController implements Tool {
       this.drag = { kind, before: snapshot(this.options.session.get()!), start: local, screen: input.screenPoint, ref, missing };
     };
     for (const ref of [...state.selectedPoints].reverse()) {
-      const point = state.paths.find((path) => path.id === ref.pathId)?.points[ref.pointIndex];
-      if (!point) { continue; }
+      const path = state.paths.find((path) => path.id === ref.pathId);
+      const point = path?.points[ref.pointIndex];
+      if (!path || !point) { continue; }
+      const handles = vectorHandleLayout(path, ref.pointIndex, matrix);
       for (const handle of ['inHandle', 'outHandle'] as const) {
-        if (point[handle] && distance(applyToPoint(matrix, point[handle]), input.screenPoint) <= 7) {
-          begin(handle, [...state.selectedPoints.filter((other) => !sameRef(ref, other)), ref], ref); return;
+        const marker = handles[handle];
+        if (marker && distance(marker, input.screenPoint) <= HANDLE_HIT_RADIUS_PX) {
+          begin(handle, [...state.selectedPoints.filter((other) => !sameRef(ref, other)), ref], ref);
+          const origin = point[handle] ?? applyToPoint(invert(matrix)!, marker);
+          this.drag!.handleOrigin = origin;
+          if (!point[handle]) {
+            this.publish({ paths: this.mapPoints(state.paths, [ref], (copy) => setBezierPointHandle(copy, handle, origin)) });
+          }
+          return;
         }
       }
     }
@@ -304,7 +318,7 @@ export class VectorEditingController implements Tool {
     for (const path of ordered) {
       for (let pointIndex = 0; pointIndex < path.points.length; pointIndex += 1) {
         const point = path.points[pointIndex]!;
-        if (distance(applyToPoint(matrix, point.anchor), input.screenPoint) > 8) { continue; }
+        if (distance(applyToPoint(matrix, point.anchor), input.screenPoint) > ANCHOR_HIT_RADIUS_PX) { continue; }
         const ref = { pathId: path.id, pointIndex };
         const selected = state.selectedPoints.some((other) => sameRef(ref, other));
         const refs = input.modifiers.ctrl || input.modifiers.meta || selected
@@ -363,7 +377,7 @@ export class VectorEditingController implements Tool {
     const path = drag.before.paths.find((candidate) => candidate.id === ref.pathId)!;
     const point = path.points[ref.pointIndex]!;
     const local = applyToPoint(invert(this.matrix())!, input.documentPoint);
-    if (distance(drag.screen, input.screenPoint) < 3) { this.publish({ paths: drag.before.paths }); return; }
+    if (distance(drag.screen, input.screenPoint) < 3 && !drag.handleOrigin) { this.publish({ paths: drag.before.paths }); return; }
     if (drag.kind === 'maybe-pull') {
       const handle = point[drag.missing === 'inHandle' ? 'outHandle' : 'inHandle']!;
       const dot = (local.x - point.anchor.x) * (handle.x - point.anchor.x) + (local.y - point.anchor.y) * (handle.y - point.anchor.y);
@@ -378,7 +392,10 @@ export class VectorEditingController implements Tool {
       }) });
     } else {
       const handle = drag.kind === 'pull' ? getBezierPointPullHandleType(path.points, path.isClosed, ref.pointIndex, local) : drag.kind === 'inHandle' ? 'inHandle' : 'outHandle';
-      this.publish({ paths: this.mapPoints(drag.before.paths, [ref], (copy) => setBezierPointHandle(copy, handle, local)) });
+      const target = drag.handleOrigin
+        ? { x: drag.handleOrigin.x + local.x - drag.start.x, y: drag.handleOrigin.y + local.y - drag.start.y }
+        : local;
+      this.publish({ paths: this.mapPoints(drag.before.paths, [ref], (copy) => setBezierPointHandle(copy, handle, target)) });
     }
   };
   onPointerUp = (): void => {

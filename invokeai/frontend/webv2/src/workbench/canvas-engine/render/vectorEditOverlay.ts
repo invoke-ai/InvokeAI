@@ -3,6 +3,7 @@ import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState
 
 import { applyToPoint, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { transformBounds } from '@workbench/canvas-engine/math/rect';
+import { vectorHandleLayout } from '@workbench/canvas-engine/math/vectorHandleLayout';
 
 import type { RasterSurface } from './raster';
 
@@ -23,12 +24,13 @@ export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, ov
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(90, 175, 255, 0.75)';
   for (const ref of session.selectedPoints) {
-    const point = session.paths.find((path) => path.id === ref.pathId)?.points[ref.pointIndex];
-    if (!point) { continue; }
+    const path = session.paths.find((path) => path.id === ref.pathId);
+    const point = path?.points[ref.pointIndex];
+    if (!path || !point) { continue; }
     const anchor = applyToPoint(matrix, point.anchor);
-    for (const handle of [point.inHandle, point.outHandle]) {
-      if (!handle) { continue; }
-      const p = applyToPoint(matrix, handle);
+    const handles = vectorHandleLayout(path, ref.pointIndex, matrix);
+    for (const p of [handles.inHandle, handles.outHandle]) {
+      if (!p) { continue; }
       ctx.beginPath(); ctx.moveTo(anchor.x, anchor.y); ctx.lineTo(p.x, p.y); ctx.stroke();
       ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
@@ -41,11 +43,12 @@ export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, ov
       const p = applyToPoint(matrix, point.anchor);
       ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
       ctx.lineWidth = 2;
-      ctx.fillStyle = isSelected ? 'rgba(90, 175, 255, 0.8)' : '#fff';
-      ctx.strokeStyle = isActive ? '#3ed684' : isSelected ? '#fff' : 'rgba(90, 175, 255, 1)';
+      ctx.fillStyle = isActive ? 'rgba(90, 175, 255, 1)' : isSelected ? 'rgba(90, 175, 255, 0.55)' : 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeStyle = isActive ? '#3ed684' : isSelected ? 'rgba(255, 255, 255, 0.9)' : 'rgba(90, 175, 255, 1)';
       ctx.fill(); ctx.stroke();
     });
   }
+  ctx.globalAlpha = 1;
   if (session.selectionRect) {
     const rect = transformBounds(view, session.selectionRect);
     ctx.fillStyle = 'rgba(90, 175, 255, 0.12)';

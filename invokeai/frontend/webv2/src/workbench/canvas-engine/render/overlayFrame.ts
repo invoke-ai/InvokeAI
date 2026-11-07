@@ -165,6 +165,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
           paths: edit?.layerId === leaf.id ? edit.paths : leaf.layer.paths,
           matrix,
           opacity: leaf.layer.opacity,
+          ...(edit?.layerId === leaf.id ? { editActivePathId: edit.activePathId } : {}),
         });
       }
       return {

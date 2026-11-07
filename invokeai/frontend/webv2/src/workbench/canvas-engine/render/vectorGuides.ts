@@ -11,6 +11,8 @@ export interface VectorGuideLayer {
   paths: readonly CanvasBezierPathContract[];
   matrix: Mat2d;
   opacity: number;
+  /** Undefined outside Edit; null means Edit has no active path. */
+  editActivePathId?: string | null;
 }
 
 /** Creation geometry is in document space; committed paths are in layer-local space. */
@@ -70,8 +72,18 @@ export const drawVectorGuides = (
   for (const layer of layers) {
     ctx.globalAlpha = layer.opacity;
     const matrix = multiply(view, layer.matrix);
+    const editing = layer.editActivePathId !== undefined;
+    ctx.strokeStyle = GUIDE_COLOR;
+    ctx.lineWidth = 1.5;
     for (const path of layer.paths) {
+      if (editing && path.id === layer.editActivePathId) { continue; }
       strokePath(ctx, path.points, path.isClosed, matrix);
+    }
+    const active = editing ? layer.paths.find((path) => path.id === layer.editActivePathId) : null;
+    if (active) {
+      ctx.globalAlpha = layer.opacity;
+      ctx.lineWidth = 2.25;
+      strokePath(ctx, active.points, active.isClosed, matrix);
     }
   }
   ctx.globalAlpha = 1;
