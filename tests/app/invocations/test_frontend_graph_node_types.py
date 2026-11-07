@@ -180,13 +180,6 @@ def _annotation(cls: type[BaseInvocation], field_name: str) -> Any:
 
 SILENTLY_IGNORED: dict[str, dict[str, set[str]]] = {
     "generate": {
-        # `color_compensation` is a field of `i2l`, the *encode* node — legacy web sets it only
-        # there, on the img2img/inpaint/outpaint paths. webv2 writes it onto the `l2i` decode node
-        # instead (`graph.ts`, `l2iProps`), where no such field exists, so the Generate tab's SDXL
-        # colour-compensation toggle changes nothing about the generated image. Invocations ignore
-        # extra fields rather than rejecting them, which is why this never surfaced as an enqueue
-        # error.
-        "l2i": {"color_compensation"},
         # `flux_ip_adapter` has no `method`: the FLUX adapter applies the whole image. webv2 shares
         # the SD reference-image card with FLUX, so its Full/Style/Composition mode is offered there
         # and sent, and changes nothing.

@@ -39,6 +39,7 @@ import {
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   isReferenceImageSupported,
+  isComponentCompatibleWithModel,
   isGenerateModelSelectable,
   isLossyModelSwitch,
   isModelFromRepo,
@@ -429,16 +430,38 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
-      'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+      'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
     ]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual([]);
     expect(
       getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: incompatibleSource }))
-    ).toEqual(['Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.']);
+    ).toEqual([
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }))
     ).toEqual([]);
+  });
+
+  it('names the Qwen3 size a FLUX.2 Klein model needs, and none when its size is unknown', () => {
+    const missingEncoder = (variant: string | undefined, overrides: Partial<GenerateSettings> = {}) => {
+      const model = createModel('flux2', { format: 'gguf_quantized', variant });
+
+      return getGenerationValidationReasons(model, createSettings(model, { vae: flux2Vae, ...overrides }));
+    };
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+
+    // A Klein 9B with only the 4B encoder installed learns which one to get.
+    expect(missingEncoder('klein_9b', { qwen3EncoderModel: qwen3_4b })).toEqual([
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
+    expect(missingEncoder('klein_4b_base')).toEqual([
+      'Generate needs a Qwen3 4B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
+    expect(missingEncoder(undefined)).toEqual([
+      'Generate needs a Qwen3 Encoder or a FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
   });
 
   it('validates FLUX.2 [dev] Mistral and VAE requirements and allows bundled alternatives', () => {
@@ -451,12 +474,12 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
-      'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+      'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.',
+      'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.',
     ]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual([]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: kleinSource }))).toEqual(
-      ['Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.']
+      ['Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.']
     );
     expect(
       getGenerationValidationReasons(
@@ -470,6 +493,67 @@ describe('component policies', () => {
       'pidDecoderModel',
       'gemma2EncoderModel',
     ]);
+  });
+
+  describe('FLUX.2 [dev] component sources', () => {
+    // `flux2_dev_model_loader` reads components only from Diffusers installs, unlike the Klein loader.
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'dev' });
+    const completePipeline = { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} };
+    const sdnqKlein = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-sdnq',
+      submodels: completePipeline,
+      variant: 'klein_9b',
+    });
+    const diffusersKlein = createModel('flux2', {
+      format: 'diffusers',
+      key: 'flux2-klein-diffusers',
+      variant: 'klein_9b',
+    });
+    const mistralMissing =
+      'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.';
+    const vaeMissing = 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.';
+    const selectDev = (currentValues: GenerateSettings, models: MainModelConfig[]) =>
+      getGenerateModelSelectionResult({ currentValues, model, models }).settings;
+
+    it('picks no SDNQ pipeline and names the VAE to install instead', () => {
+      const settings = selectDev(createSettings(model, { mistralEncoderModel: mistralEncoder }), [sdnqKlein]);
+
+      expect(settings.componentSourceModel).toBeNull();
+      expect(getGenerationValidationReasons(model, settings)).toEqual([vaeMissing]);
+    });
+
+    it('takes the VAE from a Diffusers Klein pipeline next to a standalone Mistral encoder', () => {
+      const settings = selectDev(createSettings(model, { mistralEncoderModel: mistralEncoder }), [
+        sdnqKlein,
+        diffusersKlein,
+      ]);
+
+      expect(settings.componentSourceModel).toBe(diffusersKlein);
+      expect(getGenerationValidationReasons(model, settings)).toEqual([]);
+    });
+
+    it('drops a saved or recalled SDNQ pipeline source', () => {
+      const settings = createSettings(model, { componentSourceModel: sdnqKlein, mistralEncoderModel: mistralEncoder });
+
+      expect(isComponentCompatibleWithModel(model, settings, 'componentSourceModel', sdnqKlein)).toBe(false);
+      expect(getGenerationValidationReasons(model, settings)).toEqual([vaeMissing]);
+      expect(selectDev(settings, [sdnqKlein]).componentSourceModel).toBeNull();
+    });
+
+    it('does not count a self-contained SDNQ [dev] main as bundled', () => {
+      const sdnqDev = createModel('flux2', { format: 'sdnq_quantized', submodels: completePipeline, variant: 'dev' });
+      const settings = createSettings(sdnqDev);
+
+      expect(getComponentSectionPolicy(sdnqDev, settings).defaultOpen).toBe(true);
+      expect(getGenerationValidationReasons(sdnqDev, settings)).toEqual([mistralMissing, vaeMissing]);
+      expect(
+        getGenerationValidationReasons(
+          sdnqDev,
+          createSettings(sdnqDev, { mistralEncoderModel: mistralEncoder, vae: flux2Vae })
+        )
+      ).toEqual([]);
+    });
   });
 
   it('keeps FLUX.2 component source hidden and auto-selects installed Diffusers sources', () => {

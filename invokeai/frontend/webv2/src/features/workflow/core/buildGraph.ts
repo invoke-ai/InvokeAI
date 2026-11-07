@@ -22,7 +22,12 @@ import {
 } from './batch';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
 import { createWorkflowId, nodeAcceptsExtraInputs } from './document';
-import { getWorkflowFieldInvalidReason, isDirectInputField, isWorkflowCollectionItemValid } from './fields';
+import {
+  getHiDiffusionRatioOrderIssue,
+  getWorkflowFieldInvalidReason,
+  isDirectInputField,
+  isWorkflowCollectionItemValid,
+} from './fields';
 import {
   createForLoopValidationReason,
   ForLoopGraphValidationError,
@@ -144,9 +149,18 @@ export const getProjectGraphReadiness = (
   }
 
   const reasons: WorkflowReadinessReason[] = [];
-  const connectedInputs = new Set(
-    canonicalEdges.map((edge) => `${edge.destination.node_id}:${edge.destination.field}`)
-  );
+  const connectedInputs = new Set<string>();
+  const connectedFieldsByNode = new Map<string, Set<string>>();
+  for (const edge of canonicalEdges) {
+    const { node_id, field } = edge.destination;
+    connectedInputs.add(`${node_id}:${field}`);
+    let fields = connectedFieldsByNode.get(node_id);
+    if (!fields) {
+      fields = new Set();
+      connectedFieldsByNode.set(node_id, fields);
+    }
+    fields.add(field);
+  }
 
   for (const node of invocationNodes) {
     const template = templates[node.data.type];
@@ -158,6 +172,16 @@ export const getProjectGraphReadiness = (
     }
 
     const nodeName = getNodeDisplayName(node, templates);
+    const ratioIssue = getHiDiffusionRatioOrderIssue(node, connectedFieldsByNode.get(node.id) ?? new Set());
+    if (ratioIssue) {
+      reasons.push(
+        createWorkflowIssue(
+          'invalidInput',
+          { field: ratioIssue, node: nodeName },
+          { nodeId: node.id, fieldName: 'hidiffusion_t2_ratio' }
+        )
+      );
+    }
     const onField = (fieldName: string) => ({ fieldName, nodeId: node.id });
 
     // The batch planner judges a batch node's own list (size, connections); the field rules would only repeat it.

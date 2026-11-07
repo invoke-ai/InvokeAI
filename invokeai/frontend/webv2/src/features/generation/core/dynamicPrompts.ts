@@ -1,6 +1,7 @@
 import { planSeedSubmission, type SeedMode, type SeedStep, type SeedSubmissionPlan } from '@platform/core/seed';
 
 import type { EffectivePrompts, PromptTemplateSnapshot } from './promptTemplates';
+import type { DynamicPromptsSettings } from './types';
 
 import { getEffectivePrompts, isJsonPrompt } from './promptTemplates';
 
@@ -11,6 +12,16 @@ export const DYNAMIC_PROMPTS_MAX_PROMPTS = 10_000;
 export const DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS = 100;
 
 export type DynamicPromptsSeedBehaviour = 'per-iteration' | 'per-image';
+
+/** Generate's dynamic prompts settings, and the fallback for each one a stored record lacks. */
+export const DEFAULT_DYNAMIC_PROMPTS_SETTINGS: Readonly<DynamicPromptsSettings> = {
+  dynamicPromptsCombinatorial: true,
+  dynamicPromptsEnabled: true,
+  dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
+  dynamicPromptsResample: true,
+  dynamicPromptsSampleSeed: 0,
+  dynamicPromptsSeedBehaviour: 'per-iteration',
+};
 
 export interface DynamicPromptsConfig {
   combinatorial: boolean;
@@ -347,10 +358,10 @@ export const findDynamicPromptComment = (prompt: string): PromptCommentMarker | 
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';
 
-export const sanitizeMaxPrompts = (value: unknown): number =>
+export const sanitizeMaxPrompts = (value: unknown, fallback = DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS): number =>
   typeof value === 'number' && Number.isFinite(value)
     ? Math.min(DYNAMIC_PROMPTS_MAX_PROMPTS, Math.max(DYNAMIC_PROMPTS_MIN_PROMPTS, Math.round(value)))
-    : DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS;
+    : fallback;
 
 /** Reads an untrusted persisted/transported config, or `null` when it is unusable. */
 export const sanitizeDynamicPromptsConfig = (value: unknown): DynamicPromptsConfig | null => {

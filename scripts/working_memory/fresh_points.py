@@ -14,6 +14,10 @@ point is `in_fit` where it is a fit point and its estimator's line admits its fe
 forward with a term on top of the line, such as the score matrix a build's SDPA kernel materializes, measures that term
 rather than the line, as a check does.
 
+A measuring process that raises -- the operation's own error, or a synchronization or a peak reset that failed
+(`measurement.measure`) -- leaves without a result line. The driving process records that point as `failed`, with the
+last line of the process's stderr, keeps it out of the point file and goes on with the next point.
+
 Nothing here imports torch at import time: a measuring process has to configure the allocator first.
 """
 

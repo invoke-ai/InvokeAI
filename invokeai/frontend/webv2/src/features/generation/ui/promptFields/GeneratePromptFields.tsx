@@ -8,6 +8,7 @@ import { Stack } from '@chakra-ui/react';
 import { getImageExpandPromptSuggestion, getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
+import { getDynamicPromptsSettingsPatch } from '@features/generation/core/settings';
 import { type GenerateDraft, pickGenerateSettings } from '@features/generation/ui/generateDebounce';
 import { flushGenerateDrafts } from '@features/generation/ui/generateDraftRegistry';
 import { offerGenerateUndo } from '@features/generation/ui/generateUndo';
@@ -34,18 +35,6 @@ interface GeneratePromptValues {
   positivePrompt: string;
   positivePromptHeightPx: number;
 }
-
-/** The flat GenerateSettings field behind each dynamic prompts config key. */
-const DYNAMIC_PROMPT_SETTING_KEYS = {
-  combinatorial: 'dynamicPromptsCombinatorial',
-  enabled: 'dynamicPromptsEnabled',
-  maxPrompts: 'dynamicPromptsMaxPrompts',
-  resample: 'dynamicPromptsResample',
-  sampleSeed: 'dynamicPromptsSampleSeed',
-  seedBehaviour: 'dynamicPromptsSeedBehaviour',
-} as const satisfies Record<keyof DynamicPromptsConfig, keyof GenerateSettings>;
-
-type DynamicPromptsConfigKey = keyof typeof DYNAMIC_PROMPT_SETTING_KEYS;
 
 const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues => ({
   negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
@@ -194,15 +183,7 @@ export const GeneratePromptFields = ({
   );
 
   const handleDynamicPromptsChange = useCallback(
-    (patch: Partial<DynamicPromptsConfig>) =>
-      onCommitImmediate(
-        Object.fromEntries(
-          Object.entries(patch).map(([key, value]) => [
-            DYNAMIC_PROMPT_SETTING_KEYS[key as DynamicPromptsConfigKey],
-            value,
-          ])
-        )
-      ),
+    (patch: Partial<DynamicPromptsConfig>) => onCommitImmediate(getDynamicPromptsSettingsPatch(patch)),
     [onCommitImmediate]
   );
 

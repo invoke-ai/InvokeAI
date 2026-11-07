@@ -35,4 +35,19 @@ describe('areVideoValuesEqual', () => {
     expect(areVideoValuesEqual(values, { ...values, ltx2DurationHeadModel: head })).toBe(false);
     expect(areVideoValuesEqual(values, { ...values, autoDuration: !values.autoDuration })).toBe(false);
   });
+
+  it('treats every dynamic prompts setting as part of the values', () => {
+    const edits: Partial<typeof values>[] = [
+      { dynamicPromptsCombinatorial: !values.dynamicPromptsCombinatorial },
+      { dynamicPromptsEnabled: !values.dynamicPromptsEnabled },
+      { dynamicPromptsMaxPrompts: values.dynamicPromptsMaxPrompts + 1 },
+      { dynamicPromptsResample: !values.dynamicPromptsResample },
+      { dynamicPromptsSampleSeed: values.dynamicPromptsSampleSeed + 1 },
+      { dynamicPromptsSeedBehaviour: 'per-image' },
+    ];
+
+    for (const edit of edits) {
+      expect(areVideoValuesEqual(values, { ...values, ...edit })).toBe(false);
+    }
+  });
 });

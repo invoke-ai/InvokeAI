@@ -9,6 +9,24 @@ import type {
 
 export type QueueHistoryItemStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+/**
+ * Why a run failed, for failures the queue runtime words itself, so the notice can show translated text. The English
+ * `error` stays alongside as diagnostic detail; server and validation text is shown as the notice's reason.
+ * - `invalid-submission`: the queued request is missing or malformed, so it was never sent.
+ * - `not-accepted`: the server queue took none of the run's items.
+ * - `project-not-saved`: the run's project cannot be saved, so it was not sent.
+ * - `removed`: the run's backend items vanished from the server queue.
+ * - `server-error`: enqueue kept failing with a server error until the runtime gave up.
+ * - `unexplained`: the backend failed the run without a reason.
+ */
+export type QueueRunErrorCode =
+  | 'invalid-submission'
+  | 'not-accepted'
+  | 'project-not-saved'
+  | 'removed'
+  | 'server-error'
+  | 'unexplained';
+
 export interface QueueSubmissionSnapshot {
   backendSubmission: QueueCompiledSubmission;
   sourceId: QueueSourceId;

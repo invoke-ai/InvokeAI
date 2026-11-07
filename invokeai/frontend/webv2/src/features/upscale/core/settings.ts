@@ -18,6 +18,7 @@ import {
   hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
@@ -376,16 +377,11 @@ export const UPSCALE_ARCHITECTURES = {
     tileControlNet: null,
   },
   flux2: {
-    // Both loaders fall back to a bundled main model's own encoder and VAE; [dev]'s counts only a Diffusers
-    // install as bundled, Klein's a complete SDNQ pipeline too.
+    // Both loaders fall back to a bundled main model's own encoder and VAE.
     components: (model) =>
-      model.variant === 'dev'
-        ? model.format === 'diffusers'
-          ? NO_COMPONENTS
-          : { slots: [FLUX2_MISTRAL_SLOT], vae: true }
-        : isBundledMainForBase('flux2')(model)
-          ? NO_COMPONENTS
-          : { slots: [flux2KleinQwen3Slot(model)], vae: true },
+      isBundledFlux2Main(model)
+        ? NO_COMPONENTS
+        : { slots: [model.variant === 'dev' ? FLUX2_MISTRAL_SLOT : flux2KleinQwen3Slot(model)], vae: true },
     denoiseGrid: 16,
     // `flux2_denoise` clips by sigma value like FLUX.1, then re-spaces the window to the requested steps.
     indexClipping: null,

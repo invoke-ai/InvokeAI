@@ -60,6 +60,17 @@ z_image_turbo_int8 = StarterModel(
     dependencies=[z_image_qwen3_encoder_fp4, flux_vae],
 )
 
+z_image_turbo_fp8 = StarterModel(
+    name="Z-Image Turbo (fp8)",
+    base=BaseModelType.ZImage,
+    source="https://huggingface.co/Kijai/Z-Image_comfy_fp8_scaled/resolve/952c72754beb38038a35c87a03a6da85d8232278/"
+    "z-image-turbo_fp8_scaled_e4m3fn_KJ.safetensors",
+    description="Z-Image Turbo in Kijai's scaled fp8 build, about half the size of the bf16 transformer. "
+    "FP8 Storage is switched on when it is installed. Requires standalone Qwen3 text encoder and Flux VAE. ~6.2GB",
+    type=ModelType.Main,
+    dependencies=[z_image_qwen3_encoder_fp4, flux_vae],
+)
+
 z_image_turbo_sdnq = StarterModel(
     name="Z-Image Turbo (SDNQ uint4 + SVD)",
     base=BaseModelType.ZImage,

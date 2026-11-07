@@ -12,6 +12,7 @@ hold within 1.3x are listed in `bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit o
 import collections
 import dataclasses
 import itertools
+import math
 import platform as stdlib_platform
 import re
 from dataclasses import replace
@@ -49,6 +50,7 @@ from invokeai.backend.working_memory.counters import backend_for
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fingerprint import environment_for
 from invokeai.backend.working_memory.fit import (
+    SMALLEST_APP_SIDE,
     capping_spans,
     carried_lines,
     carrier_of,
@@ -222,12 +224,28 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
 def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
     """A value no point decides is unguarded: any number would pass. An estimator without points of its own takes a
     measured one's values with `values_from`, and is then held to that one's points. Only declared stand-ins are
-    exempt, and they are listed in the entry, as are the values of a `legacy` entry."""
+    exempt, and they are listed in the entry, as are the values of a `legacy` entry. A value is decided in the entry
+    that carries its line for the point: an estimator's own tiled line, the lender's untiled one. A tiled decode
+    reserves the larger of its tile phase and its assembly phase (`fit.Line.assembly`), so where either is reserved
+    the point decides both its tiled and its assembly line: an assembly line no point needs is zero, and the points it
+    lies under decide that."""
     decided: set[tuple[tuple[str, int, tuple[tuple[str, str], ...]], str]] = set()
     for point in ALL_POINTS:
-        if point.in_fit:
-            owner = entry_key(carrier_of(ENTRIES, point))
-            decided |= {(owner, t.coefficient) for t in _evaluate(point).terms if t.included and t.coefficient}
+        if not point.in_fit:
+            continue
+        terms = _evaluate(point).terms
+        line = SPECS[point.estimator].line(point.features)
+        phases = (
+            {f"{part}_{suffix}" for suffix in (line.suffix, line.assembly) for part in ("k", "b")}
+            if line is not None and line.assembly is not None
+            else set()
+        )
+        phase_reserved = any(t.included and t.coefficient in phases for t in terms)
+        decided |= {
+            (entry_key(carrier_of(ENTRIES, point, t.coefficient[2:])), t.coefficient)
+            for t in terms
+            if t.coefficient and (t.included or (phase_reserved and t.coefficient in phases))
+        }
 
     undecided = [
         f"{entry.estimator} {entry.platform} {name}"
@@ -291,6 +309,46 @@ def test_a_stand_in_is_a_whole_line_its_fresh_process_points_cannot_fit() -> Non
         assert not measured, f"{entry.estimator} on {entry.platform}: fit {measured}, they are measured now"
 
 
+def test_every_tiled_point_joins_its_estimators_own_tiled_line_and_caps_it_on_a_tile_the_app_sets() -> None:
+    """A tiled VAE point is a fresh-process measurement of its family's tiled line: it joins that line's fit, on the
+    entry of its own estimator rather than the lender of the untiled line beneath. On a tile the app sets it caps the
+    line and holds the upper bound; on a smaller one (`fit.SMALLEST_APP_SIDE`) it is covered only."""
+    groups = fit_points(shipped_data().values(), SPECS)
+    tiled = [point for point in ALL_POINTS if point.features.get("tile") is not None]
+    assert {point.features["tile"] < SMALLEST_APP_SIDE for point in tiled} == {True, False}, "the check is broken"
+    for point in tiled:
+        line = SPECS[point.estimator].line(point.features)
+        assert line is not None and line.sits_on is not None and line.fits, _id(point)
+        assert point.in_fit and point.holds_upper_bound, _id(point)
+        assert line.caps == (point.features["tile"] >= SMALLEST_APP_SIDE), _id(point)
+        owner = carrier_of(ENTRIES, point, line.suffix)
+        assert owner.estimator == point.estimator, _id(point)
+        fitted_on = groups[(entry_key(owner), line.suffix)]
+        joined = [p for p in fitted_on if (p.size, p.bytes) == (line.size, point.measured_bytes)]
+        assert any(p.caps == line.caps for p in joined), _id(point)
+
+
+def test_an_untiled_vae_point_caps_its_line_only_on_an_image_the_app_sets() -> None:
+    """An untiled point on the convolution line of fewer pixels than a `fit.SMALLEST_APP_SIDE` square, a tiling run's
+    reference at a small tile, joins its line's fit covered only; from that square on it caps the line."""
+    groups = fit_points(shipped_data().values(), SPECS)
+    untiled = [
+        (point, line)
+        for point in ALL_POINTS
+        if SPECS[point.estimator].line is convolution_line and point.in_fit and point.holds_upper_bound
+        and (line := SPECS[point.estimator].line(point.features)) is not None and line.fits and line.sits_on is None
+    ]  # fmt: skip
+    small = {line.size < SMALLEST_APP_SIDE * SMALLEST_APP_SIDE for _, line in untiled}
+    assert small == {True, False}, "the check is broken"
+    for point, line in untiled:
+        assert line.caps == (line.size >= SMALLEST_APP_SIDE * SMALLEST_APP_SIDE), _id(point)
+        owner = carrier_of(ENTRIES, point, line.suffix)
+        joined = [
+            p for p in groups[(entry_key(owner), line.suffix)] if (p.size, p.bytes) == (line.size, point.measured_bytes)
+        ]
+        assert any(p.caps == line.caps for p in joined), _id(point)
+
+
 def test_the_out_of_fit_points_are_the_listed_ones() -> None:
     """Leaving the fit removes a point's upper bound, so it is never a quiet flag flip."""
     out_of_fit = collections.Counter(
@@ -300,14 +358,17 @@ def test_the_out_of_fit_points_are_the_listed_ones() -> None:
 
 
 def test_every_listed_upper_bound_exception_is_a_shipped_point_that_needs_it() -> None:
-    """A stale exception would let a new point at that id over-reserve unseen."""
+    """A stale exception would let a new point at that id over-reserve unseen. Each lists its point's ratio, rounded up
+    to two decimals, so a refit that moves it shows here."""
     ids = {_id(point): point for point in ALL_POINTS}
     for listed, ratio in UPPER_BOUND_EXCEPTIONS.items():
         point = ids.get(listed)
         assert point is not None, f"{listed}: no such point"
         assert point.in_fit
         reserved = _evaluate(point).reservation_bytes / point.measured_bytes
-        assert MAX_OVER_RESERVATION < reserved <= ratio, f"{listed}: {reserved:.3f}x"
+        assert MAX_OVER_RESERVATION < reserved <= ratio < reserved + 0.01, (
+            f"{listed}: list {math.ceil(reserved * 100) / 100}"
+        )
 
 
 @pytest.mark.parametrize("point", POINTS)
@@ -619,10 +680,30 @@ def test_a_borrowing_that_is_not_one_hop_to_matching_values_is_refused(entries, 
         resolve_coefficients(_data(*entries), _spec("a"), CUDNN, origin="test")
 
 
-@pytest.mark.parametrize("values, values_from", [({"k": 1.0}, "b"), (None, None)], ids=["both", "neither"])
-def test_an_entry_carries_exactly_one_of_values_and_values_from(values, values_from) -> None:
-    with pytest.raises(ValidationError, match="exactly one of"):
-        _entry("a", values=values, values_from=values_from)
+def test_an_entry_carries_values_or_borrows_them() -> None:
+    with pytest.raises(ValidationError, match="carries `values`, `values_from` or both"):
+        _entry("a")
+
+
+def test_an_entry_reads_its_own_lines_beside_the_borrowed_ones_and_the_floors_of_both() -> None:
+    """The family's VAE estimators borrow the untiled lines and carry their own tiled ones."""
+    spec = _spec("test.borrower", coefficients=frozenset({"k", "j"}))
+    lender = _entry("test.lender", values={"k": 7.0, "k_other": 9.0}, floor={"k": 8.0})
+    data = _data(lender, _entry("test.borrower", values={"j": 5.0}, values_from="test.lender", floor={"j": 6.0}))
+
+    on_cudnn = resolve_coefficients(data, spec, CUDNN, origin="test")
+    assert on_cudnn == ResolvedCoefficients(
+        values={"j": 5.0, "k": 7.0}, source="test:conv_backend=cudnn (values of test.lender)"
+    )
+    on_mps = resolve_coefficients(data, spec, replace(CUDNN, conv_backend="mps"), origin="test")
+    assert dict(on_mps.values) == {"j": 6.0, "k": 8.0}
+
+    shadowing = _data(lender, _entry("test.borrower", values={"j": 5.0, "k": 1.0}, values_from="test.lender"))
+    with pytest.raises(LookupError, match=r"carry \['k'\], which they also borrow from 'test\.lender'"):
+        resolve_coefficients(shadowing, spec, CUDNN, origin="test")
+    unread = _data(lender, _entry("test.borrower", values={"j": 5.0, "i": 1.0}, values_from="test.lender"))
+    with pytest.raises(LookupError, match=r"provide \['i', 'j', 'k', 'k_other'\] \(with test\.lender\)"):
+        resolve_coefficients(unread, spec, CUDNN, origin="test")
 
 
 def test_a_floor_or_stand_in_names_a_value_the_entry_carries() -> None:

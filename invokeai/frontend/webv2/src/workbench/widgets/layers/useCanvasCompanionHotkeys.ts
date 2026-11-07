@@ -5,15 +5,18 @@ import { useNotify } from '@workbench/useNotify';
 import {
   CANVAS_COMPANION_HOTKEYS,
   CANVAS_HISTORY_HOTKEYS,
+  CANVAS_MERGE_DOWN_HOTKEY,
   executeCanvasToolCommand,
+  mergeSelectedLayerDown,
   reportTransformRefusal,
   type CanvasToolCommandId,
 } from '@workbench/widgets/canvas/canvasToolCommands';
 import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
+import { reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useEffect, useEffectEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type CompanionCommandId = (typeof CANVAS_HISTORY_HOTKEYS)[number][0] | CanvasToolCommandId;
+type CompanionCommandId = (typeof CANVAS_HISTORY_HOTKEYS)[number][0] | CanvasToolCommandId | 'canvas.mergeDown';
 
 export type CanvasCompanionEngine = Pick<
   CanvasEngineHandle,
@@ -22,7 +25,7 @@ export type CanvasCompanionEngine = Pick<
 
 /**
  * Registers the canvas keys that stay live while a companion widget (Layers and its Color pane) holds focus:
- * undo/redo and the shared tool, brush-size and color table. Rows keep arrows, Delete and selection.
+ * undo/redo, merge down, and the shared tool, brush-size and color table. Rows keep arrows, Delete and selection.
  */
 export const useCanvasCompanionHotkeys = (
   runtime: { commands: Pick<WidgetCommandApi, 'register'>; hotkeys: WidgetHotkeyApi },
@@ -41,6 +44,12 @@ export const useCanvasCompanionHotkeys = (
       return;
     }
     const model = engine?.document.model() ?? null;
+    if (commandId === 'canvas.mergeDown') {
+      if (model) {
+        mergeSelectedLayerDown(engine, model.document, (refusal) => reportLayerOperation(refusal, notify.error, t));
+      }
+      return;
+    }
     const selectedId = model?.document.selectedLayerId ?? null;
     executeCanvasToolCommand(commandId, {
       engine,
@@ -52,7 +61,7 @@ export const useCanvasCompanionHotkeys = (
   });
   useEffect(() => {
     // Undo/redo stay reachable while a companion owns focus: selecting a layer or editing it must not strand mod+Z.
-    const disposers = [...CANVAS_HISTORY_HOTKEYS, ...CANVAS_COMPANION_HOTKEYS].flatMap(
+    const disposers = [...CANVAS_HISTORY_HOTKEYS, ...CANVAS_COMPANION_HOTKEYS, CANVAS_MERGE_DOWN_HOTKEY].flatMap(
       ([id, titleKey, defaultKeys]) => {
         const title = t(titleKey);
         return [

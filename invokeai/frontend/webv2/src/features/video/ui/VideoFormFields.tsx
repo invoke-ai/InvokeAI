@@ -4,13 +4,15 @@ import type {
   MainModelConfig,
   PromptHistoryItem,
 } from '@features/generation/contracts';
+import type { DynamicPromptsConfig } from '@features/generation/settings';
 import type { VideoWidgetValues } from '@features/video/core/types';
 
 import { Stack } from '@chakra-ui/react';
 import { NegativePromptField, PositivePromptField } from '@features/generation/components';
+import { getDynamicPromptsSettingsPatch } from '@features/generation/settings';
 import { normalizeVideoWidgetValues } from '@features/video/core/settings';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areVideoLorasEquivalent, areVideoModelsEquivalent } from './videoComparators';
@@ -35,7 +37,10 @@ const getRecallRevert = (before: VideoPrompts, written: VideoPrompts, current: V
  */
 export const VideoPromptFields = memo(
   function VideoPromptFields({
+    batchCount,
+    dynamicPrompts,
     expandPromptSuggestion,
+    isSeedFixed,
     loras,
     model,
     negativeHelpText,
@@ -49,7 +54,10 @@ export const VideoPromptFields = memo(
     projectId,
     showSyntaxHighlighting,
   }: {
+    batchCount: number;
+    dynamicPrompts: DynamicPromptsConfig;
     expandPromptSuggestion: ExpandPromptSuggestion | null;
+    isSeedFixed: boolean;
     loras: GenerateLora[];
     model: MainModelConfig | null;
     negativeHelpText?: string;
@@ -141,6 +149,14 @@ export const VideoPromptFields = memo(
       (positivePromptHeight: number) => onPatchValues({ positivePromptHeightPx: positivePromptHeight }),
       [onPatchValues]
     );
+    const handleDynamicPromptsChange = useCallback(
+      (patch: Partial<DynamicPromptsConfig>) => onPatchValues(getDynamicPromptsSettingsPatch(patch)),
+      [onPatchValues]
+    );
+    const dynamicPromptsField = useMemo(
+      () => ({ ...dynamicPrompts, isSeedFixed, onChange: handleDynamicPromptsChange }),
+      [dynamicPrompts, handleDynamicPromptsChange, isSeedFixed]
+    );
     const handleNegativeResizeEnd = useCallback(
       (negativePromptHeight: number) => onPatchValues({ negativePromptHeightPx: negativePromptHeight }),
       [onPatchValues]
@@ -149,7 +165,10 @@ export const VideoPromptFields = memo(
     return (
       <Stack gap="2" p="2">
         <PositivePromptField
+          batchCount={batchCount}
+          dynamicPrompts={dynamicPromptsField}
           expandPromptSuggestion={expandPromptSuggestion}
+          focusOwner="video"
           heightPx={positivePromptHeightPx}
           loras={loras}
           projectId={projectId}
@@ -179,7 +198,10 @@ export const VideoPromptFields = memo(
     );
   },
   (previous, next) =>
+    previous.batchCount === next.batchCount &&
+    previous.dynamicPrompts === next.dynamicPrompts &&
     previous.expandPromptSuggestion === next.expandPromptSuggestion &&
+    previous.isSeedFixed === next.isSeedFixed &&
     previous.negativePrompt === next.negativePrompt &&
     previous.negativePromptEnabled === next.negativePromptEnabled &&
     previous.negativePromptHeightPx === next.negativePromptHeightPx &&

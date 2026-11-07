@@ -22,14 +22,17 @@ spec.loader.exec_module(check_platform_locks)
 
 NVIDIA = check_platform_locks.NVIDIA_WIN_ARM64_REGISTRY
 PYPI = "https://pypi.org/simple"
-CU128 = "https://download.pytorch.org/whl/cu128"
+CU130 = "https://download.pytorch.org/whl/cu130"
 SELF_BUILT = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html"
 WIN_ARM = "platform_machine == 'ARM64' and sys_platform == 'win32'"
 NOT_WIN_ARM = "(platform_machine != 'ARM64' or sys_platform != 'win32')"
 AARCH64 = "platform_machine == 'aarch64' and sys_platform == 'linux'"
 NOT_AARCH64 = "(platform_machine != 'aarch64' or sys_platform != 'linux')"
 CUDA = "extra == 'extra-8-invokeai-cuda'"
+CPU = "extra == 'extra-8-invokeai-cpu'"
 NO_CUDA = "extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-cpu'"
+TORCH_CUDA_VERSION = "2.13.0+cu130"
+TORCHVISION_CUDA_VERSION = "0.28.0+cu130"
 
 
 def wheel(name: str, version: str, tag: str, registry: str) -> str:
@@ -88,7 +91,16 @@ def make_lock(
     *,
     win_arm_torch_registry: str = NVIDIA,
     win_arm_torch_tag: str = "cp312-cp312-win_arm64",
+    aarch64_torch_tag: str = "cp312-cp312-manylinux_2_28_aarch64",
     aarch64_torchvision_tag: str = "cp312-cp312-manylinux_2_28_aarch64",
+    aarch64_cpu_torch_version: str = "2.7.1",
+    aarch64_cpu_torchvision_version: str = "0.22.1",
+    aarch64_cpu_registry: str = PYPI,
+    aarch64_cuda_torch_version: str = TORCH_CUDA_VERSION,
+    aarch64_cuda_torchvision_version: str = TORCHVISION_CUDA_VERSION,
+    aarch64_cuda_registry: str = CU130,
+    aarch64_cuda_torch_tag: str = "cp312-cp312-manylinux_2_28_aarch64",
+    aarch64_cuda_torchvision_tag: str = "cp312-cp312-manylinux_2_28_aarch64",
     closure_tag: str = "cp312-abi3-win_arm64",
     test_extra_tag: str = "cp312-cp312-win_arm64",
     unresolved_edge: bool = False,
@@ -98,11 +110,31 @@ def make_lock(
     cpu_extra_aarch64_torch: bool = True,
 ) -> str:
     base_torch = [
-        dep("torch", "2.7.1", PYPI, f"({AARCH64}) or ({NOT_WIN_ARM} and {NO_CUDA})"),
-        dep("torch", "2.7.1+cu128", CU128, f"{NOT_AARCH64} and {NOT_WIN_ARM} and {CUDA}"),
+        dep(
+            "torch",
+            aarch64_cpu_torch_version,
+            aarch64_cpu_registry,
+            f"({AARCH64} and {CPU}) or ({NOT_AARCH64} and {NOT_WIN_ARM} and {NO_CUDA})",
+        ),
+        dep(
+            "torch",
+            aarch64_cuda_torch_version,
+            aarch64_cuda_registry,
+            f"({AARCH64} and {CUDA}) or ({NOT_AARCH64} and {NOT_WIN_ARM} and {CUDA})",
+        ),
         dep("torch", "2.14.0+cu134", win_arm_torch_registry, WIN_ARM),
-        dep("torchvision", "0.22.1", PYPI, f"({AARCH64}) or ({NOT_WIN_ARM} and {NO_CUDA})"),
-        dep("torchvision", "0.22.1+cu128", CU128, f"{NOT_AARCH64} and {NOT_WIN_ARM} and {CUDA}"),
+        dep(
+            "torchvision",
+            aarch64_cpu_torchvision_version,
+            aarch64_cpu_registry,
+            f"({AARCH64} and {CPU}) or ({NOT_AARCH64} and {NOT_WIN_ARM} and {NO_CUDA})",
+        ),
+        dep(
+            "torchvision",
+            aarch64_cuda_torchvision_version,
+            aarch64_cuda_registry,
+            f"({AARCH64} and {CUDA}) or ({NOT_AARCH64} and {NOT_WIN_ARM} and {CUDA})",
+        ),
         dep("torchvision", "0.29.0+cu134", win_arm_torch_registry, WIN_ARM),
     ]
     # The aarch64 fallback pins are the PyPI edges; without them the extra leans on the base's torch alone.
@@ -154,11 +186,11 @@ test = [
 {package(sdist_only, "1.0", PYPI, [], sdist=True) if sdist_only else ""}
 {package("blake3", "1.0.9", SELF_BUILT, [wheel("blake3", "1.0.9", closure_tag, SELF_BUILT)])}
 {package("blake3", "1.0.9", PYPI, [wheel("blake3", "1.0.9", "cp312-cp312-win_amd64", PYPI)])}
-{package("torch", "2.7.1", PYPI, [wheel("torch", "2.7.1", "cp312-cp312-manylinux_2_28_aarch64", PYPI)])}
-{package("torch", "2.7.1+cu128", CU128, [wheel("torch", "2.7.1+cu128", "cp312-cp312-win_amd64", CU128)])}
+{package("torch", aarch64_cpu_torch_version, aarch64_cpu_registry, [wheel("torch", aarch64_cpu_torch_version, aarch64_torch_tag, aarch64_cpu_registry)])}
+{package("torch", aarch64_cuda_torch_version, aarch64_cuda_registry, [wheel("torch", aarch64_cuda_torch_version, aarch64_cuda_torch_tag, aarch64_cuda_registry)])}
 {package("torch", "2.14.0+cu134", win_arm_torch_registry, [wheel("torch", "2.14.0+cu134", win_arm_torch_tag, win_arm_torch_registry)])}
-{package("torchvision", "0.22.1", PYPI, [wheel("torchvision", "0.22.1", aarch64_torchvision_tag, PYPI)])}
-{package("torchvision", "0.22.1+cu128", CU128, [wheel("torchvision", "0.22.1+cu128", "cp312-cp312-win_amd64", CU128)])}
+{package("torchvision", aarch64_cpu_torchvision_version, aarch64_cpu_registry, [wheel("torchvision", aarch64_cpu_torchvision_version, aarch64_torchvision_tag, aarch64_cpu_registry)])}
+{package("torchvision", aarch64_cuda_torchvision_version, aarch64_cuda_registry, [wheel("torchvision", aarch64_cuda_torchvision_version, aarch64_cuda_torchvision_tag, aarch64_cuda_registry)])}
 {package("torchvision", "0.29.0+cu134", win_arm_torch_registry, [wheel("torchvision", "0.29.0+cu134", win_arm_torch_tag, win_arm_torch_registry)])}
 """
 
@@ -223,6 +255,68 @@ def test_win_arm64_sdist_only_package_fails_unless_allow_listed(tmp_path: Path):
 
 def test_aarch64_torchvision_without_aarch64_wheel_fails(tmp_path: Path):
     assert run(tmp_path, make_lock(aarch64_torchvision_tag="cp312-cp312-manylinux_2_28_x86_64"), "aarch64") == 1
+
+
+def test_aarch64_cuda_uses_the_pinned_torch_pair_and_index(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    assert run(tmp_path, make_lock(), "aarch64") == 0
+    output = capsys.readouterr().out
+    assert f"torch=={TORCH_CUDA_VERSION} from {CU130}" in output
+    assert f"torchvision=={TORCHVISION_CUDA_VERSION} from {CU130}" in output
+    assert "torch==2.7.1 from https://pypi.org/simple" in output
+    assert "torchvision==0.22.1 from https://pypi.org/simple" in output
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"aarch64_cuda_torch_version": "2.12.0+cu130"},
+        {"aarch64_cuda_torchvision_version": "0.27.0+cu130"},
+        {"aarch64_cuda_registry": PYPI},
+    ],
+    ids=["torch-version", "torchvision-version", "registry"],
+)
+def test_aarch64_cuda_wrong_version_or_registry_fails(tmp_path: Path, kwargs: dict):
+    assert run(tmp_path, make_lock(**kwargs), "aarch64") == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"aarch64_cuda_torch_tag": "cp312-cp312-manylinux_2_28_x86_64"},
+        {"aarch64_cuda_torchvision_tag": "cp312-cp312-manylinux_2_28_x86_64"},
+    ],
+    ids=["torch", "torchvision"],
+)
+def test_aarch64_cuda_package_without_arm64_wheel_fails(tmp_path: Path, kwargs: dict):
+    assert run(tmp_path, make_lock(**kwargs), "aarch64") == 1
+
+
+def test_aarch64_cpu_wrong_registry_fails(tmp_path: Path):
+    assert run(tmp_path, make_lock(aarch64_cpu_registry=CU130), "aarch64") == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"aarch64_cpu_torch_version": "2.8.0"},
+        {"aarch64_cpu_torchvision_version": "0.23.0"},
+    ],
+    ids=["torch", "torchvision"],
+)
+def test_aarch64_cpu_wrong_fallback_version_fails(tmp_path: Path, kwargs: dict):
+    assert run(tmp_path, make_lock(**kwargs), "aarch64") == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"aarch64_torch_tag": "cp312-cp312-manylinux_2_28_x86_64"},
+        {"aarch64_torchvision_tag": "cp312-cp312-manylinux_2_28_x86_64"},
+    ],
+    ids=["torch", "torchvision"],
+)
+def test_aarch64_cpu_package_without_arm64_wheel_fails(tmp_path: Path, kwargs: dict):
+    assert run(tmp_path, make_lock(**kwargs), "aarch64") == 1
 
 
 def test_aarch64_extra_without_its_own_fallback_pin_fails(tmp_path: Path):

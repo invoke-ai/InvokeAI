@@ -57,6 +57,15 @@ def test_download_images_from_board_id_empty_image_name_list(
     assert json_response["bulk_download_item_name"] == "test.zip"
 
 
+def test_download_uncategorized_board(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_download_images_test(monkeypatch, mock_invoker)
+
+    response = client.post("/api/v1/images/download", json={"board_id": "none"})
+    json_response = response.json()
+    assert response.status_code == 202
+    assert json_response["bulk_download_item_name"] == "test.zip"
+
+
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)

@@ -850,9 +850,7 @@ export const createQueueCoordinator = (
 
     settleWait(event.item_id, toTerminalOutcome(event.status, event.error_message, event.error_type));
 
-    if (event.status === 'completed') {
-      scheduleGalleryRefresh();
-    }
+    // Gallery owns socket-completion invalidation across tabs.
   };
 
   const handleItemsCanceled = (event: QueueItemsCanceledEvent): void => {

@@ -1,6 +1,5 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
-import type { VideoConditioningRole } from '@features/video';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import {
@@ -11,7 +10,7 @@ import {
   toGalleryItemKey,
 } from '@features/gallery';
 import { getGalleryMoveTargets } from '@features/gallery/contracts';
-import { galleryKeys, galleryVideoMetadataOptions } from '@features/gallery/queries';
+import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
@@ -21,9 +20,6 @@ import { useQuery } from '@tanstack/react-query';
 import { formatHotkeyPartLabel } from '@workbench/hotkeys/keys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
-  ClapperboardIcon,
-  AsteriskIcon,
-  AudioLinesIcon,
   BoxIcon,
   CopyIcon,
   CrosshairIcon,
@@ -31,13 +27,8 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   FileJsonIcon,
-  FilmIcon,
   FolderIcon,
-  ImagePlayIcon,
   ImagesIcon,
-  QuoteIcon,
-  ShuffleIcon,
-  SproutIcon,
   StarIcon,
   Trash2Icon,
   WorkflowIcon,
@@ -51,9 +42,8 @@ import type { ImageActions } from './useImageActions';
 
 import { ContextSubMenu, IMAGE_MENU_CONTENT_PROPS } from './ContextSubMenu';
 import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
-import { ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
+import { ImageContinueGroup, ImageUseGroups, VideoUseGroups } from './ImageItemMenuGroups';
 import { useImageRecallCapabilities } from './useImageRecallCapabilities';
-import { EMPTY_VIDEO_RECALL_CAPABILITIES, getVideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -66,7 +56,8 @@ export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemC
 
 /**
  * `housekeeping` leaves out the groups a host already offers beside the menu (Preview's Edit and Use menus): what to
- * continue working on with the image and what to take from it. Single images only; videos and selections stay full.
+ * continue working on with the image, and what to take from the image or video. Single items only; selections stay
+ * full.
  */
 export type ImageContextMenuVariant = 'full' | 'housekeeping';
 
@@ -181,6 +172,7 @@ export const ImageContextMenu = ({
       boards={boards}
       previewVideoActions={previewVideoActions}
       target={itemTarget}
+      variant={variant}
       onClose={onClose}
       onRequestDeletion={requestDeletion}
     />
@@ -192,6 +184,7 @@ const GalleryItemContextMenuContent = ({
   boards,
   previewVideoActions,
   target,
+  variant,
   onClose,
   onRequestDeletion,
 }: {
@@ -199,6 +192,7 @@ const GalleryItemContextMenuContent = ({
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
   target: GalleryItemContextMenuTarget;
+  variant: ImageContextMenuVariant;
   onClose: () => void;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
@@ -262,6 +256,7 @@ const GalleryItemContextMenuContent = ({
                 item={item}
                 itemRef={itemRef}
                 previewVideoActions={previewVideoActions}
+                variant={variant}
                 onRequestDeletion={onRequestDeletion}
               />
             )}
@@ -278,6 +273,7 @@ const SingleItemMenuItems = ({
   item,
   itemRef,
   previewVideoActions,
+  variant,
   onRequestDeletion,
 }: {
   actions: ImageActions;
@@ -285,6 +281,7 @@ const SingleItemMenuItems = ({
   item: GalleryItem;
   itemRef: GalleryItemRef;
   previewVideoActions?: PreviewVideoContextActions;
+  variant: ImageContextMenuVariant;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
   const { t } = useTranslation();
@@ -305,12 +302,6 @@ const SingleItemMenuItems = ({
   const owner = captureAccountScope();
   const videoItem = item.kind === 'video' ? item : null;
   const videoName = videoItem?.name ?? '';
-  // The gallery's shared entry, which Preview Details and recall commands also read; a failed read holds no answer, so
-  // the next open reads it again.
-  const videoMetadataQuery = useQuery({
-    ...galleryVideoMetadataOptions(owner, videoName),
-    enabled: videoItem !== null,
-  });
   // The record answers whether a workflow is embedded only when the listing did not say.
   const readsVideoRecord = videoItem !== null && videoItem.hasWorkflow === undefined;
   const videoHasWorkflowQuery = useQuery({
@@ -340,10 +331,6 @@ const SingleItemMenuItems = ({
     retry: false,
     staleTime: Infinity,
   });
-  const isLoadingVideoRecall = videoMetadataQuery.isPending;
-  const videoRecallCapabilities = videoMetadataQuery.isSuccess
-    ? getVideoRecallCapabilities(videoMetadataQuery.data)
-    : EMPTY_VIDEO_RECALL_CAPABILITIES;
   const isLoadingVideoWorkflow = readsVideoRecord && videoHasWorkflowQuery.isPending;
   const hasVideoWorkflow = readsVideoRecord ? videoHasWorkflowQuery.data === true : videoItem?.hasWorkflow === true;
   const handleLoadVideoWorkflow = useCallback(() => {
@@ -351,41 +338,6 @@ const SingleItemMenuItems = ({
       void actions.loadVideoWorkflow(item);
     }
   }, [actions, item]);
-
-  const makeVideoRecallHandler = useCallback(
-    (kind: VideoRecallKind) => () => {
-      if (item.kind === 'video') {
-        void actions.recallVideoData(item, kind);
-      }
-    },
-    [actions, item]
-  );
-  const handleVideoRecallAll = useMemo(() => makeVideoRecallHandler('all'), [makeVideoRecallHandler]);
-  const handleVideoRecallRemix = useMemo(() => makeVideoRecallHandler('remix'), [makeVideoRecallHandler]);
-  const handleVideoRecallPrompts = useMemo(() => makeVideoRecallHandler('prompts'), [makeVideoRecallHandler]);
-  const handleVideoRecallSeed = useMemo(() => makeVideoRecallHandler('seed'), [makeVideoRecallHandler]);
-  const handleExtendInVideo = useCallback(() => {
-    if (item.kind === 'video') {
-      actions.sendToInitialVideo(item);
-    }
-  }, [actions, item]);
-  const handleUseAsReferenceVideo = useCallback(() => {
-    if (item.kind === 'video') {
-      // eslint-disable-next-line react/hooks -- `useAsReferenceVideo` is a plain action method; the compiler reads its name as a hook.
-      actions.useAsReferenceVideo(item);
-    }
-  }, [actions, item]);
-  const makeConditioningClipHandler = useCallback(
-    (role: VideoConditioningRole) => () => {
-      if (item.kind === 'video') {
-        // eslint-disable-next-line react/hooks -- `useAsConditioningClip` is a plain action method; the compiler reads its name as a hook.
-        actions.useAsConditioningClip(item, role);
-      }
-    },
-    [actions, item]
-  );
-  const handleUseSoundtrack = useMemo(() => makeConditioningClipHandler('audio'), [makeConditioningClipHandler]);
-  const handleUsePicture = useMemo(() => makeConditioningClipHandler('video'), [makeConditioningClipHandler]);
 
   return (
     <>
@@ -434,66 +386,13 @@ const SingleItemMenuItems = ({
             value="load-video-workflow"
             onClick={handleLoadVideoWorkflow}
           />
-          <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.reuseFromVideo')}>
-            <ContextMenuItem
-              disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
-              icon={AsteriskIcon}
-              label={t('widgets.gallery.itemMenu.allSettings')}
-              value="video-recall-all"
-              onClick={handleVideoRecallAll}
-            />
-            <ContextMenuItem
-              disabled={isLoadingVideoRecall || !videoRecallCapabilities.remix}
-              icon={ShuffleIcon}
-              label={t('widgets.gallery.itemMenu.remixVideo')}
-              value="video-remix"
-              onClick={handleVideoRecallRemix}
-            />
-            <ContextMenuItem
-              disabled={isLoadingVideoRecall || !videoRecallCapabilities.prompts}
-              icon={QuoteIcon}
-              label={t('widgets.gallery.itemActions.recall.verbs.prompts')}
-              value="video-use-prompt"
-              onClick={handleVideoRecallPrompts}
-            />
-            <ContextMenuItem
-              disabled={isLoadingVideoRecall || !videoRecallCapabilities.seed}
-              icon={SproutIcon}
-              label={t('widgets.gallery.itemActions.recall.verbs.seed')}
-              value="video-use-seed"
-              onClick={handleVideoRecallSeed}
-            />
-          </ContextSubMenu>
-          <ContextMenuItem
-            icon={ClapperboardIcon}
-            label={t('widgets.gallery.itemMenu.extendInVideo')}
-            value="extend-in-video"
-            onClick={handleExtendInVideo}
-          />
-          <ContextMenuItem
-            disabled={!actions.canUseAsReferenceVideo}
-            icon={FilmIcon}
-            label={t('widgets.gallery.itemMenu.useAsReferenceVideo')}
-            value="use-as-reference-video"
-            onClick={handleUseAsReferenceVideo}
-          />
-          <ContextSubMenu icon={AudioLinesIcon} label={t('widgets.gallery.itemMenu.useAsConditioningClip')}>
-            <ContextMenuItem
-              disabled={!actions.canUseAsConditioningClip.audio}
-              icon={AudioLinesIcon}
-              label={t('widgets.video.conditioningRoleAudio')}
-              value="use-as-conditioning-audio"
-              onClick={handleUseSoundtrack}
-            />
-            {/* A wrapped audio upload's picture is a placeholder, so it has nothing to lend. */}
-            <ContextMenuItem
-              disabled={!actions.canUseAsConditioningClip.video || item.mediaOrigin === 'audio_upload'}
-              icon={ImagePlayIcon}
-              label={t('widgets.video.conditioningRoleVideo')}
-              value="use-as-conditioning-video"
-              onClick={handleUsePicture}
-            />
-          </ContextSubMenu>
+          {variant === 'full' ? (
+            <>
+              <Menu.Separator borderColor="border.subtle" />
+              <VideoUseGroups actions={actions} item={item} presentation="compact" />
+              <Menu.Separator borderColor="border.subtle" />
+            </>
+          ) : null}
         </>
       ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (

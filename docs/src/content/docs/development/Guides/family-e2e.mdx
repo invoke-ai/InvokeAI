@@ -1,6 +1,6 @@
 ---
 title: Family E2E Runs
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-05
 ---
 
 `scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
@@ -87,6 +87,16 @@ A runner registers before it does anything else: it writes its process into `hea
 On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
 
 A resumed run skips every step that already has a final record and keeps the measures of the earlier sessions. Its new server starts with a cold model cache, so each case size with measures left first repeats its last warm-up, once. The manifest, the graphs, and the server's commit and dirty flag must not have changed since the run started; further edits to an already dirty checkout cannot be detected.
+
+## Comparing a branch with its base
+
+Use this to test a pull request that changes what a model computes or how it loads.
+
+1. Run the base commit and `accept` it as the reference. Its bundle then reports `BASELINE`.
+2. Run the branch, with `expect: changed` on the cases the pull request is meant to change.
+3. Put the `summary.md` table in the pull request description and attach the `bundle` zip.
+
+Until such a comparison exists, treat time differences under about 10 % between sessions as noise.
 
 ## Working-memory calibration
 

@@ -508,6 +508,9 @@ class TestClassicVaeEstimators:
 
         vae = MagicMock(spec=spec)
         vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.bfloat16)])
+        # The stock geometry a tiled estimate snaps its tile with: an 8x downsample, the 0.25 overlap.
+        vae.config.block_out_channels = (128, 256, 512, 512)
+        vae.tile_overlap_factor = 0.25
         return vae
 
     @staticmethod

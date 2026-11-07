@@ -583,13 +583,82 @@ describe('queue runtime', () => {
     expect(enqueueGenerate).not.toHaveBeenCalled();
     if (shouldFail) {
       expect(commands.setStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
+        expect.objectContaining({
+          errorCode: 'project-not-saved',
+          projectId: project.id,
+          queueItemId: queueItem.id,
+          status: 'failed',
+        })
       );
     } else {
       expect(commands.setStatus).not.toHaveBeenCalled();
     }
     await runtime.dispose();
     vi.useRealTimers();
+  });
+
+  it('fails a run whose queued request is invalid with a code its notice can translate, without enqueueing', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    delete (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const enqueueGenerate = vi.fn();
+    const commands = createTestCommands();
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(enqueueGenerate).not.toHaveBeenCalled();
+    expect(commands.setStatus).toHaveBeenCalledWith({
+      error: 'Queue item is missing a compiled backend submission.',
+      errorCode: 'invalid-submission',
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+    });
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('fails a run the server queue accepted none of with a code its notice can translate', async () => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi.fn().mockResolvedValue({ batchId: 'batch-1', enqueued: 0, itemIds: [], requested: 1 });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() =>
+      expect(commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorCode: 'not-accepted',
+          projectId: project.id,
+          queueItemId: queueItem.id,
+          status: 'failed',
+        })
+      )
+    );
+    await runtime.dispose();
   });
 
   it('leaves durable enqueue receipt acknowledgement to the durable acknowledgement worker', async () => {
@@ -1689,8 +1758,15 @@ describe('queue runtime', () => {
     runtime.start();
 
     await vi.advanceTimersByTimeAsync(20_000);
+    // The notice words the give-up itself and quotes the server's error as the reason.
     expect(commands.setStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
+      expect.objectContaining({
+        error: 'graph validation crashed',
+        errorCode: 'server-error',
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        status: 'failed',
+      })
     );
     const attempts = enqueueGenerate.mock.calls.length;
     expect(attempts).toBeGreaterThanOrEqual(3);

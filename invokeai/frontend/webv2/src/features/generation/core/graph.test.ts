@@ -12,7 +12,11 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
+import {
+  getDefaultGenerateSettings,
+  getGenerationValidationIssues,
+  isSupportedGenerateModel,
+} from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
 import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
 import { getReferenceImagePromptTags } from './referenceImage';
@@ -208,7 +212,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'unet')?.source.node_id).toBe('model_loader');
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('records the accelerator supplied by the orchestration boundary in metadata', () => {
@@ -223,10 +227,11 @@ describe('compileGenerateGraph', () => {
     expect(getNodeByType(graph, 'core_metadata')?.rand_device).toBe('xpu');
   });
 
-  it('passes SDXL color compensation to the VAE decode node when enabled', () => {
-    const graph = compile(sdxlModel, { colorCompensation: true });
+  it.each([true, false])('omits encoder-only color compensation from SDXL txt2img when enabled=%s', (enabled) => {
+    const graph = compile(sdxlModel, { colorCompensation: enabled });
 
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('SDXL');
+    expect(getNodeByType(graph, 'i2l')).toBeUndefined();
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('coerces invalid SD schedulers before graph submission', () => {
@@ -268,6 +273,39 @@ describe('compileGenerateGraph', () => {
       hidiffusion_t2_ratio: 0.15,
       hidiffusion_window_attn: true,
     });
+  });
+
+  it.each([sd1Model, sdxlModel])('preserves automatic ratios and explicit zero for $base', (model) => {
+    const automatic = compile(model, { hiDiffusionEnabled: true, hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 } });
+    expect(getNodeByType(automatic, 'denoise_latents')).toMatchObject({
+      hidiffusion_auto_ratios: true,
+      hidiffusion_t1_ratio: 0,
+      hidiffusion_t2_ratio: 0,
+    });
+    expect(getNodeByType(automatic, 'core_metadata')).toMatchObject({
+      hidiffusion_t1_ratio: null,
+      hidiffusion_t2_ratio: null,
+    });
+    const zero = compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0, hiDiffusionT2Ratio: 0 });
+    expect(getNodeByType(zero, 'denoise_latents')).toMatchObject({ hidiffusion_t1_ratio: 0, hidiffusion_t2_ratio: 0 });
+    expect(() =>
+      compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0.2, hiDiffusionT2Ratio: 0.4 })
+    ).toThrow('HiDiffusion T1');
+    expect(
+      getGenerationValidationIssues(model, {
+        ...getDefaultGenerateSettings(model),
+        hiDiffusionEnabled: true,
+        hiDiffusionT1Ratio: 0.2,
+        hiDiffusionT2Ratio: 0.4,
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'HiDiffusion T1 ratio must be greater than or equal to T2.',
+          target: { section: 'advanced' },
+        }),
+      ])
+    );
   });
 
   it('omits HiDiffusion ratios from denoise while disabled but records all metadata settings', () => {
@@ -532,6 +570,67 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
   });
 
+  describe('FLUX.2 [dev] component sources', () => {
+    const sdnqKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-sdnq-source',
+      submodels: completeSdnqPipeline,
+    };
+    const diffusersKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'diffusers',
+      key: 'flux2-klein-9b-diffusers-source',
+    };
+
+    it('never sends an SDNQ pipeline as the Mistral source', () => {
+      expect(() =>
+        compile(flux2DevGgufModel, { componentSourceModel: sdnqKleinSource, mistralEncoderModel: mistralEncoder })
+      ).toThrow('Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.');
+
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: sdnqKleinSource,
+        mistralEncoderModel: mistralEncoder,
+        vae: flux2Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: undefined,
+        vae_model: flux2Vae,
+      });
+    });
+
+    it('takes only the VAE from a Diffusers Klein pipeline', () => {
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: diffusersKleinSource,
+        mistralEncoderModel: mistralEncoder,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: diffusersKleinSource,
+        type: 'flux2_dev_model_loader',
+        vae_model: undefined,
+      });
+    });
+
+    it('sends a self-contained SDNQ [dev] main its standalone encoder and VAE', () => {
+      const sdnqDev: MainModelConfig = { ...flux2DevModel, format: 'sdnq_quantized', submodels: completeSdnqPipeline };
+
+      expect(() => compile(sdnqDev)).toThrow(
+        'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.'
+      );
+      expect(compile(sdnqDev, { mistralEncoderModel: mistralEncoder, vae: flux2Vae }).nodes.model_loader).toMatchObject(
+        {
+          mistral_encoder_model: mistralEncoder,
+          type: 'flux2_dev_model_loader',
+          vae_model: flux2Vae,
+        }
+      );
+    });
+  });
+
   it('uses a complete FLUX.2 SDNQ component source without standalone overrides', () => {
     const source: MainModelConfig = {
       ...flux2Klein9bModel,
@@ -557,7 +656,7 @@ describe('compileGenerateGraph', () => {
     };
 
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: source })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
@@ -578,7 +677,7 @@ describe('compileGenerateGraph', () => {
 
   it('rejects a stale incompatible FLUX.2 component source when Qwen3 is missing', () => {
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: incompatibleFlux2Source, vae: flux2Vae })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
@@ -1526,6 +1625,18 @@ describe('FLUX.3 graphs', () => {
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
 
+  it('wires a variant-less FLUX.3 LoRA on Klein to the transformer alone', () => {
+    // FLUX.3 LoRAs carry no variant: Klein and Klein Base share the transformer they change.
+    const lora: LoraModelConfig = { base: 'flux3', key: 'flux3-lora', name: 'A LoRA', type: 'lora' };
+    const graph = compile(kleinModel, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+    const loader = getNodeByType(graph, 'flux3_lora_collection_loader');
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+  });
+
   it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
     const plain = compile(kleinModel);
     const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
@@ -2031,7 +2142,7 @@ describe('SDXL Refiner', () => {
     expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
   });
 
-  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+  it('keeps HiDiffusion off the refiner pass and coerces its scheduler', () => {
     const graph = compile(sdxlModel, {
       ...refinerSettings,
       hiDiffusionEnabled: true,
@@ -2040,10 +2151,9 @@ describe('SDXL Refiner', () => {
     });
 
     expect(graph.nodes.refiner_denoise_latents).toMatchObject({
-      hidiffusion: true,
-      hidiffusion_t1_ratio: 0.3,
       scheduler: 'euler_a',
     });
+    expect(graph.nodes.refiner_denoise_latents).not.toHaveProperty('hidiffusion');
     expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
   });
 

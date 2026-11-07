@@ -9,6 +9,7 @@ import {
   CATALOG_MANAGED_EXTERNAL_SOURCE,
   collectCanvasLeaves,
   createMockBackendFixture,
+  createLargeWorkflowLibraryFixture,
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
@@ -506,6 +507,8 @@ const createState = (profile, clock) => {
     nextWorkflowThumbnailVersion: 1,
     /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
     workflowRequests: [],
+    libraryScenario: null,
+    hasLibraryPageFailed: false,
   };
 };
 
@@ -3183,6 +3186,19 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           : json(404, { detail: 'Video not found' });
       }
 
+      if (method === 'POST' && path === '/__workflow-library') {
+        const { scenario = 'large' } = await readJsonBody(request);
+        if (!['large', 'empty', 'failed-page', 'slow-detail', 'changed-revision'].includes(scenario)) {
+          return json(400, { detail: 'Unknown workflow library scenario' });
+        }
+        const workflows = scenario === 'empty' ? [] : createLargeWorkflowLibraryFixture();
+        state.workflows = new Map(workflows.map((workflow) => [workflow.workflow_id, workflow]));
+        state.libraryScenario = scenario;
+        state.hasLibraryPageFailed = false;
+        state.workflowRequests = [];
+        return json(200, { count: workflows.length, nodesPerDocument: 40, scenario });
+      }
+
       if (path.startsWith('/api/v1/workflows')) {
         state.workflowRequests.push({ method, path });
       }
@@ -3334,6 +3350,14 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
 
         if (method === 'GET') {
+          if (state.libraryScenario === 'slow-detail') {
+            await new Promise((resolve) => {
+              setTimeout(resolve, 300);
+            });
+          }
+          if (state.libraryScenario === 'changed-revision' && workflow.revision === 1) {
+            workflow.revision = 2;
+          }
           return json(200, workflowRecord(workflow));
         }
 
@@ -3430,6 +3454,10 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
+        if (state.libraryScenario === 'failed-page' && page === 2 && !state.hasLibraryPageFailed) {
+          state.hasLibraryPageFailed = true;
+          return json(503, { detail: 'Synthetic page failure; retry succeeds' });
+        }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
         // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.

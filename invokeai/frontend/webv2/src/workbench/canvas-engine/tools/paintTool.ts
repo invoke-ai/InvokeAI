@@ -114,6 +114,12 @@ const awaitsPixels = (ctx: ToolContext, layerId: string, hasDurablePixels: boole
   return true;
 };
 
+/** Whether a press paints `layer` itself; any other selection (a group, text, a gradient) gets a new paint layer. */
+const paintsInPlace = (layer: CanvasLayerContract): boolean =>
+  layer.type === 'raster'
+    ? layer.source.type === 'paint' || layer.source.type === 'image'
+    : layer.type === 'control' || isMaskLayer(layer);
+
 /**
  * Why a press of `tool` on the selected leaf would be refused before it starts, without side effects: drives the
  * not-allowed cursor. Loading pixels are not predicted; the press itself reports them.
@@ -123,14 +129,7 @@ const predictRefusal = (
   tool: PaintToolSpec['id']
 ): CanvasLayerEditRefusal['status'] | null => {
   const selected = leaf?.layer;
-  if (!leaf || !selected) {
-    return null;
-  }
-  const paintsInPlace =
-    selected.type === 'raster'
-      ? selected.source.type === 'paint' || selected.source.type === 'image'
-      : selected.type === 'control' || isMaskLayer(selected);
-  if (!paintsInPlace) {
+  if (!leaf || !selected || !paintsInPlace(selected)) {
     return null;
   }
   const refusal = leafEditRefusal(leaf);
@@ -302,6 +301,12 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       const doc = ctx.getDocument();
       const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
       return !session && predictRefusal(leaf, spec.id) ? 'not-allowed' : 'crosshair';
+    },
+    // A press paints the selected leaf in place unless it is refused up front; any other selection gets a new layer.
+    editsSelectedLayer: (ctx) => {
+      const doc = ctx.getDocument();
+      const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+      return !!leaf && paintsInPlace(leaf.layer) && predictRefusal(leaf, spec.id) === null;
     },
     id: spec.id,
     onDeactivate: (ctx, opts) => {

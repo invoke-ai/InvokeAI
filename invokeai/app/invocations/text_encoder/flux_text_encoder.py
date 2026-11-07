@@ -24,6 +24,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 
 
 @invocation(
@@ -83,11 +84,12 @@ class FluxTextEncoderInvocation(BaseInvocation):
         t5_encoder_config = t5_encoder_info.config
         assert t5_encoder_config is not None
 
-        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
-        # zero for other builds.
+        # A GGUF build dequantizes each Linear per forward and a retained-FP8 build widens each one, transients
+        # its resident size does not cover; both are zero for other builds.
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(t5_encoder_info.compute_device)
         dequant_bytes = peak_dequant_transient_bytes(
-            t5_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(t5_encoder_info.compute_device)
-        )
+            t5_encoder_info.model, compute_dtype
+        ) + peak_fp8_cast_transient_bytes(t5_encoder_info.model, compute_dtype)
         with (
             t5_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (cached_weights, t5_text_encoder),
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
@@ -99,7 +101,8 @@ class FluxTextEncoderInvocation(BaseInvocation):
             # Determine if the model is quantized.
             # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
             # slower inference than direct patching, but is agnostic to the quantization format.
-            if t5_encoder_config.format in [ModelFormat.T5Encoder, ModelFormat.Diffusers]:
+            # A single-file fp8 build may keep its Linear weights in float8; the patcher sidecars those itself.
+            if t5_encoder_config.format in [ModelFormat.T5Encoder, ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 model_is_quantized = False
             elif t5_encoder_config.format in [
                 ModelFormat.BnbQuantizedLlmInt8b,

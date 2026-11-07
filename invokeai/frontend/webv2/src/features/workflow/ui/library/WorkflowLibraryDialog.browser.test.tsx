@@ -6,6 +6,7 @@ import type {
   ProjectGraphState,
   ProjectWorkflowEntry,
 } from '@features/workflow/core/types';
+import type * as libraryBrowseStoreModule from '@features/workflow/data/libraryBrowseStore';
 import type {
   WorkflowLibraryBrowseSnapshot,
   WorkflowLibraryEntry,
@@ -28,6 +29,7 @@ import {
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
 import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
@@ -128,12 +130,13 @@ const browse = vi.hoisted(() => ({
   ensureWorkflowLibraryBrowseLoaded: vi.fn(() => Promise.resolve()),
   // Assigned by the module factory below, which owns the store instance.
   getSnapshot: null as null | (() => WorkflowLibraryBrowseSnapshot),
-  loadNextWorkflowLibraryPage: vi.fn(),
+  loadWorkflowLibraryRange: vi.fn((_start: number, _end: number) => Promise.resolve(true)),
   setSnapshot: null as null | ((snapshot: WorkflowLibraryBrowseSnapshot) => void),
   setWorkflowLibraryBrowseFilter: vi.fn(),
 }));
 
-vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
+vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
+  const { selectWorkflowLibraryEntry } = await original<typeof libraryBrowseStoreModule>();
   const { createExternalStore } = await import('@platform/state/externalStore');
   const store = createExternalStore<WorkflowLibraryBrowseSnapshot>({
     entries: [],
@@ -151,9 +154,13 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
   browse.setSnapshot = store.setSnapshot;
 
   return {
+    selectWorkflowLibraryEntry,
     ensureWorkflowLibraryBrowseLoaded: browse.ensureWorkflowLibraryBrowseLoaded,
     getWorkflowLibraryBrowseSnapshot: store.getSnapshot,
-    loadNextWorkflowLibraryPage: browse.loadNextWorkflowLibraryPage,
+    loadWorkflowLibraryRange: browse.loadWorkflowLibraryRange,
+    rememberWorkflowLibraryScroll: vi.fn(),
+    setWorkflowLibraryVisibleDemand: vi.fn(),
+    setWorkflowLibrarySelectedDemand: vi.fn(),
     setWorkflowLibraryBrowseFilter: browse.setWorkflowLibraryBrowseFilter,
     useWorkflowLibraryBrowseSelector: store.useSelector,
   };
@@ -194,6 +201,18 @@ vi.mock('@features/models', async (importOriginal) => ({
 
 // Provide English/plural strings without booting the HTTP-backed i18n client.
 const TRANSLATIONS: Record<string, string> = {
+  'workflowLibrary.openProjectWorkflowHint': 'Makes it the active workflow',
+  'workflowLibrary.renameProjectWorkflowHint': 'Changes its name in this project; a linked template keeps its own',
+  'workflowLibrary.duplicateProjectWorkflowHint': 'A copy beside it in this project',
+  'workflowLibrary.saveToLibraryHint': 'Creates a new template from this workflow',
+  'workflowLibrary.updateTemplateHint': 'Writes this workflow over its library template',
+  'workflowLibrary.removeHint': 'Removes it from this project only',
+  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
+  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
+  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
+  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
+  'workflowLibrary.deleteHint': 'Removes it from your library',
+
   'common.close': 'Close',
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
@@ -212,7 +231,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.loading': 'Loading workflows…',
-  'workflowLibrary.loadingMore': 'Loading more…',
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.newWorkflow': 'New workflow',
   'workflowLibrary.nodeCount_one': '{{count}} node',
@@ -556,38 +574,41 @@ describe('WorkflowLibraryDialog', () => {
 
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
 
-  /**
-   * Real layout in a `Dialog` portal gives no deterministic scroll geometry,
-   * so the viewport's metrics are defined directly — the assertion is about
-   * the dialog's near-bottom threshold, not the browser's layout engine.
-   */
-  const scrollTo = async (scrollTop: number) => {
-    const viewport = gridViewport();
-    expect(viewport).not.toBeNull();
+  const expectContained = (element: HTMLElement | Range, container: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    const bounds = container.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(bounds.left - 1);
+    expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
+    expect(box.top).toBeGreaterThanOrEqual(bounds.top - 1);
+    expect(
+      box.bottom,
+      element instanceof HTMLElement ? element.outerHTML.slice(0, 180) : 'metadata ending'
+    ).toBeLessThanOrEqual(bounds.bottom + 1);
+  };
 
-    for (const [property, value] of [
-      ['clientHeight', 400],
-      ['scrollHeight', 4000],
-      ['scrollTop', scrollTop],
-    ] as const) {
-      Object.defineProperty(viewport, property, { configurable: true, value, writable: true });
-    }
-
-    await act(async () => {
-      viewport?.dispatchEvent(new Event('scroll'));
-      // Settle deferred ScrollArea reactions within the same act scope.
-      await settleFrame();
+  const expectWrappedRenameHint = async (menu: HTMLElement, dialog: HTMLElement) => {
+    await act(() => userEvent.keyboard('{Home}{ArrowDown}'));
+    const rename = menu.querySelector<HTMLElement>('[data-menu-item="rename"]')!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(rename.id);
+      const hint = rename.querySelector('p')!;
+      expect(hint.textContent).toBe(TRANSLATIONS['workflowLibrary.renameProjectWorkflowHint']);
+      const text = document.createRange();
+      text.selectNodeContents(hint);
+      expect(text.getClientRects().length).toBeGreaterThan(1);
+      expectContained(text, menu);
+      expectContained(text, dialog);
     });
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resizeViewport(1280, 800);
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
-    browse.loadNextWorkflowLibraryPage.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
     loader.open.mockClear();
     loader.resume.mockClear();
@@ -931,16 +952,384 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ search: 'photo' });
   });
 
-  it('requests the next page only once the grid is scrolled near the bottom', async () => {
+  it('bounds mounted cards and requests server positions while scrolling 1,000 workflows', async () => {
+    await resizeViewport(1280, 800);
+    const entries = Array.from({ length: 1000 }, (_, index) => ({
+      ...LOADED_SNAPSHOT.entries[0]!,
+      item: { ...LOADED_SNAPSHOT.entries[0]!.item, workflow_id: `large-${index}`, name: `Large ${index}` },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 1000, pages: 50 });
+    expect(cards().length).toBeGreaterThan(0);
+    expect(cards().length).toBeLessThan(40);
+    const viewport = gridViewport()!;
+    await act(async () => {
+      viewport.scrollTop = 3200;
+      viewport.dispatchEvent(new Event('scroll'));
+      await settleFrame();
+    });
+    expect(cards().length).toBeLessThan(40);
+    expect(browse.loadWorkflowLibraryRange.mock.calls.some(([start]) => Number(start) > 0)).toBe(true);
+    await act(async () => {
+      viewport.scrollTop = 0;
+      viewport.dispatchEvent(new Event('scroll'));
+      await settleFrame();
+    });
+    expect(card('large-0')).not.toBeNull();
+  });
+
+  it('keeps measured rows separated after viewport resize, zoom and text reflow', async () => {
+    const entries = Array.from({ length: 90 }, (_, index) => ({
+      ...PORTRAIT,
+      item: { ...PORTRAIT.item, workflow_id: `reflow-${index}`, name: LONG_NAME },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 90, pages: 5 });
+    const rootStyle = document.documentElement.style;
+    const previousZoom = rootStyle.zoom;
+    const previousFontSize = rootStyle.fontSize;
+    onTestFinished(() => {
+      rootStyle.zoom = previousZoom;
+      rootStyle.fontSize = previousFontSize;
+    });
+
+    const expectRowGaps = async (zoom = 1, gap = 12) => {
+      await vi.waitFor(() => {
+        const rows = [...new Set(cards().map((element) => element.closest<HTMLElement>('[data-index]')!))].sort(
+          (a, b) => Number(a.dataset.index) - Number(b.dataset.index)
+        );
+        expect(rows.length).toBeGreaterThanOrEqual(3);
+        expect(cards().length).toBeLessThan(40);
+        for (let index = 1; index < rows.length; index += 1) {
+          const previous = rows[index - 1]!;
+          const current = rows[index]!;
+          const previousRect = previous.getBoundingClientRect();
+          const currentRect = current.getBoundingClientRect();
+          // Row padding owns the 12px gap; the row boxes themselves must meet without overlap.
+          expect(Math.abs((currentRect.top - previousRect.bottom) / zoom)).toBeLessThanOrEqual(1);
+          const cardBottom = Math.max(
+            ...[...previous.querySelectorAll<HTMLElement>('[data-workflow-card]')].map(
+              (element) => element.getBoundingClientRect().bottom
+            )
+          );
+          expect(Math.abs((currentRect.top - cardBottom) / zoom - gap)).toBeLessThanOrEqual(1);
+        }
+      });
+    };
+
+    await expectRowGaps();
+    await page.viewport(700, 800);
+    await expectRowGaps();
+    await page.viewport(1280, 800);
+    await expectRowGaps();
+    await act(() => {
+      rootStyle.zoom = '2';
+    });
+    await expectRowGaps(2);
+    await act(() => {
+      rootStyle.zoom = previousZoom;
+      rootStyle.fontSize = '20px';
+    });
+    // Text scaling also scales the rem-based gap.
+    await expectRowGaps(1, 15);
+    await act(() => {
+      const viewport = gridViewport()!;
+      viewport.scrollTop = 1000;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await page.viewport(900, 800);
+    await expectRowGaps(1, 15);
+  });
+
+  it.each(
+    (['library', 'project'] as const).flatMap((view) =>
+      [
+        [640, 400],
+        [512, 384],
+        [320, 400],
+        [1280, 320],
+        [700, 320],
+        [640, 320],
+        [512, 320],
+        [320, 320],
+      ].map(([width, height]) => ({ view, width: width!, height: height! }))
+    )
+  )(
+    'keeps the $view grid, selected metadata and actions usable at $width×$height layout viewport',
+    async ({ view, width: targetWidth, height: targetHeight }) => {
+      const description = `${'Required workflow metadata. '.repeat(200)}End of required metadata.`;
+      const entries = [
+        { ...PREVIEW_FIXTURE, item: { ...PREVIEW_FIXTURE.item, description } },
+        ...Array.from({ length: 1000 }, (_, index) => ({
+          ...PORTRAIT,
+          item: { ...PORTRAIT.item, workflow_id: `layout-${index}` },
+        })),
+      ];
+      project.setSnapshot(
+        projectSnapshot([
+          ...PROJECT_WORKFLOWS.map((entry) =>
+            entry === USER_COPY ? { ...entry, document: { ...entry.document, description } } : entry
+          ),
+          ...Array.from({ length: 1000 }, (_, index) => ({
+            ...USER_COPY,
+            document: { ...USER_COPY.document, id: `project-layout-${index}` },
+          })),
+        ])
+      );
+      await openWith(withSnapshot({ entries, total: entries.length, pages: 51 }));
+      if (view === 'project') {
+        await clickSegment('project');
+        await vi.waitFor(() => expect(card('wf-user')).not.toBeNull());
+        await act(() => card('wf-user')!.click());
+        expect(document.querySelector('[data-project-workflow-detail="wf-user"]')).not.toBeNull();
+      }
+
+      const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+      const detail = dialog.querySelector<HTMLElement>('[data-workflow-detail], [data-project-workflow-detail]')!;
+      const metadata = detail.querySelector<HTMLElement>('[role="region"]')!;
+      const grid = gridViewport()!;
+      const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+      const open = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Open'
+      )!;
+      const preview = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Preview graph'
+      )!;
+      const menu = detail.querySelector<HTMLButtonElement>('button[aria-label="More actions"]')!;
+
+      for (const [width, height] of [
+        [1280, 800],
+        [700, 800],
+        [targetWidth, targetHeight],
+      ] as const) {
+        // Real layout-viewport reduction, as at 200% browser zoom on a 1280×800 display. CSS zoom misses this.
+        await page.viewport(width, height);
+        expect(window.innerWidth).toBe(width);
+        expect(window.innerHeight).toBe(height);
+        await vi.waitFor(() => {
+          // Enough for readable metadata and a substantial part of a card, rather than merely nonzero boxes.
+          expect(metadata.clientHeight, 'selected metadata scroll viewport').toBeGreaterThanOrEqual(80);
+          expect(grid.clientHeight, 'workflow grid scroll viewport').toBeGreaterThanOrEqual(120);
+          expect(grid.clientHeight, 'finite virtual grid viewport').toBeLessThanOrEqual(640);
+          expect(detail.clientHeight, 'finite detail pane').toBeLessThanOrEqual(640);
+          if (width <= 512 || height === 320) {
+            expect(grid.clientHeight, 'flow grid has a finite viewport').toBe(256);
+            expect(detail.getBoundingClientRect().height, 'flow detail does not grow with metadata').toBe(320);
+          }
+          expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth + 1);
+          expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width);
+          expect(dialog.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+          expect(dialog.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
+          if ((width >= 640 && height >= 400) || height >= 640) {
+            for (const action of [open, preview, menu, close]) {
+              expectContained(action, dialog);
+            }
+          }
+          for (const control of dialog.querySelectorAll<HTMLElement>(
+            'input[type="search"], [role="combobox"], [role="tab"], [aria-label="Thumbnail display"]'
+          )) {
+            expectContained(control, dialog);
+          }
+          if ((width === 700 && height >= 640) || width <= 512) {
+            expect(grid.getBoundingClientRect().bottom).toBeLessThanOrEqual(detail.getBoundingClientRect().top);
+          } else {
+            expect(grid.getBoundingClientRect().right).toBeLessThanOrEqual(detail.getBoundingClientRect().left);
+          }
+          expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth + 1);
+          expect(cards().length).toBeGreaterThan(0);
+          expect(cards().length).toBeLessThan(40);
+          for (const element of cards()) {
+            const box = element.getBoundingClientRect();
+            const bounds = grid.getBoundingClientRect();
+            expect(box.left).toBeGreaterThanOrEqual(bounds.left);
+            expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
+            expect(box.width).toBeGreaterThanOrEqual(180);
+            const row = element.closest<HTMLElement>('[data-index]')!;
+            expectContained(element, row);
+            const nextRow = row.nextElementSibling;
+            if (nextRow) {
+              expect(box.bottom).toBeLessThanOrEqual(nextRow.getBoundingClientRect().top);
+            }
+          }
+        });
+      }
+
+      const expectUnclipped = (element: HTMLElement) => {
+        expectContained(element, dialog);
+        for (let parent = element.parentElement; parent && parent !== dialog; parent = parent.parentElement) {
+          const style = getComputedStyle(parent);
+          if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+            expectContained(element, parent);
+          }
+        }
+      };
+      await act(() => cards()[0]!.focus());
+      const focusedCard = cards()[0]!.getBoundingClientRect();
+      const gridBounds = grid.getBoundingClientRect();
+      const modalBounds = dialog.getBoundingClientRect();
+      expect(
+        Math.min(focusedCard.bottom, gridBounds.bottom, modalBounds.bottom) -
+          Math.max(focusedCard.top, gridBounds.top, modalBounds.top)
+      ).toBeGreaterThanOrEqual(120);
+      await act(() => grid.focus());
+      await act(() => userEvent.keyboard('{PageDown}'));
+      await vi.waitFor(() => {
+        expect(grid.scrollTop).toBeGreaterThan(0);
+        expect(cards().length).toBeLessThan(40);
+        expect(grid.clientHeight).toBeLessThanOrEqual(640);
+      });
+      await act(() => metadata.focus());
+      expect(document.activeElement).toBe(metadata);
+      expectUnclipped(metadata);
+      await act(() => userEvent.keyboard('{End}'));
+      await vi.waitFor(() => {
+        expect(metadata.scrollTop).toBeGreaterThan(0);
+        const lastMetadata =
+          metadata.querySelector<HTMLElement>('[data-workflow-source]') ?? [...metadata.querySelectorAll('p')].at(-1)!;
+        const ending = document.createRange();
+        ending.selectNodeContents(lastMetadata);
+        const text = lastMetadata.firstChild!;
+        ending.setStart(text, Math.max(0, text.textContent!.length - 24));
+        expectContained(ending, metadata);
+        expectContained(ending, dialog);
+      });
+
+      // Native focus scrolling must bring each action into the modal's clipped viewport, including flow layouts.
+      const reached = new Set<Element>();
+      for (let index = 0; index < 40 && reached.size < 4; index += 1) {
+        await act(() => userEvent.keyboard('{Tab}'));
+        if ([open, preview, menu, close].includes(document.activeElement as HTMLButtonElement)) {
+          expectUnclipped(document.activeElement as HTMLElement);
+          reached.add(document.activeElement!);
+        }
+      }
+      expect(reached.size).toBe(4);
+      const toolbarTargets = [
+        dialog.querySelector<HTMLElement>('input[type="search"]'),
+        dialog.querySelector<HTMLElement>('[role="combobox"]'),
+        dialog.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'),
+        [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(
+          (button) => button.textContent === 'New workflow'
+        ),
+      ].filter((element): element is HTMLElement => Boolean(element));
+      const toolbarReached = new Set<Element>();
+      for (const key of ['{Shift>}{Tab}{/Shift}', '{Tab}']) {
+        await act(() => close.focus());
+        for (let index = 0; index < 30; index += 1) {
+          await act(() => userEvent.keyboard(key));
+          const focused = document.activeElement as HTMLElement;
+          if (focused.hasAttribute('data-workflow-card')) {
+            break;
+          }
+          if (toolbarTargets.includes(focused)) {
+            expectUnclipped(focused);
+            toolbarReached.add(focused);
+          }
+        }
+      }
+      expect(toolbarReached.size).toBe(toolbarTargets.length);
+      if (dialog.scrollHeight > dialog.clientHeight + 1) {
+        await act(() => close.focus());
+        await act(() => userEvent.keyboard('{End}'));
+        await vi.waitFor(() => {
+          expect(dialog.scrollTop).toBeGreaterThan(0);
+          expectUnclipped(preview);
+        });
+      }
+      // Focus first, as a keyboard user would, so offscreen controls scroll into view before activation.
+      await act(() => menu.focus());
+      expectUnclipped(menu);
+      await act(() => userEvent.keyboard('{Enter}'));
+      await vi.waitFor(() => expect(menu.getAttribute('aria-expanded')).toBe('true'));
+      const menuContent = document.querySelector<HTMLElement>('[role="menu"]')!;
+      // Open state precedes the entry slide's final geometry.
+      await act(() => settleAnimations(menuContent));
+      expectContained(menuContent, dialog);
+      if (view === 'project' && targetWidth === 320) {
+        await expectWrappedRenameHint(menuContent, dialog);
+      }
+      await act(() => userEvent.keyboard('{End}'));
+      const lastAction = [...menuContent.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+      await vi.waitFor(() => {
+        expect(menuContent.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+        expectContained(lastAction, menuContent);
+        expectContained(lastAction, dialog);
+      });
+      await act(() => userEvent.keyboard('{Escape}'));
+      await act(() => preview.focus());
+      expectUnclipped(preview);
+      await act(() => userEvent.keyboard('{Enter}'));
+      await waitForPreviewDialog();
+      expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+      // The preview renderer is stubbed; close it through its existing harness controls before using the rail.
+      await clickText('Close preview');
+      await clickText('Finish preview exit');
+      await act(() => open.focus());
+      expectUnclipped(open);
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(view === 'project' ? COMMANDS.selectWorkflow : loader.open).toHaveBeenCalled();
+      await act(() => close.focus());
+      expectUnclipped(close);
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    }
+  );
+
+  it('keeps keyboard focus mounted across virtual row boundaries', async () => {
+    await resizeViewport(1280, 800);
+    const entries = Array.from({ length: 90 }, (_, index) => ({
+      ...PORTRAIT,
+      item: { ...PORTRAIT.item, workflow_id: `key-${index}` },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 90, pages: 5 });
+    await act(() => document.querySelector<HTMLElement>('[data-workflow-card-menu="key-0"]')?.focus());
+    for (let index = 1; index <= 18; index += 1) {
+      await act(async () => {
+        await userEvent.keyboard('{Tab}');
+        await settleFrame();
+        await settleFrame();
+      });
+      await vi.waitFor(() => expect(document.activeElement?.getAttribute('data-workflow-card')).toBe(`key-${index}`));
+      await act(() => userEvent.keyboard('{Tab}'));
+      expect(document.activeElement?.getAttribute('data-workflow-card-menu')).toBe(`key-${index}`);
+    }
+    expect(cards().length).toBeLessThan(40);
+  });
+
+  it.each(['library', 'project'] as const)('keeps the %s card menu inside its dialog while resizing', async (view) => {
+    await resizeViewport(320, 320);
     await openWith(LOADED_SNAPSHOT);
-
-    await scrollTo(100);
-
-    expect(browse.loadNextWorkflowLibraryPage).not.toHaveBeenCalled();
-
-    await scrollTo(3200);
-
-    expect(browse.loadNextWorkflowLibraryPage).toHaveBeenCalled();
+    if (view === 'project') {
+      await clickSegment('project');
+    }
+    await vi.waitFor(() => expect(card(view === 'project' ? 'wf-alpha' : 'wf-landscape')).not.toBeNull());
+    const source = card(view === 'project' ? 'wf-alpha' : 'wf-landscape')!;
+    await act(() => source.focus());
+    // Keyboard context-menu events have no pointer coordinates.
+    await act(() => source.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+    );
+    const menu = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]')!;
+    const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+    await act(() => settleAnimations(menu));
+    expectContained(menu, dialog);
+    if (view === 'project') {
+      await expectWrappedRenameHint(menu, dialog);
+    }
+    await act(() => userEvent.keyboard('{End}'));
+    const lastAction = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+      expectContained(lastAction, menu);
+      expectContained(lastAction, dialog);
+    });
+    await resizeViewport(700, 320);
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('data-state')).toBe('open');
+      expectContained(menu, dialog);
+    });
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(source));
+    expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull();
   });
 
   it('auto-selects the first entry and moves the selection when it disappears', async () => {
@@ -1341,6 +1730,7 @@ describe('WorkflowLibraryDialog', () => {
 
       const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
       const contentBox = content.getBoundingClientRect();
+      expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth + 1);
       const title = content.querySelector<HTMLElement>('[data-part="title"]')!;
       const close = content.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
       const tabs = [...content.querySelectorAll<HTMLElement>('[role="tab"]')];

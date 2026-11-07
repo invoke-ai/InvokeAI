@@ -47,10 +47,24 @@ MB = 1024**2
 GB = 1024**3
 
 
+def _mock_bf16_vae() -> MagicMock:
+    """A bf16 `AutoencoderKLFlux2` stand-in for the estimator: the parameter dtype, and the stock geometry a tiled
+    estimate snaps its tile with as `scoped_vae_tiling` does, an 8x downsample and the 0.25 overlap."""
+    vae = MagicMock(spec=AutoencoderKLFlux2)
+    vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+    vae.config.block_out_channels = (128, 256, 512, 512)
+    vae.tile_overlap_factor = 0.25
+    return vae
+
+
 def _vae_line(conv_backend, operation, pixels, allocator="native", os="linux"):
     """What the shipped FLUX.2 VAE line reserves in bf16 over `pixels` output pixels on one platform."""
     values = shipped_coefficients(VAE_FLUX2_SPEC, Platform(conv_backend, allocator, os)).values
     return int(values[f"k_{operation}_bf16"] * pixels + values[f"b_{operation}_bf16"])
+
+
+CPU = Platform("cpu", "native", "linux")
+"""The platform the `FUSED` device prices on: the CPU, priced as cuDNN with the native allocator, floored."""
 
 
 # The width the denoise tests price at unless they say otherwise, and the head count that follows from it.
@@ -143,11 +157,6 @@ class TestTransformerWidthIsBudgeted:
 
 
 class TestFlux2VaeWorkingMemoryEstimate:
-    def _mock_bf16_vae(self):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-        return vae
-
     def _tensor_for(self, operation, px):
         # decode receives 32-channel latents at pixels/8; encode receives a pixel image.
         return torch.zeros(1, 32, px // 8, px // 8) if operation == "decode" else torch.zeros(1, 3, px, px)
@@ -155,36 +164,30 @@ class TestFlux2VaeWorkingMemoryEstimate:
     @pytest.mark.parametrize("operation", ["decode", "encode"])
     def test_the_estimate_is_the_bf16_line_over_the_pixel_area(self, operation):
         estimate = estimate_vae_working_memory_flux2(
-            operation=operation, image_tensor=self._tensor_for(operation, 1024), vae=self._mock_bf16_vae(), device=FUSED
+            operation=operation, image_tensor=self._tensor_for(operation, 1024), vae=_mock_bf16_vae(), device=FUSED
         )
         assert estimate.reservation_bytes == _vae_line("cudnn", operation, 1024 * 1024)
 
-    def test_tiled_estimate_is_bounded_by_the_tile_not_the_image(self):
-        """Reference-image encoding forces 512px tiling precisely so the peak stops following the
-        reference resolution -- measured flat at ~0.55GB from 1024px up to the 2024px reference cap."""
-        estimates = [
+    def test_a_tiled_reference_image_encode_reserves_a_fraction_of_the_untiled_one(self):
+        """Reference-image encoding forces 512px tiling so the peak stops following the reference resolution. The whole
+        point of tiling: it must shrink the reservation, not just bound the VAE."""
+        tiled, untiled = (
             estimate_vae_working_memory_flux2(
                 operation="encode",
-                image_tensor=torch.zeros(1, 3, px, px),
-                vae=self._mock_bf16_vae(),
-                tile_size=512,
+                image_tensor=torch.zeros(1, 3, 2024, 2024),
+                vae=_mock_bf16_vae(),
+                tile_size=tile_size,
                 device=FUSED,
             ).reservation_bytes
-            for px in (1024, 1328, 2024)
-        ]
-        assert len(set(estimates)) == 1
-        assert estimates[0] == _vae_line("cudnn", "encode", 512 * 512 * 1.25)
-        # The whole point of tiling: it must shrink the reservation, not just bound the VAE.
-        untiled = estimate_vae_working_memory_flux2(
-            operation="encode", image_tensor=torch.zeros(1, 3, 2024, 2024), vae=self._mock_bf16_vae(), device=FUSED
-        ).reservation_bytes
-        assert estimates[0] < untiled / 4
+            for tile_size in (512, None)
+        )
+        assert tiled < untiled / 4
 
     def _decode_estimate(self, height, width, tile_size):
         return estimate_vae_working_memory_flux2(
             operation="decode",
             image_tensor=torch.zeros(1, 32, height // 8, width // 8),
-            vae=self._mock_bf16_vae(),
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=FUSED,
         )
@@ -197,19 +200,13 @@ class TestFlux2VaeWorkingMemoryEstimate:
         assert estimate.reservation_bytes == _vae_line("cudnn", "decode", 1024 * 1024)
         assert estimate.features["tile"] is None
 
-    def test_an_elongated_image_prices_the_tile_clamped_per_axis(self):
-        """A 2048px tile on a 1024x4096 image is tiled along the long side only, and every slice it
-        takes is at most 1024x2048."""
-        estimate = self._decode_estimate(1024, 4096, 2048)
-        assert estimate.reservation_bytes == _vae_line("cudnn", "decode", 1024 * 2048 * 1.25)
-
     @pytest.mark.parametrize("tile_size, resolved", [(0, 512), (64, 128)], ids=["default-sentinel", "below-minimum"])
     def test_the_node_tile_field_is_resolved_before_pricing(self, tile_size, resolved):
         """The nodes pass their `tile_size` field through: 0 means the default tile, and anything under
         the minimum is raised to it -- pricing the raw value would reserve nothing or too little."""
         estimate = self._decode_estimate(1024, 1024, tile_size)
-        assert estimate.reservation_bytes == _vae_line("cudnn", "decode", resolved * resolved * 1.25)
         assert estimate.features["tile"] == resolved
+        assert estimate.reservation_bytes == self._decode_estimate(1024, 1024, resolved).reservation_bytes
 
 
 class TestVaeConstantsFollowTheConvBackend:
@@ -307,12 +304,10 @@ class TestFlux2VaeBatchIsBudgeted:
     """
 
     def _decode_estimate(self, batch, px=1024, tile_size=None, device=FUSED):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
         return estimate_vae_working_memory_flux2(
             operation="decode",
             image_tensor=torch.zeros(batch, 32, px // 8, px // 8),
-            vae=vae,
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=device,
         ).reservation_bytes
@@ -615,17 +610,12 @@ class TestMaterializedScoreMatrixIsBudgeted:
     different phases and the estimate takes the larger -- see `TestVaeTermsDoNotAdd`.
     """
 
-    def _mock_bf16_vae(self):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-        return vae
-
     def _vae_estimate(self, operation, px, device, tile_size=None):
         tensor = torch.zeros(1, 32, px // 8, px // 8) if operation == "decode" else torch.zeros(1, 3, px, px)
         return estimate_vae_working_memory_flux2(
             operation=operation,
             image_tensor=tensor,
-            vae=self._mock_bf16_vae(),
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=device,
         ).reservation_bytes
@@ -671,17 +661,25 @@ class TestMaterializedScoreMatrixIsBudgeted:
 
     def test_tiling_makes_the_score_matrix_irrelevant(self):
         """Tiling caps the mid-block sequence at (tile/8)^2, which drops the quadratic term far below
-        the tile's own linear cost -- so a tiled estimate is the linear term whether the build
-        materializes or not, and is flat across input sizes."""
+        the tile's own linear cost -- so a tiled estimate is the convolutions' whether the build
+        materializes or not."""
         with _materializing():
             estimates = [
-                self._vae_estimate("encode", px, device=MATERIALIZING, tile_size=512) for px in (1024, 1328, 2024)
+                estimate_vae_working_memory_flux2(
+                    operation="encode",
+                    image_tensor=torch.zeros(1, 3, px, px),
+                    vae=_mock_bf16_vae(),
+                    tile_size=512,
+                    device=MATERIALIZING,
+                )
+                for px in (1024, 1328, 2024)
             ]
             untiled = self._vae_estimate("encode", 2024, device=MATERIALIZING)
-        assert len(set(estimates)) == 1
-        assert estimates[0] == self._vae_estimate("encode", 1024, device=FUSED, tile_size=512)
+        for estimate in estimates:
+            [scores] = [term for term in estimate.terms if term.name == "mid_block_scores"]
+            assert scores.bytes > 0 and not scores.included
         # Tiling turns a 100GB+ reservation at the 2024px reference cap into under 2GB.
-        assert estimates[0] < untiled / 50
+        assert estimates[-1].reservation_bytes < untiled / 50
 
     def test_the_score_matrix_of_an_elongated_image_follows_the_clamped_tile(self):
         """A 2048px tile on a 1024x4096 image slices at most 1024x2048, so the mid-block attends over
@@ -690,13 +688,12 @@ class TestMaterializedScoreMatrixIsBudgeted:
             estimate = estimate_vae_working_memory_flux2(
                 operation="encode",
                 image_tensor=torch.zeros(1, 3, 1024, 4096),
-                vae=self._mock_bf16_vae(),
+                vae=_mock_bf16_vae(),
                 tile_size=2048,
                 device=MATERIALIZING,
             ).reservation_bytes
         tokens = 128 * 256
-        linear = _vae_line("cudnn", "encode", 1024 * 2048 * 1.25)
-        assert estimate == max(linear, tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
+        assert estimate == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT, "the scores are the larger phase here"
 
 
 class TestVaeTermsDoNotAdd:

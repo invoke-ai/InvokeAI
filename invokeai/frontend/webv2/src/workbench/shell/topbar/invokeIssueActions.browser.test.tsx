@@ -12,6 +12,7 @@ import {
 } from '@features/generation/core/architectureCapabilities';
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { registerPositivePromptElement } from '@features/generation/ui/promptFields/promptFocus';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
@@ -229,7 +230,39 @@ describe('useInvokeIssueActions', () => {
     await run({ message: 'Settings are incomplete.', target: { kind: 'widget', widgetId: 'video' } }, 'show');
     expect(isPlaced('video')).toBe(true);
 
-    await run({ message: 'The prompt could not be expanded.', target: { kind: 'prompt' } }, 'show');
+    await run(
+      { message: 'The prompt could not be expanded.', target: { kind: 'prompt', widgetId: 'generate' } },
+      'show'
+    );
     expect(isPlaced('generate')).toBe(true);
+  });
+
+  it("opens Video and focuses its own prompt, not Generate's, for a Video prompt that cannot expand", async () => {
+    const generatePrompt = document.createElement('textarea');
+    const videoPrompt = document.createElement('textarea');
+    document.body.append(generatePrompt, videoPrompt);
+    registerPositivePromptElement('generate', generatePrompt, null);
+    registerPositivePromptElement('video', videoPrompt, null);
+
+    try {
+      await run(
+        { message: 'The prompt could not be expanded.', target: { kind: 'prompt', widgetId: 'video' } },
+        'show'
+      );
+      await act(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          })
+      );
+
+      expect(isPlaced('video')).toBe(true);
+      expect(document.activeElement).toBe(videoPrompt);
+    } finally {
+      registerPositivePromptElement('generate', null, generatePrompt);
+      registerPositivePromptElement('video', null, videoPrompt);
+      generatePrompt.remove();
+      videoPrompt.remove();
+    }
   });
 });

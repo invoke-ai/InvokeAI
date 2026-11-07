@@ -103,6 +103,22 @@ def test_image_reads_reject_foreign_private_image(method_name: str, service_meth
     getattr(services.images, service_method).assert_not_called()
 
 
+def test_get_pil_keeps_the_cached_image_intact_when_the_conversion_fails() -> None:
+    """LAB has no conversion to L: the original mode is returned, as a copy rather than the service's object."""
+    images, services = _make_interface(allowed=True)
+    cached = Image.new("LAB", (4, 4), (50, 128, 128))
+    services.images.get_pil_image.return_value = cached
+    expected = cached.tobytes()
+
+    result = images.get_pil("lab-image", "L")
+
+    assert result.mode == "LAB"
+    assert result is not cached
+    result.paste((255, 0, 0), (0, 0, 4, 4))
+    assert cached.tobytes() == expected
+    services.logger.warning.assert_called_once()
+
+
 def test_image_dto_allows_foreign_shared_image() -> None:
     images, services = _make_interface(allowed=True)
     services.image_records.get_user_id.return_value = "owner"

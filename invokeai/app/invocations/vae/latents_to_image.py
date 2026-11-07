@@ -20,7 +20,11 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl, sd_vae_run_dtype
+from invokeai.backend.util.vae_working_memory import (
+    SD_VAE_TILE_OVERLAP_FACTOR,
+    estimate_vae_working_memory_sd15_sdxl,
+    sd_vae_run_dtype,
+)
 
 
 @invocation(
@@ -49,7 +53,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.tensors.load(self.latents.latents_name)
+        # The node returns the first image only, so decode only the first sample: the VAE and its working-memory
+        # estimate see a batch of one however many samples the latents carry.
+        latents = context.tensors.load(self.latents.latents_name)[:1]
 
         use_tiling = self.tiled or context.config.get().force_tiled_decode
 
@@ -91,7 +97,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 tiling_context = patch_vae_tiling_params(
                     vae,
                     tile_sample_min_size=self.tile_size,
-                    tile_overlap_factor=0.25,
+                    tile_overlap_factor=SD_VAE_TILE_OVERLAP_FACTOR,
                 )
 
             # clear memory as vae decode can request a lot

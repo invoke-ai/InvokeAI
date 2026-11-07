@@ -36,6 +36,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
+    MistralVariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -287,6 +288,49 @@ KLEIN_4B_SDNQ = _sdnq_pipeline("klein-4b-sdnq", BaseModelType.Flux2, variant=Flu
 FLUX2_VAE = _model("flux2-vae", BaseModelType.Flux2, ModelType.VAE)
 QWEN3_4B = _model("qwen3-4b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_4B)
 GGUF_DEV = _model("dev-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Dev)
+SDNQ_DEV = _sdnq_pipeline("dev-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Dev)
+MISTRAL = _model("mistral", BaseModelType.Any, ModelType.MistralEncoder, variant=MistralVariantType.Mistral24B)
+FP16_VAES = VaeDtypes(standalone_flux="fp16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
+"""A standalone FLUX.2 VAE decodes in fp16, apart from a Diffusers pipeline's bf16 and an SDNQ pipeline's fp32."""
+
+
+@pytest.mark.parametrize(
+    "target, line",
+    [(GGUF_KLEIN_9B, f"decode_{SDNQ_PIPELINE_VAE_DTYPE}"), (GGUF_DEV, "decode_fp16")],
+    ids=["klein-takes-the-sdnq-pipelines-vae", "dev-decodes-with-the-standalone-vae"],
+)
+def test_an_sdnq_flux2_pipeline_is_a_component_source_for_klein_only(target, line) -> None:
+    """The Klein model loader node takes a VAE from a self-contained SDNQ pipeline; the [dev] one takes components only
+    from a Diffusers pipeline, so beside the same installed models a [dev] model decodes with the standalone VAE."""
+    models = [KLEIN_4B_SDNQ, FLUX2_VAE, MISTRAL, QWEN3_8B]
+
+    assert _lines_of(_plan(target, models, vae_dtypes=FP16_VAES)) == {(line, ())}
+
+
+def test_a_dev_model_beside_only_an_sdnq_pipeline_and_no_vae_cannot_be_calibrated() -> None:
+    """Issue #10010: a [dev] GGUF model with a standalone Mistral encoder and only an SDNQ Klein pipeline has no source
+    its loader takes a VAE from, so without a standalone VAE no graph compiles."""
+    plan = _plan(GGUF_DEV, [KLEIN_4B_SDNQ, MISTRAL])
+
+    assert not plan.supported and plan.cases == [] and "standalone VAE" in (plan.reason or "")
+
+
+def test_a_diffusers_klein_pipeline_gives_a_dev_model_its_vae_beside_a_mistral_encoder() -> None:
+    """The [dev] loader takes the VAE of any Diffusers FLUX.2 pipeline, passing over an SDNQ one listed first."""
+    klein = _model("klein-diffusers", BaseModelType.Flux2, format="diffusers", variant=Flux2VariantType.Klein4B)
+
+    plan = _plan(GGUF_DEV, [KLEIN_4B_SDNQ, klein, FLUX2_VAE, MISTRAL], vae_dtypes=FP16_VAES)
+
+    assert _lines_of(plan) == {(f"decode_{FLUX2_PIPELINE_VAE_DTYPE}", ())}
+
+
+def test_an_sdnq_dev_model_decodes_with_a_standalone_vae_not_its_own() -> None:
+    """The [dev] loader takes no components from an SDNQ pipeline, the [dev] model itself included: it decodes with the
+    standalone VAE, or with a Diffusers [dev] pipeline's where one is installed."""
+    dev = _model("dev-diffusers", BaseModelType.Flux2, format="diffusers", variant=Flux2VariantType.Dev)
+
+    assert _lines_of(_plan(SDNQ_DEV, [FLUX2_VAE, MISTRAL], vae_dtypes=FP16_VAES)) == {("decode_fp16", ())}
+    assert _lines_of(_plan(SDNQ_DEV, [dev], vae_dtypes=FP16_VAES)) == {(f"decode_{FLUX2_PIPELINE_VAE_DTYPE}", ())}
 
 
 @pytest.mark.parametrize(
@@ -298,10 +342,20 @@ GGUF_DEV = _model("dev-gguf", BaseModelType.Flux2, format="gguf_quantized", vari
         # The 4B encoder fits the 4B transformer only.
         (GGUF_KLEIN_9B, [KLEIN_4B_SDNQ, QWEN3_4B], "Qwen3 8B"),
         (GGUF_DEV, [KLEIN_4B_SDNQ, FLUX2_VAE, QWEN3_8B], "Mistral"),
+        # The [dev] loader takes no encoder from an SDNQ [dev] model itself.
+        (SDNQ_DEV, [FLUX2_VAE], "Mistral"),
         # A VAE goes through the only main model that takes its pick, which cannot generate.
         (FLUX2_VAE, [GGUF_KLEIN_9B], "Qwen3 8B"),
     ],
-    ids=["unfitting-source", "unfitting-source-and-vae", "vae-alone", "encoder-of-another-size", "dev", "vae-target"],
+    ids=[
+        "unfitting-source",
+        "unfitting-source-and-vae",
+        "vae-alone",
+        "encoder-of-another-size",
+        "dev",
+        "sdnq-dev",
+        "vae-target",
+    ],
 )
 def test_a_flux2_model_without_a_text_encoder_generate_can_use_cannot_be_calibrated(target, models, encoder) -> None:
     """A FLUX.2 model that is no pipeline compiles only with a text encoder: a fitting pipeline's, or a standalone one of

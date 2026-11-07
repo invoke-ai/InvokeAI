@@ -25,7 +25,12 @@ import {
   type PromptTemplateState,
   type SavedPromptModels,
 } from './PositivePromptActions';
-import { editTextareaText, insertPromptText, registerPositivePromptElement } from './promptFocus';
+import {
+  editTextareaText,
+  insertPromptText,
+  type PositivePromptOwner,
+  registerPositivePromptElement,
+} from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 import { usePromptImageDrop } from './usePromptImageDrop';
@@ -40,6 +45,8 @@ interface PositivePromptFieldProps {
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
   /** Absent on surfaces whose model family has no prompt enhancer of its own. */
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
+  /** Whose prompt focus requests reach this field; Upscale shares Generate's. */
+  focusOwner?: PositivePromptOwner;
   /** Absent on surfaces with no template concept (Upscale). */
   promptTemplate?: PromptTemplateSnapshot | null;
   /** Show the merged prompt read-only instead of the authored text. */
@@ -69,6 +76,7 @@ export const PositivePromptField = ({
   batchCount = 1,
   dynamicPrompts = null,
   expandPromptSuggestion = null,
+  focusOwner = 'generate',
   heightPx,
   isTemplateViewMode = false,
   loras,
@@ -191,10 +199,13 @@ export const PositivePromptField = ({
     [flushDraftValue, onUsePrompt, writePrompt]
   );
 
-  const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
-    textareaRef.current = element;
-    registerPositivePromptElement(element);
-  }, []);
+  const handleTextareaRef = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      registerPositivePromptElement(focusOwner, element, textareaRef.current);
+      textareaRef.current = element;
+    },
+    [focusOwner]
+  );
 
   const insertTextAtCaret = useCallback(
     (text: string) => {

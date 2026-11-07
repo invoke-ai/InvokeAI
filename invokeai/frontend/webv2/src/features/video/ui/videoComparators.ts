@@ -32,6 +32,12 @@ export const areVideoValuesEqual = (left: VideoWidgetValues, right: VideoWidgetV
     left.negativePrompt === right.negativePrompt &&
     left.negativePromptEnabled === right.negativePromptEnabled &&
     left.positivePromptHeightPx === right.positivePromptHeightPx &&
+    left.dynamicPromptsCombinatorial === right.dynamicPromptsCombinatorial &&
+    left.dynamicPromptsEnabled === right.dynamicPromptsEnabled &&
+    left.dynamicPromptsMaxPrompts === right.dynamicPromptsMaxPrompts &&
+    left.dynamicPromptsResample === right.dynamicPromptsResample &&
+    left.dynamicPromptsSampleSeed === right.dynamicPromptsSampleSeed &&
+    left.dynamicPromptsSeedBehaviour === right.dynamicPromptsSeedBehaviour &&
     left.negativePromptHeightPx === right.negativePromptHeightPx &&
     left.aspectRatioId === right.aspectRatioId &&
     left.targetResolution === right.targetResolution &&

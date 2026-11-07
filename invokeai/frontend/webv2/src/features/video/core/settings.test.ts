@@ -130,6 +130,34 @@ describe('normalizeVideoSettings', () => {
     expect(isVideoSettings(legacy)).toBe(false);
   });
 
+  it("reads dynamic prompt settings saved before Video had them as off, with Video's prompt cap", () => {
+    const legacy: Record<string, unknown> = { ...createSettings() };
+
+    for (const key of Object.keys(legacy).filter((name) => name.startsWith('dynamicPrompts'))) {
+      delete legacy[key];
+    }
+
+    expect(normalizeVideoSettings(legacy)).toMatchObject({
+      dynamicPromptsCombinatorial: true,
+      dynamicPromptsEnabled: false,
+      dynamicPromptsMaxPrompts: 10,
+      dynamicPromptsResample: true,
+      dynamicPromptsSampleSeed: 0,
+      dynamicPromptsSeedBehaviour: 'per-iteration',
+    });
+    expect(isVideoSettings(legacy)).toBe(false);
+  });
+
+  it('starts a new Video panel, seeded or not yet, with dynamic prompts on and capped at 10', () => {
+    const newPanel = { dynamicPromptsEnabled: true, dynamicPromptsMaxPrompts: 10 };
+
+    expect(getDefaultVideoSettings()).toMatchObject(newPanel);
+    expect(normalizeVideoSettings({})).toMatchObject(newPanel);
+    expect(normalizeVideoSettings({ firstFrameImage: FIRST_FRAME, positivePrompt: 'a {red|green} fox' })).toMatchObject(
+      newPanel
+    );
+  });
+
   it('round-trips canonical settings', () => {
     const settings = createSettings({ firstFrameImage: FIRST_FRAME, positivePrompt: 'a cat' });
     const normalized = normalizeVideoSettings(settings);

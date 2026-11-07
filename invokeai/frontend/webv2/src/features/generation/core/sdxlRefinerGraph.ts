@@ -56,12 +56,6 @@ export const addSDXLRefinerStage = ({
     denoising_end: 1,
     denoising_start: settings.refinerStart,
     id: REFINER_DENOISE_NODE_ID,
-    // HiDiffusion is a UNet-level patch, so the refiner pass runs with the same settings as the base pass.
-    hidiffusion: denoise.hidiffusion,
-    hidiffusion_raunet: denoise.hidiffusion_raunet,
-    hidiffusion_window_attn: denoise.hidiffusion_window_attn,
-    hidiffusion_t1_ratio: denoise.hidiffusion_t1_ratio,
-    hidiffusion_t2_ratio: denoise.hidiffusion_t2_ratio,
     scheduler,
     steps: settings.refinerSteps,
     type: 'denoise_latents',

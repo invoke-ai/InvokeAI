@@ -2,7 +2,8 @@
 
 The measurement needs a CUDA or ROCm device and runs by hand. These cover what decides the lines the scripts write: that
 a measuring process applies the server's runtime with the allocator it was asked for and reports on the child protocol,
-how a cold and a warm forward become a `MeasuredPoint` in the point file or an invalid line that stays out of it, and that
+that a point whose measuring process raised is a failed line each script's run goes on past, how a cold and a warm
+forward become a `MeasuredPoint` in the point file or an invalid line that stays out of it, and that
 both scripts' records are what `scripts/working_memory/build_shipped.py --points` reads. Which of a point's windows decides
 its bytes is `measurement`'s, tested there; each script's grid, model and inputs are its own test file's.
 """
@@ -47,6 +48,7 @@ def _load(name: str):
 
 z_image = _load("calibrate_z_image_working_memory")
 flux2 = _load("calibrate_flux2_denoise_working_memory")
+tiling = _load("calibrate_vae_tiling_working_memory")
 ZPoint = z_image.Point
 
 
@@ -184,6 +186,57 @@ def test_the_driving_process_reads_the_childs_result_line_or_records_why_there_i
     assert measured == {"status": "point", "point": dataclasses.asdict(point)}
     assert failed == fresh_points.failed_line(point, "exit code 1: the device is gone")
     assert fresh_points.file_record(failed) is None
+
+
+@pytest.mark.parametrize(
+    ("script", "points"),
+    [
+        pytest.param(z_image, [ZPoint("fit", px, 512, "bfloat16", 2) for px in (1024, 2048)], id="z-image"),
+        pytest.param(flux2, [flux2.Point("fit", 3072, px, 512) for px in (1024, 2048)], id="flux2-denoise"),
+        pytest.param(
+            tiling, [tiling.Point("flux", "decode", "bfloat16", side, 512) for side in (1024, 2048)], id="vae-tiling"
+        ),
+    ],
+)
+def test_a_point_whose_measuring_process_raised_is_a_failed_row_and_the_run_goes_on(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], script, points: list
+) -> None:
+    """A measuring process raises when the device cannot synchronize or reset its peaks (`measurement.measure`), as on
+    any other error. Each script's run records that point as failed, with the error, prints its row in the script's
+    own columns, keeps it out of the point file and measures the next point."""
+    failing, measured = points
+    error = "RuntimeError: CUDA error: an illegal memory access was encountered"
+    child = tmp_path / "child.py"
+    child.write_text(
+        "import json, sys\n"
+        "request = json.loads(sys.argv[2])\n"
+        f"if request['point'] == {dataclasses.asdict(failing)!r}:\n"
+        f"    sys.exit({error!r})\n"
+        "line = {'status': 'point', 'fit': True, 'point': request['point'], 'measured_bytes': 2**30, "
+        "'method': 'demand_peak'}\n"
+        f"print({fresh_points.RESULT_PREFIX!r} + json.dumps(line))\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "points.jsonl"
+
+    lines = fresh_points.measure_points(
+        points,
+        script=child,
+        out=out,
+        alloc_conf="",
+        force=False,
+        logger_name="test",
+        columns=script._COLUMNS,
+        head=script._head,
+    )
+
+    assert lines[0] == fresh_points.failed_line(failing, f"exit code 1: {error}")
+    assert [json.loads(record) for record in out.read_text(encoding="utf-8").splitlines()] == [
+        fresh_points.file_record(lines[1])
+    ]
+    printed = capsys.readouterr().out
+    assert f"{script._head(lines[0])} {'FAILED':>10}  exit code 1: {error}" in printed
+    assert lines[1]["point"] == dataclasses.asdict(measured)
 
 
 WEIGHTS = 1463092352

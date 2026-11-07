@@ -22,6 +22,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 
 # The SD3 T5 Max Sequence Length set based on the default in diffusers.
 SD3_T5_MAX_SEQ_LEN = 256
@@ -99,11 +100,12 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         prompt = [self.prompt]
 
         t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
-        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
-        # zero for other builds.
+        # A GGUF build dequantizes each Linear per forward and a retained-FP8 build widens each one, transients
+        # its resident size does not cover; both are zero for other builds.
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(t5_text_encoder_info.compute_device)
         dequant_bytes = peak_dequant_transient_bytes(
-            t5_text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(t5_text_encoder_info.compute_device)
-        )
+            t5_text_encoder_info.model, compute_dtype
+        ) + peak_fp8_cast_transient_bytes(t5_text_encoder_info.model, compute_dtype)
         with (
             t5_text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (_, t5_text_encoder),
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,

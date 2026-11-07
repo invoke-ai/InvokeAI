@@ -56,7 +56,7 @@ from invokeai.backend.krea2.sampling_utils import (
 from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
 from invokeai.backend.krea2.text_encoding import KREA2_MAX_REFERENCE_IMAGES
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -489,7 +489,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self._validate_inputs()
 
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        inference_dtype = TorchDevice.choose_krea2_transformer_dtype(
+            is_gguf=transformer_config.format is ModelFormat.GGUFQuantized, device=device
+        )
 
         # Before the transformer loads, so a malformed reference fails before anything is spent on the model.
         self._validate_reference_counts(context)
@@ -657,7 +660,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        transformer_config = context.models.get_config(self.transformer.transformer)
         num_train_timesteps = scheduler.config.num_train_timesteps
 
         # Loaded once: the estimate prices these patches and the patcher applies the same ones. Each load reports its

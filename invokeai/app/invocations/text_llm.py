@@ -1,5 +1,4 @@
 import torch
-from transformers import AutoTokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, SystemPromptField, UIComponent
@@ -15,7 +14,11 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_common im
 )
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.model_manager.taxonomy import ModelType
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
+from invokeai.backend.text_llm_pipeline import (
+    DEFAULT_SYSTEM_PROMPT,
+    TextLLMPipeline,
+    load_text_llm_tokenizer_and_processor,
+)
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -28,12 +31,11 @@ def _run_text_llm(
     seed: int,
 ) -> str:
     """Shared LLM invocation body used by every text-LLM node in this module."""
-    model_config = context.models.get_config(text_llm_model)
+    tokenizer, _ = load_text_llm_tokenizer_and_processor(
+        lambda submodel: context.models.load(text_llm_model, submodel), with_processor=False
+    )
 
     with context.models.load(text_llm_model).model_on_device() as (_, model):
-        model_abs_path = context.models.get_absolute_path(model_config)
-        tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
-
         pipeline = TextLLMPipeline(model, tokenizer)
         model_device = next(model.parameters()).device
         return pipeline.run(

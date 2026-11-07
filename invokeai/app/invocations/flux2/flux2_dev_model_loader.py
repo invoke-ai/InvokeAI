@@ -182,10 +182,9 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
         variant-filtered in the workflow editor, so the *encoder* path is where variant gating
         belongs — see ``_validate_encoder_source``.
 
-        Note the [dev] linear UI is stricter than this: ``buildFLUXGraph`` sources from dev-only
-        pipelines and readiness gates on one, so the Klein-pipeline-as-VAE-source case is reachable
-        through the workflow editor only. (The Klein loader's linear UI *does* fall back to any
-        FLUX.2 diffusers pipeline for the VAE.)
+        Generate follows the same rule: with a standalone Mistral encoder it takes the VAE from any
+        FLUX.2 Diffusers pipeline, Klein ones included, and it never offers an SDNQ pipeline, which
+        this check rejects.
         """
         config = context.models.get_config(model)
         if config.format != ModelFormat.Diffusers:

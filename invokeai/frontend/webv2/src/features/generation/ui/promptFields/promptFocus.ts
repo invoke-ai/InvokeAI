@@ -1,26 +1,43 @@
 import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
 
-let positivePromptElement: HTMLTextAreaElement | null = null;
+/** Which surface's positive prompt: Generate (shared with Upscale) and Video are mounted side by side. */
+export type PositivePromptOwner = 'generate' | 'video';
+
+const positivePromptElements = new Map<PositivePromptOwner, HTMLTextAreaElement>();
 
 export type PromptTextRange = { end: number; start: number };
 
-export const registerPositivePromptElement = (element: HTMLTextAreaElement | null): void => {
-  positivePromptElement = element;
+/** `previous` is the field's own element, so one field unmounting never unregisters another's. */
+export const registerPositivePromptElement = (
+  owner: PositivePromptOwner,
+  element: HTMLTextAreaElement | null,
+  previous: HTMLTextAreaElement | null
+): void => {
+  if (element) {
+    positivePromptElements.set(owner, element);
+  } else if (positivePromptElements.get(owner) === previous) {
+    positivePromptElements.delete(owner);
+  }
 };
 
-export const focusPositivePrompt = (): boolean => {
-  if (!positivePromptElement) {
+export const focusPositivePrompt = (owner: PositivePromptOwner = 'generate'): boolean => {
+  const element = positivePromptElements.get(owner);
+
+  if (!element) {
     return false;
   }
 
-  positivePromptElement.focus();
-  positivePromptElement.select();
+  element.focus();
+  element.select();
 
   return true;
 };
 
-export const isPositivePromptFocused = (): boolean =>
-  positivePromptElement !== null && document.activeElement === positivePromptElement;
+export const isPositivePromptFocused = (owner: PositivePromptOwner = 'generate'): boolean => {
+  const element = positivePromptElements.get(owner);
+
+  return element !== undefined && document.activeElement === element;
+};
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 

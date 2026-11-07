@@ -106,13 +106,20 @@ The analytic terms:
   and invisible to them (`peak_dequant_transient_bytes`); zero for every other build.
 - The compute-dtype copies of a layer's float8-stored weights that FP8 Storage widens per forward
   (`peak_fp8_cast_transient_bytes`); zero for every other build.
+- What the LoRAs on the transformer need beside the activations, their sidecar layers' tensors and the largest
+  update a patched module forms per forward (`patches.sidecar_working_memory.lora_sidecar_bytes`): an update has a row
+  per token of the joint sequence of every sample, but in the timestep embedders (`_TIMESTEP_EMBEDDERS`), which run
+  once per sample. Zero without LoRAs, as at every point.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Final, cast
 
 import torch
 
+from invokeai.backend.model_manager.taxonomy import ModelFormat
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import FLUX3_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.calc_tensor_size import largest_module_bytes
@@ -129,6 +136,14 @@ _DTYPE_NAMES: Final[Mapping[torch.dtype, str]] = {torch.bfloat16: "bf16", torch.
 """The dtypes `TorchDevice.choose_bfloat16_safe_dtype` runs the transformer in."""
 _LINES: Final = tuple(f"denoise_{dtype}_h{width}" for dtype in _DTYPE_NAMES.values() for width in FLUX3_HIDDEN_SIZES)
 _COEFFICIENTS: Final = frozenset(f"{part}_{line}" for part in ("k", "b") for line in _LINES)
+_TIMESTEP_EMBEDDERS: Final = (
+    "timestep_embedder.linear_1",
+    "timestep_embedder.linear_2",
+    "target_timestep_embedder.linear_1",
+    "target_timestep_embedder.linear_2",
+)
+"""The Linears that embed a timestep, once per sample. Every other Linear runs over its stream's tokens: diffusers'
+transformer expands the timestep embedding to one row per token before the modulations and `norm_out.linear`."""
 
 
 def _suffix(features: Mapping[str, FeatureValue]) -> str | None:
@@ -175,6 +190,8 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
         WorkingMemoryTerm("attention_scores", cast(int, features["score_matrix_bytes"]), True),
         WorkingMemoryTerm("dequant_transient", cast(int, features["dequant_transient_bytes"]), True),
         WorkingMemoryTerm("fp8_cast_transient", cast(int, features["fp8_cast_transient_bytes"]), True),
+        # Absent from the points measured before LoRAs ran on FLUX.3, all of them forwards without one.
+        WorkingMemoryTerm("lora_sidecar", cast(int, features.get("lora_sidecar_bytes", 0)), True),
     )
 
 
@@ -198,6 +215,8 @@ def estimate_flux3_denoise_working_memory(
     text_seq_len: int,
     batch_size: int,
     weights_resident: bool = False,
+    loras: Sequence[ModelPatchRaw] = (),
+    model_format: ModelFormat | None = None,
     device: torch.device,
     dtype: torch.dtype,
 ) -> WorkingMemoryEstimate:
@@ -207,7 +226,8 @@ def estimate_flux3_denoise_working_memory(
     config, its largest layer, and its dequantization and fp8 cast transients. `image_seq_len`, `ref_image_seq_len`
     and `text_seq_len` are one sample's token counts, the longer caption of a CFG pair, and `batch_size` the samples the
     forward runs. `weights_resident` is True only where the caller knows every weight stays on the device for the
-    forward; otherwise the largest layer, which partial loading would stream, is reserved too.
+    forward; otherwise the largest layer, which partial loading would stream, is reserved too. `loras` are the LoRA
+    patches the forward applies, with the transformer's `model_format`, which decides whether they run as sidecars.
     """
     config: Any = transformer.config  # a diffusers ConfigMixin's
     heads, head_dim = int(config.num_attention_heads), int(config.attention_head_dim)
@@ -241,5 +261,35 @@ def estimate_flux3_denoise_working_memory(
         ),
         "dequant_transient_bytes": peak_dequant_transient_bytes(transformer, dtype),
         "fp8_cast_transient_bytes": peak_fp8_cast_transient_bytes(transformer, dtype),
+        "lora_sidecar_bytes": _lora_sidecar_bytes(transformer, loras, model_format, tokens, batch_size, dtype),
     }
     return FLUX3_DENOISE_SPEC.estimate(features, device)
+
+
+def _lora_sidecar_bytes(
+    transformer: torch.nn.Module,
+    loras: Sequence[ModelPatchRaw],
+    model_format: ModelFormat | None,
+    tokens: int,
+    batch_size: int,
+    dtype: torch.dtype,
+) -> int:
+    if not loras:
+        return 0
+    if model_format is None:
+        raise ValueError(
+            "Pricing LoRAs needs the transformer's model format, which decides where they run as sidecars."
+        )
+    # Imported here: the patch layers import the model manager's loaders, and `import_estimator_modules` imports this
+    # module on its own.
+    from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
+
+    return lora_sidecar_bytes(
+        loras,
+        transformer,
+        model_format,
+        prefix=FLUX3_LORA_TRANSFORMER_PREFIX,
+        rows=batch_size * tokens,
+        per_sample_rows=dict.fromkeys(_TIMESTEP_EMBEDDERS, batch_size),
+        dtype=dtype,
+    )

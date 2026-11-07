@@ -1,4 +1,4 @@
-import type { QueueItem } from '@features/queue/core/historyTypes';
+import type { QueueItem, QueueRunErrorCode } from '@features/queue/core/historyTypes';
 import type {
   QueueBackendPort,
   QueueEnqueueGenerateRequest,
@@ -136,7 +136,7 @@ export interface QueueHistoryCommands {
   }): void;
   setStatus(payload: {
     error?: string;
-    /** Set when `error` is a stand-in the notice words itself: the backend gave no reason, or the item vanished. */
+    /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
     errorCode?: QueueRunErrorCode;
     /** The backend items whose failure ended the run, so the failure notice can show and retry them. */
     failedBackendItemIds?: readonly number[];
@@ -146,8 +146,6 @@ export interface QueueHistoryCommands {
     status: QueueItem['status'];
   }): void;
 }
-
-export type QueueRunErrorCode = 'removed' | 'unexplained';
 
 type QueueItemBackendSubmission =
   | { kind: 'generate'; request: QueueEnqueueGenerateRequest }
@@ -1857,6 +1855,7 @@ export const createQueueRuntime = ({
       settleRun(project.id, currentQueueItem.id);
       commands.setStatus({
         error: 'This run was not submitted because its project cannot be saved.',
+        errorCode: 'project-not-saved',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1868,6 +1867,7 @@ export const createQueueRuntime = ({
     if (submission.kind === 'invalid') {
       commands.setStatus({
         error: submission.error,
+        errorCode: 'invalid-submission',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1936,6 +1936,7 @@ export const createQueueRuntime = ({
             settleRun(project.id, currentQueueItem.id);
             commands.setStatus({
               error: error.message,
+              errorCode: 'not-accepted',
               projectId: project.id,
               queueItemId: currentQueueItem.id,
               status: 'failed',
@@ -2290,6 +2291,7 @@ export const createQueueRuntime = ({
               if (exhaustedServerError !== undefined) {
                 commands.setStatus({
                   error: exhaustedServerError,
+                  errorCode: 'server-error',
                   projectId: project.id,
                   queueItemId: currentQueueItem.id,
                   status: 'failed',
