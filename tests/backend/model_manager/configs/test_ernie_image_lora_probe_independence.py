@@ -14,8 +14,10 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_ErnieImage_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -42,8 +44,8 @@ atexit.register(_TMP_DIR.cleanup)
 
 
 def _state_dict(keys: dict[str, list[int]]) -> dict[str, torch.Tensor]:
-    """The layout with a single element of storage per tensor: probes read names and shapes, never values."""
-    return {key: torch.zeros((), dtype=torch.float32).expand(shape) for key, shape in keys.items()}
+    """The layout as ``meta`` tensors, which is what the install probe reads from a safetensors file: shapes, no values."""
+    return {key: torch.empty(shape, dtype=torch.float32, device="meta") for key, shape in keys.items()}
 
 
 def _mod(sd: dict[str, torch.Tensor], name: str) -> tuple[MagicMock, dict]:
@@ -344,3 +346,167 @@ def test_the_weight_shape_table_matches_the_released_transformer() -> None:
     }
     # The one Conv2d is deliberately outside the table (and the module regex): no sidecar pricing exists for it.
     assert ernie_image_weight_shape("x_embedder.proj") is None
+
+
+# --- Real files through the real factory ---------------------------------------------------------------------------
+# Identification reads a safetensors file's header into `meta` tensors, so nothing in the probe may read a value. The
+# tests above hand the probe meta tensors directly; these write the bytes and go through `from_model_on_disk`.
+
+_ERNIE = "LoRA_LyCORIS_ErnieImage_Config"
+_PEFT_Q = "base_model.model.layers.3.self_attention.to_q"
+
+
+def _real_file(tmp_path: Path, layers: dict[str, list[int] | float]) -> Path:
+    """A safetensors file; a shape gives zeros of that shape, a float a one-element tensor (an alpha)."""
+    tensors = {
+        key: torch.full((1,), value, dtype=torch.float16)
+        if isinstance(value, float)
+        else torch.zeros(value, dtype=torch.float16)
+        for key, value in layers.items()
+    }
+    path = tmp_path / "lora.safetensors"
+    save_file(tensors, path)
+    return path
+
+
+def _identified_as(path: Path) -> dict[str, bool]:
+    result = ModelConfigFactory.from_model_on_disk(path)
+    return {name: not isinstance(v, Exception) for name, v in result.details.items() if "LoRA" in name}
+
+
+def _ernie_probe_error(path: Path) -> Exception:
+    result = ModelConfigFactory.from_model_on_disk(path)
+    error = result.details[_ERNIE]
+    assert isinstance(error, Exception)
+    return error
+
+
+_ALPHA_FILES = {
+    "kohya low-rank": {
+        f"{_Q}.lora_down.weight": [4, 4096],
+        f"{_Q}.lora_up.weight": [4096, 4],
+        f"{_Q}.alpha": 4.0,
+    },
+    "PEFT low-rank": {
+        f"{_PEFT_Q}.lora_A.weight": [4, 4096],
+        f"{_PEFT_Q}.lora_B.weight": [4096, 4],
+        f"{_PEFT_Q}.alpha": 2.0,
+    },
+    "LoHA": {
+        f"{_Q}.hada_w1_a": [4096, 4],
+        f"{_Q}.hada_w1_b": [4, 4096],
+        f"{_Q}.hada_w2_a": [4096, 4],
+        f"{_Q}.hada_w2_b": [4, 4096],
+        f"{_Q}.alpha": 4.0,
+    },
+    "factored LoKR": {
+        f"{_Q}.lokr_w1_a": [8, 2],
+        f"{_Q}.lokr_w1_b": [2, 8],
+        f"{_Q}.lokr_w2_a": [512, 2],
+        f"{_Q}.lokr_w2_b": [2, 512],
+        f"{_Q}.alpha": 2.0,
+    },
+}
+
+
+@pytest.mark.parametrize("case", list(_ALPHA_FILES))
+def test_a_saved_ernie_image_lora_with_an_alpha_tensor_is_identified(tmp_path: Path, case: str) -> None:
+    """The probe reads the file as `meta` tensors; building a layer used to call `.item()` on the alpha and refuse
+    every file that carried one."""
+    path = _real_file(tmp_path, _ALPHA_FILES[case])
+
+    assert _identified_as(path)[_ERNIE]
+
+
+def test_a_saved_ernie_image_lora_with_a_multi_value_alpha_is_refused(tmp_path: Path) -> None:
+    path = _real_file(tmp_path, {**_ALPHA_FILES["kohya low-rank"], f"{_Q}.alpha": [2]})
+
+    assert "alpha holds 2 values" in str(_ernie_probe_error(path))
+
+
+@pytest.mark.parametrize(
+    "layers,message",
+    [
+        ({f"{_Q}.alpha": 4.0}, "incomplete or inconsistent"),
+        ({f"{_Q}.lora_down.weight": [4, 4096], f"{_Q}.alpha": 4.0}, "low-rank pair"),
+        ({f"{_Q}.lora_down.weight": [4, 3072], f"{_Q}.lora_up.weight": [4096, 4], f"{_Q}.alpha": 4.0}, "shape"),
+    ],
+    ids=["orphan alpha", "half pair with alpha", "wrong input width with alpha"],
+)
+def test_a_saved_ernie_image_lora_that_cannot_be_applied_is_still_refused(
+    tmp_path: Path, layers: dict[str, list[int] | float], message: str
+) -> None:
+    path = _real_file(tmp_path, layers)
+
+    assert message in str(_ernie_probe_error(path))
+    assert not any(_identified_as(path).values())
+
+
+# Tucker cores (LyCORIS writes them for convolutions): the layer rebuilds them with an einsum that needs the core's
+# first two axes to match the factors' first axes, and the kernel axes must be 1x1 to reshape onto a Linear weight.
+_LOKR_TUCKER = {
+    f"{_Q}.lokr_w1": [8, 8],
+    f"{_Q}.lokr_t2": [2, 3, 1, 1],
+    f"{_Q}.lokr_w2_a": [2, 512],
+    f"{_Q}.lokr_w2_b": [3, 512],
+}
+_LOHA_TUCKER = {
+    f"{_Q}.hada_t1": [2, 3, 1, 1],
+    f"{_Q}.hada_w1_a": [2, 4096],
+    f"{_Q}.hada_w1_b": [3, 4096],
+    f"{_Q}.hada_t2": [2, 3, 1, 1],
+    f"{_Q}.hada_w2_a": [2, 4096],
+    f"{_Q}.hada_w2_b": [3, 4096],
+}
+
+
+def test_a_correctly_sized_tucker_lokr_and_loha_are_identified(tmp_path: Path) -> None:
+    lokr = _real_file(tmp_path, {**_LOKR_TUCKER, f"{_Q}.alpha": 2.0})
+    assert _identified_as(lokr)[_ERNIE]
+
+    loha = _real_file(tmp_path, {**_LOHA_TUCKER, f"{_Q}.alpha": 2.0})
+    assert _identified_as(loha)[_ERNIE]
+
+
+@pytest.mark.parametrize(
+    "layers,message",
+    [
+        ({**_LOKR_TUCKER, f"{_Q}.lokr_w2_a": [5, 512]}, "Tucker"),
+        ({**_LOKR_TUCKER, f"{_Q}.lokr_t2": [2, 3, 3, 3]}, "kernel"),
+        ({**_LOHA_TUCKER, f"{_Q}.hada_w1_b": [7, 4096]}, "Tucker"),
+        ({**_LOHA_TUCKER, f"{_Q}.hada_w2_a": [2, 2048]}, "Tucker"),
+        ({k: v for k, v in _LOKR_TUCKER.items() if "w2_" not in k}, "incomplete or inconsistent"),
+        # Plain (out, rank) / (rank, in) factors next to a core: the product is sized (4096, 4096), but the
+        # patcher's einsum wants the core's axes to match the factors' first axes.
+        ({**_LOKR_TUCKER, f"{_Q}.lokr_w2_a": [512, 4], f"{_Q}.lokr_w2_b": [4, 512]}, "Tucker"),
+        (
+            {
+                **_LOHA_TUCKER,
+                f"{_Q}.hada_w1_a": [4096, 4],
+                f"{_Q}.hada_w1_b": [4, 4096],
+                f"{_Q}.hada_w2_a": [4096, 4],
+                f"{_Q}.hada_w2_b": [4, 4096],
+            },
+            "Tucker",
+        ),
+    ],
+    ids=[
+        "LoKR factor",
+        "LoKR kernel",
+        "LoHA factor",
+        "LoHA product shapes",
+        "LoKR core without factors",
+        "LoKR factors in the plain layout",
+        "LoHA factors in the plain layout",
+    ],
+)
+def test_a_saved_ernie_image_lora_with_inconsistent_tucker_factors_is_refused(
+    tmp_path: Path, layers: dict[str, list[int] | float], message: str
+) -> None:
+    """The last two ("plain layout") passed the probe, which sized the factors' product as (4096, 4096), and then
+    raised an einsum ValueError in the patcher at generation. The others were already refused by the shape check,
+    because their factors' inner sizes disagree; they pin the Tucker check's own messages."""
+    path = _real_file(tmp_path, layers)
+
+    assert message in str(_ernie_probe_error(path))
+    assert not any(_identified_as(path).values())
