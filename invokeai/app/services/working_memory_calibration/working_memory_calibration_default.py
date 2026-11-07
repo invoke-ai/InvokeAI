@@ -1246,6 +1246,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
     def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
         """Count a retry in flight on each run one of whose items the queue is about to retry, before it commits the
         retries: the store then records every retry of a calibration item, or keeps its attempt out of every fit.
+        Refuse a retry whose attempt no longer owns an exclusive measurement sequence on the device class.
 
         A retry inherits its source's origin, which names the run: a recreated or restored database that gave a
         recorded id to an unrelated item cannot make that item's retry the run's, and a bulk retry of generations
@@ -1260,10 +1261,20 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             return None
         run_ids = frozenset(run_id for run_id, _ in lineages.values())
         counted: dict[str, frozenset[str]] = {}
+
+        def count(file: CalibrationStoreFile) -> tuple[bool, frozenset[str]]:
+            keys = {key for run in file.runs if run.run_id in run_ids and (key := _attempt_key(run)) is not None}
+            for key in keys:
+                if _cut_off(file, key):
+                    raise CalibrationAttemptInterleavedError(_INTERLEAVED)
+                if (busy := self._attempt_blocks(file, key)) is not None:
+                    raise CalibrationAttemptBusyError(busy)
+            return _count_retries(run_ids, file)
+
         try:
             for device_class_id in self._store.device_class_ids():
                 try:
-                    marked = self._store.change(device_class_id, partial(_count_retries, run_ids))
+                    marked = self._store.change(device_class_id, count)
                 except CalibrationStoreUnusableError:
                     # Kept as it is and never written: it holds no run a calibration item can be admitted for.
                     continue

@@ -37,8 +37,9 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Called by the session queue before it commits retries: per item a retry is made of, that item's origin and
         the item its lineage started from. Counts the retries in flight on the runs of the calibration items among
         them, in the store, so that a retry the store then fails to record keeps its attempt from feeding a fit. None
-        when no item is a calibration's, which touches no store file. Raises `CalibrationStoreError` when the store
-        cannot be written: the queue then retries nothing."""
+        when no item is a calibration's, which touches no store file. Raises `CalibrationAttemptBusyError` or
+        `CalibrationAttemptInterleavedError` when retrying would break attempt exclusivity, and `CalibrationStoreError`
+        when the store cannot be written: the queue then retries nothing."""
 
     @abstractmethod
     def retries_committed(self, in_flight: RetriesInFlight, retried: Optional[Iterable[RetriedQueueItem]]) -> None:

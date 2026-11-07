@@ -1738,6 +1738,32 @@ def test_a_calibration_between_two_steps_of_an_attempt_refuses_its_next_step(tmp
     assert runs[first.run_id] == "aborted_attempt"
 
 
+@pytest.mark.parametrize("other_status", ["completed", "running"])
+def test_a_retry_after_another_attempt_started_is_refused(tmp_path: Path, started, other_status: str) -> None:
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    request_a = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="tab-a", attempt_steps=2
+    )
+    failed = asyncio.run(service.create_run("model-a", request_a, "system"))
+    _settle_as_the_runner(service, failed.run_id, failed.item_ids, "failed")
+
+    request_b = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="tab-b", attempt_steps=2
+    )
+    other = asyncio.run(service.create_run("model-a", request_b, "system"))
+    if other_status == "completed":
+        _settle_as_the_runner(service, other.run_id, other.item_ids, "completed")
+
+    before = queue.get_queue_item_ids("default").item_ids
+    with pytest.raises(CalibrationAttemptInterleavedError):
+        queue.retry_items_by_id("default", failed.item_ids)
+
+    assert queue.get_queue_item_ids("default").item_ids == before
+    failed_record = _stored_run(tmp_path, failed.run_id)
+    assert failed_record.get("retries_in_flight", 0) == 0
+
+
 def test_another_attempt_waits_while_one_is_between_its_steps(tmp_path: Path, started, monkeypatch) -> None:
     """A's first step finished a moment ago, and its client is about to post the next: B, another administrator's,
     is refused, A's next step is not, and once A finished B may start."""
