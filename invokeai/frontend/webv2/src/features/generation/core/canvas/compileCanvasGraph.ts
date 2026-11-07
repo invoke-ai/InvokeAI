@@ -390,7 +390,7 @@ const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: nu
   }
 };
 
-/** The SD `i2l` node carries fp32; every other family's encode node does not. */
+/** Only the SD `i2l` node supports precision and color compensation settings. */
 const isSdI2l = (i2lType: string): boolean => i2lType === 'i2l';
 
 /** Adds the base-appropriate image-to-latents encode node fed by `imageName`. */
@@ -404,7 +404,12 @@ const addEncodeNode = (
     id: 'canvas_i2l',
     ...(imageName ? { image: { image_name: imageName } } : {}),
     type: i2lType,
-    ...(isSdI2l(i2lType) ? { fp32: settings.vaePrecision === 'fp32' } : {}),
+    ...(isSdI2l(i2lType)
+      ? {
+          color_compensation: settings.colorCompensation ? 'SDXL' : 'None',
+          fp32: settings.vaePrecision === 'fp32',
+        }
+      : {}),
   });
 
 const addInputResizeNode = (

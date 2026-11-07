@@ -34,6 +34,7 @@ class BulkDownloadService(BulkDownloadBase):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        uncategorized_owner_id: Optional[str] = None,
     ) -> None:
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
         bulk_download_item_id = bulk_download_item_id or uuid_string()
@@ -48,7 +49,7 @@ class BulkDownloadService(BulkDownloadBase):
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                image_dtos = self._board_handler(board_id)
+                image_dtos = self._board_handler(board_id, uncategorized_owner_id)
             elif image_names:
                 image_dtos = self._image_handler(image_names)
             else:
@@ -71,11 +72,14 @@ class BulkDownloadService(BulkDownloadBase):
     def _image_handler(self, image_names: list[str]) -> list[ImageDTO]:
         return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
-    def _board_handler(self, board_id: str) -> list[ImageDTO]:
+    def _board_handler(self, board_id: str, uncategorized_owner_id: Optional[str]) -> list[ImageDTO]:
+        # "none" spans every account's uncategorized images, so it is scoped to the owner. A real board was
+        # authorized as a whole, so a shared board keeps every contributor's images.
         image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(
             board_id,
             categories=None,
             is_intermediate=None,
+            user_id=uncategorized_owner_id if board_id == "none" else None,
         )
         return self._image_handler(image_names)
 

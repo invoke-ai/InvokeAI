@@ -198,6 +198,12 @@ export interface ToolContext {
   documentDeltaToLayerLocal?(layerId: string, delta: Vec2): Vec2;
   /** True if `point` (document space) falls inside the live selection. */
   isPointInSelection?(point: Vec2): boolean;
+  /**
+   * The gesture in progress has started editing the selected layer in place after its press, e.g. a move crossing
+   * its drag threshold. Answers what {@link Tool.editsSelectedLayer} would have at the press, for a tool that only
+   * knows later; outside a pointer gesture it does nothing.
+   */
+  beginSelectedLayerEdit?(): void;
 }
 
 /** Temporary modifier switches/restores preserve sessions; real switches or disposal tear them down. */
@@ -237,4 +243,12 @@ export interface Tool {
    * pointer pipeline must not turn an alt-hold into the temporary color picker.
    */
   readonly usesAltKey?: boolean;
+  /**
+   * Whether a primary gesture starting now edits the selected layer in place, writing its pixels or its placement:
+   * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture
+   * starts; absent means never at the press (a tool that decides later calls
+   * {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a mask or a region, the screen shows
+   * their stacks above a staged preview that otherwise hides them.
+   */
+  editsSelectedLayer?(ctx: ToolContext): boolean;
 }
