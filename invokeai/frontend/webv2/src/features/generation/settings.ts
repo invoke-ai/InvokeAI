@@ -53,6 +53,7 @@ export {
   createReferenceImageId,
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
+  getDefaultTextEncoderSlots,
   withAddedReferenceImages,
   getGenerateModelSelectionResult,
   isComponentCompatibleWithModel,

@@ -110,6 +110,8 @@ export interface WorkbenchPreferences {
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;
+  /** Picking another Generate model applies its defaults, as "Reset all to model defaults" does. */
+  applyModelDefaultsOnSwitch: boolean;
   /** Toast when an invocation is added to the queue. The notification center records it regardless. */
   notifyOnEnqueue: boolean;
   /** Project export carries the exporter's workspace (layout, generation settings, prompt history); the last choice. */

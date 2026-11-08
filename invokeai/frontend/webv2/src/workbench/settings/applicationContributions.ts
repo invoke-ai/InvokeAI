@@ -75,6 +75,11 @@ export const behaviorSettings = section('behavior', 'Behavior', [
       { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
     ],
   },
+  preference(
+    'applyModelDefaultsOnSwitch',
+    'Apply model defaults when switching models',
+    'generate model steps cfg guidance scheduler vae encoder reset'
+  ),
   preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
   preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),

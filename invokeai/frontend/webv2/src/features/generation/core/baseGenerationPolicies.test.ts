@@ -9,6 +9,7 @@ import {
 import i18n from 'i18next';
 import { describe, expect, it } from 'vitest';
 
+import type { GenerationModelCatalogItem as ModelConfig } from './contracts';
 import type {
   ComponentModelConfig,
   GenerateReferenceImage,
@@ -35,6 +36,7 @@ import {
   getKrea2EditLoraState,
   getMaxReferenceImages,
   getMissingReferenceImageFormat,
+  getModelDefaultComponents,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
@@ -2097,6 +2099,117 @@ describe('component policies', () => {
         [model as never]
       )
     ).toEqual([]);
+  });
+});
+
+describe('model defaults and required components on a switch', () => {
+  const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+  const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', name: 'Qwen3 8B', variant: 'qwen3_8b' };
+  const otherQwen3_8b: ComponentModelConfig = { ...qwen3_8b, key: 'qwen3-8b-fp8', name: 'Qwen3 8B FP8' };
+  const otherFlux2Vae: VaeModelConfig = { ...flux2Vae, key: 'flux2-vae-2', name: 'FLUX.2 VAE (copy)' };
+  const clipG: ComponentModelConfig = { ...clipEmbed, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+  const sdxl = createModel('sdxl');
+  const klein9b = createModel('flux2', { format: 'gguf_quantized', key: 'klein-9b', variant: 'klein_9b' });
+  const select = (
+    model: GenerateModelConfig,
+    models: readonly ModelConfig[],
+    currentValues: GenerateSettings = createSettings(sdxl),
+    applyModelDefaults = false
+  ) => getGenerateModelSelectionResult({ applyModelDefaults, currentValues, model, models });
+
+  it('fills an empty required encoder and VAE with the only installed models that fit', () => {
+    const { settings } = select(klein9b, [qwen3_4b, qwen3_8b, flux2Vae, fluxVae]);
+
+    expect(settings.qwen3EncoderModel?.key).toBe(qwen3_8b.key);
+    expect(settings.vae?.key).toBe(flux2Vae.key);
+  });
+
+  it('replaces an encoder the new model cannot use with the only one that fits, and still reports the removal', () => {
+    const zImage = createModel('z-image', { format: 'checkpoint' });
+    const result = select(
+      klein9b,
+      [qwen3_4b, qwen3_8b, flux2Vae],
+      createSettings(zImage, { qwen3EncoderModel: qwen3_4b })
+    );
+
+    expect(result.settings.qwen3EncoderModel?.key).toBe(qwen3_8b.key);
+    expect(result.changes).toContainEqual({ kind: 'removed', subject: 'qwen3EncoderModel' });
+  });
+
+  it('leaves a slot empty when several installed models fit and the model names none of them', () => {
+    const { settings } = select(klein9b, [qwen3_8b, otherQwen3_8b, flux2Vae, otherFlux2Vae]);
+
+    expect(settings.qwen3EncoderModel).toBeNull();
+    expect(settings.vae).toBeNull();
+  });
+
+  it("takes the model's default among several that fit", () => {
+    const model = { ...klein9b, default_settings: { text_encoders: [otherQwen3_8b.key], vae: otherFlux2Vae.key } };
+    const { settings } = select(model, [qwen3_8b, otherQwen3_8b, flux2Vae, otherFlux2Vae]);
+
+    expect(settings.qwen3EncoderModel?.key).toBe(otherQwen3_8b.key);
+    expect(settings.vae?.key).toBe(otherFlux2Vae.key);
+  });
+
+  it('keeps a compatible encoder the user chose over the only other one and over the default', () => {
+    const model = { ...klein9b, default_settings: { text_encoders: [qwen3_8b.key] } };
+    const kleinFp8 = createModel('flux2', { format: 'checkpoint', key: 'klein-fp8', variant: 'klein_9b' });
+    const { settings } = select(
+      model,
+      [qwen3_8b, otherQwen3_8b],
+      createSettings(kleinFp8, { qwen3EncoderModel: otherQwen3_8b })
+    );
+
+    expect(settings.qwen3EncoderModel?.key).toBe(otherQwen3_8b.key);
+  });
+
+  it('leaves optional slots empty, where empty means the components the main model brings', () => {
+    const { settings } = select(createModel('sd-3'), [t5Encoder, clipEmbed, clipG]);
+
+    expect([settings.t5EncoderModel, settings.clipLEmbedModel, settings.clipGEmbedModel]).toEqual([null, null, null]);
+  });
+
+  it('fills nothing when the model stays the same', () => {
+    const { settings } = select(klein9b, [qwen3_8b, flux2Vae], createSettings(klein9b));
+
+    expect(settings.qwen3EncoderModel).toBeNull();
+    expect(settings.vae).toBeNull();
+  });
+
+  it('puts each default text encoder into the slot that accepts it and skips ones that fit none or are missing', () => {
+    const flux = createModel('flux', {
+      default_settings: { text_encoders: ['not-installed', clipG.key, clipEmbed.key, t5Encoder.key], vae: fluxVae.key },
+    });
+
+    expect(getModelDefaultComponents(flux, createSettings(flux), [t5Encoder, clipEmbed, clipG, fluxVae])).toEqual({
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    });
+  });
+
+  it("starts a switch from the new model's defaults only when asked to", () => {
+    const model = {
+      ...klein9b,
+      default_settings: { scheduler: 'heun', steps: 4, text_encoders: [otherQwen3_8b.key], vae: otherFlux2Vae.key },
+    };
+    const models = [qwen3_8b, otherQwen3_8b, flux2Vae, otherFlux2Vae];
+    const before = createSettings(sdxl, { scheduler: 'euler', steps: 30 });
+    const kept = select(model, models, before).settings;
+    const applied = select(model, models, before, true).settings;
+
+    expect([kept.steps, kept.scheduler]).toEqual([30, 'euler']);
+    expect([applied.steps, applied.scheduler, applied.modelKey]).toEqual([4, 'heun', model.key]);
+    expect([applied.qwen3EncoderModel?.key, applied.vae?.key]).toEqual([otherQwen3_8b.key, otherFlux2Vae.key]);
+    expect(select(model, models, createSettings(model, { steps: 30 }), true).settings.steps).toBe(30);
+  });
+
+  it("applies the model's default encoders on Reset all to model defaults", () => {
+    const flux = createModel('flux', { default_settings: { text_encoders: [t5Encoder.key, clipEmbed.key] } });
+    const settings = getSettingsWithModelDefaults(createSettings(flux), flux, [t5Encoder, clipEmbed]);
+
+    expect([settings.t5EncoderModel?.key, settings.clipEmbedModel?.key]).toEqual([t5Encoder.key, clipEmbed.key]);
+    expect(getSettingsWithModelDefaults(createSettings(flux), flux).t5EncoderModel).toBeNull();
   });
 });
 

@@ -21,6 +21,11 @@ DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 
 class MainModelDefaultSettings(BaseModel):
     vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
+    text_encoders: list[str] | None = Field(
+        default=None,
+        description="Default text encoders for this model (model keys). Generate fills each encoder slot the model "
+        "uses with the first of these it accepts.",
+    )
     vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
     scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
     steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")

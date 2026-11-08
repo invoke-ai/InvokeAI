@@ -1,5 +1,5 @@
 import type { AnyModelDefaultSettings, ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
-import type { ModelSchedulerPolicy, SchedulerChoice } from '@features/models/ui/ModelsUiContext';
+import type { ModelSchedulerPolicy, SchedulerChoice, TextEncoderSlotChoice } from '@features/models/ui/ModelsUiContext';
 import type { TFunction } from 'i18next';
 
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
@@ -42,7 +42,9 @@ export type DefaultSettingsControl =
       sameBase: boolean;
       /** Placeholder shown for the backend's 'default' sentinel. */
       placeholderKey: string;
-    };
+    }
+  /** One picker per slot; the value is the list of picked model keys. */
+  | { kind: 'textEncoders'; slots: readonly TextEncoderSlotChoice[] };
 
 export interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
@@ -84,7 +86,16 @@ const VAE_FIELD: FieldSpec = {
   labelKey: 'models.defaultFields.vae',
 };
 
-/** Main-model fields after the VAE and scheduler rows. */
+/** An empty list turns the row on with nothing picked yet, as the VAE's 'default' sentinel does. */
+const getTextEncodersField = (slots: readonly TextEncoderSlotChoice[]): FieldSpec => ({
+  control: { kind: 'textEncoders', slots },
+  defaultValue: [],
+  inheritLabelKey: 'models.defaultFieldInherited.textEncoders',
+  key: 'text_encoders',
+  labelKey: 'models.defaultFields.textEncoders',
+});
+
+/** Main-model fields after the VAE, text encoder and scheduler rows. */
 const MAIN_FIELDS: FieldSpec[] = [
   {
     control: { kind: 'number', max: 10000, min: 1 },
@@ -197,7 +208,9 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
  *
  * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the
  * scheduler the row is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the
- * rules load or after they fail the row shows disabled, so it neither jumps in later nor silently disappears.
+ * rules load or after they fail the row shows disabled, so it neither jumps in later nor silently disappears. The
+ * rules also name the model's text encoder slots; the encoders row needs them to show its pickers, so it appears with
+ * them, and a model without slots has none.
  */
 export const getFieldsForModel = (
   model: Pick<ModelConfig, 'default_settings' | 'type'>,
@@ -213,7 +226,11 @@ export const getFieldsForModel = (
       (typeof schedulerRules === 'string' || schedulerRules.appliesToGraph || storedScheduler !== null)
         ? [getSchedulerField(schedulerRules, storedScheduler)]
         : [];
-    return [VAE_FIELD, ...schedulerFields, ...MAIN_FIELDS, ...fp8Fields];
+    const textEncoderFields =
+      schedulerRules && typeof schedulerRules !== 'string' && schedulerRules.textEncoderSlots.length > 0
+        ? [getTextEncodersField(schedulerRules.textEncoderSlots)]
+        : [];
+    return [VAE_FIELD, ...textEncoderFields, ...schedulerFields, ...MAIN_FIELDS, ...fp8Fields];
   }
 
   if (model.type === 'lora') {

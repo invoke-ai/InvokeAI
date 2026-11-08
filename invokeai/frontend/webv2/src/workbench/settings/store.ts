@@ -41,6 +41,7 @@ export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
   antialiasProgressImages: false,
+  applyModelDefaultsOnSwitch: false,
   aspectRatioPresets: [],
   autoSwitchInvocationRoute: true,
   canvasToolMemory: {},
@@ -415,6 +416,7 @@ type WorkbenchPreferencesInput = Omit<
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
   antialiasProgressImages: preferences?.antialiasProgressImages === true,
+  applyModelDefaultsOnSwitch: preferences?.applyModelDefaultsOnSwitch === true,
   aspectRatioPresets: normalizeAspectRatioPresetRecords(preferences?.aspectRatioPresets),
   autoSwitchInvocationRoute:
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'

@@ -27,6 +27,7 @@ export type MainModelConfig = ModelIdentifierConfig & {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    text_encoders?: string[] | null;
   } | null;
 };
 

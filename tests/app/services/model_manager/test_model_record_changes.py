@@ -224,6 +224,11 @@ def _identify(model_file: Path, overrides: Optional[dict[str, object]] = None, /
             ModelRecordChanges(default_settings=MainModelDefaultSettings(steps=12)), False, id="generation_default"
         ),
         pytest.param(
+            ModelRecordChanges(default_settings=MainModelDefaultSettings(text_encoders=["t5-key", "clip-key"])),
+            False,
+            id="default_text_encoders",
+        ),
+        pytest.param(
             ModelRecordChanges(default_settings=MainModelDefaultSettings(fp8_storage=True)), True, id="fp8_storage"
         ),
         pytest.param(ModelRecordChanges(default_settings=MainModelDefaultSettings(cpu_only=True)), True, id="cpu_only"),

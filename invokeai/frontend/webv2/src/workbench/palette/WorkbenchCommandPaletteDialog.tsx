@@ -284,6 +284,7 @@ const WorkbenchCommandPaletteDialog = ({
         selectModel: (model, catalogModels) => {
           const { currentValues, isCanvasFrame, projectId } = readCurrentGenerateContext();
           const selection = selectProjectGenerateModel({
+            applyModelDefaults: preferences.applyModelDefaultsOnSwitch,
             currentValues,
             generation,
             isCanvasFrame,
@@ -369,6 +370,7 @@ const WorkbenchCommandPaletteDialog = ({
     openProject,
     openProjects,
     openWidgetPlacement,
+    preferences.applyModelDefaultsOnSwitch,
     projectId,
     projectLibrary,
     promptHistory,

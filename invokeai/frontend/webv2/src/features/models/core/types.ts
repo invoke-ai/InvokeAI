@@ -97,6 +97,8 @@ export type PredictionType = 'epsilon' | 'v_prediction' | 'sample';
 /** Per-model defaults that Generate can apply explicitly. */
 export interface MainModelDefaultSettings {
   vae?: string | null;
+  /** Model keys; Generate puts each into the encoder slot that accepts it. */
+  text_encoders?: string[] | null;
   vae_precision?: 'fp16' | 'fp32' | null;
   scheduler?: string | null;
   steps?: number | null;

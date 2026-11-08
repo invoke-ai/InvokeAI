@@ -64,6 +64,7 @@ export const GenerateModelCard = ({
   const selectId = useId();
   // On a Canvas source the width and height are the frame, which a switch keeps for a hosted provider.
   const isCanvasFrame = ui.project.invocationSourceId === 'canvas';
+  const applyModelDefaults = ui.models.applyDefaultsOnSwitch;
   const openManagerForMainModels = useCallback(() => openManager({ modelType: 'main' }), [openManager]);
   const [isRetryingModels, setIsRetryingModels] = useState(false);
   const { refresh: refreshModels } = ui.models;
@@ -85,6 +86,7 @@ export const GenerateModelCard = ({
       pendingSwitchModel
         ? describeModelSwitchChanges(
             getGenerateModelSelectionResult({
+              applyModelDefaults,
               currentValues: settings,
               isCanvasFrame,
               model: pendingSwitchModel,
@@ -100,7 +102,13 @@ export const GenerateModelCard = ({
 
   const commitModelSelection = (model: GenerateModelConfig) => {
     const before = draft.getSnapshot();
-    const result = getGenerateModelSelectionResult({ currentValues: before, isCanvasFrame, model, models });
+    const result = getGenerateModelSelectionResult({
+      applyModelDefaults,
+      currentValues: before,
+      isCanvasFrame,
+      model,
+      models,
+    });
 
     onCommitSettings(result.settings);
 
@@ -130,6 +138,7 @@ export const GenerateModelCard = ({
     }
 
     const result = getGenerateModelSelectionResult({
+      applyModelDefaults,
       currentValues: draft.getSnapshot(),
       isCanvasFrame,
       model,
