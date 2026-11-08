@@ -53,7 +53,7 @@ const draw = (tool: Tool, ctx: ToolContext, kind: ShapeToolKind, cutout = false)
 const drawOn = (
   layer: CanvasLayerContract,
   kind: ShapeToolKind,
-  { cutout = false, prefill }: { cutout?: boolean; prefill?: string } = {}
+  { cutout = false, prefill, strokeOnly = false }: { cutout?: boolean; prefill?: string; strokeOnly?: boolean } = {}
 ) => {
   const backend = createDomRasterBackend();
   const layers = createLayerCacheStore(backend);
@@ -64,7 +64,7 @@ const drawOn = (
     entry.surface.ctx.fillRect(0, 0, 100, 100);
   }
   const stores = createEngineStores();
-  stores.shapeOptions.set({ ...stores.shapeOptions.get(), kind });
+  stores.shapeOptions.set({ ...stores.shapeOptions.get(), fillEnabled: !strokeOnly, kind, strokeEnabled: strokeOnly });
   // A translucent foreground must still paint full coverage.
   stores.colorPair.set({ background: '#000000', foreground: '#ff000040' });
   const strokeEdit = createRecordingStrokeEdit();
@@ -125,6 +125,14 @@ describe('shape tool on a mask in Chromium', () => {
     }
   );
 
+  it('paints an inside stroke without filling the mask interior', () => {
+    const { alphaAt, strokeEdit } = drawOn(layerContract('mask', 'inpaint_mask'), 'rect', { strokeOnly: true });
+    expect(alphaAt(22, 40)).toBe(255);
+    expect(alphaAt(50, 40)).toBe(0);
+    expect(alphaAt(19, 40)).toBe(0);
+    expect(strokeEdit.record.commits).toHaveLength(1);
+  });
+
   it('lands coverage under the cursor on a moved and scaled regional mask', () => {
     const mask = layerContract('region', 'regional_guidance', {
       transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 10, y: 10 },
@@ -164,5 +172,18 @@ describe('shape cutout in Chromium', () => {
     } else {
       expect(alphaAt(50, 40)).toBe(0);
     }
+  });
+
+  it('cuts only the inside polygon outline and leaves its hollow interior intact', () => {
+    const { alphaAt, strokeEdit } = drawOn(layerContract('paint', 'raster'), 'polygon', {
+      cutout: true,
+      prefill: '#336699',
+      strokeOnly: true,
+    });
+    expect(alphaAt(76, 35)).toBe(0);
+    expect(alphaAt(65, 30)).toBe(255);
+    expect(alphaAt(25, 55)).toBe(255);
+    expect(strokeEdit.record.commits).toHaveLength(1);
+    expect(strokeEdit.record.commits[0]?.tool).toBe('shape-cutout');
   });
 });
