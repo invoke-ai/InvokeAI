@@ -18,7 +18,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, Activity, useState, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -212,6 +212,21 @@ let queryClient: QueryClient;
 let compile: ReturnType<typeof vi.fn<CalibrationGraphCompiler>>;
 let currentSummary: WorkingMemorySummary | Error;
 
+const RetainedSection = () => {
+  const [visible, setVisible] = useState(true);
+  const toggleVisible = useCallback(() => setVisible((value) => !value), []);
+  return (
+    <>
+      <button type="button" data-test-visibility="" onClick={toggleVisible}>
+        Toggle visibility
+      </button>
+      <Activity mode={visible ? 'visible' : 'hidden'}>
+        <WorkingMemorySection modelKey={MODEL_KEY} />
+      </Activity>
+    </>
+  );
+};
+
 /** Renders the section, opened as a user would unless `expanded` is false: it starts collapsed. */
 const renderSection = async ({ expanded = true }: { expanded?: boolean } = {}) => {
   host = document.createElement('div');
@@ -225,7 +240,7 @@ const renderSection = async ({ expanded = true }: { expanded?: boolean } = {}) =
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient}>
           <CalibrationGraphCompilerProvider compile={compile}>
-            <WorkingMemorySection modelKey={MODEL_KEY} />
+            <RetainedSection />
           </CalibrationGraphCompilerProvider>
         </QueryClientProvider>
       </ChakraProvider>
@@ -316,7 +331,37 @@ afterEach(async () => {
 });
 
 describe('WorkingMemorySection', () => {
+  it('disconnects inactive query observers, then refreshes current server state without duplicates', async () => {
+    await renderSection();
+    const queries = () =>
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .filter((query) => query.queryKey.includes('workingMemory'));
+    await expect.poll(() => queries().some((query) => query.getObserversCount() > 0)).toBe(true);
+    const expanded = sectionToggle().getAttribute('aria-expanded');
+    await act(() => userEvent.click(host.querySelector<HTMLButtonElement>('[data-test-visibility]')!));
+    await expect.poll(() => queries().every((query) => query.getObserversCount() === 0)).toBe(true);
+    const reads = api.getWorkingMemorySummary.mock.calls.length;
+    await refreshSummary();
+    expect(api.getWorkingMemorySummary).toHaveBeenCalledTimes(reads);
+    await act(() => userEvent.click(host.querySelector<HTMLButtonElement>('[data-test-visibility]')!));
+    await expect.poll(() => api.getWorkingMemorySummary.mock.calls.length).toBeGreaterThan(reads);
+    expect(sectionToggle().getAttribute('aria-expanded')).toBe(expanded);
+    expect(queries().every((query) => query.getObserversCount() <= 1)).toBe(true);
+  });
+
   it('calibrates a model that was never calibrated: dialog, queued runs, progress, then the measurements', async () => {
+    const enqueue = api.calibrateWorkingMemory.getMockImplementation()!;
+    let releaseFirst: () => void = () => {};
+    api.calibrateWorkingMemory.mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          releaseFirst = () => {
+            void Promise.resolve(enqueue(...args)).then(resolve);
+          };
+        })
+    );
     // The summary polls on an interval while a run is running: the test steps that interval rather than wait it out.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     await renderSection();
@@ -348,7 +393,23 @@ describe('WorkingMemorySection', () => {
     expect(dialog.textContent).toContain('Shared SD1');
 
     await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(1);
+    await act(() => userEvent.click(host.querySelector<HTMLButtonElement>('[data-test-visibility]')!));
+    await act(async () => {
+      releaseFirst();
+      await Promise.resolve();
+    });
     await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
+
+    // The account-owned enqueue continues while its view has no observers.
+    expect(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .filter((query) => query.queryKey.includes('workingMemory'))
+        .every((query) => query.getObserversCount() === 0)
+    ).toBe(true);
+    await act(() => userEvent.click(host.querySelector<HTMLButtonElement>('[data-test-visibility]')!));
 
     // Compiled to open the dialog, and again on confirmation over the model records read then.
     expect(compile).toHaveBeenCalledTimes(2);

@@ -297,6 +297,10 @@
         "standalone-components": [
           "qwen3VLEncoderModel",
           "vae"
+        ],
+        "standalone-gguf-encoder": [
+          "qwen3VLEncoderModel",
+          "vae"
         ]
       },
       "nodeTypes": [
@@ -675,6 +679,8 @@
         "clip_skip": [
           0
         ],
+        "control_layers": [],
+        "controlnets": [],
         "dype_exponent": [
           1
         ],
@@ -735,8 +741,17 @@
           true
         ],
         "ideogram4_color_palette": [],
+        "ideogram4_guidance_scale": [
+          null
+        ],
+        "ideogram4_mu": [
+          null
+        ],
         "ideogram4_sampler_preset": [
           "V4_QUALITY_48"
+        ],
+        "ideogram4_steps": [
+          null
         ],
         "ideogram4_unconditional_model": [],
         "is_intermediate": [
@@ -784,6 +799,7 @@
         "qwen3_encoder": [],
         "qwen3_source": [],
         "qwen3_vl_encoder": [],
+        "qwen3_vl_vision_tower": [],
         "rand_device": [
           "cpu"
         ],
@@ -832,12 +848,16 @@
         "strength": [
           0.6
         ],
+        "t2iAdapters": [],
         "t5_encoder": [],
         "use_cache": [
           true
         ],
         "vae": [],
         "wan_component_source": [],
+        "wan_guidance_scale_low_noise": [
+          null
+        ],
         "wan_t5_encoder_model": [],
         "width": [
           1024,
@@ -2021,6 +2041,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],

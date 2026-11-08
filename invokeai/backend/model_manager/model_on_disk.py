@@ -119,6 +119,7 @@ class ModelOnDisk:
         # This prevents redundant computations during matching and parsing
         self._state_dict_cache: dict[Path, Any] = {}
         self._metadata_cache: dict[Path, Any] = {}
+        self._metadata_errors: dict[Path, str] = {}
 
     def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
@@ -156,11 +157,23 @@ class ModelOnDisk:
                 with safe_open(path, framework="pt", device="cpu") as f:
                     metadata = f.metadata()
                     assert isinstance(metadata, dict)
-        except Exception:
+        except Exception as e:
             metadata = {}
+            # The message only: a stored exception would pin the traceback frames.
+            self._metadata_errors[path] = f"{type(e).__name__}: {e}"
 
         self._metadata_cache[path] = metadata
         return metadata
+
+    def metadata_read_error(self, path: Optional[Path] = None) -> Optional[str]:
+        """Why `metadata()` could not read the file, or None if it could.
+
+        `metadata()` returns `{}` for an unreadable file, which is indistinguishable from a readable one
+        without metadata; this tells the two apart without a second parse.
+        """
+        path = path or self.path
+        self.metadata(path)
+        return self._metadata_errors.get(path)
 
     def repo_variant(self) -> Optional[ModelRepoVariant]:
         if self.path.is_file():
