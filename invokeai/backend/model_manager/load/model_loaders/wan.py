@@ -40,6 +40,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    is_scale_metadata_key,
     parse_quantization_metadata,
     read_safetensors_metadata,
     strip_layer_path_prefix,
@@ -511,6 +512,11 @@ class WanCheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=_model_declared_skip_patterns(model),
             )
+            # Metadata the fp8 branch strips: a stray `scaled_fp8` flag, or a weight scale beside a dense weight.
+            # Left in, `_raise_for_incompatible_keys` would blame it on an Animate/S2V variant. Dropped after the
+            # install, whose foreign-scale check has to see (and refuse) a scale that sits on an fp8 weight.
+            for key in [k for k in sd if is_scale_metadata_key(k) and k.rsplit(".", 1)[0] not in quantized]:
+                del sd[key]
             logger.info(
                 f"Wan 2.2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
                 "(int8_tensorwise checkpoint, dequantized per forward)"

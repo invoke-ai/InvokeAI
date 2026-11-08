@@ -526,6 +526,18 @@ class TestInt8Convrot:
 
         _assert_decodes_like_the_reference(model, reference, BLOCK_LAYERS)
 
+    def test_stray_fp8_metadata_is_dropped_as_on_the_fp8_path(self, tmp_path: Path) -> None:
+        """The fp8 branch drops a top-level `scaled_fp8` flag and a weight scale beside a dense weight silently. Left
+        in the dict here they would be unexpected keys, which the Wan loader blames on an Animate/S2V variant."""
+        reference, sd = _int8_checkpoint(BLOCK_LAYERS)
+        sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
+        sd["proj_out.weight_scale"] = torch.ones(())
+        path = _write(tmp_path, sd)
+
+        model = _load(path, dtype=torch.float32)
+
+        _assert_decodes_like_the_reference(model, reference, BLOCK_LAYERS)
+
     def test_a_quantized_condition_embedder_is_widened_and_the_forward_runs(self, tmp_path: Path) -> None:
         """The time embedder's dtype probe reads a parameter, so those layers cannot stay int8. They are decoded
         densely at load, and the result must still be the reference weight."""
