@@ -3500,6 +3500,28 @@ class GraphExecutionState(BaseModel):
         registry = self._prepared_registry()
         selected_field = self._resolved_if_exec_branches.get(exec_node_id)
         branches = (selected_field,) if selected_field is not None else ("true_input", "false_input")
+
+        def get_overlapping_prepared_ids(edge: Edge) -> Iterable[str]:
+            source_node = self.graph.get_node(edge.source.node_id)
+            if not (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+            ):
+                return registry.get_prepared_ids_with_overlapping_path(edge.source.node_id, target_path)
+
+            source_axes = materializer._get_iteration_axes(source_node.id)
+            target_axes = registry.get_iteration_axes(exec_node_id)
+            if target_axes is None:
+                target_axes = materializer._get_iteration_axes(source_node_id) or None
+            if len(source_axes) > len(target_path) or (
+                target_axes is not None and target_axes[: len(source_axes)] != source_axes
+            ):
+                return ()
+            self._get_prepared_for_index()
+            assert self._final_prepared_for_index is not None
+            prepared_id = self._final_prepared_for_index.get((source_node.id, target_path[: len(source_axes)]))
+            return (prepared_id,) if prepared_id is not None else ()
+
         return all(
             not (edges := self.graph._get_input_edges(source_node_id, branch))
             or branch in attached_fields
@@ -3513,7 +3535,7 @@ class GraphExecutionState(BaseModel):
                 and not any(
                     registry.get_metadata(prepared_id).state != "skipped"
                     and materializer._prepared_node_has_edge_output(edge, prepared_id)
-                    for prepared_id in registry.get_prepared_ids_with_overlapping_path(edge.source.node_id, target_path)
+                    for prepared_id in get_overlapping_prepared_ids(edge)
                 )
                 for edge in edges
             )

@@ -11,8 +11,10 @@ graph instead of mutating the source graph. Fresh `If` graphs are eager by defau
 evaluated after the condition gate resolves, while the pending `If` attaches and hydrates only the selected branch
 edge/value. Lazy execution is limited to two shapes, which run only the selected branch: one root ordinary `If` with no
 other control-flow nodes or iterator axes, where both branch dependency closures are private; and the exact connected
-single-axis `Iterate -> If -> Collect` topology, where the condition and both branch inputs share the same iterator frame
-and both branch outputs are private. Any external consumer of a branch producer makes the whole `If` eager.
+single-axis `Iterate -> If -> Collect` topology of six nodes and seven edges. In that mixed shape, one inputless
+collection producer feeds `Iterate`; `Iterate.item` feeds `If.condition` and one direct producer for each branch; each
+branch producer consumes that same item and outputs only to its corresponding `If` branch; and `If.value` is the sole
+input to a terminal `Collect.item`. No other nodes or edges are admitted.
 Nested, sibling, fan-out, loop, saved-workflow, and other valid shapes keep eager branch behavior; frame/control-flow
 combinations rejected by validation still fail before invocation. Legacy snapshots retain their generic compatibility
 projection and skipped-state metadata. Both scheduler adapters consume frame-local activation dependencies without
@@ -795,9 +797,8 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - By default, once the frame-local condition gate resolves, both branch paths are admitted and evaluated; the pending
   `If` attaches and hydrates only the selected branch edge/value. Shared ancestors run once and remain shared.
 - Lazy execution applies only to one root ordinary `If` with private branch dependency closures and no other control
-  flow or iterator axes, or the exact connected single-axis `Iterate -> If -> sole Collect` shape whose condition and
-  branches share the iterator frame and whose branch outputs are private. A branch producer with any external consumer
-  makes the whole `If` eager.
+  flow or iterator axes, or the exact six-node, seven-edge single-axis shape described above. A branch producer with any
+  external consumer makes the whole `If` eager.
 - Legacy snapshots keep their recorded selected-only and skipped-node projection. Fresh eager execution does not create
   skipped nodes. Both scheduler adapters use append-only execution edges; no type-specific branch scheduler performs
   pruning or skip propagation.

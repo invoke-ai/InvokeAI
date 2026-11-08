@@ -242,10 +242,12 @@ This has a few consequences:
 - Unselected paths can perform work or side effects, such as saving a file or calling a provider, before execution
   ends.
 
-Two narrow shapes remain lazy: a root `If` with private branch paths and no other control flow or iterator axes; and a
-single-axis `Iterate -> If -> Collect` where the condition and both branches share that frame and the branch outputs
-have no external consumers. An external consumer of either branch path makes the `If` eager. Errors or cancellation can
-also stop a workflow early, so eager execution does not guarantee that every node completes.
+Two narrow shapes remain lazy: a root `If` with private branch paths and no other control flow or iterator axes; and an
+exact six-node, seven-edge single-axis `Iterate -> If -> Collect` graph. In the mixed graph, one inputless collection
+source feeds one `Iterate`; its `item` directly feeds `If.condition` and one producer for each branch; each producer
+consumes that same item and feeds only its corresponding branch input; and `If.value` is the sole input to a terminal
+`Collect.item`. Extra nodes or edges make the `If` eager. Errors or cancellation can also stop a workflow early, so eager
+execution does not guarantee that every node completes.
 
 ## Collection Type Checks
 

@@ -12021,7 +12021,7 @@ def test_sibling_collect_cannot_feed_multiple_if_branches(force_compatibility_sc
 
 
 @pytest.mark.slow
-def test_1000_node_any_chain_inside_iterate_if_completes() -> None:
+def test_1000_node_any_chain_inside_iterate_if_completes_with_eager_branches() -> None:
     chain_length = 1_000
     graph = Graph()
     graph.add_node(CollectionConcatInvocation(id="source", first=[True, False]))
@@ -12051,8 +12051,8 @@ def test_1000_node_any_chain_inside_iterate_if_completes() -> None:
 
     collect_exec_id = next(iter(state.source_prepared_mapping["collect"]))
     assert state.results[collect_exec_id].collection == [True, "fFalse"]
-    assert all(trace.count(f"chain_{index}") == 1 for index in range(chain_length))
-    assert trace.count("false_branch") == 1
+    assert all(trace.count(f"chain_{index}") == 2 for index in range(chain_length))
+    assert trace.count("false_branch") == 2
     assert state.is_complete(), f"graph stalled after {trace[-8:]}"
 
 

@@ -238,9 +238,11 @@ valid. A loaded terminal legacy state may retain its empty in-memory ledger for 
 selected branch, and the graph state validates and persists it after invocation. Fresh ordinary-node `If` graphs are
 eager by default: both branch paths may be admitted and evaluated after the condition gate resolves, while the pending
 `If` attaches and hydrates only the selected branch input. Lazy execution is limited to two exact shapes: one root
-ordinary `If` with no control-flow nodes or iterator axes and private branch dependency closures, and the connected
-single-axis `Iterate`/`If`/`Collect` topology where the condition and both branch inputs share the same iterator frame and
-both branch outputs are private. Any external consumer of a branch producer makes the `If` eager. The generic and
+ordinary `If` with no control-flow nodes or iterator axes and private branch dependency closures, and a six-node,
+seven-edge single-axis `Iterate`/`If`/`Collect` graph. In the mixed graph, one inputless collection producer feeds one
+`Iterate`; its `item` directly feeds `If.condition` and one producer for each branch; each branch producer consumes
+that same item and outputs only to its corresponding branch input; and `If.value` is the sole input to a terminal
+`Collect.item`. No extra nodes or edges are admitted. The generic and
 compatibility adapters consume the same frame-local dependency decisions and append-only execution edges; no
 type-specific branch scheduler prunes edges or propagates skips. Legacy snapshots retain their generic compatibility
 projection and old skipped-state metadata. Loop-containing `For`/`ForReturn`, saved-workflow control flow, and other
