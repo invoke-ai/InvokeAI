@@ -45369,7 +45369,7 @@ export type components = {
         };
         /**
          * Apply LoRA Collection - Qwen Image
-         * @description Applies a collection of LoRAs to a Qwen Image transformer.
+         * @description Applies a collection of LoRAs to a Qwen Image transformer and/or Qwen2.5-VL text encoder.
          */
         QwenImageLoRACollectionLoader: {
             /**
@@ -45402,6 +45402,12 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Qwen VL Encoder
+             * @description Qwen2.5-VL tokenizer, processor and text/vision encoder
+             * @default null
+             */
+            qwen_vl_encoder?: components["schemas"]["QwenVLEncoderField"] | null;
+            /**
              * type
              * @default qwen_image_lora_collection_loader
              * @constant
@@ -45410,7 +45416,7 @@ export type components = {
         };
         /**
          * Apply LoRA - Qwen Image
-         * @description Apply a LoRA model to a Qwen Image transformer.
+         * @description Apply a LoRA model to a Qwen Image transformer and/or Qwen2.5-VL text encoder.
          */
         QwenImageLoRALoaderInvocation: {
             /**
@@ -45449,6 +45455,12 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Qwen VL Encoder
+             * @description Qwen2.5-VL tokenizer, processor and text/vision encoder
+             * @default null
+             */
+            qwen_vl_encoder?: components["schemas"]["QwenVLEncoderField"] | null;
+            /**
              * type
              * @default qwen_image_lora_loader
              * @constant
@@ -45466,6 +45478,12 @@ export type components = {
              * @default null
              */
             transformer: components["schemas"]["TransformerField"] | null;
+            /**
+             * Qwen VL Encoder
+             * @description Qwen2.5-VL tokenizer, processor and text/vision encoder
+             * @default null
+             */
+            qwen_vl_encoder: components["schemas"]["QwenVLEncoderField"] | null;
             /**
              * type
              * @default qwen_image_lora_loader_output
@@ -45715,6 +45733,11 @@ export type components = {
             tokenizer: components["schemas"]["ModelIdentifierField"];
             /** @description Info to load text_encoder submodel */
             text_encoder: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Loras
+             * @description LoRAs to apply on model loading
+             */
+            loras?: components["schemas"]["LoRAField"][];
         };
         /**
          * QwenVLEncoder_Checkpoint_Config
