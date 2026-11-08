@@ -1480,14 +1480,26 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(graph.nodes.denoise_latents?.type).toBe('krea2_denoise');
   });
 
-  it('omits Krea-2 negative conditioning while CFG is disabled, and adds it when enabled', () => {
+  it('omits Krea-2 negative conditioning while CFG is disabled, and collects it when enabled', () => {
     // Krea-2-Turbo runs at cfg_scale 1 by default, where the model takes no negative input.
-    expect(compile(krea2Diffusers, { cfgScale: 1 }).nodes.neg_cond).toBeUndefined();
+    const withoutCfg = compile(krea2Diffusers, { cfgScale: 1 });
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(withoutCfg.nodes.neg_cond_collect).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
 
     const withCfg = compile(krea2Diffusers, { cfgScale: 4.5 });
 
     expect(withCfg.nodes.neg_cond?.type).toBe('krea2_text_encoder');
-    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')).toBeDefined();
+    expect(withCfg.nodes.neg_cond_collect?.type).toBe('collect');
+    // Regional negatives join the global one through the collector.
+    expect(getEdge(withCfg, 'neg_cond_collect', 'item')?.source).toEqual({
+      field: 'conditioning',
+      node_id: 'neg_cond',
+    });
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+      field: 'collection',
+      node_id: 'neg_cond_collect',
+    });
   });
 
   it('passes standalone Krea-2 submodels to the loader for a non-diffusers transformer', () => {
