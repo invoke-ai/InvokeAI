@@ -1797,6 +1797,8 @@
     "statusUnauthorized": "Unauthorized",
     "stopScan": "Stop",
     "scanFolderTooltip": "Scan this folder for model files",
+    "showStarterModel": "Show {{name}}",
+    "previewDecoderHint": "Optional live-preview decoder (needs tiny_autoencoder_previews):",
     "scanModelsFolder": "Scan models folder",
     "modelsFolderUnavailable": "Couldn't get the models folder location from the server. Check that the server is reachable, then retry.",
     "scanSummary_one": "{{count}} file in {{path}} · {{notInstalled}} not installed",
