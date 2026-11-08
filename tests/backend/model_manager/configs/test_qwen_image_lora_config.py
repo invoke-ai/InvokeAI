@@ -100,6 +100,84 @@ def test_only_the_qwen_image_probe_claims_a_qwen_image_lora(prefix: str, tmp_pat
 
 
 @pytest.mark.parametrize(
+    ("prefix", "text_encoder_prefix"),
+    [
+        ("", "text_encoder."),
+        ("base_model.model.", "base_model.model.text_encoder."),
+        ("diffusion_model.", "text_encoders.qwen25_7b.transformer."),
+    ],
+)
+def test_a_lora_with_text_encoder_layers_is_still_claimed_by_the_qwen_image_probe_alone(
+    prefix: str, text_encoder_prefix: str, tmp_path: Path
+) -> None:
+    """Qwen2.5-VL layers in the file are applied to the encoder, but must not change what the file is identified as."""
+    path = tmp_path / "lora.safetensors"
+    sd = _qwen_image_lora(prefix)
+    sd.update(
+        _lora(
+            {
+                f"{text_encoder_prefix}model.language_model.layers.0.self_attn.q_proj": (3584, 3584),
+                f"{text_encoder_prefix}model.language_model.layers.0.mlp.down_proj": (18944, 3584),
+                f"{text_encoder_prefix}model.visual.blocks.0.attn.qkv": (1280, 3840),
+            }
+        )
+    )
+    mod = _make_mod(path, sd)
+
+    accepting = []
+    for cls in Config_Base.CONFIG_CLASSES:
+        if getattr(cls.model_fields.get("type"), "default", None) is not ModelType.LoRA:
+            continue
+        try:
+            cls.from_model_on_disk(mod, _overrides(path))
+        except Exception:
+            continue
+        accepting.append(cls.__name__)
+
+    assert accepting == [LoRA_LyCORIS_QwenImage_Config.__name__]
+
+
+def test_a_onetrainer_kohya_lora_with_text_encoder_layers_is_claimed_by_the_qwen_image_probe_alone(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "lora.safetensors"
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        for module, (in_features, out_features) in {
+            "attn_to_q": (3072, 3072),
+            "attn_add_q_proj": (3072, 3072),
+            "img_mod_1": (3072, 18432),
+            "img_mlp_net_0_proj": (3072, 12288),
+            "txt_mlp_net_2": (12288, 3072),
+        }.items():
+            layer = f"lora_unet_transformer_blocks_{block}_{module}"
+            sd[f"{layer}.lora_down.weight"] = _z(16, in_features)
+            sd[f"{layer}.lora_up.weight"] = _z(out_features, 16)
+            sd[f"{layer}.alpha"] = torch.tensor(16.0)
+    for module, (in_features, out_features) in {
+        "self_attn_q_proj": (3584, 3584),
+        "mlp_down_proj": (18944, 3584),
+    }.items():
+        layer = f"lora_te_model_language_model_layers_0_{module}"
+        sd[f"{layer}.lora_down.weight"] = _z(16, in_features)
+        sd[f"{layer}.lora_up.weight"] = _z(out_features, 16)
+        sd[f"{layer}.alpha"] = torch.tensor(16.0)
+    mod = _make_mod(path, sd)
+
+    accepting = []
+    for cls in Config_Base.CONFIG_CLASSES:
+        if getattr(cls.model_fields.get("type"), "default", None) is not ModelType.LoRA:
+            continue
+        try:
+            cls.from_model_on_disk(mod, _overrides(path))
+        except Exception:
+            continue
+        accepting.append(cls.__name__)
+
+    assert accepting == [LoRA_LyCORIS_QwenImage_Config.__name__]
+
+
+@pytest.mark.parametrize(
     "layers",
     [
         pytest.param(

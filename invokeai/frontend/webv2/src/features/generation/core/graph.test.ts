@@ -2542,6 +2542,40 @@ describe('model-family tuning', () => {
     expect(getNodeByType(quantized, 'core_metadata')?.qwen_image_quantization).toBe('nf4');
   });
 
+  describe('Qwen-Image LoRAs', () => {
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'A LoRA', type: 'lora' };
+    const loras = [{ isEnabled: true, model: qwenLora, weight: 0.7 }];
+
+    it('routes the Qwen2.5-VL encoder to both prompts through the LoRA collection loader', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, loader?.id ?? '', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    });
+
+    it('takes the encoder straight from the model loader without an active LoRA', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras: [{ ...loras[0]!, isEnabled: false }] });
+
+      expect(getNodeByType(graph, 'qwen_image_lora_collection_loader')).toBeUndefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+    });
+
+    it('keeps the encoder quantization on both prompts next to the LoRA edges', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras, qwenImageEncoderQuantization: 'int8' });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(graph.nodes.pos_cond?.quantization).toBe('int8');
+      expect(graph.nodes.neg_cond?.quantization).toBe('int8');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+    });
+  });
+
   it('encodes the enabled Krea-2 style reference at the denoise size and feeds it to the denoise node', () => {
     // The served limit is one enabled reference; a disabled card stays out of the graph.
     const graph = compile(krea2Model, {

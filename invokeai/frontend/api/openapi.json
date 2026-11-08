@@ -104759,7 +104759,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Applies a collection of LoRAs to a Qwen Image transformer.",
+        "description": "Applies a collection of LoRAs to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -104828,6 +104828,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_collection_loader",
             "default": "qwen_image_lora_collection_loader",
@@ -104840,7 +104857,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -104849,7 +104866,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA model to a Qwen Image transformer.",
+        "description": "Apply a LoRA model to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -104921,6 +104938,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_loader",
             "default": "qwen_image_lora_loader",
@@ -104933,7 +104967,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -104957,6 +104991,21 @@
             "title": "Transformer",
             "ui_hidden": false
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "output",
+            "title": "Qwen VL Encoder",
+            "ui_hidden": false
+          },
           "type": {
             "const": "qwen_image_lora_loader_output",
             "default": "qwen_image_lora_loader_output",
@@ -104965,7 +105014,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "type", "type"],
+        "required": ["output_meta", "transformer", "qwen_vl_encoder", "type", "type"],
         "title": "QwenImageLoRALoaderOutput",
         "type": "object"
       },
@@ -105425,6 +105474,14 @@
           "text_encoder": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load text_encoder submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
           }
         },
         "required": ["tokenizer", "text_encoder"],

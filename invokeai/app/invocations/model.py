@@ -118,6 +118,7 @@ class QwenVLEncoderField(BaseModel):
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: list[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class Qwen3EncoderField(BaseModel):
