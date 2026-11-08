@@ -11,7 +11,7 @@ from invokeai.backend.model_manager.configs.main import Main_GGUF_SD3_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, gguf_tensor_bytes, unpack_ggml_at_load
 from invokeai.backend.sd3.checkpoint_layout import (
     convert_mmdit_to_diffusers,
     is_mmdit_transformer_key,
@@ -30,6 +30,12 @@ class SD3GGUFModel(ModelLoader):
     model reads outside a matmul and what the file stores unquantized is unpacked at load. Its text encoders and
     VAE are separate models, chosen on the SD3 model loader node.
     """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """The bytes of the tensors `_load_model` reads: a bundled VAE or text encoder is never read."""
+        return sum(size for name, size in gguf_tensor_bytes(model_path).items() if is_mmdit_transformer_key(name))
 
     def _load_model(
         self,

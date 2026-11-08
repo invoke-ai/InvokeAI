@@ -197,3 +197,23 @@ def test_a_bundled_vae_is_never_read(monkeypatch, tmp_path: Path) -> None:
     _load(monkeypatch, tmp_path, sd_cpp=True)
 
     assert read and all(key.startswith("model.diffusion_model.") for key in read[0])
+
+
+def test_a_file_bundling_a_vae_and_text_encoders_is_sized_by_its_transformer_alone(monkeypatch, tmp_path: Path) -> None:
+    """What the cache makes room for before the load: the VAE and encoder tensors beside the transformer are never
+    read, so the file is sized as the same transformer stored alone."""
+    transformer = tiny_mmdit_state_dict()
+    bundled_components = {
+        "first_stage_model.decoder.conv_in.weight": torch.zeros(512, 512),
+        "text_encoders.clip_l.transformer.text_model.embeddings.token_embedding.weight": torch.zeros(1024, 1024),
+    }
+    component_bytes = 2 * (512 * 512 + 1024 * 1024)  # Stored as F16.
+    bare, bundled = tmp_path / "sd3.gguf", tmp_path / "sd3-bundled.gguf"
+    _write_gguf(bare, transformer)
+    _write_gguf(bundled, {**{f"{SD_CPP_PREFIX}{k}": v for k, v in transformer.items()}, **bundled_components})
+    loader = prepare(SEAM, monkeypatch).loader
+
+    size = loader.get_size_fs(None, bundled)
+
+    assert size == loader.get_size_fs(None, bare) > 0
+    assert bundled.stat().st_size - size >= component_bytes
