@@ -222,6 +222,14 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
 
+FLUX.1 and FLUX.2 kohya LoRAs (`lora_unet_…`) may also train the layers outside the transformer blocks: `img_in`,
+`txt_in`, the time, vector and guidance embedders (`time_in`, `vector_in`, `guidance_in`), the last layer
+(`final_layer_linear`, `final_layer_adaLN_modulation_1`) and FLUX.2's shared modulations. FLUX.1 OneTrainer LoRAs
+(`lora_transformer_…`, its LEGACY_LORA output format) may likewise train `x_embedder`, `context_embedder`, the
+timestep, text and guidance embedders, `norm_out` and the final `proj_out`; these files need single-block layers too.
+A kohya file holding only such layers, with no transformer block or text-encoder layer, is not recognized as FLUX,
+because Qwen-Image and SD 3 name some of them alike. On FLUX.2 the guidance embedder exists in FLUX.2 [dev] only.
+
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 

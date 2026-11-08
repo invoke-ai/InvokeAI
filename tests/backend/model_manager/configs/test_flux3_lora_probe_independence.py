@@ -19,13 +19,18 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
-from invokeai.backend.model_manager.configs.lora import LoRA_Diffusers_Flux3_Config, LoRA_LyCORIS_Flux3_Config
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.configs.lora import (
+    LoRA_Diffusers_Flux3_Config,
+    LoRA_LyCORIS_Flux2_Config,
+    LoRA_LyCORIS_Flux3_Config,
+)
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType
 from invokeai.backend.patches.lora_conversions import flux3_lora_constants as constants
 from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from tests.backend.model_manager.load.state_dicts import flux3_klein_keys
 from tests.backend.patches.lora_conversions.lora_state_dicts import (
+    flux2_lora_kohya_non_block_format,
     flux3_lora_aitoolkit_format,
     flux3_lora_comfy_alpha_format,
     flux3_lora_diffusers_format,
@@ -36,7 +41,13 @@ from tests.backend.patches.lora_conversions.lora_state_dicts import (
     flux_lora_aitoolkit_format,
     flux_lora_diffusers_format,
     flux_lora_kohya_format,
+    flux_lora_onetrainer_non_block_format,
     flux_lora_xlabs_format,
+    qwen_image_lora_kohya_format,
+)
+from tests.backend.patches.lora_conversions.test_flux_onetrainer_lora_conversion_utils import (
+    _meta_sd3,
+    _onetrainer_legacy_state_dict,
 )
 
 _DTYPES = {"BF16": torch.bfloat16, "F32": torch.float32, "F8_E4M3": torch.float8_e4m3fn}
@@ -156,6 +167,9 @@ def _flux2_klein_native() -> dict[str, list[int]]:
         (flux_lokr_bfl_format.state_dict_keys, "LoRA_LyCORIS_Flux2_Config"),
         (_flux2_klein_diffusers(), "LoRA_LyCORIS_Flux2_Config"),
         (_flux2_klein_native(), "LoRA_LyCORIS_Flux2_Config"),
+        (flux2_lora_kohya_non_block_format.state_dict_keys, "LoRA_LyCORIS_Flux2_Config"),
+        (flux_lora_onetrainer_non_block_format.state_dict_keys, "LoRA_LyCORIS_FLUX_Config"),
+        (qwen_image_lora_kohya_format.state_dict_keys, "LoRA_LyCORIS_QwenImage_Config"),
     ],
     ids=[
         "flux1-ai-toolkit",
@@ -166,10 +180,29 @@ def _flux2_klein_native() -> dict[str, list[int]]:
         "flux2-bfl-lokr",
         "flux2-klein-diffusers",
         "flux2-klein-native",
+        "flux2-klein-kohya-with-non-block-layers",
+        "flux1-onetrainer-with-non-block-layers",
+        "qwen-image-kohya",
     ],
 )
 def test_a_flux1_or_flux2_lora_keeps_its_config(keys: dict[str, list[int]], claimed_by: str, tmp_path: Path) -> None:
     assert _claimed_by(_state_dict(keys), tmp_path) == [claimed_by]
+
+
+def test_a_kohya_lora_with_non_block_layers_is_a_klein_4b_lora(tmp_path: Path) -> None:
+    """`txt_in` of the layers outside the blocks is what tells Klein 4B (7680 inputs) from FLUX.1 (#10030)."""
+    config = _probe(LoRA_LyCORIS_Flux2_Config, _state_dict(flux2_lora_kohya_non_block_format.state_dict_keys), tmp_path)
+
+    assert config.base is BaseModelType.Flux2
+    assert config.variant is Flux2VariantType.Klein4B
+
+
+def test_an_sd3_onetrainer_lora_with_top_level_layers_is_not_claimed_as_flux(tmp_path: Path) -> None:
+    """SD3's top-level layers and double blocks are named like FLUX's, which OneTrainer's LEGACY_LORA keys keep; only
+    FLUX has single blocks."""
+    state_dict = _onetrainer_legacy_state_dict(_meta_sd3(), lambda name: True)
+
+    assert "LoRA_LyCORIS_FLUX_Config" not in _claimed_by(state_dict, tmp_path)
 
 
 def test_a_distillation_extract_is_refused_with_its_reason(tmp_path: Path) -> None:
