@@ -1578,8 +1578,7 @@ const buildKrea2Graph = (
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
-      // Krea-2's negative conditioning feeds the denoise directly, so regional negatives have nothing to join.
-      negative: null,
+      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
       positive: posCond,
       positiveCollector: posCondCollect,
     },
