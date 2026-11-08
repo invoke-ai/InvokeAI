@@ -217,7 +217,8 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | ERNIE-Image | ✓ (ai-toolkit/ComfyUI, diffusers/PEFT; LoKR and LoHA too, DoRA is refused) | ✗ | |
 | SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused) | ✗ | |
-| CogView4, Ideogram 4, MOSS-Image | ✗ | ✗ | |
+| Ideogram 4 | ✓ (ai-toolkit/ComfyUI, kohya and diffusers files and Diffusers folders, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
+| CogView4, MOSS-Image | ✗ | ✗ | |
 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
