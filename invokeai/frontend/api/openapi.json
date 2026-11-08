@@ -3063,8 +3063,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -3680,8 +3679,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -3693,7 +3691,7 @@
             "description": "The model could not be found"
           },
           "409": {
-            "description": "There is already a model corresponding to the new name"
+            "description": "The change cannot be applied to this model"
           },
           "422": {
             "description": "Validation Error",
@@ -4324,8 +4322,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -5843,8 +5840,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -95176,18 +95172,6 @@
             ],
             "description": "The prediction type of the model."
           },
-          "upcast_attention": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Upcast Attention",
-            "description": "Whether to upcast attention."
-          },
           "config_path": {
             "anyOf": [
               {
@@ -101665,6 +101649,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -101683,7 +101679,8 @@
           "config_path",
           "base",
           "type",
-          "format"
+          "format",
+          "cpu_only"
         ],
         "title": "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config",
         "description": "Configuration for MiniMax H3's truncated Qwen3-VL-32B conditioning encoder single files\n(Comfy-Org ``qwen3vl_32b_minimax_h3_*.safetensors`` and mirrors).\n\nThese are NOT complete Qwen3-VL-32B checkpoints: the language stack is truncated to the 50\nlayers H3 conditions on (the file's ``minimax_h3_te`` metadata records the contract:\n\"unnormalized_hidden_after_layer_50\"), the final norm and LM head are omitted, and the\nbf16/int8-convrot repacks quantize only the 50 language layers (vision tower stays bf16).\n\nIdentified primarily by the explicit ``minimax_h3_te`` safetensors metadata; a structural\nfallback covers metadata-stripped re-uploads. ``Qwen3VLEncoder_Checkpoint_Config`` accepts only\nthe two widths it can build (2560 and 4096), so neither config can claim the other's files.\n\nThe nvfp4 repacks share this layout and are accepted here, but the loader rejects their\nquantization format early (header-only check) with a clear error - mirroring how the H3\ntransformer checkpoint config treats fp8_scaled files."

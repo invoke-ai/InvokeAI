@@ -55,6 +55,11 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
   const [updateModel, { isLoading: isSubmitting }] = useUpdateModelMutation();
   const dispatch = useAppDispatch();
   const isExternal = useMemo(() => isExternalApiModelConfig(modelConfig), [modelConfig]);
+  // The backend refuses a non-null value for a field the model's config does not store, and a registered input
+  // submits its value even when untouched (an empty config path posts ""), so the config path renders only where the
+  // config has it. The variant and prediction-type selects are controllers that submit only a picked value, so they
+  // stay available to a reclassification that needs them.
+  const hasConfigPath = 'config_path' in modelConfig;
 
   const form = useForm<ModelEditFormValues>({
     defaultValues: modelConfig as unknown as ModelEditFormValues,
@@ -201,17 +206,15 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
                 <FormLabel>{t('modelManager.variant')}</FormLabel>
                 <ModelVariantSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
-              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
-                <Input {...form.register('config_path')} />
-              </FormControl>
+              {hasConfigPath && (
+                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                  <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
+                  <Input {...form.register('config_path')} />
+                </FormControl>
+              )}
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.predictionType')}</FormLabel>
                 <PredictionTypeSelect control={form.control as unknown as Control<UpdateModelBody>} />
-              </FormControl>
-              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
-                <Checkbox {...form.register('upcast_attention')} />
               </FormControl>
             </SimpleGrid>
             {isExternal && (
