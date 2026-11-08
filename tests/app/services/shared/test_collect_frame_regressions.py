@@ -6,6 +6,7 @@ keyed by path would hide it. Order across different sources in one Collect is un
 
 import json
 import re
+from collections.abc import Callable
 from typing import Any as AnyValue
 from unittest.mock import Mock
 
@@ -1412,3 +1413,258 @@ def test_seed_1234_reiteration_keeps_empty_outer_frame(
     ]
     assert _sorted_runs(out_runs) == [((0,), []), ((1,), [collected_value] * 3)]
     assert _sorted_runs(out2_runs) == [((0,), []), ((1,), [reiterated_value] * 3)]
+
+
+def _root_for_final_selected_in_every_frame(items: int, for_items: int) -> Graph:
+    """A per-item If feeds one branch of a literal-False If whose other branch is a root For final."""
+    return _graph(
+        [["c"]] * items,
+        1,
+        [
+            Truthy(id="cond"),
+            Value(id="t", value="T"),
+            Value(id="f", value="F"),
+            If(id="inner"),
+            For(id="for", collection=[f"u{index}" for index in range(for_items)]),
+            Marked(id="body", marker="B"),
+            ForReturn(id="ret"),
+            If(id="outer", condition=False),
+            Collect(id="out"),
+        ],
+        """
+        it0.item -> cond.value
+        cond.condition -> inner.condition
+        t.value -> inner.true_input
+        f.value -> inner.false_input
+        for.item -> body.value
+        body.value -> ret.output
+        for.loop_linkage -> ret.loop_linkage
+        inner.value -> outer.true_input
+        for.output_collection -> outer.false_input
+        outer.value -> out.item
+        """,
+    )
+
+
+@pytest.mark.parametrize(
+    ("items", "for_items"),
+    [
+        pytest.param(2, 1, id="2-frames-1-for-item"),
+        pytest.param(3, 2, id="3-frames-2-for-items"),
+        pytest.param(5, 3, id="5-frames-3-for-items"),
+        pytest.param(3, 3, id="3-frames-3-for-items"),
+        pytest.param(3, 0, id="3-frames-empty-for"),
+    ],
+)
+def test_root_for_final_reaches_every_item_frame(items: int, for_items: int, compatibility_scheduler: bool) -> None:
+    """Every frame gets the For final, whether or not its index is also a For iteration index."""
+    final = [f"Bu{index}" for index in range(for_items)]
+
+    runs = _collect_runs(_root_for_final_selected_in_every_frame(items, for_items), compatibility_scheduler)["out"]
+
+    assert runs == [((), [final] * items)]
+
+
+def _run_with_reload(graph: Graph, compatibility: bool, reload_after: int, *sinks: str) -> dict[str, Runs]:
+    """Like `_collect_runs`, but dump and reload the state after `reload_after` invocations."""
+
+    def use_scheduler(state: GraphExecutionState) -> GraphExecutionState:
+        state._execution_scheduler = (
+            _ExecutionScheduler(state) if compatibility else _GenericGraphSchedulerAdapter(state)
+        )
+        return state
+
+    state = use_scheduler(GraphExecutionState(graph=graph))
+    for step in range(5000):
+        if step == reload_after:
+            snapshot = json.loads(json.dumps(dump_execution_state(state)))
+            state = use_scheduler(load_execution_state(snapshot))
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+    assert step > reload_after, "the graph finished before the reload point"
+    assert state.is_complete() and not state.has_error()
+    return {
+        name: _sorted_runs(
+            [
+                (state._get_iteration_path(execution), state.results[execution].collection)
+                for execution in state._prepared_registry().get_prepared_ids(name)
+                if execution in state.results
+            ]
+        )
+        for name in sinks or ("out",)
+    }
+
+
+def _per_item_if_selecting_root_for_final() -> Graph:  # fuzz-6
+    return _graph(
+        [["a"], []],
+        1,
+        [
+            For(id="for1"),
+            Marked(id="fb2", marker="F"),
+            ForReturn(id="ret3"),
+            Marked(id="p4", marker="T:"),
+            For(id="for5", collection=["u", "v"]),
+            Marked(id="fb6", marker="F"),
+            ForReturn(id="ret7"),
+            If(id="if"),
+            Truthy(id="cond"),
+            Collect(id="out"),
+        ],
+        """
+        it0.item -> for1.collection
+        for1.item -> fb2.value
+        fb2.value -> ret3.output
+        for1.loop_linkage -> ret3.loop_linkage
+        for1.output_collection -> p4.value
+        for5.item -> fb6.value
+        fb6.value -> ret7.output
+        for5.loop_linkage -> ret7.loop_linkage
+        p4.value -> if.true_input
+        for5.output_collection -> if.false_input
+        it0.item -> cond.value
+        cond.condition -> if.condition
+        if.value -> out.item
+        """,
+    )
+
+
+def _nested_for_ifs_under_literal_if() -> Graph:  # fuzz-125
+    return _graph(
+        [[["b"], ["b"]]],
+        2,
+        [
+            For(id="for2"),
+            Marked(id="fb3", marker="F"),
+            ForReturn(id="ret4"),
+            Value(id="root5", value="bT:"),
+            If(id="iif1"),
+            Truthy(id="ic6"),
+            For(id="for8"),
+            Marked(id="fb9", marker="F"),
+            ForReturn(id="ret10"),
+            Marked(id="p11", marker="aF:"),
+            For(id="for12"),
+            Marked(id="fb13", marker="F"),
+            ForReturn(id="ret14"),
+            If(id="iif7"),
+            Truthy(id="ic15"),
+            If(id="if", condition=True),
+            Collect(id="out"),
+            Collect(id="out2"),
+        ],
+        """
+        it0.item -> for2.collection
+        for2.item -> fb3.value
+        fb3.value -> ret4.output
+        for2.loop_linkage -> ret4.loop_linkage
+        for2.output_collection -> iif1.true_input
+        root5.value -> iif1.false_input
+        it1.item -> ic6.value
+        ic6.condition -> iif1.condition
+        it0.item -> for8.collection
+        for8.item -> fb9.value
+        fb9.value -> ret10.output
+        for8.loop_linkage -> ret10.loop_linkage
+        for8.output_collection -> p11.value
+        for12.item -> fb13.value
+        fb13.value -> ret14.output
+        for12.loop_linkage -> ret14.loop_linkage
+        p11.value -> iif7.true_input
+        for12.output_collection -> iif7.false_input
+        it0.item -> ic15.value
+        ic15.condition -> iif7.condition
+        iif1.value -> if.true_input
+        iif7.value -> if.false_input
+        if.value -> out.item
+        out.collection -> out2.item
+        """,
+    )
+
+
+def _chained_per_item_ifs_over_root_fors() -> Graph:  # fuzz-763
+    return _graph(
+        [[], []],
+        1,
+        [
+            For(id="for2", collection=["u"]),
+            Marked(id="fb3", marker="F"),
+            ForReturn(id="ret4"),
+            For(id="for5"),
+            Marked(id="fb6", marker="F"),
+            ForReturn(id="ret7"),
+            Marked(id="p8", marker="bT:"),
+            If(id="iif1"),
+            Truthy(id="ic9"),
+            For(id="for10", collection=["u", "v"]),
+            Marked(id="fb11", marker="F"),
+            ForReturn(id="ret12"),
+            If(id="if"),
+            Truthy(id="cond"),
+            Value(id="root13", value="O:"),
+            If(id="if2", condition=True),
+            Collect(id="out"),
+            Collect(id="out2"),
+        ],
+        """
+        for2.item -> fb3.value
+        fb3.value -> ret4.output
+        for2.loop_linkage -> ret4.loop_linkage
+        it0.item -> for5.collection
+        for5.item -> fb6.value
+        fb6.value -> ret7.output
+        for5.loop_linkage -> ret7.loop_linkage
+        for5.output_collection -> p8.value
+        for2.output_collection -> iif1.true_input
+        p8.value -> iif1.false_input
+        it0.item -> ic9.value
+        ic9.condition -> iif1.condition
+        for10.item -> fb11.value
+        fb11.value -> ret12.output
+        for10.loop_linkage -> ret12.loop_linkage
+        iif1.value -> if.true_input
+        for10.output_collection -> if.false_input
+        it0.item -> cond.value
+        cond.condition -> if.condition
+        if.value -> if2.true_input
+        root13.value -> if2.false_input
+        if2.value -> out.item
+        out.collection -> out2.item
+        """,
+    )
+
+
+_FOR_FINAL_BOTH = [["Fu", "Fv"], ["Fu", "Fv"]]
+_NESTED_FINALS = [["F['b']", "F['b']"], ["F['b']", "F['b']"]]
+
+
+@pytest.mark.parametrize(
+    ("build", "expected"),
+    [
+        pytest.param(
+            _per_item_if_selecting_root_for_final,
+            {"out": [((0,), ["T:['Fa']"]), ((1,), [["Fu", "Fv"]])]},
+            id="fuzz-6",
+        ),
+        pytest.param(
+            _nested_for_ifs_under_literal_if,
+            {"out": [((0,), _NESTED_FINALS)], "out2": [((), [_NESTED_FINALS])]},
+            id="fuzz-125",
+        ),
+        pytest.param(
+            _chained_per_item_ifs_over_root_fors,
+            {"out": [((), _FOR_FINAL_BOTH)], "out2": [((), [_FOR_FINAL_BOTH])]},
+            id="fuzz-763",
+        ),
+    ],
+)
+@pytest.mark.parametrize("reload_after", [3, 6, 10])
+def test_mid_run_reload_keeps_root_for_finals(
+    build: Callable[[], Graph], expected: dict[str, Runs], reload_after: int, compatibility_scheduler: bool
+) -> None:
+    """A dumped and reloaded state finishes with the same runs as an uninterrupted one."""
+    assert _collect_runs(build(), compatibility_scheduler, *expected) == expected
+
+    assert _run_with_reload(build(), compatibility_scheduler, reload_after, *expected) == expected
