@@ -4,6 +4,8 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { SelectedShapeAppearanceSettings } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
+import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';
@@ -204,6 +206,11 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
+      {layer.source.type === 'shape' ? (
+        <PropertyGroup id="layer-shape-appearance" label={t('widgets.properties.groups.appearance')}>
+          <SelectedShapeAppearanceSettings engine={engine} layer={layer} source={layer.source} />
+        </PropertyGroup>
+      ) : null}
       <Switch.Root checked={isLocked} onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>
