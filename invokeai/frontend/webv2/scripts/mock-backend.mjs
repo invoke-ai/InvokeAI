@@ -2977,11 +2977,29 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       const imageMatch = /^\/api\/v1\/images\/i\/([^/]+)$/.exec(path);
-      if (imageMatch) {
+      if ((method === 'GET' || method === 'PATCH') && imageMatch) {
         const imageName = decodeURIComponent(imageMatch[1]);
         const image = state.images.get(imageName);
-
-        return image ? json(200, image) : json(404, { detail: 'Image not found' });
+        if (!image) {
+          return json(404, { detail: 'Image not found' });
+        }
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+          if (
+            ('is_intermediate' in changes && typeof changes.is_intermediate !== 'boolean') ||
+            ('image_category' in changes &&
+              !['general', 'control', 'mask', 'user', 'other'].includes(changes.image_category))
+          ) {
+            return json(422, { detail: 'Invalid image changes' });
+          }
+          if ('is_intermediate' in changes) {
+            image.is_intermediate = changes.is_intermediate;
+          }
+          if ('image_category' in changes) {
+            image.image_category = changes.image_category;
+          }
+        }
+        return json(200, image);
       }
 
       if (method === 'POST' && path === '/api/v1/videos/upload') {
