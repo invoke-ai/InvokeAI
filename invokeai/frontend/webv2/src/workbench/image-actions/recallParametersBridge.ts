@@ -101,7 +101,7 @@ export const attachRecallParametersRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets'>;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets' | 'canvas'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   load?: () => Promise<RecallParametersRuntimeModule>;

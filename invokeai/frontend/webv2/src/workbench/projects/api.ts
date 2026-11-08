@@ -132,17 +132,60 @@ export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]>
     signal
   );
 
+const getProjectPath = (projectId: string): string =>
+  `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+  `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`;
+
 export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
   withRequestDeadline(
-    (signal) =>
-      apiFetchJson<ProjectWithWorkspaceDTO>(
-        `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
-          `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
-        { signal }
-      ),
+    (signal) => apiFetchJson<ProjectWithWorkspaceDTO>(getProjectPath(projectId), { signal }),
     PROJECT_REQUEST_TIMEOUT_MS,
     signal
   );
+
+/**
+ * A project record no larger than `maxBytes` once decoded, else null without parsing it: for reads that inspect a
+ * closed project in passing and must not spend the main thread on a large document. A declared `Content-Length` over
+ * the bound skips the body at once. That header counts the encoded body, and the server compresses JSON, so a small one
+ * proves nothing: the body is read as a stream, counting decoded bytes, and the read stops once past the bound.
+ */
+export const getProjectWithinSize = async (
+  projectId: string,
+  maxBytes: number,
+  signal?: AbortSignal
+): Promise<ProjectWithWorkspaceDTO | null> => {
+  const response = await apiFetch(getProjectPath(projectId), { signal });
+  const declared = Number(response.headers.get('Content-Length'));
+
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    return null;
+  }
+
+  const decoder = new TextDecoder();
+  let text = '';
+  let size = 0;
+
+  if (response.body) {
+    const reader = response.body.getReader();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  }
+
+  return JSON.parse(text + decoder.decode()) as ProjectWithWorkspaceDTO;
+};
 
 const isProjectWriteBusyError = (error: unknown): error is ApiError => {
   if (!(error instanceof ApiError) || error.status !== 429) {

@@ -2,7 +2,6 @@
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
-import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
@@ -19,7 +18,7 @@ import {
 } from '@tanstack/react-router';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
-import { act } from 'react';
+import { type ReactNode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -37,6 +36,7 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useCapabilities: () => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }),
   UsersPage: () => null,
 }));
+vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
 vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
 vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
 vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
@@ -168,6 +168,16 @@ afterEach(async () => {
 });
 
 describe('Launchpad shell', () => {
+  it('retains selected model details across section deactivation', async () => {
+    await render();
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    await page.getByRole('link', { name: 'launchpad.sections.models' }).click();
+    await expect.element(page.getByRole('button', { name: 'common.edit', exact: true })).toBeVisible();
+    expect(host.textContent).toContain('Lora b');
+  });
+
   it('keeps the model manager usable at 720×450 (a 1440×900 window at 200%) beside an icon rail', async () => {
     await page.viewport(720, 450);
     await render();

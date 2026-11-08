@@ -41,6 +41,16 @@ PreviewRenderer: TypeAlias = Callable[[BaseModelType, torch.Tensor], PreviewFram
 SignalPreviewFunc: TypeAlias = Callable[[str, float | None, PreviewRender], None]
 
 
+def preview_frame(sample: torch.Tensor) -> torch.Tensor:
+    """The latent a preview shows: the last frame of a `(B, C, T, h, w)` window, any other sample as it is.
+
+    A video denoiser may report a window of latent frames so a Tiny AutoEncoder can decode the last one
+    with the frames before it as temporal context. Everything that reads a single latent -- the linear
+    projection, and `resolve_latent_space`, which takes `shape[-3]` as the channel count -- gets the last.
+    """
+    return sample[:, :, -1] if sample.dim() == 5 else sample
+
+
 def render_linear_preview(base_model: BaseModelType, sample: torch.Tensor) -> tuple[Image.Image, tuple[int, int]]:
     """Project `sample` onto RGB with the architecture's linear latent factors.
 
@@ -52,6 +62,7 @@ def render_linear_preview(base_model: BaseModelType, sample: torch.Tensor) -> tu
     # a fifteen-branch if/elif ending in `raise ValueError(f"Unsupported base model: {base_model}")`,
     # which fired on the first preview step — after the model had loaded and generation had started.
     # An architecture that declares no latent space now fails at boot instead.
+    sample = preview_frame(sample)
     latent_space = resolve_latent_space(base_model, sample)
     image = latent_space.preview(sample)
     return image, (image.width * latent_space.spatial_compression, image.height * latent_space.spatial_compression)

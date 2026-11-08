@@ -4,6 +4,7 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { getModalOpenGeneration } from '@platform/ui/modalPresence';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 
 import { useWorkbenchPreferenceSelector } from './settings/store';
@@ -36,9 +37,10 @@ export interface WorkbenchFocusController {
   /**
    * Move keyboard focus into the region a control just opened a widget in, once that widget shows. Without a
    * widget, focus moves into the region as it stands. An instance id waits for that widget's visible frame,
-   * including when another instance of the same type is still mounted but hidden.
+   * including when another instance of the same type is still mounted but hidden. A recovery resource may defer
+   * the frame wait until loading settles; navigation, scope changes and newer modals still cancel the original request.
    */
-  focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId): void;
+  focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId, ready?: Promise<unknown>): void;
   /**
    * Forget a window target whose window has docked or closed, and tell subscribers the center holds focus again.
    * Forgetting it also keeps the same instance from taking focus back without being focused, should a preset or undo
@@ -112,14 +114,23 @@ export const createWorkbenchFocusController = ({
    * account changes first, or the user presses somewhere else. Focus that starts inside is still watched: the opener
    * can sit in the view the open replaces, which drops its focus a frame later.
    */
-  const moveFocus = (target: WorkbenchFocusTarget, findContainer: () => HTMLElement | null): void => {
+  const moveFocus = (
+    target: WorkbenchFocusTarget,
+    findContainer: () => HTMLElement | null,
+    ready?: Promise<unknown>
+  ): void => {
     // The control that asked, where a closing menu or dialog would put focus back.
     const opener = document.activeElement;
     const move = ++focusMove;
     const projectId = getProjectId();
     const owner = captureAccountScope();
-    const isCurrent = () => move === focusMove && projectId === getProjectId() && isAccountScopeCurrent(owner);
-    const deadline = performance.now() + FOCUS_MOVE_WAIT_MS;
+    const modalGeneration = getModalOpenGeneration();
+    const isCurrent = () =>
+      move === focusMove &&
+      modalGeneration === getModalOpenGeneration() &&
+      projectId === getProjectId() &&
+      isAccountScopeCurrent(owner);
+    let deadline: number;
 
     moveTarget = target;
 
@@ -158,38 +169,53 @@ export const createWorkbenchFocusController = ({
       }
     };
 
-    requestAnimationFrame(attempt);
+    const start = () => {
+      if (!isCurrent()) {
+        return;
+      }
+      deadline = performance.now() + FOCUS_MOVE_WAIT_MS;
+      requestAnimationFrame(attempt);
+    };
+    if (ready) {
+      void ready.then(start, start);
+    } else {
+      start();
+    }
   };
 
-  const focusRegion: WorkbenchFocusController['focusRegion'] = (region, typeId, instanceId) =>
-    moveFocus({ kind: 'region', region }, () => {
-      // Side frames are replaced when their lazy view loads; center's owning frame stays mounted.
-      // Kept-alive panels and instances of the same type may also still be mounted but hidden.
-      for (const container of visibleRegionContainers()) {
-        if (
-          container.dataset.focusRegion !== region ||
-          (region !== 'center' && container.querySelector('[data-widget-loading]'))
-        ) {
-          continue;
-        }
-        if (instanceId !== undefined) {
-          const selector = `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"]`;
+  const focusRegion: WorkbenchFocusController['focusRegion'] = (region, typeId, instanceId, ready) =>
+    moveFocus(
+      { kind: 'region', region },
+      () => {
+        // Side frames are replaced when their lazy view loads; center's owning frame stays mounted.
+        // Kept-alive panels and instances of the same type may also still be mounted but hidden.
+        for (const container of visibleRegionContainers()) {
           if (
-            [container, ...container.querySelectorAll<HTMLElement>(selector)].some(
-              (element) => element.matches(selector) && element.getClientRects().length > 0
-            )
+            container.dataset.focusRegion !== region ||
+            (region !== 'center' && container.querySelector('[data-widget-loading]'))
           ) {
+            continue;
+          }
+          if (instanceId !== undefined) {
+            const selector = `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"]`;
+            if (
+              [container, ...container.querySelectorAll<HTMLElement>(selector)].some(
+                (element) => element.matches(selector) && element.getClientRects().length > 0
+              )
+            ) {
+              return container;
+            }
+            continue;
+          }
+          if (typeId === undefined || container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`)) {
             return container;
           }
-          continue;
         }
-        if (typeId === undefined || container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`)) {
-          return container;
-        }
-      }
 
-      return null;
-    });
+        return null;
+      },
+      ready
+    );
 
   return {
     activate: (target, { byPointer = false, projectId = getProjectId() } = {}) => {

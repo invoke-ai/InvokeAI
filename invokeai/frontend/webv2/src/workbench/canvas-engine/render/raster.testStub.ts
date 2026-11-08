@@ -55,13 +55,14 @@ const fontSizeFromShorthand = (font: unknown): number => {
 
 const createStubCtx = (
   callLog: RasterCallLogEntry[],
-  readbackAlpha: number
+  readbackAlpha: number,
+  canvas: RasterSurface['canvas']
 ): OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D => {
   const log = (op: string, args: unknown[]): void => {
     callLog.push({ args, op });
   };
 
-  const props: Record<string, unknown> = {};
+  const props: Record<string, unknown> = { canvas };
 
   const methods: Record<string, (...args: unknown[]) => unknown> = {
     arc: (...args: unknown[]) => log('arc', args),
@@ -147,13 +148,15 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
     this.width = width;
     this.height = height;
     this.canvas = { height, width } as unknown as OffscreenCanvas | HTMLCanvasElement;
-    this.ctx = createStubCtx(this.callLog, readbackAlpha);
+    this.ctx = createStubCtx(this.callLog, readbackAlpha, this.canvas);
   }
 
   resize(w: number, h: number): void {
     this.callLog.push({ args: [w, h], op: 'resize' });
     this.width = w;
     this.height = h;
+    this.canvas.width = w;
+    this.canvas.height = h;
   }
 
   /**
@@ -164,6 +167,8 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
     this.callLog.push({ args: [w, h, dx, dy], op: 'resizePreserving' });
     this.width = w;
     this.height = h;
+    this.canvas.width = w;
+    this.canvas.height = h;
   }
 }
 
