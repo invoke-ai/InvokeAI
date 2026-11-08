@@ -297,6 +297,10 @@
         "standalone-components": [
           "qwen3VLEncoderModel",
           "vae"
+        ],
+        "standalone-gguf-encoder": [
+          "qwen3VLEncoderModel",
+          "vae"
         ]
       },
       "nodeTypes": [
@@ -795,6 +799,7 @@
         "qwen3_encoder": [],
         "qwen3_source": [],
         "qwen3_vl_encoder": [],
+        "qwen3_vl_vision_tower": [],
         "rand_device": [
           "cpu"
         ],
@@ -2036,6 +2041,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],

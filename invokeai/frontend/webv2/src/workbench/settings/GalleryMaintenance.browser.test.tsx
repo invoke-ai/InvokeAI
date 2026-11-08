@@ -13,7 +13,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, Activity } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, userEvent } from 'vitest/browser';
@@ -186,12 +186,14 @@ describe('gallery maintenance in Data & workspace settings', () => {
     await import('./GalleryMaintenance');
   });
 
-  const renderSettings = async () => {
+  const renderSettings = async (mode: 'visible' | 'hidden' = 'visible') => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
           <QueryClientProvider client={queryClient}>
-            <WorkspaceSettings onReveal={() => {}} />
+            <Activity mode={mode}>
+              <WorkspaceSettings onReveal={() => {}} />
+            </Activity>
           </QueryClientProvider>
         </ChakraProvider>
       )
@@ -417,6 +419,71 @@ describe('gallery maintenance in Data & workspace settings', () => {
 
     await act(() => resolveExecution(result('archive_untracked', { images_archived: 4 })));
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['success', 'error', 'account'] as const)(
+    'settles %s while Activity hides an executing modal',
+    async (outcome) => {
+      let settle!: () => void;
+      mocks.apiFetchJson
+        .mockResolvedValueOnce(preview('remove_missing', operations[0].fingerprint))
+        .mockReturnValueOnce(
+          new Promise((resolve, reject) => {
+            settle = () =>
+              outcome !== 'error'
+                ? resolve(result('remove_missing', { records_removed: 2 }))
+                : reject(new Error('Hidden execution failed'));
+          })
+        );
+      await renderSettings();
+      await openAction(operations[0]);
+      await act(() => userEvent.click(getConfirmButton(operations[0])!));
+      await renderSettings('hidden');
+      if (outcome === 'account') {
+        await act(() => accountLifecycle.activate('hidden-execution-next', ':user:hidden-execution-next'));
+      }
+      await act(async () => {
+        settle();
+        await Promise.resolve();
+      });
+      await renderSettings();
+      await expect.poll(() => getButton(operations[0].button)?.disabled).toBe(false);
+      if (outcome === 'account') {
+        expect(host.querySelector('[data-testid="gallery-maintenance-result"]')).toBeNull();
+      } else {
+        expect(host.textContent).toContain(
+          outcome === 'success' ? 'settings.galleryMaintenance.completed' : 'Hidden execution failed'
+        );
+      }
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+      expect(mocks.invalidateGallery).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+      expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+    }
+  );
+
+  it('retains a pending preview across Activity cleanup, but fences an account change while hidden', async () => {
+    let resolvePreview!: (value: ReturnType<typeof preview>) => void;
+    mocks.apiFetchJson.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        })
+    );
+    await renderSettings();
+    await expect.poll(() => getButton(operations[0].button)).toBeDefined();
+    await act(() => userEvent.click(getButton(operations[0].button)!));
+    await renderSettings('hidden');
+    await act(() => resolvePreview(preview('remove_missing', operations[0].fingerprint)));
+    await renderSettings();
+    await expect.poll(() => getConfirmButton(operations[0])?.disabled).toBe(false);
+    await act(() => userEvent.keyboard('{Escape}'));
+    await act(() => userEvent.click(getButton(operations[0].button)!));
+    await renderSettings('hidden');
+    await act(() => accountLifecycle.activate('hidden-next-account', ':user:hidden-next-account'));
+    await act(() => resolvePreview(preview('remove_missing', operations[0].fingerprint)));
+    await renderSettings();
+    expect(getConfirmButton(operations[0])?.disabled).not.toBe(false);
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
   });
 

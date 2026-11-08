@@ -852,6 +852,7 @@ type RecalledComponentSetting = keyof Pick<
   | 'pidDecoderModel'
   | 'qwen3EncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen3VLVisionTowerModel'
   | 'qwen35EncoderModel'
   | 'qwenVLEncoderModel'
   | 't5EncoderModel'
@@ -883,6 +884,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
   { metadataKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
   { metadataKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
+  { metadataKey: 'qwen3_vl_vision_tower', setting: 'qwen3VLVisionTowerModel' },
   { metadataKey: 'qwen3_5_encoder', setting: 'qwen35EncoderModel' },
   { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
   { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
@@ -1480,14 +1482,18 @@ export const buildImageRecallSettings = ({
     const componentPatch = getComponentPatch(metadata, models);
     const recordedSettings = Object.keys(componentPatch) as RecalledComponentSetting[];
     const effectiveModel = values.model;
-    // A recorded component that does not fit the effective model is skipped, so the current pick stays.
-    const fittingSettings = recordedSettings.filter((setting) => {
+    // A recorded component that does not fit the effective model is skipped, so the current pick stays. Each is judged
+    // beside the ones already restored, because a slot can depend on another (the Vision Tower on a GGUF encoder).
+    const fittingSettings: RecalledComponentSetting[] = [];
+
+    for (const setting of recordedSettings) {
       const component = componentPatch[setting];
 
-      return !component || isComponentCompatibleWithModel(effectiveModel, values, setting, component);
-    });
-
-    values = { ...values, ...Object.fromEntries(fittingSettings.map((setting) => [setting, componentPatch[setting]])) };
+      if (!component || isComponentCompatibleWithModel(effectiveModel, values, setting, component)) {
+        values = { ...values, [setting]: component };
+        fittingSettings.push(setting);
+      }
+    }
 
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);
 
@@ -1571,6 +1577,7 @@ export const buildImageRecallSettings = ({
     // still the current one and incompatible configs are re-targeted or dropped.
     referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
     const recordedReferenceImages = referenceRecall.images;
+    // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),
       values.model,

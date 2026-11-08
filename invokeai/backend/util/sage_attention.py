@@ -68,7 +68,8 @@ _FIRST_CALL_MAX_ERROR = 0.5
 # whole output costs ~14 bytes per element to compare -- about 5 GB for one call of Wan 2.2 14B at 720p.
 _FIRST_CALL_ROWS = 1024
 
-DOCS_URL = "https://invoke-ai.github.io/InvokeAI-7/configuration/optimization/sage-attention/"
+# The published page. The old GitHub Pages path under InvokeAI-7 returns 404.
+DOCS_URL = "https://v7.invoke.ai/configuration/optimization/sage-attention/"
 
 
 @dataclass
