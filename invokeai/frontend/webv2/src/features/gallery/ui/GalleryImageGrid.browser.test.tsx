@@ -424,21 +424,28 @@ type CanonicalContextTarget = {
   allStarred?: boolean;
   itemRefs?: GalleryItemRef[];
   items: GalleryItem[];
+  returnFocus?: () => HTMLElement | null;
   x: number;
   y: number;
 } | null;
 const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
-  <output data-testid="context-target">
-    {JSON.stringify(
-      target
-        ? {
-            itemRefs: target.itemRefs ?? null,
-            items: target.items.map(({ kind, name }) => ({ kind, name })),
-            ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
-          }
-        : null
-    )}
-  </output>
+  <>
+    <output data-testid="context-target">
+      {JSON.stringify(
+        target
+          ? {
+              itemRefs: target.itemRefs ?? null,
+              items: target.items.map(({ kind, name }) => ({ kind, name })),
+              ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
+            }
+          : null
+      )}
+    </output>
+    {/* Stands in for a dialog the menu opened, closing: focus goes where the target says. */}
+    <button data-testid="context-return-focus" type="button" onClick={() => target?.returnFocus?.()?.focus()}>
+      Close dialog
+    </button>
+  </>
 );
 const NoopProvider = ({ children }: { children: ReactNode }) => children;
 
@@ -1409,6 +1416,34 @@ describe('GalleryImageGrid mixed item cells', () => {
         items: [{ kind: 'video', name: 'clip.mp4' }],
       })
     );
+  });
+
+  it('returns focus from a dialog its context menu opens to the right-clicked thumbnail, or the grid once it is gone', async () => {
+    const first = createItem('image', 'first.png');
+    const second = createItem('image', 'second.png');
+    await renderGallery(createGallery({ items: [first, second], selectedItemKey: null, selectedItemKeys: [] }));
+    const secondButton = getButton('Select second.png for preview');
+
+    await interact(() =>
+      secondButton.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+
+    const closeDialog = host!.querySelector<HTMLButtonElement>('[data-testid="context-return-focus"]')!;
+
+    await interact(() => closeDialog.click());
+    expect(document.activeElement).toBe(secondButton);
+
+    // Resolved as the dialog closes: a deletion that removed the thumbnail leaves focus in the grid, not on the page.
+    secondButton.remove();
+    await interact(() => closeDialog.click());
+    // The removed thumbnail held the tab stop, so focus lands on the grid's scroll viewport, which keeps it in the grid.
+    const gridViewport = getButton('Select first.png for preview').closest<HTMLElement>(
+      '[data-scope="scroll-area"][data-part="viewport"]'
+    );
+    expect(gridViewport).not.toBeNull();
+    expect(document.activeElement).toBe(gridViewport);
   });
 
   it('retains an unloaded video ref when opening the context menu inside a mixed selection', async () => {

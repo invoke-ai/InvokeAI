@@ -7,6 +7,7 @@ import type {
 
 import { SEED_MAX } from '@platform/core/seed';
 
+import type { FamilyGraph } from './familyGraph';
 import type {
   CompiledGenerateGraph,
   ComponentModelConfig,
@@ -61,7 +62,7 @@ import {
   toGraphContract,
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
-import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
+import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
 import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
@@ -81,6 +82,14 @@ const getCompatibleComponent = (
   component: ComponentModelConfig | null,
   filter: GenerateComponentFilter
 ): ComponentModelConfig | null => (component && filter(component) ? component : null);
+
+// Encode node types shared across families: a family that denoises in another's VAE latent space encodes with its node.
+/** FLUX.2's VAE encode; FLUX.3 and MOSS-Image denoise in the FLUX.2 VAE's raw latent layout. */
+const FLUX2_ENCODE_TYPE = 'flux2_vae_encode';
+/** Qwen-Image's VAE encode; Krea-2 shares the Qwen-Image VAE. Canvas and reference-image encodes use it alike. */
+const QWEN_IMAGE_ENCODE_TYPE = 'qwen_image_i2l';
+/** Qwen-Image-2.1's VAE encode, for Canvas and reference-image encodes alike. */
+const QWEN_IMAGE_2_1_ENCODE_TYPE = 'qwen_image_2_1_i2l';
 
 const toImageField = (image: GenerateReferenceImageAsset) => ({
   image_name: getEffectiveReferenceImage(image).image_name,
@@ -114,7 +123,7 @@ const addIPAdapterReferenceImages = (
   settings: GenerateSettings,
   model: MainModelConfig,
   denoise: BackendInvocationContract
-) => {
+): BackendInvocationContract | null => {
   const strengthOnly = isStrengthOnlyIPAdapterBase(model.base);
   // Anima drops a strength-0 adapter anyway; sending one would still encode the image, or install the encoder.
   const refs = getEnabledReferenceImages(settings.referenceImages, 'ip_adapter').filter(
@@ -122,7 +131,7 @@ const addIPAdapterReferenceImages = (
   );
 
   if (refs.length === 0) {
-    return;
+    return null;
   }
 
   const collector = addNode(graph, { id: createId('ip_adapter_collector'), type: 'collect' });
@@ -156,6 +165,7 @@ const addIPAdapterReferenceImages = (
   }
 
   addEdge(graph, collector, 'collection', denoise, 'ip_adapter');
+  return collector;
 };
 
 const FLUX_REDUX_INFLUENCE = {
@@ -171,13 +181,13 @@ const addFluxReduxReferenceImages = (
   settings: GenerateSettings,
   model: MainModelConfig,
   denoise: BackendInvocationContract
-) => {
+): BackendInvocationContract | null => {
   const refs = getEnabledReferenceImages(settings.referenceImages, 'flux_redux').filter(
     (ref) => ref.config.model?.base === model.base
   );
 
   if (refs.length === 0) {
-    return;
+    return null;
   }
 
   const collector = addNode(graph, { id: createId('flux_redux_collector'), type: 'collect' });
@@ -201,6 +211,7 @@ const addFluxReduxReferenceImages = (
   }
 
   addEdge(graph, collector, 'collection', denoise, 'redux_conditioning');
+  return collector;
 };
 
 const addFluxKontextReferenceImages = (
@@ -325,7 +336,7 @@ const buildSDGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
   const compelType = getCompelPromptNodeType(model.base);
@@ -441,13 +452,14 @@ const buildSDGraph = (
 
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
-  addIPAdapterReferenceImages(graph, settings, model, denoise);
+  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
   const refiner = getActiveRefiner(settings, model);
   const refinerDenoise = refiner
     ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
     : null;
   // Create decode only after resolving the final VAE source.
+  const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   const output = addDecodeOutput({
     denoise: refinerDenoise ?? denoise,
     graph,
@@ -458,7 +470,7 @@ const buildSDGraph = (
     positivePrompt,
     seed,
     settings,
-    vaeSource: seamless ?? vaeLoader ?? modelLoader,
+    vaeSource,
   });
 
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
@@ -478,7 +490,25 @@ const buildSDGraph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector,
+      negative: { collector: negCondCollect, node: negCond },
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: noise.height, width: noise.width },
+    graph,
+    latents: {
+      encodeType: 'i2l',
+      fp32: settings.vaePrecision === 'fp32',
+      unet: { field: 'unet', node: unetSource },
+      vae: { field: 'vae', node: vaeSource },
+    },
+    layoutPrompt: null,
+  };
 };
 
 const addPromptAndSeedNodes = (graph: BackendGraphContract) => ({
@@ -548,32 +578,6 @@ const addDecodeOutput = ({
   return output;
 };
 
-/**
- * The node and field a built graph decodes with, for grafting an encode onto it. An ordinary decode carries it on
- * `canvas_output.vae`. A PiD decode carries it on its `vae` edge when its node type takes that input: only the FLUX.2
- * decode reads it, the others keep the edge as the record of the decode VAE. The FLUX and SD-3 PiD decodes take none,
- * and those builders decode with the model loader, which the fallback names. Null when no builder convention applies.
- */
-export const findVaeSource = (
-  graph: BackendGraphContract
-): { node: BackendInvocationContract; field: string } | null => {
-  const edge = graph.edges.find(
-    (candidate) =>
-      candidate.destination.field === 'vae' &&
-      (candidate.destination.node_id === 'canvas_output' ||
-        isPidDecodeNodeType(graph.nodes[candidate.destination.node_id]?.type))
-  );
-  if (edge) {
-    const node = graph.nodes[edge.source.node_id];
-    return node ? { field: edge.source.field, node } : null;
-  }
-  // A PiD decode without a `vae` edge is the FLUX or SD-3 one. Their builders decode with `model_loader`, which takes
-  // any VAE override as a loader input, so its `vae` output is the decode VAE.
-  const modelLoader = graph.nodes.model_loader;
-  const decodesWithPid = Object.values(graph.nodes).some((node) => isPidDecodeNodeType(node.type));
-  return modelLoader && decodesWithPid ? { field: 'vae', node: modelLoader } : null;
-};
-
 /** Native PiD denoises at one quarter of the requested target dimensions. */
 const getDenoiseSize = (settings: GenerateSettings, model: MainModelConfig): { width: number; height: number } =>
   // Use the model-native grid for divided dimensions, not the UI's PiD-scaled grid.
@@ -584,7 +588,7 @@ const buildSD3Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const graph: BackendGraphContract = { edges: [], id: createId('sd3_graph'), nodes: {} };
   const vaeModel = getCompatibleVae(settings, model);
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -649,7 +653,14 @@ const buildSD3Graph = (
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'sd3_i2l', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 /**
@@ -676,7 +687,7 @@ const buildFluxGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   if (model.variant === 'dev_fill') {
     throw new Error('FLUX Fill models do not support text-to-image generation.');
   }
@@ -744,8 +755,8 @@ const buildFluxGraph = (
   if (model.name.toLowerCase().includes('kontext')) {
     addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
   }
-  addIPAdapterReferenceImages(graph, settings, model, denoise);
-  addFluxReduxReferenceImages(graph, settings, model, denoise);
+  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
+  const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
     clip_embed_model: clipEmbedModel ?? undefined,
     guidance: settings.cfgScale,
@@ -759,7 +770,20 @@ const buildFluxGraph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector,
+      ipAdapterCollector,
+      negative: null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'flux_vae_encode', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildFlux2Graph = (
@@ -767,7 +791,7 @@ const buildFlux2Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const isDev = model.variant === 'dev';
   const sourceModel = getFlux2ComponentSource(model, settings);
   const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
@@ -876,7 +900,20 @@ const buildFlux2Graph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector: null,
+      negative: null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildCogView4Graph = (
@@ -884,7 +921,7 @@ const buildCogView4Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const graph: BackendGraphContract = { edges: [], id: createId('cogview4_graph'), nodes: {} };
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const modelLoader = addNode(graph, { id: 'model_loader', model, type: 'cogview4_model_loader' });
@@ -912,7 +949,14 @@ const buildCogView4Graph = (
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'cogview4_txt2img', projectSettings, { scheduler: undefined });
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'cogview4_i2l', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildErnieImageGraph = (
@@ -920,7 +964,7 @@ const buildErnieImageGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // Bundles supply submodels; single-file models need explicit encoder/VAE selections.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
@@ -977,7 +1021,14 @@ const buildErnieImageGraph = (
     mistral_encoder: mistralEncoderModel ?? undefined,
   });
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: null,
+    layoutPrompt: null,
+  };
 };
 
 const buildQwenImageGraph = (
@@ -985,7 +1036,7 @@ const buildQwenImageGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const sourceModel = getCompatibleComponentSource(settings, model);
   const hasBundledComponents = model.format === 'diffusers' || sourceModel;
   const vaeModel = getCompatibleVae(settings, model);
@@ -1088,7 +1139,7 @@ const buildQwenImageGraph = (
 
     const firstImage = qwenReferenceImages[0]?.config.image;
     if (firstImage) {
-      const refI2l = addNode(graph, { id: createId('qwen_ref_i2l'), type: 'qwen_image_i2l' });
+      const refI2l = addNode(graph, { id: createId('qwen_ref_i2l'), type: QWEN_IMAGE_ENCODE_TYPE });
       const refImageNode = addNode(graph, {
         id: createId('qwen_ref_img_for_vae'),
         image: toImageField(firstImage),
@@ -1111,7 +1162,14 @@ const buildQwenImageGraph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildZImageGraph = (
@@ -1119,7 +1177,7 @@ const buildZImageGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
     settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
@@ -1219,7 +1277,20 @@ const buildZImageGraph = (
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector: null,
+      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'z_image_i2l', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildAnimaGraph = (
@@ -1227,7 +1298,7 @@ const buildAnimaGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   const vaeModel = requireComponent(getCompatibleVae(settings, model), 'Anima VAE');
   const qwen3EncoderModel = requireComponent(
     settings.qwen3EncoderModel && isAnimaQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null,
@@ -1297,7 +1368,7 @@ const buildAnimaGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addIPAdapterReferenceImages(graph, settings, model, denoise);
+  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
     qwen3_encoder: qwen3EncoderModel,
     ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
@@ -1306,7 +1377,20 @@ const buildAnimaGraph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector,
+      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'anima_i2l', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 /**
@@ -1339,7 +1423,12 @@ const addKrea2EditReferences = (
 
   for (const image of referenceImages) {
     // `reference` sizes the image as ai-toolkit trains edit LoRAs, so width and height stay unset.
-    const encode = addNode(graph, { id: createId('krea2_ref_i2l'), image, reference: true, type: 'qwen_image_i2l' });
+    const encode = addNode(graph, {
+      id: createId('krea2_ref_i2l'),
+      image,
+      reference: true,
+      type: QWEN_IMAGE_ENCODE_TYPE,
+    });
     const collect = addNode(graph, { id: createId('krea2_ref_latents_collect'), type: 'collect' });
 
     addEdge(graph, vaeSource, 'vae', encode, 'vae');
@@ -1363,7 +1452,7 @@ const buildKrea2Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // Standalone Krea needs a separate VAE/encoder without a component source.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
@@ -1483,7 +1572,21 @@ const buildKrea2Graph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector: null,
+      // Krea-2's negative conditioning feeds the denoise directly, so regional negatives have nothing to join.
+      negative: null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 const buildQwenImage21Graph = (
@@ -1491,7 +1594,7 @@ const buildQwenImage21Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // A Diffusers pipeline brings its VAE and encoder; for single-file and GGUF transformers the generation policy
   // requires both before this runs.
   const vaeModel = getCompatibleVae(settings, model);
@@ -1552,7 +1655,14 @@ const buildQwenImage21Graph = (
   addEdge(graph, denoise, 'metadata', output, 'metadata');
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: QWEN_IMAGE_2_1_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 /**
@@ -1587,7 +1697,7 @@ const addQwenImage21ReferenceImages = (
       image: toImageField(config.image),
       type: 'image',
     });
-    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: QWEN_IMAGE_2_1_ENCODE_TYPE });
     addEdge(graph, imageNode, 'image', i2l, 'image');
     addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
 
@@ -1620,7 +1730,7 @@ const buildMossImageGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both. The filter drops a stale
   // Qwen3.5 4B selection left over from Anima-3.8B, which shares the setting.
   const isDiffusers = model.format === 'diffusers';
@@ -1706,7 +1816,14 @@ const buildMossImageGraph = (
     addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
   }
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt,
+  };
 };
 
 const buildFlux3Graph = (
@@ -1714,7 +1831,7 @@ const buildFlux3Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // A single-file or GGUF FLUX.3 model is the transformer alone; a Diffusers one bundles the VAE and encoder.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
@@ -1804,7 +1921,14 @@ const buildFlux3Graph = (
   });
   addReferenceImageMetadata(graph, output, settings);
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt,
+  };
 };
 
 const buildIdeogram4Graph = (
@@ -1812,7 +1936,7 @@ const buildIdeogram4Graph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // Standalone Ideogram needs its other branch, encoder, and VAE; bundles supply them.
   const isDiffusers = model.format === 'diffusers';
   const unconditionalModel = settings.ideogram4UnconditionalModel;
@@ -1881,7 +2005,14 @@ const buildIdeogram4Graph = (
   // Record the caption the encoder saw; the positive prompt alone does not show regions or palette.
   addEdge(graph, captionBuilder, 'value', metadata, 'ideogram4_caption');
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: null,
+    layoutPrompt: captionBuilder,
+  };
 };
 
 const buildWanGraph = (
@@ -1889,7 +2020,7 @@ const buildWanGraph = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): BackendGraphContract => {
+): FamilyGraph => {
   // GGUF Wan sources encoder/VAE from standalone selections or a bundle.
   const sourceModel = getDiffusersSource(settings, model);
   const vaeModel = getCompatibleVae(settings, model);
@@ -1951,7 +2082,14 @@ const buildWanGraph = (
     wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
   });
 
-  return graph;
+  return {
+    conditioning: null,
+    denoise,
+    denoiseSize: { height: denoise.height, width: denoise.width },
+    graph,
+    latents: { encodeType: 'wan_i2l', vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+  };
 };
 
 /** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
@@ -2030,7 +2168,7 @@ type GenerateGraphBuilder = (
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-) => BackendGraphContract;
+) => FamilyGraph;
 
 export const GRAPH_BUILDERS = {
   'sd-1': buildSDGraph,
@@ -2052,6 +2190,10 @@ export const GRAPH_BUILDERS = {
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
 
+/** The builder for a base, or null. Own keys only: a base from the API must not reach `Object.prototype` members. */
+export const getFamilyGraphBuilder = (base: string): GenerateGraphBuilder | null =>
+  Object.hasOwn(GRAPH_BUILDERS, base) ? GRAPH_BUILDERS[base as SupportedGenerateBase] : null;
+
 export const compileGenerateGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2072,7 +2214,7 @@ export const compileGenerateGraph = (
       return buildExternalGraph(settings, model, outputIsIntermediate, runtimeProjectSettings);
     }
 
-    const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+    const builder = getFamilyGraphBuilder(model.base);
 
     if (!builder) {
       const dimensionGrid = getGenerationDimensions(model).grid;
@@ -2080,7 +2222,7 @@ export const compileGenerateGraph = (
       throw new Error(`${model.name} dimensions must be multiples of ${dimensionGrid}.`);
     }
 
-    const graph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
+    const { graph } = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
     // External providers return finished images; the filters apply to every locally decoded family.
     addOutputPostprocessors(graph, runtimeProjectSettings, outputIsIntermediate);
 

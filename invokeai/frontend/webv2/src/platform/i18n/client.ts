@@ -3,6 +3,8 @@ import i18n from 'i18next';
 import Backend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
 
+import { getEffectiveWorkbenchLanguage, normalizeWorkbenchLanguage } from './languages';
+
 void i18n
   .use(Backend)
   .use(initReactI18next)
@@ -16,6 +18,7 @@ void i18n
       // worker caches only these versioned URLs.
       queryStringParams: { v: import.meta.env.LOCALE_VERSION },
     },
+    lng: getEffectiveWorkbenchLanguage(normalizeWorkbenchLanguage(globalThis.document?.documentElement.lang) ?? 'en'),
     debug: false,
     fallbackLng: 'en',
     fallbackNS: 'translation',
