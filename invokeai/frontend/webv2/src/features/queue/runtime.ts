@@ -412,6 +412,8 @@ const RERUN_CLAIM_TTL_MS = 120_000;
 const RERUN_CLAIM_RENEW_MS = 40_000;
 
 interface RunAttempt {
+  /** Only fresh admissions observed here are known ordinary; restored runs still need metadata validation. */
+  ordinaryBackendItemIds?: ReadonlySet<number>;
   generation: number;
   key: string;
   projectId: string;
@@ -625,6 +627,7 @@ export const createQueueRuntime = ({
   const beginAttempt = (projectId: string, queueItemId: string): RunAttempt => {
     const key = getRunKey(projectId, queueItemId);
     const attempt = {
+      ordinaryBackendItemIds: activeAttempts.get(key)?.ordinaryBackendItemIds,
       generation: ++nextAttemptGeneration,
       key,
       projectId,
@@ -1273,7 +1276,10 @@ export const createQueueRuntime = ({
         );
       }
       try {
-        commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
+        deliveryConfirmations.routeOrdinaryResults(
+          backendItemIds.filter((id) => attempt.ordinaryBackendItemIds?.has(id)),
+          () => commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos })
+        );
       } catch (error) {
         let stagedBackendItemIds: Set<number> | undefined;
         for (const backendItemId of backendItemIds) {
@@ -1393,13 +1399,17 @@ export const createQueueRuntime = ({
         markAdoptedRerunsStaged(projectId, queueItem, [backendItemId]);
       }
       try {
-        commands.routePartialResults({
-          backendItemId,
-          images: visibleImages,
-          projectId,
-          queueItemId: queueItem.id,
-          videos,
-        });
+        deliveryConfirmations.routeOrdinaryResults(
+          attempt.ordinaryBackendItemIds?.has(backendItemId) ? [backendItemId] : [],
+          () =>
+            commands.routePartialResults({
+              backendItemId,
+              images: visibleImages,
+              projectId,
+              queueItemId: queueItem.id,
+              videos,
+            })
+        );
       } catch (error) {
         const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
         if (claim) {
@@ -2189,6 +2199,9 @@ export const createQueueRuntime = ({
           });
         }
 
+        if (currentQueueItem.snapshot.destination === 'canvas') {
+          attempt.ordinaryBackendItemIds = new Set(itemIds);
+        }
         commands.markBackendSubmitted({
           backendBatchId: batchId,
           backendItemIds: itemIds,

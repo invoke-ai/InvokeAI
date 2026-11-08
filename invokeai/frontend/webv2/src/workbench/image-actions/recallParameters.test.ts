@@ -586,7 +586,7 @@ describe('buildRecallParametersSettings', () => {
     expect(result.skipped).toEqual([{ detail: sd3.name, key: 'reference_images', reason: 'incompatible' }]);
   });
 
-  it('reports parameters the Generate panel has no home for, ignoring empty lists', () => {
+  it('leaves canvas parameters to the canvas owner, ignoring empty lists', () => {
     const result = build(currentFor(sdxl), {
       control_layers: [{ model_key: 'controlnet' }],
       denoise_strength: 0.5,
@@ -594,7 +594,7 @@ describe('buildRecallParametersSettings', () => {
     });
 
     expect(result.fields).toEqual(['prompts']);
-    expect(result.skipped.map((skip) => skip.key).sort()).toEqual(['control_layers', 'denoise_strength']);
+    expect(result.skipped).toEqual([]);
     expect(result.skipped.every((skip) => skip.reason === 'unsupported')).toBe(true);
 
     expect(build(currentFor(sdxl), { control_layers: [] }).skipped).toEqual([]);

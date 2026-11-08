@@ -675,6 +675,8 @@
         "clip_skip": [
           0
         ],
+        "control_layers": [],
+        "controlnets": [],
         "dype_exponent": [
           1
         ],
@@ -735,8 +737,17 @@
           true
         ],
         "ideogram4_color_palette": [],
+        "ideogram4_guidance_scale": [
+          null
+        ],
+        "ideogram4_mu": [
+          null
+        ],
         "ideogram4_sampler_preset": [
           "V4_QUALITY_48"
+        ],
+        "ideogram4_steps": [
+          null
         ],
         "ideogram4_unconditional_model": [],
         "is_intermediate": [
@@ -832,12 +843,16 @@
         "strength": [
           0.6
         ],
+        "t2iAdapters": [],
         "t5_encoder": [],
         "use_cache": [
           true
         ],
         "vae": [],
         "wan_component_source": [],
+        "wan_guidance_scale_low_noise": [
+          null
+        ],
         "wan_t5_encoder_model": [],
         "width": [
           1024,

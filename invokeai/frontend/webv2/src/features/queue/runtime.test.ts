@@ -190,6 +190,7 @@ const createWorkbenchQueueHistory = () => {
     ),
   });
   return {
+    dispatch,
     /** The backend item a successful enqueue of the run creates. */
     acceptedItem: {
       batchId: 'backend-batch',
@@ -4465,6 +4466,144 @@ describe('queue runtime retries', () => {
     await adopting.runtime.dispose();
     await later.runtime.dispose();
     vi.useRealTimers();
+  });
+
+  it.each(['partial', 'completed'] as const)(
+    'excludes live ordinary %s staging from recovery through history clearing, then recovers an unknown rerun',
+    async (routing) => {
+      vi.useFakeTimers();
+      const workbench = createWorkbenchQueueHistory();
+      const projectId = workbench.history.getSnapshot().projects[0]!.id;
+      const queueItemId = workbench.getRun()!.id;
+      const commands = workbench.history.commands;
+      if (routing === 'partial') {
+        vi.mocked(commands.routePartialResults).mockImplementation((payload) =>
+          workbench.dispatch({ ...payload, type: 'routeQueueItemPartialResults' })
+        );
+      } else {
+        vi.mocked(commands.routeResults).mockImplementation((payload) =>
+          workbench.dispatch({ ...payload, type: 'routeQueueItemResults' })
+        );
+      }
+      const backend = createTestBackend({
+        enqueueGenerate: vi.fn().mockResolvedValue({
+          batchId: 'backend-batch',
+          enqueued: routing === 'partial' ? 2 : 1,
+          itemIds: routing === 'partial' ? [88, 89] : [88],
+          requested: routing === 'partial' ? 2 : 1,
+        }),
+        getItem: vi.fn<QueueBackendPort['getItem']>((id) =>
+          Promise.resolve({ ...workbench.acceptedItem, id, status: id === 88 ? 'completed' : 'pending' })
+        ),
+        getResultImages: vi.fn().mockResolvedValue([
+          {
+            imageName: 'ordinary.png',
+            sourceBackendItemId: 88,
+            sourceQueueItemId: queueItemId,
+            width: 64,
+            height: 64,
+          } as QueueResultImage,
+        ]),
+        readItemsById: vi.fn().mockRejectedValue(new TypeError('metadata unavailable')),
+        claimItemDelivery: vi.fn().mockResolvedValue({ kind: 'delivered' }),
+      });
+      const runtime = createQueueRuntime({ ...runtimeServices, backend, history: workbench.history });
+      try {
+        runtime.start();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(workbench.history.listStagedResults()).toEqual([{ backendItemId: 88, projectId, queueItemId }]);
+        if (routing === 'partial') {
+          expect(workbench.getRun()?.status).toBe('running');
+          commands.setStatus({ projectId, queueItemId, status: 'failed' });
+        } else {
+          expect(workbench.getRun()?.status).toBe('completed');
+        }
+        workbench.dispatch({ type: 'clearCompletedQueueItems' });
+        expect(workbench.getRun()).toBeUndefined();
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(workbench.history.listStagedResults()).toEqual([{ backendItemId: 88, projectId, queueItemId }]);
+        expect(backend.readItemsById).not.toHaveBeenCalled();
+        expect(backend.claimItemDelivery).not.toHaveBeenCalled();
+        expect(commands.recordError).not.toHaveBeenCalled();
+
+        // A candidate arriving from project recovery has no live routing classification or queue history.
+        vi.mocked(backend.readItemsById).mockResolvedValue([
+          {
+            id: 99,
+            retriedFromItemId: 41,
+            destination: 'canvas',
+            origin: buildQueueItemOrigin('restored-run', projectId),
+          } as Awaited<ReturnType<QueueBackendPort['readItemsById']>>[number],
+        ]);
+        workbench.dispatch({
+          type: 'stageRetriedCanvasResults',
+          backendItemId: 99,
+          projectId,
+          queueItemId: 'restored-run',
+          images: [
+            { imageName: 'restored.png', sourceQueueItemId: 'restored-run', width: 64, height: 64 } as QueueResultImage,
+          ],
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(backend.readItemsById).toHaveBeenCalledExactlyOnceWith([99], expect.any(AbortSignal));
+        expect(backend.claimItemDelivery).toHaveBeenCalledExactlyOnceWith(
+          99,
+          'confirm',
+          `run:${JSON.stringify([projectId, 'restored-run'])}`
+        );
+        expect(commands.recordError).not.toHaveBeenCalled();
+      } finally {
+        await runtime.dispose();
+      }
+    }
+  );
+
+  it('validates a restored active run without local retry history before confirming its staged rerun', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const projectId = workbench.history.getSnapshot().projects[0]!.id;
+    const queueItemId = workbench.getRun()!.id;
+    const commands = workbench.history.commands;
+    commands.markBackendSubmitted({ backendItemIds: [88], backendBatchId: 'backend-batch', projectId, queueItemId });
+    vi.mocked(commands.routeResults).mockImplementation((payload) =>
+      workbench.dispatch({ ...payload, type: 'routeQueueItemResults' })
+    );
+    const backend = createTestBackend({
+      getItem: vi.fn().mockResolvedValue({ ...workbench.acceptedItem, status: 'completed' }),
+      getResultImages: vi.fn().mockResolvedValue([
+        {
+          imageName: 'restored.png',
+          sourceBackendItemId: 88,
+          sourceQueueItemId: queueItemId,
+          width: 64,
+          height: 64,
+        } as QueueResultImage,
+      ]),
+      readItemsById: vi.fn().mockResolvedValue([
+        {
+          id: 88,
+          retriedFromItemId: 41,
+          destination: 'canvas',
+          origin: buildQueueItemOrigin(queueItemId, projectId),
+        },
+      ]),
+      claimItemDelivery: vi.fn().mockResolvedValue({ kind: 'delivered' }),
+    });
+    const runtime = createQueueRuntime({ ...runtimeServices, backend, history: workbench.history });
+    try {
+      runtime.start();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(workbench.getRun()).toMatchObject({ status: 'completed' });
+      expect(backend.enqueueGenerate).not.toHaveBeenCalled();
+      expect(backend.readItemsById).toHaveBeenCalledExactlyOnceWith([88], expect.any(AbortSignal));
+      expect(backend.claimItemDelivery).toHaveBeenCalledExactlyOnceWith(
+        88,
+        'confirm',
+        `run:${JSON.stringify([projectId, queueItemId])}`
+      );
+    } finally {
+      await runtime.dispose();
+    }
   });
 
   it('confirms an already staged candidate recovered from the project without staging it again', async () => {

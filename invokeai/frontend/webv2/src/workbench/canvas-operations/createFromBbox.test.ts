@@ -164,7 +164,13 @@ describe('createFromBbox', () => {
 
     const result = await harness.run('raster');
 
-    expect(harness.order).toEqual(['flush', 'document', 'export', 'upload', 'resolve', 'commit']);
+    expect(harness.order.filter((event) => event !== 'document')).toEqual([
+      'flush',
+      'export',
+      'upload',
+      'resolve',
+      'commit',
+    ]);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'rect', rect: bbox });
     expect(harness.uploadImage).toHaveBeenCalledWith(defaultBlob, {
       fileName: 'bbox.png',

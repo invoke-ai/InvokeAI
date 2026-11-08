@@ -109,6 +109,34 @@ describe('delivery confirmations', () => {
     confirmations.dispose();
   });
 
+  it.each([false, true])(
+    'keeps only surviving ordinary candidates when routing throws (staged: %s)',
+    async (staged) => {
+      const { backend, confirmations } = harness();
+      expect(() =>
+        confirmations.routeOrdinaryResults([99], () => {
+          if (staged) {
+            confirmations.recover([candidate(99)]);
+          }
+          throw new Error('routing failed');
+        })
+      ).toThrow('routing failed');
+      if (staged) {
+        confirmations.recover([candidate(99)]);
+        await Promise.resolve();
+        expect(backend.readItemsById).not.toHaveBeenCalled();
+        // Removing the candidate ends its classification, so a later restored candidate must be validated again.
+        confirmations.recover([]);
+      }
+      confirmations.recover([candidate(99)]);
+      await vi.waitFor(() =>
+        expect(backend.claimItemDelivery).toHaveBeenCalledWith(99, 'confirm', 'run:["project","run"]')
+      );
+      expect(backend.readItemsById).toHaveBeenCalledExactlyOnceWith([99], expect.any(AbortSignal));
+      confirmations.dispose();
+    }
+  );
+
   it('shares one five-attempt budget across run/tab claimants and synchronous candidate notifications', async () => {
     vi.useFakeTimers();
     const { backend, confirmations, reportError } = harness({

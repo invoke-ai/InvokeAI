@@ -161,6 +161,22 @@ export const createDeliveryConfirmations = ({
     drainRenewals();
   };
 
+  const routeOrdinaryResults = (itemIds: number[], route: () => void): void => {
+    // Mark before synchronous staging notifications; retain only candidates the route actually leaves behind.
+    for (const id of itemIds) {
+      checkedCandidates.add(id);
+    }
+    try {
+      route();
+    } finally {
+      for (const id of itemIds) {
+        if (!candidates.has(id)) {
+          checkedCandidates.delete(id);
+        }
+      }
+    }
+  };
+
   const recover = (staged: StagedQueueResult[]): void => {
     if (!active()) {
       return;
@@ -273,6 +289,7 @@ export const createDeliveryConfirmations = ({
   return {
     confirm,
     renewOwned,
+    routeOrdinaryResults,
     isStaged: (itemId: number) => confirmations.has(itemId) || candidates.has(itemId),
     recover,
     dispose,

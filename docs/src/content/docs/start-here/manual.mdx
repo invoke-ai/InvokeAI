@@ -1,10 +1,13 @@
 ---
 title: Manual Installation
-lastUpdated: 2026-10-19
+lastUpdated: 2026-10-25
 ---
 
-import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
+import { LinkCard, Steps, LinkButton } from '@astrojs/starlight/components'
 import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+import SetupPicker from '@components/SetupPicker.astro'
+import SetupVariant from '@components/SetupVariant.astro'
+import SetupSwitch from '@components/SetupSwitch.astro'
 
 <SystemRequirementsLink />
 
@@ -22,6 +25,10 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
   href="../../development"
 />
 
+## Your setup
+
+<SetupPicker />
+
 ## Walkthrough
 
 We'll use [`uv`](https://github.com/astral-sh/uv) to install python and create a virtual environment, then install the `invokeai` package. `uv` is a modern, very fast alternative to `pip`.
@@ -36,53 +43,59 @@ The following commands vary depending on the version of Invoke being installed a
 
   2. Create a directory for your installation, typically in your home directory (e.g. `~/invokeai` or `$Home/invokeai`):
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          ```ps
-          mkdir $Home/invokeai
-          cd $Home/invokeai
-          ```
-        </TabItem>
-        <TabItem label="Linux/MacOS" icon="linux">
-          ```bash
-          mkdir ~/invokeai
-          cd ~/invokeai
-          ```
-        </TabItem>
-      </Tabs>
+      <SetupSwitch>
+      <SetupVariant os="windows">
+        ```ps
+        mkdir $Home/invokeai
+        cd $Home/invokeai
+        ```
+      </SetupVariant>
+      <SetupVariant os="macos linux">
+        ```bash
+        mkdir ~/invokeai
+        cd ~/invokeai
+        ```
+      </SetupVariant>
+      </SetupSwitch>
 
   3. Create a virtual environment in that directory:
 
-      ```sh
-      uv venv --relocatable --prompt invoke --python 3.12 --python-preference only-managed .venv
-      ```
+      <SetupSwitch>
+      <SetupVariant gpu="nvidia amd intel none apple" label="Every setup except Windows · ARM64">
+        ```sh
+        uv venv --relocatable --prompt invoke --python 3.12 --python-preference only-managed .venv
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="arm64">
+        ```ps
+        uv venv --relocatable --prompt invoke `
+          --python cpython-3.12-windows-aarch64-none --python-preference only-managed .venv
+        ```
+      </SetupVariant>
+      </SetupSwitch>
 
       This command creates a portable virtual environment at `.venv` complete with a portable python 3.12. It doesn't matter if your system has no python installed, or has a different version - `uv` will handle everything.
 
-      :::note[Windows on ARM64 (RTX Spark)]
-        `uv` installs an x86_64 python on ARM64 Windows unless asked for the native build, and an x86_64 python cannot load the ARM64 torch. Request the native interpreter explicitly:
-
-        ```sh
-        uv venv --relocatable --prompt invoke --python cpython-3.12-windows-aarch64-none --python-preference only-managed .venv
-        ```
-
-        Use the same `--python cpython-3.12-windows-aarch64-none` in place of `--python 3.12` in the install commands below.
-      :::
+      <SetupVariant os="windows" gpu="arm64">
+        :::note[Windows on ARM64 (RTX Spark)]
+          `uv` installs an x86_64 python on ARM64 Windows unless asked for the native build, and an x86_64 python cannot load the ARM64 torch, so this command requests the native interpreter explicitly. The install command below uses the same `--python cpython-3.12-windows-aarch64-none` in place of `--python 3.12`.
+        :::
+      </SetupVariant>
 
   4. Activate the virtual environment:
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          ```ps
-          .venv\Scripts\activate
-          ```
-        </TabItem>
-        <TabItem label="Linux/MacOS" icon="linux">
-          ```bash
-          source .venv/bin/activate
-          ```
-        </TabItem>
-      </Tabs>
+      <SetupSwitch>
+      <SetupVariant os="windows">
+        ```ps
+        .venv\Scripts\activate
+        ```
+      </SetupVariant>
+      <SetupVariant os="macos linux">
+        ```bash
+        source .venv/bin/activate
+        ```
+      </SetupVariant>
+      </SetupSwitch>
 
   5. Choose a version to install.
 
@@ -97,10 +110,17 @@ The following commands vary depending on the version of Invoke being installed a
 
   6. Determine the package specifier to use when installing: `invokeai`, plus any of these extras in brackets, separated by commas.
 
-      - `cuda`, if you use `--torch-backend=cu130` in the next step (Nvidia GPU on Windows x64 or Linux x86_64). It installs the PyTorch build Invoke is tested with and, on Windows, Triton. Add it only for Invoke 7 or newer, and never with another torch backend: it pins PyTorch's CUDA 13 build, which no other backend provides.
-      - `xformers`, if you have an Nvidia 16xx or 20xx series GPU. This is a performance optimization.
+      <SetupSwitch>
+      <SetupVariant os="windows linux" gpu="nvidia">
+        - `cuda`, if you use `--torch-backend=cu130` in the next step (Nvidia GPU on Windows x64 or Linux x86_64). It installs the PyTorch build Invoke is tested with and, on Windows, Triton. Add it only for Invoke 7 or newer, and never with another torch backend: it pins PyTorch's CUDA 13 build, which no other backend provides.
+        - `xformers`, if you have an Nvidia 16xx or 20xx series GPU. This is a performance optimization.
 
-      For example `invokeai[cuda]` for a 30xx series GPU or newer, `invokeai[cuda,xformers]` for a 16xx or 20xx series GPU, or `invokeai` without an Nvidia GPU.
+        For example `invokeai[cuda]` for a 30xx series GPU or newer, or `invokeai[cuda,xformers]` for a 16xx or 20xx series GPU.
+      </SetupVariant>
+      <SetupVariant gpu="amd intel none apple arm64" label="Every setup except NVIDIA">
+        Use `invokeai` without extras. The `cuda` extra is only for `--torch-backend=cu130` (Nvidia GPU on Windows x64 or Linux x86_64): it pins PyTorch's CUDA 13 build, which no other backend provides. The `xformers` extra is only for Nvidia 16xx or 20xx series GPUs.
+      </SetupVariant>
+      </SetupSwitch>
 
   7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is achieved by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
@@ -108,140 +128,201 @@ The following commands vary depending on the version of Invoke being installed a
         Pick a torch backend only when it applies to your system. In all other cases, do not use a torch backend.
       :::
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          <Tabs synkKey="windowsGpuType">
-            <TabItem label="Nvidia GPU">
-              Use:
-              ```sh
-              --torch-backend=cu130
-              ```
-            </TabItem>
-            <TabItem label="Intel Arc GPU">
-              Use:
-              ```sh
-              --torch-backend=xpu
-              ```
-            </TabItem>
-            <TabItem label="AMD GPU">
-              Do not use a torch backend. AMD publishes its ROCm wheels on its own index, with the GPU kernels in a separate package per GPU target. In the next step, pin them for your GPU's target and point `uv` at that index instead:
-              ```sh
-              uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch[device-<TARGET>]==2.13.0+rocm10.0.0" "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" --index https://stable.repo.amd.com/rocm/whl-next/ --index-strategy unsafe-best-match --python 3.12 --python-preference only-managed --force-reinstall
-              ```
-              `<TARGET>` is `gfx1201` for the RX 9070 series and Radeon AI PRO R9700, `gfx1200` for the RX 9060 series, `gfx1100` for the RX 7900 series, `gfx1101` for the RX 7700 and 7800 series, `gfx1102` for the RX 7600 series, and `gfx1151` for Ryzen AI Max. For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
-            </TabItem>
-            <TabItem label="Windows on ARM64">
-              Do not use a torch backend. torch comes from NVIDIA's own index, and three packages that have no ARM64 build on PyPI (OpenCV, blake3, tiktoken) come from wheels Invoke publishes. Use these two options instead of `--torch-backend`:
-              ```sh
-              --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html
-              ```
-              With or without an NVIDIA GPU: this is the only torch build for Windows ARM64. See the [system requirements](../system-requirements#windows-on-arm64-rtx-spark) for the platform's feature differences.
-            </TabItem>
-            <TabItem label="Other / no GPU">
-              Do not use a torch backend.
-            </TabItem>
-          </Tabs>
-        </TabItem>
+      <SetupSwitch>
+      <SetupVariant os="windows linux" gpu="nvidia">
+        Use:
+        ```sh
+        --torch-backend=cu130
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows linux" gpu="intel">
+        Use:
+        ```sh
+        --torch-backend=xpu
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="amd">
+        Do not use a torch backend. AMD publishes its ROCm wheels on its own index, with the GPU kernels in a separate package per GPU target. In the next step, pin them for your GPU's target and point `uv` at that index instead.
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="amd">
+        Do not use a torch backend. In the next step, install AMD's ROCm 10 wheels from AMD's index, as the launcher does, with the GPU kernels pinned for your GPU's target.
 
-        <TabItem label="Linux/MacOS" icon="linux">
-          <Tabs syncKey="unixGpuType">
-            <TabItem label="Linux + Nvidia GPU">
-              Use:
-              ```sh
-              --torch-backend=cu130
-              ```
-            </TabItem>
-            <TabItem label="Linux + no GPU">
-              On `x86_64`, use:
-              ```sh
-              --torch-backend=cpu
-              ```
-              On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
-            </TabItem>
-            <TabItem label="Linux + AMD GPU">
-              Do not use a torch backend. Install AMD's ROCm 10 wheels from AMD's index, as the launcher does, with the GPU kernels pinned for your GPU's target:
-              ```sh
-              uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch[device-<TARGET>]==2.13.0+rocm10.0.0" "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" --index https://stable.repo.amd.com/rocm/whl-next/ --index-strategy unsafe-best-match --python 3.12 --python-preference only-managed --force-reinstall
-              ```
-              `<TARGET>` is `gfx1201` for the RX 9070 series and Radeon AI PRO R9700, `gfx1200` for the RX 9060 series, `gfx1100` for the RX 7900 series, `gfx1101` for the RX 7700 and 7800 series, `gfx1102` for the RX 7600 series, and `gfx1151` for Ryzen AI Max. For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
+        ROCm 10 has no kernels for Vega-based cards (gfx900/gfx906). For those, use PyTorch's ROCm 7.2 build instead:
+        ```sh
+        --torch-backend=rocm7.2
+        ```
 
-              ROCm 10 has no kernels for Vega-based cards (gfx900/gfx906). For those, use PyTorch's ROCm 7.2 build instead:
-              ```sh
-              --torch-backend=rocm7.2
-              ```
-
-              :::tip[ROCm and torch versions]
-                Prefer torch 2.13+ on the `rocm7.2` index: its bundled attention kernels (AOTriton
-                0.12b) are around 3x faster on RDNA3 cards than the 2.10/`rocm7.1` generation.
-                torch 2.12.x on the older `rocm7.1` index was reported to break generation
-                ([#9410](https://github.com/invoke-ai/InvokeAI/issues/9410)); if you must stay on
-                `rocm7.1`, also pass `"torch<2.12"` to constrain the resolver.
-              :::
-            </TabItem>
-            <TabItem label="Linux + Intel Arc GPU">
-              Use:
-              ```sh
-              --torch-backend=xpu
-              ```
-            </TabItem>
-            <TabItem label="All other cases">
-              Do not use a torch backend.
-            </TabItem>
-          </Tabs>
-        </TabItem>
-      </Tabs>
+        :::tip[ROCm and torch versions]
+          Prefer torch 2.13+ on the `rocm7.2` index: its bundled attention kernels (AOTriton
+          0.12b) are around 3x faster on RDNA3 cards than the 2.10/`rocm7.1` generation.
+          torch 2.12.x on the older `rocm7.1` index was reported to break generation
+          ([#9410](https://github.com/invoke-ai/InvokeAI/issues/9410)); if you must stay on
+          `rocm7.1`, also pass `"torch<2.12"` to constrain the resolver.
+        :::
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="arm64">
+        Do not use a torch backend. torch comes from NVIDIA's own index, and three packages that have no ARM64 build on PyPI (OpenCV, blake3, tiktoken) come from wheels Invoke publishes. Use these two options instead of `--torch-backend`:
+        ```sh
+        --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html
+        ```
+        With or without an NVIDIA GPU: this is the only torch build for Windows ARM64. See the [system requirements](../system-requirements#windows-on-arm64-rtx-spark) for the platform's feature differences.
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="none">
+        On `x86_64`, use:
+        ```sh
+        --torch-backend=cpu
+        ```
+        On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="none">
+        Do not use a torch backend.
+      </SetupVariant>
+      <SetupVariant os="macos">
+        Do not use a torch backend.
+      </SetupVariant>
+      </SetupSwitch>
 
   8. Install the `invokeai` package. Substitute the package specifier and version.
 
-      <Tabs synckKey="torchBackend">
-        <TabItem label="No torch backend">
-          ```sh
-          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --force-reinstall
-          ```
-        </TabItem>
-        <TabItem label="With torch backend">
-          ```sh
-          uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
-          ```
-        </TabItem>
-        <TabItem label="Windows on ARM64">
-          ```sh
-          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python cpython-3.12-windows-aarch64-none --python-preference only-managed --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html --force-reinstall
-          ```
-        </TabItem>
+      <SetupSwitch>
+      <SetupVariant os="windows" gpu="nvidia">
+        ```ps
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" `
+          --python 3.12 --python-preference only-managed `
+          --torch-backend=cu130 --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="nvidia">
+        ```sh
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" \
+          --python 3.12 --python-preference only-managed \
+          --torch-backend=cu130 --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="intel">
+        ```ps
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" `
+          --python 3.12 --python-preference only-managed `
+          --torch-backend=xpu --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="intel">
+        ```sh
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" \
+          --python 3.12 --python-preference only-managed \
+          --torch-backend=xpu --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="amd">
+        Also substitute your GPU's `<TARGET>` (see below).
 
-      </Tabs>
+        ```ps
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> `
+          "torch[device-<TARGET>]==2.13.0+rocm10.0.0" `
+          "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" `
+          --index https://stable.repo.amd.com/rocm/whl-next/ `
+          --index-strategy unsafe-best-match `
+          --python 3.12 --python-preference only-managed `
+          --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="amd">
+        Also substitute your GPU's `<TARGET>` (see below).
+
+        ```sh
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> \
+          "torch[device-<TARGET>]==2.13.0+rocm10.0.0" \
+          "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" \
+          --index https://stable.repo.amd.com/rocm/whl-next/ \
+          --index-strategy unsafe-best-match \
+          --python 3.12 --python-preference only-managed \
+          --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="arm64">
+        ```ps
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> `
+          --python cpython-3.12-windows-aarch64-none --python-preference only-managed `
+          --index https://pypi.nvidia.com/nvtorch_oot/ `
+          --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html `
+          --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="none">
+        On `x86_64`:
+
+        ```sh
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" \
+          --python 3.12 --python-preference only-managed \
+          --torch-backend=cpu --force-reinstall
+        ```
+
+        On ARM64 (`aarch64`), without a torch backend:
+
+        ```sh
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> \
+          --python 3.12 --python-preference only-managed \
+          --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="windows" gpu="none">
+        ```ps
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> `
+          --python 3.12 --python-preference only-managed `
+          --force-reinstall
+        ```
+      </SetupVariant>
+      <SetupVariant os="macos">
+        ```sh
+        uv pip install <PACKAGE_SPECIFIER>==<VERSION> \
+          --python 3.12 --python-preference only-managed \
+          --force-reinstall
+        ```
+      </SetupVariant>
+      </SetupSwitch>
+      <SetupVariant os="windows linux" gpu="amd">
+        | `<TARGET>` | GPUs |
+        | --- | --- |
+        | `gfx1201` | RX 9070 series and Radeon AI PRO R9700 |
+        | `gfx1200` | RX 9060 series |
+        | `gfx1100` | RX 7900 series |
+        | `gfx1101` | RX 7700 and 7800 series |
+        | `gfx1102` | RX 7600 series |
+        | `gfx1151` | Ryzen AI Max |
+
+        For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
+      </SetupVariant>
+      <SetupVariant os="linux" gpu="amd">
+        For a Vega-based card (gfx900/gfx906), install PyTorch's ROCm 7.2 build instead:
+
+        ```sh
+        uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" \
+          --python 3.12 --python-preference only-managed \
+          --torch-backend=rocm7.2 --force-reinstall
+        ```
+      </SetupVariant>
 
   9. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          ```ps
-          deactivate
-          .venv\Scripts\activate
-          ```
-        </TabItem>
-        <TabItem label="Linux/MacOS" icon="linux">
-          ```bash
-          deactivate && source .venv/bin/activate
-          ```
-        </TabItem>
-      </Tabs>
+      <SetupSwitch>
+      <SetupVariant os="windows">
+        ```ps
+        deactivate
+        .venv\Scripts\activate
+        ```
+      </SetupVariant>
+      <SetupVariant os="macos linux">
+        ```bash
+        deactivate && source .venv/bin/activate
+        ```
+      </SetupVariant>
+      </SetupSwitch>
 
   10. Run the application, specifying the directory you created earlier as the root directory:
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          ```ps
-          invokeai-web --root ~/invokeai
-          ```
-        </TabItem>
-        <TabItem label="Linux/MacOS" icon="linux">
-          ```bash
-          invokeai-web --root ~/invokeai
-          ```
-        </TabItem>
-      </Tabs>
+      ```sh
+      invokeai-web --root ~/invokeai
+      ```
 
       To keep an existing install as it is, give v7 a directory of its own: see [Run v7 alongside v6](/start-here/upgrading/#run-v7-alongside-v6).
 </Steps>
