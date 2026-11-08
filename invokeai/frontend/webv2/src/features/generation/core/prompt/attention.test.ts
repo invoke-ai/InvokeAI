@@ -296,6 +296,77 @@ describe('Anima source-preserving edits', () => {
   };
 
   it.each([
+    ['(dog (cat)+)', '(dog (cat))', '(cat)'],
+    ['(cat)+(dog)', '(cat)(dog)', '(cat)'],
+    ['(dog "cat"+)', '(dog "cat")', '"cat"'],
+    ['(dog (cat)1.1)', '(dog (cat))', '(cat)'],
+    ['(dog (cat).attend(+))', '(dog (cat))', '(cat)'],
+    ['(cat)+- dog', '(cat)1- dog', '(cat)1'],
+    ['🌄 (cat)+(dog)', '🌄 (cat)(dog)', '(cat)'],
+  ])('keeps a promoted group selected across repeated shortcuts: %s', (prompt, neutral, selected) => {
+    for (const numeric of [false, true]) {
+      const caret = prompt.indexOf('cat') + 1;
+      const first = adjustPromptAttention(prompt, caret, caret, 'decrement', numeric, 'anima');
+      expect(first.prompt).toBe(neutral);
+      expect(first.prompt.slice(first.selectionStart, first.selectionEnd)).toBe(selected);
+      const second = adjustPromptAttention(
+        first.prompt,
+        first.selectionStart,
+        first.selectionEnd,
+        'decrement',
+        numeric,
+        'anima'
+      );
+      expect(weightAt(second.prompt, 'cat')).toBeCloseTo(0.9, 10);
+      expect(weightAt(second.prompt, 'dog')).toBe(1);
+      expect(parseAnimaPrompt(second.prompt).text).toBe(parseAnimaPrompt(prompt).text);
+      const third = adjustPromptAttention(
+        second.prompt,
+        second.selectionStart,
+        second.selectionEnd,
+        'increment',
+        numeric,
+        'anima'
+      );
+      const fourth = adjustPromptAttention(
+        third.prompt,
+        third.selectionStart,
+        third.selectionEnd,
+        'increment',
+        numeric,
+        'anima'
+      );
+      expect(weightAt(fourth.prompt, 'cat')).toBeCloseTo(1.1, 10);
+      expect(weightAt(fourth.prompt, 'dog')).toBe(1);
+    }
+  });
+
+  it('keeps all promoted targets selected when their suffixes change length', () => {
+    const prompt = '(cat)+(bird)+ dog';
+    const first = adjustPromptAttention(
+      prompt,
+      prompt.indexOf('cat'),
+      prompt.indexOf('bird') + 4,
+      'decrement',
+      false,
+      'anima'
+    );
+    expect(first.prompt).toBe('(cat)(bird) dog');
+    expect(first.prompt.slice(first.selectionStart, first.selectionEnd)).toBe('(cat)(bird)');
+    const second = adjustPromptAttention(
+      first.prompt,
+      first.selectionStart,
+      first.selectionEnd,
+      'decrement',
+      false,
+      'anima'
+    );
+    expect(weightAt(second.prompt, 'cat')).toBeCloseTo(0.9, 10);
+    expect(weightAt(second.prompt, 'bird')).toBeCloseTo(0.9, 10);
+    expect(weightAt(second.prompt, 'dog')).toBe(1);
+  });
+
+  it.each([
     ['red\\+ cat', 'red\\+', 1],
     ['foo\\(bar\\)+ cat', 'foo(bar)', 1.1],
     ['(cat)! dog', 'cat', 1],

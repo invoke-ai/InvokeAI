@@ -232,3 +232,31 @@ it('allows the Anima group hotkey when all descendants can reach zero', async ()
 
   await expect.poll(() => input.value).toBe('(cat (dog)1)0');
 });
+
+it.each(['(dog (cat)+)', '(cat)+(dog)'])('keeps repeated Anima hotkeys on the promoted group in %s', async (prompt) => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, prompt);
+  const input = host.querySelector('textarea')!;
+  const caret = prompt.indexOf('cat') + 1;
+  input.focus();
+  input.setSelectionRange(caret, caret);
+  await act(() => {
+    expect(adjustFocusedPromptAttention('decrement', false)).toBe(true);
+  });
+  expect(input.value.slice(input.selectionStart, input.selectionEnd)).toBe('(cat)');
+  await act(() => {
+    expect(adjustFocusedPromptAttention('decrement', false)).toBe(true);
+  });
+  const parsed = parseAnimaPrompt(input.value);
+  expect(parsed.text).toBe(parseAnimaPrompt(prompt).text);
+  for (const [word, weight] of [
+    ['cat', 0.9],
+    ['dog', 1],
+  ] as const) {
+    const start = parsed.text.indexOf(word);
+    expect(parsed.ranges.find((range) => range.start <= start && range.end > start)?.weight).toBeCloseTo(weight, 10);
+  }
+  expect(document.activeElement).toBe(input);
+});

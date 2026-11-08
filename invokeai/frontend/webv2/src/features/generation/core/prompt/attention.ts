@@ -437,7 +437,7 @@ const adjustAnimaAttention = (
         }
         return target;
       });
-  const edits: { start: number; end: number; value: string; numericBoundary: string }[] = [];
+  const edits: { start: number; end: number; targetStart: number; value: string; numericBoundary: string }[] = [];
   // A whole-group edit steps each effective base before deriving child factors.
   // This also steps literal method punctuation without rewriting its source.
   const adjustedGroups = new Map<AnimaTarget, Weight>();
@@ -477,6 +477,7 @@ const adjustAnimaAttention = (
       edits.push({
         start: part.contentRange.end + 1,
         end: part.range.end,
+        targetStart: part.range.start,
         value: suffix,
         numericBoundary: serializePromptAttention(local),
       });
@@ -487,6 +488,7 @@ const adjustAnimaAttention = (
     edits.push({
       start: part.range.start,
       end: part.range.end,
+      targetStart: part.range.start,
       value,
       numericBoundary: `(${content})${serializePromptAttention(local)}`,
     });
@@ -503,7 +505,8 @@ const adjustAnimaAttention = (
     for (const edit of edits) {
       output += prompt.slice(cursor, edit.start);
       if (selectionStart < 0) {
-        selectionStart = output.length;
+        // Group edits replace only a suffix; keep the whole target selected even when that suffix disappears.
+        selectionStart = output.length - (edit.start - edit.targetStart);
       }
       output += useNumericBoundary ? edit.numericBoundary : edit.value;
       selectionEnd = output.length;
