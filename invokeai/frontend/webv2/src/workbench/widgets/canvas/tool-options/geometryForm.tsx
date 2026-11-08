@@ -1,6 +1,4 @@
-import type { AspectRatioId } from '@features/generation/contracts';
 import type { CanvasLayerContract, LayerTransform, TransformOptions } from '@workbench/canvas-engine/api';
-import type { LayerTransform } from '@workbench/canvas-engine/api';
 import type {
   ToolFormProps,
   ToolPropertyForm,
@@ -8,13 +6,10 @@ import type {
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { createListCollection, Flex, Stack, Text } from '@chakra-ui/react';
-import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
-import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
-import { Button } from '@platform/ui/Button';
-import { Select } from '@platform/ui/Select';
-import { Flex, Text } from '@chakra-ui/react';
 import { AspectRatioLockButton, AspectRatioPicker } from '@features/generation/components';
 import { getLockedAspectRatioSettings } from '@features/generation/settings';
+import { Button } from '@platform/ui/Button';
+import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { bboxMinSize, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import { useAspectRatioPresets } from '@workbench/settings/aspectRatioPresets';
@@ -37,7 +32,6 @@ import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit
 import { fitLayerTransformToBbox } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
-import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useBboxEditor } from './useBboxEditor';
