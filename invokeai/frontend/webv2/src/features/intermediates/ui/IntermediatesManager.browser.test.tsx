@@ -10,7 +10,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, Activity, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
@@ -157,6 +157,21 @@ let host: HTMLDivElement;
 let root: Root;
 let queryClient: QueryClient;
 
+const RetainedManager = ({ children }: { children: React.ReactNode }) => {
+  const [visible, setVisible] = useState(true);
+  return (
+    <>
+      <button type="button" onClick={() => setVisible(false)}>
+        Hide manager
+      </button>
+      <button type="button" onClick={() => setVisible(true)}>
+        Show manager
+      </button>
+      <Activity mode={visible ? 'visible' : 'hidden'}>{children}</Activity>
+    </>
+  );
+};
+
 const renderManager = async (
   options: {
     focusProjectId?: string;
@@ -184,11 +199,13 @@ const renderManager = async (
   const manager = (
     <ChakraProvider value={system}>
       <QueryClientProvider client={queryClient}>
-        <IntermediatesManager
-          canClearOthersIntermediates={options.canClearOthersIntermediates ?? false}
-          currentUserId={options.currentUserId === undefined ? 'alice' : options.currentUserId}
-          currentUserLabel={options.currentUserLabel}
-        />
+        <RetainedManager>
+          <IntermediatesManager
+            canClearOthersIntermediates={options.canClearOthersIntermediates ?? false}
+            currentUserId={options.currentUserId === undefined ? 'alice' : options.currentUserId}
+            currentUserLabel={options.currentUserLabel}
+          />
+        </RetainedManager>
       </QueryClientProvider>
     </ChakraProvider>
   );
@@ -296,6 +313,22 @@ describe('IntermediatesManager', () => {
     host?.remove();
     const { followIntermediatesOperation } = await import('@features/intermediates/data/operationStore');
     followIntermediatesOperation(null);
+  });
+
+  it('keeps a pending search consistent after hide and reveal without retaining query observers', async () => {
+    await renderManager();
+    const search = page.getByRole('textbox', { name: 'intermediates.searchLabel' }).element() as HTMLInputElement;
+    await act(() => setInputValue(search, 'Portraits'));
+    await page.getByRole('button', { name: 'Hide manager', exact: true }).click();
+    const callsWhileHidden = dependencies.getIntermediatesSummary.mock.calls.length;
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 300);
+    });
+    expect(dependencies.getIntermediatesSummary).toHaveBeenCalledTimes(callsWhileHidden);
+    await page.getByRole('button', { name: 'Show manager', exact: true }).click();
+    await expect.poll(() => dependencies.getIntermediatesSummary.mock.calls.at(-1)?.[0].search).toBe('Portraits');
+    expect(search.value).toBe('Portraits');
+    expect(host.textContent).not.toContain('Landscapes');
   });
 
   it('starts an admin in their own account and exposes an explicit everyone switch', async () => {

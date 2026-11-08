@@ -34,7 +34,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
     'systemPrompts',
     'widget',
   ],
-  identity: [],
+  identity: ['launchpad'],
   intermediates: ['holdLease', 'settingsContribution'],
   models: ['launchpad', 'react'],
   nodes: [],

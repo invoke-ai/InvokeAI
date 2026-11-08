@@ -23,6 +23,7 @@ import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPr
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
+import { createWidgetRecovery, type WidgetRecoveryStore } from './widget-frame/widgetRecoveryStore';
 import { areWidgetsLoaded } from './widgetRegistry';
 import { getProjectWidgetValues } from './widgetState';
 import {
@@ -739,6 +740,7 @@ export interface WorkbenchQueries {
 }
 
 export interface WorkbenchInternalStore {
+  widgetRecovery: Map<string, WidgetRecoveryStore>;
   commands: WorkbenchCommands;
   getPersistedRevision: () => number;
   getSnapshot: () => WorkbenchSnapshot;
@@ -951,6 +953,9 @@ export const createWorkbenchStore = (
   // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
   // settings subscription keeps the mirror current from then on.
   let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
+  const widgetRecovery = new Map(
+    Object.keys(getActiveProject(state).widgetInstances).map((id) => [id, createWidgetRecovery()])
+  );
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -966,6 +971,23 @@ export const createWorkbenchStore = (
       persistedRevision += 1;
     }
 
+    const project = getActiveProject(nextState);
+    const previousProject = getActiveProject(state);
+    if (project.id !== previousProject.id || project.widgetInstances !== previousProject.widgetInstances) {
+      if (project.id !== previousProject.id) {
+        widgetRecovery.clear();
+      }
+      for (const id of widgetRecovery.keys()) {
+        if (!project.widgetInstances[id]) {
+          widgetRecovery.delete(id);
+        }
+      }
+      for (const id of Object.keys(project.widgetInstances)) {
+        if (!widgetRecovery.has(id)) {
+          widgetRecovery.set(id, createWidgetRecovery());
+        }
+      }
+    }
     state = nextState;
     hasHydrated = nextHasHydrated;
     snapshotStore.setSnapshot(createSnapshot(state, hasHydrated));
@@ -1030,6 +1052,7 @@ export const createWorkbenchStore = (
 
   return {
     commands,
+    widgetRecovery,
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,
     getState,

@@ -789,7 +789,8 @@
     "updated": "User updated",
     "user": "User",
     "you": "You",
-    "manageIntermediatesNamed": "Manage intermediates of {{name}}"
+    "manageIntermediatesNamed": "Manage intermediates of {{name}}",
+    "loadFailed": "Unable to load users"
   },
   "fonts": {
     "title": "Fonts",
@@ -2661,7 +2662,10 @@
         "description": "Version, build, and server information."
       },
       "language": {
-        "label": "Language"
+        "label": "Language",
+        "description": "Unavailable and incomplete translations display English content. Your language choice is kept.",
+        "incomplete": "{{label}} — Incomplete; English content",
+        "unavailable": "{{label}} — Unavailable; English content"
       },
       "workflowEdgeStyle": {
         "label": "Connection style",
@@ -2869,7 +2873,22 @@
       "copyError": "Copy error",
       "copyErrorFailed": "Could not copy the error details",
       "retry": "Retry",
-      "title": "{{label}} failed"
+      "title": "{{label}} failed",
+      "recovered": "{{label}} recovered",
+      "reloadEditor": "Reload editor",
+      "compactReloadLabel": "{{label}} failed — Reload editor",
+      "reloadTitle": "Reload the editor?",
+      "reloadWarning": "Reloading affects ALL open projects. Registered edits will be saved first, but Canvas undo and per-workflow edit histories in every open project will be lost. Cancel to keep those histories. A reload may not fix a persistent module error.",
+      "reloadReasons": {
+        "inactive": "This recovery is no longer active. Return to the current editor and try again.",
+        "unsaved": "Some project changes are not saved. Resolve pending saves or conflicts before reloading.",
+        "changed": "The workspace changed during recovery, including possible background updates. Retry reloading once the workspace has settled.",
+        "pixels": "Canvas pixels could not be saved. The editor has stayed open; try again after saving succeeds.",
+        "unavailable": "Project persistence is unavailable. The editor has stayed open.",
+        "failed": "The editor could not be prepared for reload. It has stayed open with its histories intact."
+      },
+      "reloadFailed": "Could not reload safely",
+      "retrying": "Retrying {{label}}"
     },
     "floating": {
       "centerFloating": "{{label}} is in a floating window",
