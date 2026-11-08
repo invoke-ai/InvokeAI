@@ -16,9 +16,12 @@ export const QUEUE_FILTER_TABS_ID = 'queue-filter';
  * labels or counts.
  */
 export const QueueFilterTabs = ({
+  localRunCount,
   value,
   onChange,
 }: {
+  /** This tab's runs the backend has not accepted that the widget lists (`useShownLocalRuns`). */
+  localRunCount: number;
   value: QueueFilterId;
   onChange: (filter: QueueFilterId) => void;
 }) => {
@@ -28,7 +31,7 @@ export const QueueFilterTabs = ({
   const tabs = useMemo<SegmentTab<QueueFilterId>[]>(
     () =>
       QUEUE_FILTERS.map((filter) => {
-        const count = getFilterCount(counts, filter.id);
+        const count = getFilterCount(counts, filter.id, localRunCount);
 
         return {
           id: filter.id,
@@ -47,7 +50,7 @@ export const QueueFilterTabs = ({
           ),
         };
       }),
-    [counts, formatCount, t]
+    [counts, formatCount, localRunCount, t]
   );
 
   return (

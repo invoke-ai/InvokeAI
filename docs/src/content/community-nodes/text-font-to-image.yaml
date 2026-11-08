@@ -1,0 +1,9 @@
+title: Text font to Image
+author: mickr777
+repo: https://github.com/mickr777/textfontimage
+summary: Render text in a chosen font as an image.
+description: >-
+  Downloads the font to use, or takes it from the font cache. The text always resizes to the image size; padding
+  controls the margin, and there is an optional second line. The author's examples use the output with a depth
+  ControlNet.
+categories: [utility, control]

@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import process from 'node:process';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { parse } from 'yaml';
 
 import { createChunkSourceManifest, getModuleSourceOwner } from './chunk-source-manifest.mjs';
 import {
@@ -1013,4 +1018,119 @@ describe('the remedy is offered only for budget failures', () => {
     assert.ok(!isBudgetFailure('launchpad initial source-owner graph changed. Added: source:src/leaked.ts.'));
     assert.ok(!isBudgetFailure('ui has 3 direct importers (budget 1).'));
   });
+});
+
+describe('exact-base workflow measurements', () => {
+  const packageRoot = fileURLToPath(new URL('../', import.meta.url));
+  const workflow = parse(readFileSync(resolve(packageRoot, '../../../.github/workflows/frontend-tests.yml'), 'utf8'));
+  const measure = workflow.jobs['frontend-webv2-tests'].steps.find(
+    (step) => step.name === 'measure missing performance base'
+  );
+
+  for (const scenario of [
+    'complete',
+    'missing-browser',
+    'malformed-browser',
+    'incompatible-browser',
+    'incomplete-build',
+  ]) {
+    it(`accepts failed base checks only with their newly generated valid reference pair (${scenario})`, () => {
+      const root = mkdtempSync(join(tmpdir(), 'invokeai-reference-workflow-'));
+      try {
+        const candidate = resolve(root, 'invokeai/frontend/webv2');
+        const base = resolve(root, '.perf-base/invokeai/frontend/webv2');
+        const binary = resolve(root, 'bin');
+        for (const directory of [candidate, base, binary]) {
+          mkdirSync(directory, { recursive: true });
+        }
+        mkdirSync(resolve(candidate, 'scripts'));
+        copyFileSync(
+          resolve(packageRoot, 'scripts/performance-budgets.mjs'),
+          resolve(candidate, 'scripts/performance-budgets.mjs')
+        );
+        mkdirSync(resolve(base, 'performance'));
+        const buildMeasurement = createSyntheticBuild(1_000);
+        const build = createBuildReference([buildMeasurement]);
+        const browserBaseline = createBrowserBaseline();
+        const browser = createBrowserReference(
+          browserBaseline.routes.map((route) => ({
+            id: route.id,
+            stateProfile: route.stateProfile,
+            resources: route.resourceBaseline,
+            activatedResources: route.activatedResourceBaseline,
+          }))
+        );
+        writeFileSync(
+          resolve(root, 'build.json'),
+          JSON.stringify(scenario === 'incomplete-build' ? { ...build, routes: {} } : build)
+        );
+        writeFileSync(
+          resolve(root, 'browser.json'),
+          scenario === 'malformed-browser'
+            ? '{'
+            : JSON.stringify(scenario === 'incompatible-browser' ? { ...browser, schemaVersion: 999 } : browser)
+        );
+        writeFileSync(
+          resolve(base, 'performance/architecture-baseline.json'),
+          JSON.stringify(createArchitectureBaseline(buildMeasurement))
+        );
+        writeFileSync(resolve(base, 'performance/browser-baseline.json'), JSON.stringify(browserBaseline));
+        // Stale files, including candidate measurements, cannot rescue a failed base measurement.
+        for (const directory of [base, candidate]) {
+          const output = resolve(directory, 'artifacts/architecture-performance');
+          mkdirSync(output, { recursive: true });
+          writeFileSync(resolve(output, 'build-reference.json'), JSON.stringify(build));
+          writeFileSync(resolve(output, 'browser-reference.json'), JSON.stringify(browser));
+        }
+        writeFileSync(resolve(binary, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+        writeFileSync(
+          resolve(binary, 'node'),
+          `#!/bin/sh
+          if [ "$1" = --experimental-strip-types ]; then shift; fi
+          case "$1" in
+            scripts/check-architecture-performance.mjs)
+              echo build >> "$GITHUB_WORKSPACE/calls"
+              cp "$GITHUB_WORKSPACE/build.json" artifacts/architecture-performance/build-reference.json
+              exit 1 ;;
+            scripts/measure-architecture-performance.mjs)
+              echo browser >> "$GITHUB_WORKSPACE/calls"
+              if [ "$REFERENCE_CASE" != missing-browser ]; then
+                cp "$GITHUB_WORKSPACE/browser.json" artifacts/architecture-performance/browser-reference.json
+              fi
+              exit 1 ;;
+          esac
+          exec "${process.execPath}" "$@"
+        `,
+          { mode: 0o755 }
+        );
+        const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', measure.run], {
+          cwd: base,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_WORKSPACE: root,
+            PATH: `${binary}:${process.env.PATH}`,
+            REFERENCE_CASE: scenario,
+          },
+        });
+        assert.equal(readFileSync(resolve(root, 'calls'), 'utf8'), 'build\nbrowser\n');
+        assert.equal(result.status, scenario === 'complete' ? 0 : 1, result.stderr);
+        if (scenario === 'complete') {
+          assert.deepEqual(
+            JSON.parse(readFileSync(resolve(candidate, 'artifacts/perf-reference/build-reference.json'), 'utf8')),
+            build
+          );
+          assert.deepEqual(
+            JSON.parse(readFileSync(resolve(candidate, 'artifacts/perf-reference/browser-reference.json'), 'utf8')),
+            browser
+          );
+        } else {
+          assert.equal(existsSync(resolve(candidate, 'artifacts/perf-reference/build-reference.json')), false);
+          assert.equal(existsSync(resolve(candidate, 'artifacts/perf-reference/browser-reference.json')), false);
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
 });

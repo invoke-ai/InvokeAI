@@ -63,6 +63,13 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
     select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
+    aspectRatioPresets: {
+      isFull: false,
+      presets: [],
+      remove: () => undefined,
+      save: () => null,
+      update: () => undefined,
+    },
     CanvasRenderSize: harness.slot,
     project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: () => undefined },

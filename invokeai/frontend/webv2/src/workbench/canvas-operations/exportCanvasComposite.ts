@@ -2,6 +2,7 @@ import type {
   AdjustmentRefusal,
   LayerUnreadable,
   CanvasDocumentCapability,
+  CanvasDocumentContractV3,
   CanvasExportCapability,
   CanvasLifecycleCapability,
 } from '@workbench/canvas-engine/api';
@@ -10,7 +11,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 export type CanvasCompositeRegion = 'canvas' | 'bbox';
 
 export type ExportCanvasCompositeResult =
-  | { status: 'ok'; blob: Blob; rect: Rect }
+  | { status: 'ok'; blob: Blob; rect: Rect; document: CanvasDocumentContractV3 }
   | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
   | LayerUnreadable
   | AdjustmentRefusal;
@@ -35,7 +36,14 @@ export const exportCanvasComposite = async (
     return { status: 'not-ready' };
   }
 
-  return engine.exports.exportRasterComposite(
+  const result = await engine.exports.exportRasterComposite(
     region === 'canvas' ? { bounds: 'content' } : { bounds: 'rect', rect: document.bbox }
   );
+  if (result.status !== 'ok') {
+    return result;
+  }
+  if (engine.document.getDocument() !== document) {
+    return { status: 'stale' };
+  }
+  return { ...result, document };
 };

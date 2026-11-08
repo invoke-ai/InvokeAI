@@ -68,17 +68,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type Ref,
-} from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -101,6 +91,7 @@ import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
   getPreviewMetadataOpen,
+  getPreviewVideoLoop,
   type PreviewComparisonMode,
 } from './previewSettings';
 import { usePreviewNavigation } from './usePreviewNavigation';
@@ -186,17 +177,6 @@ const getFocusedElement = (): HTMLElement | null => {
   const { activeElement } = document;
 
   return activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
-};
-
-/** A focused video seeks with the arrows; keep them from the workbench hotkeys, which would step to another item. */
-const keepVideoArrowKeys = (event: KeyboardEvent<HTMLElement>) => {
-  if (
-    (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
-    event.target instanceof Element &&
-    event.target.closest('video')
-  ) {
-    event.stopPropagation();
-  }
 };
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
@@ -389,6 +369,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [widgets]
   );
   const openVideoDetails = useCallback(() => widgets.patchValues('preview', { metadataOpen: true }), [widgets]);
+  const isVideoLooping = getPreviewVideoLoop(previewValues);
+  const setVideoLoop = useCallback((videoLoop: boolean) => widgets.patchValues('preview', { videoLoop }), [widgets]);
   const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
     setCopyAvailableItemKey((current) => (isAvailable ? itemKey : current === itemKey ? null : current));
   }, []);
@@ -688,7 +670,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         role="region"
         tabIndex={0}
         w="full"
-        onKeyDown={keepVideoArrowKeys}
       >
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
@@ -727,8 +708,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               item={selectedItem}
               swipe={swipeNavigation}
               videoControllerRef={videoControllerRef}
+              videoLoop={isVideoLooping}
               onContextMenu={openItemContextMenu}
               onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+              onVideoLoopChange={setVideoLoop}
             />
           )
         ) : (
@@ -811,6 +794,7 @@ const SelectedVideoPreview = ({
   const { t } = useTranslation();
   const source = useMemo<PreviewMediaSource>(
     () => ({
+      ...(item.fps === undefined ? {} : { fps: item.fps }),
       itemKey: toGalleryItemKey(item),
       kind: 'video',
       label: t('widgets.preview.videoLabel', { name: item.name }),
@@ -845,6 +829,8 @@ interface SelectedMediaPreviewProps {
   onContextMenu: (x: number, y: number) => void;
   swipe?: PreviewSwipeNavigation;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
+  videoLoop?: boolean;
+  onVideoLoopChange?: (loop: boolean) => void;
 }
 
 /**
@@ -879,6 +865,8 @@ const SelectedMediaPreview = ({
   swipe,
   onContextMenu,
   videoControllerRef,
+  videoLoop,
+  onVideoLoopChange,
 }: SelectedMediaPreviewProps & {
   dragItem?: GalleryItemRef;
   frameHeight: number;
@@ -913,7 +901,9 @@ const SelectedMediaPreview = ({
         swipe={swipe}
         variant="framed"
         videoControllerRef={videoControllerRef}
+        videoLoop={videoLoop}
         onContextMenu={onContextMenu}
+        onVideoLoopChange={onVideoLoopChange}
       />
       {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
     </Flex>
