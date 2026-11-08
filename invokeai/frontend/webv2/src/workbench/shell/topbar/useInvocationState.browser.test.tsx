@@ -102,7 +102,10 @@ vi.mock('@workbench/settings/store', async (importOriginal) => {
   };
 });
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: harness.submit }));
-vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
+vi.mock('@workbench/invocationPreparation', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useIsInvocationPreparing: () => false,
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
   useWorkbenchCommands: () => ({}),
