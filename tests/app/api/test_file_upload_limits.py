@@ -35,7 +35,9 @@ def test_file_upload_limiter_is_installed_with_configured_request_cap() -> None:
 
     assert len(limiters) == 1
     kwargs = limiters[0].kwargs
-    assert kwargs["max_body_bytes"] == api_app.app_config.max_file_upload_size_bytes + files.FILE_UPLOAD_MULTIPART_OVERHEAD
+    assert (
+        kwargs["max_body_bytes"] == api_app.app_config.max_file_upload_size_bytes + files.FILE_UPLOAD_MULTIPART_OVERHEAD
+    )
     assert kwargs["max_concurrent"] == files.MAX_CONCURRENT_FILE_UPLOADS
     assert kwargs["max_concurrent_per_user"] == files.MAX_CONCURRENT_FILE_UPLOADS_PER_USER
     assert api_app._is_file_upload("POST", "/api/v1/files/upload")
