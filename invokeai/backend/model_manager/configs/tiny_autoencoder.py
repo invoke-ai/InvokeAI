@@ -25,7 +25,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import Field
 from typing_extensions import Any
 
-from invokeai.backend.architectures import latent_space_with_channels
+from invokeai.backend.architectures import LatentSpace, latent_space_with_channels
 from invokeai.backend.model_manager.configs.backbone_names import name_components
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -133,6 +133,12 @@ def named_tiny_autoencoder(components: tuple[str, ...]) -> tuple[str, BaseModelT
         if len(named) == 1:
             return named[0]
     return None
+
+
+def named_tiny_autoencoder_space(base: BaseModelType, source: str) -> LatentSpace | None:
+    """The latent space the published TAE `source` names decodes for, when filed under `base`."""
+    named = named_tiny_autoencoder((source,))
+    return latent_space_with_channels(base, named[2]) if named is not None else None
 
 
 def _name_verdict(layout: TinyAutoencoderLayout, components: tuple[str, ...]) -> BaseModelType | _Twin | None:

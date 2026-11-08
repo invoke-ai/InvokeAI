@@ -19,11 +19,11 @@ from invokeai.backend.ideogram4.sampling_utils import (
     pack_latents_to_grid,
 )
 from invokeai.backend.ideogram4.scheduler import get_schedule_for_resolution, make_step_intervals
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
-# Called after each completed step with (step_index, total_steps, packed_latents), where
-# packed_latents is the current estimate in packed grid form ``(1, LATENT_DIM, grid_h, grid_w)`` —
-# ready for a preview (unpatchify + VAE decode / RGB approximation) without re-deriving the grid.
-StepCallback = Callable[[int, int, torch.Tensor], None]
+# Called after each completed step. `latents` is the current noisy latent in packed grid form
+# ``(1, LATENT_DIM, grid_h, grid_w)``, still normalized.
+StepCallback = Callable[[PipelineIntermediateState], None]
 
 
 def _compute_dtype(transformer: Ideogram4Transformer) -> torch.dtype:
@@ -134,7 +134,14 @@ def run_ideogram4_denoise(
         z = z + v * (s_val - t_val)
 
         if step_callback is not None:
-            # Hand the callback the current estimate in packed grid form so it can render a preview.
-            step_callback(num_steps - i, num_steps, pack_latents_to_grid(z, grid_h, grid_w))
+            step_callback(
+                PipelineIntermediateState(
+                    step=num_steps - i,
+                    order=1,
+                    total_steps=num_steps,
+                    timestep=int(t_val * 1000),
+                    latents=pack_latents_to_grid(z, grid_h, grid_w),
+                )
+            )
 
     return pack_latents_to_grid(z, grid_h, grid_w)

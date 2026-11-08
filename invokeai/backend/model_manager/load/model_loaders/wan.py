@@ -7,7 +7,8 @@ Currently covers:
   Both are transformer-only — one file per A14B expert — and rely on a
   standalone VAE + T5 encoder for the rest of the pipeline.
 - WanT5Encoder: standalone UMT5-XXL encoder folder (``text_encoder/`` +
-  ``tokenizer/`` subdirs, or a flat ``text_encoder/`` folder).
+  ``tokenizer/`` subdirs, or a flat ``text_encoder/`` folder), or one llama.cpp
+  GGUF file.
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
@@ -25,6 +26,7 @@ from invokeai.backend.model_manager.configs.main import (
     _is_benign_extra_key,
     _is_native_wan_layout,
 )
+from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_GGUF_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
@@ -39,6 +41,12 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.util.llamacpp_t5 import (
+    convert_llamacpp_t5_keys,
+    infer_t5_encoder_config,
+    load_t5_tokenizer_from_gguf,
+    make_feed_forward_gguf_safe,
+)
 from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     parse_quantization_metadata,
@@ -46,7 +54,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     strip_layer_path_prefix,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -56,6 +64,7 @@ from invokeai.backend.quantization.int8_convrot import (
     resolve_quantized_module_paths,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -618,3 +627,77 @@ class WanT5EncoderLoader(ModelLoader):
         raise ValueError(
             f"Unsupported submodel type for WanT5Encoder: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+def _umt5_compute_dtype(device: torch.device) -> torch.dtype:
+    """bfloat16, as the folder loader always uses, or float32 where the device lacks it -- never float16.
+
+    UMT5's feed-forward activations overflow float16; transformers guards a float16 load by keeping
+    ``wo`` in float32, which a packed ``wo`` cannot be.
+    """
+    dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+    return torch.float32 if dtype == torch.float16 else dtype
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.GGUFQuantized)
+class WanT5EncoderGGUFLoader(ModelLoader):
+    """Loader for a UMT5-XXL encoder in one llama.cpp GGUF file (``city96/umt5-xxl-encoder-gguf``).
+
+    Quantized Linear weights stay packed ``GGMLTensor``s, which the model cache's GGUF-aware layers
+    dequantize per forward. Unpacked once at load is what a module cannot read packed -- the token
+    embedding and every block's relative attention bias (``nn.Embedding`` indexes its weight; UMT5 has
+    a bias per block where T5 v1.1 has one), and the RMS norms -- and Linear weights the file stores
+    unquantized (F32/F16/BF16), which unpacking does not enlarge and which packed would be converted
+    on every forward. The tokenizer is built from the file's metadata.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # The tokenizer comes from the header, not from the tensors the file size counts.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, WanT5Encoder_GGUF_Config):
+            raise TypeError(f"Expected WanT5Encoder_GGUF_Config, got {type(config).__name__}.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return load_t5_tokenizer_from_gguf(Path(config.path))
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+
+        raise ValueError(
+            f"Unsupported submodel type for a GGUF Wan T5 encoder: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: WanT5Encoder_GGUF_Config) -> AnyModel:
+        import accelerate
+        from transformers import UMT5Config, UMT5EncoderModel
+
+        compute_dtype = _umt5_compute_dtype(TorchDevice.choose_torch_device())
+        sd = convert_llamacpp_t5_keys(gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype))
+
+        with accelerate.init_empty_weights():
+            model = UMT5EncoderModel(infer_t5_encoder_config(sd, UMT5Config))
+
+        # No model-declared skip patterns, unlike the transformer loaders: UMT5 declares
+        # `_keep_in_fp32_modules = ["wo"]`, which would unpack every feed-forward output projection --
+        # nearly a fifth of the encoder's weights. transformers keeps those in float32 only for a
+        # float16 load, against an overflow this loader never computes in.
+        source = "Wan UMT5 GGUF encoder"
+        unpack_ggml_at_load(sd, model, (), self._ram_cache.make_room)
+        load_state_dict_ignoring_extras(
+            model, sd, source=source, assign=True, allowed_missing={"encoder.embed_tokens.weight"}
+        )
+        model.encoder.embed_tokens.weight = model.shared.weight
+
+        make_feed_forward_gguf_safe(model)
+        reject_incomplete_load(model, what=source)
+        return model

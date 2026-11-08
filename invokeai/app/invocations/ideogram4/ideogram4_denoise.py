@@ -14,12 +14,10 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.architectures import resolve_latent_space
 from invokeai.backend.ideogram4 import run_ideogram4_denoise
-from invokeai.backend.ideogram4.latent_norm import get_latent_norm
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer, compute_dtype_of
 from invokeai.backend.ideogram4.sampler_configs import PRESETS
-from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN, unpatchify_and_denormalize
+from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN, unpatchify
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
@@ -29,6 +27,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES, get_model_compute_dtype
@@ -173,41 +172,11 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         assert isinstance(info, Ideogram4ConditioningInfo)
         llm_features = info.prompt_embeds.to(device=device, dtype=torch.float32)
 
-        # Denormalization params come from get_latent_norm (no VAE).
-        latent_shift, latent_scale = get_latent_norm()
-
-        def step_callback(step: int, total: int, packed_latents: torch.Tensor) -> None:
-            # The projection and the downscale come from what this architecture declares, which is
-            # the same source the shared denoise callback reads. This was a second copy of the
-            # FLUX.2 constants with the 8x downscale hardcoded — and Ideogram 4 was missing from
-            # that shared dispatch entirely, so reading either one could not have revealed the other.
-            preview = None
-            preview_size = None
-            try:
-                # packed_latents: (1, LATENT_DIM, grid_h, grid_w) -> VAE latent (1, 32, H/8, W/8).
-                vae_latent = unpatchify_and_denormalize(
-                    packed_latents.float(),
-                    latent_shift.to(packed_latents.device),
-                    latent_scale.to(packed_latents.device),
-                )
-                latent_space = resolve_latent_space(BaseModelType.Ideogram4, vae_latent)
-                preview = latent_space.preview(vae_latent)
-                preview_size = (
-                    preview.width * latent_space.spatial_compression,
-                    preview.height * latent_space.spatial_compression,
-                )
-            except Exception:
-                # A preview must never break generation — fall back to a plain progress signal.
-                preview = None
-            if preview is not None:
-                context.util.signal_progress(
-                    "Running Ideogram 4 denoising",
-                    step / total,
-                    preview,
-                    preview_size,
-                )
-            else:
-                context.util.signal_progress("Running Ideogram 4 denoising", step / total)
+        def step_callback(state: PipelineIntermediateState) -> None:
+            # No denormalize: the FLUX.2 preview space is normalized, and Ideogram's stats are close enough to the
+            # FLUX.2 VAE's for previews (TAEF2 measured 21.0 dB against 22.7 with FLUX.2's own; raw scores 16.9).
+            state.latents = unpatchify(state.latents.float())
+            context.util.sd_step_callback(state, BaseModelType.Ideogram4)
 
         with ExitStack() as stack:
             conditional, unconditional = self._load_branches(
