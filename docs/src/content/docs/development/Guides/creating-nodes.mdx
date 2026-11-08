@@ -14,9 +14,7 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
 
   2. Make sure the node is contained in a new Python (.py) file. Preferably, the node is in a repo with a README detailing the nodes usage & examples to help others more easily use your node. Including the tag "invokeai-node" in your repository's README can also help other users find it more easily.
 
-  3. Submit a pull request with a link to your node(s) repo in GitHub against the `main` branch to add the node to the [Community Nodes](/users-guide/workflows/community-nodes/) list
-
-      Make sure you are following the template below and have provided all relevant details about the node and what it does. Example output images and workflows are very helpful for other users looking to use your node.
+  3. Submit a pull request against the `main` branch that adds your pack to the [Community Nodes](/users-guide/workflows/community-nodes/) list, as described in [Listing your node pack](#listing-your-node-pack) below.
 
   4. A maintainer will review the pull request and node. If the node is aligned with the direction of the project, you may be asked for permission to include it in the core project.
 </Steps>
@@ -55,22 +53,30 @@ Because the whole node is moved to another device, only mark a node `idle_gpu_of
 If a node that also runs the denoiser, VAE, or other session-GPU work is marked `idle_gpu_offloadable=True`, that work will be re-pinned to the wrong GPU and can misplace tensors or raise device-mismatch errors. When in doubt, leave it unset (the default is `False`) — the node will still work correctly, just without the offload optimization.
 :::
 
-### Community Node Template
+### Listing your node pack
 
-Append the following template to your pull request and the [Community Nodes](/users-guide/workflows/community-nodes/) page when submitting a node to be added to the community nodes list:
+Each pack on the [Community Nodes](/users-guide/workflows/community-nodes/) page is one YAML file in
+`docs/src/content/community-nodes/`. Add a file for yours, such as `super-cool-nodes.yaml`:
 
-```md
----
-
-### Super Cool Node Template
-
-**Description:** This node allows you to do super cool things with InvokeAI.
-
-**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
-
-**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
-
-**Output Examples**
-
-![InvokeAI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
+```yaml
+title: Super Cool Nodes
+author: your-github-name
+repo: https://github.com/your-github-name/super-cool-nodes
+summary: Does super cool things to images.
+categories: [image-effects]
+nodes:
+  - name: Super Cool Node
+    description: Makes an image super cool.
+links:
+  - label: Example workflow
+    url: https://github.com/your-github-name/super-cool-nodes/blob/main/example-workflow.json
+thumbnail: ./super-cool-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/your-github-name/super-cool-nodes/main/example.png
+    alt: An image before and after the Super Cool Node
 ```
+
+The [README in that folder](https://github.com/invoke-ai/InvokeAI/blob/main/docs/src/content/community-nodes/README.md)
+lists every field and category, and how to make the card's small WebP thumbnail, which goes beside the YAML file.
+Example images and workflows help others decide to use your pack. Users install a pack
+by pasting its Git URL into the Nodes manager, which needs an `__init__.py` at the top level of your repository.

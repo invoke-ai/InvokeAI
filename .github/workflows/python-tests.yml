@@ -183,6 +183,8 @@ jobs:
               # tests/ covers a few of these (e.g. test_check_pins.py, test_docs_json_export.py)
               - 'scripts/**'
               - 'pins.json'
+              # test_check_pr_metadata.py parses the template as a body.
+              - '.github/pull_request_template.md'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

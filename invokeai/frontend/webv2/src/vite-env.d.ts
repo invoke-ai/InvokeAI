@@ -8,4 +8,5 @@ interface ImportMetaEnv {
   readonly APP_VERSION: string;
   /** A content hash of `public/locales`, injected by `scripts/locale-assets-plugin.mjs`. */
   readonly LOCALE_VERSION: string;
+  readonly LOCALE_AVAILABILITY: string;
 }

@@ -29,6 +29,7 @@ from invokeai.app.services.intermediates.intermediates_common import (
     MAX_AFFECTED_DOCUMENTS,
     PREVIEW_TTL_SECONDS,
     RECENT_GRACE_SECONDS,
+    ActiveQueueMediaUse,
     IntermediatesAffectedDocument,
     IntermediatesBrowserHoldRequest,
     IntermediatesImpact,
@@ -164,6 +165,9 @@ class IntermediatesService(IntermediatesServiceBase):
 
     def hold_cached_media(self, session_id: str, references: MediaReferences) -> bool:
         return self._records.hold_cached_media(session_id, references)
+
+    def get_active_queue_uses(self, references: MediaReferences) -> list[ActiveQueueMediaUse]:
+        return self._records.get_active_uses(references)
 
     def replace_browser_hold(
         self, caller: IntermediatesCaller, lease_id: str, request: IntermediatesBrowserHoldRequest

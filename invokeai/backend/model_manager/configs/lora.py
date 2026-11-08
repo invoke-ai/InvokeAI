@@ -38,6 +38,7 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
+    SD3VariantType,
     WanLoRAVariantType,
     ZImageVariantType,
 )
@@ -72,6 +73,14 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants imp
     unsupported_keys as qwen_image_21_unsupported_lora_keys,
 )
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import QWEN_IMAGE_ONLY_MODULE_RE
+from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
+    group_sd3_lora_layers,
+    is_sd3_lora,
+    is_sd3_named_without_width,
+    layer_delta_shape,
+    sd3_lora_refusal,
+    sd3_lora_variant,
+)
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -723,6 +732,9 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
         # lora_token_vector_length() misidentifies as SD2/SDXL.
         if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
             raise NotAMatchError("model looks like an Anima LoRA, not a Stable Diffusion LoRA")
+        # Same for SD 3 LoRAs that train CLIP-L and CLIP-G: kohya's te1 + te2 layers read as SDXL.
+        if is_sd3_lora(state_dict):
+            raise NotAMatchError("model looks like an SD 3 LoRA, not an SD 1/2/XL LoRA")
 
         # If we've gotten here, we assume that the model is a Stable Diffusion model
         token_vector_length = lora_token_vector_length(state_dict)
@@ -922,6 +934,37 @@ _QWEN_IMAGE_LYCORIS_ONLY_SUFFIXES = {
 }
 
 
+# Qwen-Image's transformer width (24 heads of 128).
+_QWEN_IMAGE_HIDDEN_SIZE = 3072
+# Module names diffusers' SD 3 has and Qwen-Image does not (it names its MLPs `img_mlp`/`txt_mlp` and its modulation
+# `img_mod`/`txt_mod`), dotted or flattened.
+_SD3_ONLY_MODULE_RE = re.compile(r"(?:^|[._])(?:ff|ff_context)[._]net[._]|(?:^|[._])norm1(?:_context)?[._]linear$")
+_ATTENTION_PROJECTION_RE = re.compile(
+    r"(?:^|[._])attn[._](?:to_q|to_k|to_v|to_out(?:[._]0)?|add_q_proj|add_k_proj|add_v_proj|to_add_out)$"
+)
+
+
+def _is_not_a_qwen_image_lora(state_dict: dict[str | int, Any]) -> str | None:
+    """Why a state dict that uses Qwen-Image's attention names cannot be one: it names SD 3 modules, or an attention
+    projection is not Qwen-Image's width (SD 3 is 1536 or 2432 wide) or lacks half of its pair.
+
+    SD 3's recognizer needs a complete attention layer of its own, so a file with SD 3 module names but no such layer,
+    or only half of one, would otherwise install as Qwen-Image and break at generation.
+    """
+    for layer_path, values in group_sd3_lora_layers(state_dict).items():
+        if _SD3_ONLY_MODULE_RE.search(layer_path):
+            return f"layer {layer_path!r} names a module Qwen-Image does not have"
+        if _ATTENTION_PROJECTION_RE.search(layer_path):
+            shape = layer_delta_shape(values)
+            if shape is None:
+                return f"layer {layer_path!r} is incomplete"
+            # Only a low-rank pair states the module's own width; a Kronecker product's shape is its factors'.
+            is_low_rank = "lora_B.weight" in values or "lora_up.weight" in values
+            if is_low_rank and shape != (_QWEN_IMAGE_HIDDEN_SIZE, _QWEN_IMAGE_HIDDEN_SIZE):
+                return f"layer {layer_path!r} is {shape}, not Qwen-Image's {_QWEN_IMAGE_HIDDEN_SIZE} wide"
+    return None
+
+
 class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
 
@@ -978,6 +1021,12 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
+        # SD 3 uses the very same diffusers attention names (`add_q_proj`, `to_add_out`) and is told apart by its width;
+        # CogView4 keeps its blocks under `transformer_blocks.N.attn1`.
+        if is_sd3_lora(state_dict) or _has_cogview4_lora_keys(state_dict):
+            raise NotAMatchError("model looks like an SD 3 or CogView4 LoRA, not a Qwen Image LoRA")
+        if (not_qwen := _is_not_a_qwen_image_lora(state_dict)) is not None:
+            raise NotAMatchError(f"model is not a Qwen Image LoRA: {not_qwen}")
         if (
             has_qwen_ie_keys
             and has_lora_suffix
@@ -1027,6 +1076,15 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         ):
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+_ATTN1_RE = re.compile(r"(?:^|[._])attn1[._]")
+
+
+def _has_cogview4_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict targets `transformer_blocks.N.attn1` in either spelling (CogView4, and the diffusers
+    layouts of Wan, LTX-2 and Anima; Qwen-Image never names it so)."""
+    return any(isinstance(k, str) and _ATTN1_RE.search(k) for k in state_dict)
 
 
 def _has_ltx2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1427,7 +1485,9 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_cosmos_keys and has_lora_suffix and not has_ltx2_lora_keys(str_keys):
+        # Diffusers' Cosmos layout (`transformer_blocks.N.attn1` / `attn2`) is also SD 3.5 Medium's; the width tells them
+        # apart.
+        if has_cosmos_keys and has_lora_suffix and not has_ltx2_lora_keys(str_keys) and not is_sd3_lora(state_dict):
             return
 
         raise NotAMatchError("model does not match Anima LoRA heuristics")
@@ -1444,8 +1504,10 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
         if (
-            has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys)
-        ) and not has_ltx2_lora_keys(str_keys):
+            (has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys))
+            and not has_ltx2_lora_keys(str_keys)
+            and not is_sd3_lora(state_dict)
+        ):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
@@ -1667,6 +1729,53 @@ class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like an LTX-2 LoRA")
 
 
+class LoRA_LyCORIS_SD3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for SD 3 / 3.5 LoRA files: diffusers / ai-toolkit, PEFT, SimpleTuner LyCORIS and kohya MMDiT.
+
+    Qwen-Image shares diffusers' attention names, so the match rests on an attention layer at an SD 3 width (1536
+    Medium, 2432 Large) -- in kohya's fused naming too; see `sd3_lora_constants`. The width also gives the variant, so
+    the UI can keep a Large LoRA off a Medium model.
+    """
+
+    base: Literal[BaseModelType.StableDiffusion3] = Field(default=BaseModelType.StableDiffusion3)
+    variant: SD3VariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+        cls._validate_looks_like_lora(mod)
+        cls._validate_base(mod)
+        # Into the config, not the caller's dict: the factory hands the same fields to every candidate.
+        variant = override_fields.get("variant") or sd3_lora_variant(mod.load_state_dict())
+        return cls(**{**override_fields, "variant": variant})
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        _validate_sd3_lora_state_dict(mod.load_state_dict())
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if is_sd3_lora(mod.load_state_dict()):
+            return BaseModelType.StableDiffusion3
+        raise NotAMatchError("model does not look like an SD 3 LoRA")
+
+
+def _validate_sd3_lora_state_dict(state_dict: dict[str | int, Any]) -> None:
+    if not is_sd3_lora(state_dict):
+        if is_sd3_named_without_width(state_dict):
+            raise InvalidMatchError(
+                "SD 3 LoRA cannot be identified: it names only SD 3 modules but has no complete attention, "
+                "MLP-input or modulation layer, "
+                "so its size (Medium or Large) is unknown."
+            )
+        raise NotAMatchError("model does not match SD 3 LoRA heuristics")
+    refusal = sd3_lora_refusal(state_dict)
+    if refusal is not None:
+        # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the install.
+        raise InvalidMatchError(f"SD 3 LoRA cannot be applied: {refusal}")
+
+
 class ControlAdapter_Config_Base(ABC, BaseModel):
     default_settings: ControlAdapterDefaultSettings | None = Field(None)
 
@@ -1803,6 +1912,32 @@ class LoRA_Diffusers_Flux2_Config(LoRA_Diffusers_Config_Base, Config_Base):
         if _is_flux2_lora_state_dict(state_dict):
             return BaseModelType.Flux2
         raise NotAMatchError("model is not a FLUX.2 Diffusers LoRA")
+
+
+class LoRA_Diffusers_SD3_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for SD 3 / 3.5 LoRAs in a Diffusers folder, as diffusers' DreamBooth script saves them.
+
+    The folder holds `pytorch_lora_weights.safetensors` (often next to `checkpoint-*/` copies, which are not read).
+    """
+
+    base: Literal[BaseModelType.StableDiffusion3] = Field(default=BaseModelType.StableDiffusion3)
+    variant: SD3VariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        state_dict = mod.load_state_dict(cls._get_weight_file_or_raise(mod))
+        _validate_sd3_lora_state_dict(state_dict)
+        # Into the config, not the caller's dict: the factory hands the same fields to every candidate.
+        variant = override_fields.get("variant") or sd3_lora_variant(state_dict)
+        return cls(**{**override_fields, "variant": variant})
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if is_sd3_lora(mod.load_state_dict(cls._get_weight_file_or_raise(mod))):
+            return BaseModelType.StableDiffusion3
+        raise NotAMatchError("model does not look like an SD 3 LoRA")
 
 
 class LoRA_Diffusers_Flux3_Config(LoRA_Diffusers_Config_Base, Config_Base):

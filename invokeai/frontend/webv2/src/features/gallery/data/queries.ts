@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type {
@@ -177,6 +178,33 @@ const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
   accountId: owner.accountId,
   epoch: owner.epoch,
 });
+
+/**
+ * Where a board's media is still used, for one opening of its deletion dialog: a reopened dialog asks again, and
+ * nothing refetches it while open. `opening` is null while the dialog is closed, so a closing dialog leaves its
+ * opening's key, which stops a check still running there. Kept outside the `gallery` root so gallery invalidations
+ * never re-run a check the user is reading.
+ */
+export const galleryBoardMediaUsageQueryOptions = ({
+  boardId,
+  load,
+  opening,
+  owner,
+}: {
+  boardId: string;
+  load: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
+  opening: number | null;
+  owner: AccountScope;
+}) =>
+  queryOptions({
+    gcTime: 0,
+    queryFn: ({ signal }) => load(boardId, signal),
+    queryKey: ['galleryMediaUsage', 'board', getAccountKey(owner), boardId, opening] as const,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 
 const normalizePageOffset = (offset: number): number =>
   Math.max(0, Math.floor(offset / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);

@@ -1,5 +1,5 @@
 /**
- * PSD export separates pure geometry planning from raster baking, lazy `ag-psd` serialization and download.
+ * PSD export separates pure geometry planning from raster baking, worker `ag-psd` serialization and download.
  * Reverse every top-first tree level for ag-psd's bottom-first children; omit empty leaves/folders and size the
  * document to exported world bounds.
  *
@@ -313,18 +313,92 @@ export const planPsdExport = (
     return out;
   };
 
+  const tree = buildTree(inputs);
+  const countRecords = (nodes: readonly PsdPlanNode[]): number =>
+    nodes.reduce((total, node) => total + (node.kind === 'folder' ? 2 + countRecords(node.children) : 1), 0);
+  if (countRecords(tree) > 32767) {
+    return { status: 'too-large', width: canvasRect.width, height: canvasRect.height };
+  }
   return {
     canvasRect,
     height: canvasRect.height,
     layers,
     status: 'ok',
-    tree: buildTree(inputs),
+    tree,
     unmappedBlends: [...unmappedBlends],
     width: canvasRect.width,
   };
 };
 
 // ---- Executor (impure) -----------------------------------------------------
+
+/** Private export wire contract: only executor-owned pixels and PSD metadata, never engine resources. */
+export interface PsdSerializationRequest {
+  id: number;
+  psd: Psd;
+}
+export type PsdSerializationResponse = { id: number; bytes: ArrayBuffer } | { id: number; error: string };
+
+/** One operation, one worker: termination interrupts the synchronous writer and discards its entire heap. */
+export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffer> => {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('PSD export was aborted.', 'AbortError'));
+  }
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./psdSerialization.worker.ts', import.meta.url), { type: 'module' });
+    const cleanup = (): void => {
+      signal?.removeEventListener('abort', abort);
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.onmessageerror = null;
+      worker.terminate();
+    };
+    const fail = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const abort = (): void => fail(new DOMException('PSD export was aborted.', 'AbortError'));
+    // The worker is private to this call, so id 1 cannot collide with another operation or retry.
+    worker.onmessage = ({ data }: MessageEvent<PsdSerializationResponse>) => {
+      if (data.id !== 1) {
+        return;
+      }
+      cleanup();
+      if ('error' in data) {
+        reject(new Error(data.error));
+      } else {
+        resolve(data.bytes);
+      }
+    };
+    worker.onerror = (event) => {
+      event.preventDefault();
+      fail(new Error(event.message || 'PSD serialization worker failed.'));
+    };
+    worker.onmessageerror = () => fail(new Error('PSD serialization response could not be read.'));
+    signal?.addEventListener('abort', abort, { once: true });
+    try {
+      const buffers: Transferable[] = [];
+      const toWire = (node: AgPsdLayer): AgPsdLayer => {
+        const { imageData, children, ...metadata } = node;
+        // ImageData itself is cloned even with its buffer transferred. Transfer plain PixelData instead.
+        if (imageData) {
+          buffers.push(imageData.data.buffer);
+        }
+        return {
+          ...metadata,
+          ...(imageData
+            ? { imageData: { width: imageData.width, height: imageData.height, data: imageData.data } }
+            : {}),
+          ...(children ? { children: children.map(toWire) } : {}),
+        };
+      };
+      const wire = toWire(psd) as Psd;
+      worker.postMessage({ id: 1, psd: wire } satisfies PsdSerializationRequest, buffers);
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+};
 
 type Ctx = RasterSurface['ctx'];
 
@@ -336,16 +410,9 @@ const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
 const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: number, y: number): void =>
   surface.ctx.putImageData(imageData, x, y);
 
-/** Lazy-loads `ag-psd` only for serialization, keeping it out of the main bundle. */
-const defaultWritePsd = async (psd: Psd): Promise<ArrayBuffer> => {
-  const { writePsd } = await import('ag-psd');
-  return writePsd(psd);
-};
-
 /** Triggers a browser download of the PSD bytes (Blob + anchor click). */
-const defaultDownload = (data: ArrayBuffer, fileName: string): void => {
-  const blob = new Blob([data], { type: 'image/vnd.adobe.photoshop' });
-  downloadBlob(blob, fileName);
+const defaultDownload = async (data: ArrayBuffer, fileName: string): Promise<void> => {
+  await downloadBlob(new Blob([data], { type: 'image/vnd.adobe.photoshop' }), fileName);
 };
 
 /** Injected dependencies for {@link executePsdExport}. */
@@ -354,6 +421,7 @@ export interface ExecutePsdExportDeps {
   backend: { createSurface(width: number, height: number): RasterSurface };
   /** Cancels before the next background allocation or side effect. */
   signal?: AbortSignal;
+  onStage?(stage: 'serializing' | 'downloading'): void;
   /**
    * Evaluates spatial adjustment runs; without it a spatial stack throws {@link AdjustmentRefusedError} rather than
    * bake without its spatial entries.
@@ -365,10 +433,10 @@ export interface ExecutePsdExportDeps {
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   /** Writes pixels back to a surface (default `putImageData`). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
-  /** Serializes a PSD to bytes (default: lazy `ag-psd` `writePsd`). */
+  /** Serializes a PSD to bytes (default: operation-owned worker). */
   writePsd?(psd: Psd): Promise<ArrayBuffer>;
   /** Triggers the download (default: Blob + anchor click). */
-  download?(data: ArrayBuffer, fileName: string): void;
+  download?(data: ArrayBuffer, fileName: string): void | Promise<void>;
 }
 
 /** Sets a 2D context transform from a matrix. */
@@ -439,6 +507,10 @@ const bakeLayer = async (
     ctx.drawImage(source.canvas, rect.x, rect.y);
   }
 
+  if (source !== cache) {
+    source.resize(0, 0);
+  }
+
   const fullRect: Rect = { height, width, x: 0, y: 0 };
   let imageData = read(surface, fullRect);
   if (planLayer.groupStacks && planLayer.groupStacks.length > 0) {
@@ -464,96 +536,121 @@ export const executePsdExport = async (
   if (plan.status !== 'ok') {
     return;
   }
-  const read = deps.readImageData ?? defaultReadImageData;
-  const write = deps.writeImageData ?? defaultWriteImageData;
-  const writePsdFn = deps.writePsd ?? defaultWritePsd;
-  const download = deps.download ?? defaultDownload;
+  const surfaces: RasterSurface[] = [];
+  const backend = deps.backend;
+  deps = {
+    ...deps,
+    backend: {
+      createSurface: (width, height) => {
+        const surface = backend.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    },
+  };
+  try {
+    const read = deps.readImageData ?? defaultReadImageData;
+    const write = deps.writeImageData ?? defaultWriteImageData;
+    const writePsdFn = deps.writePsd ?? ((psd: Psd) => serializePsd(psd, deps.signal));
+    const download = deps.download ?? defaultDownload;
 
-  const bakedById = new Map<string, AgPsdLayer>();
-  const baked: { planLayer: PsdPlanLayer; surface: RasterSurface }[] = [];
+    const bakedById = new Map<string, AgPsdLayer>();
+    const baked: { planLayer: PsdPlanLayer; surface: RasterSurface }[] = [];
 
-  for (const planLayer of plan.layers) {
+    for (const planLayer of plan.layers) {
+      throwIfAborted(deps.signal);
+      const { imageData, surface } = await bakeLayer(planLayer, deps, read, write);
+      baked.push({ planLayer, surface });
+      bakedById.set(planLayer.id, {
+        blendMode: planLayer.blendMode,
+        bottom: planLayer.bottom,
+        hidden: planLayer.hidden,
+        imageData,
+        left: planLayer.left,
+        ...(planLayer.colorLabel ? { layerColor: planLayer.colorLabel } : {}),
+        name: planLayer.name,
+        opacity: planLayer.opacity,
+        right: planLayer.right,
+        top: planLayer.top,
+      });
+    }
+    const toChildren = (nodes: readonly PsdPlanNode[]): AgPsdLayer[] =>
+      nodes.map((node) =>
+        node.kind === 'folder'
+          ? {
+              blendMode: node.blendMode,
+              children: toChildren(node.children),
+              hidden: node.hidden,
+              ...(node.colorLabel ? { layerColor: node.colorLabel } : {}),
+              name: node.name,
+              opacity: node.opacity,
+              opened: true,
+            }
+          : bakedById.get(node.id)!
+      );
+    const children = toChildren(plan.tree);
+
+    // Flatten bottom-first. Isolate folders with opacity/blend so the merged preview matches readers' folder
+    // compositing.
     throwIfAborted(deps.signal);
-    const { imageData, surface } = await bakeLayer(planLayer, deps, read, write);
-    baked.push({ planLayer, surface });
-    bakedById.set(planLayer.id, {
-      blendMode: planLayer.blendMode,
-      bottom: planLayer.bottom,
-      hidden: planLayer.hidden,
-      imageData,
-      left: planLayer.left,
-      ...(planLayer.colorLabel ? { layerColor: planLayer.colorLabel } : {}),
-      name: planLayer.name,
-      opacity: planLayer.opacity,
-      right: planLayer.right,
-      top: planLayer.top,
-    });
-  }
-  const toChildren = (nodes: readonly PsdPlanNode[]): AgPsdLayer[] =>
-    nodes.map((node) =>
-      node.kind === 'folder'
-        ? {
-            blendMode: node.blendMode,
-            children: toChildren(node.children),
-            hidden: node.hidden,
-            ...(node.colorLabel ? { layerColor: node.colorLabel } : {}),
-            name: node.name,
-            opacity: node.opacity,
-            opened: true,
-          }
-        : bakedById.get(node.id)!
-    );
-  const children = toChildren(plan.tree);
-
-  // Flatten bottom-first. Isolate folders with opacity/blend so the merged preview matches readers' folder
-  // compositing.
-  throwIfAborted(deps.signal);
-  const surfaceById = new Map(baked.map(({ planLayer, surface }) => [planLayer.id, surface]));
-  const drawPreview = (ctx: Ctx, nodes: readonly PsdPlanNode[]): void => {
-    for (const node of nodes) {
-      if (node.hidden) {
-        continue;
-      }
-      if (node.kind === 'folder') {
-        if (node.opacity === 1 && node.compositeBlend === 'source-over') {
-          drawPreview(ctx, node.children);
+    const surfaceById = new Map(baked.map(({ planLayer, surface }) => [planLayer.id, surface]));
+    const drawPreview = (ctx: Ctx, nodes: readonly PsdPlanNode[]): void => {
+      for (const node of nodes) {
+        if (node.hidden) {
           continue;
         }
-        const buffer = deps.backend.createSurface(plan.width, plan.height);
-        setTransform(buffer.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-        buffer.ctx.clearRect(0, 0, plan.width, plan.height);
-        drawPreview(buffer.ctx, node.children);
+        if (node.kind === 'folder') {
+          if (node.opacity === 1 && node.compositeBlend === 'source-over') {
+            drawPreview(ctx, node.children);
+            continue;
+          }
+          const buffer = deps.backend.createSurface(plan.width, plan.height);
+          setTransform(buffer.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+          buffer.ctx.clearRect(0, 0, plan.width, plan.height);
+          drawPreview(buffer.ctx, node.children);
+          ctx.globalAlpha = node.opacity;
+          ctx.globalCompositeOperation = node.compositeBlend;
+          ctx.drawImage(buffer.canvas, 0, 0);
+          continue;
+        }
+        const surface = surfaceById.get(node.id);
+        if (!surface) {
+          continue;
+        }
         ctx.globalAlpha = node.opacity;
         ctx.globalCompositeOperation = node.compositeBlend;
-        ctx.drawImage(buffer.canvas, 0, 0);
-        continue;
+        ctx.drawImage(surface.canvas, node.left, node.top);
       }
-      const surface = surfaceById.get(node.id);
-      if (!surface) {
-        continue;
-      }
-      ctx.globalAlpha = node.opacity;
-      ctx.globalCompositeOperation = node.compositeBlend;
-      ctx.drawImage(surface.canvas, node.left, node.top);
+    };
+    const composite = deps.backend.createSurface(plan.width, plan.height);
+    const cctx = composite.ctx;
+    setTransform(cctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+    cctx.clearRect(0, 0, plan.width, plan.height);
+    drawPreview(cctx, plan.tree);
+    cctx.globalAlpha = 1;
+    cctx.globalCompositeOperation = 'source-over';
+
+    const psd: Psd = {
+      children,
+      height: plan.height,
+      imageData: read(composite, { height: plan.height, width: plan.width, x: 0, y: 0 }),
+      width: plan.width,
+    };
+
+    for (const surface of surfaces) {
+      surface.resize(0, 0);
     }
-  };
-  const composite = deps.backend.createSurface(plan.width, plan.height);
-  const cctx = composite.ctx;
-  setTransform(cctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-  cctx.clearRect(0, 0, plan.width, plan.height);
-  drawPreview(cctx, plan.tree);
-  cctx.globalAlpha = 1;
-  cctx.globalCompositeOperation = 'source-over';
-
-  const psd: Psd = {
-    children,
-    height: plan.height,
-    imageData: read(composite, { height: plan.height, width: plan.width, x: 0, y: 0 }),
-    width: plan.width,
-  };
-
-  throwIfAborted(deps.signal);
-  const bytes = await writePsdFn(psd);
-  throwIfAborted(deps.signal);
-  download(bytes, fileName);
+    surfaces.length = 0;
+    deps.onStage?.('serializing');
+    throwIfAborted(deps.signal);
+    const bytes = await writePsdFn(psd);
+    throwIfAborted(deps.signal);
+    // Once the browser accepts the click, cancellation cannot retract the download.
+    deps.onStage?.('downloading');
+    await download(bytes, fileName);
+  } finally {
+    for (const surface of surfaces) {
+      surface.resize(0, 0);
+    }
+  }
 };

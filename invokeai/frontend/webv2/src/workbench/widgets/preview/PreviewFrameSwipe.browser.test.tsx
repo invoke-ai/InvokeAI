@@ -21,8 +21,22 @@ void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   initAsync: false,
   lng: 'en',
-  resources: { en: { translation: { widgets: { preview: { dragVideo: 'Drag video' } } } } },
+  resources: {
+    en: {
+      translation: {
+        common: { videoPlayer: { playbackSpeedValue: 'Playback speed: {{rate}}', rate: '{{rate}}×' } },
+        widgets: { preview: { dragVideo: 'Drag video' } },
+      },
+    },
+  },
 });
+
+// Preview loads the player with its first video; loading it up front keeps a slow first transform out of these
+// tests' timing. PreviewFrameLazyPlayer covers the lazy path itself.
+await import('@platform/ui/video-player/VideoPlayer');
+
+// The mock backend's clip: 64×64 H.264, one second long. Vite serves the package root.
+const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 
 // The production hold, so a slow runner cannot arm a drag between a touch and its first quick move.
 const HOLD_DELAY_MS = 400;
@@ -45,7 +59,7 @@ const makeItem = (name: string, kind: 'image' | 'video' = 'image'): GalleryItem 
     width: 128,
   };
 
-  return kind === 'image' ? { ...base, kind } : { ...base, durationSeconds: 1, kind };
+  return kind === 'image' ? { ...base, kind } : { ...base, durationSeconds: 1, fullUrl: FIXTURE_VIDEO_URL, kind };
 };
 
 let host: HTMLDivElement | null = null;
@@ -224,8 +238,19 @@ const renderCarousel = async ({
 
   const media = () => host!.querySelector<HTMLElement>('img[alt]:not([alt=""]), video')!;
 
+  // A video's player loads with the first one shown; until then only its poster stands in.
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(media()).not.toBeNull();
+  });
+
   return {
-    content: () => media().parentElement!,
+    // The fitted frame: an image's parent, or the frame around a video's player.
+    content: () => {
+      const element = media();
+
+      return (element.tagName === 'VIDEO' ? element.closest('[role="group"]')! : element).parentElement!;
+    },
     media,
     neighbors: () => [...host!.querySelectorAll<HTMLElement>('[data-swipe-neighbor]')],
     onDrop,
@@ -477,12 +502,15 @@ describe('PreviewFrame touch swipe', () => {
     expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
   });
 
-  it('swipes a video from its picture but leaves the native control bar alone', async () => {
+  it("swipes a video from its picture but leaves the player's control bar alone", async () => {
     const carousel = await renderCarousel({ items: [makeItem('red'), makeItem('clip', 'video'), makeItem('blue')] });
     const video = carousel.media();
     const rect = video.getBoundingClientRect();
+    const bar = host!.querySelector<HTMLElement>('[data-video-player-controls]')!;
+    const barRect = bar.getBoundingClientRect();
 
-    await swipe(video, [200, 170, 140], { y: rect.bottom - 10 });
+    // Anywhere on the bar, its seek track included, belongs to the player.
+    await swipe(bar, [200, 170, 140], { y: barRect.top + barRect.height / 2 });
     await interact(() => {}, 400);
 
     expect(carousel.onNavigate).not.toHaveBeenCalled();
@@ -491,5 +519,31 @@ describe('PreviewFrame touch swipe', () => {
     await vi.waitFor(() => expect(carousel.media().getAttribute('alt')).toBe('blue'));
 
     expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("leaves a touch drag inside the player's portalled speed menu alone", async () => {
+    // Wide enough for the bar to keep its speed menu.
+    const clip = { ...makeItem('clip', 'video'), height: 180, width: 320 };
+    const carousel = await renderCarousel({ items: [makeItem('red'), clip, makeItem('blue')] });
+    const trigger = host!.querySelector<HTMLButtonElement>('[aria-label="Playback speed: 1×"]')!;
+
+    // The controls come alive once the clip's metadata is in.
+    await vi.waitFor(() => expect(trigger.disabled).toBe(false), { timeout: 5000 });
+    await interact(() => trigger.click(), 200);
+    const option = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+      (item) => item.textContent === '2×'
+    )!;
+    const optionRect = option.getBoundingClientRect();
+
+    // The menu renders outside the stage, but its events still reach the stage through the portal.
+    expect(host!.contains(option)).toBe(false);
+
+    await swipe(option, [optionRect.left + 60, optionRect.left + 30, optionRect.left], {
+      y: optionRect.top + optionRect.height / 2,
+    });
+    await interact(() => {}, 400);
+
+    expect(carousel.onNavigate).not.toHaveBeenCalled();
+    expect(carousel.content().style.translate).toBe('');
   });
 });
