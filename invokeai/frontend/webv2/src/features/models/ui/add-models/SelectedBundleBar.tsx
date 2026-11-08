@@ -32,6 +32,7 @@ export const SelectedBundleBar = ({
         {decoder ? (
           <>
             {' · '}
+            {t('models.previewDecoderHint')}{' '}
             <Button
               aria-label={t('models.showStarterModel', { name: decoder.decoder.name })}
               color="fg.muted"

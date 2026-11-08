@@ -13,7 +13,7 @@ from invokeai.backend.model_manager.configs.external_api import (
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
 )
-from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -50,8 +50,7 @@ class StarterModelWithoutDependencies(BaseModel):
         # same pairing `latent_space_with_channels` makes for an installed TAE record. The published TAE the
         # source names gives the channel count, which tells Wan's two spaces apart.
         if self.type is ModelType.TinyAutoencoder:
-            named = named_tiny_autoencoder((self.source,))
-            space = latent_space_with_channels(self.base, named[2]) if named is not None else None
+            space = named_tiny_autoencoder_space(self.base, self.source)
             if space is not None:
                 self.compatible_bases = sorted(
                     (

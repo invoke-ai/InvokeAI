@@ -72,8 +72,8 @@ const SOURCE_KIND_ICONS: Record<string, ElementType> = {
  */
 const FP8_STORAGE_INSTALL_CONFIG: ModelRecordChanges = { default_settings: { fp8_storage: true } };
 
-/** Frames to wait for a revealed starter's row; the deferred search re-renders within a few. */
-const REVEAL_WAIT_FRAMES = 30;
+/** How long to wait for a revealed starter's row; the deferred search re-renders within a few frames. */
+const REVEAL_WAIT_MS = 1500;
 
 export const AddModelsView = () => {
   const { t } = useTranslation();
@@ -183,17 +183,37 @@ export const AddModelsView = () => {
 
   const starterListRef = useRef<HTMLDivElement | null>(null);
   const starterFilterMenuRef = useRef<HTMLDivElement | null>(null);
+  // The base and type a decoder reveal set. No bundle holds a decoder, so selecting a bundle by any path (a chip, the
+  // Launchpad) drops them while they are still the reveal's; a base or type the user picked since stays.
+  const [revealedFilters, setRevealedFilters] = useState<Pick<StarterModelFilters, 'baseFilter' | 'typeFilter'> | null>(
+    null
+  );
+  const [previousBundleName, setPreviousBundleName] = useState(selectedBundleName);
+  if (selectedBundleName !== previousBundleName) {
+    setPreviousBundleName(selectedBundleName);
+    if (selectedBundleName !== null && revealedFilters) {
+      setRevealedFilters(null);
+      if (
+        starterFilters.baseFilter === revealedFilters.baseFilter &&
+        starterFilters.typeFilter === revealedFilters.typeFilter
+      ) {
+        setStarterFilters({ ...starterFilters, baseFilter: null, typeFilter: null });
+      }
+    }
+  }
 
   /** Reveal, not install: the starters filtered to the decoder's type and the family show it with its install button. */
   const showBundleDecoder = async ({ decoder, family }: BundlePreviewDecoder) => {
     // Search text and other filters reset so they cannot hide it.
     updateModelsUi({ addModelsQuery: '', selectedBundleName: null });
+    setRevealedFilters({ baseFilter: family, typeFilter: decoder.type });
     setStarterFilters({ ...DEFAULT_STARTER_MODEL_FILTERS, baseFilter: family, typeFilter: decoder.type });
     // The hint left with the bundle bar, dropping focus. The row appears once the deferred search catches up: wait a
-    // bounded number of frames, then hand focus to its install button, else to the filter menu that now shows it.
+    // bounded time, then hand focus to its install button, else to the filter menu that now shows it.
     const findRow = () =>
       starterListRef.current?.querySelector<HTMLElement>(`[data-list-row="${CSS.escape(decoder.source)}"]`) ?? null;
-    for (let frame = 0; frame < REVEAL_WAIT_FRAMES && !findRow(); frame += 1) {
+    const deadline = performance.now() + REVEAL_WAIT_MS;
+    while (!findRow() && performance.now() < deadline) {
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => resolve());
       });

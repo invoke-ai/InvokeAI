@@ -7,6 +7,7 @@ two standalone dependencies so installing it also pulls the pieces needed to run
 one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -218,6 +219,14 @@ def test_wan_preview_decoders_list_only_their_own_latent_space() -> None:
 
     assert {BaseModelType.QwenImage, BaseModelType.Krea2, BaseModelType.Anima} <= set(taew2_1.compatible_bases)
     assert taew2_2.compatible_bases == []
+
+
+def test_every_preview_decoder_starter_resolves_to_a_latent_space() -> None:
+    """`compatible_bases` and the missing-TAE log both read the space from the TAE the source names: a starter whose
+    URL names no published TAE would silently drop out of the base filter, the bundle hint and the log."""
+    for model in STARTER_MODELS:
+        if model.type is ModelType.TinyAutoencoder:
+            assert named_tiny_autoencoder_space(model.base, model.source) is not None, model.name
 
 
 def test_only_preview_decoders_list_compatible_bases() -> None:
