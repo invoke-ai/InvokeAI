@@ -277,11 +277,9 @@ def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
 def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVariantType:
     """Derive the variant from the tensors, and reject a file whose tensors are incomplete.
 
-    Deliberately not taken from the ``embedding_length``/``block_count`` metadata, though both are
-    present. A llama.cpp multi-part quant (``...-00002-of-00003.gguf``, routine for the larger 8B
-    quants) and an interrupted download both carry a complete KV block and only some of the tensors.
-    Matching on metadata alone would install such a file, offer it in the encoder picker, and fail
-    at the user's first generation rather than at install time.
+    Deliberately not taken from the ``embedding_length``/``block_count`` metadata: a file can carry a
+    complete KV block and only some of the tensors. Matching on metadata alone would install such a file,
+    offer it in the encoder picker, and fail at the user's first generation rather than at install time.
 
     Raises ``InvalidMatchError``, not ``NotAMatchError``: the caller runs this only after the
     architecture metadata identified the file as a Qwen3-VL encoder, so "recognised and unusable" is
@@ -305,9 +303,7 @@ def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVa
     if not any(isinstance(key, str) and key.startswith(f"blk.{last_layer}.") for key in state_dict):
         raise InvalidMatchError(
             f"this Qwen3-VL encoder GGUF is incomplete: it carries no 'blk.{last_layer}.*' tensors, but a "
-            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Multi-part quants "
-            "('...-00002-of-00003.gguf') must be joined before installing, and an interrupted download "
-            "must be re-fetched."
+            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Re-fetch the file."
         )
     return variant
 
@@ -394,6 +390,7 @@ class Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Config_
     base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
     type: Literal[ModelType.Qwen3VLEncoder] = Field(default=ModelType.Qwen3VLEncoder)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

@@ -1,0 +1,17 @@
+title: Grid to Gif
+author: mildmisery
+repo: https://github.com/mildmisery/invokeai-GridToGifNode
+summary: Turn a grid image into an image collection, and an image collection into a GIF.
+categories: [video-3d, compositing]
+install: manual
+links:
+  - label: Example workflow
+    url: https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json
+thumbnail: ./grid-to-gif.webp
+images:
+  - src: https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif
+    alt: An animated GIF made from the frames of a grid
+    caption: Output GIF
+  - src: https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png
+    alt: A grid of image frames
+    caption: Input grid

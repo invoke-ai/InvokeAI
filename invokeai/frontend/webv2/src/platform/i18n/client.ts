@@ -9,7 +9,9 @@ void i18n
   .init({
     backend: {
       loadPath: (_languages: readonly string[], namespaces: readonly string[]) =>
-        `${getDeploymentBaseUrl()}/locales/{{lng}}${namespaces[0] === 'fonts' ? '.fonts' : ''}.json`,
+        `${getDeploymentBaseUrl()}/locales/{{lng}}${
+          namespaces[0] === 'fonts' || namespaces[0] === 'metadata' ? `.${namespaces[0]}` : ''
+        }.json`,
       // Changes with locale content, so a release never reads the previous one's cached translations; the service
       // worker caches only these versioned URLs.
       queryStringParams: { v: import.meta.env.LOCALE_VERSION },

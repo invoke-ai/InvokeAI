@@ -504,6 +504,7 @@ const createCommands = (
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
       markBackendSubmitted: command('markQueueItemBackendSubmitted'),
+      recordSubmissionRetry: command('recordQueueItemSubmissionRetry'),
       setCancellationPending: command('setQueueItemCancellationPending'),
       setLocalRecoveryState: command('setQueueItemLocalRecoveryState'),
       routePartialResults: command('routeQueueItemPartialResults'),

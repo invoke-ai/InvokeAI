@@ -179,6 +179,11 @@ class ImageIndexServiceBase(ABC):
         pending embedding work, and an `image_map_projection_ready` event is
         emitted when the cache is updated.
 
+        A refit of a scope that was fit before waits out a cooldown measured
+        from that fit (a floor, or a multiple of how long the fit took), so a
+        busy server cannot keep the worker refitting one scope back to back.
+        The request stays queued meanwhile.
+
         Args:
             user_id: The user whose projection cache to update.
             all_images: Compute over every embedded item (admin scope)
@@ -189,8 +194,10 @@ class ImageIndexServiceBase(ABC):
                 every poll cannot drive an endless request/event cycle.
             user_initiated: This request came from a person rather than from
                 polling, so a spent retry budget is cleared and the failed
-                scope gets another fit. Callers driven by a timer, an event, or
-                a staleness check must leave this False.
+                scope gets another fit, and the refit cooldown is bypassed.
+                Pass it only for a person's explicit request: callers driven by
+                a timer, an event, or a staleness check must leave this False,
+                or every fit would chain straight into the next (#9635).
 
         Returns:
             True if the request was accepted (or already pending); False if

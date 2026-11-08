@@ -331,7 +331,6 @@ const buildSDGraph = (
   const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
-  const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
   const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
@@ -362,8 +361,9 @@ const buildSDGraph = (
           hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
           ...(settings.hiDiffusionEnabled
             ? {
-                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
-                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+                hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
+                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio ?? 0,
+                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio ?? 0,
               }
             : {}),
         }
@@ -451,7 +451,7 @@ const buildSDGraph = (
   const output = addDecodeOutput({
     denoise: refinerDenoise ?? denoise,
     graph,
-    l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
+    l2iProps: { fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
     model,
     outputIsIntermediate,
@@ -466,6 +466,7 @@ const buildSDGraph = (
       ? {
           hidiffusion: settings.hiDiffusionEnabled,
           hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
           hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
           hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
           hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
@@ -587,6 +588,7 @@ const buildSD3Graph = (
   const graph: BackendGraphContract = { edges: [], id: createId('sd3_graph'), nodes: {} };
   const vaeModel = getCompatibleVae(settings, model);
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     clip_g_model: settings.clipGEmbedModel ?? undefined,
     clip_l_model: settings.clipLEmbedModel ?? undefined,
@@ -596,6 +598,14 @@ const buildSD3Graph = (
     type: 'sd3_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // SD 3 LoRAs train the transformer and, with DreamBooth's text-encoder option, CLIP-L and CLIP-G; T5 takes none.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'sd3_lora_collection_loader', modelLoader, [
+        'transformer',
+        'clip_l',
+        'clip_g',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'sd3_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'sd3_text_encoder' });
   const sd3DenoiseSize = getDenoiseSize(settings, model);
@@ -621,11 +631,11 @@ const buildSD3Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
-  addEdge(graph, modelLoader, 'clip_l', posCond, 'clip_l');
-  addEdge(graph, modelLoader, 'clip_l', negCond, 'clip_l');
-  addEdge(graph, modelLoader, 'clip_g', posCond, 'clip_g');
-  addEdge(graph, modelLoader, 'clip_g', negCond, 'clip_g');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'clip_l', posCond, 'clip_l');
+  addEdge(graph, loraSource, 'clip_l', negCond, 'clip_l');
+  addEdge(graph, loraSource, 'clip_g', posCond, 'clip_g');
+  addEdge(graph, loraSource, 'clip_g', negCond, 'clip_g');
   addEdge(graph, modelLoader, 't5_encoder', posCond, 't5_encoder');
   addEdge(graph, modelLoader, 't5_encoder', negCond, 't5_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
@@ -1859,10 +1869,10 @@ const buildIdeogram4Graph = (
   addEdge(graph, denoise, 'latents', output, 'latents');
   const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
     ideogram4_color_palette: settings.ideogram4ColorPalette,
-    ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
-    ideogram4_mu: settings.ideogram4Mu ?? undefined,
+    ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? null,
+    ideogram4_mu: settings.ideogram4Mu ?? null,
     ideogram4_sampler_preset: settings.ideogram4SamplerPreset,
-    ideogram4_steps: settings.ideogram4Steps ?? undefined,
+    ideogram4_steps: settings.ideogram4Steps ?? null,
     // Record both transformer files in provenance.
     ideogram4_unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
@@ -1936,7 +1946,7 @@ const buildWanGraph = (
   addMetadata(graph, output, settings, model, 'wan_txt2img', projectSettings, {
     vae: vaeModel ?? undefined,
     wan_component_source: sourceModel,
-    wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? undefined,
+    wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? null,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
     wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
   });

@@ -76,6 +76,12 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/Slider.tsx',
   '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
+  // Eager menus and popovers and the lazily loaded video player share these controls and their overlay registry;
+  // alone they cost both routes a request.
+  '/platform/ui/Menu.tsx',
+  '/platform/ui/Popover.tsx',
+  '/platform/ui/widgetOverlayRegistry.ts',
+  '/platform/ui/widgetOverlays.ts',
   '/platform/ui/RetryBoundary.tsx',
   '/platform/ui/PanelHeader.tsx',
   '/platform/ui/settings/contracts.ts',
@@ -187,8 +193,13 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
   // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // API recall (editor boot) and the lazy Canvas controls share strength defaults; avoid a standalone boot request.
+  '/workbench/widgets/canvas/invoke/canvasStrength.ts',
   // The canvas dims sync and the lazy Canvas widget and Frame tool share the model grid and the centred resize.
   '/workbench/widgets/canvas/bboxGrid.ts',
+  // Generate's UI adapter (editor boot) and the lazy canvas Frame tool share the saved aspect ratios; alone they cost a
+  // boot request.
+  '/workbench/settings/aspectRatioPresets.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
   // The Gallery, the Preview filmstrip and the Canvas staging bar share the progress badge; alone it costs a boot
