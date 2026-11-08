@@ -327,17 +327,36 @@ export const useImageActions = ({
       boardId?: string,
       onUndo?: (() => void) | null
     ) => {
-      if (result.failed.length > 0) {
+      // The backend lists the starred items it kept in `failed` too, so that rollback restores them.
+      const keptStarredCount = result.starredSkipped?.length ?? 0;
+      const failedCount = result.failed.length - keptStarredCount;
+
+      if (failedCount > 0) {
         recordError(
           new Error(
             t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
               board: boardId ? getBoardName(boardId) : undefined,
-              count: requestedCount,
-              failed: result.failed.length,
+              count: requestedCount - keptStarredCount,
+              failed: failedCount,
               succeeded: result.succeeded.length,
             })
           )
         );
+        return;
+      }
+
+      // The backend keeps a starred item the listing did not show as starred, so the user was never asked about it.
+      // Say so: the next delete knows the star and asks.
+      if (keptStarredCount > 0) {
+        notifications.add({
+          kind: 'info',
+          title: t(
+            result.succeeded.length > 0
+              ? 'widgets.gallery.itemActions.delete.starredKept'
+              : 'widgets.gallery.itemActions.delete.starredOnly',
+            { count: keptStarredCount, succeeded: result.succeeded.length }
+          ),
+        });
         return;
       }
 
@@ -416,7 +435,7 @@ export const useImageActions = ({
         result.failed.length === 0 ? getUndo?.(result.succeeded) : null
       );
     };
-    const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
+    const deleteItemsConfirmed = (items: GalleryItemRef[], deleteStarred: boolean): Promise<void> => {
       // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
       // confirmed removals then apply again.
       const deletionContext = getItemActionContext?.() ?? null;
@@ -557,7 +576,7 @@ export const useImageActions = ({
           }
 
           signal.throwIfAborted();
-          return galleryItemOrganization.delete(items, signal);
+          return galleryItemOrganization.delete(items, signal, { deleteStarred });
         },
         requested: items,
         rollback: () => {
@@ -571,20 +590,44 @@ export const useImageActions = ({
       });
     };
     const deleteItems: ImageActions['deleteItems'] = (items, options) => {
+      // Stars as the grid and caches know them; the backend settles any star they do not show. Never ignores stars.
+      const starredByKey = new Map<GalleryItemKey, boolean>();
+
+      if (confirmImageDeletion !== 'never') {
+        for (const [key, fields] of collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)) {
+          starredByKey.set(key, fields.starred);
+        }
+
+        for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
+          starredByKey.set(key, cachedStarred);
+        }
+      }
+
+      const starredCount = items.filter((item) => starredByKey.get(toGalleryItemKey(item)) === true).length;
       const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
       const usage = project ? collectMediaUsage(project, items) : [];
 
-      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media the
-      // project still uses always ask: the dialog names what goes, and authored work would point at nothing.
+      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen, media the project
+      // still uses and, unless the user chose Never, starred media always ask: the dialog names what goes, and
+      // authored work would point at nothing.
       const canSkipFutureConfirmations = items.length === 1 && options?.targetsOffScreen !== true;
+      const needsConfirmation =
+        confirmImageDeletion === 'always' ||
+        (confirmImageDeletion === 'starred' && starredCount > 0) ||
+        usage.length > 0 ||
+        !canSkipFutureConfirmations;
+      // Only a starred item the user was warned about, or any item under Never, is deleted. Under Only for starred
+      // media a star the listing did not show stays: nobody asked about it.
+      const deleteStarred = confirmImageDeletion !== 'starred' || starredCount > 0;
 
-      return confirmImageDeletion || usage.length > 0 || !canSkipFutureConfirmations
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
+      return needsConfirmation
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items, deleteStarred), {
             canSkipFutureConfirmations,
             returnFocus: options?.returnFocus,
+            starredCount,
             usage,
           })
-        : deleteItemsConfirmed(items);
+        : deleteItemsConfirmed(items, deleteStarred);
     };
     /** Groups refs by a known prior value; refs whose prior value is unknown are left out. */
     const groupByPrior = <Value>(

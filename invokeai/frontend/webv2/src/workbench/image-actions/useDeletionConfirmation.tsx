@@ -20,6 +20,8 @@ export interface DeletionConfirmationOptions {
   canSkipFutureConfirmations?: boolean;
   /** Where focus goes when the dialog closes; without it, back to the control that opened it. */
   returnFocus?: () => HTMLElement | null;
+  /** How many of the items are known to be starred; the dialog says so, since deleting them is not routine. */
+  starredCount?: number;
   /** Project surfaces that still use some of the items; listed so the user sees what the deletion breaks. */
   usage?: readonly MediaUsage[];
 }
@@ -35,6 +37,7 @@ interface PendingDeletion {
   executeDeletion: () => Promise<void>;
   itemRefs: readonly GalleryItemRef[];
   resolve: () => void;
+  starredCount: number;
   usage: readonly MediaUsage[];
 }
 
@@ -108,9 +111,11 @@ export const useDeletionConfirmation = (): {
   const deletionInFlightRef = useRef(false);
   // Read only when deletion is confirmed, so ticking it and then cancelling changes nothing.
   const [skipFutureConfirmations, setSkipFutureConfirmations] = useState(false);
-  // With routine confirmations already off, the dialog only appears because the media is in use or the request
-  // cannot skip it, which the opt-out does not cover.
-  const confirmsRoutineDeletions = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
+  // Only `always` has a routine confirmation to opt out of. In the other modes the dialog appears because starred media
+  // is involved, the media is in use or the request cannot skip it, which the opt-out does not cover.
+  const confirmsRoutineDeletions = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.confirmImageDeletion === 'always'
+  );
   const skipHintId = useId();
   const usageHeadingId = useId();
 
@@ -128,7 +133,11 @@ export const useDeletionConfirmation = (): {
   }, []);
 
   const requestDeletionConfirmation = useCallback<RequestDeletionConfirmation>(
-    (itemRefs, executeDeletion, { canSkipFutureConfirmations = false, returnFocus: getReturnFocus, usage } = {}) => {
+    (
+      itemRefs,
+      executeDeletion,
+      { canSkipFutureConfirmations = false, returnFocus: getReturnFocus, starredCount = 0, usage } = {}
+    ) => {
       if (pendingDeletionRef.current) {
         return Promise.resolve();
       }
@@ -139,6 +148,7 @@ export const useDeletionConfirmation = (): {
           executeDeletion,
           itemRefs: [...itemRefs],
           resolve,
+          starredCount,
           usage: usage ?? NO_USAGE,
         };
 
@@ -161,7 +171,7 @@ export const useDeletionConfirmation = (): {
     deletionInFlightRef.current = true;
 
     if (skipFutureConfirmations && pending.canSkipFutureConfirmations) {
-      void patchWorkbenchPreferences({ confirmImageDeletion: false });
+      void patchWorkbenchPreferences({ confirmImageDeletion: 'starred' });
     }
 
     try {
@@ -186,6 +196,7 @@ export const useDeletionConfirmation = (): {
   const isImageOnly = pendingDeletion?.itemRefs.every((item) => item.kind === 'image') ?? false;
   const titleKey = isImageOnly ? 'widgets.gallery.deleteImagesConfirmTitle' : 'widgets.gallery.deleteItemsConfirmTitle';
   const bodyKey = isImageOnly ? 'widgets.gallery.deleteImagesConfirmBody' : 'widgets.gallery.deleteItemsConfirmBody';
+  const starredCount = pendingDeletion?.starredCount ?? 0;
   const usage = pendingDeletion?.usage ?? NO_USAGE;
   const itemRefs = pendingDeletion?.itemRefs ?? NO_ITEMS;
   const countSummary = formatGalleryMediaCounts(t, {
@@ -206,6 +217,13 @@ export const useDeletionConfirmation = (): {
               </Text>
               <DeletionTargets itemRefs={itemRefs} />
             </Stack>
+            {starredCount > 0 ? (
+              <Text color="fg.warning" fontSize="md">
+                {itemRefs.length === 1
+                  ? t('widgets.gallery.deleteStarredNoticeSingle')
+                  : t('widgets.gallery.deleteStarredNotice', { count: starredCount })}
+              </Text>
+            ) : null}
             {usage.length > 0 ? (
               <Stack aria-labelledby={usageHeadingId} as="section" gap="1" role="group">
                 <Text fontWeight="semibold" id={usageHeadingId}>

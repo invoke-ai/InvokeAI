@@ -31,6 +31,8 @@ export {
   type GalleryItemsPage,
   type GalleryVideoItem,
 } from './core/items';
+import type { GalleryDeleteOptions } from './core/types';
+
 import {
   toGalleryItemKey as getGalleryItemKey,
   type GalleryItemKind as ItemKind,
@@ -143,12 +145,14 @@ const addConfirmedPartition = ({
   kind,
   names,
   outcome,
+  protectedKeys,
 }: {
   affectedBoardIds: Set<string>;
   confirmedKeys: Set<string>;
   kind: ItemKind;
   names: string[];
   outcome: PromiseSettledResult<GalleryItemOrganizationTransportResult>;
+  protectedKeys: Set<string>;
 }): void => {
   if (outcome.status === 'rejected') {
     return;
@@ -156,6 +160,12 @@ const addConfirmedPartition = ({
 
   const requestedNames = new Set(names);
   let hasConfirmedSuccess = false;
+
+  for (const name of outcome.value.protectedNames ?? []) {
+    if (requestedNames.has(name)) {
+      protectedKeys.add(getGalleryItemKey({ kind, name }));
+    }
+  }
 
   for (const name of outcome.value.succeededNames) {
     if (!requestedNames.has(name)) {
@@ -188,6 +198,7 @@ const mutateGalleryItems = async (
   ]);
   const affectedBoardIds = new Set<string>();
   const confirmedKeys = new Set<string>();
+  const protectedKeys = new Set<string>();
 
   addConfirmedPartition({
     affectedBoardIds,
@@ -195,6 +206,7 @@ const mutateGalleryItems = async (
     kind: 'image',
     names: imageNames,
     outcome: imageOutcome,
+    protectedKeys,
   });
   addConfirmedPartition({
     affectedBoardIds,
@@ -202,11 +214,15 @@ const mutateGalleryItems = async (
     kind: 'video',
     names: videoNames,
     outcome: videoOutcome,
+    protectedKeys,
   });
+
+  const starredSkipped = requested.filter((ref) => protectedKeys.has(getGalleryItemKey(ref)));
 
   return {
     affectedBoardIds: [...affectedBoardIds].sort(),
     failed: requested.filter((ref) => !confirmedKeys.has(getGalleryItemKey(ref))),
+    ...(starredSkipped.length > 0 ? { starredSkipped } : {}),
     succeeded: requested.filter((ref) => confirmedKeys.has(getGalleryItemKey(ref))),
   };
 };
@@ -216,8 +232,17 @@ const mutateGalleryItems = async (
  * refs and do not patch caches, invalidate queries, or notify.
  */
 export const galleryItemOrganization = {
-  delete: (refs: readonly ItemRef[], signal?: AbortSignal): Promise<ConfirmedGalleryItemMutationResult> =>
-    mutateGalleryItems(refs, deleteGalleryImageItems, deleteGalleryVideoItems, signal),
+  delete: (
+    refs: readonly ItemRef[],
+    signal?: AbortSignal,
+    options?: GalleryDeleteOptions
+  ): Promise<ConfirmedGalleryItemMutationResult> =>
+    mutateGalleryItems(
+      refs,
+      (names, requestSignal) => deleteGalleryImageItems(names, requestSignal, options),
+      (names, requestSignal) => deleteGalleryVideoItems(names, requestSignal, options),
+      signal
+    ),
   moveToBoard: (
     refs: readonly ItemRef[],
     boardId: string,

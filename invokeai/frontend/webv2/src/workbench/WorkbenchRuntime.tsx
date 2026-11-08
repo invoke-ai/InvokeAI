@@ -90,6 +90,8 @@ export const createGalleryBoardReferenceCheck = (
             deletedVideoNames: [],
             failedImageNames: [],
             failedVideoNames: [],
+            protectedImageNames: [],
+            protectedVideoNames: [],
           });
         }
       })

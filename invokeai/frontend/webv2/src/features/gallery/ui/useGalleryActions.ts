@@ -229,7 +229,7 @@ export const useGalleryActions = ({
           return false;
         }
       },
-      deleteBoard: async (boardId, includeImages) => {
+      deleteBoard: async (boardId, includeImages, keepStarred = false) => {
         const owner = captureAccountScope();
         const boardName = getBoardName(boardId);
 
@@ -244,7 +244,10 @@ export const useGalleryActions = ({
           : null;
 
         try {
-          const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal);
+          // The dialog already asked, and said what happens to the starred items.
+          const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal, {
+            deleteStarred: !keepStarred,
+          });
 
           assertAccountScopeCurrent(owner);
           const failedCount = outcome.failedImageNames.length + outcome.failedVideoNames.length;
@@ -257,12 +260,14 @@ export const useGalleryActions = ({
           const deleted = formatMedia(outcome.deletedImageNames, outcome.deletedVideoNames);
           const failed = formatMedia(outcome.failedImageNames, outcome.failedVideoNames);
           const moved = formatMedia(outcome.deletedBoardImageNames, outcome.deletedBoardVideoNames);
+          const kept = formatMedia(outcome.protectedImageNames, outcome.protectedVideoNames);
           // Only what happened: nothing about media that was not there, and no failure clause without a failure.
           const message = (
             includeImages
               ? [
                   deleted ? t('widgets.gallery.deleteBoardMediaDeleted', { media: deleted }) : '',
                   failed ? t('widgets.gallery.deleteBoardMediaFailed', { media: failed }) : '',
+                  kept ? t('widgets.gallery.deleteBoardStarredKept', { media: kept }) : '',
                 ]
               : [moved ? t('widgets.gallery.deleteBoardMoveOutcome', { media: moved }) : '']
           )

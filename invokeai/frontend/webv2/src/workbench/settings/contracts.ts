@@ -18,6 +18,9 @@ export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
 /** What a launch of the app's bare URL opens: the Launchpad, or the most recent project. */
 export type StartupDestination = 'launchpad' | 'recentProject';
 
+/** `starred` asks only when the deletion includes starred media; `never` skips the question for everything. */
+export type ImageDeletionConfirmation = 'always' | 'starred' | 'never';
+
 /**
  * Export document generation settings with the project; personal editor choices belong in {@link
  * WorkbenchPreferences} so imports cannot overwrite them.
@@ -99,7 +102,8 @@ export interface WorkbenchPreferences {
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
-  confirmImageDeletion: boolean;
+  /** When deleting one visible item asks first. Starred media asks in every mode but `never`. */
+  confirmImageDeletion: ImageDeletionConfirmation;
   /** The note that browsing a board no longer changes where new results go was shown; once per account. */
   galleryDestinationNoticeShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */

@@ -26,7 +26,8 @@ export interface GalleryActions {
   /** In the given project, or in the Library for null. */
   /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
-  deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
+  /** `keepStarred` deletes the board's media except its starred items, which move to Uncategorized. */
+  deleteBoard: (boardId: string, includeImages: boolean, keepStarred?: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
   /** Export the project that owns this board as a complete `.invk` archive. */
   exportProject: (projectId: string, projectName: string) => void;

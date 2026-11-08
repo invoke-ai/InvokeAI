@@ -2,8 +2,9 @@
 import type { GalleryBoard, GalleryBoardAccess, GalleryBoardAction } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act, useCallback, useState } from 'react';
+import { act, useCallback, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -13,6 +14,29 @@ import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 import { GalleryBoardMenu } from './GalleryBoardMenu';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
+const mocks = vi.hoisted(() => ({
+  starredCount: 0,
+  starredCountFails: false,
+  starredCountGate: null as Promise<void> | null,
+}));
+
+vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  galleryBoardStarredCountOptions: (boardId: string) => ({
+    queryFn: async () => {
+      await mocks.starredCountGate;
+
+      if (mocks.starredCountFails) {
+        throw new Error('count unavailable');
+      }
+
+      return mocks.starredCount;
+    },
+    queryKey: ['board-starred-count', boardId],
+    retry: false,
+  }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => {
@@ -21,10 +45,22 @@ vi.mock('react-i18next', () => ({
         'common.cancel': 'Cancel',
         'widgets.gallery.deleteBoard': 'Delete board',
         'widgets.gallery.deleteBoardAndMedia': `Delete board and ${String(values?.count)} items`,
-        'widgets.gallery.deleteBoardDescription': `Its ${String(values?.media)} move to Uncategorized.`,
+        'widgets.gallery.deleteBoardAllStarred': 'Every item is starred.',
+        'widgets.gallery.deleteBoardDeleteAll': `Delete all ${String(values?.count)} items`,
+        'widgets.gallery.deleteBoardDeleteAllWithStarred': `Delete all ${String(values?.count)} items, including ${String(
+          values?.starred
+        )} starred`,
+        'widgets.gallery.deleteBoardDescription': `Choose what happens to its ${String(values?.media)}.`,
         'widgets.gallery.deleteBoardEmptyDescription': 'The board is empty.',
-        'widgets.gallery.deleteBoardIncludeMedia': `Also permanently delete its ${String(values?.count)} items`,
+        'widgets.gallery.deleteBoardChoices': 'What happens to the items',
+        'widgets.gallery.deleteBoardKeepStarredUnavailable': 'Delete all but the starred items',
+        'widgets.gallery.deleteBoardKeepStarred': `Delete ${String(values?.count)} items, move ${String(
+          values?.starred
+        )} starred to Uncategorized`,
+        'widgets.gallery.deleteBoardMoveAll': `Move ${String(values?.count)} items to Uncategorized`,
+        'widgets.gallery.deleteBoardNoStarred': 'No starred items.',
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
+        'widgets.gallery.deleteBoardStarredUnknown': 'starred count unknown',
         'widgets.gallery.deleteBoardTypeName': `Type "${String(values?.name)}" to confirm`,
         'widgets.gallery.downloadBoard': 'Download board',
         'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
@@ -90,21 +126,37 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** The client of the last `renderMenu`, for tests that make the starred count change under an open dialog. */
+let testQueryClient = new QueryClient();
+
+const renderMenu = async (widgetContext: GalleryWidgetContextValue) => {
+  testQueryClient = new QueryClient();
+  const queryClient = testQueryClient;
+  const tree: ReactNode = (
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider value={system}>
+        <GalleryWidgetContext value={widgetContext}>
+          <GalleryBoardMenu target={target} onClose={noop} />
+        </GalleryWidgetContext>
+      </ChakraProvider>
+    </QueryClientProvider>
+  );
+
+  await act(async () => {
+    root?.render(tree);
+    await Promise.resolve();
+  });
+};
+
 beforeEach(async () => {
+  mocks.starredCount = 0;
+  mocks.starredCountFails = false;
+  mocks.starredCountGate = null;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  await act(async () => {
-    root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={context}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
-    );
-    await Promise.resolve();
-  });
+  await renderMenu(context);
 });
 
 afterEach(async () => {
@@ -142,62 +194,163 @@ const dialogButton = (label: string) =>
     (button) => button.textContent === label
   );
 
-it('deletes the board and keeps its media unless the user also asks to delete the media', async () => {
+/** The radio of a delete-dialog choice, found by its label. */
+const choiceRadio = (dialog: HTMLElement, label: string) =>
+  Array.from(dialog.querySelectorAll<HTMLElement>('[data-part="item"]')).find((item) =>
+    item.textContent?.includes(label)
+  )!;
+
+const chooseRadio = (dialog: HTMLElement, label: string) => act(() => userEvent.click(choiceRadio(dialog, label)));
+
+const radioInput = (dialog: HTMLElement, label: string) =>
+  choiceRadio(dialog, label).querySelector<HTMLInputElement>('input[type="radio"]')!;
+
+const nameInput = (dialog: HTMLElement) => dialog.querySelector<HTMLInputElement>('input:not([type="radio"])');
+
+it('deletes the board and moves its media to Uncategorized unless the user picks another choice', async () => {
   const dialog = await openDeleteDialog();
 
   // Only the kinds the board holds, and where they go.
-  expect(dialog.textContent).toContain('Its 2 images and 1 videos move to Uncategorized.');
-  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+  expect(dialog.textContent).toContain('Choose what happens to its 2 images and 1 videos.');
+  expect(radioInput(dialog, 'Move 3 items to Uncategorized').checked).toBe(true);
+  expect(dialog.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('What happens to the items');
   await act(() => userEvent.click(dialogButton('Delete board')!));
 
-  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false);
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false, false);
 });
 
-it('deletes the media too only behind its checkbox, naming how many items go', async () => {
+it('deletes the media too only behind its choice, naming how many items go', async () => {
   const dialog = await openDeleteDialog();
 
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
-  expect(dialog.textContent).toContain('Also permanently delete its 3 items');
+  await chooseRadio(dialog, 'Delete all 3 items');
   await act(() => userEvent.click(dialogButton('Delete board and 3 items')!));
 
-  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true, false);
 });
 
-it('asks for the board name before deleting many items with it', async () => {
+it('offers to keep the starred items, naming what goes and what stays, once the board is known to hold some', async () => {
+  mocks.starredCount = 1;
+  const dialog = await openDeleteDialog();
+
+  await vi.waitFor(() => expect(radioInput(dialog, 'Delete 2 items, move 1 starred').disabled).toBe(false));
+  expect(dialog.textContent).toContain('Delete all 3 items, including 1 starred');
+  await chooseRadio(dialog, 'Delete 2 items, move 1 starred');
+  await act(() => userEvent.click(dialogButton('Delete board and 2 items')!));
+
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true, true);
+});
+
+it.each([
+  ['the board has no starred items', 0, false, 'No starred items.'],
+  ['every item on the board is starred', 3, false, 'Every item is starred.'],
+  ['the starred items cannot be counted', 0, true, 'starred count unknown'],
+])('mutes keeping the starred items when %s', async (_case, starredCount, countFails, hint) => {
+  mocks.starredCount = starredCount;
+  mocks.starredCountFails = countFails;
+  const dialog = await openDeleteDialog();
+
+  await vi.waitFor(() => expect(dialog.textContent).toContain(hint));
+  expect(radioInput(dialog, 'Delete all but the starred items').disabled).toBe(true);
+
+  // The default move stays selected and still goes.
+  expect(radioInput(dialog, 'Move 3 items to Uncategorized').checked).toBe(true);
+  await act(() => userEvent.click(dialogButton('Delete board')!));
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false, false);
+});
+
+it('asks for the board name when keeping the starred items still deletes 50 or more', async () => {
+  mocks.starredCount = 20;
+  await renderMenuFor({ ...board, assetCount: 19, imageCount: 100 } as GalleryBoard);
+  const dialog = await openDeleteDialog();
+
+  await vi.waitFor(() => expect(radioInput(dialog, 'Delete 100 items, move 20 starred').disabled).toBe(false));
+  await chooseRadio(dialog, 'Delete 100 items, move 20 starred');
+  expect(dialogButton('Delete board and 100 items')!.disabled).toBe(true);
+
+  await act(() => userEvent.type(nameInput(dialog)!, 'Board 1'));
+  await act(() => userEvent.click(dialogButton('Delete board and 100 items')!));
+
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true, true);
+});
+
+it('holds deleting media until the starred count is known, so the choice names the stars it takes along', async () => {
+  let releaseCount!: () => void;
+  mocks.starredCountGate = new Promise<void>((resolve) => {
+    releaseCount = resolve;
+  });
+  mocks.starredCount = 1;
+  const dialog = await openDeleteDialog();
+
+  await chooseRadio(dialog, 'Delete all 3 items');
+  expect(dialogButton('Delete board and 3 items')!.disabled).toBe(true);
+
+  await act(() => {
+    releaseCount();
+  });
+
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Delete all 3 items, including 1 starred'));
+  expect(dialogButton('Delete board and 3 items')!.disabled).toBe(false);
+});
+
+it('falls back to moving everything when the starred choice stops being offered under an open dialog', async () => {
+  mocks.starredCount = 1;
+  const dialog = await openDeleteDialog();
+
+  await vi.waitFor(() => expect(radioInput(dialog, 'Delete 2 items, move 1 starred').disabled).toBe(false));
+  await chooseRadio(dialog, 'Delete 2 items, move 1 starred');
+  expect(dialogButton('Delete board and 2 items')).toBeDefined();
+
+  mocks.starredCount = 0;
+  await act(() => testQueryClient.invalidateQueries());
+
+  await vi.waitFor(() => expect(radioInput(dialog, 'Move 3 items to Uncategorized').checked).toBe(true));
+  expect(dialogButton('Delete board and 2 items')).toBeUndefined();
+  await act(() => userEvent.click(dialogButton('Delete board')!));
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false, false);
+});
+
+it('asks for the board name before deleting many items, counting the ones that actually go', async () => {
+  mocks.starredCount = 20;
   await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
   const dialog = await openDeleteDialog();
 
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  await vi.waitFor(() => expect(radioInput(dialog, 'move 20 starred').disabled).toBe(false));
+  // 61 items, 20 starred: keeping those deletes 41, under the limit.
+  await chooseRadio(dialog, 'move 20 starred');
+  expect(nameInput(dialog)).toBeNull();
+  expect(dialogButton('Delete board and 41 items')!.disabled).toBe(false);
+
+  await chooseRadio(dialog, 'Delete all 61 items');
   const confirm = dialogButton('Delete board and 61 items')!;
   expect(confirm.disabled).toBe(true);
 
-  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
+  await act(() => userEvent.type(nameInput(dialog)!, 'Board 1'));
   expect(confirm.disabled).toBe(false);
   await act(() => userEvent.click(confirm));
 
-  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true, false);
 });
 
 it('starts each opening of the delete dialog over, for the same board too', async () => {
   await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
   let dialog = await openDeleteDialog();
 
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
-  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
+  await chooseRadio(dialog, 'Delete all 61 items');
+  await act(() => userEvent.type(nameInput(dialog)!, 'Board 1'));
   expect(dialogButton('Delete board and 61 items')!.disabled).toBe(false);
   await act(() => userEvent.click(dialogButton('Cancel')!));
   await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
 
   dialog = await openDeleteDialog();
 
-  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
-  expect(dialog.querySelector('input:not([type="checkbox"])')).toBeNull();
+  expect(radioInput(dialog, 'Move 61 items').checked).toBe(true);
+  expect(nameInput(dialog)).toBeNull();
   expect(dialogButton('Delete board and 61 items')).toBeUndefined();
   expect(dialogButton('Delete board')!.disabled).toBe(false);
 
-  // Asking again for the media brings back an empty name field and a refused delete.
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
-  expect(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!.value).toBe('');
+  // Asking again to delete brings back an empty name field and a refused delete.
+  await chooseRadio(dialog, 'Delete all 61 items');
+  expect(nameInput(dialog)!.value).toBe('');
   expect(dialogButton('Delete board and 61 items')!.disabled).toBe(true);
 });
 
@@ -216,11 +369,13 @@ it.each(['cancel', 'delete'] as const)(
   async (outcome) => {
     await act(async () => {
       root?.render(
-        <ChakraProvider value={system}>
-          <GalleryWidgetContext value={context}>
-            <ControlledMenu initialTarget={target} />
-          </GalleryWidgetContext>
-        </ChakraProvider>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <GalleryWidgetContext value={context}>
+              <ControlledMenu initialTarget={target} />
+            </GalleryWidgetContext>
+          </ChakraProvider>
+        </QueryClientProvider>
       );
       await Promise.resolve();
     });
@@ -258,16 +413,7 @@ it('makes the board the auto-add destination', async () => {
 });
 
 it('hands results back to the default destination from the auto-add board itself', async () => {
-  await act(async () => {
-    root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={targetContext}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
-    );
-    await Promise.resolve();
-  });
+  await renderMenu(targetContext);
 
   const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="auto-add-board"]');
 
@@ -293,11 +439,13 @@ const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<Gallery
   } as GalleryWidgetContextValue;
   await act(async () => {
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={value}>
-          <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={new QueryClient()}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={value}>
+            <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     );
     await Promise.resolve();
   });

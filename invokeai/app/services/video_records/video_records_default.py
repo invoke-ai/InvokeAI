@@ -108,6 +108,9 @@ class VideoRecordStorage(VideoRecordStorageBase):
     def delete_many(self, video_names: list[str]) -> None:
         self._queries.videos.delete_many(video_names)
 
+    def delete_many_keeping_starred(self, video_names: list[str]) -> list[str]:
+        return self._queries.videos.delete_many_keeping_starred(video_names)
+
     def save(
         self,
         video_name: str,

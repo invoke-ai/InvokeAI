@@ -1,7 +1,7 @@
 ---
 title: Gallery Reference
 description: Details of the Gallery — the board menu, archiving, downloading and deleting boards, the media menu, Gallery settings and keyboard shortcuts.
-lastUpdated: 2026-10-15
+lastUpdated: 2026-11-06
 sidebar:
   order: 2
 ---
@@ -48,12 +48,17 @@ Archived boards are not included in [semantic search](/users-guide/gallery/intro
 
 Choose **Delete board** from the board's menu. The confirmation dialog says what the board holds, such as **98 images and 1 video**, and that deleting the board keeps it: its media moves to **Uncategorized** in the Library.
 
-<Image src={deleteBoard} alt="The Delete board dialog with the media it holds, the Also permanently delete its items checkbox, and Cancel and Delete board buttons." width={500} />
+<Image src={deleteBoard} alt="The Delete board dialog with the media it holds, the choices for what happens to it, and Cancel and Delete board buttons." width={500} />
 
-* **Delete board** — removes the board and moves everything on it to **Uncategorized**. This is the default.
-* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm.
+* **Move N items to Uncategorized** — removes the board and moves everything on it to **Uncategorized**. This is the default.
+* **Delete N items, move M starred to Uncategorized** — deletes the board's images and videos except the starred ones, which move to **Uncategorized**. It is greyed out while the starred items are being counted and when the board has none, or only starred ones.
+* **Delete all N items** — deletes everything on the board, starred items included (the choice says how many are starred).
+
+The last two permanently delete media; the button then says how many items go, such as **Delete board and 99 items**. When 50 or more items would be deleted, you also type the board's name to confirm.
 
 A deleted board cannot be restored, and deleted media cannot be undone. While media is being deleted, a notice says so; when it finishes, another says what was moved or deleted, and how much could not be deleted, if any.
+
+See [Deleting media](/users-guide/gallery/introduction/#deleting-media) for how starred items are treated when deleting from the Gallery.
 
 Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. A project's Inbox cannot be deleted from the Gallery; delete the project instead, which also asks what to do with the project's other boards.
 

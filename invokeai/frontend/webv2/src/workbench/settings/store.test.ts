@@ -371,6 +371,19 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences image deletion confirmation', () => {
+  it('asks always unless one of the known modes is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({}).confirmImageDeletion).toBe('always');
+    expect(store.normalizeWorkbenchPreferences({ confirmImageDeletion: false as never }).confirmImageDeletion).toBe(
+      'always'
+    );
+
+    expect(store.normalizeWorkbenchPreferences({ confirmImageDeletion: 'starred' }).confirmImageDeletion).toBe(
+      'starred'
+    );
+  });
+});
+
 describe('normalizeWorkbenchPreferences canvas tool memory', () => {
   it('keeps only the known tools, each a plain record, and an already-valid record as is', () => {
     const valid = { brush: { size: 12 }, text: { fontSize: 40 } };

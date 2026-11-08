@@ -1,14 +1,16 @@
 import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
-import { chakra, Checkbox, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, HStack, Icon, Input, Menu, Portal, RadioGroup, Stack, Text } from '@chakra-ui/react';
 import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
+import { galleryBoardStarredCountOptions } from '@features/gallery/data/queries';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -134,9 +136,9 @@ export const GalleryBoardMenu = ({
   const handleCancelDelete = useCallback(() => setDeleteTarget(null), []);
 
   const handleDelete = useCallback(
-    (includeMedia: boolean) => {
+    (includeMedia: boolean, keepStarred: boolean) => {
       if (deleteTarget) {
-        void actions.deleteBoard(deleteTarget.id, includeMedia);
+        void actions.deleteBoard(deleteTarget.id, includeMedia, keepStarred);
       }
 
       setDeleteTarget(null);
@@ -246,12 +248,16 @@ export const GalleryBoardMenu = ({
   );
 };
 
-/** From this many items, also deleting them needs the board's name typed, not only a tick. */
+/** From this many items going, deleting them needs the board's name typed, not only a pick. */
 export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
+
+/** What a board delete does with the board's media: all of it moves, only the starred part moves, or none of it does. */
+type BoardMediaChoice = 'move' | 'keepStarred' | 'deleteAll';
 
 /**
  * Deleting a board keeps its media by default: it moves to Uncategorized in the Library, where the server puts what a
- * deleted board held. Deleting the media too is the opt-in, behind a checkbox and, for many items, the typed name.
+ * deleted board held. Deleting media is the opt-in, and the user can still keep the starred part; each option says how
+ * many items it deletes, and for many the board's name is typed.
  */
 const BoardDeleteDialog = ({
   board,
@@ -261,7 +267,7 @@ const BoardDeleteDialog = ({
 }: {
   board: GalleryBoard | null;
   onCancel: () => void;
-  onDelete: (includeMedia: boolean) => void;
+  onDelete: (includeMedia: boolean, keepStarred: boolean) => void;
   onOpenChange: (event: { open: boolean }) => void;
 }) => {
   const { t } = useTranslation();
@@ -269,20 +275,24 @@ const BoardDeleteDialog = ({
   // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
   const [shownBoard, setShownBoard] = useState(board);
   const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
-  const [choices, setChoices] = useState({ includeMedia: false, typedName: '' });
+  const [choices, setChoices] = useState<{ choice: BoardMediaChoice; typedName: string }>({
+    choice: 'move',
+    typedName: '',
+  });
   if (board !== null && board !== shownBoard) {
     setShownBoard(board);
   }
   if ((board?.id ?? null) !== openedBoardId) {
     setOpenedBoardId(board?.id ?? null);
     if (board !== null) {
-      setChoices({ includeMedia: false, typedName: '' });
+      setChoices({ choice: 'move', typedName: '' });
     }
   }
-  const { includeMedia, typedName } = choices;
+  const { choice: pickedChoice, typedName } = choices;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const mediaHintId = useId();
   const nameInputId = useId();
+  const keepStarredHintId = useId();
   const boardName = shownBoard ? getGalleryBoardLabel(shownBoard, t) : '';
   const counts = shownBoard ? getBoardCounts(shownBoard) : null;
   const itemCount = counts?.items ?? 0;
@@ -291,11 +301,41 @@ const BoardDeleteDialog = ({
     uploads: counts?.uploads ?? 0,
     videos: counts?.videos ?? 0,
   });
-  const needsTypedName = includeMedia && itemCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS;
-  const canDelete = !needsTypedName || typedName.trim() === boardName.trim();
-  const handleIncludeMediaChange = useCallback(
-    (details: { checked: boolean | 'indeterminate' }) =>
-      setChoices((current) => ({ ...current, includeMedia: details.checked === true })),
+  // Read while the dialog is open; "keep the starred ones" is offered only once the count says there are some.
+  const {
+    data: starredCount,
+    isError: starredCountFailed,
+    isFetching: starredCountFetching,
+    isSuccess: starredCountLoaded,
+  } = useQuery({
+    ...galleryBoardStarredCountOptions(shownBoard?.id ?? ''),
+    enabled: board !== null && itemCount > 0,
+    // The open dialog keeps one answer: a refocus must not change what is offered under the user's hand.
+    refetchOnWindowFocus: false,
+  });
+  // A count from an earlier opening of the dialog is not an answer while the new one is on its way.
+  const starredCountKnown = starredCountLoaded && !starredCountFetching;
+  const starredCountPending = itemCount > 0 && !starredCountFailed && !starredCountKnown;
+  const starred = starredCount ?? 0;
+  const deletedWhenKeepingStarred = Math.max(0, itemCount - starred);
+  const canKeepStarred = starredCountKnown && starred > 0 && deletedWhenKeepingStarred > 0;
+  // A pick the count no longer allows falls back to the safe choice instead of staying selected while muted.
+  const choice: BoardMediaChoice = pickedChoice === 'keepStarred' && !canKeepStarred ? 'move' : pickedChoice;
+  const keepStarredHint = starredCountFailed
+    ? t('widgets.gallery.deleteBoardStarredUnknown')
+    : starredCountKnown && starred === 0
+      ? t('widgets.gallery.deleteBoardNoStarred')
+      : starredCountKnown && deletedWhenKeepingStarred === 0
+        ? t('widgets.gallery.deleteBoardAllStarred')
+        : null;
+  const deletedCount = choice === 'move' ? 0 : choice === 'keepStarred' ? deletedWhenKeepingStarred : itemCount;
+  const needsTypedName = deletedCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS;
+  // Deleting media waits for the count, so the label and the warning name the starred items it takes along.
+  const canDelete =
+    !(choice !== 'move' && starredCountPending) && (!needsTypedName || typedName.trim() === boardName.trim());
+  const handleChoiceChange = useCallback(
+    (details: { value: string | null }) =>
+      setChoices((current) => ({ ...current, choice: (details.value ?? 'move') as BoardMediaChoice })),
     []
   );
   const handleTypedNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -304,10 +344,10 @@ const BoardDeleteDialog = ({
     setChoices((current) => ({ ...current, typedName: typed }));
   }, []);
   const getInitialFocus = useCallback(() => cancelRef.current, []);
-  const handleConfirm = useCallback(() => onDelete(includeMedia), [includeMedia, onDelete]);
+  const handleConfirm = useCallback(() => onDelete(choice !== 'move', choice === 'keepStarred'), [choice, onDelete]);
 
   return (
-    // Cancel takes focus, not the checkbox that would delete the media.
+    // Cancel takes focus, not a radio that would delete media.
     <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
       <Portal>
         <Dialog.Backdrop />
@@ -321,25 +361,59 @@ const BoardDeleteDialog = ({
                 <Text fontSize="md">
                   {itemCount === 0
                     ? t('widgets.gallery.deleteBoardEmptyDescription')
-                    : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
+                    : t('widgets.gallery.deleteBoardDescription', { media })}
                 </Text>
                 {itemCount > 0 ? (
                   <Stack gap="1">
-                    <Checkbox.Root
-                      checked={includeMedia}
+                    <RadioGroup.Root
+                      aria-describedby={mediaHintId}
+                      aria-label={t('widgets.gallery.deleteBoardChoices')}
                       colorPalette="red"
                       size="sm"
-                      onCheckedChange={handleIncludeMediaChange}
+                      value={choice}
+                      onValueChange={handleChoiceChange}
                     >
-                      <Checkbox.HiddenInput aria-describedby={mediaHintId} />
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
-                      <Checkbox.Label fontSize="md">
-                        {t('widgets.gallery.deleteBoardIncludeMedia', { count: itemCount })}
-                      </Checkbox.Label>
-                    </Checkbox.Root>
-                    <Text color="fg.muted" fontSize="sm" id={mediaHintId} ps="5">
+                      <Stack gap="2">
+                        <RadioGroup.Item value="move">
+                          <RadioGroup.ItemHiddenInput />
+                          <RadioGroup.ItemIndicator />
+                          <RadioGroup.ItemText fontSize="md">
+                            {t('widgets.gallery.deleteBoardMoveAll', { count: itemCount })}
+                          </RadioGroup.ItemText>
+                        </RadioGroup.Item>
+                        <RadioGroup.Item alignItems="start" disabled={!canKeepStarred} value="keepStarred">
+                          <RadioGroup.ItemHiddenInput
+                            aria-describedby={keepStarredHint ? keepStarredHintId : undefined}
+                          />
+                          <RadioGroup.ItemIndicator mt="0.5" />
+                          <Stack gap="0">
+                            <RadioGroup.ItemText fontSize="md">
+                              {canKeepStarred
+                                ? t('widgets.gallery.deleteBoardKeepStarred', {
+                                    count: deletedWhenKeepingStarred,
+                                    starred,
+                                  })
+                                : t('widgets.gallery.deleteBoardKeepStarredUnavailable')}
+                            </RadioGroup.ItemText>
+                            {keepStarredHint ? (
+                              <Text color="fg.muted" fontSize="sm" id={keepStarredHintId}>
+                                {keepStarredHint}
+                              </Text>
+                            ) : null}
+                          </Stack>
+                        </RadioGroup.Item>
+                        <RadioGroup.Item value="deleteAll">
+                          <RadioGroup.ItemHiddenInput />
+                          <RadioGroup.ItemIndicator />
+                          <RadioGroup.ItemText fontSize="md">
+                            {starred > 0
+                              ? t('widgets.gallery.deleteBoardDeleteAllWithStarred', { count: itemCount, starred })
+                              : t('widgets.gallery.deleteBoardDeleteAll', { count: itemCount })}
+                          </RadioGroup.ItemText>
+                        </RadioGroup.Item>
+                      </Stack>
+                    </RadioGroup.Root>
+                    <Text color="fg.muted" fontSize="sm" id={mediaHintId}>
                       {t('widgets.gallery.deleteBoardIncludeMediaHint')}
                     </Text>
                   </Stack>
@@ -365,9 +439,9 @@ const BoardDeleteDialog = ({
                 {t('common.cancel')}
               </Button>
               <Button colorPalette="red" disabled={!canDelete} onClick={handleConfirm}>
-                {includeMedia
-                  ? t('widgets.gallery.deleteBoardAndMedia', { count: itemCount })
-                  : t('widgets.gallery.deleteBoard')}
+                {choice === 'move'
+                  ? t('widgets.gallery.deleteBoard')
+                  : t('widgets.gallery.deleteBoardAndMedia', { count: deletedCount })}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

@@ -43,6 +43,8 @@ const NO_MEDIA_DELETED: Omit<GalleryBoardDeletionResult, 'boardId'> = {
   deletedVideoNames: [],
   failedImageNames: [],
   failedVideoNames: [],
+  protectedImageNames: [],
+  protectedVideoNames: [],
 };
 
 /** Where a project's active runs are: they hold its deletion until they finish. */
