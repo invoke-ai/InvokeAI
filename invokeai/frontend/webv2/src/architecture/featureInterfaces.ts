@@ -8,6 +8,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
     'contracts',
     'launchpad',
     'mediaSlot',
+    'mediaUsage',
     'paletteSearch',
     'picker',
     'queries',

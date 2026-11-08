@@ -1938,6 +1938,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       isPendingPush:
         !entry || pendingProjectIds.has(projectId) || conflict !== undefined || schemaRefusal !== undefined,
       revision: entry?.revision ?? null,
+      ...(entry ? { workspaceRevision: entry.workspaceRevision } : {}),
       ...(conflict
         ? {
             conflict: {

@@ -347,6 +347,9 @@ const GALLERY_STATE_MODULES = [
   // costs a request.
   '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
+  // The deletion dialogs' usage panel, published by the React entry: eager (Preview, image actions) and lazy (the
+  // Gallery's board menu) owners reach it; alone it costs a boot request. Its report view stays lazy.
+  '/features/gallery/ui/GalleryMediaUsagePanel.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
   // The queue contracts, index and React entries re-export these; the lazy queue rows and widget share them. Alone

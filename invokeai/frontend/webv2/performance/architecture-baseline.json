@@ -363,12 +363,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1254258,
+        "brotliBytes": 1268052,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1247521,
+        "gzipBytes": 1261076,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3460233,
+        "initialRawBytes": 3502701,
         "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 172801,
@@ -546,6 +546,7 @@
           "source:src/features/gallery/ui/GalleryDragCursor.tsx",
           "source:src/features/gallery/ui/GalleryItemSearch.tsx",
           "source:src/features/gallery/ui/GalleryLoadError.tsx",
+          "source:src/features/gallery/ui/GalleryMediaUsagePanel.tsx",
           "source:src/features/gallery/ui/GallerySearchField.tsx",
           "source:src/features/gallery/ui/GallerySearchHelp.tsx",
           "source:src/features/gallery/ui/GalleryTileFrame.tsx",
