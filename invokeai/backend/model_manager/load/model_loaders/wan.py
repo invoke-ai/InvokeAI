@@ -22,9 +22,10 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Wan_Config,
     Main_GGUF_Wan_Config,
+    _is_benign_extra_key,
     _is_native_wan_layout,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
     _dequantize_comfyui_fp8,
@@ -38,9 +39,22 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    is_scale_metadata_key,
+    parse_quantization_metadata,
+    read_safetensors_metadata,
+    strip_layer_path_prefix,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
+from invokeai.backend.quantization.int8_convrot import (
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+    resolve_quantized_module_paths,
+)
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -72,6 +86,11 @@ class WanDiffusersModel(GenericDiffusersLoader):
             patch_wan_causal_conv3d_for_rocm()
 
         model_path = Path(config.path)
+        if submodel_type is SubModelType.Tokenizer:
+            from invokeai.backend.wan.tokenizer import load_wan_tokenizer
+
+            return load_wan_tokenizer(model_path / submodel_type.value)
+
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
@@ -147,6 +166,13 @@ _WAN_NATIVE_TO_DIFFUSERS_RENAMES: tuple[tuple[str, str], ...] = (
 )
 
 
+def _rename_wan_native_key(key: str) -> str:
+    """The diffusers name of one native upstream Wan key."""
+    for needle, replacement in _WAN_NATIVE_TO_DIFFUSERS_RENAMES:
+        key = key.replace(needle, replacement)
+    return key
+
+
 def _convert_wan_native_to_diffusers(state_dict: dict) -> dict:
     """Rename native upstream Wan keys (ComfyUI / QuantStack) to diffusers names.
 
@@ -158,10 +184,7 @@ def _convert_wan_native_to_diffusers(state_dict: dict) -> dict:
         if not isinstance(key, str):
             converted[key] = value
             continue
-        new_key = key
-        for needle, replacement in _WAN_NATIVE_TO_DIFFUSERS_RENAMES:
-            new_key = new_key.replace(needle, replacement)
-        converted[new_key] = value
+        converted[_rename_wan_native_key(key)] = value
     return converted
 
 
@@ -188,71 +211,6 @@ def _unwrap_unquantized_to_compute_dtype(state_dict: dict) -> dict:
         else:
             unwrapped[key] = value
     return unwrapped
-
-
-# Top-level modules that legitimately ride along in a single-file Wan checkpoint
-# without being part of the transformer. Dropping these is correct: the pipeline
-# sources its VAE and text encoder from separately-wired models, and the EMA copy
-# is not the weight set we generate with.
-#
-# ``vae`` / ``text_encoders`` / ``clip`` / ``cond_stage_model`` / ``first_stage_model``
-# are the "all-in-one" packaging convention — one file holding transformer + VAE +
-# CLIP so ComfyUI's ``Load Checkpoint`` node can supply all three. The
-# Phr00t/WAN2.2-14B-Rapid-AllInOne family and its ~110 GGUF conversions
-# (befox/WAN2.2-14B-Rapid-AllInOne-GGUF) ship this way and loaded fine before the
-# unexpected-key check existed, so refusing them would be a regression.
-_BENIGN_EXTRA_MODULES = frozenset(
-    {
-        "vae",
-        "first_stage_model",
-        "text_encoders",
-        "cond_stage_model",
-        "clip",
-        "model_ema",
-    }
-)
-
-# Trailing segments marking a merged-in LoRA's leftover adapter tensors. The main-model
-# probe deliberately admits checkpoints that retain these — see
-# ``configs.main._has_wan_transformer_block_weights``, which uses a *positive* structural
-# test precisely so merged-LoRA mains aren't turned away — so the loader has to admit
-# them too, or the two halves disagree about the same file.
-#
-# Kept in step with the suffix set ``LoRA_LyCORIS_Wan_Config`` matches on
-# (``configs/lora.py``): kohya, PEFT, DoRA and LoKr. Matched against the *last* path
-# segment rather than as a substring anywhere in the key, so a future conditioning branch
-# that merely contains "lora_a" in a module name still trips the backstop instead of
-# being silently discarded by it.
-_MERGED_LORA_SEGMENTS = frozenset(
-    {
-        "alpha",
-        "dora_scale",
-        "lora_magnitude_vector",
-        "lokr_w1",
-        "lokr_w2",
-        "lokr_w1_a",
-        "lokr_w1_b",
-        "lokr_w2_a",
-        "lokr_w2_b",
-        "hada_w1_a",
-        "hada_w1_b",
-        "hada_w2_a",
-        "hada_w2_b",
-        "oft_blocks",
-    }
-)
-_MERGED_LORA_PENULTIMATE = frozenset({"lora_a", "lora_b", "lora_down", "lora_up", "lora_mid", "lora_magnitude"})
-
-
-def _is_benign_extra_key(key: str) -> bool:
-    """True if an unexpected key is packaging rather than an unsupported branch."""
-    parts = key.lower().split(".")
-    if parts[0] in _BENIGN_EXTRA_MODULES:
-        return True
-    if parts[-1] in _MERGED_LORA_SEGMENTS:
-        return True
-    # `...to_q.lora_down.weight` — the marker is the segment before the tensor name.
-    return len(parts) >= 2 and parts[-2] in _MERGED_LORA_PENULTIMATE
 
 
 def _drop_benign_extra_keys(sd: dict, source: str, logger: Any) -> None:
@@ -469,7 +427,9 @@ class WanCheckpointModel(ModelLoader):
     ``model.diffusion_model.`` key prefix, the native upstream key layout as well
     as the diffusers one, ComfyUI ``fp8_scaled`` weights (dequantized to the
     compute dtype at load time), and plain ``float8_e4m3fn`` weights with no
-    scales (cast the same way as any other non-bf16 dtype).
+    scales (cast the same way as any other non-bf16 dtype). ComfyUI ``int8_tensorwise`` (convrot) builds keep
+    their marked layers in int8 as ``Int8ConvrotLinear`` and dequantize them per forward; layers the model
+    reads outside a matmul (``condition_embedder``) are widened at load instead.
 
     Like the GGUF loader, one file is one expert; A14B pairing happens at the
     WanModelLoaderInvocation layer.
@@ -508,20 +468,35 @@ class WanCheckpointModel(ModelLoader):
         sd = CheckpointPrefix.detect(sd).strip(sd)
         _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
 
-        dequantized = _dequantize_comfyui_fp8(sd, model_dtype, f"Wan checkpoint {model_path.name}")
-        if dequantized > 0:
-            logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
-        # Drop the scale tensors themselves — they've been folded into the weights
-        # above and are not parameters of WanTransformer3DModel. load_state_dict
-        # runs with strict=False and would ignore them anyway, but dropping them
-        # here keeps the dtype cast and the RAM-cache reservation below honest.
-        _strip_quantization_metadata(sd)
+        # Markers and header entries name their layers in the file's native key space, so they are read before
+        # any rename. The refusal sits outside the "found markers" branch on purpose: an int8 weight no marker
+        # claims must be refused, not cast to the compute dtype as raw codes.
+        header_layers = strip_layer_path_prefix(
+            parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        )
+        int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
+        reject_unmarked_int8_weights(sd, int8_markers, f"Wan 2.2 ({model_path.name})", header_layers=header_layers)
+
+        dequantized = 0
+        if int8_markers:
+            sd = drop_unconsumed_quantization_sidecars(sd)
+        else:
+            dequantized = _dequantize_comfyui_fp8(sd, model_dtype, f"Wan checkpoint {model_path.name}")
+            if dequantized > 0:
+                logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
+            # Drop the scale tensors themselves — they've been folded into the weights
+            # above and are not parameters of WanTransformer3DModel. load_state_dict
+            # runs with strict=False and would ignore them anyway, but dropping them
+            # here keeps the dtype cast and the RAM-cache reservation below honest.
+            _strip_quantization_metadata(sd)
 
         # Community releases ship the native upstream Wan key layout
         # (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
         # diffusers' WanTransformer3DModel expects condition_embedder.*,
         # attn1/attn2, ffn.net.*, proj_out. Convert if needed.
+        key_map: dict[str, str] = {}
         if _is_native_wan_layout(sd):
+            key_map = {key: _rename_wan_native_key(key) for key in sd if isinstance(key, str)}
             sd = _convert_wan_native_to_diffusers(sd)
 
         model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
@@ -529,15 +504,38 @@ class WanCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)
 
-        # Cast every float tensor to the compute dtype. Dequantized fp8_scaled
-        # weights are already there; this catches plain fp16/fp32/fp8 checkpoints
-        # and makes the cache reservation below reflect the post-cast sizes.
-        for key in list(sd.keys()):
-            if sd[key].is_floating_point():
-                sd[key] = sd[key].to(model_dtype)
+        if int8_markers:
+            # Casts only the dense tensors: the blanket cast below would also cast the fp32 scales. The skip
+            # patterns match diffusers names, hence after the rename; `condition_embedder` reads its dtype from
+            # a parameter, which an int8 layer does not have, so it is widened here.
+            quantized = install_int8_convrot_layers(
+                model,
+                sd,
+                resolve_quantized_module_paths(int8_markers, key_map),
+                model_dtype,
+                architecture="Wan 2.2",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=_model_declared_skip_patterns(model),
+            )
+            # Metadata the fp8 branch strips: a stray `scaled_fp8` flag, or a weight scale beside a dense weight.
+            # Left in, `_raise_for_incompatible_keys` would blame it on an Animate/S2V variant. Dropped after the
+            # install, whose foreign-scale check has to see (and refuse) a scale that sits on an fp8 weight.
+            for key in [k for k in sd if is_scale_metadata_key(k) and k.rsplit(".", 1)[0] not in quantized]:
+                del sd[key]
+            logger.info(
+                f"Wan 2.2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(int8_tensorwise checkpoint, dequantized per forward)"
+            )
+        else:
+            # Cast every float tensor to the compute dtype. Dequantized fp8_scaled
+            # weights are already there; this catches plain fp16/fp32/fp8 checkpoints
+            # and makes the cache reservation below reflect the post-cast sizes.
+            for key in list(sd.keys()):
+                if sd[key].is_floating_point():
+                    sd[key] = sd[key].to(model_dtype)
 
-        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
-        self._ram_cache.make_room(new_sd_size)
+            new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+            self._ram_cache.make_room(new_sd_size)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
@@ -581,7 +579,7 @@ class WanT5EncoderLoader(ModelLoader):
        what ``Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer`` produces.
     2. A flat ``text_encoder/`` folder with ``config.json`` declaring
        ``model_type: umt5`` directly at the root. In this case the tokenizer
-       is loaded from the same folder via ``AutoTokenizer.from_pretrained``.
+       is loaded from the same folder.
     """
 
     def _load_model(
@@ -606,7 +604,7 @@ class WanT5EncoderLoader(ModelLoader):
                 local_files_only=True,
             )
         if submodel_type == SubModelType.Tokenizer:
-            from transformers import AutoTokenizer
+            from invokeai.backend.wan.tokenizer import load_wan_tokenizer
 
             # Prefer a sibling tokenizer/ directory; fall back to the encoder dir
             # itself, which is normal for "flat" downloads.
@@ -615,7 +613,7 @@ class WanT5EncoderLoader(ModelLoader):
                 if nested_tokenizer.exists()
                 else (nested_text_encoder if nested_text_encoder.exists() else root)
             )
-            return AutoTokenizer.from_pretrained(str(target), local_files_only=True)
+            return load_wan_tokenizer(target)
 
         raise ValueError(
             f"Unsupported submodel type for WanT5Encoder: {submodel_type.value if submodel_type else 'None'}"

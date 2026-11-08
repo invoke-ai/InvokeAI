@@ -95,7 +95,7 @@ def padded_tokens(tokens: int) -> int:
 def _regional_attention_bias_bytes(
     regional_attn_mask: Optional[torch.Tensor], image_seq_len: int, dtype: torch.dtype
 ) -> int:
-    """What `regional_forward` allocates per positive pass for regional prompting: a boolean copy of the mask, the
+    """What `regional_forward` allocates per regional pass for regional prompting: a boolean copy of the mask, the
     additive bias over the padded unified sequence, and the image-to-image block `torch.where` fills it from. The mask
     itself is already on the device when the estimate is taken. Measured at 1024px on CUDA: 68 MiB over the plain
     forward, against 93 MiB charged."""
@@ -167,7 +167,7 @@ def estimate_z_image_denoise_working_memory(
 
     `transformer` is the model about to be locked, read unlocked for its dequantization and fp8 cast transients.
     `image_seq_len` and `text_seq_len` are the unpadded token counts, the longer caption of a CFG pair. `control_blocks`
-    is the ControlNet's block count, `regional_attn_mask` regional prompting's mask, and `has_attention_mask`
+    is the ControlNet's block count, `regional_attn_mask` the larger regional mask of a CFG pair, and `has_attention_mask`
     whether the forward passes an attention mask at all.
     """
     dtype_name = _DTYPE_NAMES.get(dtype)

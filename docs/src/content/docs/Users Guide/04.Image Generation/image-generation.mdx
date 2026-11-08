@@ -18,7 +18,7 @@ Most image models in InvokeAI are **diffusion models**. A diffusion model starts
 
 **Prompt.** The text that describes the image you want. Many models also accept a **negative prompt** listing what you do not want. See the [Prompting Guide](/users-guide/image-generation/prompting-guide/).
 
-**Steps.** How many denoising passes the model makes. More steps refine detail up to a point, after which they change little. Standard models typically use 25 to 50 steps; distilled "Turbo" and "Lightning" models are designed for 4 to 10.
+**Steps.** How many denoising passes the model makes. More steps refine detail up to a point, after which they change little. Standard models typically use 25 to 50 steps; distilled "Turbo" and "Lightning" models are designed for 4 to 9.
 
 **CFG (classifier-free guidance) or Guidance.** How strictly the model follows the prompt. Higher values follow it more literally; too high looks harsh or oversaturated. Distilled models usually run at a CFG of 1.
 

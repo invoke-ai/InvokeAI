@@ -317,8 +317,29 @@ describe('ImageContextMenu deletion delegation', () => {
 
     await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
 
-    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }], {
+      returnFocus: undefined,
+    });
     expect(getOpenAlertDialog()).toBeNull();
+  });
+
+  it('hands the deletion the place its host says focus returns to, since the menu is gone by then', async () => {
+    const deleteItems = vi.fn(() => Promise.resolve());
+    const target = item('image', 'right-clicked.png');
+    const returnFocus = () => null;
+    await renderItemMenu(createActions(deleteItems), {
+      itemRefs: [{ kind: 'image', name: target.name }],
+      items: [target],
+      returnFocus,
+      x: 20,
+      y: 20,
+    });
+
+    await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
+
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'right-clicked.png' }], {
+      returnFocus,
+    });
   });
 });
 

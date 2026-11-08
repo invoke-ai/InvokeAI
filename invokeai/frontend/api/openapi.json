@@ -1626,6 +1626,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -1698,6 +1704,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -1719,6 +1731,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -1726,6 +1741,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -1759,6 +1777,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -1801,6 +1822,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -2192,6 +2216,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2264,6 +2294,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -2285,6 +2321,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -2292,6 +2331,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -2325,6 +2367,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -2367,6 +2412,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -2758,6 +2806,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2830,6 +2884,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -2851,6 +2911,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -2858,6 +2921,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -2891,6 +2957,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -2933,6 +3002,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -3045,8 +3117,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -3369,6 +3440,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -3441,6 +3518,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -3462,6 +3545,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -3469,6 +3555,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -3502,6 +3591,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -3544,6 +3636,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -3656,8 +3751,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -3669,7 +3763,7 @@
             "description": "The model could not be found"
           },
           "409": {
-            "description": "There is already a model corresponding to the new name"
+            "description": "The change cannot be applied to this model"
           },
           "422": {
             "description": "Validation Error",
@@ -4007,6 +4101,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -4079,6 +4179,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -4100,6 +4206,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -4107,6 +4216,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -4140,6 +4252,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -4182,6 +4297,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -4294,8 +4412,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -5520,6 +5637,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -5592,6 +5715,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -5613,6 +5742,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                     },
                     {
@@ -5620,6 +5752,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -5653,6 +5788,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -5695,6 +5833,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -5807,8 +5948,7 @@
                   "converted_at": 0,
                   "variant": "normal",
                   "prediction_type": "epsilon",
-                  "repo_variant": "fp16",
-                  "upcast_attention": false
+                  "repo_variant": "fp16"
                 }
               }
             }
@@ -11493,6 +11633,52 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/gallery/usage": {
+      "post": {
+        "tags": ["gallery"],
+        "summary": "Get Gallery Media Usage",
+        "description": "Reports what still uses media before it is deleted: the caller's saved documents and active queue work by\nname, other accounts' as counts. Deleting stays a separate request; this only reads.",
+        "operationId": "get_gallery_media_usage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMediaUsageRequest",
+                "description": "The media to check"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMediaUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/gallery/maintenance/preview": {
@@ -21290,6 +21476,12 @@
             "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
           },
           {
+            "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+          },
+          {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
           },
           {
@@ -21362,6 +21554,12 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
           },
           {
@@ -21383,6 +21581,9 @@
             "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
           },
           {
@@ -21390,6 +21591,9 @@
           },
           {
             "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
           },
           {
             "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -21423,6 +21627,9 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -21465,6 +21672,9 @@
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -21946,17 +22156,11 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
-          "reference_images_require_format": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Images Require Format",
-            "description": "If set, reference images are only accepted for models of this format."
+          "reference_images_require_vision_tower": {
+            "type": "boolean",
+            "title": "Reference Images Require Vision Tower",
+            "description": "If true, reference images are read by the Qwen3-VL vision tower: the effective encoder (the model's own or a standalone one) must carry one.",
+            "default": false
           },
           "supports_regional_guidance": {
             "type": "boolean",
@@ -45356,6 +45560,263 @@
         ],
         "title": "GalleryMaintenanceResult"
       },
+      "GalleryMediaUsage": {
+        "properties": {
+          "checked_image_count": {
+            "type": "integer",
+            "title": "Checked Image Count",
+            "description": "Images checked: the requested ones the caller may delete, or the images the board's deletion would delete."
+          },
+          "checked_video_count": {
+            "type": "integer",
+            "title": "Checked Video Count",
+            "description": "Videos checked: the requested ones the caller may delete, or the videos the board's deletion would delete."
+          },
+          "in_use_image_count": {
+            "type": "integer",
+            "title": "In Use Image Count",
+            "description": "Distinct checked images that anything below names."
+          },
+          "in_use_video_count": {
+            "type": "integer",
+            "title": "In Use Video Count",
+            "description": "Distinct checked videos that anything below names."
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/GalleryMediaUsageDocument"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "The caller's own documents naming checked media, by kind, then name, then id; at most 100."
+          },
+          "documents_total": {
+            "type": "integer",
+            "title": "Documents Total",
+            "description": "How many of the caller's documents name checked media."
+          },
+          "queue": {
+            "$ref": "#/components/schemas/GalleryMediaUsageQueue",
+            "description": "The caller's own active queue work naming checked media."
+          },
+          "other_accounts": {
+            "$ref": "#/components/schemas/GalleryMediaUsageOthers",
+            "description": "Other accounts' documents and queue work naming checked media, as counts only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_image_count",
+          "checked_video_count",
+          "in_use_image_count",
+          "in_use_video_count",
+          "documents",
+          "documents_total",
+          "queue",
+          "other_accounts"
+        ],
+        "title": "GalleryMediaUsage",
+        "description": "What still uses media a deletion would remove. Saved documents count conservatively: anything they name,\nhistory included."
+      },
+      "GalleryMediaUsageDocument": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["project", "workflow", "legacy_editor", "quarantined_project"],
+            "title": "Kind",
+            "description": "'project': a project's content and the caller's own workspace in it. 'workflow': a library workflow. 'legacy_editor': the legacy editor's saved state, all of it as one entry. 'quarantined_project': a project kept for repair."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The project or workflow id; 'legacy_editor' for the legacy editor's state."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The document's name; null for the legacy editor or a missing document."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images the document names, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos the document names, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images the document names, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos the document names, past the list's cap too."
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "For a project: its content revision when the names were read, as the project read reports it (`revision`). Null for other kinds, and for a project the caller does not own."
+          },
+          "workspace_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Revision",
+            "description": "For a project: the caller's workspace revision when the names were read, as the project read reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "image_names",
+          "video_names",
+          "image_count",
+          "video_count",
+          "revision",
+          "workspace_revision"
+        ],
+        "title": "GalleryMediaUsageDocument",
+        "description": "One of the caller's saved documents that names checked media."
+      },
+      "GalleryMediaUsageOthers": {
+        "properties": {
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count",
+            "description": "Other accounts' documents naming checked media."
+          },
+          "queue_item_count": {
+            "type": "integer",
+            "title": "Queue Item Count",
+            "description": "Other accounts' active queue items naming checked media."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "Distinct checked images other accounts' documents or queue work name."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "Distinct checked videos other accounts' documents or queue work name."
+          }
+        },
+        "type": "object",
+        "required": ["document_count", "queue_item_count", "image_count", "video_count"],
+        "title": "GalleryMediaUsageOthers",
+        "description": "Other accounts' documents and queue work that name checked media, without identifying them."
+      },
+      "GalleryMediaUsageQueue": {
+        "properties": {
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "The caller's active queue items (pending, in progress or waiting, and the completed children of an active root) whose sessions name checked media."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images those items name, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos those items name, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images those items name, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos those items name, past the list's cap too."
+          }
+        },
+        "type": "object",
+        "required": ["item_count", "image_names", "video_names", "image_count", "video_count"],
+        "title": "GalleryMediaUsageQueue",
+        "description": "The caller's active queue work that names checked media."
+      },
+      "GalleryMediaUsageRequest": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "Images to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /images/delete` skips them."
+          },
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "Videos to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /videos/delete` skips them."
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "Check the images and videos `DELETE /boards/{board_id}?include_images=true` would delete, under the same access rules. Not combined with names."
+          }
+        },
+        "type": "object",
+        "title": "GalleryMediaUsageRequest",
+        "description": "The media to check: named images and videos, or every item on one board."
+      },
       "GeminiImageGenerationInvocation": {
         "category": "image",
         "class": "invocation",
@@ -46886,6 +47347,12 @@
                   "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
                 },
                 {
@@ -47384,6 +47851,12 @@
                   "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/SD3LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/SD3LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
                 },
                 {
@@ -47819,6 +48292,12 @@
                   "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
+                },
+                {
                   "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
                 },
                 {
@@ -48021,6 +48500,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/SD3ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/SD3LoRACollectionLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/SD3LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/SDXLLoRALoaderOutput"
@@ -50591,7 +51076,7 @@
         "tags": ["image", "ideogram4"],
         "title": "Denoise - Ideogram 4",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -50705,6 +51190,268 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "Ideogram4LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to an Ideogram 4 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["ideogram-4"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ideogram4_lora_collection_loader",
+            "default": "ideogram4_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ideogram-4"],
+        "title": "Apply LoRA Collection - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+        }
+      },
+      "Ideogram4LoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "Ideogram 4 LoRA collection loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_lora_collection_loader_output",
+            "default": "ideogram4_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "Ideogram4LoRACollectionLoaderOutput",
+        "type": "object"
+      },
+      "Ideogram4LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to an Ideogram 4 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["ideogram-4"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ideogram4_lora_loader",
+            "default": "ideogram4_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ideogram-4"],
+        "title": "Apply LoRA - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
+        }
+      },
+      "Ideogram4LoRALoaderOutput": {
+        "class": "output",
+        "description": "Ideogram 4 LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_lora_loader_output",
+            "default": "ideogram4_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "Ideogram4LoRALoaderOutput",
+        "type": "object"
       },
       "Ideogram4ModelLoaderInvocation": {
         "category": "model",
@@ -57347,6 +58094,12 @@
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
               },
               {
@@ -57845,6 +58598,12 @@
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SD3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
               },
               {
@@ -58276,6 +59035,12 @@
                 "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
               },
               {
@@ -58478,6 +59243,12 @@
               },
               {
                 "$ref": "#/components/schemas/SD3ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRACollectionLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRALoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/SDXLLoRALoaderOutput"
@@ -59043,6 +59814,12 @@
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
               },
               {
@@ -59539,6 +60316,12 @@
               },
               {
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
@@ -60227,6 +61010,12 @@
           "ideogram4_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "ideogram4_lora_collection_loader": {
+            "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+          },
+          "ideogram4_lora_loader": {
+            "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
+          },
           "ideogram4_model_loader": {
             "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
           },
@@ -60737,6 +61526,12 @@
           "sd3_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "sd3_lora_collection_loader": {
+            "$ref": "#/components/schemas/SD3LoRACollectionLoaderOutput"
+          },
+          "sd3_lora_loader": {
+            "$ref": "#/components/schemas/SD3LoRALoaderOutput"
+          },
           "sd3_model_loader": {
             "$ref": "#/components/schemas/Sd3ModelLoaderOutput"
           },
@@ -61078,6 +61873,8 @@
           "ideogram4_caption_builder",
           "ideogram4_denoise",
           "ideogram4_l2i",
+          "ideogram4_lora_collection_loader",
+          "ideogram4_lora_loader",
           "ideogram4_model_loader",
           "ideogram4_text_encoder",
           "if",
@@ -61248,6 +62045,8 @@
           "sd3_denoise",
           "sd3_i2l",
           "sd3_l2i",
+          "sd3_lora_collection_loader",
+          "sd3_lora_loader",
           "sd3_model_loader",
           "sd3_pid_decode",
           "sd3_text_encoder",
@@ -61780,6 +62579,12 @@
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
               },
               {
@@ -62276,6 +63081,12 @@
               },
               {
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
@@ -63079,6 +63890,12 @@
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
               },
               {
@@ -63575,6 +64392,12 @@
               },
               {
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/SD3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
@@ -64400,7 +65223,7 @@
           "tiny_autoencoder_previews": {
             "type": "boolean",
             "title": "Tiny Autoencoder Previews",
-            "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.",
+            "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.",
             "default": false
           },
           "attention_type": {
@@ -64753,7 +65576,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    show_donation_link: Show the Donate to InvokeAI link in the frontend menus.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.\n    db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.\n    clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.\n    fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).\n    fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.\n    int8_compute: Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    rocm_aotriton_experimental: Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.<br>Valid values: `auto`, `on`, `off`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`\n    wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    tiny_autoencoder_previews: Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    attention_backend: Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.<br>Valid values: `auto`, `sage`, `cudnn`, `flash`, `efficient`, `math`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.\n    auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.\n    image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.\n    image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.\n    image_index_batch_size: Number of gallery items embedded per batch by the image index worker.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_atlascloud_api_key: API key for Atlas Cloud image generation.\n    external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.\n    http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    show_donation_link: Show the Donate to InvokeAI link in the frontend menus.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.\n    db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.\n    clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.\n    fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).\n    fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.\n    int8_compute: Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    rocm_aotriton_experimental: Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.<br>Valid values: `auto`, `on`, `off`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`\n    wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    tiny_autoencoder_previews: Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    attention_backend: Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.<br>Valid values: `auto`, `sage`, `cudnn`, `flash`, `efficient`, `math`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.\n    auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.\n    image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.\n    image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.\n    image_index_batch_size: Number of gallery items embedded per batch by the image index worker.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_atlascloud_api_key: API key for Atlas Cloud image generation.\n    external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.\n    http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -72133,6 +72956,158 @@
         "title": "LoRA_Diffusers_Flux3_Config",
         "description": "Model config for a FLUX.3 Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a\nrepository-id install of a diffusers trainer's output leaves it. The file is held to what\n`LoRA_LyCORIS_Flux3_Config` holds a single file to."
       },
+      "LoRA_Diffusers_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_Diffusers_Ideogram4_Config",
+        "description": "Model config for an Ideogram 4 LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a\nrepository-id install of a diffusers trainer's output leaves it. The file is held to what\n`LoRA_LyCORIS_Ideogram4_Config` holds a single file to."
+      },
       "LoRA_Diffusers_SD1_Config": {
         "properties": {
           "key": {
@@ -72434,6 +73409,169 @@
           "base"
         ],
         "title": "LoRA_Diffusers_SD2_Config"
+      },
+      "LoRA_Diffusers_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "LoRA_Diffusers_SD3_Config",
+        "description": "Model config for SD 3 / 3.5 LoRAs in a Diffusers folder, as diffusers' DreamBooth script saves them.\n\nThe folder holds `pytorch_lora_weights.safetensors` (often next to `checkpoint-*/` copies, which are not read)."
       },
       "LoRA_Diffusers_SDXL_Config": {
         "properties": {
@@ -73366,6 +74504,158 @@
         ],
         "title": "LoRA_LyCORIS_Flux3_Config",
         "description": "Model config for FLUX.3 Image LoRA files: diffusers/PEFT, Black Forest Labs' native names (ai-toolkit, ComfyUI)\nand raw PEFT, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers\nheader or one describing a PEFT LoRA (`peft_scale`). LyCORIS here is the single-file format: LyCORIS's own\nflattened key names (`lycoris_...`) are none of these layouts and are not recognized.\n\nNo variant: Klein and Klein Base share the transformer, so a LoRA trained on either runs on both."
+      },
+      "LoRA_LyCORIS_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_Ideogram4_Config",
+        "description": "Model config for Ideogram 4 LoRA models (single file; PEFT, kohya-style or LoKR tensors).\n\nIdeogram 4 LoRAs name the vendored transformer's modules (fused `attention.qkv`, `attention.o`,\n`feed_forward.w1..3`, `adaln_modulation`) or diffusers' split ones behind a container prefix. Z-Image uses the\nsame block names, so the match also needs a patched weight at one of Ideogram 4's widths; see\n`ideogram4_lora_constants`."
       },
       "LoRA_LyCORIS_Krea2_Config": {
         "properties": {
@@ -74428,6 +75718,169 @@
           "base"
         ],
         "title": "LoRA_LyCORIS_SD2_Config"
+      },
+      "LoRA_LyCORIS_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "LoRA_LyCORIS_SD3_Config",
+        "description": "Model config for SD 3 / 3.5 LoRA files: diffusers / ai-toolkit, PEFT, SimpleTuner LyCORIS and kohya MMDiT.\n\nQwen-Image shares diffusers' attention names, so the match rests on an attention layer at an SD 3 width (1536\nMedium, 2432 Large) -- in kohya's fused naming too; see `sd3_lora_constants`. The width also gives the variant, so\nthe UI can keep a Large LoRA off a Medium model."
       },
       "LoRA_LyCORIS_SDXL_Config": {
         "properties": {
@@ -76907,7 +78360,7 @@
           "variant"
         ],
         "title": "Main_Checkpoint_Flux3_Config",
-        "description": "Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16)."
+        "description": "Model config for FLUX.3 Image single-file transformers.\n\nBFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA\nModelOpt layout), and Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages. The record is the same for all of\nthem: the loader reads the scheme off the file."
       },
       "Main_Checkpoint_Ideogram4_Config": {
         "properties": {
@@ -78108,7 +79561,7 @@
           "variant"
         ],
         "title": "Main_Checkpoint_QwenImage_Config",
-        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.\nThe loader keeps scaled fp8 weights when fp8 compute is available or the\n`default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),\nand dequantizes them to bf16 at load time otherwise."
+        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled, nvfp4 and int8_tensorwise(+convrot)\ncheckpoints. The loader keeps scaled fp8 weights when fp8 compute is available or the\n`default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),\nand dequantizes them to bf16 at load time otherwise. An int8 weight whose marker is missing or\nnames another format is refused at install, as the loader would refuse it."
       },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
@@ -78973,7 +80426,7 @@
           "expert"
         ],
         "title": "Main_Checkpoint_Wan_Config",
-        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized. The loader normalises all of those.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
+        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized, or ComfyUI ``int8_tensorwise`` (convrot) quantized, which stays int8 in memory. The loader\nnormalises all of those. An int8 weight without a decodable ``int8_tensorwise`` marker (a bare\n``{\"convrot\": true}``, int4) is refused at install.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
       },
       "Main_Checkpoint_ZImage_Config": {
         "properties": {
@@ -81573,6 +83026,16 @@
             ],
             "title": "Submodels",
             "description": "Loadable submodels in this model"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -81594,7 +83057,8 @@
           "format",
           "repo_variant",
           "base",
-          "submodels"
+          "submodels",
+          "variant"
         ],
         "title": "Main_Diffusers_SD3_Config"
       },
@@ -92355,6 +93819,12 @@
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -92427,6 +93897,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -92448,6 +93924,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
               },
               {
@@ -92455,6 +93934,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -92488,6 +93970,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -92530,6 +94015,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -93167,6 +94655,12 @@
                     "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                   },
                   {
@@ -93239,6 +94733,12 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                   },
                   {
@@ -93260,6 +94760,9 @@
                     "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                   },
                   {
@@ -93267,6 +94770,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                   },
                   {
                     "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -93300,6 +94806,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -93342,6 +94851,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -93909,6 +95421,12 @@
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -93981,6 +95499,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -94002,6 +95526,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
               },
               {
@@ -94009,6 +95536,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -94042,6 +95572,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -94084,6 +95617,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -94462,6 +95998,12 @@
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -94534,6 +96076,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -94555,6 +96103,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
               },
               {
@@ -94562,6 +96113,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -94595,6 +96149,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -94637,6 +96194,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -95063,6 +96623,9 @@
                 "$ref": "#/components/schemas/WanLoRAVariantType"
               },
               {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
@@ -95109,18 +96672,6 @@
               }
             ],
             "description": "The prediction type of the model."
-          },
-          "upcast_attention": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Upcast Attention",
-            "description": "Whether to upcast attention."
           },
           "config_path": {
             "anyOf": [
@@ -95234,6 +96785,7 @@
           "qwen3_encoder",
           "qwen_vl_encoder",
           "qwen3_vl_encoder",
+          "qwen3_vl_vision_tower",
           "qwen3_5_encoder",
           "mistral_encoder",
           "wan_t5_encoder",
@@ -95512,6 +97064,12 @@
                   "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                 },
                 {
@@ -95584,6 +97142,12 @@
                   "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                 },
                 {
@@ -95605,6 +97169,9 @@
                   "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
                 },
                 {
@@ -95612,6 +97179,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
@@ -95645,6 +97215,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -95687,6 +97260,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -101303,7 +102879,7 @@
         "description": "Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.\n\nUsed for SDNQ bundles where the text_encoder is a folder containing\nquantization_config.json and safetensors files with SDNQ keys."
       },
       "Qwen3VLEncoderField": {
-        "description": "Field for the Qwen3-VL text encoder used by Krea-2 models.",
+        "description": "Field for the Qwen3-VL text encoder used by Krea-2 and Qwen-Image-2.1 models.",
         "properties": {
           "tokenizer": {
             "$ref": "#/components/schemas/ModelIdentifierField",
@@ -101312,6 +102888,18 @@
           "text_encoder": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load text_encoder submodel"
+          },
+          "vision_tower": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)"
           },
           "loras": {
             "description": "LoRAs to apply on model loading",
@@ -101593,6 +103181,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -101611,7 +103211,8 @@
           "config_path",
           "base",
           "type",
-          "format"
+          "format",
+          "cpu_only"
         ],
         "title": "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config",
         "description": "Configuration for MiniMax H3's truncated Qwen3-VL-32B conditioning encoder single files\n(Comfy-Org ``qwen3vl_32b_minimax_h3_*.safetensors`` and mirrors).\n\nThese are NOT complete Qwen3-VL-32B checkpoints: the language stack is truncated to the 50\nlayers H3 conditions on (the file's ``minimax_h3_te`` metadata records the contract:\n\"unnormalized_hidden_after_layer_50\"), the final norm and LM head are omitted, and the\nbf16/int8-convrot repacks quantize only the 50 language layers (vision tower stays bf16).\n\nIdentified primarily by the explicit ``minimax_h3_te`` safetensors metadata; a structural\nfallback covers metadata-stripped re-uploads. ``Qwen3VLEncoder_Checkpoint_Config`` accepts only\nthe two widths it can build (2560 and 4096), so neither config can claim the other's files.\n\nThe nvfp4 repacks share this layout and are accepted here, but the loader rejects their\nquantization format early (header-only check) with a clear error - mirroring how the H3\ntransformer checkpoint config treats fp8_scaled files."
@@ -101768,7 +103369,7 @@
           "cpu_only"
         ],
         "title": "Qwen3VLEncoder_GGUF_Config",
-        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.\nOnly the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,\nso a GGUF encoder encodes text only.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
+        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower. Only the language tower is accepted here, so a\nGGUF encoder encodes text only; the ``mmproj`` file installs as a ``Qwen3VLVisionTower_GGUF_Config``,\nwhich an edit that reads reference images takes beside the encoder.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
@@ -101916,6 +103517,160 @@
         "enum": ["qwen3_vl_4b", "qwen3_vl_8b"],
         "title": "Qwen3VLVariantType",
         "description": "Qwen3-VL (vision-language) text encoder variants, by language-model width.\n\nSeparate from `Qwen3VariantType`: those are the text-only Qwen3 encoders (Z-Image, FLUX.2\nKlein). The VL models carry a visual tower and are not interchangeable with them, and the two\nfamilies do not even share widths at the same parameter count."
+      },
+      "Qwen3VLVisionTower_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_vision_tower",
+            "title": "Type",
+            "default": "qwen3_vl_vision_tower"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VLVariantType",
+            "description": "Which Qwen3-VL this tower belongs to. It pairs only with the encoder of the same variant."
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only. Set it like the encoder's: they must share a device"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "variant",
+          "cpu_only"
+        ],
+        "title": "Qwen3VLVisionTower_GGUF_Config",
+        "description": "Configuration for the vision tower of a llama.cpp Qwen3-VL (``mmproj-*.gguf``).\n\nllama.cpp keeps the tower out of the language-tower GGUF, so a GGUF encoder cannot read reference images\nby itself. This file is that tower; the loader renames it into the HuggingFace ``Qwen3VLVisionModel`` the\nother encoders' towers are, so it stands in for the tower they would bring.\n\nIdentified by its ``clip`` architecture, ``mmproj`` type and the ``qwen3vl_merger`` projector, which is\nwhat tells it from another model's vision tower; the variant is the width that projector emits."
       },
       "Qwen3VariantType": {
         "type": "string",
@@ -102796,6 +104551,25 @@
             "ui_model_base": ["any"],
             "ui_model_type": ["qwen3_vl_encoder"]
           },
+          "qwen3_vl_vision_tower_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL 8B vision tower (the llama.cpp mmproj file). Lets a GGUF encoder read reference images.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Vision Tower",
+            "ui_model_base": ["any"],
+            "ui_model_type": ["qwen3_vl_vision_tower"]
+          },
           "type": {
             "const": "qwen_image_2_1_model_loader",
             "default": "qwen_image_2_1_model_loader",
@@ -102808,7 +104582,7 @@
         "tags": ["model", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Main Model - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
         }
@@ -102916,7 +104690,7 @@
           },
           "reference_images": {
             "default": [],
-            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs an encoder with a vision tower: a Diffusers Qwen-Image-2.1 model's own, a standalone non-GGUF Qwen3-VL 8B encoder, or a GGUF encoder with its vision tower model.",
             "field_kind": "input",
             "input": "any",
             "items": {
@@ -103889,7 +105663,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Applies a collection of LoRAs to a Qwen Image transformer.",
+        "description": "Applies a collection of LoRAs to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -103958,6 +105732,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_collection_loader",
             "default": "qwen_image_lora_collection_loader",
@@ -103970,7 +105761,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -103979,7 +105770,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA model to a Qwen Image transformer.",
+        "description": "Apply a LoRA model to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -104051,6 +105842,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_loader",
             "default": "qwen_image_lora_loader",
@@ -104063,7 +105871,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -104087,6 +105895,21 @@
             "title": "Transformer",
             "ui_hidden": false
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "output",
+            "title": "Qwen VL Encoder",
+            "ui_hidden": false
+          },
           "type": {
             "const": "qwen_image_lora_loader_output",
             "default": "qwen_image_lora_loader_output",
@@ -104095,7 +105918,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "type", "type"],
+        "required": ["output_meta", "transformer", "qwen_vl_encoder", "type", "type"],
         "title": "QwenImageLoRALoaderOutput",
         "type": "object"
       },
@@ -104555,6 +106378,14 @@
           "text_encoder": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load text_encoder submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
           }
         },
         "required": ["tokenizer", "text_encoder"],
@@ -104819,6 +106650,142 @@
         ],
         "title": "QwenVLEncoder_Diffusers_Config",
         "description": "Configuration for standalone Qwen2.5-VL encoder models in diffusers-style folder layout.\n\nExpected structure:\n    <model_root>/\n        text_encoder/\n            config.json (with `_class_name` or `architectures` listing\n                         `Qwen2_5_VLForConditionalGeneration`)\n            model.safetensors\n        tokenizer/\n            tokenizer_config.json\n            ...\n        processor/                  (optional, for vision preprocessing)\n            preprocessor_config.json\n\nThis lets users avoid downloading the full ~40 GB Qwen Image diffusers pipeline\nwhen they only need the Qwen2.5-VL encoder for use with a GGUF transformer."
+      },
+      "QwenVLEncoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen_vl_encoder",
+            "title": "Type",
+            "default": "qwen_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format"
+        ],
+        "title": "QwenVLEncoder_GGUF_Config",
+        "description": "Configuration for a llama.cpp GGUF of the Qwen2.5-VL-7B language model (e.g.\n``Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf``), used as a text-only Qwen-Image encoder.\n\nllama.cpp splits Qwen2.5-VL across two files: the language model, which is all text prompts condition on, and a\ncompanion ``mmproj-*.gguf`` holding the vision tower. Only the language model is accepted; the ``mmproj`` file is\nrefused with its own reason. Without the vision tower the encoder cannot read Qwen-Image Edit's reference\nimages, and the prompt node refuses that combination before loading anything.\n\nIdentified by the ``general.architecture`` metadata: the tensors alone are a plain llama.cpp decoder that other\nfamilies' GGUFs share. Qwen2-VL shares that architecture name and is refused by its context length."
       },
       "RandomFloatInvocation": {
         "category": "math",
@@ -106429,7 +108396,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -106654,6 +108621,397 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "SD3LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to an SD3 transformer and its CLIP encoders.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["sd-3"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "clip_l": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "CLIP L"
+          },
+          "clip_g": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "CLIP G"
+          },
+          "type": {
+            "const": "sd3_lora_collection_loader",
+            "default": "sd3_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "sd3"],
+        "title": "Apply LoRA Collection - SD3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/SD3LoRACollectionLoaderOutput"
+        }
+      },
+      "SD3LoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "SD3 LoRA collection loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "clip_l": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "output",
+            "title": "CLIP L",
+            "ui_hidden": false
+          },
+          "clip_g": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "output",
+            "title": "CLIP G",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "sd3_lora_collection_loader_output",
+            "default": "sd3_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "clip_l", "clip_g", "lora_metadata", "type", "type"],
+        "title": "SD3LoRACollectionLoaderOutput",
+        "type": "object"
+      },
+      "SD3LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to an SD3 transformer and its CLIP encoders.\n\nA LoRA patches only what it trained; T5 layers in a LoRA are dropped, since the T5 encoder takes no LoRA.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["sd-3"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "clip_l": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "CLIP L"
+          },
+          "clip_g": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "CLIP G"
+          },
+          "type": {
+            "const": "sd3_lora_loader",
+            "default": "sd3_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "sd3"],
+        "title": "Apply LoRA - SD3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/SD3LoRALoaderOutput"
+        }
+      },
+      "SD3LoRALoaderOutput": {
+        "class": "output",
+        "description": "SD3 LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "clip_l": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "output",
+            "title": "CLIP L",
+            "ui_hidden": false
+          },
+          "clip_g": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CLIPField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count",
+            "field_kind": "output",
+            "title": "CLIP G",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "sd3_lora_loader_output",
+            "default": "sd3_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "clip_l", "clip_g", "lora_metadata", "type", "type"],
+        "title": "SD3LoRALoaderOutput",
+        "type": "object"
+      },
       "SD3PiDDecodeInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -106819,6 +109177,12 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "SD3VariantType": {
+        "type": "string",
+        "enum": ["sd3_medium", "sd3_large"],
+        "title": "SD3VariantType",
+        "description": "SD 3 transformer sizes, which decide the LoRAs that fit a model.\n\nThe values carry the family name because variant values share one namespace and `large` is already a CLIP variant."
       },
       "SDXLCompelPromptInvocation": {
         "category": "prompt",
@@ -110719,6 +113083,9 @@
                 "$ref": "#/components/schemas/WanLoRAVariantType"
               },
               {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
@@ -110921,6 +113288,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanLoRAVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
@@ -112210,6 +114580,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanLoRAVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
@@ -115956,6 +118329,147 @@
         ],
         "title": "TinyAutoencoder_Checkpoint_Flux2_Config"
       },
+      "TinyAutoencoder_Checkpoint_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "tiny_autoencoder",
+            "title": "Type",
+            "default": "tiny_autoencoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "latent_channels": {
+            "type": "integer",
+            "title": "Latent Channels",
+            "description": "Latent channels the decoder consumes."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "latent_channels",
+          "base"
+        ],
+        "title": "TinyAutoencoder_Checkpoint_LTX2_Config"
+      },
       "TinyAutoencoder_Checkpoint_QwenImage21_Config": {
         "properties": {
           "key": {
@@ -116519,6 +119033,148 @@
           "base"
         ],
         "title": "TinyAutoencoder_Checkpoint_SDXL_Config"
+      },
+      "TinyAutoencoder_Checkpoint_Wan_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "tiny_autoencoder",
+            "title": "Type",
+            "default": "tiny_autoencoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "latent_channels": {
+            "type": "integer",
+            "title": "Latent Channels",
+            "description": "Latent channels the decoder consumes."
+          },
+          "base": {
+            "type": "string",
+            "const": "wan",
+            "title": "Base",
+            "default": "wan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "latent_channels",
+          "base"
+        ],
+        "title": "TinyAutoencoder_Checkpoint_Wan_Config",
+        "description": "taew2_1 (16 channels, also Qwen-Image, Krea-2, Anima) or taew2_2 (48, TI2V-5B): `latent_channels` decides."
       },
       "TransformerField": {
         "properties": {
