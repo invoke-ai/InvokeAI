@@ -1980,15 +1980,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     updateCursor,
   });
   toolsReady = true;
+  // The shape cursor reads Place on: not-allowed over a selected layer a shape drawn there would refuse.
+  const unsubscribeShapeOptions = stores.shapeOptions.subscribe(() => {
+    if (interactionController.getActiveToolId() === 'shape') {
+      updateCursor();
+    }
+  });
   const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
     colorSamples.onToolChange(toolId);
     interactionController.setTool(toolId, options);
   };
 
   /**
-   * After gesture cancellation, Escape cancels defocused text editing, then transform, then selection. Focused
-   * portals handle Escape themselves. If a gesture consumed Escape, preserve committed selection. Shared with
-   * pipeline wiring and node tests.
+   * After gesture cancellation, Escape cancels defocused text editing, then transform, then a float, then the tool's
+   * own open session (a polygon between clicks), then an application operation, then selection. Focused portals
+   * handle Escape themselves. If a gesture or a tool session consumed Escape, preserve committed selection. Shared
+   * with pipeline wiring and node tests.
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
     if (colorSamples.onEscape()) {
@@ -2009,6 +2016,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // Escape restores lifted pixels while retaining selection; Enter, deselect and tool switches commit the
       // float.
       floatingSelection.cancel();
+      return;
+    }
+    // The tool the user is really on: a Space-held pan mid-polygon keeps the polygon's session on the held tool.
+    const sessionTool = tools.get(pipeline.heldRestoreToolId() ?? interactionController.getActiveToolId());
+    if (sessionTool?.onKeyCommand?.(toolContext, 'cancel')) {
       return;
     }
     if (applicationEscapeHandler?.(gestureWasActive)) {
@@ -2687,6 +2699,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(unsubscribeShowBbox);
     cleanup.run(unsubscribeBboxOverlay);
     cleanup.run(unsubscribeRuleOfThirds);
+    cleanup.run(unsubscribeShapeOptions);
     cleanup.run(unsubscribeProjectPreviewLifecycle);
     cleanup.run(unsubscribeTextFontSources);
     cleanup.run(unsubscribeTextDefaultsFontSources);

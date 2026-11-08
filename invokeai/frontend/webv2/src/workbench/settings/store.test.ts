@@ -677,3 +677,36 @@ describe('antialiasProgressImages preference', () => {
     expect(store.normalizeWorkbenchPreferences({ antialiasProgressImages: true }).antialiasProgressImages).toBe(true);
   });
 });
+
+describe('aspectRatioPresets preference', () => {
+  const cinema = { height: 1, id: 'cinema', label: 'Cinema', width: 2.39 };
+
+  it('starts empty for older preferences and keeps well-shaped entries, a clean list as is', () => {
+    expect(store.normalizeWorkbenchPreferences({}).aspectRatioPresets).toEqual([]);
+    expect(store.normalizeWorkbenchPreferences({ aspectRatioPresets: 'cinema' as never }).aspectRatioPresets).toEqual(
+      []
+    );
+
+    const clean = [cinema, { height: 5, id: 'banner', label: 'Banner', width: 12 }];
+
+    expect(store.normalizeWorkbenchPreferences({ aspectRatioPresets: clean }).aspectRatioPresets).toBe(clean);
+  });
+
+  it('drops malformed entries and repeated ids but leaves ratio rules to generation', () => {
+    // 20:1 is outside this build's range; a newer build may allow it, so storage keeps it for that build.
+    const wide = { height: 1, id: 'wide', label: 'Wide', width: 20 };
+
+    expect(
+      store.normalizeWorkbenchPreferences({
+        aspectRatioPresets: [
+          cinema,
+          null,
+          { height: 1, id: 'no-label', label: ' ', width: 2 },
+          { height: '1', id: 'text', label: 'Text', width: 2 },
+          { ...cinema, label: 'Repeat' },
+          wide,
+        ] as never,
+      }).aspectRatioPresets
+    ).toEqual([cinema, wide]);
+  });
+});

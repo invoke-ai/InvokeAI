@@ -3,6 +3,7 @@ instances of the model exactly when the change affects how it loads. The load fe
 themselves to is covered by `tests/app/services/model_load/test_stale_model_load_fence.py`."""
 
 import gc
+import re
 import threading
 import time
 from pathlib import Path
@@ -44,7 +45,13 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen35VariantType,
     SubModelType,
 )
-from invokeai.backend.tiny_autoencoder.checkpoint import TaesdLayout
+from invokeai.backend.tiny_autoencoder.checkpoint import (
+    TAELTX2_3,
+    TAEW2_1,
+    TAEW2_2,
+    TaehvLayout,
+    TinyAutoencoderLayout,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.load.state_dicts import (
     clip_g_comfy_keys,
@@ -54,7 +61,15 @@ from tests.backend.model_manager.load.state_dicts import (
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 from tests.fixtures.spandrel_models import write_compact_upscaler
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
-from tests.fixtures.tiny_autoencoders import TAEF2, TAEQI2_1, TAESD, TAESD3, diffusers_weights, native_weights
+from tests.fixtures.tiny_autoencoders import (
+    TAEF2,
+    TAEQI2_1,
+    TAESD,
+    TAESD3,
+    diffusers_weights,
+    native_weights,
+    taehv_weights,
+)
 
 KEY = "model-key"
 MODEL_PATH = "sd-1/main/model.safetensors"
@@ -507,24 +522,31 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(harness: _Har
     assert harness.manager.reidentify_model(KEY).base is BaseModelType.StableDiffusion3
 
 
-def _write_tae(path: Path, layout: TaesdLayout, combined: bool) -> None:
-    native = native_weights(layout, dtype=torch.float16)
+def _write_tae(path: Path, layout: TinyAutoencoderLayout, combined: bool = True) -> None:
+    """A TAESD file in the combined or native layout, or a TAEHV file (which has only one)."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(layout, TaehvLayout):
+        save_file(taehv_weights(layout, dtype=torch.float16), path)
+        return
+    native = native_weights(layout, dtype=torch.float16)
     save_file(diffusers_weights(native) if combined else native, path)
 
 
-# The four Tiny AutoEncoders that share their latent space with another base, so only a name can say which they are.
+# The Tiny AutoEncoders whose weights do not say which they are, so only a name can: the four that share their latent
+# space with another base, and the two whose network is also published as an unsupported twin.
 _NAME_AMBIGUOUS_TAES = [
     pytest.param("taesd", TAESD, False, BaseModelType.StableDiffusion1, id="taesd"),
     pytest.param("taesdxl", TAESD, False, BaseModelType.StableDiffusionXL, id="taesdxl"),
     pytest.param("taesd3", TAESD3, True, BaseModelType.StableDiffusion3, id="taesd3"),
     pytest.param("taef1", TAESD3, True, BaseModelType.Flux, id="taef1"),
+    pytest.param("taew2_1", TAEW2_1, True, BaseModelType.Wan, id="taew2_1"),
+    pytest.param("taeltx2_3", TAELTX2_3, True, BaseModelType.LTX2, id="taeltx2_3"),
 ]
 
 
 @pytest.mark.parametrize(("folder", "layout", "combined", "base"), _NAME_AMBIGUOUS_TAES)
 def test_reidentify_keeps_the_base_a_local_install_read_off_the_folder_it_came_from(
-    harness: _Harness, folder: str, layout: TaesdLayout, combined: bool, base: BaseModelType
+    harness: _Harness, folder: str, layout: TinyAutoencoderLayout, combined: bool, base: BaseModelType
 ) -> None:
     """The install moves the file into a folder named for its key and keeps its generic name. The folder that named the
     TAE survives only in the recorded source path."""
@@ -541,21 +563,33 @@ def test_reidentify_keeps_the_base_a_local_install_read_off_the_folder_it_came_f
 
 _TAE_STARTERS = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
 
+# What each published TAE's file holds, by the TAE's name.
+_PUBLISHED_TAE_LAYOUTS: dict[str, tuple[TinyAutoencoderLayout, bool]] = {
+    "taesd": (TAESD, False),
+    "taesdxl": (TAESD, False),
+    "taesd3": (TAESD3, True),
+    "taef1": (TAESD3, True),
+    "taef2": (TAEF2, True),
+    "taeqi2_1": (TAEQI2_1, True),
+    "taew2_1": (TAEW2_1, True),
+    "taew2_2": (TAEW2_2, True),
+    "taeltx2_3": (TAELTX2_3, True),
+}
 
-@pytest.mark.parametrize("starter", _TAE_STARTERS, ids=lambda m: m.name)
+
+def _tae_name(starter: StarterModel) -> str:
+    """The TAE's name: its Hugging Face repo, or its file in the TAEHV GitHub repo."""
+    match = re.search(r"madebyollin/(?:taehv/raw/[0-9a-f]+/safetensors/)?(?P<name>\w+)", starter.source)
+    assert match is not None, starter.source
+    return match["name"]
+
+
+@pytest.mark.parametrize("starter", _TAE_STARTERS, ids=_tae_name)
 def test_reidentify_keeps_the_base_of_a_tiny_autoencoder_starter(harness: _Harness, starter: StarterModel) -> None:
     """A starter downloads to a file named like its URL, filed under the base the starter sets, then moved into a folder
     named for its key. TAESD3 and TAEF1 publish the same generic file name; their URLs name them."""
-    layouts = {
-        BaseModelType.StableDiffusion1: (TAESD, False),
-        BaseModelType.StableDiffusionXL: (TAESD, False),
-        BaseModelType.StableDiffusion3: (TAESD3, True),
-        BaseModelType.Flux: (TAESD3, True),
-        BaseModelType.Flux2: (TAEF2, True),
-        BaseModelType.QwenImage21: (TAEQI2_1, True),
-    }
     path = harness.models_path / KEY / starter.source.rsplit("/", 1)[-1]
-    _write_tae(path, *layouts[starter.base])
+    _write_tae(path, *_PUBLISHED_TAE_LAYOUTS[_tae_name(starter)])
     installed = ModelConfigFactory.from_model_on_disk(
         path,
         {

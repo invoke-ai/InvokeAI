@@ -15,13 +15,14 @@ This page describes each section of the **Generate** panel in detail. For a firs
 The **Size** section sets the width and height of the image.
 
 * **Width** and **Height** can be set by dragging, by typing a value, or by dragging the corner of the small size preview. Sizes run from 64 to 4096 pixels and snap to a multiple the model requires, usually 8, 16 or 32.
-* **Aspect ratio** offers common shapes: 21:9, 16:9, 3:2, 4:3, 1:1, 3:4, 2:3, 9:16 and 9:21, or **Free**. Choosing a ratio locks it, so changing the width changes the height to match. The lock button between the two fields locks or unlocks the current ratio.
+* **Aspect ratio** opens a picker with common shapes: 21:9, 16:9, 3:2, 4:3, 1:1, 3:4, 2:3, 9:16 and 9:21, or **Free**. Choosing a ratio locks it and keeps the current pixel count, so changing the width changes the height to match. The lock button between the two fields locks or unlocks the current ratio. Arrow keys move between the shapes.
+* **Your ratios** in the same picker holds ratios you name yourself, such as *Cinema* at 2.39:1. **Add ratio** starts from the locked ratio when the lock is on, otherwise from the current size's ratio; each saved ratio shows the size picking it would set, and can be edited or deleted (with Undo). You can keep up to 50. Saved ratios are only shapes, never sizes, so they work with every model, and they belong to your account, shared by every project and by the canvas frame tool. A locked ratio you have not named shows as its terms, such as 12:5.
 * **Swap width and height** turns a landscape image into a portrait one and back.
 * Each model has an optimal image area, typically about one megapixel for newer models and less for SD 1.5. The line under the fields shows the image's size in megapixels, marks the recommended size, and estimates the run time from your recent runs.
 * **Reset size**, the button beside **Swap width and height**, opens a menu. Each item shows the size it sets, and the item matching the current size is checked; choosing it again changes nothing:
+  * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio, named by its saved name when it has one. It is absent at 1:1, where it would be the native square.
+  * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one. A locked ratio stays locked and takes the default size's ratio; an unlocked one stays unlocked.
   * **Square at native size** — a 1:1 square at the model's native size, such as 1024×1024 for SDXL and FLUX or 512×512 for SD 1.5, with the ratio locked.
-  * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio. It is absent at 1:1, where it would be the native square.
-  * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one.
 
   Right-clicking the width and height and choosing **Reset to model default** also resets the size this way.
 

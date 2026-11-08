@@ -27,7 +27,7 @@ The **Color** tab edits the two painting colors: the **Foreground color**, which
 
 * The color wheel, or a box picker via **Switch to box picker**, and the hex value, always shown. The format button next to it cycles through hex only, RGB, HSB and HSL, adding a field for each channel.
 * **Swap foreground and background colors** (**X**) and **Reset colors to black and white** (**D**).
-* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
+* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas with the Brush, Eraser, Gradient, Text or View tool. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
 
 Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick never turns on a fill or stroke the shape does not have: on such a shape it sets the active foreground or background color instead. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
@@ -126,7 +126,8 @@ The Layer section is dimmed while Filter or Select Object is running.
 
 ### Raster layer
 
-* **Lock transparency** — paint only where the layer already has pixels, leaving transparent areas transparent, like Photoshop's "Lock transparent pixels". Use it to recolor a shape without spilling paint around it, or to refine a subject painted on a transparent layer without growing its outline. Brushes, shapes and pen input all respect the lock.
+* **Lock transparency** — paint only where the layer already has pixels, leaving transparent areas transparent, like Photoshop's "Lock transparent pixels". Use it to recolor a shape without spilling paint around it, or to refine a subject painted on a transparent layer without growing its outline. Brushes, shapes and pen input all respect the lock, and the Eraser and a Shape cutout can't remove pixels while it's on.
+* **Shape appearance** — with a shape layer selected, its **Fill**, **Stroke** and stroke **Width** appear under **Appearance**, whatever canvas tool is active. Each gesture is one undoable step and changes only the selected shape. The Shape tool's own **Appearance** group sets creation defaults separately.
 * **Filter** — start the Filter operation.
 
 The Brush and Eraser paint directly on a selected image layer, such as an accepted result or an added picture, rather than adding a new layer. The first stroke turns it into a paint layer, with its position, scale and adjustments applied to its pixels; one undo restores the original image layer.
