@@ -238,7 +238,6 @@ example_model_config = {
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
-    "upcast_attention": False,
 }
 
 example_model_input = {
@@ -635,7 +634,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
-        409: {"description": "There is already a model corresponding to the new name"},
+        409: {"description": "The change cannot be applied to this model"},
     },
     status_code=200,
 )
@@ -1488,7 +1487,7 @@ def get_is_installed(
 
     for model in installed_models:
         # Check if source matches exactly
-        if model.source == starter_model.source:
+        if model.source == starter_model.source or model.source in starter_model.previous_sources:
             return True
         # Check if name (or previous names), base and type match
         if (

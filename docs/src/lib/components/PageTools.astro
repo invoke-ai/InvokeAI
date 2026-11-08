@@ -1,0 +1,39 @@
+---
+import PageActions from './PageActions.astro';
+import PageFeedback from './PageFeedback.astro';
+import PageMeta from './PageMeta.astro';
+
+type Props = {
+  /** Distinguishes the element ids of the copies in the right rail and the footer. */
+  instance: string;
+};
+
+const { instance } = Astro.props;
+---
+
+<div class="page-tools">
+  <PageActions instance={instance} />
+  <slot />
+  <PageFeedback instance={instance} />
+  <div class="meta">
+    <PageMeta />
+  </div>
+</div>
+
+<style>
+  .page-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    /* Page actions, feedback and links are for the screen. */
+    @media print {
+      display: none;
+    }
+  }
+
+  .meta {
+    padding-top: 1rem;
+    border-top: 1px solid var(--docs-border);
+  }
+</style>

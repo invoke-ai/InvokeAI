@@ -87,6 +87,17 @@ beforeEach(async () => {
 });
 
 describe('loadWorkbenchSettings', () => {
+  it.each(['ar', 'fr', 'en-GB'])(
+    'preserves requested %s content through backend load, save and reload',
+    async (language) => {
+      seedBackendPreferences({ language });
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+      await store.patchWorkbenchPreferences({ reduceMotion: true });
+      expect(readBackendPreferences().language).toBe(language);
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+    }
+  );
+
   it('migrates a preference stored under a renamed theme id', async () => {
     seedBackendPreferences({ themeId: 'forest' });
 
@@ -675,5 +686,38 @@ describe('antialiasProgressImages preference', () => {
       store.normalizeWorkbenchPreferences({ antialiasProgressImages: 'yes' as never }).antialiasProgressImages
     ).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ antialiasProgressImages: true }).antialiasProgressImages).toBe(true);
+  });
+});
+
+describe('aspectRatioPresets preference', () => {
+  const cinema = { height: 1, id: 'cinema', label: 'Cinema', width: 2.39 };
+
+  it('starts empty for older preferences and keeps well-shaped entries, a clean list as is', () => {
+    expect(store.normalizeWorkbenchPreferences({}).aspectRatioPresets).toEqual([]);
+    expect(store.normalizeWorkbenchPreferences({ aspectRatioPresets: 'cinema' as never }).aspectRatioPresets).toEqual(
+      []
+    );
+
+    const clean = [cinema, { height: 5, id: 'banner', label: 'Banner', width: 12 }];
+
+    expect(store.normalizeWorkbenchPreferences({ aspectRatioPresets: clean }).aspectRatioPresets).toBe(clean);
+  });
+
+  it('drops malformed entries and repeated ids but leaves ratio rules to generation', () => {
+    // 20:1 is outside this build's range; a newer build may allow it, so storage keeps it for that build.
+    const wide = { height: 1, id: 'wide', label: 'Wide', width: 20 };
+
+    expect(
+      store.normalizeWorkbenchPreferences({
+        aspectRatioPresets: [
+          cinema,
+          null,
+          { height: 1, id: 'no-label', label: ' ', width: 2 },
+          { height: '1', id: 'text', label: 'Text', width: 2 },
+          { ...cinema, label: 'Repeat' },
+          wide,
+        ] as never,
+      }).aspectRatioPresets
+    ).toEqual([cinema, wide]);
   });
 });
