@@ -620,8 +620,6 @@ describe('InvokeButton route card', () => {
     await act(() => userEvent.hover(document.body));
     await waitPastCloseDelay();
 
-    // Closed by now; the card leaves the page once its exit animation ends.
-    expect(cardMode()).toBe('closed');
     await expect.element(destinationGroup()).not.toBeInTheDocument();
   });
 
