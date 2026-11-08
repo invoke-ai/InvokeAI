@@ -7092,8 +7092,8 @@ export type components = {
             file: Blob;
             /**
              * Resize To
-             * @description Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216
-             * @example "[1024,1024]"
+             * @description Dimensions to resize the image to, as a stringified JSON object with positive integer width and height. Max total pixel count: 16777216
+             * @example {"width": 1024, "height": 1024}
              */
             resize_to?: string | null;
             /**
