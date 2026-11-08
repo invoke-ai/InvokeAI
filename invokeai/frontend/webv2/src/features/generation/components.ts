@@ -4,7 +4,6 @@ export {
   type AspectRatioLockButtonProps,
   type AspectRatioPickerProps,
 } from './ui/shared/AspectRatioPicker';
-export { AspectRatioPreview } from './ui/shared/AspectRatioPreview';
 export { NegativePromptField } from './ui/promptFields/NegativePromptField';
 export { PositivePromptField } from './ui/promptFields/PositivePromptField';
 export { PromptTextarea } from './ui/promptFields/PromptTextarea';
