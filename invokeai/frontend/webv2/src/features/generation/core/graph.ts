@@ -1860,10 +1860,10 @@ const buildIdeogram4Graph = (
   addEdge(graph, denoise, 'latents', output, 'latents');
   const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
     ideogram4_color_palette: settings.ideogram4ColorPalette,
-    ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
-    ideogram4_mu: settings.ideogram4Mu ?? undefined,
+    ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? null,
+    ideogram4_mu: settings.ideogram4Mu ?? null,
     ideogram4_sampler_preset: settings.ideogram4SamplerPreset,
-    ideogram4_steps: settings.ideogram4Steps ?? undefined,
+    ideogram4_steps: settings.ideogram4Steps ?? null,
     // Record both transformer files in provenance.
     ideogram4_unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
@@ -1937,7 +1937,7 @@ const buildWanGraph = (
   addMetadata(graph, output, settings, model, 'wan_txt2img', projectSettings, {
     vae: vaeModel ?? undefined,
     wan_component_source: sourceModel,
-    wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? undefined,
+    wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? null,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
     wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
   });
