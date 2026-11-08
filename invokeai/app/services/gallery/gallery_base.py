@@ -1,16 +1,22 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from collections.abc import Collection
+from typing import Literal, Optional
 
 from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
+    GalleryItemKind,
+    GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
+    GalleryMediaUsage,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
+
+# A listing's media filter: one kind's items only. None (the default everywhere) lists both.
+GalleryMediaKind = Literal["image", "video"]
 
 
 class GalleryServiceABC(ABC):
@@ -30,8 +36,33 @@ class GalleryServiceABC(ABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         """Lists a paginated, time-sorted stream of image + video items."""
+        pass
+
+    @abstractmethod
+    def get_item_location(
+        self,
+        kind: GalleryItemKind,
+        name: str,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
+    ) -> Optional[GalleryItemLocation]:
+        """Finds an item's exact zero-based position in an ordinary item listing."""
         pass
 
     @abstractmethod
@@ -47,6 +78,10 @@ class GalleryServiceABC(ABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNamesResult:
         """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
 
@@ -68,11 +103,21 @@ class GalleryServiceABC(ABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNames:
         """Returns the ordered flat name list for optimistic UI / virtualized lists.
 
         `created_date` restricts the result to items created on the given ISO date — used by
         date-based virtual boards.
+
+        `created_from` and `created_to` are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+
+        `starred` restricts to starred (`True`) or unstarred (`False`) items; `None` applies no filter.
+
+        `media_kind` restricts to images or videos; `None` lists both.
         """
         pass
 
@@ -88,4 +133,18 @@ class GalleryServiceABC(ABC):
     @abstractmethod
     def get_board_media_summaries(self, board_ids: list[str]) -> dict[str, BoardMediaSummary]:
         """Returns covers and media counts for each requested board."""
+        pass
+
+    @abstractmethod
+    def get_media_usage(
+        self, image_names: Collection[str], video_names: Collection[str], user_id: str, is_admin: bool
+    ) -> GalleryMediaUsage:
+        """What still uses the named media that the caller may delete: the names `POST /images/delete` and
+        `POST /videos/delete` would delete. Other names, unknown ones included, are left out as those skip them."""
+        pass
+
+    @abstractmethod
+    def get_board_media_usage(self, board_id: str, user_id: str, contributor_id: Optional[str]) -> GalleryMediaUsage:
+        """What still uses the media that deleting the board with its media would delete: `contributor_id`'s items on
+        it, or every item when None. The caller (`user_id`) must already be allowed to delete the board."""
         pass

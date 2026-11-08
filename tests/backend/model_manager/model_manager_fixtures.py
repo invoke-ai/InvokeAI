@@ -40,6 +40,10 @@ from tests.backend.model_manager.model_metadata.metadata_examples import (
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 from tests.test_nodes import TestEventService
 
+# The commits the mocked Hugging Face metadata reports as each repo's "sha".
+SDXL_TURBO_COMMIT = "f4b0486b498f84668e828044de1d0c8ba486e05b"
+TEXTUAL_INVERSION_TESTS_COMMIT = "b4221947b01eb61658972c43e33250820d8e3411"
+
 
 # Create a temporary directory using the contents of `./data/invokeai_root` as the template
 @pytest.fixture
@@ -262,15 +266,17 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
             },
         ),
     )
-    sess.mount(
-        "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/model_index.json",
-        TestAdapter(
-            RepoHFModelJson1,
-            headers={
-                "Content-Length": len(RepoHFModelJson1),
-            },
-        ),
-    )
+    # Installs name the commit the metadata reports (its "sha"); tests that build their own metadata use main.
+    for revision in ("main", SDXL_TURBO_COMMIT):
+        sess.mount(
+            f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/{revision}/model_index.json",
+            TestAdapter(
+                RepoHFModelJson1,
+                headers={
+                    "Content-Length": len(RepoHFModelJson1),
+                },
+            ),
+        )
     with open(embedding_file, "rb") as f:
         data = f.read()  # file is small - just 15K
     sess.mount(
@@ -284,37 +290,42 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
         ),
     )
-    sess.mount(
+    for api_url in (
         "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
-        TestAdapter(
-            HFTestLoraMetadata,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
-        ),
-    )
-    sess.mount(
-        "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors",
-        TestAdapter(
-            data,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
-        ),
-    )
+        f"https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests/revision/{TEXTUAL_INVERSION_TESTS_COMMIT}",
+    ):
+        sess.mount(
+            api_url,
+            TestAdapter(
+                HFTestLoraMetadata,
+                headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
+            ),
+        )
+    for revision in ("main", TEXTUAL_INVERSION_TESTS_COMMIT):
+        sess.mount(
+            f"https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/{revision}/learned_embeds-steps-1000.safetensors",
+            TestAdapter(
+                data,
+                headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
+            ),
+        )
     for root, _, files in os.walk(diffusers_dir):
         for name in files:
             path = Path(root, name)
             url_base = path.relative_to(diffusers_dir).as_posix()
-            url = f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/{url_base}"
             with open(path, "rb") as f:
                 data = f.read()
-            sess.mount(
-                url,
-                TestAdapter(
-                    data,
-                    headers={
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Content-Length": len(data),
-                    },
-                ),
-            )
+            for revision in ("main", SDXL_TURBO_COMMIT):
+                sess.mount(
+                    f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/{revision}/{url_base}",
+                    TestAdapter(
+                        data,
+                        headers={
+                            "Content-Type": "application/json; charset=utf-8",
+                            "Content-Length": len(data),
+                        },
+                    ),
+                )
 
     for i in ["12345", "9999", "54321"]:
         content = (

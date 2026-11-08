@@ -1,0 +1,28 @@
+---
+/*
+ * One step of a `Pipeline` that splits into alternative `PipelineLane`s, one above the other, which join again at the
+ * next step. Read as a nested list: each lane's label, then its steps. See `Pipeline.astro`.
+ */
+---
+
+{/* Its lanes hold steps side by side, so it takes more room than a single step. */}
+<li class="pipeline__item" style="flex-grow: 3">
+  <ul class="branch" role="list">
+    <slot />
+  </ul>
+</li>
+
+<style>
+  .branch {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0.5rem;
+    border: 1px dashed var(--docs-border-strong);
+    border-radius: var(--docs-radius-container);
+    list-style: none;
+  }
+</style>

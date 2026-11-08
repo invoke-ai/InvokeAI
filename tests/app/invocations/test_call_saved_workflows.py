@@ -46,6 +46,7 @@ def build_workflow_record_dto(
         opened_at=None,
         user_id=user_id,
         is_public=is_public,
+        revision=1,
     )
 
 
@@ -104,6 +105,25 @@ def test_call_saved_workflow_invocation_contract():
 
     assert isinstance(output, WorkflowReturnOutput)
     assert output.values == {}
+
+
+def test_call_saved_workflow_invocation_validates_when_lifecycle_effects_are_disabled():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+    from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
+
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="workflow-123")
+    context = build_context()
+    context.execution = Mock()
+    context.execution_effects = SimpleNamespace(allow_lifecycle_effects=False)
+
+    output = invocation.invoke(context)
+
+    assert isinstance(output, WorkflowReturnOutput)
+    assert output.values == {}
+    context._services.workflow_records.get.assert_called_once_with("workflow-123")
+    context.execution.authorize_workflow.assert_not_called()
+    context.execution.spawn.assert_not_called()
+    context.execution.fail.assert_not_called()
 
 
 def test_call_saved_workflow_invocation_raises_when_workflow_id_is_empty():

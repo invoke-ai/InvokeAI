@@ -1,0 +1,134 @@
+import { chakra, Checkbox, Input } from '@chakra-ui/react';
+import { loginSchema } from '@features/identity/core/schemas';
+import { isLoginAttemptSupersededError, loginWithCredentials, useAuthSession } from '@features/identity/session';
+import { useZodForm } from '@platform/react/useZodForm';
+import { getApiErrorMessage } from '@platform/transport/http';
+import { Button, Field } from '@platform/ui';
+import { Navigate, useSearch } from '@tanstack/react-router';
+import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { AuthFormAlert, AuthScreen } from './AuthScreen';
+import { PasswordInput } from './PasswordInput';
+
+/**
+ * Where an expired session was, as the router's `returnTo` search value: an in-app path, never another origin and
+ * never the auth screens themselves.
+ */
+export const readLoginReturnPath = (value: unknown): string | undefined =>
+  typeof value === 'string' &&
+  value.startsWith('/') &&
+  // `//host`, `/\host` and a slash followed by whitespace or a control character all read as another origin to some
+  // URL parsers; refuse them whatever history the router uses.
+  !/^\/[\\/\s\p{Cc}]/u.test(value) &&
+  !value.startsWith('/login') &&
+  !value.startsWith('/setup')
+    ? value
+    : undefined;
+
+/**
+ * Sign-in screen, shown only when the backend runs in multi-user mode. After an expired session, signing back in as
+ * the same account returns to where it was; any other account starts at Home.
+ */
+export const LoginScreen = () => {
+  const { t } = useTranslation();
+  const session = useAuthSession();
+  const returnTo = useSearch({ select: (search: { returnTo?: string }) => search.returnTo, strict: false });
+  // Captured as the screen opens: a successful sign-in clears the session's record of who expired.
+  const [returnFor] = useState(() => (returnTo === undefined ? null : session.expiredUserId));
+  const form = useZodForm(loginSchema, { email: '', password: '', rememberMe: false });
+
+  const submit = useCallback(
+    () =>
+      form.handleSubmit(async (values) => {
+        try {
+          await loginWithCredentials(values.email, values.password, values.rememberMe);
+        } catch (error) {
+          // A newer identity transition supersedes this submit; stale completion must neither navigate nor report
+          // an error.
+          if (isLoginAttemptSupersededError(error)) {
+            return;
+          }
+
+          throw new Error(getApiErrorMessage(error, t('auth.signInFailed')));
+        }
+      }),
+    [form, t]
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void submit();
+    },
+    [submit]
+  );
+
+  const handleEmailChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('email', event.target.value),
+    [form]
+  );
+
+  const handlePasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('password', event.target.value),
+    [form]
+  );
+
+  const handleRememberMeChange = useCallback(
+    (event: Checkbox.CheckedChangeDetails) => form.setValue('rememberMe', event.checked === true),
+    [form]
+  );
+
+  // Leave once signed in, whether by this form or by following a sign-in in another tab.
+  if (session.multiuserEnabled && session.user !== null) {
+    return returnTo !== undefined && returnFor !== null && session.user.user_id === returnFor ? (
+      <Navigate href={returnTo} replace to="." />
+    ) : (
+      <Navigate replace to="/" />
+    );
+  }
+
+  return (
+    <AuthScreen
+      footer={t('auth.forgotPasswordHint')}
+      subtitle={t('auth.signInSubtitle')}
+      title={t('auth.welcomeTitle')}
+    >
+      <chakra.form display="flex" flexDirection="column" gap="4" onSubmit={handleSubmit}>
+        {session.sessionExpired ? <AuthFormAlert message={t('auth.sessionExpired')} tone="warning" /> : null}
+        {form.formError ? <AuthFormAlert message={form.formError} tone="error" /> : null}
+        <Field error={form.errors.email} label={t('users.email')}>
+          <Input
+            aria-invalid={form.errors.email ? true : undefined}
+            autoComplete="email"
+            autoFocus
+            placeholder="you@example.com"
+            size="lg"
+            value={form.values.email}
+            onChange={handleEmailChange}
+          />
+        </Field>
+        <Field error={form.errors.password} label={t('auth.password')}>
+          <PasswordInput
+            aria-invalid={form.errors.password ? true : undefined}
+            autoComplete="current-password"
+            placeholder={t('auth.yourPassword')}
+            size="lg"
+            value={form.values.password}
+            onChange={handlePasswordChange}
+          />
+        </Field>
+        <Checkbox.Root checked={form.values.rememberMe} onCheckedChange={handleRememberMeChange}>
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+          <Checkbox.Label color="fg.muted" fontWeight="400">
+            {t('auth.keepSignedIn')}
+          </Checkbox.Label>
+        </Checkbox.Root>
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
+          {t('auth.signIn')}
+        </Button>
+      </chakra.form>
+    </AuthScreen>
+  );
+};

@@ -349,3 +349,31 @@ class AlibabaCloudImageGenerationInvocation(BaseExternalImageGenerationInvocatio
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["alibabacloud"],
     )
+
+
+@invocation(
+    "atlascloud_image_generation",
+    title="Atlas Cloud Image Generation",
+    tags=["external", "generation", "atlascloud"],
+    category="image",
+    version="1.0.0",
+)
+class AtlasCloudImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images through the Atlas Cloud asynchronous media API."""
+
+    provider_id = "atlascloud"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["atlascloud"],
+    )
+
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image for img2img/inpaint", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+    reference_images: list[ImageField] = InputField(default=[], description="Reference images", ui_hidden=True)

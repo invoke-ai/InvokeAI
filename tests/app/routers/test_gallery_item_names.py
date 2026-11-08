@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 
 ITEM_NAMES_URL = "/api/v1/gallery/item_names"
 DEPRECATED_URL = "/api/v1/gallery/items/names"
@@ -160,3 +161,25 @@ def test_marked_deprecated_in_the_openapi_schema(client: TestClient):
         "/api/v1/virtual_boards/by_date/{date}/item_names",
     ):
         assert schema["paths"][path]["get"]["deprecated"] is True, f"{path} should be marked deprecated"
+
+
+def test_starred_filter_matches_the_deprecated_endpoint(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """Both name shapes must narrow to the same rows under the `starred` filter."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "img-plain.png", user1.user_id)
+    _save_video(mock_invoker, "vid-starred.mp4", user1.user_id)
+    mock_invoker.services.video_records.update("vid-starred.mp4", VideoRecordChanges(starred=True))
+
+    headers = {"Authorization": f"Bearer {user1_token}"}
+    for starred, expected in (("true", ["vid-starred.mp4"]), ("false", ["img-plain.png"])):
+        new = client.get(ITEM_NAMES_URL, params={"starred": starred}, headers=headers)
+        old = client.get(DEPRECATED_URL, params={"starred": starred}, headers=headers)
+        assert new.status_code == status.HTTP_200_OK
+        assert old.status_code == status.HTTP_200_OK
+
+        assert new.json()["item_names"] == expected
+        assert new.json()["item_names"] == [item["name"] for item in old.json()["items"]]
+        assert new.json()["total_count"] == old.json()["total_count"] == 1
+        assert new.json()["starred_count"] == old.json()["starred_count"]

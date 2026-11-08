@@ -2,8 +2,6 @@ from typing import Optional
 
 import torch
 from PIL import Image
-
-# Import SAM2 components - these should be available in transformers 4.56.0+
 from transformers.models.sam2 import Sam2Model
 from transformers.models.sam2.processing_sam2 import Sam2Processor
 
@@ -101,7 +99,6 @@ class SegmentAnything2Pipeline(RawModel):
         masks = self._sam2_processor.post_process_masks(
             masks=outputs.pred_masks,
             original_sizes=processed_inputs.original_sizes,
-            reshaped_input_sizes=processed_inputs.reshaped_input_sizes,
         )
 
         # There should be only one batch.

@@ -1,0 +1,41 @@
+---
+title: Image manipulation provenance
+description: Sources, dependencies, licensing, and patent review status for the image manipulation nodes.
+---
+
+This record covers the image manipulation invocation and its shared numerical helpers. The table is the per-file provenance manifest; each row has the same origin, notice, and license status stated below.
+
+## Sources and implementation
+
+The image color-space conversion follows the published [Oklab model and reference equations](https://bottosson.github.io/posts/oklab/).
+The scalar edge-aware smoothing follows the guided-filter formulation of He, Sun, and Tang, [Guided Image Filtering (ECCV 2010)](https://doi.org/10.1007/978-3-642-15549-9_1), using normalized box means and reflected boundaries. The sRGB transfer function follows the [CSS Color Module Level 4 definition](https://www.w3.org/TR/css-color-4/#predefined-sRGB). The canvas fill of fully transparent pixels follows the chamfer distance transform of Borgefors, [Distance transformations in digital images (1986)](https://doi.org/10.1016/S0734-189X(86)80047-0).
+
+The clarity, texture, and contrast-dehaze controls are first-party image adjustments built from these documented equations and standard multiscale image-processing operations. Contrast Dehaze is an aesthetic approximation: it is not a physical haze estimator or scene-recovery method. The candidate contains no Dark Channel Prior (DCP) implementation or DCP control.
+
+The references below identify mathematical and specification foundations; apart from the gamut-clipping reference noted for `numerics.ts` below, they are not code sources.
+
+| Implementation file | Purpose and algorithm/source basis | Libraries and owner |
+| --- | --- | --- |
+| `invokeai/app/invocations/image_manipulation.py` | InvokeAI node adapters for Clarity, Texture, and Contrast Dehaze; no external algorithm code. | InvokeAI invocation/image services and the three first-party backend helpers. |
+| `invokeai/backend/image_util/clarity.py` | Midtone-gated, edge-aware multiscale detail adjustment; guided-filter formulation and Oklab lightness. | NumPy, Pillow; delegates to the `color.py` and `multiscale.py` helpers. |
+| `invokeai/backend/image_util/color.py` | Oklab lightness conversion and image restoration; Oklab equations and sRGB transfer function. | NumPy, Pillow, PyTorch, OpenCV core APIs (`cv2`). |
+| `invokeai/backend/image_util/contrast_dehaze.py` | First-party broad-scale contrast and chroma adjustment using guided-filter bands and Oklab. | NumPy, Pillow; delegates to the `color.py` and `multiscale.py` helpers. |
+| `invokeai/backend/image_util/guided_filter.py` | Scalar guided image filter; He, Sun, and Tang's guided-filter formulation, implemented with normalized OpenCV box filters. | NumPy, OpenCV core APIs (`cv2`). |
+| `invokeai/backend/image_util/multiscale.py` | Difference between two self-guided smooths; built on the guided-filter formulation. | NumPy; delegates to `guided_filter.py`. |
+| `invokeai/backend/image_util/texture.py` | Fine-scale detail adjustment with a local RMS gate; guided-filter bands and Oklab lightness. | NumPy, Pillow, OpenCV core APIs (`cv2`); delegates to the `color.py` and `multiscale.py` helpers. |
+| `invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/alphaFill.ts` | Nearest-visible-pixel labels for hidden-pixel fill; reproduces the labels of OpenCV's 5×5 chamfer distance transform (`distanceTransformWithLabels` with `DIST_L2` and `DIST_LABEL_PIXEL`), a chamfer transform after Borgefors. | TypeScript and standard ECMAScript typed arrays. |
+| `invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/evaluateSpatialSteps.ts` | Canvas evaluation of Clarity, Texture, and Contrast Dehaze over a layer's alpha bounds; mirrors the first-party backend helpers above. | TypeScript and standard ECMAScript typed arrays/math; delegates to the other files in this directory and to the canvas engine's `alphaBounds.ts`. |
+| `invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/guidedFilter.ts` | Self-guided filter and edge-aware bands with reflected boundaries and float64 box sums; He, Sun, and Tang's guided-filter formulation. | TypeScript and standard ECMAScript typed arrays/math. |
+| `invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/numerics.ts` | sRGB transfer, Oklab conversion, Oklab gamut clipping, and Python-compatible half-to-even rounding; published Oklab equations, sRGB transfer function, and a scalar port of the backend's `gamut_clip_tensor` (`invokeai/backend/image_util/color_conversion.py`), which follows Björn Ottosson's [sRGB gamut clipping](https://bottosson.github.io/posts/gamutclipping/) reference implementation. | TypeScript and standard ECMAScript numeric arrays/math. Gamut-clipping portion `MIT`, Copyright (c) 2021 Björn Ottosson; the notice is reproduced in the file. |
+| `invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/spatialSteps.ts` | Step and result types shared with the canvas worker; no algorithm. | TypeScript. |
+
+For every file in the table except the two noted below, the implementation was authored for InvokeAI, with no individual author asserted, and no code was copied or adapted from the cited works, their reference implementations, or other external code.
+
+- `numerics.ts` adapts Björn Ottosson's MIT-licensed gamut-clipping reference code (maximum-saturation polynomial and its coefficients, cusp search, gamut intersection, and the adaptive lightness anchor) through the backend's `gamut_clip_tensor`. It carries Ottosson's MIT copyright and permission notice and the SPDX expression `Apache-2.0 AND MIT`. The backend's `color_conversion.py`, which predates this feature and is outside this manifest, implements the same reference but does not carry that notice; `composition.py` carries a one-line Ottosson attribution.
+- `alphaFill.ts`: to return the same labels as the backend, its mask weights, neighbor visiting order, and tie rule were taken from OpenCV 4.11.0's `distanceTransformEx_5x5` (`modules/imgproc/src/distransform.cpp`; OpenCV is distributed under `Apache-2.0`, and that file keeps its earlier Intel and OpenCV Foundation BSD-style notice). The TypeScript is an independent implementation of that behavior; no OpenCV source text is reproduced.
+
+Each file is licensed under `Apache-2.0` (SPDX identifier in the source), except the MIT-licensed gamut-clipping portion of `numerics.ts` described above; no other third-party code or notices are included in these files. The Python modules call OpenCV core APIs only. The project already declares the `opencv-contrib-python` distribution, but this feature uses no contrib-only API and adds no contrib requirement or other dependency.
+
+## License and patent status
+
+No patent search or qualified patent clearance has been performed for the files in this manifest; this record makes no representation that the described techniques are patent-free. None of the listed files implements or exposes Dark Channel Prior (DCP). Any future inclusion or distribution of DCP, or upstream submission containing DCP, is gated on qualified patent and provenance clearance, as required by the project checklist.

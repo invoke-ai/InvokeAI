@@ -8,7 +8,7 @@ from diffusers import T2IAdapter
 from PIL.Image import Image
 
 from invokeai.app.util.controlnet_utils import prepare_control_image
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.architectures import get_max_unet_downscale
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
@@ -44,14 +44,8 @@ class T2IAdapterExt(ExtensionBase):
 
         self._adapter_state: Optional[List[torch.Tensor]] = None
 
-        # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
         model_config = self._node_context.models.get_config(self._model_id.key)
-        if model_config.base == BaseModelType.StableDiffusion1:
-            self._max_unet_downscale = 8
-        elif model_config.base == BaseModelType.StableDiffusionXL:
-            self._max_unet_downscale = 4
-        else:
-            raise ValueError(f"Unexpected T2I-Adapter base model type: '{model_config.base}'.")
+        self._max_unet_downscale = get_max_unet_downscale(model_config.base)
 
     @callback(ExtensionCallbackType.SETUP)
     def setup(self, ctx: DenoiseContext):

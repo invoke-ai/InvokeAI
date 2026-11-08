@@ -2,13 +2,14 @@
 Test the refactored model config classes.
 """
 
+import json
 from hashlib import sha256
 from typing import Any, Optional
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import insert
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     ModelRecordOrderBy,
@@ -17,18 +18,25 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH, ModelQueries
+from invokeai.app.services.shared.database.schema.models import models
+from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SD1_Config, LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_SD1_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
     Main_Diffusers_SDXL_Config,
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -41,18 +49,12 @@ from invokeai.backend.model_manager.taxonomy import (
     SchedulerPredictionType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.fixtures.races import when_called
 
 
 @pytest.fixture
-def store(
-    datadir: Any,
-) -> ModelRecordServiceSQL:
-    config = InvokeAIAppConfig()
-    config._root = datadir
-    logger = InvokeAILogger.get_logger(config=config)
-    db = create_mock_sqlite_database(config, logger)
-    return ModelRecordServiceSQL(db, logger)
+def store(database: Database) -> ModelRecordServiceSQL:
+    return ModelRecordServiceSQL(database, InvokeAILogger.get_logger())
 
 
 def example_ti_config(key: Optional[str] = None) -> TI_File_SD1_Config:
@@ -80,7 +82,7 @@ def test_type(store: ModelRecordServiceBase):
 
 
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
-    # Models have a uniqueness constraint by their name, base and type
+    # The key and the path are unique: config1 again repeats both, config2 its path.
     config1 = example_ti_config("key1")
     config2 = config1.model_copy(deep=True)
     config2.key = "key2"
@@ -139,24 +141,225 @@ def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordS
     assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 
-def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
-    config = example_ti_config("key1")
+@pytest.mark.parametrize("class_order", ["by name", "reversed"])
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/tmp/flux-3-image-klein-pup", TextLLM_Diffusers_Config),
+        ("/tmp/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", TextLLM_Checkpoint_Config),
+    ],
+    ids=["folder", "single file"],
+)
+def test_a_type_change_picks_the_class_of_the_records_container(
+    store: ModelRecordServiceBase, monkeypatch: pytest.MonkeyPatch, path: str, expected: type, class_order: str
+) -> None:
+    """An unidentified FLUX.3 prompt upsampler, made a Text LLM by hand. Its `unknown` format names no Text LLM
+    class, so each class of the type is tried without it, and both validate: the record's path has to decide, in
+    whatever order the classes come. `CONFIG_CLASSES` is a set, and taking the first class it yielded made the
+    outcome differ between processes."""
+    ordered = sorted(Config_Base.CONFIG_CLASSES, key=lambda cls: cls.__name__, reverse=class_order == "reversed")
+    monkeypatch.setattr(Config_Base, "CONFIG_CLASSES", ordered)
+    config = Unknown_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path=path,
+        file_size=1024,
+        name="FLUX.3 Prompt Upsampler",
+        hash="ABC123",
+    )
     store.add_model(config)
-    config = store.get_model("key1")
-    # upcast_attention is an invalid field for TIs
-    changes = ModelRecordChanges(upcast_attention=True)
-    with pytest.raises(ValidationError):
-        store.update_model(config.key, changes)
+    changes = ModelRecordChanges(type=ModelType.TextLLM, base=BaseModelType.Any)
+
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+
+    assert type(new_config) is expected
 
 
-def test_model_records_rejects_invalid_attr_changes_that_change_class(store: ModelRecordServiceBase):
-    config = example_ti_config("key1")
-    store.add_model(config)
-    config = store.get_model("key1")
-    # upcast_attention is an invalid field for TIs
-    changes = ModelRecordChanges(upcast_attention=True)
+@pytest.mark.parametrize("allow_class_change", [False, True])
+def test_rejected_update_preserves_the_complete_stored_record(
+    store: ModelRecordServiceBase, allow_class_change: bool
+) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+    # A classification edit may combine valid metadata changes with an incompatible model format.
+    changes = ModelRecordChanges(name="edited name", path="/tmp/edited.bin", format=ModelFormat.Diffusers)
+
     with pytest.raises(ValidationError):
-        store.update_model(config.key, changes)
+        store.update_model(original.key, changes, allow_class_change=allow_class_change)
+
+    after = store.get_model(original.key)
+    assert type(after) is type(before)
+    assert after.model_dump() == before.model_dump()
+
+
+@pytest.mark.parametrize("new_key", ["key2", "../../pwned"])
+def test_update_refuses_to_change_the_key(store: ModelRecordServiceBase, new_key: str) -> None:
+    """The row keeps its key, so a different key written into the stored config would leave a record that reports
+    a key nothing can look it up by."""
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+
+    with pytest.raises(ValueError, match="key cannot be changed"):
+        store.update_model(original.key, ModelRecordChanges(key=new_key, name="renamed"), allow_class_change=True)
+
+    assert store.get_model(original.key).model_dump() == before.model_dump()
+    assert not store.exists(new_key)
+
+
+def test_update_accepts_the_unchanged_key_echoed_back(store: ModelRecordServiceBase) -> None:
+    """The edit form posts the whole record back, key included."""
+    store.add_model(example_ti_config("key1"))
+
+    updated = store.update_model("key1", ModelRecordChanges(key="key1", name="renamed"))
+
+    assert (updated.key, updated.name) == ("key1", "renamed")
+
+
+def test_rejected_class_change_preserves_the_original_record(store: ModelRecordServiceBase) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+    # Correcting a model's classification can leave an explicitly incompatible format in the submitted edit.
+    changes = ModelRecordChanges(type=ModelType.LoRA, format=ModelFormat.EmbeddingFile, name="edited name")
+
+    with pytest.raises(ValidationError):
+        store.update_model(original.key, changes, allow_class_change=True)
+
+    after = store.get_model(original.key)
+    assert isinstance(after, TI_File_SD1_Config)
+    assert after.model_dump() == before.model_dump()
+
+
+def test_minimax_h3_text_encoder_stores_its_cpu_only_setting(store: ModelRecordServiceBase) -> None:
+    """Issue #9865: the switch reported success while the record kept no setting."""
+    config = Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(
+        key="h3-encoder",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        file_size=1024,
+        name="MiniMax H3 Text Encoder (int8)",
+        hash="ABC123",
+    )
+    store.add_model(config)
+
+    store.update_model(config.key, ModelRecordChanges(cpu_only=True), allow_class_change=True)
+    assert store.get_model(config.key).cpu_only is True
+
+    store.update_model(config.key, ModelRecordChanges(cpu_only=None), allow_class_change=True)
+    assert store.get_model(config.key).cpu_only is None
+
+
+def test_update_refuses_a_value_the_model_cannot_store(store: ModelRecordServiceBase) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+
+    with pytest.raises(ValueError, match="'old name' does not support cpu_only"):
+        store.update_model(original.key, ModelRecordChanges(cpu_only=True, name="renamed"), allow_class_change=True)
+
+    assert store.get_model(original.key).model_dump() == before.model_dump()
+
+
+def test_update_accepts_clearing_a_field_the_model_does_not_have(store: ModelRecordServiceBase) -> None:
+    """The identity form sends null for prediction_type and variant whatever the model's class."""
+    store.add_model(example_ti_config("key1"))
+
+    changes = ModelRecordChanges(cpu_only=None, prediction_type=None, variant=None, name="renamed")
+    updated = store.update_model("key1", changes, allow_class_change=True)
+
+    assert updated.name == "renamed"
+
+
+def test_class_change_drops_values_only_the_previous_class_stores(store: ModelRecordServiceBase) -> None:
+    """The edit form re-sends the old class's values when the type changes."""
+    store.add_model(
+        Main_Checkpoint_SD1_Config(
+            key="key1",
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+            path="/tmp/model.safetensors",
+            file_size=1024,
+            name="model",
+            hash="ABC123",
+            prediction_type=SchedulerPredictionType.VPrediction,
+            variant=ModelVariantType.Normal,
+        )
+    )
+
+    changes = ModelRecordChanges(
+        type=ModelType.LoRA,
+        format=ModelFormat.LyCORIS,
+        prediction_type=SchedulerPredictionType.VPrediction,
+        variant=ModelVariantType.Normal,
+    )
+    store.update_model("key1", changes, allow_class_change=True)
+
+    assert isinstance(store.get_model("key1"), LoRA_LyCORIS_SD1_Config)
+
+
+def test_class_change_stores_values_only_the_new_class_has(store: ModelRecordServiceBase) -> None:
+    store.add_model(
+        LoRA_LyCORIS_SD1_Config(
+            key="key1",
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+            path="/tmp/model.safetensors",
+            file_size=1024,
+            name="model",
+            hash="ABC123",
+        )
+    )
+
+    changes = ModelRecordChanges(
+        type=ModelType.Main,
+        format=ModelFormat.Checkpoint,
+        prediction_type=SchedulerPredictionType.VPrediction,
+        variant=ModelVariantType.Inpaint,
+    )
+    store.update_model("key1", changes, allow_class_change=True)
+
+    stored = store.get_model("key1")
+    assert isinstance(stored, Main_Checkpoint_SD1_Config)
+    assert (stored.prediction_type, stored.variant) == (SchedulerPredictionType.VPrediction, ModelVariantType.Inpaint)
+
+
+def _diffusers_vae_config() -> VAE_Diffusers_SD1_Config:
+    return VAE_Diffusers_SD1_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/vae",
+        file_size=1024,
+        name="old name",
+        hash="ABC123",
+        repo_variant=ModelRepoVariant.Default,
+    )
+
+
+@pytest.mark.parametrize(
+    "make_config", [lambda: example_ti_config("key1"), _diffusers_vae_config], ids=["embedding", "vae"]
+)
+def test_a_record_posted_back_with_an_edit_is_accepted(store: ModelRecordServiceBase, make_config: Any) -> None:
+    """The legacy edit form submits the whole record; every field it holds is one its class stores."""
+    store.add_model(make_config())
+    record = store.get_model("key1").model_dump()
+    echoed = {field: value for field, value in record.items() if field in ModelRecordChanges.model_fields}
+
+    updated = store.update_model(
+        "key1", ModelRecordChanges.model_validate({**echoed, "name": "renamed"}), allow_class_change=True
+    )
+
+    assert updated.model_dump() == {**record, "name": "renamed"}
+
+
+@pytest.mark.parametrize("field", ["type", "base"])
+def test_model_record_changes_reject_invalid_classification_values(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ModelRecordChanges.model_validate({field: "not-a-model-classification"})
 
 
 def test_unknown_key(store: ModelRecordServiceBase):
@@ -294,8 +497,7 @@ def test_unique_by_path(store: ModelRecordServiceBase):
         prediction_type=SchedulerPredictionType.Epsilon,
         repo_variant=ModelRepoVariant.Default,
     )
-    # config1, config2 and config3 are compatible because they have unique paths
-    # of name, type and base
+    # config1, config2 and config3 can be installed together: their paths differ, though not their names
     for c in config1, config2, config3:
         c.key = sha256(c.path.encode("utf-8")).hexdigest()
         store.add_model(c)
@@ -467,3 +669,202 @@ def test_model_record_changes():
 
     changes = ModelRecordChanges.model_validate({"default_settings": {"vae": "value"}})
     assert isinstance(changes.default_settings, MainModelDefaultSettings)
+
+
+def _embedding(key: str, *, name: str = "embedding") -> TI_File_SD1_Config:
+    return TI_File_SD1_Config(
+        key=key,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path=f"/tmp/{key}.bin",
+        file_size=1024,
+        name=name,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.TextualInversion,
+        format=ModelFormat.EmbeddingFile,
+        hash="ABC123",
+    )
+
+
+def test_a_duplicate_is_reported_by_what_it_repeats(store: ModelRecordServiceBase) -> None:
+    store.add_model(_embedding("key1"))
+
+    with pytest.raises(DuplicateModelException, match="with path"):
+        store.add_model(_embedding("key2").model_copy(update={"path": "/tmp/key1.bin"}))
+    with pytest.raises(DuplicateModelException, match="with key"):
+        store.add_model(_embedding("key1").model_copy(update={"path": "/tmp/elsewhere.bin"}))
+
+
+def test_models_that_tie_are_listed_by_key_and_names_ignore_case(store: ModelRecordServiceBase) -> None:
+    # Added against key order, so that only the tie-break lists equal names by key. By bytes "Beta" sorts before
+    # "alpha", so only a case-insensitive order lists it last.
+    for key, name in (("k4", "Beta"), ("k3", "alpha"), ("k2", "ALPHA"), ("k1", "Alpha")):
+        store.add_model(_embedding(key, name=name))
+
+    def keys(order_by: ModelRecordOrderBy, direction: SQLiteDirection) -> list[str]:
+        return [model.key for model in store.search_by_attr(order_by=order_by, direction=direction)]
+
+    # The embeddings share their type, base and format, so the default order goes by their names too.
+    for order_by in (ModelRecordOrderBy.Name, ModelRecordOrderBy.Default):
+        assert keys(order_by, SQLiteDirection.Ascending) == ["k1", "k2", "k3", "k4"]
+        assert keys(order_by, SQLiteDirection.Descending) == ["k4", "k3", "k2", "k1"]
+
+
+_MAIN = {
+    "variant": ModelVariantType.Normal,
+    "prediction_type": SchedulerPredictionType.Epsilon,
+    "repo_variant": ModelRepoVariant.Default,
+}
+# Models that differ on every ordered attribute: key -> (class, fields of the class, name, path, size, added, modified).
+# Timestamps are written as stored, so that no test waits for the clock.
+_ORDERED_MODELS: dict[str, tuple[type, dict[str, Any], str, str, int, str, str]] = {
+    "a": (
+        Main_Diffusers_SDXL_Config,
+        _MAIN,
+        "delta",
+        "/m/2",
+        3000,
+        "2000-01-03 00:00:00.000",
+        "2000-02-02 00:00:00.000",
+    ),
+    "b": (
+        VAE_Diffusers_SD1_Config,
+        {"repo_variant": ModelRepoVariant.Default},
+        "Charlie",
+        "/m/4",
+        1000,
+        "2000-01-01 00:00:00.000",
+        "2000-02-04 00:00:00.000",
+    ),
+    "c": (TI_File_SD1_Config, {}, "bravo", "/m/1", 4000, "2000-01-02 00:00:00.000", "2000-02-03 00:00:00.000"),
+    "d": (LoRA_LyCORIS_SDXL_Config, {}, "Alpha", "/m/3", 2000, "2000-01-04 00:00:00.000", "2000-02-01 00:00:00.000"),
+    "e": (Main_Diffusers_SD1_Config, _MAIN, "echo", "/m/5", 5000, "2000-01-05 00:00:00.000", "2000-02-05 00:00:00.000"),
+}
+# Each order's listing, ascending; descending is its reverse, ties included.
+_ASCENDING = {
+    ModelRecordOrderBy.Default: "cdeab",  # by type, then base: the two main models
+    ModelRecordOrderBy.Type: "cdaeb",  # the two main models tie, by key
+    ModelRecordOrderBy.Base: "bcead",
+    ModelRecordOrderBy.Name: "dcbae",  # ignoring case; by bytes it would be "dbcae"
+    ModelRecordOrderBy.Format: "abecd",
+    ModelRecordOrderBy.Size: "bdace",
+    ModelRecordOrderBy.DateAdded: "bcade",
+    ModelRecordOrderBy.DateModified: "dacbe",
+    ModelRecordOrderBy.Path: "cadbe",
+}
+
+
+@pytest.fixture
+def ordered_store(database: Database, store: ModelRecordServiceSQL) -> ModelRecordServiceSQL:
+    with database.begin(write=True) as conn:
+        for key, (cls, fields, name, path, size, added, modified) in _ORDERED_MODELS.items():
+            config = cls(
+                key=key,
+                name=name,
+                path=path,
+                file_size=size,
+                hash=f"hash-{key}",
+                source="test/source/",
+                source_type=ModelSourceType.Path,
+                **fields,
+            )
+            conn.execute(
+                insert(models).values(id=key, config=config.model_dump_json(), created_at=added, updated_at=modified)
+            )
+    return store
+
+
+def _listed(store: ModelRecordServiceBase, order_by: ModelRecordOrderBy, direction: SQLiteDirection) -> str:
+    return "".join(model.key for model in store.search_by_attr(order_by=order_by, direction=direction))
+
+
+def test_each_order_has_its_own_listing() -> None:
+    # Else a test below could not tell one order's column from another's.
+    assert len(set(_ASCENDING.values())) == len(_ASCENDING) == len(ModelRecordOrderBy)
+
+
+@pytest.mark.parametrize("order_by", list(ModelRecordOrderBy))
+def test_each_order_sorts_by_its_own_column(ordered_store: ModelRecordServiceSQL, order_by: ModelRecordOrderBy) -> None:
+    assert _listed(ordered_store, order_by, SQLiteDirection.Ascending) == _ASCENDING[order_by]
+    assert _listed(ordered_store, order_by, SQLiteDirection.Descending) == _ASCENDING[order_by][::-1]
+
+
+def test_an_update_makes_a_model_the_last_modified(ordered_store: ModelRecordServiceSQL) -> None:
+    ordered_store.update_model("c", ModelRecordChanges(description="edited"))
+
+    assert _listed(ordered_store, ModelRecordOrderBy.DateModified, SQLiteDirection.Ascending) == "dabec"
+    assert _listed(ordered_store, ModelRecordOrderBy.DateAdded, SQLiteDirection.Ascending) == "bcade"
+
+
+def test_the_format_filter_applies(ordered_store: ModelRecordServiceSQL) -> None:
+    diffusers = ordered_store.search_by_attr(model_format=ModelFormat.Diffusers)
+
+    assert [model.key for model in diffusers] == ["e", "a", "b"]
+
+
+def test_a_replaced_model_is_stored_and_an_unknown_one_is_not_found(ordered_store: ModelRecordServiceSQL) -> None:
+    replaced = ordered_store.get_model("c").model_copy(update={"name": "renamed"})
+
+    ordered_store.replace_model("c", replaced)
+
+    assert ordered_store.get_model("c").name == "renamed"
+    with pytest.raises(ValueError):
+        ordered_store.replace_model("c", ordered_store.get_model("a"))
+    with pytest.raises(UnknownModelException):
+        ordered_store.replace_model("ghost", replaced.model_copy(update={"key": "ghost", "path": "/m/ghost"}))
+    with pytest.raises(UnknownModelException):
+        ordered_store.del_model("ghost")
+
+
+def test_concurrent_updates_of_a_model_both_apply(
+    store: ModelRecordServiceBase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.add_model(example_ti_config("key1"))
+
+    def second() -> object:
+        return store.update_model("key1", ModelRecordChanges(description="second"))
+
+    # The second update starts while the first holds the model's row: it must wait, then build on the first.
+    ended = when_called(monkeypatch, ModelQueries, "lock", second)
+    store.update_model("key1", ModelRecordChanges(name="first"))
+
+    assert ended() == []
+    updated = store.get_model("key1")
+    assert (updated.name, updated.description) == ("first", "second")
+
+
+def test_model_paths_include_records_that_no_longer_validate(store: ModelRecordServiceBase, database: Database) -> None:
+    store.add_model(_embedding("key1"))
+    # A record of a model type this version does not know, as after going back to an older version.
+    unknown = _embedding("key2").model_dump(mode="json") | {"type": "from_the_future"}
+    database.queries.models.insert("key2", json.dumps(unknown))
+
+    assert sorted(store.get_model_paths()) == ["/tmp/key1.bin", "/tmp/key2.bin"]
+    assert [model.key for model in store.search_by_attr()] == ["key1"]
+
+
+def test_the_oldest_model_of_a_file_comes_first(store: ModelRecordServiceBase, database: Database) -> None:
+    # The same file under two paths, the older record with the larger key: the route that recalls a model by its hash
+    # takes the first.
+    with database.begin(write=True) as conn:
+        for key, added in (("k1", "2000-01-02 00:00:00.000"), ("k2", "2000-01-01 00:00:00.000")):
+            config = _embedding(key).model_dump_json()
+            conn.execute(insert(models).values(id=key, config=config, created_at=added, updated_at=added))
+
+    assert [model.key for model in store.search_by_hash("ABC123")] == ["k2", "k1"]
+
+
+def test_a_key_or_path_longer_than_a_record_holds_is_refused(store: ModelRecordServiceBase) -> None:
+    # SQLite would hold them, a server would not: every backend refuses them alike.
+    with pytest.raises(ValueError, match="key"):
+        store.add_model(_embedding("k" * (MAX_KEY_LENGTH + 1)))
+    too_long_path = "/" + "p" * MAX_PATH_LENGTH
+    with pytest.raises(ValueError, match="path"):
+        store.add_model(_embedding("key1").model_copy(update={"path": too_long_path}))
+
+    longest_path = "/" + "p" * (MAX_PATH_LENGTH - 1)
+    store.add_model(_embedding("k" * MAX_KEY_LENGTH).model_copy(update={"path": longest_path}))
+    store.add_model(_embedding("key1"))
+    with pytest.raises(ValueError, match="path"):
+        store.update_model("key1", ModelRecordChanges(path=too_long_path))
+    assert store.get_model("key1").path == "/tmp/key1.bin"

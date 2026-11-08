@@ -1,0 +1,8 @@
+title: Nightmare Promptgen
+author: gogurtenjoyer
+repo: https://github.com/gogurtenjoyer/nightmare-promptgen
+summary: Generate imaginative, usually nightmarish, prompts with a local text generation model.
+description: >-
+  By default it offers GPT-Neo models the author fine-tuned on more than 2,500 of their own InvokeAI prompts in Compel
+  format, and you can add your own. Troublesome words can be replaced with a random choice from a list you define.
+categories: [prompts, language-models]

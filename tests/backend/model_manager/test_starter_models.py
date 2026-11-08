@@ -1,22 +1,63 @@
-"""Tests for the Krea-2 starter-model bundle and its GGUF dependency wiring.
+"""Tests for the starter-model bundles, the LTX-2 GGUF transformers and the FLUX.3 single files.
 
-A single-file / GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
+A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
-bundle exists, exposes both the diffusers and GGUF options, and that each GGUF entry declares the two
-standalone dependencies so installing it also pulls the pieces needed to run it.
+bundle exists, exposes the diffusers, GGUF and nvfp4 options, and that each transformer-only entry declares the
+two standalone dependencies so installing it also pulls the pieces needed to run it. The FLUX.2 bundle installs from
+one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
     StarterModel,
+    StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux3VariantType,
     Krea2VariantType,
+    LTX2VariantType,
     ModelFormat,
     ModelType,
 )
+
+
+def _hf_repo(source: str) -> str:
+    """The Hugging Face repo a starter source downloads from: `org/repo`, `org/repo::subpath` or a resolve URL."""
+    hf_url_prefix = "https://huggingface.co/"
+    if source.startswith(hf_url_prefix):
+        return "/".join(source.removeprefix(hf_url_prefix).split("/")[:2])
+    return source.split("::")[0]
+
+
+def _flux2_bundle_installs() -> list[StarterModelWithoutDependencies]:
+    """Everything installing the FLUX.2 bundle downloads: its members and each member's dependencies."""
+    installs: list[StarterModelWithoutDependencies] = []
+    for model in STARTER_BUNDLES[BaseModelType.Flux2].models:
+        installs.append(model)
+        installs.extend(model.dependencies or [])
+    return installs
+
+
+def test_flux2_bundle_installs_nothing_gated_or_non_commercial() -> None:
+    # Deliberately strict: Klein 4B is the only Apache 2.0, ungated FLUX.2 model, so anything else added to the
+    # bundle needs a license review before this allow-list grows.
+    offending = [m.name for m in _flux2_bundle_installs() if "klein-4b" not in _hf_repo(m.source).lower()]
+    assert offending == [], f"FLUX.2 bundle installs models from outside the Klein 4B repositories: {offending}"
+
+
+def test_flux2_bundle_runs_klein_4b_on_its_own() -> None:
+    installs = _flux2_bundle_installs()
+
+    assert any(
+        m.type is ModelType.Main and m.base is BaseModelType.Flux2 and "klein-4b" in m.source.lower() for m in installs
+    )
+    assert any(m.type is ModelType.VAE and m.base is BaseModelType.Flux2 for m in installs)
+    assert "black-forest-labs/FLUX.2-klein-4B::text_encoder+tokenizer" in {
+        m.source for m in installs if m.type is ModelType.Qwen3Encoder
+    }
 
 
 def _krea2_bundle_by_source() -> dict[str, StarterModel]:
@@ -26,7 +67,7 @@ def _krea2_bundle_by_source() -> dict[str, StarterModel]:
 
 def test_krea2_bundle_is_registered() -> None:
     assert BaseModelType.Krea2 in STARTER_BUNDLES
-    assert STARTER_BUNDLES[BaseModelType.Krea2].name == "Krea-2"
+    assert STARTER_BUNDLES[BaseModelType.Krea2].name == "Krea 2"
 
 
 def test_krea2_bundle_contains_diffusers_gguf_and_standalone_components() -> None:
@@ -37,7 +78,8 @@ def test_krea2_bundle_contains_diffusers_gguf_and_standalone_components() -> Non
     assert "krea/Krea-2-Raw" in by_source
     assert any(s.endswith("krea2_turbo-Q4_K_M.gguf") for s in by_source)
     assert any(s.endswith("krea2_turbo-Q8_0.gguf") for s in by_source)
-    # Standalone components (also declared as GGUF dependencies).
+    assert any(s.endswith("krea2_turbo_nvfp4.safetensors") for s in by_source)
+    # Standalone components (also declared as dependencies of the transformer-only entries).
     assert any(m.type is ModelType.VAE for m in by_source.values())
     assert any(m.type is ModelType.Qwen3VLEncoder for m in by_source.values())
 
@@ -49,21 +91,44 @@ def test_krea2_diffusers_variants() -> None:
     assert by_source["krea/Krea-2-Raw"].variant is Krea2VariantType.Base
 
 
-def test_krea2_gguf_entries_declare_vae_and_encoder_dependencies() -> None:
-    gguf_models = [
+def test_krea2_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Everything but the diffusers pipelines is a single file holding only the transformer: the GGUFs and the nvfp4
+    # safetensors alike.
+    transformer_only = [
         m
         for m in _krea2_bundle_by_source().values()
-        if m.format is ModelFormat.GGUFQuantized and m.base is BaseModelType.Krea2
+        if m.type is ModelType.Main and m.base is BaseModelType.Krea2 and m.source.startswith("https://")
     ]
-    assert len(gguf_models) == 2
+    assert {m.format for m in transformer_only} == {ModelFormat.GGUFQuantized, None}
+    assert len(transformer_only) == 3
 
-    for model in gguf_models:
+    for model in transformer_only:
         assert model.variant is Krea2VariantType.Turbo
         assert model.dependencies is not None, f"{model.name} must declare its standalone dependencies"
         dep_types = {dep.type for dep in model.dependencies}
-        # GGUF ships only the transformer -> it must pull a VAE and a Qwen3-VL encoder.
+        # It ships only the transformer -> it must pull a VAE and a Qwen3-VL encoder.
         assert ModelType.VAE in dep_types, f"{model.name} is missing a VAE dependency"
         assert ModelType.Qwen3VLEncoder in dep_types, f"{model.name} is missing a Qwen3-VL encoder dependency"
+
+
+def test_moss_image_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Single-file and GGUF MOSS-Image mains hold only the transformer; the loader requires a standalone FLUX.2 VAE and
+    # a Qwen3.5 encoder, so an entry without them installs but cannot generate.
+    transformer_only = [
+        m
+        for m in STARTER_MODELS
+        if m.type is ModelType.Main and m.base is BaseModelType.MossImage and m.source.startswith("https://")
+    ]
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert any(dep.type is ModelType.VAE and dep.base is BaseModelType.Flux2 for dep in dependencies), (
+            f"{model.name} is missing the FLUX.2 VAE dependency"
+        )
+        assert any(dep.type is ModelType.Qwen35Encoder for dep in dependencies), (
+            f"{model.name} is missing a Qwen3.5 encoder dependency"
+        )
 
 
 def test_krea2_bundle_models_are_registered_in_starter_models() -> None:
@@ -78,3 +143,111 @@ def test_krea2_gguf_dependency_models_are_registered_in_starter_models() -> None
     for model in STARTER_BUNDLES[BaseModelType.Krea2].models:
         for dep in model.dependencies or []:
             assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_minimax_h3_bundle_contains_working_set_and_turbo_loras() -> None:
+    bundle = STARTER_BUNDLES[BaseModelType.MiniMaxH3]
+    by_source = {model.source: model for model in bundle.models}
+    # The minimal working set: shared components, text encoder, and both task transformers.
+    assert any(s.startswith("MiniMaxAI/MiniMax-H3::") for s in by_source)
+    assert any(m.type is ModelType.Qwen3VLEncoder for m in by_source.values())
+    assert any(m.type is ModelType.Main and m.format is ModelFormat.Checkpoint for m in by_source.values())
+    assert "Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors" in by_source
+    assert "Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors" in by_source
+    # All three turbo (step-distillation) LoRAs.
+    loras = [m for m in bundle.models if m.type is ModelType.LoRA]
+    lora_sources = {m.source for m in loras}
+    assert "larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors" in lora_sources
+    assert "lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors" in lora_sources
+    assert "lightx2v/Minimax-h3-Turbo::minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors" in lora_sources
+    # The 4-step v0.1 Ref2V repack pans the camera whenever a video reference is used; it
+    # must not come back as a starter.
+    assert not any("ref2v_turbo_4step_v0.1" in s for s in lora_sources)
+
+
+def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
+    starter_sources = {m.source for m in STARTER_MODELS}
+    for model in STARTER_BUNDLES[BaseModelType.MiniMaxH3].models:
+        assert model.source in starter_sources, f"{model.name} is not registered in STARTER_MODELS"
+        for dep in model.dependencies or []:
+            assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> None:
+    """A GGUF build holds only the transformer, as the int8 single files do: installing one has to pull the component
+    folder and the Gemma-4 encoder it cannot run without, both installable starters themselves."""
+    gguf = [
+        m
+        for m in STARTER_MODELS
+        if m.base is BaseModelType.LTX2 and m.type is ModelType.Main and m.format is ModelFormat.GGUFQuantized
+    ]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.variant for m in gguf} == {LTX2VariantType.Dev, LTX2VariantType.Distilled}
+    for model in gguf:
+        dependencies = model.dependencies or []
+        assert {(dep.type, dep.format) for dep in dependencies} >= {
+            (ModelType.Main, ModelFormat.Diffusers),
+            (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
+        }, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name
+
+
+def test_preview_decoders_list_the_bases_sharing_their_latent_space() -> None:
+    """A TAE is filed under one base but decodes for every base denoising in the same latents, so the starter-model
+    base filter can show it there too. A base with a different latent space must not be listed."""
+    taes = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+    taesd = next(m for m in taes if m.base is BaseModelType.StableDiffusion1)
+    taef1 = next(m for m in taes if m.base is BaseModelType.Flux)
+    taef2 = next(m for m in taes if m.base is BaseModelType.Flux2)
+
+    assert BaseModelType.StableDiffusion2 in taesd.compatible_bases
+    assert BaseModelType.StableDiffusionXL not in taesd.compatible_bases
+    assert BaseModelType.ZImage in taef1.compatible_bases
+    assert BaseModelType.Flux2 not in taef1.compatible_bases
+    assert {BaseModelType.Flux3, BaseModelType.ErnieImage, BaseModelType.Ideogram4} <= set(taef2.compatible_bases)
+    assert BaseModelType.Flux not in taef2.compatible_bases
+    for model in taes:
+        assert model.base not in model.compatible_bases, model.name
+
+
+def test_wan_preview_decoders_list_only_their_own_latent_space() -> None:
+    """Both Wan TAEs are filed under Wan, but only the 16-channel one shares latents with other families."""
+    taes = {m.name: m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder and m.base is BaseModelType.Wan}
+    taew2_1 = next(m for n, m in taes.items() if n.startswith("TAEW2.1"))
+    taew2_2 = next(m for n, m in taes.items() if n.startswith("TAEW2.2"))
+
+    assert {BaseModelType.QwenImage, BaseModelType.Krea2, BaseModelType.Anima} <= set(taew2_1.compatible_bases)
+    assert taew2_2.compatible_bases == []
+
+
+def test_every_preview_decoder_starter_resolves_to_a_latent_space() -> None:
+    """`compatible_bases` and the missing-TAE log both read the space from the TAE the source names: a starter whose
+    URL names no published TAE would silently drop out of the base filter, the bundle hint and the log."""
+    for model in STARTER_MODELS:
+        if model.type is ModelType.TinyAutoencoder:
+            assert named_tiny_autoencoder_space(model.base, model.source) is not None, model.name
+
+
+def test_only_preview_decoders_list_compatible_bases() -> None:
+    others = [m for m in STARTER_MODELS if m.type is not ModelType.TinyAutoencoder]
+    assert others and all(m.compatible_bases == [] for m in others)
+
+
+def test_every_flux3_transformer_only_starter_pulls_the_vae_and_the_encoder() -> None:
+    """The single files, quantized or not, and the GGUFs hold only the transformer: installing one has to pull the
+    FLUX.2 VAE and the Qwen3-VL encoder, both installable starters themselves. Klein and Klein Base both ship that way."""
+    transformer_only = [
+        m for m in STARTER_MODELS if m.base is BaseModelType.Flux3 and m.type is ModelType.Main and m.format is not None
+    ]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+    assert {m.variant for m in transformer_only if m.format is ModelFormat.Checkpoint} == {
+        Flux3VariantType.Klein,
+        Flux3VariantType.KleinBase,
+    }
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert {dep.type for dep in dependencies} == {ModelType.VAE, ModelType.Qwen3VLEncoder}, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name

@@ -1,6 +1,8 @@
+import pytest
 import torch
 
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 
 
 def _reference_aitoolkit_forward(
@@ -63,3 +65,70 @@ def test_in_dim_magnitude_keeps_lycoris_math() -> None:
     direction_norm = direction.transpose(0, 1).norm(dim=1, keepdim=True).transpose(0, 1)
     expected = direction * (dora_scale / direction_norm)
     assert torch.allclose(orig_weight + layer.get_weight(orig_weight), expected, atol=1e-6)
+
+
+@torch.no_grad()
+@pytest.mark.parametrize(
+    ["out_features", "in_features"],
+    [(12, 20), (16, 16), (1, 8)],
+    ids=["non-square", "square", "single-output-row"],
+)
+def test_out_dim_dora_scale_matches_lycoris_wd_on_out(out_features: int, in_features: int) -> None:
+    """A ``.dora_scale`` stored per output row, ``(out_features, 1)``, is LyCORIS' default ``wd_on_out=True`` layout
+    (and OneTrainer's "DoRA on output axis"). It must be applied per output row, as LyCORIS' ``weight_decompose``
+    does, not per input column (#10016)."""
+    torch.manual_seed(0)
+    rank, alpha = 2, 1.0
+    orig_weight = torch.randn(out_features, in_features)
+    up = torch.randn(out_features, rank) * 0.3
+    down = torch.randn(rank, in_features) * 0.3
+    dora_scale = orig_weight.norm(dim=1, keepdim=True)
+
+    layer = any_lora_layer_from_state_dict(
+        {"lora_up.weight": up, "lora_down.weight": down, "dora_scale": dora_scale, "alpha": torch.tensor(alpha)}
+    )
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True
+
+    direction = orig_weight + up @ down * (alpha / rank)
+    expected = dora_scale * direction / direction.norm(dim=1, keepdim=True)
+    torch.testing.assert_close(orig_weight + layer.get_weight(orig_weight.clone()), expected, rtol=1e-5, atol=1e-5)
+
+
+@torch.no_grad()
+def test_out_dim_dora_scale_matches_lycoris_wd_on_out_for_conv() -> None:
+    """For a conv layer, LyCORIS' ``wd_on_out=True`` ``.dora_scale`` is ``(out_channels, 1, 1, 1)``."""
+    torch.manual_seed(0)
+    out_channels, in_channels, rank = 8, 4, 2
+    orig_weight = torch.randn(out_channels, in_channels, 3, 3)
+    up = torch.randn(out_channels, rank, 1, 1) * 0.3
+    down = torch.randn(rank, in_channels, 3, 3) * 0.3
+    dora_scale = orig_weight.flatten(1).norm(dim=1).reshape(out_channels, 1, 1, 1)
+
+    layer = DoRALayer.from_state_dict_values({"lora_up.weight": up, "lora_down.weight": down, "dora_scale": dora_scale})
+    assert layer.magnitude_is_out_dim is True
+
+    direction = orig_weight + (up.flatten(1) @ down.flatten(1)).reshape(orig_weight.shape)
+    direction_norm = direction.flatten(1).norm(dim=1).reshape(out_channels, 1, 1, 1)
+    expected = dora_scale * direction / direction_norm
+    torch.testing.assert_close(orig_weight + layer.get_weight(orig_weight.clone()), expected, rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    ["dora_scale_shape", "expected_out_dim"],
+    [
+        ((1, 20), False),  # LyCORIS wd_on_out=False, linear
+        ((12, 1), True),  # LyCORIS wd_on_out=True, linear
+        ((1, 20, 1, 1), False),  # LyCORIS wd_on_out=False, conv
+        ((12, 1, 1, 1), True),  # LyCORIS wd_on_out=True, conv
+        ((20,), False),  # 1-D: no axis to tell from, keeps the input-axis reading
+    ],
+)
+def test_dora_scale_orientation_follows_its_shape(dora_scale_shape: tuple[int, ...], expected_out_dim: bool) -> None:
+    out_features, in_features, rank = 12, 20, 4
+    up = torch.ones(out_features, rank, *([1] * (len(dora_scale_shape) - 2)))
+    down = torch.ones(rank, in_features, *([1] * (len(dora_scale_shape) - 2)))
+    layer = DoRALayer.from_state_dict_values(
+        {"lora_up.weight": up, "lora_down.weight": down, "dora_scale": torch.ones(dora_scale_shape)}
+    )
+    assert layer.magnitude_is_out_dim is expected_out_dim

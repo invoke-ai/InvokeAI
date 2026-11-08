@@ -1,5 +1,10 @@
+import logging
+import warnings
+
 import pytest
 import torch
+
+from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
 
 try:
     from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
@@ -83,3 +88,21 @@ def test_invoke_linear_8bit_lt_state_dict_roundtrip():
     # Assert that the inference results are the same.
     assert torch.allclose(y, y_quantized_1.to("cpu"), atol=0.05)
     assert torch.allclose(y_quantized_1, y_quantized_2, atol=1e-5)
+
+
+def test_a_bf16_int8_matmul_reports_no_cast_notice(caplog):
+    """The installed bitsandbytes, not a stand-in: a renamed logger or message would show up here."""
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+    layer = InvokeLinear8bitLt(input_features=32, output_features=64, has_fp16_weights=False)
+    layer.load_state_dict(torch.nn.Linear(32, 64).state_dict())
+    layer.to("cuda")
+
+    with warnings.catch_warnings(record=True) as caught, caplog.at_level(logging.WARNING):
+        warnings.simplefilter("always")
+        silence_int8_cast_notice()
+        layer(torch.randn(4, 32, dtype=torch.bfloat16, device="cuda"))
+        layer(torch.randn(4, 32, dtype=torch.bfloat16, device="cuda"))
+
+    assert not [w for w in caught if "MatMul8bitLt" in str(w.message)]
+    assert not [r for r in caplog.records if "MatMul8bitLt" in r.getMessage()]

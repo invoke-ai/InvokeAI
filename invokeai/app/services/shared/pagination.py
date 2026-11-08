@@ -1,6 +1,9 @@
+from enum import Enum
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
+
+from invokeai.app.util.metaenum import MetaEnum
 
 GenericBaseModel = TypeVar("GenericBaseModel", bound=BaseModel)
 
@@ -8,6 +11,14 @@ GenericBaseModel = TypeVar("GenericBaseModel", bound=BaseModel)
 # SQL LIMIT clauses, where SQLite treats a negative limit as unlimited and a huge one
 # materializes every row into DTOs — routes must clamp with ge=0/le=MAX_PAGE_SIZE.
 MAX_PAGE_SIZE = 1000
+
+
+class SQLiteDirection(str, Enum, metaclass=MetaEnum):
+    # The direction of an ordering. (Its name is part of the API schema, from when only SQLite backed it; a docstring
+    # would add a description to that schema.)
+
+    Ascending = "ASC"
+    Descending = "DESC"
 
 
 class CursorPaginatedResults(BaseModel, Generic[GenericBaseModel]):

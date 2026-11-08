@@ -1,0 +1,528 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import type { StubRasterSurface } from './raster.testStub';
+
+import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from './layerCache';
+import { createTestStubRasterBackend } from './raster.testStub';
+
+describe('createLayerCacheStore', () => {
+  it('notifies version changes for pixel publication, invalidation, replacement, growth, and deletion', () => {
+    const backend = createTestStubRasterBackend();
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(backend, { onVersionChange });
+
+    store.getOrCreate('layer-1', 10, 10);
+    expect(onVersionChange).not.toHaveBeenCalled();
+
+    store.publishPixels('layer-1');
+    store.growToRect('layer-1', { height: 20, width: 20, x: 0, y: 0 });
+    store.invalidate('layer-1');
+    store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 5, width: 5, x: 0, y: 0 }, backend.createSurface(5, 5))
+    );
+    store.delete('layer-1');
+
+    expect(onVersionChange).toHaveBeenCalledTimes(5);
+    expect(onVersionChange).toHaveBeenCalledWith('layer-1');
+  });
+
+  it('does not notify for ordinary fresh or stale allocation', () => {
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+
+    store.getOrCreate('origin', 10, 10);
+    store.getOrCreateRect('rect', { height: 10, width: 10, x: 2, y: 3 });
+    store.growToRect('grown', { height: 10, width: 10, x: 2, y: 3 });
+
+    expect(onVersionChange).not.toHaveBeenCalled();
+  });
+
+  it('returns a stable entry identity for the same layer + size', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const a = store.getOrCreate('layer-1', 100, 50);
+    const b = store.getOrCreate('layer-1', 100, 50);
+    expect(b).toBe(a);
+    expect(store.get('layer-1')).toBe(a);
+  });
+
+  it('marks new allocations as never published', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+
+    expect(store.getOrCreate('origin', 10, 10).hasPublishedPixels).toBe(false);
+    expect(store.getOrCreateRect('rect', { height: 10, width: 10, x: 2, y: 3 }).hasPublishedPixels).toBe(false);
+    expect(store.growToRect('grown', { height: 10, width: 10, x: 2, y: 3 }).hasPublishedPixels).toBe(false);
+  });
+
+  it('marks installed raster replacements as published', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const prepared = store.prepareReplacement(
+      'layer-1',
+      { height: 10, width: 10, x: 0, y: 0 },
+      backend.createSurface(10, 10)
+    );
+
+    expect(store.installReplacement(prepared).hasPublishedPixels).toBe(true);
+  });
+
+  it('preserves published pixels through invalidation so stale previews remain drawable', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 10, width: 10, x: 0, y: 0 }, backend.createSurface(10, 10))
+    );
+
+    store.invalidate('layer-1');
+
+    expect(entry.stale).toBe(true);
+    expect(entry.hasPublishedPixels).toBe(true);
+  });
+
+  it('resets publication readiness when a resize destroys the old pixels', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 10, width: 10, x: 0, y: 0 }, backend.createSurface(10, 10))
+    );
+
+    store.getOrCreate('layer-1', 20, 20);
+
+    expect(entry.hasPublishedPixels).toBe(false);
+  });
+
+  it('resizes the surface (and marks stale) when the requested size changes', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.getOrCreate('layer-1', 100, 50);
+    entry.stale = false;
+    const resized = store.getOrCreate('layer-1', 200, 80);
+    expect(resized).toBe(entry);
+    expect(resized.surface.width).toBe(200);
+    expect(resized.surface.height).toBe(80);
+    expect(resized.stale).toBe(true);
+  });
+
+  it('invalidate bumps the version and marks the cache stale', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.getOrCreate('layer-1', 10, 10);
+    entry.stale = false;
+    expect(store.version('layer-1')).toBe(0);
+
+    store.invalidate('layer-1');
+    expect(store.version('layer-1')).toBe(1);
+    expect(entry.version).toBe(1);
+    expect(entry.stale).toBe(true);
+
+    store.invalidate('layer-1');
+    expect(store.version('layer-1')).toBe(2);
+  });
+
+  it('version is 0 for an unknown layer', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    expect(store.version('nope')).toBe(0);
+  });
+
+  it('a recreated entry (after delete) resumes ABOVE the old version, never resetting to 0', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const first = store.getOrCreate('a', 10, 10);
+    store.invalidate('a');
+    store.invalidate('a');
+    expect(first.version).toBe(2);
+
+    // Recreated ids must exceed prior versions so adjusted surfaces and thumbnails cannot reuse stale pixels.
+    store.delete('a');
+    const recreated = store.getOrCreate('a', 10, 10);
+    expect(recreated.version).toBeGreaterThan(2);
+  });
+
+  it('an evicted-then-re-shown entry also resumes above its pre-eviction version', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('hidden', 100, 100);
+    store.invalidate('hidden'); // version 1
+    const budget = 100 * 100 * 4; // room for one surface
+    store.getOrCreate('visible', 100, 100);
+    const evicted = store.evict((id) => id === 'visible', budget);
+    expect(evicted).toContain('hidden');
+
+    const reshown = store.getOrCreate('hidden', 100, 100);
+    expect(reshown.version).toBeGreaterThan(1);
+  });
+
+  it('byteSize sums w*h*4 across all cache surfaces', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 100, 100); // 40_000
+    store.getOrCreate('b', 10, 10); // 400
+    expect(store.byteSize()).toBe(100 * 100 * 4 + 10 * 10 * 4);
+  });
+
+  it('delete drops a cache entry', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 10, 10);
+    store.delete('a');
+    expect(store.get('a')).toBeUndefined();
+    expect(store.byteSize()).toBe(0);
+  });
+
+  it('evict does nothing when already within budget', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 10, 10);
+    const evicted = store.evict(() => false, DEFAULT_CACHE_BUDGET_BYTES);
+    expect(evicted).toEqual([]);
+    expect(store.get('a')).toBeDefined();
+  });
+
+  it('evict removes least-recently-used unprotected caches until within budget, never protected ones', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    // Each surface is 100*100*4 = 40_000 bytes.
+    store.getOrCreate('old-hidden', 100, 100);
+    store.getOrCreate('visible', 100, 100);
+    store.getOrCreate('new-hidden', 100, 100);
+    // Touch 'new-hidden' so 'old-hidden' is the LRU among hidden entries.
+    store.get('new-hidden');
+
+    // Budget allows exactly two surfaces; three exist -> one hidden must go.
+    const budget = 100 * 100 * 4 * 2;
+    const evicted = store.evict((id) => id === 'visible', budget);
+
+    expect(evicted).toEqual(['old-hidden']);
+    expect(store.get('old-hidden')).toBeUndefined();
+    expect(store.get('visible')).toBeDefined();
+    expect(store.get('new-hidden')).toBeDefined();
+    expect(store.byteSize()).toBeLessThanOrEqual(budget);
+  });
+
+  it('evict keeps protected caches even when still over budget', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('visible', 100, 100);
+    const evicted = store.evict((id) => id === 'visible', 1);
+    expect(evicted).toEqual([]);
+    expect(store.get('visible')).toBeDefined();
+  });
+
+  it('keeps a running byte total through allocation, resize, transfer and release', () => {
+    const backend = createTestStubRasterBackend();
+    const reported: number[] = [];
+    const store = createLayerCacheStore(backend, { onBytesChange: (bytes) => reported.push(bytes) });
+
+    store.getOrCreateRect('a', { height: 10, width: 10, x: 0, y: 0 });
+    store.growToRect('a', { height: 10, width: 20, x: 0, y: 0 });
+    store.shrinkToRect('a', { height: 5, width: 20, x: 0, y: 0 });
+    const before = store.captureState('a');
+    store.installReplacement(
+      store.prepareReplacement('a', { height: 4, width: 4, x: 0, y: 0 }, backend.createSurface(4, 4))
+    );
+    expect(store.byteSize()).toBe(64);
+    store.restoreState('a', before);
+    expect(store.byteSize()).toBe(400);
+    // An exact rollback: guards captured before the replacement describe the reinstated entry again.
+    expect(store.peek('a')).toMatchObject({ rect: before!.rect, surface: before!.surface, version: before!.version });
+    store.publishRasterized('b', { height: 2, width: 3, x: 0, y: 0 }, backend.createSurface(3, 2));
+    store.delete('a');
+
+    expect(reported).toEqual([400, 800, 400, 64, 400, 424, 24]);
+    expect(store.byteSize()).toBe(24);
+    store.dispose();
+    expect(reported.at(-1)).toBe(0);
+  });
+
+  it('publishRasterized resizes, replaces and publishes the live pixels at a copied rect', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.getOrCreateRect('a', { height: 4, width: 4, x: 0, y: 0 });
+    const rect = { height: 8, width: 6, x: 1, y: 2 };
+
+    const published = store.publishRasterized('a', rect, backend.createSurface(6, 8), 'face-1');
+
+    expect(published).toBe(entry);
+    expect([entry.surface.width, entry.surface.height]).toEqual([6, 8]);
+    expect(entry.rect).toEqual(rect);
+    expect(entry.rect).not.toBe(rect);
+    expect(entry).toMatchObject({ hasPublishedPixels: true, renderedFontFamily: 'face-1', stale: false });
+    expect(store.byteSize()).toBe(6 * 8 * 4);
+  });
+
+  it('publishRasterized clears without drawing an empty result', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.getOrCreateRect('a', { height: 4, width: 4, x: 0, y: 0 });
+    const calls = (entry.surface as ReturnType<typeof backend.createSurface>).callLog;
+
+    store.publishRasterized('a', { height: 0, width: 0, x: 0, y: 0 }, backend.createSurface(0, 0));
+
+    expect(calls.some((call) => call.op === 'clearRect')).toBe(true);
+    expect(calls.some((call) => call.op === 'drawImage')).toBe(false);
+  });
+
+  it('dispose clears caches', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 10, 10);
+
+    store.dispose();
+    expect(store.byteSize()).toBe(0);
+  });
+});
+
+describe('getOrCreateRect (content-sized, off-origin placement)', () => {
+  it('creates a new surface placed at an off-origin (negative) layer-local rect', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.getOrCreateRect('L', { height: 40, width: 60, x: -15, y: -25 });
+    expect(entry.rect).toEqual({ height: 40, width: 60, x: -15, y: -25 });
+    expect(entry.surface.width).toBe(60);
+    expect(entry.surface.height).toBe(40);
+    expect(entry.stale).toBe(true);
+  });
+
+  it('NEVER resizes or re-places an existing entry (a grown paint cache must survive)', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.getOrCreateRect('L', { height: 40, width: 60, x: 5, y: 5 });
+    entry.stale = false;
+    // A later request with the (smaller/different) contract rect returns the
+    // live entry untouched: sizing belongs to the rasterizer/grow paths.
+    const again = store.getOrCreateRect('L', { height: 10, width: 10, x: 0, y: 0 });
+    expect(again).toBe(entry);
+    expect(again.rect).toEqual({ height: 40, width: 60, x: 5, y: 5 });
+    expect(again.surface.width).toBe(60);
+    expect(again.stale).toBe(false);
+  });
+
+  it('supports a zero-rect entry (brand-new empty paint layer)', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.getOrCreateRect('L', { height: 0, width: 0, x: 0, y: 0 });
+    expect(entry.rect).toEqual({ height: 0, width: 0, x: 0, y: 0 });
+    expect(entry.surface.width).toBe(0);
+    expect(entry.surface.height).toBe(0);
+  });
+});
+
+describe('growToRect (paint caches grow with strokes)', () => {
+  it('creates a fresh non-stale entry at the rounded target rect when none exists', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.growToRect('L', { height: 19.2, width: 10.6, x: 3.4, y: -2.7 });
+    expect(entry.rect).toEqual({ height: 19, width: 11, x: 3, y: -3 });
+    expect(entry.stale).toBe(false);
+  });
+
+  it('grows to the UNION of the current extent and the request, preserving old pixels at their shifted origin', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.growToRect('L', { height: 20, width: 20, x: 10, y: 10 });
+    const surfaceBefore = entry.surface;
+
+    const grown = store.growToRect('L', { height: 20, width: 20, x: -10, y: -10 });
+    expect(grown).toBe(entry);
+    // Union of [10,30)² and [-10,10)² = [-10,30)² → 40×40 at (-10,-10).
+    expect(grown.rect).toEqual({ height: 40, width: 40, x: -10, y: -10 });
+    // Resized in place: the surface identity is preserved (open sessions hold it).
+    expect(grown.surface).toBe(surfaceBefore);
+    expect(grown.surface.width).toBe(40);
+    expect(grown.surface.height).toBe(40);
+
+    // Preserve local placement at new surface offset (20,20) using GPU blits, without getImageData readback.
+    const log = (grown.surface as StubRasterSurface).callLog;
+    expect(log.filter((e) => e.op === 'resizePreserving').map((e) => e.args)).toEqual([[40, 40, 20, 20]]);
+    expect(log.map((e) => e.op)).not.toContain('getImageData');
+    expect(log.map((e) => e.op)).not.toContain('putImageData');
+  });
+
+  it('is a no-op (no resize, no blit) when the current extent already covers the request', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.growToRect('L', { height: 100, width: 100, x: 0, y: 0 });
+    const logLength = (entry.surface as StubRasterSurface).callLog.length;
+
+    const again = store.growToRect('L', { height: 10, width: 10, x: 20, y: 20 });
+    expect(again).toBe(entry);
+    expect(again.rect).toEqual({ height: 100, width: 100, x: 0, y: 0 });
+    expect((again.surface as StubRasterSurface).callLog.length).toBe(logLength);
+  });
+
+  it('adopts the target rect from an EMPTY extent without snapshotting stale pixels', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const empty = store.getOrCreateRect('L', { height: 0, width: 0, x: 0, y: 0 });
+    empty.stale = false;
+
+    const grown = store.growToRect('L', { height: 30, width: 30, x: 50, y: 60 });
+    expect(grown).toBe(empty);
+    // No union with the empty rect's (0,0) origin: the first stroke's bounds
+    // become the extent verbatim (no needless 0,0-anchored surface).
+    expect(grown.rect).toEqual({ height: 30, width: 30, x: 50, y: 60 });
+    const log = (grown.surface as StubRasterSurface).callLog;
+    expect(log.some((e) => e.op === 'getImageData')).toBe(false);
+    expect(log.some((e) => e.op === 'putImageData')).toBe(false);
+  });
+});
+
+describe('shrinkToRect (paint caches trim back to their visible pixels)', () => {
+  /** A published 40x40 cache at (10,10) — the shape a chunk-padded stroke leaves. */
+  const published = () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.growToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    store.publishPixels('L');
+    return { entry, store };
+  };
+
+  it('returns undefined for a layer with no cache', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    expect(store.shrinkToRect('missing', { height: 1, width: 1, x: 0, y: 0 })).toBeUndefined();
+  });
+
+  it('crops to the target rect with a NEGATIVE blit offset, preserving surface identity', () => {
+    const { entry, store } = published();
+    const trimmed = store.shrinkToRect('L', { height: 10, width: 10, x: 25, y: 30 });
+
+    expect(trimmed).toBe(entry);
+    expect(trimmed?.rect).toEqual({ height: 10, width: 10, x: 25, y: 30 });
+    expect(trimmed?.surface).toBe(entry.surface);
+    // Old origin (10,10) minus new origin (25,30) = (-15,-20), in one GPU blit.
+    const log = (entry.surface as StubRasterSurface).callLog;
+    expect(log.filter((e) => e.op === 'resizePreserving').map((e) => e.args)).toEqual([[10, 10, -15, -20]]);
+    expect(log.map((e) => e.op)).not.toContain('getImageData');
+    expect(log.map((e) => e.op)).not.toContain('putImageData');
+  });
+
+  it('collapses to a zero-rect surface via resize (not a blit) for an empty target', () => {
+    const { entry, store } = published();
+    const emptied = store.shrinkToRect('L', { height: 0, width: 0, x: 0, y: 0 });
+
+    expect(emptied?.rect).toEqual({ height: 0, width: 0, x: 10, y: 10 });
+    expect(emptied?.surface.width).toBe(0);
+    expect(emptied?.surface.height).toBe(0);
+    const resizes = (entry.surface as StubRasterSurface).callLog.filter((e) => e.op === 'resize');
+    expect(resizes.map((e) => e.args)).toEqual([[0, 0]]);
+  });
+
+  it('keeps the ENTRY alive when collapsed, so an undo can re-grow into it', () => {
+    const { store } = published();
+    store.shrinkToRect('L', { height: 0, width: 0, x: 0, y: 0 });
+
+    expect(store.peek('L')).toBeDefined();
+    const regrown = store.growToRect('L', { height: 8, width: 8, x: 12, y: 14 });
+    expect(regrown.rect).toEqual({ height: 8, width: 8, x: 12, y: 14 });
+  });
+
+  it('CLAMPS a request reaching outside the extent and never grows the cache', () => {
+    const { store } = published();
+    const clamped = store.shrinkToRect('L', { height: 400, width: 400, x: -100, y: -100 });
+    // Intersection with [10,50)² is the whole current extent → a no-op.
+    expect(clamped?.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
+
+    const partial = store.shrinkToRect('L', { height: 100, width: 100, x: 30, y: 30 });
+    expect(partial?.rect).toEqual({ height: 20, width: 20, x: 30, y: 30 });
+  });
+
+  it('is a no-op — no resize, no version bump, no notify — when the rect already matches', () => {
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+    const entry = store.growToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    store.publishPixels('L');
+    onVersionChange.mockClear();
+    const versionBefore = entry.version;
+    const logLength = (entry.surface as StubRasterSurface).callLog.length;
+
+    const again = store.shrinkToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    expect(again).toBe(entry);
+    expect(again?.version).toBe(versionBefore);
+    expect((entry.surface as StubRasterSurface).callLog.length).toBe(logLength);
+    expect(onVersionChange).not.toHaveBeenCalled();
+  });
+
+  it('bumps the version even when no pixels were ever published', () => {
+    // A shrink destroys pixels, so an in-flight rasterization job must invalidate.
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+    const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });
+    expect(entry.hasPublishedPixels).toBe(false);
+    const versionBefore = entry.version;
+
+    store.shrinkToRect('L', { height: 10, width: 10, x: 0, y: 0 });
+    expect(entry.version).toBe(versionBefore + 1);
+    expect(onVersionChange).toHaveBeenCalledWith('L');
+  });
+
+  it('leaves stale and hasPublishedPixels untouched — the surviving pixels are still fresh', () => {
+    const { entry, store } = published();
+    store.shrinkToRect('L', { height: 10, width: 10, x: 10, y: 10 });
+    expect(entry.stale).toBe(false);
+    expect(entry.hasPublishedPixels).toBe(true);
+  });
+
+  it('drops the damage trail, since every recorded surface-local rect is now void', () => {
+    const { entry, store } = published();
+    const version = entry.version;
+    store.publishPixels('L', { height: 4, width: 4, x: 0, y: 0 });
+    expect(store.damageSince('L', version)).not.toBeNull();
+
+    store.shrinkToRect('L', { height: 10, width: 10, x: 20, y: 20 });
+    expect(store.damageSince('L', version)).toBeNull();
+  });
+});
+
+describe('damageSince', () => {
+  const seeded = () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 100, 100);
+    return store;
+  };
+  const rect = (x: number, y: number, size = 10) => ({ height: size, width: size, x, y });
+
+  it('unions the regions written since a version', () => {
+    const store = seeded();
+    const base = store.version('a');
+    store.publishPixels('a', rect(10, 10));
+    store.publishPixels('a', rect(50, 40));
+    expect(store.damageSince('a', base)).toEqual({ height: 40, width: 50, x: 10, y: 10 });
+  });
+
+  it('reports only what changed after the asked-for version', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const mid = store.version('a');
+    store.publishPixels('a', rect(60, 60));
+    expect(store.damageSince('a', mid)).toEqual(rect(60, 60));
+  });
+
+  it('gives up when any write in the span did not name its damage', () => {
+    // Skipping such a write would refresh a stale surface only where the OTHER
+    // writes landed, silently leaving the unreported region wrong.
+    const store = seeded();
+    const base = store.version('a');
+    store.publishPixels('a', rect(10, 10));
+    store.publishPixels('a', null);
+    store.publishPixels('a', rect(60, 60));
+    expect(store.damageSince('a', base)).toBeNull();
+  });
+
+  it('gives up when the trail no longer reaches back to the version', () => {
+    const store = seeded();
+    const base = store.version('a');
+    for (let i = 0; i < 40; i++) {
+      store.publishPixels('a', rect(i, i, 5));
+    }
+    expect(store.damageSince('a', base)).toBeNull();
+    // ...but a recent version is still answerable.
+    const recent = store.version('a') - 2;
+    expect(store.damageSince('a', recent)).not.toBeNull();
+  });
+
+  it('gives up after a reallocation moves the surface origin', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const before = store.version('a');
+    store.growToRect('a', { height: 200, width: 200, x: -50, y: -50 });
+    store.publishPixels('a', rect(0, 0));
+    expect(store.damageSince('a', before)).toBeNull();
+  });
+
+  it('gives up after an invalidate', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const before = store.version('a');
+    store.invalidate('a');
+    store.publishPixels('a', rect(20, 20));
+    expect(store.damageSince('a', before)).toBeNull();
+  });
+
+  it('returns null for an unknown layer or an already-current version', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    expect(store.damageSince('missing', 0)).toBeNull();
+    expect(store.damageSince('a', store.version('a'))).toBeNull();
+  });
+});

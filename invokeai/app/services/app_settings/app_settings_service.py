@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 
 
 class AppSettingsService:
@@ -12,13 +12,8 @@ class AppSettingsService:
     that needs to be persisted across restarts, such as JWT secrets.
     """
 
-    def __init__(self, db: SqliteDatabase) -> None:
-        """Initialize the app settings service.
-
-        Args:
-            db: The SQLite database instance
-        """
-        self._db = db
+    def __init__(self, database: Database) -> None:
+        self._queries = database.queries
 
     def get(self, key: str) -> Optional[str]:
         """Get a setting value by key.
@@ -29,32 +24,7 @@ class AppSettingsService:
         Returns:
             The setting value if found, None otherwise
         """
-        try:
-            with self._db.transaction() as cursor:
-                cursor.execute("SELECT value FROM app_settings WHERE key = ?;", (key,))
-                row = cursor.fetchone()
-                return row[0] if row else None
-        except Exception:
-            return None
-
-    def set(self, key: str, value: str) -> None:
-        """Set a setting value.
-
-        Args:
-            key: The setting key
-            value: The setting value
-        """
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO app_settings (key, value)
-                VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET
-                    value = excluded.value,
-                    updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW');
-                """,
-                (key, value),
-            )
+        return self._queries.app_settings.get(key)
 
     def get_jwt_secret(self) -> str:
         """Get the JWT secret key from the database.

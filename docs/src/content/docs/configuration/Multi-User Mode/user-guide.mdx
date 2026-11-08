@@ -1,0 +1,117 @@
+---
+title: Multi-User Guide
+description: Sign in to a shared InvokeAI server, share boards and workflows, and work alongside other users.
+lastUpdated: 2026-10-26
+sidebar:
+  order: 3
+---
+
+import { LinkCard, Badge } from '@astrojs/starlight/components';
+
+In multi-user mode, several people share one InvokeAI server. Everyone signs in with their own account and has their own projects, boards, workflows and settings. This guide is for everyone who uses such a server.
+
+<LinkCard title="Setting up a server?" href="/configuration/multi-user-mode/admin-guide/" description="The administrator guide covers turning on multi-user mode, creating the first administrator, and adding, editing or removing users." />
+
+## Signing in
+
+Your administrator gives you an email address and a password. Open the server's address in your browser and enter them on **Welcome to Invoke**. Select **Keep me signed in for a week** on a computer only you use.
+
+You stay signed in for 24 hours after your last change, or a week with **Keep me signed in for a week**. Each change you make renews it, and five minutes before an idle session would end, Invoke shows **Your session ends soon** with the time. Signing back in with the same account returns you to the page you were on, with your open projects; signing in as someone else starts at Home. You can sign in from several browsers and devices at once.
+
+### Your account
+
+Open the account menu: your name in the Launchpad's top bar, or the app menu in a project. It has:
+
+- **Account settings**: change your display name, which other users see instead of your email, and your password. Changing the password needs your current one, and signs out your other browsers and devices. Your email cannot be changed.
+- **Manage users**: shown only to administrators, who also see an **Admin** badge under their name.
+- **Sign out**.
+
+Your preferences, such as theme and hotkeys, are saved to your account and follow you to other browsers.
+
+## What you can do
+
+| | User | Administrator |
+| --- | --- | --- |
+| Create projects, boards and workflows; generate with every installed model | ✓ | ✓ |
+| Open boards that others share with you | ✓ | ✓ |
+| See your own queue items in full and cancel them | ✓ | ✓ |
+| See other users' queue items | Status, GPU and times only | In full |
+| Cancel other users' jobs, pause the queue | — | ✓ |
+| Open every user's boards and Library workflows | — | ✓ |
+| Install and edit models and custom nodes (Launchpad **Models** and **Nodes**) | — | ✓ |
+| Manage users and server settings | — | ✓ |
+
+To become an administrator, ask an administrator to give you the role.
+
+## Working with Your Content in Multi-User Mode
+
+### Image Boards
+
+Your boards are yours, in the Library or in a project. Other users can open one only if you give them access, and what they can do depends on their role:
+
+| Role | Shown as | Can |
+| --- | --- | --- |
+| **Viewer** | Can view | Browse the board, open and download its images and videos, copy them to their own boards, and use them in their own generations. |
+| **Contributor** | Can add | Everything a viewer can, and add their own images and videos. They can remove, star or delete only what they added. |
+| **Editor** | Can edit | Everything a contributor can, and remove or star anyone's items, rename the board, set its cover and archive it. Nothing in the interface grants this role yet. |
+| **Owner** | | Everything, including changing who has access, moving the board between the Library and a project, and deleting it. |
+
+A board's **general access** sets the role every other user gets. Change it from the board's menu (**⋮** on the board, or right-click it): **Access**, then one of:
+
+- <Badge text="Restricted" variant="note" /> The default. Only you and administrators can open the board.
+- <Badge text="Everyone can view" variant="tip" /> Every signed-in user is a viewer.
+- <Badge text="Everyone can contribute" variant="caution" /> Every signed-in user is a contributor.
+
+The change applies at once. You cannot yet give a role to one person at a time. If a database upgraded from v6 held per-person board shares, each of those people became a viewer and sees the board under **Shared with me**, even if its general access is **Restricted**. These per-person roles cannot be listed or removed in the interface yet.
+
+Boards others open to you appear in the Gallery under **Shared with me**, with their owner and your role, for example **Ana · Can view**. Searching the board list also finds them by owner name.
+
+<details>
+<summary>Edge cases</summary>
+
+- **View-only boards.** You cannot add media to a board you can only view: it is not offered when moving media, dropping media on it does nothing, and uploads to it are refused. Its menu says whom to ask for access. If new results would go to it (it is the board named under **Saving to**, or the selected board while **Follow the selected board** is on), they go to your project's **Inbox** instead, marked **Auto**.
+- **Access changes while you work.** The board list catches up at its next refresh: a board you can no longer open leaves it, and new results stop going to it. Until then, changes you make from its menu, moves and uploads are refused with a notice. A board you lose and later regain access to comes back as it was.
+- **Deleting.** Only the person who added an image or video, or an administrator, can delete it permanently. When an owner or editor removes someone else's item from a board, it returns to that person's **Uncategorized** board. Deleting a board with its media deletes only your own media, even for an administrator; other people's items return to their Uncategorized boards. Only an administrator deleting another user's board deletes everything on it.
+- **Projects.** A project's **Inbox** stays restricted, and its access follows the project. Other boards in a project can have any general access, and keep it when they move between the Library and a project.
+- **Administrators** can open and manage every user's boards, and change any board's general access. They find boards that are not shared with them under **Other users' boards**, after **Shared with me**.
+
+</details>
+
+### Workflows
+
+Library workflows have a visibility:
+
+| Visibility | Who can see it | Who can change it |
+| --- | --- | --- |
+| **Private** (default for new workflows) | You and administrators | You |
+| **Public** | Every signed-in user of this server, under **Shared**. It is not published to the internet | You; others can open, duplicate or download it |
+| Saved in single-user mode, or before workflows had owners | Every signed-in user, under **Shared** | No one is offered rename, delete or visibility controls; anyone can open, duplicate or download it |
+
+- To change visibility, select the workflow under **Yours** and use **Visibility** in its detail panel.
+- **Save to library…** has a **Public workflow** option for the new Library copy. It does not make the project's own workflow public.
+- Changing visibility does not publish unsaved project edits. **Update library template** writes them to the Library copy and keeps its visibility. Only the template's owner or an administrator can update it; anyone else can use **Save as new** to create their own.
+- Public workflows that can be called from other workflows also appear in the **Call Saved Workflow** node's picker.
+
+### The Generation Queue
+
+Everyone's jobs share one queue. By default, users take turns: each user gets one job before anyone gets a second, so a large batch from someone else does not hold yours up. Your administrator can change this; see [The shared queue](/configuration/multi-user-mode/admin-guide/#the-shared-queue).
+
+You see your own jobs in full and can cancel them. Other users' jobs show only their status, GPU and times: no prompts, images, or who queued them.
+
+### Switching Between Single-User and Multi-User Mode
+
+Switching modes does not change who owns what, but it changes who can see it. The administrator guide lists [what happens to existing data](/configuration/multi-user-mode/admin-guide/#what-happens-to-existing-data).
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| "Incorrect email or password" | Check the email address and Caps Lock. If you forgot your password, ask an administrator to reset it; the sign-in screen says so under the form. |
+| "User account is disabled" | An administrator deactivated your account. Ask one to reactivate it. |
+| "Your session expired. Sign in again to pick up where you left off." | You were inactive for 24 hours (a week with **Keep me signed in for a week**), your password was changed, or your account was deactivated or deleted. Sign in again; a deactivated account shows "User account is disabled". |
+| No **Models**, **Nodes** or **Users** in the Launchpad | They are for administrators. You can still generate with every installed model; ask an administrator to install or change one. A link to one of these pages opens **Projects**, with a notice that it needs permission you don't have. While no models are installed, **Home** tells you to ask an administrator, and the **Start something** tiles note that generating needs a model. |
+| A board is missing | Open **Filter & sort boards** in the Gallery and turn on **Archived boards** or **Other projects' boards**. Check that you are signed in to the right account. |
+| A shared board disappeared | Its owner changed its access or deleted it. |
+| Your job waits in the queue | Other users' jobs are running, or an administrator paused the queue. Your turn comes in rotation. |
+
+To use the API from scripts, see the [Multi-User API Guide](/configuration/multi-user-mode/api-guide/). For other problems, ask your administrator, the [Discord](https://discord.gg/ZmtBAhwWhy) community, or [file an issue](https://github.com/invoke-ai/InvokeAI/issues).

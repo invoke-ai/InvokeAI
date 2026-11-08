@@ -135,6 +135,19 @@ env/
 venv/
 ENV/
 
+# Generated stuff
+invokeai.yaml
+invokeai.example.yaml
+
+/models/
+/databases/
+/configs/
+/nodes/
+/outputs/
+/fonts/
+/style_presets/
+/prompt_files/
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -169,7 +182,7 @@ cython_debug/
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/web/*
+!invokeai/frontend/webv1/*
 
 # Scratch folder
 .scratch/
@@ -187,6 +200,14 @@ installer/InvokeAI-Installer/
 .aider*
 
 .claude/
+.superpowers/
+
+# Temporary agent planning artifacts.
+**/.agents/plans/
+**/.codex/plans/
+**/.claude/plans/
+**/docs/plans/
+**/docs/superpowers/
 
 # Weblate configuration file
 weblate.ini

@@ -3,6 +3,7 @@ import torch
 from diffusers.models.transformers.transformer_krea2 import Krea2Transformer2DModel
 
 from invokeai.backend.krea2.attention import (
+    KREA2_SDPA_BACKEND_ENV_VAR,
     Krea2RegionalPromptingState,
     build_krea2_attention_processors,
 )
@@ -11,6 +12,16 @@ from invokeai.backend.krea2.regional_prompting import (
     Krea2TextConditioning,
 )
 from invokeai.backend.krea2.sampling_utils import prepare_position_ids
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_override(monkeypatch):
+    """A forced backend changes the numerics these compare, so the environment is decided here.
+
+    `test_only_even_main_blocks_apply_the_regional_mask_during_a_forward` runs two real forward
+    passes and compares pixels; exporting `INVOKE_KREA2_SDPA_BACKEND` makes them differ.
+    """
+    monkeypatch.delenv(KREA2_SDPA_BACKEND_ENV_VAR, raising=False)
 
 
 def _conditioning(length: int, value: float, mask: torch.Tensor | None = None) -> Krea2TextConditioning:
@@ -56,6 +67,25 @@ def test_restricted_attention_mask_matches_flux_style_region_semantics() -> None
         ),
     )
     assert bool(mask.any(dim=1).all())
+
+
+def test_unmasked_conditioning_covers_the_whole_image_only_in_negative_mode() -> None:
+    # Sequence: [global text, regional text, region image token, background image token].
+    conditionings = [_conditioning(1, 1.0), _conditioning(1, 2.0, torch.tensor([[[1.0, 0.0]]]))]
+    positive = Krea2RegionalPromptingExtension.from_text_conditionings(conditionings, image_seq_len=2)
+    negative = Krea2RegionalPromptingExtension.from_text_conditionings(
+        conditionings, image_seq_len=2, unmasked_covers_whole_image=True
+    )
+    positive_mask = positive.get_attention_mask()
+    negative_mask = negative.get_attention_mask()
+    assert positive_mask is not None and negative_mask is not None
+
+    assert positive_mask[0, 2:].tolist() == [False, True]
+    assert positive_mask[2:, 0].tolist() == [False, True]
+    assert negative_mask[0, 2:].tolist() == [True, True]
+    assert negative_mask[2:, 0].tolist() == [True, True]
+    # Regional text and image/image isolation are the same in both modes.
+    assert torch.equal(positive_mask[1:, 1:], negative_mask[1:, 1:])
 
 
 def test_fully_covered_disjoint_regions_cannot_attend_across_regions() -> None:

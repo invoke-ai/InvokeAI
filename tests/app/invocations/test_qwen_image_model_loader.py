@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.qwen_image_model_loader import QwenImageModelLoaderInvocation
+from invokeai.app.invocations.qwen_image.qwen_image_model_loader import QwenImageModelLoaderInvocation
 from invokeai.backend.model_manager.taxonomy import ModelFormat, SubModelType
 
 

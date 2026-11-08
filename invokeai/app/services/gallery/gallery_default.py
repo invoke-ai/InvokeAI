@@ -1,36 +1,75 @@
-import sqlite3
-from typing import Optional, Union, cast
+from collections.abc import Collection
+from dataclasses import dataclass, field
+from typing import Any, Optional, Sequence
 
-from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
+from invokeai.app.services.board_access.board_access_common import ItemAction, item_allows
+from invokeai.app.services.gallery.gallery_base import GalleryMediaKind, GalleryServiceABC
 from invokeai.app.services.gallery.gallery_common import (
+    MAX_USAGE_DOCUMENTS,
+    MAX_USAGE_NAMES,
     BoardMediaSummary,
     GalleryItem,
     GalleryItemKind,
+    GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
     GalleryItemRef,
+    GalleryMediaUsage,
+    GalleryMediaUsageDocument,
+    GalleryMediaUsageDocumentKind,
+    GalleryMediaUsageOthers,
+    GalleryMediaUsageQueue,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.gallery import Filters
+from invokeai.app.services.shared.media_references import MediaKind, MediaReferences
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
+from invokeai.app.services.video_records.video_records_common import coerce_media_origin
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
+# A reference index owner: (owner kind, owner account, owner id).
+_Owner = tuple[str, str, str]
 
-class SqliteGalleryService(GalleryServiceABC):
-    """Implements a polymorphic gallery via UNION ALL across the `images` and `videos` tables.
+_LEGACY_EDITOR_ID = "legacy_editor"
 
-    Filters are applied identically on each half. The two halves expose a common column set so
-    the result is shape-compatible (a literal `kind` discriminator + a `name` alias + duration/fps
-    that are NULL for images).
-    """
+
+def _document_of(owner_kind: str, owner_id: str) -> tuple[GalleryMediaUsageDocumentKind, str]:
+    """The document a reference owner belongs to, as the usage check lists it: a project's content and its
+    workspaces are one project, and the legacy editor's client state is one document however many keys it uses."""
+    if owner_kind in ("project", "project_workspace"):
+        return "project", owner_id
+    if owner_kind == "client_state":
+        return "legacy_editor", _LEGACY_EDITOR_ID
+    if owner_kind == "workflow":
+        return "workflow", owner_id
+    return "quarantined_project", owner_id
+
+
+def _add(references: MediaReferences, kind: MediaKind, name: str) -> None:
+    (references.images if kind == "image" else references.videos).add(name)
+
+
+@dataclass
+class _DocumentUse:
+    names: MediaReferences = field(default_factory=MediaReferences)
+    owners: set[_Owner] = field(default_factory=set)
+
+
+def _capped(names: set[str]) -> list[str]:
+    return sorted(names)[:MAX_USAGE_NAMES]
+
+
+class GalleryService(GalleryServiceABC):
+    """A gallery of images and videos as one list (see `queries/gallery.py`)."""
 
     __invoker: Invoker
 
-    def __init__(self, db: SqliteDatabase) -> None:
+    def __init__(self, database: Database) -> None:
         super().__init__()
-        self._db = db
+        self._queries = database.queries
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -48,9 +87,12 @@ class SqliteGalleryService(GalleryServiceABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
-        image_half, image_params, image_count_query = self._build_half(
-            kind="image",
+        filters = Filters(
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -58,69 +100,40 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+            media_kind=media_kind,
         )
-        video_half, video_params, video_count_query = self._build_half(
-            kind="video",
-            origin=origin,
-            categories=categories,
-            is_intermediate=is_intermediate,
-            board_id=board_id,
-            search_term=search_term,
-            user_id=user_id,
-            is_admin=is_admin,
-        )
-
-        order_clause = self._build_order_clause(starred_first, order_dir)
-
-        union_query = f"""--sql
-        SELECT * FROM (
-            {image_half}
-            UNION ALL
-            {video_half}
-        )
-        {order_clause}
-        LIMIT ? OFFSET ?
-        ;
-        """
-
-        with self._db.transaction() as cursor:
-            cursor.execute(union_query, image_params + video_params + [limit, offset])
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
-
-            cursor.execute(image_count_query, image_params)
-            image_count = cast(int, cursor.fetchone()[0])
-            cursor.execute(video_count_query, video_params)
-            video_count = cast(int, cursor.fetchone()[0])
-
-        urls = self.__invoker.services.urls
-        items = [self._row_to_item(row, urls) for row in rows]
-        return OffsetPaginatedResults[GalleryItem](
-            items=items,
+        rows, total = self._queries.gallery.page(
+            filters,
             offset=offset,
             limit=limit,
-            total=image_count + video_count,
+            starred_first=starred_first,
+            descending=order_dir == SQLiteDirection.Descending,
         )
+        items = [self._to_item(row) for row in rows]
+        return OffsetPaginatedResults[GalleryItem](items=items, offset=offset, limit=limit, total=total)
 
-    def _query_name_rows(
+    def get_item_location(
         self,
-        starred_first: bool,
-        order_dir: SQLiteDirection,
-        origin: Optional[ResourceOrigin],
-        categories: Optional[list[ImageCategory]],
-        is_intermediate: Optional[bool],
-        board_id: Optional[str],
-        search_term: Optional[str],
-        user_id: Optional[str],
-        is_admin: bool,
-        created_date: Optional[str],
-    ) -> tuple[list[sqlite3.Row], int]:
-        """Runs the ordered name query and returns its rows plus the starred count.
-
-        Shared by both name-list shapes so the deprecated `(kind, name)` variant and the flat
-        one can never drift apart in ordering or filtering.
-        """
-        image_half, image_params, _ = self._build_half(
-            kind="image",
+        kind: GalleryItemKind,
+        name: str,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
+    ) -> Optional[GalleryItemLocation]:
+        """Finds item's exact rank without building or returning the full name list."""
+        filters = Filters(
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -128,43 +141,28 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
-            names_only=True,
-            created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+            media_kind=media_kind,
         )
-        video_half, video_params, _ = self._build_half(
-            kind="video",
-            origin=origin,
-            categories=categories,
-            is_intermediate=is_intermediate,
-            board_id=board_id,
-            search_term=search_term,
-            user_id=user_id,
-            is_admin=is_admin,
-            names_only=True,
-            created_date=created_date,
+        row = self._queries.gallery.location(
+            filters, kind=kind.value, name=name, descending=order_dir == SQLiteDirection.Descending
+        )
+        if row is None:
+            return None
+        found_kind, found_name, index, total = row
+        return GalleryItemLocation(
+            kind=GalleryItemKind(found_kind), name=found_name, index=int(index), total=int(total)
         )
 
-        order_clause = self._build_order_clause(starred_first, order_dir)
-
-        union_query = f"""--sql
-        SELECT * FROM (
-            {image_half}
-            UNION ALL
-            {video_half}
+    def _names(self, filters: Filters, starred_first: bool, order_dir: SQLiteDirection) -> tuple[Sequence[Any], int]:
+        """The ordered (kind, name, starred) rows and the starred count. Shared by both name-list shapes so the
+        deprecated `(kind, name)` variant and the flat one can never drift apart in ordering or filtering."""
+        rows = self._queries.gallery.names(
+            filters, starred_first=starred_first, descending=order_dir == SQLiteDirection.Descending
         )
-        {order_clause}
-        ;
-        """
-
-        with self._db.transaction() as cursor:
-            cursor.execute(union_query, image_params + video_params)
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
-
-            starred_count = 0
-            if starred_first:
-                starred_count = sum(1 for r in rows if r["starred"])
-
-        return rows, starred_count
+        return rows, (sum(1 for row in rows if row[2]) if starred_first else 0)
 
     def list_item_names(
         self,
@@ -178,10 +176,12 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNamesResult:
-        rows, starred_count = self._query_name_rows(
-            starred_first=starred_first,
-            order_dir=order_dir,
+        filters = Filters(
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -190,8 +190,13 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+            media_kind=media_kind,
         )
-        refs = [GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"]) for row in rows]
+        rows, starred_count = self._names(filters, starred_first, order_dir)
+        refs = [GalleryItemRef(kind=GalleryItemKind(kind), name=name) for kind, name, _ in rows]
         return GalleryItemNamesResult(items=refs, starred_count=starred_count, total_count=len(refs))
 
     def get_item_names(
@@ -206,10 +211,12 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNames:
-        rows, starred_count = self._query_name_rows(
-            starred_first=starred_first,
-            order_dir=order_dir,
+        filters = Filters(
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -218,96 +225,30 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+            media_kind=media_kind,
         )
-        # A list comprehension over the raw column, deliberately: building one model per row
-        # is what made the deprecated variant expensive.
-        names = [row["name"] for row in rows]
+        rows, starred_count = self._names(filters, starred_first, order_dir)
+        # The raw names, deliberately: building one model per row is what made the deprecated variant expensive.
+        names = [name for _, name, _ in rows]
         return GalleryItemNames(item_names=names, starred_count=starred_count, total_count=len(names))
 
-    def get_dates(
-        self,
-        user_id: Optional[str] = None,
-        is_admin: bool = False,
-    ) -> list[VirtualSubBoardDTO]:
-        image_conditions = " AND images.is_intermediate = 0 "
-        video_conditions = " AND videos.is_intermediate = 0 "
-        image_params: list[Union[int, str, bool]] = []
-        video_params: list[Union[int, str, bool]] = []
-
-        if user_id is not None and not is_admin:
-            image_conditions += " AND images.user_id = ? "
-            image_params.append(user_id)
-            video_conditions += " AND videos.user_id = ? "
-            video_params.append(user_id)
-
-        union = f"""--sql
-            SELECT
-                images.created_at AS created_at,
-                'image' AS kind,
-                images.image_name AS name,
-                images.image_category AS category
-            FROM images
-            WHERE 1=1 {image_conditions}
-            UNION ALL
-            SELECT
-                videos.created_at AS created_at,
-                'video' AS kind,
-                videos.video_name AS name,
-                videos.video_category AS category
-            FROM videos
-            WHERE 1=1 {video_conditions}
-        """
-
-        counts_query = f"""--sql
-        SELECT
-            DATE(created_at) AS date,
-            SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
-            SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
-            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count
-        FROM ({union})
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC;
-        """
-
-        # The cover is the newest item of each date. ROW_NUMBER with kind/name tie-breakers
-        # (rather than a bare-column MAX() aggregate) keeps the choice deterministic when
-        # several items share the maximum timestamp — otherwise the cover could flicker
-        # between equally-new items across refetches.
-        covers_query = f"""--sql
-        SELECT date, kind, name FROM (
-            SELECT
-                DATE(created_at) AS date,
-                kind,
-                name,
-                ROW_NUMBER() OVER (
-                    PARTITION BY DATE(created_at)
-                    ORDER BY created_at DESC, kind DESC, name DESC
-                ) AS rn
-            FROM ({union})
-        )
-        WHERE rn = 1;
-        """
-
-        with self._db.transaction() as cursor:
-            cursor.execute(counts_query, image_params + video_params)
-            count_rows = cast(list[sqlite3.Row], cursor.fetchall())
-            cursor.execute(covers_query, image_params + video_params)
-            cover_rows = cast(list[sqlite3.Row], cursor.fetchall())
-
-        covers = {row["date"]: (row["kind"], row["name"]) for row in cover_rows}
-
+    def get_dates(self, user_id: Optional[str] = None, is_admin: bool = False) -> list[VirtualSubBoardDTO]:
+        counts, covers = self._queries.gallery.date_counts(user_id if user_id is not None and not is_admin else None)
         boards: list[VirtualSubBoardDTO] = []
-        for row in count_rows:
-            date = row["date"]
-            cover_kind, cover_name = covers.get(date, (None, None))
+        for day in counts:
+            cover_kind, cover_name = covers.get(day.day, (None, None))
             boards.append(
                 VirtualSubBoardDTO(
-                    virtual_board_id=f"by_date:{date}",
-                    board_name=date,
-                    date=date,
-                    image_count=row["image_count"],
-                    asset_count=row["asset_count"],
-                    video_count=row["video_count"],
+                    virtual_board_id=f"by_date:{day.day}",
+                    board_name=day.day,
+                    date=day.day,
+                    image_count=day.images,
+                    asset_count=day.assets,
+                    video_count=day.videos,
+                    asset_video_count=day.asset_videos,
                     cover_image_name=cover_name if cover_kind == "image" else None,
                     cover_video_name=cover_name if cover_kind == "video" else None,
                 )
@@ -318,237 +259,172 @@ class SqliteGalleryService(GalleryServiceABC):
         summaries = {board_id: BoardMediaSummary() for board_id in board_ids}
         if not board_ids:
             return summaries
-
-        placeholders = ",".join("?" for _ in board_ids)
-        query = f"""--sql
-        SELECT
-            board_id,
-            SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
-            SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
-            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count,
-            MAX(CASE WHEN rank = 1 AND kind = 'image' THEN name END) AS cover_image_name,
-            MAX(CASE WHEN rank = 1 AND kind = 'video' THEN name END) AS cover_video_name
-        FROM (
-            SELECT
-                board_id,
-                kind,
-                name,
-                category,
-                ROW_NUMBER() OVER (
-                    PARTITION BY board_id
-                    ORDER BY starred DESC, created_at DESC, kind DESC, name DESC
-                ) AS rank
-            FROM (
-                SELECT
-                    board_images.board_id AS board_id,
-                    'image' AS kind,
-                    images.image_name AS name,
-                    images.image_category AS category,
-                    images.starred AS starred,
-                    images.created_at AS created_at
-                FROM board_images
-                INNER JOIN images ON board_images.image_name = images.image_name
-                WHERE images.is_intermediate = FALSE
-                  AND board_images.board_id IN ({placeholders})
-                UNION ALL
-                SELECT
-                    board_videos.board_id AS board_id,
-                    'video' AS kind,
-                    videos.video_name AS name,
-                    videos.video_category AS category,
-                    videos.starred AS starred,
-                    videos.created_at AS created_at
-                FROM board_videos
-                INNER JOIN videos ON board_videos.video_name = videos.video_name
-                WHERE videos.is_intermediate = FALSE
-                  AND board_videos.board_id IN ({placeholders})
-            )
-        )
-        GROUP BY board_id;
-        """
-        with self._db.transaction() as cursor:
-            cursor.execute(query, [*board_ids, *board_ids])
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
-        for row in rows:
-            summaries[row["board_id"]] = BoardMediaSummary(
-                cover_image_name=row["cover_image_name"],
-                cover_video_name=row["cover_video_name"],
-                image_count=row["image_count"],
-                video_count=row["video_count"],
-                asset_count=row["asset_count"],
+        for summary in self._queries.gallery.board_summaries(board_ids):
+            summaries[summary.board_id] = BoardMediaSummary(
+                cover_image_name=summary.cover_image_name,
+                cover_video_name=summary.cover_video_name,
+                image_count=summary.images,
+                video_count=summary.videos,
+                asset_count=summary.assets,
+                asset_video_count=summary.asset_videos,
             )
         return summaries
 
-    @staticmethod
-    def _build_order_clause(starred_first: bool, order_dir: SQLiteDirection) -> str:
-        """Ordering with `kind` + `name` tie-breakers.
+    def get_media_usage(
+        self, image_names: Collection[str], video_names: Collection[str], user_id: str, is_admin: bool
+    ) -> GalleryMediaUsage:
+        checked = MediaReferences(
+            images=self._deletable("image", image_names, user_id, is_admin),
+            videos=self._deletable("video", video_names, user_id, is_admin),
+        )
+        return self._usage(checked, user_id)
 
-        Images and videos created within the same timestamp granularity would otherwise
-        have no defined relative order — rows could reorder across refetches or shift
-        between offset pages. The tie-breakers follow `order_dir` so ascending and
-        descending remain exact mirror images.
-        """
-        direction = order_dir.value
-        tie_breakers = f"kind {direction}, name {direction}"
-        if starred_first:
-            return f"ORDER BY starred DESC, created_at {direction}, {tie_breakers}"
-        return f"ORDER BY created_at {direction}, {tie_breakers}"
+    def get_board_media_usage(self, board_id: str, user_id: str, contributor_id: Optional[str]) -> GalleryMediaUsage:
+        # The enumeration `DELETE /boards/{id}?include_images=true` deletes.
+        services = self.__invoker.services
+        images = services.board_image_records.get_all_board_image_names_for_board(
+            board_id, None, None, user_id=contributor_id
+        )
+        videos = services.board_video_records.get_all_board_video_names_for_board(
+            board_id, None, None, user_id=contributor_id
+        )
+        return self._usage(MediaReferences(images=set(images), videos=set(videos)), user_id)
 
-    def _build_half(
-        self,
-        kind: str,
-        origin: Optional[ResourceOrigin],
-        categories: Optional[list[ImageCategory]],
-        is_intermediate: Optional[bool],
-        board_id: Optional[str],
-        search_term: Optional[str],
-        user_id: Optional[str],
-        is_admin: bool,
-        names_only: bool = False,
-        created_date: Optional[str] = None,
-    ) -> tuple[str, list[Union[int, str, bool]], str]:
-        """Builds one half of the union (either `images` or `videos`).
+    def _deletable(self, kind: MediaKind, names: Collection[str], user_id: str, is_admin: bool) -> set[str]:
+        """The existing named items the caller may delete, in one query. The delete endpoints decide each item with
+        `item_allows`; no board role grants a permanent delete, so the board an item is on does not enter it."""
+        if not names:
+            return set()
+        return {
+            name
+            for name, owner in self._queries.gallery.item_owners(kind, set(names))
+            if item_allows(is_item_owner=owner == user_id, is_admin=is_admin, board=None, action=ItemAction.Delete)
+        }
 
-        Returns `(query_with_select, params, count_query)`. Both halves emit the same columns so
-        UNION ALL is shape-compatible: `kind`, `name`, `width`, `height`, `category`, `starred`,
-        `is_intermediate`, `board_id`, `created_at`, `duration`, `fps`.
+    def _usage(self, checked: MediaReferences, user_id: str) -> GalleryMediaUsage:
+        """Who uses the checked media: the caller's documents and queue work by name, everyone else's as counts."""
+        by_kind: tuple[tuple[MediaKind, set[str]], ...] = (("image", checked.images), ("video", checked.videos))
 
-        `names_only=True` selects only `kind`, `name`, `starred`, `created_at` (the minimum needed
-        for ordering + the counts result).
-        """
-        if kind == "image":
-            base_table = "images"
-            join_table = "board_images"
-            name_col = "image_name"
-            category_col = "image_category"
-            origin_col = "image_origin"
-            duration_expr = "NULL"
-            fps_expr = "NULL"
-        elif kind == "video":
-            base_table = "videos"
-            join_table = "board_videos"
-            name_col = "video_name"
-            category_col = "video_category"
-            origin_col = "video_origin"
-            duration_expr = f"{base_table}.duration"
-            fps_expr = f"{base_table}.fps"
-        else:
-            raise ValueError(f"Unknown kind: {kind}")
-
-        if board_id == "none":
-            from_clause = f"FROM {base_table}"
-            board_id_expr = "NULL"
-        elif board_id is not None:
-            # CROSS JOIN keeps explicit-board work proportional to board membership.
-            from_clause = (
-                f"FROM {join_table} CROSS JOIN {base_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+        def read(
+            q: Queries,
+        ) -> tuple[list[tuple[MediaKind, str, _Owner]], dict[_Owner, str], dict[str, tuple[int, Optional[int]]]]:
+            rows = [
+                (kind, media, (owner_kind, owner_user, owner_id))
+                for kind, names in by_kind
+                if names
+                for media, owner_kind, owner_user, owner_id in q.media_references.owners(kind, names)
+            ]
+            callers = {owner for _, _, owner in rows if owner[1] == user_id}
+            # Only the caller's own documents are named. A project's revisions are read in the same transaction as
+            # its references, which are written in the transaction that saves it: they describe the state the names
+            # were read from, which a client compares with the copy it holds.
+            projects = sorted(
+                {owner_id for owner_kind, _, owner_id in callers if _document_of(owner_kind, owner_id)[0] == "project"}
             )
-            board_id_expr = f"{join_table}.board_id"
-        elif names_only:
-            from_clause = f"FROM {base_table}"
-            board_id_expr = "NULL"
-        else:
-            from_clause = (
-                f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+            return rows, q.media_references.document_names(callers), q.projects.revisions(user_id, projects)
+
+        rows, document_names, revisions = (
+            self._queries.run(read, read_only=True) if not checked.is_empty() else ([], {}, {})
+        )
+        active = self.__invoker.services.intermediates.get_active_queue_uses(checked)
+
+        in_use = MediaReferences()
+        mine: dict[tuple[GalleryMediaUsageDocumentKind, str], _DocumentUse] = {}
+        other_documents: set[tuple[GalleryMediaUsageDocumentKind, str, str]] = set()
+        other_media = MediaReferences()
+        for kind, media, owner in rows:
+            owner_kind, owner_user, owner_id = owner
+            document = _document_of(owner_kind, owner_id)
+            _add(in_use, kind, media)
+            if owner_user == user_id:
+                use = mine.setdefault(document, _DocumentUse())
+                _add(use.names, kind, media)
+                use.owners.add(owner)
+            else:
+                # Another account's workspace in the caller's project is that account's document.
+                other_documents.add((document[0], owner_user, document[1]))
+                _add(other_media, kind, media)
+
+        queue_items = 0
+        queue_media = MediaReferences()
+        other_queue_items = 0
+        for item in active:
+            # As the queue's own owner checks: an item stored without an owner is no caller's.
+            if item.user_id == user_id:
+                queue_items += 1
+                target = queue_media
+            else:
+                other_queue_items += 1
+                target = other_media
+            for names in (in_use, target):
+                names.images |= item.images
+                names.videos |= item.videos
+
+        documents: list[GalleryMediaUsageDocument] = []
+        for (kind, document_id), use in mine.items():
+            revision, workspace_revision = (
+                revisions.get(document_id, (None, None)) if kind == "project" else (None, None)
             )
-            board_id_expr = f"{join_table}.board_id"
-
-        if names_only:
-            select_cols = (
-                f"'{kind}' AS kind, "
-                f"{base_table}.{name_col} AS name, "
-                f"{base_table}.starred AS starred, "
-                f"{base_table}.created_at AS created_at"
+            documents.append(
+                GalleryMediaUsageDocument(
+                    kind=kind,
+                    id=document_id,
+                    # A project's own name before a workspace's: sorted owners put `project` first.
+                    name=next((document_names[o] for o in sorted(use.owners) if o in document_names), None),
+                    image_names=_capped(use.names.images),
+                    video_names=_capped(use.names.videos),
+                    image_count=len(use.names.images),
+                    video_count=len(use.names.videos),
+                    revision=revision,
+                    workspace_revision=workspace_revision,
+                )
             )
+        documents.sort(key=lambda d: (d.kind, (d.name or "").casefold(), d.id))
+        return GalleryMediaUsage(
+            checked_image_count=len(checked.images),
+            checked_video_count=len(checked.videos),
+            in_use_image_count=len(in_use.images),
+            in_use_video_count=len(in_use.videos),
+            documents=documents[:MAX_USAGE_DOCUMENTS],
+            documents_total=len(documents),
+            queue=GalleryMediaUsageQueue(
+                item_count=queue_items,
+                image_names=_capped(queue_media.images),
+                video_names=_capped(queue_media.videos),
+                image_count=len(queue_media.images),
+                video_count=len(queue_media.videos),
+            ),
+            other_accounts=GalleryMediaUsageOthers(
+                document_count=len(other_documents),
+                queue_item_count=other_queue_items,
+                image_count=len(other_media.images),
+                video_count=len(other_media.videos),
+            ),
+        )
+
+    def _to_item(self, row: Sequence[Any]) -> GalleryItem:
+        kind, name, width, height, category, starred, is_intermediate, board_id, created_at, duration, fps, origin = row
+        urls = self.__invoker.services.urls
+        item_kind = GalleryItemKind(kind)
+        if item_kind == GalleryItemKind.IMAGE:
+            full_url, thumbnail_url = urls.get_image_url(name), urls.get_image_url(name, thumbnail=True)
+            duration = fps = media_origin = None
         else:
-            select_cols = (
-                f"'{kind}' AS kind, "
-                f"{base_table}.{name_col} AS name, "
-                f"{base_table}.width AS width, "
-                f"{base_table}.height AS height, "
-                f"{base_table}.{category_col} AS category, "
-                f"{base_table}.starred AS starred, "
-                f"{base_table}.is_intermediate AS is_intermediate, "
-                f"{board_id_expr} AS board_id, "
-                f"{base_table}.created_at AS created_at, "
-                f"{duration_expr} AS duration, "
-                f"{fps_expr} AS fps"
-            )
-
-        conditions = ""
-        params: list[Union[int, str, bool]] = []
-
-        if origin is not None:
-            conditions += f" AND {base_table}.{origin_col} = ? "
-            params.append(origin.value)
-
-        if categories is not None:
-            category_strings = [c.value for c in set(categories)]
-            placeholders = ",".join("?" * len(category_strings))
-            conditions += f" AND {base_table}.{category_col} IN ( {placeholders} ) "
-            for c in category_strings:
-                params.append(c)
-
-        if is_intermediate is not None:
-            conditions += f" AND {base_table}.is_intermediate = ? "
-            params.append(is_intermediate)
-
-        if created_date is not None:
-            conditions += f" AND DATE({base_table}.created_at) = ? "
-            params.append(created_date)
-
-        if board_id == "none":
-            conditions += f""" AND NOT EXISTS (
-                SELECT 1
-                FROM {join_table}
-                WHERE {join_table}.{name_col} = {base_table}.{name_col}
-            ) """
-            if user_id is not None and not is_admin:
-                conditions += f" AND {base_table}.user_id = ? "
-                params.append(user_id)
-        elif board_id is not None:
-            conditions += f" AND {join_table}.board_id = ? "
-            params.append(board_id)
-        elif user_id is not None and not is_admin:
-            # No board_id supplied — still enforce per-user isolation so
-            # non-admin callers cannot enumerate other users' items.
-            conditions += f" AND {base_table}.user_id = ? "
-            params.append(user_id)
-
-        if search_term:
-            conditions += f" AND ({base_table}.metadata LIKE ? OR {base_table}.created_at LIKE ?) "
-            params.append(f"%{search_term.lower()}%")
-            params.append(f"%{search_term.lower()}%")
-
-        half_query = f"SELECT {select_cols} {from_clause} WHERE 1=1 {conditions}"
-        count_query = f"SELECT COUNT(*) {from_clause} WHERE 1=1 {conditions}"
-        return half_query, params, count_query
-
-    def _row_to_item(self, row: sqlite3.Row, urls) -> GalleryItem:
-        kind = GalleryItemKind(row["kind"])
-        name = row["name"]
-        if kind == GalleryItemKind.IMAGE:
-            full_url = urls.get_image_url(name)
-            thumbnail_url = urls.get_image_url(name, thumbnail=True)
-            duration = None
-            fps = None
-        else:
-            full_url = urls.get_video_url(name)
-            thumbnail_url = urls.get_video_url(name, thumbnail=True)
-            duration = row["duration"]
-            fps = row["fps"]
+            full_url, thumbnail_url = urls.get_video_url(name), urls.get_video_url(name, thumbnail=True)
+            media_origin = coerce_media_origin(origin)
         return GalleryItem(
-            kind=kind,
+            kind=item_kind,
             name=name,
             full_url=full_url,
             thumbnail_url=thumbnail_url,
-            width=row["width"],
-            height=row["height"],
-            category=ImageCategory(row["category"]),
-            starred=bool(row["starred"]),
-            is_intermediate=bool(row["is_intermediate"]),
-            board_id=row["board_id"],
-            created_at=row["created_at"],
+            width=width,
+            height=height,
+            category=ImageCategory(category),
+            starred=bool(starred),
+            is_intermediate=bool(is_intermediate),
+            board_id=board_id,
+            created_at=created_at,
             duration=duration,
             fps=fps,
+            media_origin=media_origin,
         )

@@ -1,8 +1,10 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Team
 """Implementation of model loader service."""
 
+import threading
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Type
+from typing import Callable, Iterable, Iterator, Optional, Type
 
 from picklescan.scanner import scan_file_path
 from safetensors.torch import load_file as safetensors_load_file
@@ -11,18 +13,104 @@ from torch import load as torch_load
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_load.model_load_common import distinct_caches, load_settings_changed
+from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import (
     LoadedModel,
     LoadedModelWithoutConfig,
+    ModelLoader,
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
+    StaleModelConfigError,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+
+
+@dataclass
+class _RecordEdit:
+    """One bracketed write of a model record (see `_RecordEdits.edit`)."""
+
+    # Whether the write changed how the model loads, judged by the record as stored (read back if the write
+    # failed); left set when either record cannot be read or the write is interrupted. While set, overlapping
+    # loads are re-checked.
+    load_affecting: bool = True
+
+
+@dataclass
+class _KeyEdits:
+    in_progress: int = 0
+    # Loads between their record read and their check under MODEL_LOAD_LOCK.
+    watchers: int = 0
+    # Bumped as each edit that changed how the model loads ends.
+    generation: int = 0
+
+
+class _RecordEdits:
+    """Per model key: record edits in progress, and whether one that changed how the model loads has ended since a
+    load read the record. A key is tracked only while it has edits in progress or loads watching it: a load that
+    starts later waits for in-progress edits, so it reads their result."""
+
+    def __init__(self) -> None:
+        self._changed = threading.Condition(threading.Lock())
+        self._keys: dict[str, _KeyEdits] = {}
+
+    def _retire_if_unused(self, key: str) -> None:
+        state = self._keys[key]
+        if not state.in_progress and not state.watchers:
+            del self._keys[key]
+
+    @contextmanager
+    def edit(self, key: str) -> Iterator[_RecordEdit]:
+        """Bracket a write of `key`'s record that may change how it loads, from before it commits until after any
+        cache invalidation it performs. Cold loads of `key` wait for open brackets before reading the record, and
+        are rejected if a bracket is still open, or a load-affecting one has closed, by the time construction is
+        serialized against invalidation. A bracket that changed nothing that loads clears `load_affecting` on the
+        yielded edit. `ModelLoadService.apply_record_change` is the only writer."""
+        record_edit = _RecordEdit()
+        with self._changed:
+            self._keys.setdefault(key, _KeyEdits()).in_progress += 1
+        try:
+            yield record_edit
+        finally:
+            with self._changed:
+                state = self._keys[key]
+                if record_edit.load_affecting:
+                    state.generation += 1
+                state.in_progress -= 1
+                if not state.in_progress:
+                    self._changed.notify_all()
+                self._retire_if_unused(key)
+
+    def wait_idle(self, key: str) -> None:
+        """Wait until no edit of `key` is in progress."""
+        with self._changed:
+            self._changed.wait_for(lambda: key not in self._keys or not self._keys[key].in_progress)
+
+    @contextmanager
+    def watch(self, key: str) -> Iterator[Callable[[], bool]]:
+        """Wait until no edit of `key` is in progress, then yield a callable telling whether `key` is still unedited:
+        no edit in progress, and none that changed how it loads ended since the wait."""
+        with self._changed:
+            self._changed.wait_for(lambda: key not in self._keys or not self._keys[key].in_progress)
+            state = self._keys.setdefault(key, _KeyEdits())
+            state.watchers += 1
+            generation = state.generation
+
+        def unchanged() -> bool:
+            with self._changed:
+                return not state.in_progress and state.generation == generation
+
+        try:
+            yield unchanged
+        finally:
+            with self._changed:
+                state.watchers -= 1
+                self._retire_if_unused(key)
 
 
 class ModelLoadService(ModelLoadServiceBase):
@@ -53,6 +141,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self._ram_caches: dict[str, ModelCache] = dict(ram_caches) if ram_caches else {}
         self._ram_caches.setdefault(str(TorchDevice.normalize(ram_cache.execution_device)), ram_cache)
         self._registry = registry
+        self._record_edits = _RecordEdits()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -92,17 +181,136 @@ class ModelLoadService(ModelLoadServiceBase):
         if hasattr(self, "_invoker"):
             self._invoker.services.events.emit_model_load_started(model_config, submodel_type, user_id or "system")
 
+        try:
+            try:
+                return self._load(model_config, submodel_type)
+            except StaleModelConfigError:
+                # The record changed after the caller read it: loading what it says now is what this call
+                # would have done had it been made a moment later. Retried here rather than by callers so
+                # every caller gets it.
+                return self._load(self._current_record(model_config.key), submodel_type)
+            except FileNotFoundError:
+                # The same, when the model was moved and its record updated to the new path; a missing
+                # file under an unchanged (or deleted) record is the caller's real error.
+                current = self._moved_record(model_config)
+                if current is None:
+                    raise
+                return self._load(current, submodel_type)
+        finally:
+            # Sent however the load ends, so a UI showing it as in progress can clear it.
+            if hasattr(self, "_invoker"):
+                self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
+
+    def _load(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> LoadedModel:
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
-        loaded_model: LoadedModel = implementation(
+        loader = implementation(
             app_config=self._app_config,
             logger=self._logger,
             ram_cache=self.ram_cache,
-        ).load_model(model_config, submodel_type)
-
+        )
+        if not isinstance(loader, ModelLoader):
+            # Only `ModelLoader` applies the stale-config check before admitting a model to the cache.
+            raise TypeError(f"{implementation!r} is not a ModelLoader, so it cannot be loaded safely")
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
+            loader.config_check = self._check_config
+        return loader.load_model(model_config, submodel_type)
 
-        return loaded_model
+    def apply_record_change(self, key: str, write: Callable[[], AnyModelConfig]) -> AnyModelConfig:
+        # Lock order: the bracket opens before MODEL_LOAD_LOCK is taken and closes after it is released, so a
+        # load rejected under the lock waits for the whole change, its invalidation included.
+        store = self._invoker.services.model_manager.store
+        with self._record_edits.edit(key) as edit:
+            previous = store.get_model(key)
+            try:
+                updated = write()
+            except Exception:
+                # The write may have committed before it failed, so judge it by the record as stored. An
+                # interrupt (KeyboardInterrupt, SystemExit) skips this: dropping waits for MODEL_LOAD_LOCK, which a
+                # construction may hold for a long time. Overlapping loads are still re-checked.
+                try:
+                    stored: Optional[AnyModelConfig] = store.get_model(key)
+                except UnknownModelException:
+                    # Deleted meanwhile (installs, syncs and prunes delete records outside this bracket): the
+                    # cached entries belong to a model that is gone.
+                    self._logger.debug(f"Model {key} was deleted during a failed write; dropping its cached entries.")
+                    stored = None
+                except Exception:
+                    self._logger.warning(
+                        f"Could not read back the record of model {key} after a failed write; dropping its cached "
+                        "entries.",
+                        exc_info=True,
+                    )
+                    stored = None
+                self._settle_record_change(edit, key, previous, stored)
+                raise
+            self._settle_record_change(edit, key, previous, updated)
+        return updated
+
+    def _settle_record_change(
+        self, edit: _RecordEdit, key: str, previous: AnyModelConfig, stored: Optional[AnyModelConfig]
+    ) -> None:
+        """Record on `edit` whether the change made `key` load differently, and if so drop its cached entries.
+        `stored` is None when the record could not be read back or is gone; the change then counts as
+        load-affecting."""
+        edit.load_affecting = stored is None or self._load_settings_changed(previous, stored)
+        if edit.load_affecting:
+            dropped = self.drop_cached_models([key])
+            if dropped:
+                self._logger.info(
+                    f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after "
+                    "settings change."
+                )
+
+    def drop_cached_models(self, keys: Iterable[str]) -> int:
+        keys = list(keys)
+        with MODEL_LOAD_LOCK.write_lock():
+            return sum(cache.drop_model(key) for cache in distinct_caches(self._ram_caches.values()) for key in keys)
+
+    def _load_settings_changed(self, previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
+        """The comparison every check of a record against another uses here: edits and the load fence must agree on
+        what loads differently, or a no-op rewrite (a path in another form) would evict and reject loads."""
+        return load_settings_changed(previous, updated, models_path=self._app_config.models_path)
+
+    def _current_record(self, key: str) -> AnyModelConfig:
+        """The stored record for `key`, read once no edit of it is in progress."""
+        self._record_edits.wait_idle(key)
+        return self._invoker.services.model_manager.store.get_model(key)
+
+    def _moved_record(self, config: AnyModelConfig) -> Optional[AnyModelConfig]:
+        """The stored record for `config`'s key if it now loads differently from `config`, else None."""
+        if not hasattr(self, "_invoker"):
+            return None
+        try:
+            current = self._current_record(config.key)
+        except UnknownModelException:
+            return None
+        if self._load_settings_changed(config, current):
+            return current
+        return None
+
+    @contextmanager
+    def _check_config(self, config: AnyModelConfig) -> Iterator[Callable[[], bool]]:
+        """Check `config` against its record; the yielded callable completes the check under MODEL_LOAD_LOCK.
+
+        Nothing here touches the database under that lock, so a long DB transaction (e.g. VACUUM) stalls only
+        this load. The record is read here, once no edit of it is in progress; edits bracket their commit and
+        cache invalidation with `_RecordEdits.edit()`. An edit that commits after this read therefore started after
+        the wait, so by the time construction is serialized against invalidation it is either still in
+        progress or has ended; either way the load is rejected, unless it ended having changed nothing that
+        loads (e.g. a rename).
+        """
+        with self._record_edits.watch(config.key) as unedited:
+            current = self._config_is_current(config)
+            yield lambda: current and unedited()
+
+    def _config_is_current(self, config: AnyModelConfig) -> bool:
+        """Whether `config` still loads the same model as the stored record for its key."""
+        try:
+            current = self._invoker.services.model_manager.store.get_model(config.key)
+        except UnknownModelException:
+            # Nothing newer to load instead, and the key can no longer be requested.
+            return True
+        return not self._load_settings_changed(config, current)
 
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None

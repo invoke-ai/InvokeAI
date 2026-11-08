@@ -8,7 +8,7 @@ call ``invoke`` with ``None`` directly.
 
 import pytest
 
-from invokeai.app.invocations.wan_ideal_dimensions import (
+from invokeai.app.invocations.wan.wan_ideal_dimensions import (
     WAN_TARGET_RESOLUTION_PX,
     WAN_TI2V_PIXEL_MULTIPLE,
     WanTI2VIdealDimensionsInvocation,

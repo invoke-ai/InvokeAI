@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
+from invokeai.backend.quantization.fp8_rowwise import FP8_ROWWISE_WEIGHT_DTYPE, Fp8Linear
+from invokeai.backend.quantization.fp8_scaled import WEIGHT_SCALE_SUFFIXES
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 if TYPE_CHECKING:
@@ -22,7 +23,7 @@ _BNB_SIBLING_SUFFIXES = (
 # Largest magnitude representable by the e4m3 float8 format. Per-row weight
 # scales map each row's max abs value onto this so we use the full range.
 FP8_E4M3_MAX = 448.0
-FP8_WEIGHT_DTYPE = torch.float8_e4m3fn
+FP8_WEIGHT_DTYPE = FP8_ROWWISE_WEIGHT_DTYPE
 FP8_SCALE_SUFFIX = ".weight_scale"
 # Marker written into the text encoder's config.json so the loader knows to take
 # the custom weight-only FP8 path instead of transformers' from_pretrained.
@@ -161,50 +162,39 @@ def quantize_weight_to_fp8(
     return q, scale.squeeze(1).to(torch.float32)
 
 
+def reject_scale_spellings_this_path_drops(state_dict: dict[str, torch.Tensor], what: str) -> None:
+    """Refuse a weight scale spelled in a way this path reads nothing from.
+
+    Everything here keys on ``FP8_SCALE_SUFFIX`` and only that: :func:`swap_linears_to_fp8` decides
+    a layer is quantized by it, and :func:`load_fp8_state_dict` keeps a float32 tensor by it. The
+    other spelling ComfyUI writes, ``.scale_weight``, therefore selects nothing -- the layer stays
+    an ordinary ``nn.Linear``, the fp8 codes are copied into it *as the weight*, and the scale is
+    reported at DEBUG as an unexpected key. The load succeeds and every affected weight is off by
+    ``1/weight_scale``, which for a per-row scale of ``amax/448`` is three to four orders of
+    magnitude on a typical layer.
+
+    Refusing rather than reading the second spelling, because a file that uses it is a ComfyUI
+    scaled-fp8 build and not this path's private layout: supporting those is a different piece of
+    work, with its own markers and its own per-layer flags, and this error is what would say it is
+    needed. The suffixes come from the shared tuple rather than a literal, though with two spellings
+    in it today no test can tell the two apart.
+    """
+    unread = tuple(suffix for suffix in WEIGHT_SCALE_SUFFIXES if suffix != FP8_SCALE_SUFFIX)
+    carried = sorted(key for key in state_dict if key.endswith(unread))
+    if carried:
+        raise ValueError(
+            f"{what} carries {len(carried)} weight scale(s) spelled `{unread[0]}` (e.g. "
+            f"{', '.join(carried[:3])}), and this loader reads only `{FP8_SCALE_SUFFIX}`. They would be "
+            "dropped and their layers left holding raw fp8 codes -- a model that loads and generates "
+            "noise. Use the unquantized build, or an Ideogram 4 build quantized by InvokeAI."
+        )
+
+
 def is_fp8_state_dict(state_dict: dict[str, torch.Tensor]) -> bool:
     """True if the checkpoint carries weight-only FP8 Linear weights."""
     return any(k.endswith(FP8_SCALE_SUFFIX) for k in state_dict) or any(
         v.dtype == FP8_WEIGHT_DTYPE for v in state_dict.values()
     )
-
-
-class Fp8Linear(nn.Module):
-    """Linear layer holding an e4m3 float8 weight + per-row float32 scale.
-
-    The weight and scale are registered as buffers (not parameters) so they load
-    via ``load_state_dict`` and are excluded from optimizer/grad machinery. The
-    dequantized matmul runs in ``compute_dtype``.
-    """
-
-    weight: torch.Tensor
-    weight_scale: torch.Tensor
-    bias: torch.Tensor | None
-
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        bias: bool,
-        compute_dtype: torch.dtype,
-    ) -> None:
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.compute_dtype = compute_dtype
-        self.register_buffer(
-            "weight",
-            torch.empty(out_features, in_features, dtype=FP8_WEIGHT_DTYPE),
-        )
-        self.register_buffer("weight_scale", torch.empty(out_features, dtype=torch.float32))
-        if bias:
-            self.register_buffer("bias", torch.empty(out_features, dtype=compute_dtype))
-        else:
-            self.bias = None
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        w = self.weight.to(x.dtype) * self.weight_scale.to(x.dtype).unsqueeze(1)
-        bias = self.bias.to(x.dtype) if self.bias is not None else None
-        return F.linear(x, w, bias)
 
 
 def swap_linears_to_fp8(

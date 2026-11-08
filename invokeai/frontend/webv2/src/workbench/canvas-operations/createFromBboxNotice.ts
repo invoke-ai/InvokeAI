@@ -1,0 +1,62 @@
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/api';
+
+import type { CanvasImportNotice } from './canvasImportNotice';
+import type { CreateFromBboxLayerDestination, CreateFromBboxResult } from './createFromBbox';
+
+import { getCanvasImportNotice } from './canvasImportNotice';
+
+/** A translated notice, or a spatial adjustment refusal the view words like every other one. */
+export type CreateFromBboxNotice =
+  | {
+      kind: 'error' | 'info' | 'success';
+      titleKey:
+        | CanvasImportNotice['titleKey']
+        | 'widgets.canvas.contextMenu.createdFromBbox'
+        | 'widgets.canvas.contextMenu.empty'
+        | 'widgets.canvas.contextMenu.notReady'
+        | 'widgets.canvas.contextMenu.stale'
+        | 'widgets.canvas.contextMenu.unreadable';
+      /** `destination` is itself a translation key naming the created entity; `name` names an unreadable layer. */
+      options?: CanvasImportNotice['options'] | { destination: string } | { name: string };
+    }
+  | { kind: 'error'; refusal: AdjustmentRefusal };
+
+const DESTINATION_LABEL_KEYS: Record<CreateFromBboxLayerDestination, string> = {
+  control: 'widgets.canvas.import.control',
+  raster: 'widgets.canvas.import.raster',
+  'regional-reference': 'widgets.canvas.import.regionalReference',
+};
+
+const assertNever = (value: never): never => {
+  throw new Error(`Unhandled create-from-bbox result: ${JSON.stringify(value)}`);
+};
+
+export const getCreateFromBboxNotice = (
+  result: Exclude<CreateFromBboxResult, { status: 'uploaded' }>
+): CreateFromBboxNotice => {
+  switch (result.status) {
+    case 'created':
+      return {
+        kind: 'success',
+        options: { destination: DESTINATION_LABEL_KEYS[result.destination] },
+        titleKey: 'widgets.canvas.contextMenu.createdFromBbox',
+      };
+    case 'empty':
+      return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.empty' };
+    case 'stale':
+      return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.stale' };
+    case 'not-ready':
+    case 'over-budget':
+      return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.notReady' };
+    case 'unreadable':
+      return { kind: 'error', options: { name: result.layerName }, titleKey: 'widgets.canvas.contextMenu.unreadable' };
+    case 'adjustment-refused':
+      return { kind: 'error', refusal: result };
+    case 'blocked':
+    case 'stale-document':
+    case 'stale-project':
+      return getCanvasImportNotice({ status: result.status });
+    default:
+      return assertNever(result);
+  }
+};

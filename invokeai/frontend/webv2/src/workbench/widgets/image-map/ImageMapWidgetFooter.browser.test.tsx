@@ -1,0 +1,182 @@
+import type { ImageMapPoint } from '@workbench/image-map/api';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { system } from '@theme/system';
+import { imageMapStore } from '@workbench/image-map/imageMapStore';
+import i18next from 'i18next';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
+
+import { ImageMapWidgetFooter } from './ImageMapWidgetFooter';
+
+const api = vi.hoisted(() => ({
+  fetchImageMapClusterLabels: vi.fn(),
+  fetchImageMapPoints: vi.fn(),
+  fetchImageMapStatus: vi.fn(),
+  requestImageMapRefresh: vi.fn(),
+}));
+
+vi.mock('@workbench/image-map/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ...api,
+}));
+
+// The components read the global instance; give it the English catalog.
+await i18next.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
+
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const points = (...clusters: number[]): ImageMapPoint[] =>
+  clusters.map((cluster, index) => ({
+    cluster,
+    item: { kind: 'image', name: `${index}.png` },
+    key: `image:${index}.png` as ImageMapPoint['key'],
+    x: index,
+    y: index,
+  }));
+
+/** The narrowest a floating window gets (`workbench/floatingWindows.ts`). */
+const NARROW_HOST = '280px';
+
+/** Every other segment the row can show at once, to squeeze the readout hardest. */
+const CROWDED = { embedded: 123456, failed: 12, pending: 60544, total: 184012 };
+
+const renderFooter = async (clusters: number[], width?: string, crowded = false) => {
+  imageMapStore.setSnapshot({
+    clusterLabels: null,
+    clusterLabelsEps: null,
+    clusterLabelsHash: null,
+    data: {
+      clusterEps: 0.2,
+      modelId: null,
+      modelName: null,
+      pointCount: clusters.length,
+      points: points(...clusters),
+      stale: crowded,
+      state: 'ready',
+      updatedAt: null,
+      visibleHash: null,
+    },
+    error: null,
+    indexCounts: crowded ? CROWDED : null,
+    indexUpdatedAt: crowded ? Date.now() : null,
+    loadState: 'loaded',
+    renderError: null,
+  });
+
+  if (width && host) {
+    host.style.width = width;
+  }
+
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <ImageMapWidgetFooter {...({} as WidgetViewProps)} />
+      </ChakraProvider>
+    )
+  );
+};
+
+const readout = (): HTMLElement => {
+  const found = Array.from(host?.querySelectorAll('p, span, div') ?? []).find((element) =>
+    element.textContent?.startsWith('· Cluster count:')
+  );
+
+  if (!(found instanceof HTMLElement)) {
+    throw new TypeError('the cluster readout is not in the document');
+  }
+
+  return found;
+};
+
+beforeEach(() => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+});
+
+afterEach(async () => {
+  await act(() => root?.unmount());
+  host?.remove();
+  host = null;
+  root = null;
+});
+
+describe('ImageMapWidgetFooter', () => {
+  it('reports the clustering beside the point count', async () => {
+    await renderFooter([0, 0, 0, 1, 1, -1]);
+
+    expect(host?.textContent).toContain('6 points');
+    expect(host?.textContent).toContain(
+      'Cluster count: 2, largest cluster: 3 media points, unclustered: 1 media point'
+    );
+  });
+
+  it('stays readable in a narrow widget, where the text itself cannot be', async () => {
+    // This segment is the only shrinkable item in the row, so it absorbs all
+    // the overflow: at 280px the numbers are clipped out of the page and the
+    // tooltip is the only way left to read them.
+    // Crowded: stale, indexing and skipped all showing, so every other
+    // segment is competing for the row. They are all nowrap and refuse to
+    // shrink, which is what makes this one absorb the whole overflow.
+    await renderFooter([0, 0, 0, 1, 1, -1], NARROW_HOST, true);
+
+    const element = readout();
+
+    expect(host?.scrollWidth).toBeLessThanOrEqual((host?.clientWidth ?? 0) + 1);
+    expect(element.scrollWidth).toBeGreaterThan(element.clientWidth);
+    // What is left of the readout is the tooltip's only hover target, so the
+    // row has to leave it a usable one. It survives on flex leftover alone —
+    // every sibling refuses to shrink — which is what this pins: a sibling
+    // that starts growing greedily would take the target away.
+    expect(element.clientWidth).toBeGreaterThanOrEqual(40);
+
+    await act(() => {
+      element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' }));
+      element.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+    });
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 500);
+    });
+
+    const tooltip = document.querySelector('[role="tooltip"]');
+
+    expect(tooltip?.textContent).toBe('Cluster count: 2, largest cluster: 3 media points, unclustered: 1 media point');
+  });
+
+  it('asks the server for a refit when Refresh is clicked, not only for the current points', async () => {
+    await renderFooter([0, 1]);
+    const { data } = imageMapStore.getSnapshot();
+    api.requestImageMapRefresh.mockResolvedValue(true);
+    api.fetchImageMapPoints.mockResolvedValue(data);
+    api.fetchImageMapStatus.mockResolvedValue({ index: null, modelId: null, modelName: null, state: 'ready' });
+    api.fetchImageMapClusterLabels.mockResolvedValue({ labels: {}, updatedAt: null, visibleHash: null });
+
+    await act(async () => {
+      (page.getByRole('button', { name: 'Refresh map' }).element() as HTMLElement).click();
+      await vi.waitFor(() => expect(imageMapStore.getSnapshot().loadState).toBe('loaded'));
+    });
+
+    expect(api.requestImageMapRefresh).toHaveBeenCalledTimes(1);
+    expect(api.fetchImageMapPoints).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so when nothing clustered', async () => {
+    // The symptom being diagnosed: a drawn map where every point is noise.
+    await renderFooter([-1, -1, -1]);
+
+    expect(host?.textContent).toContain(
+      'Cluster count: 0, largest cluster: 0 media points, unclustered: 3 media points'
+    );
+  });
+});

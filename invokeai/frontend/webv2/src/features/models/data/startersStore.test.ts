@@ -1,0 +1,75 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const api = vi.hoisted(() => ({ getStarterModels: vi.fn() }));
+
+vi.mock('./api', () => api);
+
+const response = { starter_bundles: {}, starter_models: [] };
+
+describe('starters store', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    api.getStarterModels.mockReset();
+  });
+
+  it('dedupes concurrent refreshes and keeps the catalog when the trailing rerun fails', async () => {
+    api.getStarterModels.mockResolvedValueOnce(response).mockRejectedValueOnce(new Error('outage'));
+    const store = await import('./startersStore');
+
+    const first = store.refreshStarters();
+    // Joining mid-flight shares the request and queues one trailing rerun.
+    expect(store.refreshStarters()).toBe(first);
+    await first;
+    expect(store.getStartersSnapshot()).toMatchObject({ response, status: 'loaded' });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(api.getStarterModels).toHaveBeenCalledTimes(2);
+    expect(store.getStartersSnapshot()).toMatchObject({ error: 'outage', response, status: 'loaded' });
+  });
+
+  it('ensures once and revalidates only when already loaded', async () => {
+    api.getStarterModels.mockResolvedValue(response);
+    const store = await import('./startersStore');
+
+    store.refreshStartersIfLoaded();
+    expect(api.getStarterModels).not.toHaveBeenCalled();
+
+    store.ensureStartersLoaded();
+    store.ensureStartersLoaded();
+    await Promise.resolve();
+    expect(api.getStarterModels).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a failed load on the next ensure instead of sticking in error', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('outage')).mockResolvedValueOnce(response);
+    const store = await import('./startersStore');
+
+    store.ensureStartersLoaded();
+    await vi.waitFor(() => {
+      expect(store.getStartersSnapshot().status).toBe('error');
+    });
+
+    store.ensureStartersLoaded();
+    await vi.waitFor(() => {
+      expect(store.getStartersSnapshot()).toMatchObject({ response, status: 'loaded' });
+    });
+    expect(api.getStarterModels).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the catalog on account switch', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+    account.accountLifecycle.activate('user-a');
+    api.getStarterModels.mockResolvedValue(response);
+    const store = await import('./startersStore');
+
+    await store.refreshStarters();
+    expect(store.getStartersSnapshot().status).toBe('loaded');
+
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-b');
+
+    expect(store.getStartersSnapshot()).toMatchObject({ response: null, status: 'idle' });
+  });
+});

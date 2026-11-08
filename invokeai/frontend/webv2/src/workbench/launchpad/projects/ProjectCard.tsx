@@ -1,0 +1,127 @@
+import type { ProjectSummary } from '@workbench/projects/library';
+import type { MouseEvent } from 'react';
+
+import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
+import { IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { Link } from '@tanstack/react-router';
+import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
+import { isProjectSummaryCompatible } from '@workbench/projects/library';
+import { EllipsisVerticalIcon, PinIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useProjectActionsMenu, useProjectActionsMenuTrigger } from './ProjectActionsMenuHost';
+import { ProjectCompatibilityBadge } from './ProjectCompatibilityBadge';
+import { ProjectCover } from './ProjectCover';
+
+/**
+ * Cards deep-link to the editor and preload on hover; the shared menu host handles overflow and right-click
+ * actions.
+ */
+
+const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
+const REVEAL_ON_HOVER = { opacity: 1 } as const;
+// The card clips its overlay link's own outline, so the card draws the keyboard focus ring around itself.
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
+const CARD_FOCUS_RING = {
+  '&:has(> a:focus-visible)': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
+} as const;
+const CARD_TRANSITION =
+  'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
+
+export const ProjectCard = ({
+  isPinned,
+  summary,
+  onTogglePin,
+}: {
+  isPinned: boolean;
+  summary: ProjectSummary;
+  onTogglePin: (projectId: string) => void;
+}) => {
+  const { t } = useTranslation();
+  const menu = useProjectActionsMenu();
+  const isCompatible = isProjectSummaryCompatible(summary);
+
+  const projectSearch = useMemo(() => ({ project: summary.id }), [summary.id]);
+  const pinLabel = isPinned ? t('projects.unpin') : t('projects.pin');
+  const menuTarget = useMemo(() => ({ isPinned, onTogglePin, summary }), [isPinned, onTogglePin, summary]);
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => menu.openAtPointer(event, menuTarget),
+    [menu, menuTarget]
+  );
+  const menuTrigger = useProjectActionsMenuTrigger(menuTarget);
+  const handleTogglePin = useCallback(() => onTogglePin(summary.id), [onTogglePin, summary.id]);
+
+  return (
+    <Box
+      css={CARD_FOCUS_RING}
+      bg="bg.subtle"
+      borderColor="border.subtle"
+      borderWidth="1px"
+      className="group"
+      overflow="hidden"
+      position="relative"
+      rounded="lg"
+      transition={CARD_TRANSITION}
+      _hover={isCompatible ? CARD_HOVER : undefined}
+      onContextMenu={handleContextMenu}
+    >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
+      {isCompatible ? (
+        <Link
+          aria-label={t('projects.openProjectLabel', { name: summary.name })}
+          search={projectSearch}
+          style={LINK_STYLE}
+          to="/app"
+        />
+      ) : null}
+      <Box pointerEvents="none">
+        <ProjectCover coverUrl={summary.coverUrl} />
+      </Box>
+      <Flex align="center" gap="2" p="3" pointerEvents="none">
+        <Stack flex="1" gap="0" minW="0">
+          <MiddleTruncate fontWeight="600" text={summary.name} />
+          <Text color="fg.muted" fontSize="xs">
+            {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
+          </Text>
+          <ProjectCompatibilityBadge summary={summary} />
+        </Stack>
+      </Flex>
+
+      <Box left="2" pointerEvents="auto" position="absolute" top="2" zIndex="1">
+        <Tooltip content={pinLabel}>
+          <IconButton
+            aria-label={pinLabel}
+            aria-pressed={isPinned}
+            color={isPinned ? 'fg' : 'fg.muted'}
+            opacity={isPinned ? 1 : 0}
+            size="sm"
+            variant="subtle"
+            _focusVisible={REVEAL_ON_HOVER}
+            _groupHover={REVEAL_ON_HOVER}
+            onClick={handleTogglePin}
+          >
+            <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      <Box bottom="2" pointerEvents="auto" position="absolute" right="2" zIndex="1">
+        <IconButton
+          aria-expanded={menuTrigger.isExpanded}
+          aria-haspopup="menu"
+          aria-label={t('common.actions')}
+          color="fg.muted"
+          size="sm"
+          variant="ghost"
+          onClick={menuTrigger.onClick}
+          onPointerDown={menuTrigger.onPointerDown}
+        >
+          <EllipsisVerticalIcon />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+};

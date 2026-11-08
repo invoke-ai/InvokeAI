@@ -1,0 +1,243 @@
+---
+title: Qwen Image
+description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF and fp8 installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
+lastUpdated: 2026-11-02
+sidebar:
+  order: 9
+---
+
+Qwen Image is a diffusion-transformer image family from the Qwen team that encodes prompts with the
+**Qwen2.5-VL 7B** vision-language model and decodes with a 16-channel VAE. InvokeAI supports two
+variants:
+
+- **Qwen Image** (e.g. *Qwen Image 2512*) — text-to-image generation.
+- **Qwen Image Edit** (e.g. *Qwen Image Edit 2511*) — text-guided editing driven by one or more
+  **reference images**. Because its text encoder is a vision-language model, it reads the reference
+  images alongside your instruction ("replace the background with a beach", "put this jacket on the
+  person in image 2").
+
+The variant is detected automatically on install. Both variants can also run text-to-image,
+image-to-image, inpainting and outpainting on the Canvas; only the Edit variant accepts reference images,
+and only the text-to-image variant takes a [ControlNet](#controlnet).
+
+## License
+
+Qwen Image 2512, Qwen Image Edit 2511, the Lightning LoRAs, the Qwen2.5-VL text encoder and both Qwen Image
+ControlNet Unions are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+Qwen Image is a large model: the full Diffusers pipeline is a ~40 GB download. To run it on a
+consumer GPU, use a **GGUF** or **fp8** transformer together with the standalone VAE and fp8 text encoder:
+
+| Transformer build                | Download |
+| -------------------------------- | -------- |
+| Q2_K                             | ~7.5 GB  |
+| Q4_K_M                           | ~13 GB   |
+| Q6_K                             | ~17 GB   |
+| Q8_0                             | ~22 GB   |
+| fp8 (Qwen Image 2512)            | ~20.4 GB |
+| fp8 mixed (Qwen Image Edit 2511) | ~20.5 GB |
+
+The Qwen2.5-VL encoder is loaded in addition to the transformer (~7 GB for the fp8 build). If your GPU
+cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mode/). Single-file
+checkpoints that ship fp8 weights are kept in fp8 with
+[FP8 Storage](/configuration/optimization/fp8-storage/), which is switched on for them when they are installed.
+
+ComfyUI's `int8_tensorwise` builds, rotated (`int8_convrot`) or not, load for the transformer and for the Qwen2.5-VL
+encoder. Comfy-Org publishes `int8_convrot` transformers for Qwen Image Edit 2509 and 2511; the Qwen2.5-VL int8
+encoders are community uploads. The int8 layers stay int8 in memory (about half the bf16 size) and are dequantized
+layer by layer as they run, on every device. That is the default: on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
+can run them on the int8 tensor cores instead. The main benefit is memory; no speed-up is promised. DoRA LoRAs do not
+run on an int8 transformer. A file whose int8 layers carry only a `{"convrot": true}` marker, with no format, is
+refused at install for the transformer and when the encoder loads. Int4 builds are refused at install.
+
+## Installing
+
+The easiest path is the **Qwen Image** bundle in the Model Manager's Starter Models. It installs the
+standalone VAE and fp8 encoder, the Diffusers and the Q4_K_M / Q8_0 GGUF builds of both *Qwen Image
+2512* and *Qwen Image Edit 2511*, the Lightning LoRAs for each, and the *Qwen Image ControlNet Union*.
+The other GGUF builds (Q2_K, Q6_K) and the fp8 single files, *Qwen Image 2512 (fp8)* and *Qwen Image Edit
+2511 (fp8 mixed)*, are available as individual starter models.
+
+Qwen Image needs three components:
+
+| Component                 | Diffusers install       | GGUF / single-file install             |
+| ------------------------- | ----------------------- | -------------------------------------- |
+| Transformer               | bundled in the pipeline | the `.gguf` / `.safetensors` file      |
+| VAE (Qwen Image VAE)      | bundled                 | installed separately                   |
+| Text encoder (Qwen2.5-VL) | bundled                 | installed separately                   |
+
+- **Diffusers** (`Qwen/Qwen-Image-2512`, `Qwen/Qwen-Image-Edit-2511`): a single ~40 GB install that
+  includes everything.
+- **GGUF** (from `unsloth/Qwen-Image-2512-GGUF` and `unsloth/Qwen-Image-Edit-2511-GGUF`): the file
+  contains only the transformer. The GGUF starter models install the **Qwen Image VAE** (~250 MB) and
+  the **Qwen2.5-VL Encoder (fp8 scaled)** (~7 GB) as dependencies, so you never need the full pipeline.
+- **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style plain fp8, fp8-scaled or nvfp4
+  builds) can be installed by path or URL; like GGUF, they need a standalone VAE and encoder. The two fp8
+  starter models (from `Comfy-Org/Qwen-Image` and `Comfy-Org/Qwen-Image-Edit`) install the same VAE and
+  encoder as dependencies. FP8 Storage is switched on for them at install, so each takes about 20.5 GB once
+  loaded, which fills most of a 24 GB card; with the working memory a generation needs, partial loading may
+  keep part of it in RAM. The 2512 file is plain fp8 without scales: loading it briefly needs about 41 GB of
+  free system RAM, because it is widened to bf16 before FP8 Storage casts it back.
+
+Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), **GGUF Q4_K_M** (~4.7 GB, text
+only) and **Diffusers** (~16 GB, full precision). The single-file and GGUF encoders ship with their
+tokenizer and config inside InvokeAI.
+
+The **GGUF** encoders are llama.cpp builds of Qwen2.5-VL-7B-Instruct (e.g. from
+`unsloth/Qwen2.5-VL-7B-Instruct-GGUF`) and hold only the language model. They encode text prompts, but cannot
+read reference images: with one selected, an Edit model's reference images block **Invoke** with a message
+saying so, and the workflow node fails before it loads anything. The separate `mmproj` vision file in those
+repositories is refused at install, and so is a Qwen2-VL GGUF: the previous generation shares the llama.cpp
+architecture name and would condition Qwen Image with the wrong model. Measured on the CPU against the bf16
+encoder, the prompt embeddings of the Q8_0 build agree to a mean cosine similarity of 0.9999 and those of
+Q4_K_M to 0.996. The prompt node's **Quantization** option has no effect on a GGUF encoder.
+
+When a GGUF or single-file Qwen Image model is selected, pick the **Qwen VL Encoder** and **VAE** in the
+**Components** section next to the model. Alternatively, set **Component source** to an installed
+Diffusers Qwen Image model and InvokeAI takes the missing VAE and encoder from it. A Diffusers main
+model needs neither.
+
+:::note[Edit or Generate?]
+For single-file and GGUF installs, the Edit variant is recognized from a marker tensor in the file, or
+from the word "edit" in the filename for converters that don't write the marker. Keep the published
+filenames when installing a converted Edit checkpoint.
+:::
+
+## Generation settings
+
+Selecting a Qwen Image model applies these defaults:
+
+- **Steps:** 40
+- **CFG Scale:** 4
+- **Size:** 1024×1024; width and height snap to multiples of 16.
+
+There is no scheduler choice — Qwen Image always uses its own flow-matching schedule, so the
+**Scheduler** control is hidden.
+
+:::note[Image size and the noise schedule]
+Qwen Image puts more of its steps at high noise the larger the image, up to the area of about 1448×1448
+(2.1 megapixels). Larger images keep that schedule. Without the limit, an image-to-image pass at strength
+0.5 would start at 77% noise on a 2048×2048 image and at 95%, almost pure noise, on a 4096×4096 one, so it
+would replace the image instead of refining it. To sample with a different schedule, set **Shift** on the
+**Denoise - Qwen Image** node in the workflow editor (Generate and Canvas don't send it). On this node
+Shift is the exponential shift e^mu, not mu as on Krea-2: about 3.72 reproduces the unlimited schedule at
+2048×2048, and larger images need larger values, about 44 at 4096×4096.
+:::
+
+The **negative prompt** is used only when CFG Scale is above 1; at CFG 1 it is ignored.
+
+## Lightning LoRAs (4 and 8 steps)
+
+The *Qwen Image Lightning* and *Qwen Image Edit Lightning* starter LoRAs are distillation LoRAs that cut
+generation to **4** or **8** steps. Use the one that matches your model variant, and set:
+
+- **Steps:** 4 or 8, matching the LoRA
+- **CFG Scale:** 1
+
+The LoRAs are trained for a fixed schedule shift of `3`. Turn on the **Shift** override in the Generate
+panel's Render section when using them (it starts at `3`), and leave it off for the base model's default
+schedule. In the workflow editor the same thing is the **Shift** input of **Denoise - Qwen Image**.
+
+## Image editing with reference images
+
+With a **Qwen Image Edit** model selected, add up to **five** reference images,
+then describe the change you want in the prompt. The text-to-image variant does not accept reference
+images.
+
+- All reference images are given to the Qwen2.5-VL encoder together with your prompt, so you can refer
+  to them in the instruction. This needs the fp8 scaled, NVFP4 or Diffusers encoder: a GGUF encoder has no
+  vision tower.
+- The **first** reference image is also encoded by the VAE and supplied to the transformer as a
+  pixel-level reference.
+
+In the workflow editor, reference images go into the **Reference Images** input of **Prompt - Qwen
+Image**; connect an **Image to Latents - Qwen Image** node to the **Reference Latents** input of
+**Denoise - Qwen Image** to add the pixel-level reference.
+
+## LoRA
+
+Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer and,
+when the file has text-encoder layers, to the Qwen2.5-VL encoder too. This holds for every encoder build,
+including the **Encoder quantization** setting. DoRA layers on the encoder need unpacked weights: they fail
+with int8 or nf4 quantization and with packed nvfp4 encoders, so set **Encoder quantization** to **None** and
+use a bf16 or fp8 encoder. A LoRA that holds only text-encoder layers is not recognized on install.
+
+In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**. Route the
+encoder through the LoRA node as well as the transformer: connect the node's **Qwen VL Encoder** output to
+the prompt nodes, otherwise the LoRA's text-encoder layers stay unused. The LoRA node logs a warning when it sees this.
+
+Plain LoRAs saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw PEFT adapters
+(`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers (`img_mod`,
+`txt_mod`, `img_mlp`, `txt_mlp`), as LoRAs in these layouts usually do. Other model families use the same key
+prefixes, so a LoRA in these layouts that trains only attention layers is not recognized and installs as an
+unknown model, and so do LoKR, LoHA and DoRA files in these layouts. A raw PEFT adapter's strength is set in
+its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
+with rsLoRA, applies at a different strength.
+
+## ControlNet
+
+Two ControlNets are starter models, both a single model for several conditions (~3.5 GB each, Apache 2.0):
+
+| Starter model | Design | Conditions | Recommended weight |
+| ------------- | ------ | ---------- | ------------------ |
+| **Qwen Image ControlNet Union** | alibaba-pai's *Fun-ControlNet-Union* for Qwen Image 2512 | **Canny**, **HED**, **Depth**, **Pose**, **MLSD**, **Scribble** and **Gray** control images, plus **inpainting** | `0.70` to `0.95` |
+| **Qwen Image InstantX ControlNet Union** | InstantX's *ControlNet-Union*, trained on the original Qwen Image | **Canny**, **Soft Edge** (HED), **Depth** and **Pose** control images; control only | about `1.5` to `2.0` on Qwen Image 2512 (`0.80` to `1.00` on the original Qwen Image) |
+
+The two work differently. The Fun union is a control branch inside the transformer that reads the control image
+and, when inpainting, the region being regenerated. The InstantX union is a five-block copy of the transformer that
+runs beside it once per step and adds its output to the transformer's blocks; it takes the control image and
+nothing else; InstantX recommends 30 steps at CFG 4 for it. InstantX trained it on the original Qwen Image, and on
+Qwen Image 2512 it guides weakly at its card's `0.80` to `1.00`: a pose skeleton barely moves the figure at `1.0`
+and is followed at `1.5` to `2.0`. The Fun union is trained for Qwen Image 2512 directly. InvokeAI tells the two
+apart from the file on install; a copy of the InstantX union installed by an earlier version as a Qwen Image main model is fixed by
+**Re-identify** in the Model Manager. InstantX's separate *Inpainting* ControlNet is not supported yet and is
+refused on install.
+
+Both are trained for the text-to-image transformer: with a Qwen Image Edit model selected, a control layer's
+settings and the **Invoke** button say that the ControlNet is not compatible, and nothing is generated until the
+layer is disabled or the model changed.
+
+On the Canvas, add a **Control Layer** while a Qwen Image model is selected. Its adapter type is **Qwen Image
+ControlNet**, its model either union, and its pixels are the control image; the layer's **Filter** turns a raster
+into one of the conditions (Canny, HED, Depth Anything, DW Openpose, MLSD, Scribble or Grayscale). The layer's
+**Weight** is the model's control scale: it ranges from `0` to `2` and starts at `0.85`. **Only one** Qwen Image
+control layer can be used per generation.
+
+When the Canvas inpaints or outpaints with a Fun union layer present, the ControlNet also receives the image being
+regenerated and the mask of the region as its inpainting condition. An InstantX union layer only guides the
+regenerated region with its control image. Without a control layer, inpainting and outpainting work as before.
+
+In the workflow editor, the same thing is the **Qwen Image ControlNet** node feeding the **Control** input of
+**Denoise - Qwen Image**. Give it a control **Image**, an **Inpaint Image** together with its **Inpaint Mask**
+(white is regenerated), or both; with the InstantX union, a control **Image** only, and the denoise refuses inpaint
+inputs. **Denoise - Qwen Image** then also needs its **VAE** input connected, which it uses to encode these
+images.
+
+## PiD super-resolution decode
+
+Qwen Image works with [PiD Decode](/users-guide/image-generation/advanced-topics/pid-decode/), which replaces the VAE
+decode with a 4× super-resolving pixel diffusion. The *PiD Decoder Qwen-Image (2K to 4K)* and *PiD 1.5
+Decoder Qwen-Image (2K to 4K)* decoders (including an int8 build of the latter) are starter models.
+
+## Workflow nodes
+
+| Node                                        | Purpose                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| **Main Model - Qwen Image**                 | Loads the transformer, VAE and Qwen VL encoder (or a component source) |
+| **Prompt - Qwen Image**                     | Encodes the prompt and any reference images                         |
+| **Denoise - Qwen Image**                    | Runs sampling; accepts reference latents, img2img latents, masks and a ControlNet |
+| **Qwen Image ControlNet**                   | Configures either ControlNet Union: control image and/or inpaint image with mask (Fun only), scale, step range |
+| **Image to Latents - Qwen Image**           | VAE encode                                                          |
+| **Latents to Image - Qwen Image**           | VAE decode                                                          |
+| **Latents to Image - Qwen-Image + PiD (4x SR)** | PiD super-resolution decode                                     |
+
+The **Prompt - Qwen Image** node also has a **Quantization** option (`none`, `int8`, `nf4`) that
+quantizes the Qwen2.5-VL encoder on load to reduce its VRAM use. The Generate panel offers the same choice
+as **Encoder quantization** under **Advanced**, applied to both prompt encoders. The saving has a cost: a
+quantized encoder cannot stay in the model cache, so it is loaded from disk for every prompt it encodes, twice
+per generation when CFG is above 1. Leave it at `none` if the bf16 encoder fits.

@@ -102,6 +102,12 @@ class Config_Base(ABC, BaseModel):
     """Set of all non-abstract subclasses of Config_Base, for use during model probing. In other words, this is the set
     of all known model config types."""
 
+    DECODES_GGUF_CONVROT: ClassVar[frozenset[str]] = frozenset()
+    """The marker formats this config's loader decodes from ComfyUI-GGUF's convrot layers, as
+    ``accepted_convrot_formats`` names them: ``Q8_CR`` arrives as ``int8_tensorwise`` and ``Q4_CR`` as
+    ``int4_tensorwise``. Empty by default, so a GGUF config refuses those files at install until its loader asks
+    ``gguf_sd_loader`` to decode them -- and the int4 ones until it also opts into int4."""
+
     model_config = ConfigDict(
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,
@@ -187,7 +193,7 @@ class Config_Base(ABC, BaseModel):
             # Special case: CLIP Embed models also need the variant to distinguish them.
             if (
                 type_ == ModelType.CLIPEmbed.value
-                and format_ == ModelFormat.Diffusers.value
+                and format_ in (ModelFormat.Diffusers.value, ModelFormat.Checkpoint.value)
                 and base_ == BaseModelType.Any.value
             ):
                 if variant_ := v.get("variant"):

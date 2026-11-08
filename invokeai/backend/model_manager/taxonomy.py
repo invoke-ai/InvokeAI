@@ -48,6 +48,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     Flux2 = "flux2"
     """Indicates the model is associated with FLUX.2 model architecture, including FLUX.2 Klein and FLUX.2 [dev]."""
+    Flux3 = "flux3"
+    """Indicates the model is associated with the FLUX.3 Image architecture, including FLUX.3 Image Klein and its
+    Base model."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -62,10 +65,22 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    QwenImage21 = "qwen-image-2-1"
+    """Indicates the model is associated with the Qwen-Image-2.1 architecture: a single-stream DiT on a 64-channel,
+    16x RGBA VAE, conditioned by Qwen3-VL-8B. Unrelated to `QwenImage` beyond the name."""
     Krea2 = "krea-2"
     """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
     """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
+    MiniMaxH3 = "minimax-h3"
+    """Indicates the model is associated with the MiniMax H3 (Hailuo 3.0) omni-modal architecture, which
+    generates video with jointly-denoised stereo audio."""
+    LTX2 = "ltx-2"
+    """Indicates the model is associated with the Lightricks LTX-2 family (LTX-2.5 in this version), a
+    dual-stream video+audio DiT conditioned by a Gemma text encoder through learned connectors."""
+    MossImage = "moss-image"
+    """Indicates the model is associated with the OpenMOSS MOSS-Image architecture: a single-stream DiT on the
+    FLUX.2 VAE latent, conditioned by Qwen3.5-9B."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -88,9 +103,12 @@ class ModelType(str, Enum):
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
+    Qwen3VLVisionTower = "qwen3_vl_vision_tower"
+    Qwen35Encoder = "qwen3_5_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
+    Gemma4Encoder = "gemma4_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
@@ -99,6 +117,8 @@ class ModelType(str, Enum):
     TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
+    LTX2DurationHead = "ltx2_duration_head"
+    TinyAutoencoder = "tiny_autoencoder"
     Unknown = "unknown"
 
 
@@ -114,11 +134,20 @@ class SubModelType(str, Enum):
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
+    Processor = "processor"
+    # A vision-language encoder's vision tower alone, which the text encoder is loaded without; edits attach it
+    # while they encode, so the language model is cached once. Krea-2 and Qwen-Image-2.1.
+    VisionEncoder = "vision_encoder"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"
+    AudioVAE = "audio_vae"
+    Vocoder = "vocoder"
+    Connectors = "connectors"
+    LatentUpsampler = "latent_upsampler"
+    TemporalLatentUpsampler = "temporal_latent_upsampler"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
 
@@ -162,7 +191,22 @@ class Flux2VariantType(str, Enum):
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
     Dev = "dev"
-    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.2 text encoder (guidance-distilled)."""
+
+
+class Flux3VariantType(str, Enum):
+    """FLUX.3 Image variants, by how the transformer is sampled.
+
+    The values carry a ``flux3_`` prefix: variant strings are resolved without their base, and ``klein_*``
+    already belongs to FLUX.2."""
+
+    Klein = "flux3_klein"
+    """FLUX.3 Image Klein, the step-distilled checkpoint. Its transformer is a flow map: every step is also told
+    the timestep it jumps to, it samples in 16 steps and takes no classifier-free guidance."""
+
+    KleinBase = "flux3_klein_base"
+    """FLUX.3 Image Klein Base, the undistilled checkpoint: 50 steps with classifier-free guidance and a negative
+    prompt. Black Forest Labs publishes it for fine-tuning and LoRA training."""
 
 
 class ZImageVariantType(str, Enum):
@@ -189,6 +233,16 @@ class Krea2VariantType(str, Enum):
     using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
 
     NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
+
+
+class QwenImage21VariantType(str, Enum):
+    """Qwen-Image-2.1 variants. The weights share one architecture; what differs is the sampling schedule."""
+
+    Base = "qwen_image_21_base"
+    """The released model: 40 steps on a resolution-shifted schedule with a terminal shift."""
+
+    Turbo = "qwen_image_21_turbo"
+    """Qwen-Image-2.1-Turbo: distilled for 8 steps on a fixed sigma table, CFG off."""
 
 
 class QwenImageVariantType(str, Enum):
@@ -239,6 +293,19 @@ class WanLoRAVariantType(str, Enum):
     """Targets the Wan 2.2 TI2V-5B main (inner_dim=3072)."""
 
 
+class SD3VariantType(str, Enum):
+    """SD 3 transformer sizes, which decide the LoRAs that fit a model.
+
+    The values carry the family name because variant values share one namespace and `large` is already a CLIP variant.
+    """
+
+    Medium = "sd3_medium"
+    """SD 3 Medium and SD 3.5 Medium (24 blocks, 1536 wide; 3.5 Medium adds dual attention to its first 13)."""
+
+    Large = "sd3_large"
+    """SD 3.5 Large and Large Turbo (38 blocks, 2432 wide)."""
+
+
 class Qwen3VariantType(str, Enum):
     """Qwen3 text encoder variants based on model size."""
 
@@ -252,11 +319,86 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class Qwen3VLVariantType(str, Enum):
+    """Qwen3-VL (vision-language) text encoder variants, by language-model width.
+
+    Separate from `Qwen3VariantType`: those are the text-only Qwen3 encoders (Z-Image, FLUX.2
+    Klein). The VL models carry a visual tower and are not interchangeable with them, and the two
+    families do not even share widths at the same parameter count.
+    """
+
+    Qwen3VL_4B = "qwen3_vl_4b"
+    """Qwen3-VL 4B (hidden_size=2560, 36 layers). The encoder Krea-2 conditions on."""
+
+    Qwen3VL_8B = "qwen3_vl_8b"
+    """Qwen3-VL 8B (hidden_size=4096, 36 layers). The encoder Ideogram 4 conditions on, tapping 13
+    of its layers for a 53248-wide feature vector."""
+
+
+class Qwen35VariantType(str, Enum):
+    """Qwen3.5 text encoder variants, by language-model width.
+
+    A family of its own: Qwen3.5 interleaves Gated DeltaNet linear-attention layers with gated full
+    attention, so its checkpoints share neither architecture nor key layout with `Qwen3VariantType`,
+    even at the same width.
+    """
+
+    Qwen35_4B = "qwen3_5_4b"
+    """Qwen3.5 4B (hidden_size=2560, 32 layers). Anima-3.8B's semantic encoder, read at layers 7/15/23/31."""
+
+    Qwen35_9B = "qwen3_5_9b"
+    """Qwen3.5 9B (hidden_size=4096, 32 layers). MOSS-Image's text encoder, read after its final norm."""
+
+
+class AnimaVariantType(str, Enum):
+    """Anima model variants, by how the transformer is conditioned.
+
+    The depth of the DiT (28 blocks for the official release, 40 for Anima-2.9B, 52 for Anima-3.8B)
+    is not a variant: the loader reads it from the checkpoint and nothing else depends on it.
+    """
+
+    Qwen3 = "anima_qwen3"
+    """Conditioned on Qwen3 0.6B through the native LLM adapter. Every release by CircleStone Labs
+    and Anima-2.9B."""
+
+    Qwen35 = "anima_qwen35"
+    """Additionally conditioned on Qwen3.5 4B through a bundled, timestep-aware semantic connector
+    (Anima-3.8B v1.1). Needs both encoders, and the connector runs at every denoising step."""
+
+
+class MiniMaxH3VariantType(str, Enum):
+    """MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."""
+
+    FL2VA = "fl2va"
+    """First/last-frame + text to audio-video: text-to-video and first/last-frame image-to-video
+    (HF repo subfolder ``transformer``)."""
+
+    REF2VA = "ref2va"
+    """Multi-reference to audio-video: up to 3 video + 9 image references condition generation
+    (HF repo subfolder ``transformer_ref``). Same architecture and config as FL2VA, different
+    weights; supports only the reference task."""
+
+
+class LTX2VariantType(str, Enum):
+    """LTX-2 transformer variants. Dev and Distilled are key-for-key identical checkpoints of the same
+    architecture; the variant decides the sampling recipe (guided ~40-step schedule vs the fixed
+    8-sigma distilled schedule with CFG off), so it must travel with the model record.
+
+    Values carry the family prefix because variant values are globally unique across enums
+    (`FluxVariantType.Dev` already owns "dev")."""
+
+    Dev = "ltx2_dev"
+    """The guided model: CFG / STG / modality-isolation guidance over a shifted flow schedule."""
+
+    Distilled = "ltx2_distilled"
+    """The step-distilled model: fixed 8-sigma schedule, no guidance, no negative prompt."""
+
+
 class MistralVariantType(str, Enum):
-    """Mistral text encoder variants used by FLUX.2 [dev]."""
+    """Mistral text encoder variants used by FLUX.2 [dev] and ERNIE-Image."""
 
     Cow = "cow_mistral3_small"
-    """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120).
+    """The "cow-mistral3-small" build: the first 30 of Mistral Small 3's 40 layers (hidden_size=5120).
     Hidden states are sampled at indices (10, 20, 30) which on a 30-layer model
     hit 1/3, 2/3, and the final layer. ComfyUI's reference implementation
     drops the final RMSNorm for this variant (``final_norm=False``), so the
@@ -264,12 +406,19 @@ class MistralVariantType(str, Enum):
 
     Mistral24B = "mistral3_24b"
     """The 40-layer Mistral Small 3 (24B, hidden_size=5120) text encoder BFL
-    ships in the canonical ``black-forest-labs/FLUX.2-dev/text_encoder``. Same
-    extraction indices (10, 20, 30), final RMSNorm kept enabled. Architecturally
-    identical to upstream ``mistralai/Mistral-Small-3.1/3.2`` — installing one
-    of those instead of BFL's release will load fine but produces visibly
-    weaker prompt adherence than the cow distillation, so the cow variants
-    remain the recommended default."""
+    ships in ``black-forest-labs/FLUX.2-dev/text_encoder``. Same extraction
+    indices (10, 20, 30), final RMSNorm kept enabled. Its weights are bit-identical
+    in BF16 to upstream ``mistralai/Mistral-Small-3.2-24B-Instruct-2506``, so
+    upstream builds of that model, GGUFs included, are the same encoder. Mistral
+    Small 3.0 and 3.1 have the same shape but different weights."""
+
+    Ministral3B = "ministral3_3b"
+    """The 26-layer Ministral 3B (hidden_size=3072) ERNIE-Image encodes its
+    prompts with. A different model family from the two above, not a smaller
+    build of them: it is loaded as ``Ministral3Model`` and uses YaRN RoPE
+    scaling, so the geometry alone decides the variant. The final RMSNorm is
+    kept — ERNIE reads the second-to-last hidden state, which the norm never
+    touches."""
 
 
 class PiDDecoderVariantType(str, Enum):
@@ -308,12 +457,24 @@ class ModelFormat(str, Enum):
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
+    Gemma4Encoder = "gemma4_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     ExternalApi = "external_api"
     SDNQQuantized = "sdnq_quantized"
     Unknown = "unknown"
+
+
+QUANTIZED_MODEL_FORMATS: frozenset[ModelFormat] = frozenset(
+    {
+        ModelFormat.GGUFQuantized,
+        ModelFormat.BnbQuantizednf4b,
+        ModelFormat.BnbQuantizedLlmInt8b,
+        ModelFormat.SDNQQuantized,
+    }
+)
+"""Formats whose weights are already quantized: packed payloads FP8 Storage must never re-encode."""
 
 
 class SchedulerPredictionType(str, Enum):
@@ -362,12 +523,20 @@ AnyVariant: TypeAlias = Union[
     ClipVariantType,
     FluxVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     ZImageVariantType,
     QwenImageVariantType,
     WanVariantType,
     WanLoRAVariantType,
+    SD3VariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
+    Qwen35VariantType,
+    AnimaVariantType,
     Krea2VariantType,
+    QwenImage21VariantType,
+    MiniMaxH3VariantType,
+    LTX2VariantType,
     MistralVariantType,
     PiDDecoderVariantType,
 ]
@@ -376,12 +545,20 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
+    | Qwen3VLVariantType
+    | Qwen35VariantType
+    | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
+    | MiniMaxH3VariantType
+    | LTX2VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 ](
@@ -389,12 +566,20 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
+    | Qwen3VLVariantType
+    | Qwen35VariantType
+    | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
+    | MiniMaxH3VariantType
+    | LTX2VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 )

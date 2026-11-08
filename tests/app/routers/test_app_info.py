@@ -1,9 +1,11 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -14,6 +16,7 @@ from invokeai.app.services.config.config_default import get_config, load_and_mig
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.image_files.image_subfolder_strategy import DateStrategy, create_subfolder_strategy
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
@@ -39,6 +42,147 @@ def _non_admin_user() -> Mock:
     ``TokenData`` validation.
     """
     return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True, token_epoch=0)
+
+
+@pytest.mark.parametrize(
+    ("setting", "visible"), [("", True), ("show_donation_link: true", True), ("show_donation_link: false", False)]
+)
+def test_frontend_config_exposes_only_presentation_settings_to_signed_in_users(
+    setting: str,
+    visible: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    mock_invoker: Invoker,
+    enable_multiuser: Any,
+) -> None:
+    config_path = tmp_path / "invokeai.yaml"
+    config_path.write_text(
+        f"schema_version: 4.0.2\nmultiuser: true\nexternal_openai_api_key: private-test-key\n{setting}\n"
+    )
+    config = load_and_migrate_config(config_path)
+    monkeypatch.setattr(app_info, "get_config", lambda: config)
+
+    assert client.get("/api/v1/app/frontend_config").status_code == 401
+
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
+    )
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=_non_admin_user()))
+    # Non-admin users read menu presentation without gaining access to the runtime config.
+    headers = {"Authorization": "Bearer non-admin-token"}
+    assert client.get("/api/v1/app/runtime_config", headers=headers).status_code == 403
+    response = client.get("/api/v1/app/frontend_config", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"show_donation_link": visible}
+
+
+def _patch_database_cleaner(mock_invoker: Invoker, monkeypatch: Any) -> Mock:
+    database = mock_invoker.services.database
+    clean = Mock()
+    monkeypatch.setattr(database, "clean", clean)
+    return clean
+
+
+def _authenticate_vacuum_user(monkeypatch: Any, mock_invoker: Invoker, is_admin: bool) -> None:
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=not is_admin),
+    )
+    monkeypatch.setattr(
+        mock_invoker.services.users,
+        "get",
+        Mock(
+            return_value=Mock(
+                user_id="user-1", email="user@example.com", is_admin=is_admin, is_active=True, token_epoch=0
+            )
+        ),
+    )
+
+
+def _patch_vacuum_dependencies(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+
+def test_vacuum_database_openapi_contract() -> None:
+    operation = app.openapi()["paths"]["/api/v1/app/database/vacuum"]["post"]
+
+    assert operation["operationId"] == "vacuum_database"
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert {"204", "401", "403", "500"}.issubset(operation["responses"])
+    assert "content" not in operation["responses"]["204"]
+
+
+def test_vacuum_database_allows_multiuser_admin(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    _authenticate_vacuum_user(monkeypatch, mock_invoker, is_admin=True)
+
+    response = client.post("/api/v1/app/database/vacuum", headers={"Authorization": "Bearer admin-token"})
+
+    assert response.status_code == 204
+    assert response.content == b""
+    clean.assert_called_once_with()
+
+
+def test_vacuum_database_uses_single_user_admin_fallback(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", False)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    clean.assert_called_once_with()
+
+
+def test_vacuum_database_rejects_non_admin_without_cleaning(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    _authenticate_vacuum_user(monkeypatch, mock_invoker, is_admin=False)
+
+    response = client.post("/api/v1/app/database/vacuum", headers={"Authorization": "Bearer user-token"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin privileges required"
+    clean.assert_not_called()
+
+
+def test_vacuum_database_rejects_unauthenticated_multiuser_request(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 401
+    clean.assert_not_called()
+
+
+def test_vacuum_database_sanitizes_clean_failure(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    clean.side_effect = RuntimeError("sensitive sqlite path")
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", False)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Database vacuum failed"}
+    assert "sensitive sqlite path" not in response.text
+    clean.assert_called_once_with()
 
 
 def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
@@ -463,3 +607,42 @@ def test_reset_external_provider_config_rejects_non_admin_users(
 
 def _get_provider_config(payload: list[dict[str, Any]], provider_id: str) -> dict[str, Any]:
     return next(item for item in payload if item["provider_id"] == provider_id)
+
+
+def _busy() -> None:
+    raise LockTimeoutError("lock wait timeout exceeded")
+
+
+def _busy_behind_a_routes_own_error() -> None:
+    # As many routes do: every exception becomes an answer of their own.
+    try:
+        _busy()
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
+@pytest.mark.parametrize("route", [_busy, _busy_behind_a_routes_own_error])
+def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient, route: Callable[[], None]) -> None:
+    app.add_api_route("/api/v1/test/busy", route)
+    try:
+        response = client.get("/api/v1/test/busy")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+    assert response.json() == {"detail": "The database is busy; try again"}
+
+
+def test_a_routes_own_error_is_answered_as_it_is(client: TestClient) -> None:
+    def missing() -> None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    app.add_api_route("/api/v1/test/missing", missing)
+    try:
+        response = client.get("/api/v1/test/missing")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Board not found"}

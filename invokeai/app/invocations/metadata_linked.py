@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
-from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -15,8 +15,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet import ControlField, ControlNetInvocation
-from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -27,8 +25,7 @@ from invokeai.app.invocations.fields import (
     UIType,
     WithMetadata,
 )
-from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
 from invokeai.app.invocations.model import (
     CLIPField,
@@ -53,8 +50,11 @@ from invokeai.app.invocations.primitives import (
     StringOutput,
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
-from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
-from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.sd.controlnet import ControlField, ControlNetInvocation
+from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation
+from invokeai.app.invocations.sd.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -624,7 +624,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.2.0",
+    version="1.4.0",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
@@ -666,8 +666,9 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         md.update({"hidiffusion": self.hidiffusion})
         md.update({"hidiffusion_raunet": self.hidiffusion_raunet})
         md.update({"hidiffusion_window_attn": self.hidiffusion_window_attn})
-        md.update({"hidiffusion_t1_ratio": self.hidiffusion_t1_ratio})
-        md.update({"hidiffusion_t2_ratio": self.hidiffusion_t2_ratio})
+        md.update({"hidiffusion_auto_ratios": self.hidiffusion_auto_ratios})
+        md.update({"hidiffusion_t1_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio})
+        md.update({"hidiffusion_t2_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio})
         if isinstance(self.control, ControlField) or (isinstance(self.control, list) and len(self.control) > 0):
             md.update({"controlnets": _to_json(self.control)})
         if isinstance(self.ip_adapter, IPAdapterField) or (
@@ -800,7 +801,7 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
     title=f"{AnimaDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation, WithMetadata):

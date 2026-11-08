@@ -5,6 +5,7 @@ from diffusers import Krea2Transformer2DModel
 
 from invokeai.backend.model_manager.load.model_loaders.krea2 import KREA2_TRANSFORMER_CONFIG
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
@@ -46,8 +47,8 @@ def test_peft_dora_layer_preserves_magnitude_and_alpha() -> None:
     assert isinstance(layer, DoRALayer)
     assert layer._alpha == 1.0
     assert torch.equal(layer.dora_scale, dora_scale)
-    # `.dora_scale` is the LyCORIS magnitude: it indexes the *input* dim.
-    assert layer.magnitude_is_out_dim is False
+    # A `(out_features, 1)` `.dora_scale` is the LyCORIS `wd_on_out=True` magnitude: it indexes the *output* dim.
+    assert layer.magnitude_is_out_dim is True
 
 
 def test_peft_layer_without_explicit_alpha_uses_rank_default() -> None:
@@ -370,25 +371,31 @@ def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) 
 
 
 @pytest.mark.parametrize(
-    "lycoris_suffixes",
+    ("lycoris_suffixes", "expected_second_layer"),
     [
-        ("lokr_w1", "lokr_w2"),
-        ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b"),
-        ("diff", "diff_b"),
+        # LoKr is a layout this converter understands, so its module un-flattens like any other and the
+        # adapter actually applies. The other algorithms below have no handler, so they stay verbatim.
+        (("lokr_w1", "lokr_w2"), "transformer_blocks.6.attn.to_q"),
+        (("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b"), "lora_unet_blocks_6_attn_wq"),
+        (("diff", "diff_b"), "lora_unet_blocks_6_attn_wq"),
         # LyCORIS saves an `alpha` per module, so this is the realistic on-disk shape rather than an
         # edge case — see this repo's own captured fixtures. `.alpha` is a suffix the converter knows,
         # so deciding per key rewrote it while its siblings stayed verbatim, splitting one module into
         # two groups and aborting the load on the orphaned `{'alpha'}`.
-        ("lokr_w1", "lokr_w2", "alpha"),
-        ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"),
-        # `dora_scale` is deliberately not combined with a LyCORIS algorithm here: it would orphan the
-        # same way, but even grouped correctly `any_lora_layer_from_state_dict` tests `dora_scale`
-        # before `lokr_w1`, so a weight-decomposed LoKr dispatches to DoRALayer and dies on a missing
-        # `lora_up.weight`. That precedence is shared code, predates this branch, and is not what the
-        # per-module gate below is about.
+        (("lokr_w1", "lokr_w2", "alpha"), "transformer_blocks.6.attn.to_q"),
+        (("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"), "lora_unet_blocks_6_attn_wq"),
+        # A weight-decomposed LoKr also saves a `dora_scale`. The converter drops it (there is no DoRA+LoKr
+        # layer), so the module still converts and applies as plain LoKr.
+        (("lokr_w1", "lokr_w2", "alpha", "dora_scale"), "transformer_blocks.6.attn.to_q"),
+        # `dora_scale` is deliberately not combined with LoHa or full here: it would orphan the same way, but
+        # even grouped correctly `any_lora_layer_from_state_dict` tests `dora_scale` before `hada_w1_a`, so
+        # the module dispatches to DoRALayer and dies on a missing `lora_up.weight`. That precedence is shared
+        # code, predates this branch, and is not what the per-module gate below is about.
     ],
 )
-def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(lycoris_suffixes: tuple[str, ...]) -> None:
+def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(
+    lycoris_suffixes: tuple[str, ...], expected_second_layer: str
+) -> None:
     # LyCORIS supports per-module algorithms, so one kohya file can mix ordinary lora_down/up modules with
     # LoKr/LoHa/full ones. Un-flattening a key whose suffix `_group_by_layer` cannot split back off used to
     # feed it a dotted path, whose blind `rsplit(".", 2)` fallback then cut inside the module name and fused
@@ -404,11 +411,12 @@ def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(lycoris_suffixes: tu
 
     model = lora_model_from_krea2_state_dict(state_dict)
 
-    # The ordinary module still converts, and the LyCORIS one stays verbatim so it degrades to the per-layer
-    # "Failed to find module" warning at apply time rather than taking the whole adapter down.
+    # Either way the load completes: a supported algorithm converts onto its real module, an unsupported one
+    # stays verbatim and degrades to the per-layer "Failed to find module" warning at apply time, rather than
+    # taking the whole adapter down.
     assert set(model.layers) == {
         f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_v",
-        f"{KREA2_LORA_TRANSFORMER_PREFIX}lora_unet_blocks_6_attn_wq",
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}{expected_second_layer}",
     }
 
 
@@ -483,3 +491,104 @@ def test_native_krea2_top_level_linear_keys_are_remapped() -> None:
         f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers_module}" for diffusers_module in native_to_diffusers.values()
     }
     assert expected_keys < set(model.layers)
+
+
+def test_lokr_layer_reconstructs_the_kronecker_product() -> None:
+    # LyCORIS LoKr adapters (e.g. those produced by ai-toolkit for Krea-2) carry Kronecker factors instead of
+    # a lora_A/lora_B pair. They must survive _group_by_layer intact and land on the right LoKRLayer operand.
+    # The factors are random rather than all-ones so a swapped operand changes the result:
+    # kron(ones(2, 2), ones(3, 4)) == kron(ones(3, 4), ones(2, 2)).
+    w1, w2 = torch.randn(2, 2), torch.randn(3, 4)
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": w1,
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": w2,
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(1.0),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1, w2))
+    # Unfactored LoKr has no rank, so alpha does not rescale it.
+    assert layer.scale() == 1.0
+
+
+def test_factored_lokr_layer_reconstructs_the_kronecker_product() -> None:
+    # LoKr may factor either Kronecker operand further into an `_a`/`_b` pair. Each half has to reach its own
+    # operand, and alpha scales by the rank of the factorisation.
+    w1_a, w1_b = torch.randn(2, 1), torch.randn(1, 2)
+    w2_a, w2_b = torch.randn(3, 1), torch.randn(1, 4)
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_a": w1_a,
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_b": w1_b,
+        "transformer.text_fusion.0.attn.to_q.lokr_w2_a": w2_a,
+        "transformer.text_fusion.0.attn.to_q.lokr_w2_b": w2_b,
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(4.0),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1_a @ w1_b, w2_a @ w2_b))
+    assert layer.scale() == 4.0 / w1_b.shape[0]
+
+
+def test_native_lokr_keys_are_renamed_to_diffusers_layout() -> None:
+    # Native (ComfyUI / ai-toolkit) LoKr keys must go through the same native->diffusers renaming as LoRA
+    # keys: txtfusion -> text_fusion, attn.wq -> attn.to_q, mlp.down -> ff.down.
+    w1, w2 = torch.randn(2, 2), torch.randn(3, 4)
+    state_dict = {
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w1": w1,
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w2": w2,
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.down.lokr_w1": w2,
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.down.lokr_w2": w1,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    to_q = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.layerwise_blocks.0.attn.to_q"]
+    down = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.refiner_blocks.1.ff.down"]
+    assert len(model.layers) == 2
+    assert isinstance(to_q, LoKRLayer) and isinstance(down, LoKRLayer)
+    torch.testing.assert_close(to_q.get_weight(torch.empty(6, 8)), torch.kron(w1, w2))
+    torch.testing.assert_close(down.get_weight(torch.empty(6, 8)), torch.kron(w2, w1))
+
+
+@pytest.mark.parametrize("magnitude_suffix", ["dora_scale", "magnitude"])
+def test_lokr_layer_drops_a_dora_magnitude(magnitude_suffix: str) -> None:
+    # A weight-decomposed LoKr also saves a DoRA magnitude. Kept, it would dispatch the layer to DoRALayer,
+    # which fails on the missing lora_up/lora_down. There is no DoRA+LoKr layer, so it applies as plain LoKr.
+    w1, w2 = torch.randn(2, 2), torch.randn(3, 4)
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": w1,
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": w2,
+        f"transformer.text_fusion.0.attn.to_q.{magnitude_suffix}": torch.ones(8),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1, w2))
+
+
+def test_kohya_flattened_lokr_converts_onto_its_real_module() -> None:
+    # A LoKr adapter saved in the kohya flattened layout has to clear both hurdles at once: the un-flattening
+    # pass has to reconstruct the dotted module path, and the grouper has to recognise the `lokr_*` suffixes.
+    # Before LoKr was a known suffix the module was left verbatim and the adapter was a silent no-op.
+    w1, w2_a, w2_b = torch.randn(2, 2), torch.randn(3, 1), torch.randn(1, 4)
+    state_dict = {
+        "lora_unet_txtfusion_layerwise_blocks_0_attn_wq.lokr_w1": w1,
+        "lora_unet_txtfusion_layerwise_blocks_0_attn_wq.lokr_w2_a": w2_a,
+        "lora_unet_txtfusion_layerwise_blocks_0_attn_wq.lokr_w2_b": w2_b,
+        "lora_unet_txtfusion_layerwise_blocks_0_attn_wq.alpha": torch.tensor(4.0),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.layerwise_blocks.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1, w2_a @ w2_b))
+    assert layer.scale() == 4.0 / w2_b.shape[0]

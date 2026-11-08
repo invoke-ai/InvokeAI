@@ -43,32 +43,13 @@ def test_invalid_device_name_is_rejected():
 
 def test_auto_copy_documents_legacy_device_precedence():
     """`generation_devices: auto` resolves to the single pinned legacy `device` when one is set
-    (see TorchDevice.get_generation_devices), so every user-facing description of `auto` must
-    disclose that exception instead of promising "every available GPU" unconditionally. Checks the
-    schema description (source of the API docs and generated settings docs), the generated docs
-    settings.json, the Settings UI copy, and the configuration guide's behavior table."""
-    import json
-    from pathlib import Path
-
-    repo_root = Path(__file__).parents[4]
-
+    (see TorchDevice.get_generation_devices), so the schema description must disclose that
+    exception instead of promising "every available GPU" unconditionally. The API docs and the
+    generated settings docs derive from this description; the docs workflow's check-docs-data
+    step fails when the generated copy is stale. UI and guide copy belong to their own packages."""
     field_description = InvokeAIAppConfig.model_fields["generation_devices"].description
     assert field_description is not None
     assert "legacy `device`" in field_description
-
-    generated_settings = json.loads((repo_root / "docs/src/generated/settings.json").read_text())
-    generated_description = next(
-        s["description"] for s in generated_settings["settings"] if s["name"] == "generation_devices"
-    )
-    assert "legacy `device`" in generated_description
-
-    locales = json.loads((repo_root / "invokeai/frontend/web/public/locales/en.json").read_text(encoding="utf-8"))
-    assert locales["settings"]["generationDevicesAuto"] == "Auto"  # not "Auto (all GPUs)"
-    assert "'device'" in locales["settings"]["generationDevicesHelp"]
-
-    guide = (repo_root / "docs/src/content/docs/configuration/invokeai-yaml.mdx").read_text(encoding="utf-8")
-    auto_row = next(line for line in guide.splitlines() if line.startswith("| `auto`"))
-    assert "legacy `device`" in auto_row
 
 
 @pytest.mark.parametrize("value", [["xpu:x"], ["xpu:"], ["xpu0"]])

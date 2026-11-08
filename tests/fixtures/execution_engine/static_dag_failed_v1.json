@@ -1,0 +1,44 @@
+{
+  "execution_state_version": 1,
+  "id": "fixture-failed-state",
+  "graph": {
+    "id": "source-graph",
+    "nodes": {
+      "left": {"id": "left", "type": "add", "a": 1, "b": 2, "is_intermediate": false, "use_cache": true},
+      "right": {"id": "right", "type": "add", "a": 3, "b": 4, "is_intermediate": false, "use_cache": true},
+      "join": {"id": "join", "type": "mul", "a": 0, "b": 0, "is_intermediate": false, "use_cache": true}
+    },
+    "edges": [
+      {"source": {"node_id": "left", "field": "value"}, "destination": {"node_id": "join", "field": "a"}, "type": "default"},
+      {"source": {"node_id": "right", "field": "value"}, "destination": {"node_id": "join", "field": "b"}, "type": "default"}
+    ]
+  },
+  "execution_graph": {
+    "id": "execution-graph",
+    "nodes": {
+      "left-exec": {"id": "left-exec", "type": "add", "a": 1, "b": 2, "is_intermediate": false, "use_cache": true},
+      "right-exec": {"id": "right-exec", "type": "add", "a": 3, "b": 4, "is_intermediate": false, "use_cache": true},
+      "join-exec": {"id": "join-exec", "type": "mul", "a": 0, "b": 0, "is_intermediate": false, "use_cache": true}
+    },
+    "edges": [
+      {"source": {"node_id": "left-exec", "field": "value"}, "destination": {"node_id": "join-exec", "field": "a"}, "type": "default"},
+      {"source": {"node_id": "right-exec", "field": "value"}, "destination": {"node_id": "join-exec", "field": "b"}, "type": "default"}
+    ]
+  },
+  "executed": ["left-exec", "left"],
+  "executed_history": ["left"],
+  "results": {"left-exec": {"type": "integer_output", "value": 3}},
+  "errors": {"right-exec": "injected failure"},
+  "prepared_source_mapping": {"left-exec": "left", "right-exec": "right", "join-exec": "join"},
+  "source_prepared_mapping": {"left": ["left-exec"], "right": ["right-exec"], "join": ["join-exec"]},
+  "prepared_iteration_paths": {"left-exec": [], "right-exec": [], "join-exec": []},
+  "indegree": {"left-exec": 0, "right-exec": 0, "join-exec": 1},
+  "ready_order": [],
+  "execution_refs": {},
+  "execution_tokens": {},
+  "execution_effects": {},
+  "finalized_loop_contexts": [],
+  "workflow_call_stack": [],
+  "workflow_call_history": [],
+  "max_workflow_call_depth": 4
+}

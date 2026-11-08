@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invokeai.app.invocations.krea2_lora_loader import Krea2LoRACollectionLoader, Krea2LoRALoaderInvocation
+from invokeai.app.invocations.krea2.krea2_lora_loader import Krea2LoRACollectionLoader, Krea2LoRALoaderInvocation
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, Qwen3VLEncoderField, TransformerField
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 

@@ -26,7 +26,7 @@ do not mention. That is advisory only: classifiers are optional in PEP 621 and
 informational on PyPI, so they cannot decide whether a pin is installable —
 ``requires-python`` does. One consequence is deliberate and worth stating: a
 version that satisfies an open-ended ``requires-python`` but that no interpreter
-has (``>=3.11`` with a ``3.99`` pin) is not caught here. Catching it would mean
+has (``>=3.12`` with a ``3.99`` pin) is not caught here. Catching it would mean
 gating on non-normative metadata, and a checker that rejects a legal pin is worse
 than one that misses an implausible typo.
 
@@ -59,10 +59,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #
 # - darwin is deliberately empty: macOS uses MPS, for which PyTorch publishes no
 #   separate index, so the launcher installs the default PyPI wheels.
-# - win32 has no rocm entry: PyTorch publishes no ROCm wheels for Windows, and
-#   the `rocm` extra in pyproject.toml is marked `sys_platform == 'linux'`.
+# - win32 has no rocm entry: legacy (pre-6.14.0) installs do not support ROCm on
+#   Windows. Current releases install the `rocm` extra from the lockfile, which
+#   covers Windows through AMD's index.
 # - xpu is on both win32 and linux: PyTorch's XPU index publishes win_amd64 and
 #   linux-x86_64 wheels, which is exactly what the `xpu` extra's markers allow.
+# - Windows on ARM64 is deliberately absent: the launcher's legacy path predates
+#   every Invoke version that runs there, and its bootstrap path installs from
+#   the release lockfile, which carries the ARM64 torch index itself.
 REQUIRED_BACKENDS: dict[str, set[str]] = {
     "win32": {"cpu", "cuda", "xpu"},
     "linux": {"cpu", "cuda", "rocm", "xpu"},
@@ -227,10 +231,10 @@ def check_python_classifiers(pins: dict, pyproject: dict) -> list[str]:
 
     `requires-python` is what actually gates installation, and it is the only authority this
     script fails on. Classifiers are optional in PEP 621 and purely informational on PyPI, so a
-    pin they don't mention is a documentation gap, not a broken install: `requires-python =
-    ">=3.11, <3.13"` genuinely permits a 3.11 pin whether or not a 3.11 classifier exists.
-    Saying so out loud is still useful - the classifiers are what we publish - but it must not
-    fail the build, and their *absence* must not be treated as a finding at all.
+    pin they don't mention is a documentation gap, not a broken install: a pin `requires-python`
+    admits is installable whether or not any classifier names it. Saying so out loud is still
+    useful - the classifiers are what we publish - but it must not fail the build, and their
+    *absence* must not be treated as a finding at all.
 
     Never raises, for the same reason check_python doesn't.
     """

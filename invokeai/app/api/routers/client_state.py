@@ -34,7 +34,7 @@ def get_client_state_by_key(
 def set_client_state(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
-    key: str = Query(..., description="Key to set"),
+    key: str = Query(..., description="Key to set", max_length=255),
     value: str = Body(..., description="Stringified value to set"),
 ) -> str:
     """Sets the client state for the current user (or system user if not authenticated)"""

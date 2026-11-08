@@ -16,7 +16,7 @@ Original source code:
 
 import logging
 import math
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -24,7 +24,14 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
 
+if TYPE_CHECKING:
+    from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
+
 logger = logging.getLogger(__name__)
+
+# An IP-Adapter's contribution to one DiT block: called with the block's flattened, adaLN-modulated cross-attention
+# input `b (t h w) d` and its timestep embedding `b t d`; returns the term to add after the block, as `b (t h w) d`.
+IPAdapterBlockFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 
 # ============================================================================
@@ -468,6 +475,7 @@ class DiTBlock(nn.Module):
         rope_emb_L_1_1_D: Optional[torch.Tensor] = None,
         adaln_lora_B_T_3D: Optional[torch.Tensor] = None,
         extra_per_block_pos_emb: Optional[torch.Tensor] = None,
+        ip_adapter: Optional[IPAdapterBlockFn] = None,
     ) -> torch.Tensor:
         residual_dtype = x_B_T_H_W_D.dtype
         compute_dtype = emb_B_T_D.dtype
@@ -515,9 +523,10 @@ class DiTBlock(nn.Module):
 
         # Cross-attention
         normed = _adaln(x_B_T_H_W_D, self.layer_norm_cross_attn, scale_ca, shift_ca)
+        cross_attn_x = rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d")
         result = rearrange(
             self.cross_attn(
-                rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d"),
+                cross_attn_x,
                 crossattn_emb,
                 rope_emb=rope_emb_L_1_1_D,
             ),
@@ -527,11 +536,19 @@ class DiTBlock(nn.Module):
             w=W,
         )
         x_B_T_H_W_D = result.to(residual_dtype) * gate_ca.to(residual_dtype) + x_B_T_H_W_D
+        # Only the IP-Adapter needs the query input after cross-attention; without one it is freed here, before the MLP.
+        ip_query = cross_attn_x if ip_adapter is not None else None
+        del cross_attn_x
 
         # MLP
         normed = _adaln(x_B_T_H_W_D, self.layer_norm_mlp, scale_mlp, shift_mlp)
         result = self.mlp(normed.to(compute_dtype))
         x_B_T_H_W_D = x_B_T_H_W_D + gate_mlp.to(residual_dtype) * result.to(residual_dtype)
+
+        # The IP-Adapter term is trained as a residual on the whole block's output, not on the cross-attention's.
+        if ip_adapter is not None and ip_query is not None:
+            ip = ip_adapter(ip_query, emb_B_T_D)
+            x_B_T_H_W_D = x_B_T_H_W_D + rearrange(ip, "b (t h w) d -> b t h w d", t=T, h=H, w=W).to(residual_dtype)
 
         return x_B_T_H_W_D
 
@@ -734,8 +751,10 @@ class MiniTrainDIT(nn.Module):
         context: torch.Tensor,
         fps: Optional[torch.Tensor] = None,
         padding_mask: Optional[torch.Tensor] = None,
+        ip_adapter_blocks: Optional[Sequence[Optional[IPAdapterBlockFn]]] = None,
         **kwargs,
     ) -> torch.Tensor:
+        """`ip_adapter_blocks`, when given, holds one entry per DiT block: that block's IP-Adapter term, or None."""
         orig_shape = list(x.shape)
         x = self._pad_to_patch_size(x)
 
@@ -758,8 +777,12 @@ class MiniTrainDIT(nn.Module):
         if x_B_T_H_W_D.dtype == torch.float16:
             x_B_T_H_W_D = x_B_T_H_W_D.float()
 
-        for block in self.blocks:
-            x_B_T_H_W_D = block(x_B_T_H_W_D, t_emb, context, **block_kwargs)
+        if ip_adapter_blocks is None:
+            for block in self.blocks:
+                x_B_T_H_W_D = block(x_B_T_H_W_D, t_emb, context, **block_kwargs)
+        else:
+            for block, ip_adapter in zip(self.blocks, ip_adapter_blocks, strict=True):
+                x_B_T_H_W_D = block(x_B_T_H_W_D, t_emb, context, ip_adapter=ip_adapter, **block_kwargs)
 
         x_out = self.final_layer(x_B_T_H_W_D.to(context.dtype), t_emb, adaln_lora_B_T_3D=adaln_lora)
         x_out = self.unpatchify(x_out)[:, :, : orig_shape[-3], : orig_shape[-2], : orig_shape[-1]]
@@ -783,6 +806,27 @@ def _rotate_half(x: torch.Tensor) -> torch.Tensor:
 def _apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
     """Apply rotary position embeddings to tensor x given precomputed cos/sin."""
     return (x * cos.unsqueeze(1)) + (_rotate_half(x) * sin.unsqueeze(1))
+
+
+def masked_sdpa(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None
+) -> torch.Tensor:
+    """`scaled_dot_product_attention` where a query row with no key to attend to yields zeros.
+
+    Only the math backend defines that case (as zeros); the fused kernels may return NaN for it.
+    It is reachable: an empty prompt is encoded as one masked padding token, so every key of that
+    context is masked. Such rows are computed against an unmasked key set and then zeroed.
+
+    Args:
+        attn_mask: Boolean, True where attention is allowed, broadcastable to (B, H, Lq, Lk).
+    """
+    if attn_mask is None or attn_mask.dtype != torch.bool:
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    has_key = attn_mask.any(dim=-1, keepdim=True)
+    if bool(has_key.all()):
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    out = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask | ~has_key)
+    return out * has_key.to(out.dtype)
 
 
 class LLMAdapterRotaryEmbedding(nn.Module):
@@ -842,7 +886,7 @@ class LLMAdapterAttention(nn.Module):
             q = _apply_rope(q, *pos_q)
             k = _apply_rope(k, *pos_k)
 
-        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+        y = masked_sdpa(q, k, v, attn_mask)
         y = y.transpose(1, 2).reshape(x.shape[0], x.shape[1], -1).contiguous()
         return self.o_proj(y)
 
@@ -1018,29 +1062,63 @@ class AnimaTransformer(MiniTrainDIT):
         "final_layer",
     ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, semantic_connector: Optional["AnimaSemanticConnectorConfig"] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.llm_adapter = LLMAdapter()
+        if semantic_connector is not None:
+            from invokeai.backend.anima.semantic_connector import AnimaSemanticConnector
+
+            # Named as in the Anima-3.8B bundle (`net.anima_v2_connector.*`), so its keys load as-is.
+            # FP8 Storage casts all of it. Keeping its timestep path (`time_mlp`, `time_modulation`, 159M
+            # params) in bf16 by analogy with `t_embedder` was measured and changes nothing: 30 steps, three
+            # seeds, PSNR against bf16 8.4/10.3/9.6 dB with that exception and 8.4/10.2/9.6 dB without, and
+            # 8.3/10.1/9.6 dB with the whole connector in bf16. FP8 Storage moves Anima-3.8B's composition
+            # through the DiT blocks, not the connector; Anima base stays at 14-16 dB.
+            self.anima_v2_connector = AnimaSemanticConnector(semantic_connector)
+
+    @property
+    def has_semantic_connector(self) -> bool:
+        """True for Anima-3.8B: the context depends on Qwen3.5 hidden states and on the timestep."""
+        return hasattr(self, "anima_v2_connector")
 
     def preprocess_text_embeds(
         self,
         text_embeds: torch.Tensor,
         text_ids: Optional[torch.Tensor],
         t5xxl_weights: Optional[torch.Tensor] = None,
+        *,
+        semantic_states: Optional[list[torch.Tensor]] = None,
+        semantic_mask: Optional[torch.Tensor] = None,
+        timesteps: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Run the LLM Adapter to produce conditioning for the DiT.
+        """Run the LLM Adapter (or, on Anima-3.8B, the semantic connector) to produce conditioning for the DiT.
 
         Args:
             text_embeds: Qwen3 hidden states. Shape: (batch, seq_len, 1024).
             text_ids: T5-XXL token IDs. Shape: (batch, seq_len). If None, returns text_embeds directly.
             t5xxl_weights: Optional per-token weights. Shape: (batch, seq_len, 1).
+            semantic_states: Qwen3.5 hidden states, one per connector layer. Each (batch, seq_len, 2560).
+                Required by, and only read by, a transformer with the semantic connector.
+            semantic_mask: True for valid Qwen3.5 tokens. Shape: (batch, seq_len).
+            timesteps: The flow timestep (sigma). Shape: (batch,). Required with the semantic connector,
+                whose output changes with it.
 
         Returns:
             Conditioning tensor. Shape: (batch, 512, 1024), zero-padded if needed.
         """
         if text_ids is None:
             return text_embeds
-        out = self.llm_adapter(text_embeds, text_ids)
+        if self.has_semantic_connector:
+            if semantic_states is None or timesteps is None:
+                raise ValueError(
+                    "This Anima model bundles a Qwen3.5 semantic connector and needs Qwen3.5 conditioning "
+                    "and the timestep. Encode the prompt with a Qwen3.5 encoder connected."
+                )
+            out = self.anima_v2_connector(
+                self.llm_adapter, text_embeds, text_ids, semantic_states, semantic_mask, timesteps
+            )
+        else:
+            out = self.llm_adapter(text_embeds, text_ids)
         if t5xxl_weights is not None:
             out = out * t5xxl_weights
         if out.shape[1] < 512:

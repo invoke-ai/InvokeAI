@@ -10,10 +10,11 @@ Some Anima LoRAs also target the Qwen3 text encoder with lora_te_ prefix keys
 """
 
 import re
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
+from invokeai.backend.anima.block_layout import KNOWN_DEPTHS, adapter_block_positions
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
@@ -23,9 +24,6 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.util.logging import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 
 
 def is_state_dict_likely_anima_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -64,6 +62,18 @@ _KOHYA_UNET_KEY_REPLACEMENTS = [
     ("mlp_layer2", "mlp.layer2"),
 ]
 
+# Anima's six trainable linear modules outside the DiT and LLM-adapter blocks. These need exact
+# mappings because their leaf names contain underscores (for example ``linear_1``), so they cannot
+# be recovered safely by splitting every underscore into a period.
+_KOHYA_UNET_NON_BLOCK_KEY_MAP = {
+    "final_layer_linear": "final_layer.linear",
+    "final_layer_adaln_modulation_1": "final_layer.adaln_modulation.1",
+    "final_layer_adaln_modulation_2": "final_layer.adaln_modulation.2",
+    "t_embedder_1_linear_1": "t_embedder.1.linear_1",
+    "t_embedder_1_linear_2": "t_embedder.1.linear_2",
+    "x_embedder_proj_1": "x_embedder.proj.1",
+}
+
 # Mapping for Qwen3 text encoder Kohya keys.
 _KOHYA_TE_KEY_REPLACEMENTS = [
     ("self_attn_k_proj", "self_attn.k_proj"),
@@ -81,10 +91,14 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
 
     Example: lora_unet_blocks_0_cross_attn_k_proj -> blocks.0.cross_attn.k_proj
     Example: lora_unet_llm_adapter_blocks_0_cross_attn_k_proj -> llm_adapter.blocks.0.cross_attn.k_proj
+    Example: lora_unet_final_layer_linear -> final_layer.linear
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
         key = key[len("lora_unet_") :]
+
+    if non_block_key := _KOHYA_UNET_NON_BLOCK_KEY_MAP.get(key):
+        return non_block_key
 
     # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
     llm_adapter_prefix = ""
@@ -132,18 +146,6 @@ def _convert_kohya_te_key(kohya_layer_name: str) -> str:
 
 
 def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
-    """Create a layer patch from a layer dict, handling DoRA+LoKR edge case.
-
-    Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2) weights.
-    The shared any_lora_layer_from_state_dict checks dora_scale first and expects
-    lora_up/lora_down keys, which don't exist in LoKR layers. We strip dora_scale
-    from LoKR layers so they fall through to the LoKR handler instead.
-    """
-    has_lokr = "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict
-    has_dora = "dora_scale" in layer_dict
-    if has_lokr and has_dora:
-        layer_dict = {k: v for k, v in layer_dict.items() if k != "dora_scale"}
-        logger.warning("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
     return any_lora_layer_from_state_dict(layer_dict)
 
 
@@ -166,6 +168,48 @@ _PEFT_EXTRA_SUFFIXES = [
     ".lokr_w2_a",
     ".lokr_w2_b",
 ]
+
+
+_DIFFUSERS_NON_BLOCK_KEY_MAP = {
+    "patch_embed.proj": "x_embedder.proj.1",
+    "time_embed.t_embedder.linear_1": "t_embedder.1.linear_1",
+    "time_embed.t_embedder.linear_2": "t_embedder.1.linear_2",
+    "norm_out.linear_1": "final_layer.adaln_modulation.1",
+    "norm_out.linear_2": "final_layer.adaln_modulation.2",
+    "proj_out": "final_layer.linear",
+}
+
+_DIFFUSERS_BLOCK_KEY_MAP = {
+    "attn1.to_q": "self_attn.q_proj",
+    "attn1.to_k": "self_attn.k_proj",
+    "attn1.to_v": "self_attn.v_proj",
+    "attn1.to_out.0": "self_attn.output_proj",
+    "attn2.to_q": "cross_attn.q_proj",
+    "attn2.to_k": "cross_attn.k_proj",
+    "attn2.to_v": "cross_attn.v_proj",
+    "attn2.to_out.0": "cross_attn.output_proj",
+    "ff.net.0.proj": "mlp.layer1",
+    "ff.net.2": "mlp.layer2",
+    "norm1.linear_1": "adaln_modulation_self_attn.1",
+    "norm1.linear_2": "adaln_modulation_self_attn.2",
+    "norm2.linear_1": "adaln_modulation_cross_attn.1",
+    "norm2.linear_2": "adaln_modulation_cross_attn.2",
+    "norm3.linear_1": "adaln_modulation_mlp.1",
+    "norm3.linear_2": "adaln_modulation_mlp.2",
+}
+
+_DIFFUSERS_BLOCK_KEY_RE = re.compile(r"^transformer_blocks\.(\d+)\.(.+)$")
+
+
+def _convert_diffusers_transformer_key(key: str) -> str:
+    if mapped := _DIFFUSERS_NON_BLOCK_KEY_MAP.get(key):
+        return mapped
+    if match := _DIFFUSERS_BLOCK_KEY_RE.match(key):
+        block, suffix = match.groups()
+        if mapped := _DIFFUSERS_BLOCK_KEY_MAP.get(suffix):
+            return f"blocks.{block}.{mapped}"
+        raise ValueError(f"Unsupported diffusers Anima LoRA layer: {key}")
+    return key
 
 
 def _group_keys_by_layer(
@@ -218,7 +262,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if alpha is not None:
+        if "alpha" in layer_dict:
+            values["alpha"] = layer_dict["alpha"]
+        elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         return values
     elif "lora_down.weight" in layer_dict:
@@ -282,6 +328,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if not is_text_encoder:
                 for prefix in [
                     "base_model.model.transformer.",
+                    "base_model.model.",
                     "transformer.",
                     "diffusion_model.",
                 ]:
@@ -292,9 +339,37 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if is_text_encoder:
                 final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
             else:
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{_convert_diffusers_transformer_key(clean_key)}"
 
             layer = _make_layer_patch(values)
             layers[final_key] = layer
 
     return ModelPatchRaw(layers=layers)
+
+
+_TRANSFORMER_BLOCK_KEY_RE = re.compile(rf"^{re.escape(ANIMA_LORA_TRANSFORMER_PREFIX)}blocks\.(\d+)\.")
+
+
+def anima_lora_for_depth(patch: ModelPatchRaw, target_depth: int) -> tuple[ModelPatchRaw, Optional[int]]:
+    """The LoRA with its DiT block keys moved to where `target_depth`'s model keeps the blocks it was trained on.
+
+    A LoRA trained on Anima base, applied to a depth-expanded finetune (see `invokeai.backend.anima.block_layout`),
+    would otherwise patch the wrong blocks from the third one on. Returns the patch -- a new one sharing the layers,
+    so the cached LoRA stays as it is -- and the depth it was moved from, or the patch itself and None when nothing
+    moves. Only `blocks.N.` keys of the transformer move; the LLM adapter's own `llm_adapter.blocks.N.` and the text
+    encoder's keys do not.
+    """
+    indices = [int(match.group(1)) for key in patch.layers if (match := _TRANSFORMER_BLOCK_KEY_RE.match(key))]
+    if not indices:
+        return patch, None
+    positions = adapter_block_positions(max(indices), target_depth)
+    if positions is None:
+        return patch, None
+
+    def moved(key: str) -> str:
+        return _TRANSFORMER_BLOCK_KEY_RE.sub(
+            lambda m: f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.{positions[int(m.group(1))]}.", key, count=1
+        )
+
+    source_depth = next(depth for depth in KNOWN_DEPTHS if depth > max(indices))
+    return ModelPatchRaw(layers={moved(key): layer for key, layer in patch.layers.items()}), source_depth
