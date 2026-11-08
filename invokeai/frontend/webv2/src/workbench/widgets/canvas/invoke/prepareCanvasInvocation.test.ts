@@ -1095,6 +1095,17 @@ describe('runCanvasInvocation', () => {
       expect(
         remembered.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']?.control_model
       ).toMatchObject({ key: 'depth-b' });
+      const outputMetadata = Object.values(remembered.submittedGraphs()[0]!.graph.backendGraph!.nodes).find(
+        (node) => node.type === 'core_metadata'
+      );
+      expect(outputMetadata?.canvas_v3_metadata).toMatchObject({
+        controlModels: { 'depth-layer': { key: 'depth-b', name: 'depth b', hash: 'depth-b-hash' } },
+        document: { stacks: { control: [{ id: 'depth-layer', adapter: { model: 'depth-b', kind: 'controlnet' } }] } },
+        settings: { strength: 0.75 },
+      });
+      expect(outputMetadata?.control_layers).toMatchObject([
+        { layer_id: 'depth-layer', model: { key: 'depth-b' }, type: 'controlnet' },
+      ]);
     });
 
     it('gives a FLUX union model the InstantX mode of the layer type', async () => {

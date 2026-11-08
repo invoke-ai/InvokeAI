@@ -1,8 +1,11 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type * as GalleryMediaUsageModule from '@features/gallery/mediaUsage';
+import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type * as QueueUtilityModule from '@features/queue/utility';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/contracts';
 import type * as WorkflowReact from '@features/workflow/react';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
+import type * as SettingsStoreModule from '@workbench/settings/store';
 
 import {
   resetArchitectureCapabilities,
@@ -16,11 +19,13 @@ import { parseOpenApiToTemplates } from '@features/workflow/react';
 import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { toaster } from '@platform/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
+import type * as MediaUsageReportModule from './mediaUsageReport';
 import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
@@ -85,6 +90,8 @@ const mocks = vi.hoisted(() => ({
   sendGalleryImageAsControl: vi.fn(),
   requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
+  resolveMediaUsage: vi.fn<(...args: unknown[]) => Promise<GalleryMediaUsageReport>>(),
+  checkGalleryMediaUsage: vi.fn(),
   setStarred: vi.fn(),
 }));
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
@@ -175,6 +182,18 @@ vi.mock('@features/models', () => ({
     }),
 }));
 
+// The resolver's own behaviour is covered beside it; here mostly what deletion does with its answer. One test runs the
+// real resolver over this tab's projects, with the server's answer doubled. The last look at this tab's projects before
+// a silent deletion runs for real.
+vi.mock('./mediaUsageReport', async (importOriginal) => ({
+  ...(await importOriginal<typeof MediaUsageReportModule>()),
+  resolveMediaUsage: (...args: unknown[]) => mocks.resolveMediaUsage(...args),
+}));
+vi.mock('@features/gallery/mediaUsage', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryMediaUsageModule>()),
+  checkGalleryMediaUsage: (...args: unknown[]) => mocks.checkGalleryMediaUsage(...args),
+}));
+
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ undoable: (...args: unknown[]) => mocks.notifyUndoable(...args) }),
 }));
@@ -183,7 +202,8 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWorkbenchWidget,
 }));
 
-vi.mock('@workbench/settings/store', () => ({
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof SettingsStoreModule>()),
   useWorkbenchPreferenceSelector: (selector: (value: typeof preferences) => boolean) => selector(preferences),
 }));
 
@@ -286,8 +306,13 @@ const makeMockProject = (
   galleryValues: Record<string, unknown> = {},
   upscaleValues: Record<string, unknown> = {}
 ) => ({
-  canvas: { document: { stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [] } } },
+  canvas: {
+    document: { stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [] } },
+    snapshots: [],
+    stagingArea: { pendingImages: [] },
+  },
   id,
+  name: id,
   workflows: { activeWorkflowId: 'wf', entries: [] },
   widgetInstances: {
     gallery: {
@@ -304,6 +329,31 @@ const makeMockProject = (
     },
   },
 });
+
+/**
+ * Serves `initial` as the store until the optimistic removal applies, then `removed`: each read sees the state of its
+ * moment, however many reads there are. `set` moves the store on, as a concurrent change would.
+ */
+const serveProjectStates = (
+  initial: ReturnType<typeof makeMockProject>,
+  removed: ReturnType<typeof makeMockProject>
+) => {
+  let current = initial;
+
+  mocks.getSnapshot.mockImplementation(() => ({ activeProject: current, projects: [current] }));
+  mocks.galleryRemoveItems.mockImplementation(() => {
+    current = removed;
+  });
+  onTestFinished(() => {
+    mocks.galleryRemoveItems.mockReset();
+  });
+
+  return {
+    set: (project: ReturnType<typeof makeMockProject>) => {
+      current = project;
+    },
+  };
+};
 
 const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
@@ -333,9 +383,20 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
   return null;
 };
 
+const usageReport = (overrides: Partial<GalleryMediaUsageReport> = {}): GalleryMediaUsageReport => ({
+  checkedCount: 1,
+  groups: [],
+  inUseCount: 0,
+  onlyImages: true,
+  scope: 'items',
+  serverCheck: 'complete',
+  ...overrides,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   preferences.confirmImageDeletion = false;
+  mocks.resolveMediaUsage.mockResolvedValue(usageReport());
   mocks.requestDeletionConfirmation.mockImplementation(
     (_itemRefs: readonly GalleryItemRef[], executeDeletion: () => Promise<void>) => executeDeletion()
   );
@@ -1265,13 +1326,15 @@ type ExpectedItemActions = {
 const getItemActions = (): ExpectedItemActions => actionsRef.current as unknown as ExpectedItemActions;
 
 describe('mixed item mutation outcomes', () => {
-  it('gates deletion through confirmation when the preference is enabled', async () => {
+  it('gates deletion through confirmation when the preference is enabled, checking usage as the dialog opens', async () => {
     const refs = [{ kind: 'image' as const, name: 'image.png' }];
     const result = { affectedBoardIds: ['none'], failed: [], succeeded: refs };
     let executeDeletion: (() => Promise<void>) | null = null;
+    const captured: { checkUsage?: (signal: AbortSignal) => Promise<GalleryMediaUsageReport> } = {};
     preferences.confirmImageDeletion = true;
-    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute, options) => {
       executeDeletion = execute;
+      captured.checkUsage = options.checkUsage;
       return Promise.resolve();
     });
     mocks.itemDelete.mockResolvedValue(result);
@@ -1291,8 +1354,66 @@ describe('mixed item mutation outcomes', () => {
     // The dialog learns where focus goes once the deletion has removed the control that asked for it.
     expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
       canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
       returnFocus,
-      usage: [],
+    });
+    // The dialog, not the caller, runs the check: it opens without waiting for one.
+    expect(mocks.resolveMediaUsage).not.toHaveBeenCalled();
+    expect(captured.checkUsage).toBeDefined();
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await executeDeletion?.();
+    });
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it('deletes one visible item without asking once the check finds nothing using it', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // A click is waiting: the check gets a few seconds per stage, not the dialog's longer allowance.
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledWith({ kind: 'items', refs }, expect.anything(), {
+      projectReadsTimeoutMs: 3000,
+      serverTimeoutMs: 3000,
+    });
+    expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it.each([
+    [
+      'something uses it',
+      usageReport({
+        groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'upscale' }] }],
+        inUseCount: 1,
+      }),
+    ],
+    ['the check could not reach the server', usageReport({ serverCheck: 'unavailable' })],
+  ])('still asks with routine confirmations off when %s, showing the report', async (_case, usage) => {
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    let executeDeletion: (() => Promise<void>) | null = null;
+    mocks.resolveMediaUsage.mockResolvedValue(usage);
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+      executeDeletion = execute;
+      return Promise.resolve();
+    });
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // The dialog shows the report it was handed and can run the check again from it.
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
+      returnFocus: undefined,
+      usage,
     });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
@@ -1302,16 +1423,204 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
   });
 
-  it('deletes immediately without opening confirmation when the preference is disabled', async () => {
-    const refs = [{ kind: 'image' as const, name: 'image.png' }];
-    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+  it('blocks the silent deletion of an item a project in this tab uses but has not saved yet', async () => {
+    const { resolveMediaUsage } = await vi.importActual<typeof MediaUsageReportModule>('./mediaUsageReport');
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    mocks.resolveMediaUsage.mockImplementation(resolveMediaUsage as (...args: unknown[]) => Promise<never>);
+    // The server has not seen the edit: it knows of no use.
+    mocks.checkGalleryMediaUsage.mockResolvedValue({
+      checkedImageCount: 1,
+      checkedVideoCount: 0,
+      documents: [],
+      documentsTotal: 0,
+      inUseImageCount: 0,
+      inUseVideoCount: 0,
+      otherAccounts: { documentCount: 0, imageCount: 0, queueItemCount: 0, videoCount: 0 },
+      queue: { imageCount: 0, imageNames: [], itemCount: 0, videoCount: 0, videoNames: [] },
+    });
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject(
+        'project-1',
+        {},
+        { inputImage: { height: 1, image_name: 'source.png', width: 1 } }
+      );
+
+      return { activeProject: project, projects: [project] };
+    });
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
 
     await act(async () => {
       await getItemActions().deleteItems(refs);
     });
 
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(
+      refs,
+      expect.any(Function),
+      expect.objectContaining({
+        usage: expect.objectContaining({
+          groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'upscale' }] }],
+          serverCheck: 'complete',
+        }),
+      })
+    );
+  });
+
+  it('asks instead when this tab starts using the item while the check runs, and has the dialog check again', async () => {
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    mocks.resolveMediaUsage.mockImplementation(() => {
+      // The upscale source is set to the item while the server is asked; its answer cannot know.
+      mocks.getSnapshot.mockImplementation(() => {
+        const project = makeMockProject(
+          'project-1',
+          {},
+          { inputImage: { height: 1, image_name: 'source.png', width: 1 } }
+        );
+
+        return { activeProject: project, projects: [project] };
+      });
+      return Promise.resolve(usageReport());
+    });
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    // No report: the one in hand says nothing uses the item, so the dialog runs the check again.
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
+      returnFocus: undefined,
+    });
+  });
+
+  it('runs one check and one deletion for repeated presses, saying so while a slow check runs', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    let settle: (report: GalleryMediaUsageReport) => void = () => {};
+    const createToast = vi.spyOn(toaster, 'create');
+    const dismissToast = vi.spyOn(toaster, 'dismiss');
+    mocks.resolveMediaUsage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        })
+    );
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    let first!: Promise<void>;
+    await act(() => {
+      first = getItemActions().deleteItems(refs);
+      // Key repeat, and the same item from another surface.
+      void getItemActions().deleteItems(refs);
+      void getItemActions().deleteItems([...refs]);
+    });
+    await vi.waitFor(() => expect(createToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'loading' })));
+
+    await act(async () => {
+      settle(usageReport());
+      await first;
+    });
+
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledOnce();
+    expect(mocks.itemDelete).toHaveBeenCalledOnce();
+    expect(dismissToast).toHaveBeenCalledWith(createToast.mock.results[0]?.value);
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    // Once settled, the item may be asked about again.
+    mocks.resolveMediaUsage.mockResolvedValue(usageReport());
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledTimes(2);
+    createToast.mockRestore();
+    dismissToast.mockRestore();
+  });
+
+  it('shows one checking notice for checks running at once, until the last one ends, a failed one included', async () => {
+    const settles: Array<(report: GalleryMediaUsageReport) => void> = [];
+    const rejects: Array<(error: Error) => void> = [];
+    const createToast = vi.spyOn(toaster, 'create');
+    const dismissToast = vi.spyOn(toaster, 'dismiss');
+    mocks.resolveMediaUsage.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          settles.push(resolve);
+          rejects.push(reject);
+        })
+    );
+    let dismissedBeforeDialog = false;
+    mocks.requestDeletionConfirmation.mockImplementation(() => {
+      dismissedBeforeDialog = dismissToast.mock.calls.length > 0;
+      return Promise.resolve();
+    });
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: [] });
+
+    try {
+      let first!: Promise<void>;
+      let second!: Promise<void>;
+      await act(() => {
+        first = getItemActions().deleteItems([{ kind: 'image', name: 'a.png' }]);
+        second = getItemActions().deleteItems([{ kind: 'image', name: 'b.png' }]);
+      });
+      await vi.waitFor(() => expect(createToast).toHaveBeenCalledTimes(2));
+
+      // Both checks raised the notice; it is one notice, under one id.
+      const ids = new Set(createToast.mock.calls.map(([options]) => options.id));
+      expect(ids.size).toBe(1);
+      expect(createToast.mock.calls[0]?.[0]).toMatchObject({ type: 'loading' });
+
+      await act(async () => {
+        settles[0]?.(usageReport());
+        await first;
+      });
+      // The other check still runs: its notice stays.
+      expect(dismissToast).not.toHaveBeenCalled();
+
+      // A check that fails ends too, and takes the notice with it before its dialog opens.
+      await act(async () => {
+        rejects[1]?.(new Error('Failed to fetch dynamically imported module'));
+        await second;
+      });
+      expect(dismissToast).toHaveBeenCalledExactlyOnceWith([...ids][0]);
+      expect(mocks.requestDeletionConfirmation).toHaveBeenCalledOnce();
+      expect(dismissedBeforeDialog).toBe(true);
+    } finally {
+      createToast.mockRestore();
+      dismissToast.mockRestore();
+    }
+  });
+
+  it('neither deletes nor asks when the account changes during the check', async () => {
+    mocks.resolveMediaUsage.mockImplementation(() => {
+      accountLifecycle.invalidate();
+      accountLifecycle.activate('user-b');
+      return Promise.reject(new Error('Account scope is no longer active.'));
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'image.png' }]);
+    });
+
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+  });
+
+  it('asks, with the check failed, when the check cannot run at all (its code did not load)', async () => {
+    const failure = new Error('Failed to fetch dynamically imported module');
+    mocks.resolveMediaUsage.mockRejectedValue(failure);
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'image.png' }]);
+    });
+
+    const options = mocks.requestDeletionConfirmation.mock.calls[0]?.[2] as {
+      checkUsage: (signal: AbortSignal) => Promise<unknown>;
+    };
+    await expect(options.checkUsage(new AbortController().signal)).rejects.toBe(failure);
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1333,42 +1642,10 @@ describe('mixed item mutation outcomes', () => {
 
     expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
       canSkipFutureConfirmations: false,
+      checkUsage: expect.any(Function),
       returnFocus: undefined,
-      usage: [],
     });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
-  });
-
-  it('still confirms, naming the surfaces, when the project uses an item and confirmation is off', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'source.png' },
-      { kind: 'image' as const, name: 'unused.png' },
-    ];
-    let executeDeletion: (() => Promise<void>) | null = null;
-    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
-      executeDeletion = execute;
-      return Promise.resolve();
-    });
-    mocks.getProject.mockReturnValue(
-      makeMockProject('project-1', {}, { inputImage: { height: 1, image_name: 'source.png', width: 1 } })
-    );
-    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
-    });
-
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
-      canSkipFutureConfirmations: false,
-      returnFocus: undefined,
-      usage: [{ names: ['source.png'], surface: 'upscale' }],
-    });
-    expect(mocks.itemDelete).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await executeDeletion?.();
-    });
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
   });
 
   it('uses the localized Uncategorized label in move notifications', async () => {
@@ -1716,12 +1993,8 @@ describe('total transport failure rollback', () => {
     const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
     const afterRemoval = makeMockProject('project-1', { recentImages: [] });
 
-    // First call is the pre-removal capture; every call after simulates the
-    // store having actually applied the optimistic removal.
-    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
-      activeProject: afterRemoval,
-      projects: [afterRemoval],
-    });
+    // The store holds `before` until the optimistic removal applies.
+    serveProjectStates(before, afterRemoval);
     mocks.itemDelete.mockRejectedValue(new Error('network down'));
     mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
 
@@ -1751,10 +2024,7 @@ describe('total transport failure rollback', () => {
       selectedImageNames: [],
     });
 
-    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
-      activeProject: afterRemoval,
-      projects: [afterRemoval],
-    });
+    serveProjectStates(before, afterRemoval);
     // A rejected request is reported as a result whose items all failed.
     mocks.itemDelete.mockResolvedValue({ affectedBoardIds: [], failed: refs, succeeded: [] });
 
@@ -1778,11 +2048,12 @@ describe('total transport failure rollback', () => {
       recentImages: [{ ...recentImageFixture, imageName: 'new-generation.png' }],
     });
 
-    mocks.getSnapshot
-      .mockReturnValueOnce({ activeProject: before, projects: [before] }) // capture, pre-removal
-      .mockReturnValueOnce({ activeProject: afterRemoval, projects: [afterRemoval] }) // diff, post-removal
-      .mockReturnValue({ activeProject: concurrentlyChanged, projects: [concurrentlyChanged] }); // restore-time read
-    mocks.itemDelete.mockRejectedValue(new Error('network down'));
+    const store = serveProjectStates(before, afterRemoval);
+    // A generation lands while the request is out.
+    mocks.itemDelete.mockImplementation(() => {
+      store.set(concurrentlyChanged);
+      return Promise.reject(new Error('network down'));
+    });
     mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
 
     await act(async () => {

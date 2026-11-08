@@ -391,6 +391,18 @@ describe('compileCanvasGraph', () => {
     });
   });
 
+  describe.each(['img2img', 'inpaint', 'outpaint'] as const)('SDXL %s color compensation', (mode) => {
+    it.each([
+      { colorCompensation: true, expected: 'SDXL' },
+      { colorCompensation: false, expected: 'None' },
+    ])('sets $expected on the encoder when enabled=$colorCompensation', ({ colorCompensation, expected }) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: { colorCompensation } });
+
+      expect(getNodeByType(backendGraph, 'i2l')).toMatchObject({ color_compensation: expected, fp32: true });
+      expect(getNodeByType(backendGraph, 'l2i')).not.toHaveProperty('color_compensation');
+    });
+  });
+
   describe('img2img per base', () => {
     it.each(BASE_CASES)(
       'grafts a $model.base image-to-latents encode node',
@@ -446,11 +458,16 @@ describe('compileCanvasGraph', () => {
       expect(getNodeByType(fp32.backendGraph, 'i2l')?.fp32).toBe(true);
     });
 
-    it('does not attach fp32 to non-SD encode nodes', () => {
-      const { backendGraph } = compile(fluxModel, 'img2img');
+    it.each(BASE_CASES.filter(({ encodeType }) => encodeType !== 'i2l'))(
+      'does not attach SD-only VAE settings to $model.base encode nodes',
+      ({ model, encodeType }) => {
+        const { backendGraph } = compile(model, 'img2img', { settings: { colorCompensation: true } });
+        const encode = getNodeByType(backendGraph, encodeType);
 
-      expect(getNodeByType(backendGraph, 'flux_vae_encode')?.fp32).toBeUndefined();
-    });
+        expect(encode).not.toHaveProperty('fp32');
+        expect(encode).not.toHaveProperty('color_compensation');
+      }
+    );
 
     it('threads the composite image name into the encode node', () => {
       const { backendGraph } = compile(sdxlModel, 'img2img', { compositeImageName: 'my-upload.png' });
@@ -2311,6 +2328,56 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('joins regional FLUX Redux references to the collector the builder feeds from the global ones', () => {
+    const reduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' } as const;
+    const { backendGraph } = compile(fluxModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', {
+          referenceImages: [
+            {
+              id: 'regional',
+              imageName: 'regional-redux.png',
+              model: reduxModel,
+              settings: { downsampling_factor: 1, weight: 1 },
+              type: 'flux_redux',
+            },
+          ],
+        }),
+      ],
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'global-redux.png', width: 512 } } },
+              imageInfluence: 'medium',
+              model: reduxModel,
+              type: 'flux_redux',
+            },
+            id: 'global',
+            isEnabled: true,
+          },
+        ],
+      },
+    });
+    const reduxInputs = backendGraph.edges.filter(
+      (edge) => edge.destination.node_id === 'denoise_latents' && edge.destination.field === 'redux_conditioning'
+    );
+
+    expect(reduxInputs).toHaveLength(1);
+    const builderCollector = reduxInputs[0]!.source.node_id;
+    expect(builderCollector).toMatch(/^flux_redux_collector_/);
+    expect(backendGraph.nodes.regional_flux_redux_collector).toBeUndefined();
+    expect(getEdge(backendGraph, builderCollector, 'item')).toBeDefined();
+    expect(
+      backendGraph.edges.some(
+        (edge) =>
+          edge.source.node_id === 'flux_redux_regional' &&
+          edge.source.field === 'redux_cond' &&
+          edge.destination.node_id === builderCollector
+      )
+    ).toBe(true);
   });
 
   it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {

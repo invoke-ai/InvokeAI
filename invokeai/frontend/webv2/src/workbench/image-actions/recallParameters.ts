@@ -80,7 +80,8 @@ export type RecallParameterField =
   | 'clipSkip'
   | 'loras'
   | 'referenceImages'
-  | 'refiner';
+  | 'refiner'
+  | 'canvas';
 
 export type RecallParameterSkipReason = 'unsupported' | 'unresolved' | 'incompatible' | 'invalid' | 'limit';
 
@@ -128,6 +129,8 @@ export const isRecallParametersAvailable = (parameters: Record<string, unknown>)
 
 const HANDLED_KEYS = new Set([
   'append',
+  'control_layers',
+  'denoise_strength',
   'cfg_rescale_multiplier',
   'cfg_scale',
   'clip_skip',

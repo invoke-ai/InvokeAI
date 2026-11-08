@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AddControlLayersOptions, ControlLayerGraphInput, ControlModelIdentifier } from './addControlLayers';
 
-import { addControlLayers, CONTROL_DENOISE_NODE_ID, isControlKindSupportedForBase } from './addControlLayers';
+import { addControlLayers, isControlKindSupportedForBase } from './addControlLayers';
 
 interface TestGraph {
   id: string;
@@ -41,11 +41,14 @@ const layer = (overrides: Partial<ControlLayerGraphInput> = {}): ControlLayerGra
   ...overrides,
 });
 
+// Cast: TestGraph is structurally the BackendGraphContract shape addControlLayers needs.
+const addTo = (graph: TestGraph, options: Omit<AddControlLayersOptions, 'denoise'>) =>
+  addControlLayers(graph as never, { ...options, denoise: graph.nodes.denoise_latents });
+
 // Convenience to run addControlLayers against a fresh graph.
-const run = (options: AddControlLayersOptions) => {
+const run = (options: Omit<AddControlLayersOptions, 'denoise'>) => {
   const graph = baseGraph();
-  // Cast: TestGraph is structurally the BackendGraphContract shape addControlLayers needs.
-  addControlLayers(graph as never, options);
+  addTo(graph, options);
   return graph;
 };
 
@@ -95,12 +98,6 @@ describe('isControlKindSupportedForBase', () => {
     expect(isControlKindSupportedForBase('sd-1', 'control_lora')).toBe(false);
     expect(isControlKindSupportedForBase('sdxl', 'control_lora')).toBe(false);
     expect(isControlKindSupportedForBase('sd-2', 'control_lora')).toBe(false);
-  });
-});
-
-describe('CONTROL_DENOISE_NODE_ID', () => {
-  it('is the deterministic denoise node id', () => {
-    expect(CONTROL_DENOISE_NODE_ID).toBe('denoise_latents');
   });
 });
 
@@ -454,7 +451,7 @@ describe('addControlLayers — Qwen-Image control', () => {
     const combine = { id: 'combine', type: 'mask_combine' };
     graph.nodes.resize = resize;
     graph.nodes.combine = combine;
-    addControlLayers(graph as never, {
+    addTo(graph, {
       base: 'qwen-image',
       inpaint: { image: { field: 'image', node: resize }, mask: { field: 'image', node: combine } },
       layers: [qwenLayer('Q1')],
@@ -784,14 +781,5 @@ describe('addControlLayers — unsupported kind rejected', () => {
 
   it('rejects malformed numeric adapter values at the graph boundary', () => {
     expect(() => run({ base: 'sd-1', layers: [layer({ weight: Number.NaN })] })).toThrow(/invalid_adapter_values/);
-  });
-});
-
-describe('addControlLayers — missing denoise node', () => {
-  it('throws when the base graph has no denoise node', () => {
-    const graph: TestGraph = { id: 'g', nodes: {}, edges: [] };
-    expect(() => addControlLayers(graph as never, { base: 'sd-1', layers: [layer()] })).toThrow(
-      /missing the denoise node/
-    );
   });
 });

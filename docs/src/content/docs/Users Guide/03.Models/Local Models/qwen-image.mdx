@@ -75,9 +75,19 @@ Qwen Image needs three components:
   keep part of it in RAM. The 2512 file is plain fp8 without scales: loading it briefly needs about 41 GB of
   free system RAM, because it is widened to bf16 before FP8 Storage casts it back.
 
-Three Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
-bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), and **Diffusers** (~16 GB,
-full precision). The single-file encoders ship with their tokenizer and config inside InvokeAI.
+Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), **GGUF Q4_K_M** (~4.7 GB, text
+only) and **Diffusers** (~16 GB, full precision). The single-file and GGUF encoders ship with their
+tokenizer and config inside InvokeAI.
+
+The **GGUF** encoders are llama.cpp builds of Qwen2.5-VL-7B-Instruct (e.g. from
+`unsloth/Qwen2.5-VL-7B-Instruct-GGUF`) and hold only the language model. They encode text prompts, but cannot
+read reference images: with one selected, an Edit model's reference images block **Invoke** with a message
+saying so, and the workflow node fails before it loads anything. The separate `mmproj` vision file in those
+repositories is refused at install, and so is a Qwen2-VL GGUF: the previous generation shares the llama.cpp
+architecture name and would condition Qwen Image with the wrong model. Measured on the CPU against the bf16
+encoder, the prompt embeddings of the Q8_0 build agree to a mean cosine similarity of 0.9999 and those of
+Q4_K_M to 0.996. The prompt node's **Quantization** option has no effect on a GGUF encoder.
 
 When a GGUF or single-file Qwen Image model is selected, pick the **Qwen VL Encoder** and **VAE** in the
 **Components** section next to the model. Alternatively, set **Component source** to an installed
@@ -132,7 +142,8 @@ then describe the change you want in the prompt. The text-to-image variant does 
 images.
 
 - All reference images are given to the Qwen2.5-VL encoder together with your prompt, so you can refer
-  to them in the instruction.
+  to them in the instruction. This needs the fp8 scaled, NVFP4 or Diffusers encoder: a GGUF encoder has no
+  vision tower.
 - The **first** reference image is also encoded by the VAE and supplied to the transformer as a
   pixel-level reference.
 
@@ -144,6 +155,14 @@ Image**; connect an **Image to Latents - Qwen Image** node to the **Reference La
 
 Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer.
 In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**.
+
+Plain LoRAs saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw PEFT adapters
+(`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers (`img_mod`,
+`txt_mod`, `img_mlp`, `txt_mlp`), as LoRAs in these layouts usually do. Other model families use the same key
+prefixes, so a LoRA in these layouts that trains only attention layers is not recognized and installs as an
+unknown model, and so do LoKR, LoHA and DoRA files in these layouts. A raw PEFT adapter's strength is set in
+its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
+with rsLoRA, applies at a different strength.
 
 ## ControlNet
 

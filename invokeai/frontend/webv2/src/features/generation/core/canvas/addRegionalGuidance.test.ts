@@ -171,8 +171,27 @@ const region = (overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanc
   ...overrides,
 });
 
-const run = (graph: TestGraph, options: AddRegionalGuidanceOptions): TestGraph => {
-  addRegionalGuidance(graph as never, options);
+type RunOptions = Omit<AddRegionalGuidanceOptions, 'conditioning' | 'denoise'> &
+  Partial<Pick<AddRegionalGuidanceOptions, 'conditioning'>>;
+
+/** The facts a family builder hands out for these graphs: the global conditioning nodes the fixture created. */
+const conditioningOf = (graph: TestGraph): AddRegionalGuidanceOptions['conditioning'] => ({
+  fluxReduxCollector: null,
+  ipAdapterCollector: null,
+  negative:
+    graph.nodes.neg_cond && graph.nodes.neg_cond_collect
+      ? { collector: graph.nodes.neg_cond_collect, node: graph.nodes.neg_cond }
+      : null,
+  positive: graph.nodes.pos_cond,
+  positiveCollector: graph.nodes.pos_cond_collect,
+});
+
+const run = (graph: TestGraph, options: RunOptions): TestGraph => {
+  addRegionalGuidance(graph as never, {
+    conditioning: conditioningOf(graph),
+    denoise: graph.nodes.denoise_latents,
+    ...options,
+  });
   return graph;
 };
 
@@ -427,6 +446,35 @@ describe('addRegionalGuidance — SD1', () => {
     );
     expect(collectorEdge).toBeDefined();
     expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', collectorEdge!.source.node_id, 'item')).toBe(true);
+  });
+  it('joins the ip_adapter collector the builder already feeds the denoise from', () => {
+    const graph = sdBaseGraph();
+    const builderCollector = { id: 'ip_adapter_collector', type: 'collect' };
+    graph.nodes[builderCollector.id] = builderCollector;
+    const g = run(graph, {
+      base: 'sd-1',
+      conditioning: { ...conditioningOf(graph), ipAdapterCollector: builderCollector },
+      regions: [
+        region({
+          referenceImages: [
+            {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              id: 'ref1',
+              imageName: 'ref.png',
+              method: 'full',
+              model: ipModel('sd-1'),
+              type: 'ip_adapter',
+              weight: 0.8,
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', 'ip_adapter_collector', 'item')).toBe(true);
+    expect(g.nodes.regional_ip_adapter_collector).toBeUndefined();
+    expect(g.edges.filter((e) => e.destination.field === 'ip_adapter')).toEqual([]);
   });
 });
 

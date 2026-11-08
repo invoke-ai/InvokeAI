@@ -643,6 +643,7 @@ def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
         hidiffusion=False,
         hidiffusion_raunet=False,
         hidiffusion_window_attn=False,
+        hidiffusion_auto_ratios=False,
         hidiffusion_t1_ratio=0.25,
         hidiffusion_t2_ratio=0.1,
     )
@@ -655,6 +656,7 @@ def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
     assert result.metadata.root["hidiffusion"] is False
     assert result.metadata.root["hidiffusion_raunet"] is False
     assert result.metadata.root["hidiffusion_window_attn"] is False
+    assert result.metadata.root["hidiffusion_auto_ratios"] is False
     assert result.metadata.root["hidiffusion_t1_ratio"] == 0.25
     assert result.metadata.root["hidiffusion_t2_ratio"] == 0.1
 

@@ -1479,11 +1479,13 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'anima',
   'flux',
   'flux2',
+  'flux3',
   'krea-2',
   'qwen-image',
   'qwen-image-2-1',
   'sd-1',
   'sd-2',
+  'sd-3',
   'sdxl',
   'wan',
   'z-image',
@@ -2492,6 +2494,29 @@ const getReferenceImageValidationIssues = (
     }
   });
 
+  // A GGUF Qwen VL Encoder is the language model alone (llama.cpp ships the vision tower as a separate file), and the
+  // prompt node refuses reference images with it. A selected encoder replaces the bundled one, so it decides. One
+  // reason for all images: the fix is the same for each.
+  const qwenVLEncoder = settings.qwenVLEncoderModel;
+  if (
+    qwenVLEncoder?.format === 'gguf_quantized' &&
+    settings.referenceImages.some(
+      (referenceImage) =>
+        referenceImage.isEnabled &&
+        referenceImage.config.type === 'qwen_image_reference_image' &&
+        getReferenceImageConfigSupported(model, referenceImage)
+    )
+  ) {
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `Qwen VL Encoder "${qwenVLEncoder.name}" is a GGUF build with no vision tower, so it cannot read reference ` +
+          'images. Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+        REFERENCE_IMAGES_TARGET,
+        { key: 'qwenVLEncoderModel', kind: 'clearModel' }
+      )
+    );
+  }
+
   // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
   // inherit one that cannot read the references.
   if (
@@ -2718,6 +2743,22 @@ export const getGenerationValidationIssues = (
     ...getReferenceImageValidationIssues(model, settings),
     ...getPidValidationIssues(model, settings),
   ];
+
+  if (
+    getGenerationUiPolicy(model).hiDiffusionVisible &&
+    settings.hiDiffusionEnabled &&
+    settings.hiDiffusionRauNetEnabled
+  ) {
+    const t1 = settings.hiDiffusionT1Ratio;
+    const t2 = settings.hiDiffusionT2Ratio;
+    if (t1 !== null && t2 !== null && t1 < t2) {
+      issues.push(
+        createUntranslatedGenerationIssue('HiDiffusion T1 ratio must be greater than or equal to T2.', {
+          section: 'advanced',
+        })
+      );
+    }
+  }
 
   if (model.type === 'external_image_generator') {
     const modeReason = getExternalModeReason(model, mode);
