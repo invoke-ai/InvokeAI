@@ -93,3 +93,71 @@ krea2_turbo_gguf_q8_0 = StarterModel(
     variant=Krea2VariantType.Turbo,
     dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
 )
+
+# Raw is the undistilled model, so these builds run at 28 steps with CFG, unlike the distilled Turbo entries above.
+_KREA2_COMFY_RAW = (
+    "https://huggingface.co/Comfy-Org/Krea-2/resolve/588feaf955b08b9ac4723eeb751752ab045dba71/diffusion_models"
+)
+_KREA2_RAW_GGUF = (
+    "https://huggingface.co/vantagewithai/Krea-2-Raw-GGUF/resolve/c20e61051625c7ff0a16425f3a87e702486ea3a8"
+)
+_KREA2_RAW_NOTE = (
+    "Raw is undistilled (28 steps, CFG enabled); Turbo is recommended for standard inference. Ships only the "
+    "transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as dependencies."
+)
+
+krea2_raw_fp8 = StarterModel(
+    name="Krea-2 Raw (fp8)",
+    base=BaseModelType.Krea2,
+    source=f"{_KREA2_COMFY_RAW}/krea2_raw_fp8_scaled.safetensors",
+    description=f"Krea-2 Raw transformer in Comfy-Org's scaled fp8 build. FP8 Storage is switched on when it is installed. "
+    f"{_KREA2_RAW_NOTE} ~13.1GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Base,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_raw_int8 = StarterModel(
+    name="Krea-2 Raw (int8)",
+    base=BaseModelType.Krea2,
+    source=f"{_KREA2_COMFY_RAW}/krea2_raw_int8_convrot.safetensors",
+    description=f"Krea-2 Raw transformer in Comfy-Org's int8_convrot build. {_KREA2_RAW_NOTE} ~13.5GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Base,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_raw_gguf_q4_k_m = StarterModel(
+    name="Krea-2 Raw (Q4_K_M GGUF)",
+    base=BaseModelType.Krea2,
+    source=f"{_KREA2_RAW_GGUF}/krea2_raw-Q4_K_M.gguf",
+    description="Krea-2 Raw transformer quantized to GGUF Q4_K_M for lower VRAM, a community build by "
+    f"vantagewithai. {_KREA2_RAW_NOTE} ~7.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Base,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_raw_gguf_q8_0 = StarterModel(
+    name="Krea-2 Raw (Q8_0 GGUF)",
+    base=BaseModelType.Krea2,
+    source=f"{_KREA2_RAW_GGUF}/krea2_raw-Q8_0.gguf",
+    description="Krea-2 Raw transformer quantized to GGUF Q8_0 with near-full quality, a community build by "
+    f"vantagewithai. {_KREA2_RAW_NOTE} ~13.7GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Base,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_raw_nvfp4 = StarterModel(
+    name="Krea-2 Raw (NVFP4)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/rockerBOO/krea2-raw-nvfp4/resolve/fd87108933d85b0870cfc44ad3bca474eabdd0da/"
+    "krea2_raw_nvfp4.safetensors",
+    description=f"Krea-2 Raw transformer in an nvfp4 build by rockerBOO. {_KREA2_RAW_NOTE} ~8.8GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Base,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)

@@ -7,12 +7,13 @@ from typing import Optional, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from invokeai.backend.architectures import LatentSpaceFacet, generative_bases, get, latent_space_with_channels
+from invokeai.backend.architectures import generative_bases, latent_space_with_channels
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
 )
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -36,6 +37,9 @@ class StarterModelWithoutDependencies(BaseModel):
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
+    # same for sources: installs made from a superseded URL stay recognized even if the user renamed the model
+    previous_sources: list[str] = []
+
     compatible_bases: list[BaseModelType] = Field(
         default=[], description="Other bases this model also serves, besides `base`."
     )
@@ -43,12 +47,12 @@ class StarterModelWithoutDependencies(BaseModel):
     @model_validator(mode="after")
     def _derive_compatible_bases(self) -> Self:
         # A TAE serves every base whose latents resolve to the same space object as its own base's, the
-        # same pairing `latent_space_with_channels` makes for an installed TAE record. Starters carry no
-        # channel count, so the base's primary space stands in for it.
+        # same pairing `latent_space_with_channels` makes for an installed TAE record. The published TAE the
+        # source names gives the channel count, which tells Wan's two spaces apart.
         if self.type is ModelType.TinyAutoencoder:
-            facet = get(self.base, LatentSpaceFacet)
-            if facet is not None:
-                space = facet.primary
+            named = named_tiny_autoencoder((self.source,))
+            space = latent_space_with_channels(self.base, named[2]) if named is not None else None
+            if space is not None:
                 self.compatible_bases = sorted(
                     (
                         b

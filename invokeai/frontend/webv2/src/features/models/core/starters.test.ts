@@ -140,6 +140,12 @@ describe('findBundlePreviewDecoder', () => {
     expect(findBundlePreviewDecoder(bundle(createStarter({ base: 'flux' })), installed)).toBeNull();
   });
 
+  it('names the next missing decoder when a family has two', () => {
+    const taew2_1 = createStarter({ base: 'wan', is_installed: true, name: 'TAEW2.1', type: 'tiny_autoencoder' });
+    const taew2_2 = createStarter({ base: 'wan', name: 'TAEW2.2', type: 'tiny_autoencoder' });
+    expect(findBundlePreviewDecoder(bundle(createStarter({ base: 'wan' })), [taew2_1, taew2_2])?.decoder).toBe(taew2_2);
+  });
+
   it('gives nothing for a family without a decoder', () => {
     expect(findBundlePreviewDecoder(bundle(createStarter({ base: 'cogview4' })), starters)).toBeNull();
   });

@@ -91,10 +91,13 @@ export const findBundlePreviewDecoder = (
     return null;
   }
   const [family] = bases;
+  // Wan serves two latent spaces, so its bundle can match two decoders: name the first one still missing.
   const decoder = starterModels.find(
     (model) =>
-      model.type === 'tiny_autoencoder' && (model.base === family || model.compatible_bases?.includes(family) === true)
+      model.type === 'tiny_autoencoder' &&
+      !model.is_installed &&
+      (model.base === family || model.compatible_bases?.includes(family) === true)
   );
 
-  return decoder && !decoder.is_installed ? { decoder, family } : null;
+  return decoder ? { decoder, family } : null;
 };

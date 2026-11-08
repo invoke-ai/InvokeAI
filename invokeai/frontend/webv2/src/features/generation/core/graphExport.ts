@@ -23,7 +23,7 @@ import {
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
@@ -214,10 +214,18 @@ const withComponentPicks = (
   picks: GraphExportCase['components'],
   models: readonly ModelConfig[]
 ): GenerateWidgetValues => {
-  const { slots } = getComponentSectionPolicy(values.model, values);
   let next = values;
+  const pending = Object.entries(picks);
 
-  for (const [slotKey, modelKey] of Object.entries(picks)) {
+  while (pending.length > 0) {
+    // Read per pick: another pick can open a slot (the Vision Tower follows a GGUF encoder), so a pick whose slot is
+    // not open yet waits for the others, whatever order the case lists them in.
+    const { slots } = getComponentSectionPolicy(next.model, next);
+    const index = Math.max(
+      0,
+      pending.findIndex(([key]) => slots.some((candidate) => candidate.key === key))
+    );
+    const [slotKey, modelKey] = pending.splice(index, 1)[0]!;
     const slot = slots.find((candidate) => candidate.key === slotKey);
 
     if (!slot) {
@@ -316,11 +324,13 @@ const withReferenceImages = (
 
   const { model } = values;
 
-  if (!isReferenceImageSupported(model)) {
-    const format = getMissingReferenceImageFormat(model);
-
+  if (!isReferenceImageSupported(model, values)) {
     throw new Error(
-      `reference_images: ${model.name} takes no reference images${format ? ` in this format; they need ${format}` : ''}.`
+      `reference_images: ${model.name} takes no reference images${
+        getReferenceImageUnavailableReason(model, values)
+          ? ' without a vision tower (a Diffusers model, a safetensors Qwen3-VL 8B encoder, or a GGUF one with its Vision Tower)'
+          : ''
+      }.`
     );
   }
 

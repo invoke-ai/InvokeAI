@@ -64,6 +64,11 @@ def _is_cpu_override(override: Optional[str]) -> bool:
 # How long the worker sleeps between generation-idle checks and empty-queue polls.
 _POLL_SECONDS = 1.0
 
+# Soft budget for retained decoded matrices, not metadata, in-flight builds or caller-held arrays.
+# The two most recent scopes always stay, even over budget, so two alternating scopes never evict each other.
+# Roughly the previous two-entry envelope at 100k x 768 float32 values per entry.
+_SEARCH_CACHE_MAX_BYTES = 600 * 1024**2
+
 # An image is retried this many times before being marked permanently failed. This bounds
 # per-image badness only — a corrupt file, an unreadable image, an embedding that cannot be
 # normalized. Failures of the machinery (the encoder, the database) never consume this budget;
@@ -79,6 +84,14 @@ _MAX_BACKOFF_SECONDS = 60.0
 # labels request after the window; a permanently broken install still answers from memory for
 # everything in between, at one rebuild attempt per window rather than one per points refresh.
 _VOCAB_FAILURE_RETRY_SECONDS = 600.0
+
+# A refit nobody asked for (a /points staleness check) waits this long after the scope's last fit:
+# the floor, or the multiplier times that fit's duration. On a busy server something embeds during
+# almost every fit, so without it one scope refits back to back forever; the multiplier caps it at
+# about a third of the worker's time. The floor stays short because a small gallery's map waits
+# it out after every generation. /refresh is exempt.
+_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS = 10.0
+_PROJECTION_REFIT_COOLDOWN_MULTIPLIER = 2.0
 
 
 def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
@@ -283,6 +296,12 @@ class ImageIndexService(ImageIndexServiceBase):
         # user_id -> the scope hash whose failed fit has already been retried
         # this process; see _failed_scope_retry_available.
         self._failed_projection_scopes: dict[str, str] = {}
+        # user_id -> time.monotonic() before which a queued request for that
+        # scope may not start a fit; set once a fit's result is cached.
+        self._projection_not_before: dict[str, float] = {}
+        # Users whose queued request came from a person (/refresh). Kept apart
+        # from _projection_requests so a later poll cannot downgrade it.
+        self._projection_user_initiated: set[str] = set()
         self._projection_lock = threading.Lock()
 
         self._invoker: Optional["Invoker"] = None
@@ -350,9 +369,10 @@ class ImageIndexService(ImageIndexServiceBase):
         # Guards the lazy _processor/_cpu_model init: embed_image runs on
         # request threads concurrently with the indexer worker.
         self._vision_init_lock = threading.Lock()
-        # scope_hash -> (items, matrix): the accessible embedding matrix for
-        # similarity search, so repeated queries skip re-reading BLOBs.
-        self._search_cache: dict[str, tuple[list[IndexedItem], np.ndarray]] = {}
+        # (user_id, model_id) -> (scope_hash, items, matrix): one version per owner,
+        # so gallery growth retires old matrices while small scopes can share the budget.
+        self._search_cache: dict[tuple[str | None, str], tuple[str, list[IndexedItem], np.ndarray]] = {}
+        self._search_cache_bytes = 0
         self._search_cache_lock = threading.Lock()
         # (vocabulary, embeddings) for cluster labeling; RAM + disk cached.
         self._vocab_cache: Optional[tuple[list[str], np.ndarray]] = None
@@ -710,31 +730,39 @@ class ImageIndexService(ImageIndexServiceBase):
             records = self._invoker.services.image_index_records
 
             items = records.list_accessible_embedded_items(user_id, self._model_id)
+            cache_key = (user_id, self._model_id)
+            fingerprint = scope_hash(self._model_id, items)
+            with self._search_cache_lock:
+                cached = self._search_cache.pop(cache_key, None)
+                if cached is not None:
+                    if cached[0] == fingerprint:
+                        self._search_cache[cache_key] = cached  # LRU touch.
+                        return cached[1], cached[2]
+                    self._search_cache_bytes -= cached[2].nbytes
             if not items:
                 return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
 
-            # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
-            # so the LRU holds two entries and evicts oldest-first rather than
-            # clearing wholesale. Keys self-invalidate: any change to the
-            # accessible set changes the scope hash.
-            cache_key = scope_hash(self._model_id, items)
+            # Build outside the lock: duplicate misses beat serializing searches behind BLOB reads.
+            found_items, matrix = records.get_embeddings(items, self._model_id)
+            matrix_bytes = matrix.nbytes
             with self._search_cache_lock:
-                cached = self._search_cache.get(cache_key)
-                if cached is not None:
-                    # LRU touch.
-                    del self._search_cache[cache_key]
-                    self._search_cache[cache_key] = cached
-            if cached is None:
-                # Built outside the lock: a concurrent miss for the same scope
-                # transiently builds a duplicate, which beats serializing every
-                # search behind a multi-second BLOB read.
-                cached = records.get_embeddings(items, self._model_id)
-                with self._search_cache_lock:
-                    while len(self._search_cache) >= 2:
-                        self._search_cache.pop(next(iter(self._search_cache)))
-                    self._search_cache[cache_key] = cached
+                # Last completion wins, possibly an older gallery snapshot. Keep its own fingerprint
+                # so a later request rechecks visibility and misses rather than serving stale rows.
+                previous = self._search_cache.pop(cache_key, None)
+                if previous is not None:
+                    self._search_cache_bytes -= previous[2].nbytes
+                # Empty results must not accumulate owners that cost nothing against the budget.
+                if matrix_bytes:
+                    while (
+                        len(self._search_cache) >= 2
+                        and self._search_cache_bytes + matrix_bytes > _SEARCH_CACHE_MAX_BYTES
+                    ):
+                        _, _, evicted_matrix = self._search_cache.pop(next(iter(self._search_cache)))
+                        self._search_cache_bytes -= evicted_matrix.nbytes
+                    self._search_cache[cache_key] = (fingerprint, found_items, matrix)
+                    self._search_cache_bytes += matrix_bytes
 
-            return cached
+            return found_items, matrix
 
     def search_similar(
         self,
@@ -796,6 +824,7 @@ class ImageIndexService(ImageIndexServiceBase):
                 # and is driven by polling, so clearing there would hand a
                 # poller the unlimited retries the budget exists to deny.
                 self._failed_projection_scopes.pop(user_id, None)
+                self._projection_user_initiated.add(user_id)
             # Last writer wins: the scope reflects the requester's most recent
             # admin status, so a promotion/demotion between requests cannot
             # pin a stale scope.
@@ -820,6 +849,8 @@ class ImageIndexService(ImageIndexServiceBase):
         with self._projection_lock:
             self._failed_projection_scopes.clear()
             self._projection_requests.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
 
         device_override = config.image_index_device
         if device_override and not _is_cpu_override(device_override):
@@ -1017,9 +1048,12 @@ class ImageIndexService(ImageIndexServiceBase):
         self._vocab_invalidate_requested.clear()
         with self._search_cache_lock:
             self._search_cache.clear()
+            self._search_cache_bytes = 0
         with self._projection_lock:
             self._projection_requests.clear()
             self._failed_projection_scopes.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
         self._attempts.clear()
         self._failed.clear()
         self._pending_pokes.clear()
@@ -1602,11 +1636,17 @@ class ImageIndexService(ImageIndexServiceBase):
             return self._failed_projection_scopes.get(user_id) != current_hash
 
     def _next_projection_job(self) -> Optional[tuple[str, bool]]:
+        """Take the first queued job that is not cooling down; jobs that are stay queued (/points still reports them
+        stale) and are taken once due."""
+        now = time.monotonic()
         with self._projection_lock:
-            if not self._projection_requests:
-                return None
-            user_id = next(iter(self._projection_requests))
-            return user_id, self._projection_requests.pop(user_id)
+            for user_id in self._projection_requests:
+                if user_id in self._projection_user_initiated or now >= self._projection_not_before.get(user_id, now):
+                    # The cooldown stays: a taken job that short-circuits on an
+                    # unchanged scope must not free the next poll to refit.
+                    self._projection_user_initiated.discard(user_id)
+                    return user_id, self._projection_requests.pop(user_id)
+            return None
 
     def _process_projection(self, user_id: str, all_images: bool) -> None:
         assert self._invoker is not None
@@ -1661,6 +1701,7 @@ class ImageIndexService(ImageIndexServiceBase):
             )
             return
 
+        fit_started = time.monotonic()
         try:
             # Read after the short-circuit, not before: this materializes every
             # accessible embedding (hundreds of MB on a large gallery), which is
@@ -1698,6 +1739,7 @@ class ImageIndexService(ImageIndexServiceBase):
             # per process, and the next gallery change flips the hash anyway.
             found_items = []
             coords = np.empty((0, 2), dtype=EMBEDDING_DTYPE)
+        fit_finished = time.monotonic()
 
         # Hash the scope the projection was computed against (on failure the
         # empty cache still claims the current scope, so staleness detection —
@@ -1740,6 +1782,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._failed_projection_scopes.pop(user_id, None)
             elif retrying_failed_scope:
                 self._failed_projection_scopes[user_id] = current_hash
+            self._projection_not_before[user_id] = fit_finished + max(
+                _PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS,
+                _PROJECTION_REFIT_COOLDOWN_MULTIPLIER * (fit_finished - fit_started),
+            )
         try:
             self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_items))
         except Exception:
@@ -1762,9 +1808,13 @@ class ImageIndexService(ImageIndexServiceBase):
         self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=point_count)
 
     def _requeue_projection(self, user_id: str, all_images: bool) -> None:
-        """Put a popped job back, without clobbering a newer request for that user."""
+        """Put a popped job back, without clobbering a newer request for that user.
+
+        The cooldown is dropped so the retry is immediate: every caller's fit either never ran or its result was not
+        cached, and a user-initiated job lost its exemption when it was taken."""
         with self._projection_lock:
             self._projection_requests.setdefault(user_id, all_images)
+            self._projection_not_before.pop(user_id, None)
 
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.

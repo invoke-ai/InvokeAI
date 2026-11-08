@@ -37,4 +37,3 @@ export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
 export { SessionExpiryNotice } from './ui/SessionExpiryNotice';
 export { LoginScreen, readLoginReturnPath } from './ui/LoginScreen';
 export { SetupScreen } from './ui/SetupScreen';
-export { UsersPage } from './ui/UsersPage';
