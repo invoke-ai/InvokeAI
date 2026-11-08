@@ -43,3 +43,21 @@ def test_an_fp4_encoder_starter_is_satisfied_by_an_installed_encoder_of_its_size
 ) -> None:
     assert get_is_installed(starter, [_installed_encoder(size)])
     assert not get_is_installed(starter, [_installed_encoder(other_size)])
+
+
+def test_a_renamed_install_from_a_superseded_source_still_counts_as_installed() -> None:
+    from invokeai.app.api.routers.model_manager import get_is_installed as is_installed
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux3_Config
+    from invokeai.backend.model_manager.starter_models.flux3 import flux3_klein_single_file
+
+    old_source = flux3_klein_single_file.previous_sources[0]
+    assert old_source != flux3_klein_single_file.source
+    renamed = Main_Checkpoint_Flux3_Config.model_construct(
+        key="installed",
+        name="my klein",
+        source=old_source,
+        base=flux3_klein_single_file.base,
+        type=flux3_klein_single_file.type,
+    )
+    assert is_installed(flux3_klein_single_file, [renamed])
+    assert not is_installed(flux3_klein_single_file, [renamed.model_copy(update={"source": "D:/other.safetensors"})])

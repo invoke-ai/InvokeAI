@@ -1,3 +1,4 @@
+import type { QueueSubmissionRetry } from '@features/queue/core/historyTypes';
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
@@ -25,12 +26,15 @@ export interface QueueUiAdapter {
   /** Whether `projectId` is open in this tab; a Canvas rerun is staged only into a project open here. */
   isProjectOpen(projectId: string): boolean;
   /**
-   * Runs this tab queued that the backend has not accepted yet (unsubmitted, or with their enqueue in flight), in the
-   * active project and across this tab's open projects. A backend cancel cannot reach them.
+   * Runs this tab queued that the backend has not accepted yet (unsubmitted, enqueue in flight, or retried after
+   * failures), across this tab's open projects. The backend has no row for them, so only this tab can show or cancel
+   * them. Keep the array stable while its runs are unchanged: the queue widget and its actions re-render on a new one.
    */
-  localUnsubmittedRuns: { activeProject: number; allProjects: number };
-  /** Cancels those runs, in one project or (null) every open project. */
-  cancelLocalUnsubmittedRuns(projectId: string | null): void;
+  localRuns: readonly QueueLocalRun[];
+  /** Cancels one of those runs. */
+  cancelLocalRun(projectId: string, runId: string): void;
+  /** Cancels those runs in one project or (null) every open project. */
+  cancelLocalRuns(projectId: string | null): void;
   notify: QueueUiNotificationPort;
   openQueue(): void;
   /**
@@ -52,6 +56,18 @@ export interface QueueUiAdapter {
 }
 
 export type QueueViewer = 'admin' | 'member' | 'single';
+
+/** A run this tab queued that the backend has not accepted yet, as the queue widget lists it. */
+export interface QueueLocalRun {
+  id: string;
+  projectId: string;
+  /** What it makes, in the user's words (workflow name or prompt); empty when it carries neither. */
+  label: string;
+  /** Epoch ms it was queued; 0 when unknown, which reads as long ago. */
+  submittedAt: number;
+  /** Why its latest enqueue failed while it is retried; null before any failure. */
+  retry: Pick<QueueSubmissionRetry, 'failureCount' | 'message' | 'reason'> | null;
+}
 
 export interface QueueLoadingModelPort {
   getLabel(): string | null;

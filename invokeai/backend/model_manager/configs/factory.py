@@ -135,6 +135,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
     Main_GGUF_LTX2_Config,
+    Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
@@ -484,6 +485,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
         Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
@@ -773,6 +775,33 @@ class ModelConfigFactory:
             )
 
     @staticmethod
+    def _gguf_file_refusal(mod: ModelOnDisk) -> InvalidMatchError | None:
+        """The reason a `.gguf` file cannot be installed whatever model it holds, or None.
+
+        Two files no loader reads: a part of a llama.cpp multi-part GGUF (gguf-py writes every key,
+        `general.architecture` included, into part 1 only and gives every part `split.*` keys), and a file whose
+        header cannot be parsed. Neither has an architecture key to match on, so without this they would
+        register as Unknown models, and part 1 would pass any family check that looks at metadata alone.
+        """
+        if mod.path.suffix != ".gguf" or not mod.path.is_file():
+            return None
+        if (error := mod.metadata_read_error()) is not None:
+            return InvalidMatchError(
+                f"{mod.path.name} could not be read as a GGUF file ({error}). If the file is incomplete or corrupt, "
+                "download it again."
+            )
+        metadata = mod.metadata()
+        count = metadata.get("split.count")
+        if isinstance(count, int) and count > 1:
+            part = metadata.get("split.no")
+            which = f"part {part + 1} of {count}" if isinstance(part, int) else f"one of {count} parts"
+            return InvalidMatchError(
+                f"{mod.path.name} is {which} of a multi-part GGUF, which cannot be loaded. Join the parts into "
+                "one file with llama.cpp's `llama-gguf-split --merge`, then install the joined file."
+            )
+        return None
+
+    @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
         model = AnyModelConfigValidator.validate_python(fields)
@@ -963,6 +992,10 @@ class ModelConfigFactory:
         # Perform basic sanity checks before attempting any config matching
         # This rejects obviously non-model paths early, saving time
         ModelConfigFactory._validate_path_looks_like_model(mod.path)
+
+        # A property of the file, not of any model family: no candidate runs on a file nothing can load.
+        if refusal := ModelConfigFactory._gguf_file_refusal(mod):
+            return ModelClassificationResult(config=None, details={"gguf_file": refusal})
 
         # We will always need these fields to build any model config.
         fields = ModelConfigFactory.build_common_fields(mod, override_fields)
