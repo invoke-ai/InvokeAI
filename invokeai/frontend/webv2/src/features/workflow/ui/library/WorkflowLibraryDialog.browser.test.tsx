@@ -1968,13 +1968,17 @@ describe('WorkflowLibraryDialog — This project', () => {
   });
 
   it("opens a project tile's actions from its menu button, including rename", async () => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
+    await page.viewport(1280, 800);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
     await renderDialog();
 
-    const button = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
-    await act(async () => {
-      button?.click();
-      await settleFrame();
+    const button = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
+      expect(element).not.toBeNull();
+      return element!;
     });
+    await act(() => userEvent.click(button));
 
     await vi.waitFor(() =>
       expect(document.querySelector('[data-workflow-context-menu] [data-menu-item="rename"]')).not.toBeNull()

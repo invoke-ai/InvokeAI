@@ -27,6 +27,7 @@ from invokeai.app.services.intermediates.intermediates_common import (
     BROWSER_HOLD_TTL_SECONDS,
     MAX_BROWSER_HOLD_LEASES_PER_USER,
     RECENT_GRACE_SECONDS,
+    ActiveQueueMediaUse,
     IntermediatesCleanupMode,
     IntermediatesKindCounts,
 )
@@ -90,6 +91,15 @@ class _Classifying:
             "recent_cutoff": self.clock.recent_cutoff,
             "active_names": self.active_names[kind],
         }
+
+
+class _ActiveInputs(NamedTuple):
+    """The media names one active queue item's stored session names, as of one session revision."""
+
+    revision: int
+    user_id: Optional[str]
+    images: frozenset[str]
+    videos: frozenset[str]
 
 
 class ReferenceOwner(NamedTuple):
@@ -178,7 +188,7 @@ class IntermediatesRecords:
         # workflow-call parent resuming with its child's outputs) is scanned again, a status change alone is not.
         # Entries live as long as the item is active. Derived from committed rows only, so it is right whichever
         # transaction rolls back; transactions on a server fill it side by side, hence the lock.
-        self._active_inputs: dict[int, tuple[int, frozenset[str], frozenset[str]]] = {}
+        self._active_inputs: dict[int, _ActiveInputs] = {}
         self._active_inputs_lock = threading.Lock()
 
     def start(self) -> None:
@@ -191,32 +201,52 @@ class IntermediatesRecords:
         guard waiting on one of them would hold up every write that protects media."""
         self._queries.intermediates.expire_session_holds(now=clock.now, recent_cutoff=clock.recent_cutoff)
 
-    def _classifying(self, q: Queries, clock: _Clock) -> _Classifying:
+    def _scan_active(self, q: Queries) -> dict[int, _ActiveInputs]:
         """Brings the scan of active queue items up to date, on the caller's transaction, and writes nothing.
 
         Runs on the caller's transaction, so that a classification and an enqueue it might race are ordered by the
-        database, never by a stale cache. Holds not expired yet only protect more: a hold of a session that ended
-        still counts as active until it is released.
+        database, never by a stale cache.
         """
         active = q.intermediates.active_items()
         with self._active_inputs_lock:
-            known = {item: entry for item, entry in self._active_inputs.items() if active.get(item) == entry[0]}
+            known = {item: entry for item, entry in self._active_inputs.items() if active.get(item) == entry.revision}
         changed = [item for item in active if item not in known]
-        for item, stamp, session in q.intermediates.sessions(changed):
+        for item, stamp, user_id, session in q.intermediates.sessions(changed):
             text = session if isinstance(session, str) else ""
-            known[item] = (
+            known[item] = _ActiveInputs(
                 stamp,
+                user_id,
                 frozenset(_IMAGE_NAME_RE.findall(text)),
                 frozenset(_VIDEO_NAME_RE.findall(text)),
             )
         with self._active_inputs_lock:
             self._active_inputs = known
+        return known
+
+    def _classifying(self, q: Queries, clock: _Clock) -> _Classifying:
+        """The clock and active names of one classification. Holds not expired yet only protect more: a hold of a
+        session that ended still counts as active until it is released."""
         images: set[str] = set()
         videos: set[str] = set()
-        for _, image_names, video_names in known.values():
-            images.update(image_names)
-            videos.update(video_names)
+        for entry in self._scan_active(q).values():
+            images.update(entry.images)
+            videos.update(entry.videos)
         return _Classifying(clock, {"image": frozenset(images), "video": frozenset(videos)})
+
+    def get_active_uses(self, references: MediaReferences) -> list[ActiveQueueMediaUse]:
+        """The active queue items whose sessions name any of these media, one entry each, with the ones it names.
+
+        The same scan, and the same cache, as the cleanup's classification: one definition of active work."""
+        if references.is_empty():
+            return []
+        known = self._queries.run(self._scan_active, read_only=True)
+        uses: list[ActiveQueueMediaUse] = []
+        for entry in known.values():
+            images = entry.images & references.images
+            videos = entry.videos & references.videos
+            if images or videos:
+                uses.append(ActiveQueueMediaUse(entry.user_id, images, videos))
+        return uses
 
     # region holds
 
@@ -447,28 +477,10 @@ class IntermediatesRecords:
 
     def get_document_names(self, owners: Collection[ReferenceOwner]) -> dict[ReferenceOwner, str]:
         """Names of the referencing documents, one query per kind; client state has none."""
-        wanted: dict[str, set[ReferenceOwner]] = defaultdict(set)
-        for owner in owners:
-            if owner.owner_kind in ("project", "project_workspace", "quarantined_project", "workflow"):
-                wanted[owner.owner_kind].add(owner)
-
-        def names(q: Queries) -> dict[ReferenceOwner, str]:
-            found: dict[ReferenceOwner, str] = {}
-            for owner_kind, kind_owners in wanted.items():
-                ids = sorted({owner.owner_id for owner in kind_owners})
-                named = {
-                    (owner, owner_id): name
-                    for owner, owner_id, name in q.intermediates.document_names(owner_kind, ids)
-                    if name is not None
-                }
-                for owner in kind_owners:
-                    unowned = owner_kind in ("workflow", "project_workspace")
-                    name = named.get((None if unowned else owner.user_id, owner.owner_id))
-                    if name is not None:
-                        found[owner] = name
-            return found
-
-        return self._queries.run(names, read_only=True)
+        return {
+            ReferenceOwner(*owner): name
+            for owner, name in self._queries.media_references.document_names(owners).items()
+        }
 
     # endregion
 
@@ -499,7 +511,7 @@ class IntermediatesRecords:
             named = set(names)
             references: dict[str, set[ReferenceOwner]] = defaultdict(set)
             if mode == "force":
-                for media_name, owner_kind, owner_user, owner_id in q.intermediates.reference_owners(kind, named):
+                for media_name, owner_kind, owner_user, owner_id in q.media_references.owners(kind, named):
                     references[media_name].add(ReferenceOwner(owner_kind, owner_user, owner_id))
             # Ownership is re-read here rather than trusted from the preview.
             allowed = {

@@ -67,6 +67,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
+    LoRA_Diffusers_SD3_Config,
     LoRA_Diffusers_SDXL_Config,
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
@@ -80,6 +81,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
+    LoRA_LyCORIS_SD3_Config,
     LoRA_LyCORIS_SDXL_Config,
     LoRA_LyCORIS_Wan_Config,
     LoRA_LyCORIS_ZImage_Config,
@@ -176,6 +178,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
     QwenVLEncoder_Diffusers_Config,
+    QwenVLEncoder_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
@@ -573,6 +576,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # SD 3 shares Qwen-Image's diffusers attention names; it is told apart by its width (1536 / 2432 against
+        # 3072), which Qwen-Image's probe now checks too, so the two are mutually exclusive regardless of order
+        # (locked in by `test_sd3_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_SD3_Config, LoRA_LyCORIS_SD3_Config.get_tag()],
         # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
         # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
         # ``adaln_modulation`` markers, Anima requires at least one of those
@@ -590,6 +597,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_SD1_Config, LoRA_Diffusers_SD1_Config.get_tag()],
         Annotated[LoRA_Diffusers_SD2_Config, LoRA_Diffusers_SD2_Config.get_tag()],
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
+        Annotated[LoRA_Diffusers_SD3_Config, LoRA_Diffusers_SD3_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
@@ -637,6 +645,8 @@ AnyModelConfig = Annotated[
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
+        # Text only: llama.cpp keeps the vision tower in a separate mmproj file, which this config refuses.
+        Annotated[QwenVLEncoder_GGUF_Config, QwenVLEncoder_GGUF_Config.get_tag()],
         # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
         Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
         # TI - file format

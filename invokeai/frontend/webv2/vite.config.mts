@@ -63,6 +63,19 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together;
+  // splitting by the new importer sets would add a startup request on both routes.
+  '/features/identity/core/schemas.ts',
+  '/features/identity/core/sessionPolicy.ts',
+  '/features/identity/core/storedCredential.ts',
+  '/features/identity/core/tokenStorage.ts',
+  '/features/identity/data/api.ts',
+  '/features/identity/session.ts',
+  '/features/identity/ui/AuthScreen.tsx',
+  '/features/identity/ui/PasswordInput.tsx',
+  '/features/identity/ui/useIdentityNotify.ts',
+  '/platform/react/useZodForm.ts',
+  '/platform/ui/InvokeMark.tsx',
   // The boot load-error panels and lazy empty states share it; alone it costs a startup request.
   '/platform/ui/EmptyState.tsx',
   // Boot notifications and the lazy queue item details share the toaster, tabs and copy controls; alone they cost a
@@ -229,9 +242,12 @@ const EDITOR_BOOT_SHARED_MODULES = [
 // routes) reach it through the same store, while the Launchpad palette does not. Without the group Rolldown splits it
 // by importer set, costing the editor boot one request per piece.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  '/platform/react/draftRegistry.ts',
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
   '/features/queue/core/deviceLabels.ts',
+  // The shared device entry otherwise becomes an imports-only boot request beside its labels and hook.
+  '/features/queue/devices.ts',
   '/features/queue/core/graphInputMedia.ts',
   '/features/queue/data/activeProgressTargetStore.ts',
   '/features/queue/data/progressImageStore.ts',
@@ -252,7 +268,6 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/video/ui/VideoUiContext.tsx',
   '/features/workflow/core/buildGraph.ts',
   '/features/workflow/core/formFieldSettings.ts',
-  '/platform/react/draftRegistry.ts',
   '/platform/react/useDebouncedValue.ts',
 ] as const;
 
@@ -334,6 +349,15 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/ui/useGalleryUploadInput.ts',
 ] as const;
 
+// The backend and its URL helpers load together for recent outputs. Keep picker UI out of that lazy Launchpad read.
+const GALLERY_BACKEND_MODULES = [
+  '/features/gallery/core/imagePaths.ts',
+  '/features/gallery/core/videoPaths.ts',
+  '/features/gallery/data/backend.ts',
+  '/features/gallery/data/imageUrls.ts',
+  '/features/gallery/data/videoUrls.ts',
+] as const;
+
 // Gallery's shared state projection and UI port travel together.
 const GALLERY_STATE_MODULES = [
   // Board access predicates: the state view, the gallery's caches and the picker read them; alone they cost a request.
@@ -347,6 +371,9 @@ const GALLERY_STATE_MODULES = [
   // costs a request.
   '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
+  // The deletion dialogs' usage panel, published by the React entry: eager (Preview, image actions) and lazy (the
+  // Gallery's board menu) owners reach it; alone it costs a boot request. Its report view stays lazy.
+  '/features/gallery/ui/GalleryMediaUsagePanel.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
   // The queue contracts, index and React entries re-export these; the lazy queue rows and widget share them. Alone
@@ -518,6 +545,12 @@ export default defineConfig({
               name: 'gallery-picker',
               priority: 30,
               test: (id) => matchesAnySuffix(id, GALLERY_PICKER_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'gallery-backend',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, GALLERY_BACKEND_MODULES),
             },
             {
               includeDependenciesRecursively: false,

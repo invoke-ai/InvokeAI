@@ -72,10 +72,12 @@ from invokeai.backend.model_manager.taxonomy import (
     QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
+    SD3VariantType,
     SubModelType,
     WanVariantType,
     ZImageVariantType,
 )
+from invokeai.backend.patches.lora_conversions.sd3_lora_constants import sd3_variant_from_width
 from invokeai.backend.quantization.fp8_scaled import (
     COMFY_QUANT_SUFFIX,
     FP8_WEIGHT_DTYPES,
@@ -1238,12 +1240,27 @@ class Main_Diffusers_SDXLRefiner_Config(Main_SD_Diffusers_Config_Base, Config_Ba
     base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(BaseModelType.StableDiffusionXLRefiner)
 
 
+def _sd3_variant_from_transformer_config(transformer_dir: Path) -> SD3VariantType | None:
+    """The SD 3 size a Diffusers folder's transformer has, or ``None`` if its config does not say.
+
+    Never raises: the variant only filters LoRAs, and a folder without a readable transformer config still loads.
+    """
+    try:
+        config = get_config_dict_or_raise(transformer_dir / "config.json")
+        width = int(config["num_attention_heads"]) * int(config["attention_head_dim"])
+    except Exception:
+        return None
+    return sd3_variant_from_width(width)
+
+
 class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusion3] = Field(BaseModelType.StableDiffusion3)
     submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
         description="Loadable submodels in this model",
         default=None,
     )
+    # Optional, so records installed before it existed stay valid; read from the transformer's config at install.
+    variant: SD3VariantType | None = Field(default=None)
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1263,11 +1280,13 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
         submodels = override_fields.pop("submodels", None) or cls._get_submodels_or_raise(mod)
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or _sd3_variant_from_transformer_config(mod.path / "transformer")
 
         return cls(
             **override_fields,
             submodels=submodels,
             repo_variant=repo_variant,
+            variant=variant,
         )
 
     @classmethod
@@ -2635,10 +2654,11 @@ def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImage
 class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
 
-    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.
-    The loader keeps scaled fp8 weights when fp8 compute is available or the
+    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled, nvfp4 and int8_tensorwise(+convrot)
+    checkpoints. The loader keeps scaled fp8 weights when fp8 compute is available or the
     `default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),
-    and dequantizes them to bf16 at load time otherwise.
+    and dequantizes them to bf16 at load time otherwise. An int8 weight whose marker is missing or
+    names another format is refused at install, as the loader would refuse it.
     """
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
@@ -2658,6 +2678,17 @@ class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base,
 
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+        # Not `_raise_for_unsupported_comfy_quantization`: it refuses nvfp4, which this family loads. The loader reads
+        # both the per-tensor markers and the `_quantization_metadata` header.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            sd,
+            accepted_convrot_formats(accept_int4=False),
+            read_header=True,
+            what="Qwen Image transformer",
+            supported="Only the int8_tensorwise build (rotated or not) is supported.",
+        )
 
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 

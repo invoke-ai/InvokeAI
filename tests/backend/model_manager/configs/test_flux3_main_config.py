@@ -214,7 +214,7 @@ _REFUSED = {
         {_Q: {"weight": ([3072, 3072], "I8"), "weight_scale": ([3072, 1], "F32")}},
         {},
         {},
-        "no `comfy_quant` marker",
+        "no readable int8_tensorwise marker",
     ),
     "int8-group-size": ({_Q: _INT8}, {_Q: {**_INT8_MARKER, "convrot_groupsize": 512}}, {}, "groups of 512"),
     "int8-missing-scale": (

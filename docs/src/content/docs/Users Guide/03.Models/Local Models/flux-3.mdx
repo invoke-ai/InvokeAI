@@ -70,7 +70,7 @@ values with the switches on compare against bf16 images made with that same enco
 - **Speed:** without a compute switch, every quantized layer is dequantized on each forward, so on this card the
   quantized builds take up to 13 % longer than bf16. [int8 Compute](/configuration/optimization/int8-compute/) makes
   the int8 build the fastest, 1.52× as fast as bf16, and
-  [`fp8_compute`](/configuration/optimization/fp8-storage/#fp8-compute) makes fp8r 1.16× as fast as bf16. Neither
+  [`fp8_compute`](/configuration/optimization/fp8-compute/) makes fp8r 1.16× as fast as bf16. Neither
   affects nvfp4 or GGUF.
 - **Memory:** the quantized builds peak about 5 GiB below bf16.
 
