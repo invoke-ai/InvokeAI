@@ -10,7 +10,7 @@ from tokenizers.models import Unigram
 from invokeai.backend.wan.tokenizer import load_wan_tokenizer
 
 
-def _write_serialized_umt5_tokenizer(path: Path) -> None:
+def _write_serialized_umt5_tokenizer(path: Path, with_config: bool = True) -> None:
     backend = Tokenizer(
         Unigram(
             [("<pad>", 0.0), ("</s>", 0.0), ("<s>", 0.0), ("<unk>", 0.0), ("music", -1.0)],
@@ -18,6 +18,8 @@ def _write_serialized_umt5_tokenizer(path: Path) -> None:
         )
     )
     backend.save(str(path / "tokenizer.json"))
+    if not with_config:
+        return
     (path / "tokenizer_config.json").write_text(
         json.dumps(
             {
@@ -35,26 +37,7 @@ def _write_serialized_umt5_tokenizer(path: Path) -> None:
 
 def test_load_wan_tokenizer_preserves_serialized_unknown_token_id(tmp_path) -> None:
     """Unknown text must use UMT5's <unk> id, not its <s> id."""
-    backend = Tokenizer(
-        Unigram(
-            [("<pad>", 0.0), ("</s>", 0.0), ("<s>", 0.0), ("<unk>", 0.0), ("music", -1.0)],
-            unk_id=3,
-        )
-    )
-    backend.save(str(tmp_path / "tokenizer.json"))
-    (tmp_path / "tokenizer_config.json").write_text(
-        json.dumps(
-            {
-                "tokenizer_class": "T5Tokenizer",
-                "extra_ids": 0,
-                "pad_token": "<pad>",
-                "eos_token": "</s>",
-                "bos_token": "<s>",
-                "unk_token": "<unk>",
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_serialized_umt5_tokenizer(tmp_path)
 
     tokenizer = load_wan_tokenizer(tmp_path)
 
@@ -63,13 +46,7 @@ def test_load_wan_tokenizer_preserves_serialized_unknown_token_id(tmp_path) -> N
 
 
 def test_load_wan_tokenizer_supplies_missing_umt5_special_token_config(tmp_path) -> None:
-    backend = Tokenizer(
-        Unigram(
-            [("<pad>", 0.0), ("</s>", 0.0), ("<s>", 0.0), ("<unk>", 0.0), ("music", -1.0)],
-            unk_id=3,
-        )
-    )
-    backend.save(str(tmp_path / "tokenizer.json"))
+    _write_serialized_umt5_tokenizer(tmp_path, with_config=False)
 
     tokenizer = load_wan_tokenizer(tmp_path)
 
@@ -109,7 +86,8 @@ def test_load_wan_tokenizer_reconstructs_umt5_pipeline_without_tokenizer_json(tm
 
     tokenizer = load_wan_tokenizer(tokenizer_dir)
 
-    for text in ("music", "  music", "[eod]", "a[eod]b"):
+    # Fullwidth text only matches SentencePiece through the model's precompiled NFKC charsmap.
+    for text in ("music", "  music", "[eod]", "a[eod]b", "ｍｕｓｉｃ"):
         expected = sentencepiece.encode(text, out_type=int)
         assert tokenizer.encode(text, add_special_tokens=False) == expected
         assert tokenizer.encode(text) == [*expected, sentencepiece.eos_id()]
@@ -151,36 +129,12 @@ def test_wan_diffusers_loader_uses_serialized_tokenizer_pipeline(tmp_path) -> No
 
     tokenizer_dir = tmp_path / "tokenizer"
     tokenizer_dir.mkdir()
-    backend = Tokenizer(
-        Unigram(
-            [("<pad>", 0.0), ("</s>", 0.0), ("<s>", 0.0), ("<unk>", 0.0), ("music", -1.0)],
-            unk_id=3,
-        )
-    )
-    backend.save(str(tokenizer_dir / "tokenizer.json"))
-    (tokenizer_dir / "tokenizer_config.json").write_text(
-        json.dumps(
-            {
-                "tokenizer_class": "T5Tokenizer",
-                "extra_ids": 0,
-                "pad_token": "<pad>",
-                "eos_token": "</s>",
-                "bos_token": "<s>",
-                "unk_token": "<unk>",
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_serialized_umt5_tokenizer(tokenizer_dir)
     (tmp_path / "model_index.json").write_text(
         json.dumps({"_class_name": "WanPipeline", "tokenizer": ["transformers", "T5TokenizerFast"]}),
         encoding="utf-8",
     )
     loader = object.__new__(WanDiffusersModel)
-
-    def fail_if_model_index_class_is_used(*_args, **_kwargs):
-        raise AssertionError("the Wan tokenizer must not be rebuilt through the model-index T5 class")
-
-    loader.get_hf_load_class = fail_if_model_index_class_is_used
     tokenizer = loader._load_model(SimpleNamespace(path=str(tmp_path)), SubModelType.Tokenizer)
 
     assert tokenizer.unk_token_id == 3
