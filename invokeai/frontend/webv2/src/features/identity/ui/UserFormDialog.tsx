@@ -243,7 +243,7 @@ const UserForm = ({
               <Switch.Label color="fg" fontSize="lg" fontWeight="500" m="0">
                 {t('users.administrator')}
               </Switch.Label>
-              <Text color="fg.subtle" fontSize="md">
+              <Text color="fg.muted" fontSize="md">
                 {isSelf ? t('users.cannotChangeSelfRole') : t('users.administratorHelp')}
               </Text>
             </Stack>

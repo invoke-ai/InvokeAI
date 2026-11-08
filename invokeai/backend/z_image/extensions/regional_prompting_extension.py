@@ -41,18 +41,24 @@ class ZImageRegionalPromptingExtension:
         cls,
         text_conditionings: list[ZImageTextConditioning],
         img_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> "ZImageRegionalPromptingExtension":
         """Create a ZImageRegionalPromptingExtension from a list of text conditionings.
 
         Args:
             text_conditionings: List of text conditionings with optional masks.
             img_seq_len: The image sequence length (i.e. (H // patch_size) * (W // patch_size)).
+            unmasked_covers_whole_image: Let unmasked conditionings reach every image token instead of only the
+                background. Set for the negative pass, whose global negative must stay image-wide.
 
         Returns:
             A configured ZImageRegionalPromptingExtension.
         """
         regional_text_conditioning = ZImageRegionalTextConditioning.from_text_conditionings(text_conditionings)
-        attn_mask = cls._prepare_regional_attn_mask(regional_text_conditioning, img_seq_len)
+        attn_mask = cls._prepare_regional_attn_mask(
+            regional_text_conditioning, img_seq_len, unmasked_covers_whole_image=unmasked_covers_whole_image
+        )
         return cls(
             regional_text_conditioning=regional_text_conditioning,
             regional_attn_mask=attn_mask,
@@ -63,6 +69,8 @@ class ZImageRegionalPromptingExtension:
         cls,
         regional_text_conditioning: ZImageRegionalTextConditioning,
         img_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> torch.Tensor | None:
         """Prepare a regional attention mask for Z-Image.
 
@@ -71,6 +79,8 @@ class ZImageRegionalPromptingExtension:
         - Image tokens attend only to their corresponding regional text
         - Text tokens attend only to their corresponding regional image
         - Text tokens attend to themselves
+        - Unmasked text attends to and from the background image tokens, or every image token when
+          `unmasked_covers_whole_image` is set
 
         The unrestricted image self-attention allows the model to maintain global
         coherence across regions, preventing the generation of separate/disconnected
@@ -81,6 +91,7 @@ class ZImageRegionalPromptingExtension:
         Args:
             regional_text_conditioning: The regional text conditioning data.
             img_seq_len: Number of image tokens.
+            unmasked_covers_whole_image: Let unmasked conditionings reach every image token.
 
         Returns:
             Attention mask of shape (img_seq_len + txt_seq_len, img_seq_len + txt_seq_len).
@@ -133,22 +144,16 @@ class ZImageRegionalPromptingExtension:
                 # 3. txt attends to corresponding regional img
                 # Reshape mask to (1, img_seq_len) for broadcasting
                 regional_attention_mask[txt_start:txt_end, :img_seq_len] = mask_flat.view(1, img_seq_len)
+            elif unmasked_covers_whole_image or background_region_mask is None:
+                regional_attention_mask[:img_seq_len, txt_start:txt_end] = 1.0
+                regional_attention_mask[txt_start:txt_end, :img_seq_len] = 1.0
             else:
                 # Global prompt: allow attention to/from background regions only
-                if background_region_mask is not None:
-                    # 2. background img attends to global txt
-                    regional_attention_mask[:img_seq_len, txt_start:txt_end] = background_region_mask.view(
-                        img_seq_len, 1
-                    )
+                # 2. background img attends to global txt
+                regional_attention_mask[:img_seq_len, txt_start:txt_end] = background_region_mask.view(img_seq_len, 1)
 
-                    # 3. global txt attends to background img
-                    regional_attention_mask[txt_start:txt_end, :img_seq_len] = background_region_mask.view(
-                        1, img_seq_len
-                    )
-                else:
-                    # No regional masks at all, allow full attention
-                    regional_attention_mask[:img_seq_len, txt_start:txt_end] = 1.0
-                    regional_attention_mask[txt_start:txt_end, :img_seq_len] = 1.0
+                # 3. global txt attends to background img
+                regional_attention_mask[txt_start:txt_end, :img_seq_len] = background_region_mask.view(1, img_seq_len)
 
         # 4. Allow unrestricted image self-attention
         # This is the key difference from the restricted approach - all image tokens

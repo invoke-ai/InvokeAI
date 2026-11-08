@@ -80,12 +80,15 @@
         "standalone-components": []
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "sd3_denoise",
         "sd3_l2i",
+        "sd3_lora_collection_loader",
         "sd3_model_loader",
         "sd3_text_encoder",
         "string"
@@ -316,6 +319,10 @@
       "componentsFilled": {
         "diffusers": [],
         "standalone-components": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
+        "standalone-gguf-encoder": [
           "qwen3VLEncoderModel",
           "vae"
         ]
@@ -842,6 +849,7 @@
         "qwen3_encoder": [],
         "qwen3_source": [],
         "qwen3_vl_encoder": [],
+        "qwen3_vl_vision_tower": [],
         "rand_device": [
           "cpu"
         ],
@@ -2213,6 +2221,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],
@@ -2319,6 +2328,7 @@
     "qwen_image_lora_collection_loader": {
       "inputs": [
         "loras",
+        "qwen_vl_encoder",
         "transformer"
       ],
       "literalInputs": {
@@ -2330,6 +2340,7 @@
         ]
       },
       "outputs": [
+        "qwen_vl_encoder",
         "transformer"
       ]
     },
@@ -2426,6 +2437,27 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "sd3_lora_collection_loader": {
+      "inputs": [
+        "clip_g",
+        "clip_l",
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip_g",
+        "clip_l",
+        "transformer"
       ]
     },
     "sd3_model_loader": {

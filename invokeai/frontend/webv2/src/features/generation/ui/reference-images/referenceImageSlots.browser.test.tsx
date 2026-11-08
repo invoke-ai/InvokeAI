@@ -49,6 +49,7 @@ const SDXL: GenerateModelConfig = { base: 'sdxl', format: 'diffusers', key: 'sdx
 /** Read inside each test: the capability table is seeded per test. */
 const max = () => getMaxReferenceImages(SDXL);
 const NO_MODELS: [] = [];
+const NO_VISION_COMPONENTS = {};
 const reference = (id: string): GenerateReferenceImage => ({
   config: {
     beginEndStepPct: [0, 1],
@@ -131,6 +132,7 @@ const render = async ({
                 <div data-testid="section">
                   <GenerateReferenceImagesContent
                     models={NO_MODELS}
+                    visionComponents={NO_VISION_COMPONENTS}
                     referenceImages={referenceImages}
                     selectedModel={selectedModel}
                     onCommit={onCommit}

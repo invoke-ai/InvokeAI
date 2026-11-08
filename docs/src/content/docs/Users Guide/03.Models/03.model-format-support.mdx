@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-06
 sidebar:
   order: 3
 ---
@@ -37,28 +37,30 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
-| [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | R | R | R | R | – | ✓ | – | – |
+| [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | – | ✓ | – | – |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✓ | ✓ | ✗ |
-| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | R | – | ✓ | ✗ | ✗ |
 | [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✗ | ✗ |
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
 | [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | L | ✗ | ✓ | ✗ | ✗ |
 | [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | R | ✓ | R | R | R | ✓ | ✗ | ✗ |
-| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | L | ✓ | ✗ | ✗ |
+| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | ✓ | R | L | L | ✓ | ✗ | ✗ |
 | [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | L | ✓ | ✗ | ✓ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | L | ✗ | ✗ | ✗ | ✗ |
 
 - **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds; on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
   runs them on the int8 tensor cores. **int4** means their packed 4-bit counterparts, `convrot_w4a4` and
   `int4_tensorwise`, which most builds mix with int8 layers. **nvfp4** and **fp8 scaled** mean ComfyUI's checkpoint
-  layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. For Qwen-Image-2.1, torchao
-  exports such as unsloth's FP8 build are refused at install. MOSS-Image loads Comfy-Org's int8 build and GGUFs;
-  its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao builds, are refused at install, unscaled fp8
-  included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported;
-  Krea-2 refuses them at install.
+  layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. FLUX.3 also loads Black Forest
+  Labs' own builds: the nvfp4 export in NVIDIA ModelOpt's layout and `fp8r` (fp8 with one scale per row). It refuses
+  AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1 and FLUX.3, torchao exports such as unsloth's FP8
+  builds are refused at install. MOSS-Image loads Comfy-Org's int8 build and GGUFs; its fp8, nvfp4 and w4a8
+  transformers, and unsloth's torchao builds, are refused at install, unscaled fp8 included. ComfyUI's other low-bit
+  layouts (`w4a8`, `w6a8`, SVDQuant) are not supported; Krea-2,
+  Qwen-Image and Wan 2.2 refuse them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
@@ -77,7 +79,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | R | – | R | ✗ | ✗ |
 | Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | R | ✓ | R | ✗ | ✗ |
-| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
+| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (text only) | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
@@ -96,17 +98,20 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 `text_projection` for SD 3 and is refused without it, as are extended-context CLIP-L variants such as Long-CLIP.
 FLUX.1 takes CLIP-L only.
 
-The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused. Qwen3-VL nvfp4 single
-files keep their layers packed: ComfyUI's `qwen3vl_8b_nvfp4`, and repacks that name their nvfp4 layers the same way, in
-`.comfy_quant` markers or the `_quantization_metadata` header. A repack that packs its vision tower the same way keeps
-it packed when Krea-2 edit loads it for reference images. A single file with nvfp4 layers named neither way, with AWQ
-layers, or with packed weights missing nvfp4's per-tensor `weight_scale_2` fails to install with a message; if only its
-vision tower has such layers, it installs and fails with a message when Krea-2 edit loads the tower for reference
-images. Quantized encoder folders (AWQ, ModelOpt, llm-compressor) are not covered by this. The Gemma-4 encoder installs
-as a folder (its `config.json` and tokenizer files next to exactly one weight file, bf16 or int8) or as a GGUF
-conversion of the LTX-2.5 encoder that packs its tokenizer and config in, such as elix3r's or Rootport's. Google's stock
-Gemma-4-12B GGUF fails to install with a message, since LTX-2 needs the Lightricks-tuned weights; its `mmproj` file is
-not recognized. A standalone `.safetensors` file is not recognized.
+The Qwen3-VL and Qwen2.5-VL GGUF encoders are the language model only. The Qwen3-VL `mmproj` vision file installs
+as its own **Qwen3-VL Vision Tower** model, which Qwen-Image-2.1 edits read reference images through; a Qwen2.5-VL
+`mmproj` file is refused. Without the vision tower, Qwen-Image Edit cannot read reference images with the Qwen2.5-VL GGUF encoder and says so
+before generating. A Qwen2-VL GGUF, the previous generation under the same llama.cpp architecture name, is refused.
+Qwen3-VL nvfp4 single files keep their layers packed: ComfyUI's `qwen3vl_8b_nvfp4`, and repacks that name their nvfp4
+layers the same way, in `.comfy_quant` markers or the `_quantization_metadata` header. A repack that packs its vision
+tower the same way keeps it packed when Krea-2 edit loads it for reference images. A single file with nvfp4 layers named
+neither way, with AWQ layers, or with packed weights missing nvfp4's per-tensor `weight_scale_2` fails to install with a
+message; if only its vision tower has such layers, it installs and fails with a message when Krea-2 edit loads the tower
+for reference images. Quantized encoder folders (AWQ, ModelOpt, llm-compressor) are not covered by this. The Gemma-4
+encoder installs as a folder (its `config.json` and tokenizer files next to exactly one weight file, bf16 or int8) or as
+a GGUF conversion of the LTX-2.5 encoder that packs its tokenizer and config in, such as elix3r's or Rootport's.
+Google's stock Gemma-4-12B GGUF fails to install with a message, since LTX-2 needs the Lightricks-tuned weights; its
+`mmproj` file is not recognized. A standalone `.safetensors` file is not recognized.
 
 The Qwen3.5 4B and 9B install as the same encoder type but are not interchangeable: Anima-3.8B takes only
 the 4B and MOSS-Image only the 9B, and each refuses the other. A 9B file must hold the whole language model:
@@ -211,7 +216,8 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | ERNIE-Image | ✓ (ai-toolkit/ComfyUI, diffusers/PEFT; LoKR and LoHA too, DoRA is refused) | ✗ | |
-| SD 3, CogView4, Ideogram 4, MOSS-Image | ✗ | ✗ | |
+| SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused) | ✗ | |
+| CogView4, Ideogram 4, MOSS-Image | ✗ | ✗ | |
 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
@@ -222,6 +228,8 @@ factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and 
 Plain Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
 (`base_model.model.`) when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
+
+Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.

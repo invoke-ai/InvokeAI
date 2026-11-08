@@ -19,3 +19,9 @@ Before section navigation becomes available, deferred dialog prepares binding/ed
 Production chunking keeps catalog and manifest metadata separate from editor boot UI. Build gate checks that Launchpad’s palette and settings dialog do not statically include editor application or widget renderer. Shared settings controls stay in common UI chunk; owner field bindings and custom editors stay deferred.
 
 Data & workspace keeps everyday actions (revert layout, intermediates, database and gallery maintenance) apart from "Clear saved data", which has its own warning-toned area: it deletes every server project of the account (or install) and all settings, then reloads. Its confirmation names the project count, says media is kept (boards go to the Library, inbox items to Uncategorized), links to Projects for exporting first, and needs a typed word. There is no project trash: the backend deletes projects permanently.
+
+## Language availability
+
+The saved language is a requested preference, preserved through aliases and imports even when its content is unavailable. Build metadata derives coverage from locale catalogs. Readiness is an explicit declaration: English is ready; English regional choices inherit it. Empty catalogs are unavailable and nonempty undeclared catalogs are incomplete. Both show explained English content while retaining the saved choice. The startup hint and i18n controller apply the effective content language and direction, so English fallback is English/LTR even for an Arabic preference. Catalog coverage alone never declares a translation ready.
+
+Gallery Maintenance requests belong to the captured account, not the visibility of the settings view. Activity hide releases view registrations while previews and confirmed executions settle retained state, including results/errors and running state. Account changes fence every completion and refresh; hiding never reauthorizes or repeats a mutation.

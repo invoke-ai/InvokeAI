@@ -6,29 +6,16 @@ import { patchModelInStore, replaceModelInStore } from '@features/models/data/mo
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { useCallback } from 'react';
+import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 
-/** Offer cpu_only only where backend config accepts it; other model types silently discard the field. */
-const CPU_ONLY_TYPES: ReadonlySet<string> = new Set([
-  'vae',
-  'clip_embed',
-  't5_encoder',
-  'qwen3_encoder',
-  'clip_vision',
-  'siglip',
-  'llava_onevision',
-  'text_llm',
-  'wan_t5_encoder',
-  'gemma2_encoder',
-  'mistral_encoder',
-  'qwen3_vl_encoder',
-  'qwen3_5_encoder',
-]);
-
-export const supportsCpuOnlySetting = (model: Pick<ModelConfig, 'type'>): boolean => CPU_ONLY_TYPES.has(model.type);
+/**
+ * The backend serializes `cpu_only` (null when unset) on exactly the configs that store it, so its presence decides.
+ * One model type can span configs with and without the field, so a type list would offer a switch the PATCH rejects.
+ */
+export const supportsCpuOnlySetting = (model: Pick<ModelConfig, 'cpu_only'>): boolean => model.cpu_only !== undefined;
 
 /** Immediately persists the model's CPU-only preference with optimistic rollback. */
 export const CpuOnlySetting = ({
@@ -43,6 +30,7 @@ export const CpuOnlySetting = ({
   const { t } = useTranslation();
   const { isBusy: isPending, run } = useScopedAction();
   const isVae = model.type === 'vae';
+  const helpId = useId();
 
   const handleCheckedChange = useCallback(
     async (details: { checked: boolean }) => {
@@ -80,7 +68,7 @@ export const CpuOnlySetting = ({
         disabled={isPending}
         onCheckedChange={handleCheckedChange}
       >
-        <Switch.HiddenInput />
+        <Switch.HiddenInput aria-describedby={helpId} />
         <Switch.Control>
           <Switch.Thumb />
         </Switch.Control>
@@ -88,7 +76,7 @@ export const CpuOnlySetting = ({
           {isVae ? t('models.runVaeOnCpu') : t('models.runOnCpu')}
         </Switch.Label>
       </Switch.Root>
-      <Text color="fg.subtle" fontSize="xs">
+      <Text color="fg.subtle" fontSize="xs" id={helpId}>
         {isVae ? t('models.runVaeOnCpuHelp') : t('models.runOnCpuHelp')}
       </Text>
     </Stack>
