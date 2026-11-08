@@ -1,7 +1,7 @@
 ---
 title: MOSS-Image
 description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts, layouts from canvas regions and a prompt enhancer.
-lastUpdated: 2026-10-28
+lastUpdated: 2026-11-06
 sidebar:
   order: 8
 ---
@@ -57,6 +57,16 @@ starter models.
 | ---------------- | ---------------------------------------- | ------------------------------ |
 | MOSS-Image Base  | `OpenMOSS-Team/MOSS-Image-Base` (~27 GB) | nothing, everything is bundled |
 | MOSS-Image SFT   | `OpenMOSS-Team/MOSS-Image-SFT` (~27 GB)  | nothing, everything is bundled |
+
+The single-file builds are individual starter models. They hold only the transformer, so each also installs the
+**FLUX.2 VAE** and the **Qwen3.5 9B Encoder (int8)**:
+
+| Starter | Source | Size |
+| ------- | ------ | ---- |
+| MOSS-Image Base / SFT (single file) | Comfy-Org bf16 safetensors | ~10.2 GB each |
+| MOSS-Image Base / SFT (int8) | Comfy-Org `int8_convrot` safetensors | ~5.4 GB each |
+| MOSS-Image Base / SFT (GGUF Q4_K_M) | unsloth | ~3.2 GB each |
+| MOSS-Image Base / SFT (GGUF Q8_0) | unsloth | ~5.5 GB each |
 
 :::note[Installing both]
 Each pipeline brings its own copy of the 17 GB text encoder and the VAE, so installing Base and SFT downloads
