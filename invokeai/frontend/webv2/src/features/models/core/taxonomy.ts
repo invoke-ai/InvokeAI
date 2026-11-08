@@ -188,8 +188,9 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
 };
 
 /**
- * Constrained variant choices for a base/type pair; empty means the pair has
- * no variant concept and the edit form falls back to free text.
+ * Constrained variant choices for a base/type pair; empty means the pair has no
+ * variant concept, so the edit form hides the field unless the model already
+ * stores a variant, which it then edits as free text.
  */
 export const getVariantOptionsFor = (base: string, type: string): readonly string[] => {
   if (type === 'main') {
