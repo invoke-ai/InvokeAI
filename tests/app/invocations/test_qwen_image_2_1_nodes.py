@@ -455,7 +455,10 @@ def test_a_decode_reserves_its_estimate_on_the_vaes_compute_device(meta_is_miope
     assert expected != estimate_working_memory("decode", 1536, 1536, 1024, 4, torch.device("cpu"))
 
 
-def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(meta_is_miopen) -> None:
+@pytest.mark.parametrize(("tiled", "tile"), [(False, None), (True, 512)], ids=["whole", "tiled"])
+def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(
+    meta_is_miopen, tiled: bool, tile: int | None
+) -> None:
     from PIL import Image
 
     from invokeai.app.invocations.fields import ImageField
@@ -487,15 +490,19 @@ def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(meta_is_miop
         tensors=SimpleNamespace(save=lambda tensor: "latents"),
     )
     QwenImage21ImageToLatentsInvocation.model_construct(
-        image=ImageField(image_name="in.png"), vae=SimpleNamespace(vae=None), tiled=False, tile_size=0
+        image=ImageField(image_name="in.png"), vae=SimpleNamespace(vae=None), tiled=tiled, tile_size=tile or 0
     ).invoke(context)
 
     # An fp32 encode of 1536x1536 measured ~10 GiB untiled: it stays whole on the 20 GiB device, where a decode would
-    # be tiled.
-    expected = estimate_working_memory("encode", 1536, 1536, None, 4, META)
+    # be tiled, unless the node asks for tiles; then it reserves its tile.
+    expected = estimate_working_memory("encode", 1536, 1536, tile, 4, META)
     assert reservations == [{"working_memory": expected}]
-    assert expected != estimate_working_memory("decode", 1536, 1536, None, 4, META)
-    assert expected != estimate_working_memory("encode", 1536, 1536, None, 4, torch.device("cpu"))
+    assert expected != estimate_working_memory("decode", 1536, 1536, tile, 4, META)
+    assert expected != estimate_working_memory("encode", 1536, 1536, tile, 4, torch.device("cpu"))
+    if tile is not None:
+        assert (
+            expected.reservation_bytes < estimate_working_memory("encode", 1536, 1536, None, 4, META).reservation_bytes
+        )
 
 
 def _loader(**fields) -> QwenImage21ModelLoaderInvocation:

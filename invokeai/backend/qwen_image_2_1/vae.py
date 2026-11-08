@@ -31,9 +31,11 @@ SPATIAL_SCALE = 16
 # This VAE is far hungrier than the family's: a 1024px bf16 decode peaks at 8.38 GiB on an RTX 4090, 11.81 GiB on a W7900
 # on Linux, and 14.06 GiB (10.49 GiB with expandable segments) on an RX 9060 XT on Windows.
 #
-# On MIOpen the bf16 decode steps up from ~12.5 KB per pixel to ~14.4 KB between 1264px and 1280px, so frames past the
-# step price on a line of their own, `decode_large_bf16`. A tiled operation prices its tile on the untiled line, the tile clamped to the frame
-# per axis, plus `tiled_<operation>_<dtype>` over the frame's pixels for what tiling adds (`fit.Line.sits_on`).
+# On MIOpen the bf16 decode steps up from ~12.5 KB per pixel to ~14.4 KB between 1264px and 1280px on the W7900, so frames
+# past the step price on a line of their own, `decode_large_bf16` (the RX 9060 XT with expandable segments has no step,
+# and its entry prices that line as its own decode line). A tiled operation prices its tile on the untiled line, the
+# tile clamped to the frame per axis, plus `tiled_<operation>_<dtype>` for what tiling adds (`fit.Line.sits_on`): over
+# the tile's pixels on MIOpen, over the frame's on cuDNN, whose stand-in is two RGBA copies of the image.
 _LINES = ("decode_bf16", "decode_fp32", "encode_bf16", "encode_fp32")
 _COEFFICIENTS = frozenset(
     f"{part}_{line}"
@@ -62,7 +64,8 @@ def _untiled_line(suffix: str, pixels: int, features: Mapping[str, FeatureValue]
 
 def _line(features: Mapping[str, FeatureValue]) -> Line | None:
     """`convolution_line`, without the assembly phase, and with what lies past MIOpen's bf16 decode step on its own line:
-    an untiled frame, and a tile that large, which costs what the frame of its size does.
+    an untiled frame, and a tile that large, which costs what the frame of its size does. On MIOpen what tiling adds
+    grows with the tile, not the frame, so the tiled line's size there is the tile's area; cuDNN's is the frame's.
 
     The features' `tile` is None where the tile covers the frame (`estimate_working_memory`)."""
     line = convolution_line(features)
@@ -70,9 +73,12 @@ def _line(features: Mapping[str, FeatureValue]) -> Line | None:
         return None
     if line.sits_on is not None:
         beneath, tile_area = line.sits_on
-        # shortcut: a tiled decode's assembly is not priced separately, negligible next to a tile up to the measured
-        # 3072px; give this VAE an assembly line if frames past ~8K get measured.
-        return line._replace(sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
+        size = tile_area if features.get("conv_backend") == "miopen" else line.size
+        # shortcut: on MIOpen nothing here grows with the frame, but bf16 tile peaks do: on the W7900, measured to 5120px,
+        # by ~78 B/px at a 512px tile, ~136 at 768 and ~220 at 1024 between 4096 and 5120px (fp32 flat), which passes
+        # the reservation near 5472px (512px tiles) and 5856px (768 and 1024); the RX 9060 XT is measured to 3072px
+        # only. Past the measured frames the reservation is not guaranteed; measure 6144px and up and add a frame term.
+        return line._replace(size=size, sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
     return line._replace(suffix=_untiled_line(line.suffix, line.size, features))
 
 
@@ -137,14 +143,14 @@ def estimate_working_memory(
 
 
 @functools.cache
-def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> tuple[tuple[int, int], ...]:
+def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> tuple[tuple[int, int, int, int], ...]:
     """The shipped untiled points of `operation` in `dtype` that cap the line where `platform` is priced, as (area,
-    bytes) by area; the larger where two shapes share an area."""
+    bytes, height, width) by area; the larger where two shapes share an area."""
     data = shipped_data().values()
     entries = [entry for file in data for entry in file.coefficients]
     priced = {key: str(value) for key, value in dataclasses.asdict(priced_as(platform)).items()}
     measured_on = find_entry(entries, SPEC.id, SPEC.version, priced, str(priced)).platform
-    peaks: dict[int, int] = {}
+    peaks: dict[int, tuple[int, int, int]] = {}
     for file in data:
         for point in file.points:
             features = point.features
@@ -158,9 +164,10 @@ def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> t
                 and features["tile"] is None
                 and features["dtype"] == dtype
             ):
-                area = cast(int, features["height"]) * cast(int, features["width"])
-                peaks[area] = max(peaks.get(area, 0), point.measured_bytes)
-    return tuple(sorted(peaks.items()))
+                height, width = cast(int, features["height"]), cast(int, features["width"])
+                if point.measured_bytes > peaks.get(height * width, (0,))[0]:
+                    peaks[height * width] = (point.measured_bytes, height, width)
+    return tuple((area, *peak) for area, peak in sorted(peaks.items()))
 
 
 def untiled_peak_bytes(
@@ -171,23 +178,30 @@ def untiled_peak_bytes(
     The reservation carries up to 1.3x headroom over the measured points; deciding to tile on it would tile frames
     that fit, and tiled output is not pixel-identical. So within the measured untiled points of the platform the device
     is priced as (each OS-specific entry has its own) this is the chord between the two neighbouring points, in bytes,
-    and below the first one that point's bytes per pixel, as `qwen_image_untiled_decode_peak_bytes` does for Qwen-Image.
-    Past the last point, or with no point at all, it is the reservation. One point decides up to its own size: cuDNN's,
-    so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves.
+    and past the last one that point's bytes plus what the reservation grows by from it. One point decides from its own
+    size on: cuDNN's, so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves, and
+    a 1152px one on 10.56 GiB rather than 10.98. Below the first point it is the reservation, which keeps the line's
+    base that a proportional scaling of the point would drop, but never more than the first point's bytes, so the
+    decision does not fall as a frame grows into it; with no point at all, the reservation.
     """
     peaks = _measured_untiled_peaks(operation, platform_for(device), _dtype(element_size))
-    area = height * width
-    if not peaks or area > peaks[-1][0]:
+
+    def reserved(height: int, width: int) -> int:
         return estimate_working_memory(operation, height, width, None, element_size, device).reservation_bytes
-    previous_area, previous_bytes = 0, 0
-    for measured_area, measured_bytes in peaks:
-        if measured_area >= area:
-            if previous_area == 0:
-                return measured_bytes * area // measured_area
+
+    area = height * width
+    if not peaks:
+        return reserved(height, width)
+    if area < peaks[0][0]:
+        return min(reserved(height, width), peaks[0][1])
+    last_area, last_bytes, last_height, last_width = peaks[-1]
+    if area > last_area:
+        return last_bytes + reserved(height, width) - reserved(last_height, last_width)
+    for (previous_area, previous_bytes, *_), (measured_area, measured_bytes, *_) in zip(peaks, peaks[1:], strict=False):
+        if area <= measured_area:
             span = (measured_bytes - previous_bytes) / (measured_area - previous_area)
             return int(previous_bytes + span * (area - previous_area))
-        previous_area, previous_bytes = measured_area, measured_bytes
-    raise AssertionError("areas past the measured range are handled above")
+    return last_bytes
 
 
 def default_tile_size(operation: Literal["encode", "decode"], device: torch.device, element_size: int) -> int:

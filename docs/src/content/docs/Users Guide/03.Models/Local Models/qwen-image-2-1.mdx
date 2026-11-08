@@ -1,7 +1,7 @@
 ---
 title: Qwen-Image-2.1
 description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders, a GGUF or an int8 transformer, including transparent (RGBA) output.
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-08
 sidebar:
   order: 9
 ---
@@ -58,27 +58,30 @@ Measured on an RTX 4090 at 1024×1024:
 
 The text encoder runs first and is unloaded from the GPU when the transformer needs the room. At 2048×2048 the bf16 transformer needs 15.5 GB and 3.7 s per step.
 
-The VAE's working memory depends on the card. Decoding a 1024×1024 image in bf16:
+Decoding and encoding images needs no settings: Invoke decodes an image in one piece when it fits on the card, and otherwise in tiles, deciding before it starts. For a bf16 decode, the default:
 
-| Card | Peak | Reserved |
-|---|---|---|
-| RTX 4090 | 8.4 GiB | 8.8 GiB |
-| Radeon PRO W7900, Linux | 11.8 GiB | 12.9 GiB |
-| RX 9060 XT, Windows (Invoke's default, expandable segments) | 10.5 GiB | 11.0 GiB |
-| RX 9060 XT, Windows (native allocator) | 14.1 GiB | 14.8 GiB |
+- **8 GiB cards** decode up to about 704×704 to 800×800 (AMD) or 896×896 (NVIDIA) in one piece, larger images in 512-pixel tiles.
+- **12 to 16 GiB cards** decode 1024×1024 in one piece on NVIDIA, and on AMD from 16 GiB; on Windows with the native allocator it takes 20 GiB.
+- **20 to 24 GiB cards** decode up to 1120×1120 to 1632×1632 in one piece, larger images in 768- or 1024-pixel tiles.
+- **32 GiB cards and larger** decode at least 1248×1248 in one piece, larger images in 768- or 1024-pixel tiles.
 
-With `precision: float32` a decode reserves about twice that on NVIDIA and 19.8 GiB on Linux AMD cards. Encoding one for image-to-image, inpainting or outpainting is reserved like a decode on NVIDIA and peaks at 3.6 to 4.7 GiB on AMD. When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks the largest tile whose reservation fits half of the card's memory. For a bf16 decode:
+Two figures decide this. The **peak** is the most memory a decode uses at once, measured on real cards: a 1024×1024 decode peaks at 8.38 GiB on an RTX 4090, 11.81 GiB on a Radeon PRO W7900 on Linux and 10.49 GiB on an RX 9060 XT on Windows. The **reserved** memory is what Invoke frees for it before it starts, by moving other models off the card: a little more than the peak, 8.80, 12.86 and 11.28 GiB for those three, and up to about 1.5 times the peak for some tiled decodes. An image is tiled when its expected peak would exceed 90% of the card's memory (on Windows, of the memory Windows grants Invoke: 15.09 GiB on the 16 GiB RX 9060 XT), and the tiles are the largest whose reservation fits in half of the card, or 512-pixel tiles where none does (8 GiB AMD cards on Linux, or on Windows with the native allocator):
 
-| Card | 1024-pixel tiles | 768-pixel tiles | 512-pixel tiles |
-|---|---|---|---|
-| NVIDIA | 18.25 GiB and up | 11.02 to 18.25 GiB | below 11.02 GiB |
-| AMD, Linux | 30.69 GiB and up | 19.44 to 30.69 GiB | below 19.44 GiB |
-| AMD, Windows (default) | 23.27 GiB and up | 13.80 to 23.27 GiB | below 13.80 GiB |
-| AMD, Windows (native allocator) | 32.31 GiB and up | 19.31 to 32.31 GiB | below 19.31 GiB |
+| Card memory | NVIDIA | AMD, Linux | AMD, Windows | AMD, Windows, native allocator |
+|---|---|---|---|---|
+| 8 GiB | 896 px, 512 tiles | 768 px, 512 tiles | 800 px, 512 tiles | 704 px, 512 tiles |
+| 12 GiB | 1152 px, 768 tiles | 960 px, 512 tiles | 992 px, 512 tiles | 864 px, 512 tiles |
+| 16 GiB | 1344 px, 768 tiles | 1120 px, 512 tiles | 1152 px, 768 tiles | 992 px, 512 tiles |
+| 20 GiB | 1504 px, 1024 tiles | 1216 px, 768 tiles | 1248 px, 768 tiles | 1120 px, 768 tiles |
+| 24 GiB | 1632 px, 1024 tiles | 1248 px, 768 tiles | 1376 px, 768 tiles | 1216 px, 768 tiles |
+| 32 GiB | 1888 px, 1024 tiles | 1440 px, 768 tiles | 1600 px, 1024 tiles | 1248 px, 768 tiles |
+| 48 GiB | 2336 px, 1024 tiles | 1760 px, 1024 tiles | 1920 px, 1024 tiles | 1536 px, 1024 tiles |
 
-So a 16 GB RX 9060 XT decodes in 768-pixel tiles by default, which reserve 6.9 GiB. Measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
+Each cell is the largest square image decoded in one piece, and the tile size larger images use. Other shapes go by their number of pixels. The Windows columns assume Windows grants Invoke the same share of the card as on the RX 9060 XT (about 94%). On Windows, Invoke runs AMD cards with PyTorch's expandable segments; setting `pytorch_cuda_alloc_conf: "expandable_segments:False"` (see [Settings](/configuration/optimization/low-vram-mode/#settings)) selects the native allocator, which needs more memory for the same decode (14.06 GiB peak at 1024×1024).
 
-Known limit: on AMD the per-pixel cost of a decode steps up between 1264×1264 and 1280×1280, at about 1.6 megapixels. Frames from 1.58 megapixels are priced past the step, so 1264×1264 already is. Nothing past that step is measured on Windows, so a conservative figure stands in for it, 23.2 GiB at 1264×1264, and Windows AMD cards of 20 to 24 GB tile those frames even where they might fit whole. With the native allocator on Windows, 1264×1264 reserves 27.6 GiB, and cards up to about 30.6 GiB tile such frames.
+With `precision: float32` a 1024×1024 decode reserves 16.2 GiB on NVIDIA to 19.8 GiB on AMD, and tiles are smaller; on an 8 GiB AMD card on Linux a 512-pixel float32 tile reserves 6.84 GiB, which with the VAE's 1.26 GiB of weights is more than the card holds. Encoding an image for image-to-image, inpainting or outpainting is tiled the same way; on AMD it needs much less than a decode (3.8 to 4.9 GiB reserved at 1024×1024 in bf16). Measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while 256-pixel tiles left visible seams (35.6 dB). See also [Tiled VAE decode and encode](/configuration/optimization/low-vram-mode/#tiled-vae-decode-and-encode).
+
+Known limits: with the native allocator, the cost per pixel of an AMD decode steps up at about 1.6 megapixels, between 1248×1248 and 1280×1280. On Windows the native allocator is measured only up to 1088×1088, so a conservative figure prices larger images there, and some that would fit are tiled. On AMD, tiled decodes are measured up to 5120×5120 on Linux and 3072×3072 on Windows, and larger images can peak above what Invoke reserves for them (on Linux from about 5472×5472).
 
 ### Reference images
 
