@@ -40,6 +40,20 @@ vi.mock('@workbench/projects/library', async (importOriginal) => ({
   useProjectLibrary: () => library,
 }));
 
+// A fixture index, so retitling the real docs cannot break this test; the provider still loads it through import().
+vi.mock('./docsSearchIndex.json', () => ({
+  default: {
+    pages: [
+      { c: 0, h: [['launcher', 'Launcher']], s: 'start-here/quick-setup', t: 'Quick Setup Guide' },
+      { c: 1, s: 'troubleshooting/faq', t: 'FAQ' },
+    ],
+    topics: [
+      { d: 'Install, requirements', l: 'Get Started', s: 'start-here/quick-setup' },
+      { d: 'FAQ, known bugs', l: 'Troubleshooting', s: 'troubleshooting/faq' },
+    ],
+  },
+}));
+
 import LaunchpadCommandPaletteDialog from './LaunchpadCommandPaletteDialog';
 import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
@@ -58,14 +72,14 @@ const i18nReady = fetch('/locales/en.json')
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const PaletteHost = () => (
+const PaletteHost = ({ onClose }: { onClose: () => void }) => (
   <>
     <LaunchpadCommandPaletteDialog
       isOpen
       modifierKeyLabel="ctrl"
       preferences={useWorkbenchPreferences()}
       settingsEntryDeps={SETTINGS_ENTRY_DEPS}
-      onClose={vi.fn()}
+      onClose={onClose}
       onExitComplete={vi.fn()}
     />
     <Outlet />
@@ -77,39 +91,50 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  vi.restoreAllMocks();
 });
+
+const renderLaunchpadPalette = async (onClose: () => void = vi.fn()) => {
+  await i18nReady;
+  const rootRoute = createRootRoute({ component: () => <PaletteHost onClose={onClose} /> });
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ['/projects'] }),
+    routeTree: rootRoute.addChildren(
+      ['/', '/app', '/projects'].map((path) => createRoute({ getParentRoute: () => rootRoute, path }))
+    ),
+  });
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+    await router.load();
+  });
+
+  const input = await vi.waitFor(() => {
+    const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
+    expect(node).not.toBeNull();
+    return node!;
+  });
+  return { input, router };
+};
+
+const docsOptions = () =>
+  [...document.querySelectorAll<HTMLElement>('[role="option"]')].filter((option) =>
+    option.textContent?.includes('Opens in a new tab')
+  );
 
 describe('LaunchpadCommandPaletteDialog', () => {
   it('finds a project by name and opens it in the editor', async () => {
-    await i18nReady;
-    const rootRoute = createRootRoute({ component: PaletteHost });
-    const router = createRouter({
-      history: createMemoryHistory({ initialEntries: ['/projects'] }),
-      routeTree: rootRoute.addChildren(
-        ['/', '/app', '/projects'].map((path) => createRoute({ getParentRoute: () => rootRoute, path }))
-      ),
-    });
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(async () => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={new QueryClient()}>
-              <RouterProvider router={router} />
-            </QueryClientProvider>
-          </ChakraProvider>
-        </I18nextProvider>
-      );
-      await router.load();
-    });
-
-    const input = await vi.waitFor(() => {
-      const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
-      expect(node).not.toBeNull();
-      return node!;
-    });
+    const { input, router } = await renderLaunchpadPalette();
     await act(() => userEvent.fill(input, 'neon city'));
     const option = await vi.waitFor(() => {
       const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((candidate) =>
@@ -128,5 +153,60 @@ describe('LaunchpadCommandPaletteDialog', () => {
       expect(router.state.location.pathname).toBe('/app');
       expect(router.state.location.search).toEqual({ project: 'p-city' });
     });
+  });
+
+  it('lists docs pages under Docs, marks them as opening a new tab, and opens the page on Enter', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const onClose = vi.fn();
+    const { input } = await renderLaunchpadPalette(onClose);
+
+    await act(() => userEvent.fill(input, 'quick setup'));
+    const option = await vi.waitFor(
+      () => {
+        const labels = [...document.querySelectorAll('[role="presentation"]')].map((node) => node.textContent);
+        expect(labels).toContain('Docs');
+        const node = docsOptions().find((candidate) => candidate.textContent?.startsWith('Quick Setup Guide'));
+        expect(node).toBeDefined();
+        return node!;
+      },
+      { timeout: 5000 }
+    );
+
+    // The cue is text in the option's accessible name, not only the icon.
+    expect(option.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+
+    for (let step = 0; step < 20 && input.getAttribute('aria-activedescendant') !== option.id; step += 1) {
+      await act(() => userEvent.keyboard('{ArrowDown}'));
+    }
+    expect(input.getAttribute('aria-activedescendant')).toBe(option.id);
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(open).toHaveBeenCalledWith('https://v7.invoke.ai/start-here/quick-setup/', '_blank', 'noopener,noreferrer');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('adds nothing on open, and browses the topics when the Docs scope opens empty', async () => {
+    const { input } = await renderLaunchpadPalette();
+    const scopeCommand = await vi.waitFor(() => {
+      const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (option) => option.textContent === 'Search docs…'
+      );
+      expect(node).toBeDefined();
+      return node!;
+    });
+    expect(docsOptions()).toEqual([]);
+
+    await act(() => userEvent.click(scopeCommand));
+
+    await vi.waitFor(
+      () =>
+        expect(docsOptions().map((option) => option.textContent)).toEqual([
+          'Get StartedInstall, requirementsOpens in a new tab',
+          'TroubleshootingFAQ, known bugsOpens in a new tab',
+        ]),
+      { timeout: 5000 }
+    );
+    expect(document.body.textContent).not.toContain('No Docs yet');
+    expect(input.value).toBe('');
   });
 });

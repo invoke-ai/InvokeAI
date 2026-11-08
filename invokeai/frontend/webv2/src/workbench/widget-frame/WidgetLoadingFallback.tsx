@@ -136,7 +136,7 @@ export const WidgetLoadingFallback = ({ instance, presentation, region, widget }
 
   if (region === 'left' || region === 'right' || region === 'bottom') {
     return (
-      <WidgetPanelFrame instanceId={instance.id} region={region} typeId={instance.typeId}>
+      <WidgetPanelFrame instanceId={instance.id} label={label} region={region} typeId={instance.typeId}>
         {widget.manifest.chrome?.header === 'hidden' ? null : <WidgetLoadingHeader label={label} widget={widget} />}
         <WidgetLoadingSurface bg="bg.subtle" label={loadingLabel} />
       </WidgetPanelFrame>

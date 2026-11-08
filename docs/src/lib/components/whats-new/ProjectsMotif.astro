@@ -1,0 +1,428 @@
+---
+/*
+ * Projects: a "Coastal Series.invk" folder opens and what the project holds rises out of it, a canvas, workflows,
+ * images, boards and a workbench layout, then sinks back as the folder closes. The first frame is the closed, labelled
+ * folder. The still frame is the open folder with its contents out and labelled.
+ */
+import Folder from '@lucide/astro/icons/folder';
+import FolderOpen from '@lucide/astro/icons/folder-open';
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from './box';
+import Stage from './Stage.astro';
+
+// Every miniature of the landscape uses the Video motif's width, so the page fetches no extra variant.
+const imageWidth = 160;
+const folder = { x: 48, w: 204 };
+const card = { y: 8, size: 40 };
+// Closed, the cards sit side by side behind the flap: this far below their row, and this far apart.
+const hidden = { drop: 98, pitch: 34 };
+
+const items = [
+  { id: 'canvas', label: 'Canvas' },
+  { id: 'workflows', label: 'Workflows' },
+  { id: 'images', label: 'Images' },
+  { id: 'boards', label: 'Boards' },
+  { id: 'layout', label: 'Layout' },
+].map((item, index) => {
+  const x = 30 + index * 50;
+  const hiddenX = 150 + (index - 2) * hidden.pitch - card.size / 2;
+  return { ...item, x, fromX: hiddenX - x, delay: index * 0.12 };
+});
+
+const imageCrops = [
+  { at: [3, 3], crop: '10% 30%' },
+  { at: [21, 3], crop: '90% 20%' },
+  { at: [3, 21], crop: '30% 85%' },
+  { at: [21, 21], crop: '75% 65%' },
+];
+
+// The board list: a thumbnail and a name bar per board, the middle one selected.
+const boardRows = [
+  { y: 3.5, crop: '20% 40%' },
+  { y: 15.5, crop: '80% 30%', selected: true },
+  { y: 27.5, crop: '50% 90%' },
+];
+
+// The workbench tile in miniature, in the card's own units: the top bar with its Invoke button, two rails with a
+// panel button each, two side panels, and the darker centre view with an image in it.
+const layoutBlocks = [
+  { tone: 'faint', at: [2, 2, 36, 4] },
+  { tone: 'brand', at: [31, 2.7, 5, 2.6] },
+  { tone: 'faint', at: [2, 8, 1.5, 30] },
+  { tone: 'faint', at: [36.5, 8, 1.5, 30] },
+  { tone: 'shown', at: [2.2, 10, 1.1, 1.1] },
+  { tone: 'shown', at: [36.7, 10, 1.1, 1.1] },
+  { tone: 'faint', at: [5, 8, 7, 30] },
+  { tone: 'faint', at: [28, 8, 7, 30] },
+  { tone: 'floor', at: [13.5, 8, 13, 30] },
+  { tone: 'faint', at: [16, 19, 8, 8] },
+];
+---
+
+<Stage width={300} height={170}>
+  <div class="wn-abs folder-back" style={box(folder.x, 80, folder.w, 84)}></div>
+  <div class="wn-abs folder-tab" style={box(folder.x, 70, 68, 11)}></div>
+
+  {
+    items.map(({ id, label, x, fromX, delay }) => (
+      <div
+        class="wn-abs item"
+        style={`${box(x, card.y, card.size, card.size)}; --from-x: ${fromX}; --from-y: ${hidden.drop}; --delay: ${delay}s`}
+      >
+        <div class:list={['item__card', `item__card--${id}`]}>
+          {id === 'canvas' && (
+            <>
+              <Image src={landscape} alt="" width={imageWidth} class="wn-abs" style={box(0, 0, 40, 40)} />
+              <span class="wn-abs bbox" style={box(12, 10, 17, 17)} />
+            </>
+          )}
+          {id === 'workflows' && (
+            <svg class="wn-svg" viewBox="0 0 40 40" aria-hidden="true">
+              <rect class="node" x="3" y="7" width="15" height="11" rx="2" />
+              <path class="node__bar" d="M3 11h15" />
+              <rect class="node" x="22" y="22" width="15" height="11" rx="2" />
+              <path class="node__bar" d="M22 26h15" />
+              <path class="edge" d="M18 12.5C24 12.5 16 27.5 22 27.5" />
+              <circle class="port" cx="18" cy="12.5" r="1.2" />
+              <circle class="port" cx="22" cy="27.5" r="1.2" />
+            </svg>
+          )}
+          {id === 'images' &&
+            imageCrops.map(({ at: [ix, iy], crop }) => (
+              <Image
+                src={landscape}
+                alt=""
+                width={imageWidth}
+                class="wn-abs thumb"
+                style={`${box(ix, iy, 16, 16)}; object-position: ${crop}`}
+              />
+            ))}
+          {id === 'boards' &&
+            boardRows.map(({ y, crop, selected }) => (
+              <span class:list={['wn-abs board', { 'board--selected': selected }]} style={box(3, y, 34, 9)}>
+                <Image
+                  src={landscape}
+                  alt=""
+                  width={imageWidth}
+                  class="wn-abs thumb"
+                  style={`${box(1, 1, 7, 7)}; object-position: ${crop}`}
+                />
+                <span class="wn-abs board__name" style={box(11, 3.5, 18, 2)} />
+              </span>
+            ))}
+          {id === 'layout' &&
+            layoutBlocks.map(({ tone, at: [bx, by, bw, bh] }) => (
+              <span class:list={['wn-abs block', `block--${tone}`]} style={box(bx, by, bw, bh)} />
+            ))}
+        </div>
+        <span class="item__label">{label}</span>
+      </div>
+    ))
+  }
+
+  <div class="wn-abs flap" style={box(folder.x, 88, folder.w, 76)}>
+    <div class="flap__label">
+      <span class="flap__icons">
+        <Folder class="icon icon--closed" size={24} />
+        <FolderOpen class="icon icon--open" size={24} />
+      </span>
+      Coastal Series.invk
+    </div>
+    <div class="flap__saved">Saved</div>
+  </div>
+</Stage>
+
+<style>
+  /* Open is the resting state; the animation closes it. Opening lifts the back panel, widening its lip. */
+  .folder-back,
+  .folder-tab {
+    border: 1px solid var(--wn-line);
+    background-color: var(--wn-raised);
+    translate: 0 calc(var(--u) * -4);
+  }
+
+  .folder-back {
+    border-radius: 0 calc(var(--u) * 6) calc(var(--u) * 6);
+    box-shadow: var(--docs-shadow-popup);
+  }
+
+  /* Drawn over the back panel without a bottom border, so the tab and panel read as one piece. */
+  .folder-tab {
+    border-bottom: 0;
+    border-radius: calc(var(--u) * 6) calc(var(--u) * 6) 0 0;
+  }
+
+  .item__card {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--docs-bg);
+  }
+
+  .item__card--layout {
+    background-color: var(--wn-raised);
+  }
+
+  .item__label {
+    position: absolute;
+    top: calc(100% + var(--u) * 3);
+    left: 50%;
+    padding: calc(var(--u) * 1) calc(var(--u) * 4);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-raised);
+    color: var(--wn-strong);
+    font-size: calc(var(--u) * 7.5);
+    white-space: nowrap;
+    translate: -50% 0;
+  }
+
+  .bbox {
+    border: 1px dashed var(--docs-accent);
+    border-radius: calc(var(--u) * 1);
+  }
+
+  .item__card--workflows svg {
+    stroke-width: 1px;
+
+    * {
+      vector-effect: non-scaling-stroke;
+    }
+  }
+
+  .node {
+    fill: var(--wn-raised);
+    stroke: var(--wn-ink);
+  }
+
+  .node__bar {
+    stroke: var(--wn-ink);
+  }
+
+  .edge {
+    fill: none;
+    stroke: var(--docs-accent);
+  }
+
+  .port {
+    fill: var(--docs-accent);
+    stroke: none;
+  }
+
+  .thumb,
+  .board,
+  .block {
+    border-radius: calc(var(--u) * 1.5);
+  }
+
+  .board--selected {
+    background-color: var(--docs-accent);
+  }
+
+  .board__name {
+    border-radius: calc(var(--u) * 1);
+    background-color: var(--wn-faint);
+  }
+
+  .board--selected .board__name {
+    background-color: color-mix(in oklab, var(--docs-bg) 55%, transparent);
+  }
+
+  .block--faint {
+    background-color: var(--wn-faint);
+  }
+
+  .block--brand {
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--docs-brand);
+  }
+
+  .block--shown {
+    border-radius: 50%;
+    background-color: var(--wn-shown);
+  }
+
+  .block--floor {
+    background-color: var(--docs-bg);
+  }
+
+  /* Tips forward from its bottom edge, and its shadow deepens as it does. */
+  .flap {
+    --shadow-open: 0 32px 56px -10px color-mix(in oklab, var(--invoke-neutral-950) 85%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 6);
+    background-color: var(--wn-panel);
+    box-shadow: var(--shadow-open);
+    transform-origin: 50% 100%;
+    transform: perspective(calc(var(--u) * 600)) rotateX(-22deg);
+  }
+
+  .flap__label {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 5);
+    margin-bottom: calc(var(--u) * 8);
+    color: var(--wn-strong);
+    font-family: var(--__sl-font-mono);
+    font-size: calc(var(--u) * 13);
+    white-space: nowrap;
+  }
+
+  .flap__icons {
+    display: grid;
+
+    > :global(*) {
+      grid-area: 1 / 1;
+    }
+  }
+
+  .icon {
+    width: calc(var(--u) * 15);
+    height: calc(var(--u) * 15);
+    color: var(--docs-accent);
+  }
+
+  .icon--closed {
+    opacity: 0;
+  }
+
+  .flap__saved {
+    position: absolute;
+    right: calc(var(--u) * 9);
+    bottom: calc(var(--u) * 7);
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 3);
+    font-size: calc(var(--u) * 7.5);
+
+    &::before {
+      content: '';
+      width: calc(var(--u) * 4);
+      height: calc(var(--u) * 4);
+      border-radius: 50%;
+      background-color: var(--invoke-success);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .item,
+    .item__label {
+      animation: 9s var(--wn-ease) var(--delay) infinite both;
+    }
+
+    .item {
+      animation-name: pr-rise;
+    }
+
+    .item__label {
+      animation-name: pr-label;
+    }
+
+    .flap {
+      animation: pr-flap 9s var(--wn-ease) infinite;
+    }
+
+    .folder-back,
+    .folder-tab {
+      animation: pr-lip 9s var(--wn-ease) infinite;
+    }
+
+    .icon--closed {
+      animation: pr-icon-closed 9s var(--wn-ease) infinite;
+    }
+
+    .icon--open {
+      animation: pr-icon-open 9s var(--wn-ease) infinite;
+    }
+  }
+
+  /* Closed, a card waits behind the flap; it rises into its row and sinks back. */
+  @keyframes pr-rise {
+    0%,
+    10%,
+    90%,
+    100% {
+      translate: calc(var(--from-x) * var(--u)) calc(var(--from-y) * var(--u));
+      scale: 0.9;
+    }
+    28%,
+    80% {
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+
+  @keyframes pr-label {
+    0%,
+    26%,
+    82%,
+    100% {
+      opacity: 0;
+    }
+    34%,
+    78% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pr-flap {
+    0%,
+    8%,
+    92%,
+    100% {
+      box-shadow: var(--docs-shadow-popup);
+      transform: perspective(calc(var(--u) * 600)) rotateX(0deg);
+    }
+    18%,
+    84% {
+      box-shadow: var(--shadow-open);
+      transform: perspective(calc(var(--u) * 600)) rotateX(-22deg);
+    }
+  }
+
+  @keyframes pr-lip {
+    0%,
+    8%,
+    92%,
+    100% {
+      translate: 0 0;
+    }
+    18%,
+    84% {
+      translate: 0 calc(var(--u) * -4);
+    }
+  }
+
+  @keyframes pr-icon-closed {
+    0%,
+    9%,
+    92%,
+    100% {
+      opacity: 1;
+    }
+    15%,
+    86% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pr-icon-open {
+    0%,
+    9%,
+    92%,
+    100% {
+      opacity: 0;
+    }
+    15%,
+    86% {
+      opacity: 1;
+    }
+  }
+</style>

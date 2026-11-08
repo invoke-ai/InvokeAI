@@ -12,13 +12,16 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_Config_Base,
     TinyAutoencoder_Checkpoint_Flux2_Config,
     TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_LTX2_Config,
     TinyAutoencoder_Checkpoint_SD1_Config,
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
-    is_tiny_autoencoder_supported,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.tiny_autoencoder import preview
+from invokeai.backend.tiny_autoencoder.checkpoint import TAELTX2_3, TAEW2_1, TAEW2_2, build_taehv_decoder
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 from invokeai.backend.tiny_autoencoder.preview import (
     decode_preview,
     decode_working_memory_bytes,
@@ -31,6 +34,9 @@ from invokeai.backend.tiny_autoencoder.taesd import Decoder, F16Decoder, TaesdDe
 def taesd() -> TaesdDecoder:
     torch.manual_seed(0)
     return Decoder(4).eval()
+
+
+MIB = 2**20
 
 
 def _latent(*shape: int, seed: int = 1) -> torch.Tensor:
@@ -62,7 +68,7 @@ def test_a_latent_of_another_width_is_refused(taesd: TaesdDecoder) -> None:
 
 def test_an_oversized_latent_is_area_downsampled_to_the_cap(taesd: TaesdDecoder, monkeypatch) -> None:
     """A latent of 2x2-constant blocks, halved by the cap, decodes exactly as the latent it was made from."""
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
+    monkeypatch.setattr(taesd, "max_preview_edge", 48)
     small = _latent(4, 4, 6)
     large = small.repeat_interleave(2, dim=-2).repeat_interleave(2, dim=-1)
 
@@ -74,7 +80,7 @@ def test_an_oversized_latent_is_area_downsampled_to_the_cap(taesd: TaesdDecoder,
 
 
 def test_the_cap_bounds_the_longest_edge_of_any_aspect(taesd: TaesdDecoder, monkeypatch) -> None:
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 64)
+    monkeypatch.setattr(taesd, "max_preview_edge", 64)
 
     image = decode_preview(taesd, _latent(4, 6, 16))
 
@@ -104,10 +110,10 @@ def test_a_latent_the_cap_does_not_divide_is_area_downsampled(
     MPS pools such a size on the CPU. The decoder here is float64, which that detour pools at float32 and must hand
     back at the decoder's own width.
     """
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
     if pooled_on_cpu:
         monkeypatch.setattr(preview, "_POOLING_NEEDS_DIVISIBLE_SIZES", frozenset({"cpu"}))
     decoder = copy.deepcopy(taesd).double()
+    decoder.max_preview_edge = 48
     large = _latent(4, 6, 9).double()
     pooled: list[tuple[torch.device, torch.dtype]] = []
     interpolate = torch.nn.functional.interpolate
@@ -128,14 +134,15 @@ def test_a_latent_the_cap_does_not_divide_is_area_downsampled(
 
 
 def test_a_decode_reserves_its_full_resolution_activations_at_the_capped_size(taesd: TaesdDecoder, monkeypatch) -> None:
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
+    monkeypatch.setattr(taesd, "max_preview_edge", 48)
     half = copy.deepcopy(taesd).half()
 
-    # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size.
-    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4
-    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2
+    # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size, and
+    # the fixed 5 MiB allowance.
+    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4 + 5 * MIB
+    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2 + 5 * MIB
     # 12 x 18 latents exceed the cap and are decoded at 4 x 6.
-    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4
+    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4 + 5 * MIB
 
 
 @pytest.fixture(scope="module")
@@ -146,7 +153,7 @@ def taeqi() -> TaesdDecoder:
 
 def test_the_cap_is_applied_at_the_decoders_own_compression(taeqi: TaesdDecoder, monkeypatch) -> None:
     """An 8 x 4 latent fits a 96 cap at 8x (64 x 32) but not at TAEQI2.1's 16x, where it is scaled by 3/4."""
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 96)
+    monkeypatch.setattr(taeqi, "max_preview_edge", 96)
 
     image = decode_preview(taeqi, _latent(64, 8, 4))
 
@@ -221,7 +228,10 @@ SDXL_TAE = _record(TinyAutoencoder_Checkpoint_SDXL_Config, 4, "taesdxl")
 SD3_TAE = _record(TinyAutoencoder_Checkpoint_SD3_Config, 16, "taesd3")
 FLUX_TAE = _record(TinyAutoencoder_Checkpoint_FLUX_Config, 16, "taef1")
 FLUX2_TAE = _record(TinyAutoencoder_Checkpoint_Flux2_Config, 32, "taef2")
-INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE]
+WAN16_TAE = _record(TinyAutoencoder_Checkpoint_Wan_Config, 16, "taew2_1")
+WAN48_TAE = _record(TinyAutoencoder_Checkpoint_Wan_Config, 48, "taew2_2")
+LTX2_TAE = _record(TinyAutoencoder_Checkpoint_LTX2_Config, 128, "taeltx2_3")
+INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE, WAN16_TAE, WAN48_TAE, LTX2_TAE]
 
 
 @pytest.mark.parametrize(
@@ -233,7 +243,14 @@ INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE]
         (BaseModelType.StableDiffusion3, 16, SD3_TAE),
         (BaseModelType.ErnieImage, 32, FLUX2_TAE),
         (BaseModelType.CogView4, 16, None),
-        (BaseModelType.QwenImage, 16, None),
+        # The Wan 2.1 VAE's space, shared by four architectures; Wan's 48-channel space is TI2V-5B's alone.
+        (BaseModelType.Wan, 16, WAN16_TAE),
+        (BaseModelType.QwenImage, 16, WAN16_TAE),
+        (BaseModelType.Krea2, 16, WAN16_TAE),
+        (BaseModelType.Anima, 16, WAN16_TAE),
+        (BaseModelType.Wan, 48, WAN48_TAE),
+        (BaseModelType.LTX2, 128, LTX2_TAE),
+        (BaseModelType.MiniMaxH3, 24, None),
     ],
 )
 def test_a_tae_serves_every_architecture_sharing_its_latent_space(
@@ -253,16 +270,147 @@ def test_the_choice_among_fitting_taes_is_by_name_then_key_whatever_the_order() 
 
 
 @pytest.mark.parametrize(
-    ("base", "channels", "supported"),
+    ("layout", "latent", "image_size"),
     [
-        (BaseModelType.StableDiffusion2, 4, True),
-        (BaseModelType.ZImage, 16, True),
-        (BaseModelType.Ideogram4, 32, True),
-        (BaseModelType.QwenImage21, 64, True),
-        (BaseModelType.CogView4, 16, False),
-        (BaseModelType.QwenImage, 16, False),
-        (BaseModelType.LTX2, 128, False),
+        # 8x: an 8 x 6 latent is 64 x 48 pixels, inside the cap.
+        (TAEW2_1, (16, 8, 6), (48, 64)),
+        # 16x and 32x: the same latent edge is 128 and 256 pixels, so the latent is halved and quartered.
+        (TAEW2_2, (48, 8, 6), (48, 64)),
+        (TAELTX2_3, (128, 8, 4), (32, 64)),
     ],
+    ids=["taew2_1", "taew2_2", "taeltx"],
 )
-def test_whether_any_tae_decodes_a_space(base: BaseModelType, channels: int, supported: bool) -> None:
-    assert is_tiny_autoencoder_supported(_space(base, channels)) is supported
+def test_a_taehv_preview_is_one_rgb_frame_capped_at_its_compression(
+    layout, latent: tuple[int, int, int], image_size: tuple[int, int]
+) -> None:
+    torch.manual_seed(0)
+    decoder = build_taehv_decoder(layout).eval()
+    decoder.max_preview_edge = 64
+
+    image = decode_preview(decoder, _latent(*latent))
+
+    assert image.mode == "RGB"
+    assert image.size == image_size
+
+
+class _Stop(Exception):
+    pass
+
+
+def _first_conv_input(decoder: TinyAutoencoderDecoder, latent: torch.Tensor) -> tuple[int, ...]:
+    """The latent shape the decoder's first convolution receives, without paying for the decode."""
+    seen: list[tuple[int, ...]] = []
+
+    def record(_module: torch.nn.Module, args: tuple[torch.Tensor, ...]) -> None:
+        seen.append(tuple(args[0].shape))
+        raise _Stop
+
+    first_conv = next(m for m in decoder.modules() if isinstance(m, torch.nn.Conv2d))
+    handle = first_conv.register_forward_pre_hook(record)
+    try:
+        with pytest.raises(_Stop):
+            decode_preview(decoder, latent)
+    finally:
+        handle.remove()
+    return seen[0]
+
+
+@pytest.mark.parametrize(
+    ("layout", "latent", "decoded"),
+    [
+        # 1024 pixels at 8x: taew2_1 caps at 512, so the latent is halved.
+        (TAEW2_1, (16, 128, 96), (1, 16, 64, 48)),
+        # 1024 pixels at 16x and 32x: taew2_2 and taeltx2_3 decode them as they are.
+        (TAEW2_2, (48, 64, 48), (1, 48, 64, 48)),
+        (TAELTX2_3, (128, 32, 24), (1, 128, 32, 24)),
+    ],
+    ids=["taew2_1", "taew2_2", "taeltx2_3"],
+)
+def test_each_decoder_brings_its_own_preview_edge(layout, latent: tuple[int, ...], decoded: tuple[int, ...]) -> None:
+    decoder = build_taehv_decoder(layout).eval()
+
+    assert _first_conv_input(decoder, torch.zeros(latent)) == decoded
+
+
+@pytest.fixture(scope="module")
+def taew2_1() -> TinyAutoencoderDecoder:
+    torch.manual_seed(0)
+    return build_taehv_decoder(TAEW2_1).eval()
+
+
+def test_a_latent_window_decodes_to_the_last_frame_of_its_video(taew2_1: TinyAutoencoderDecoder) -> None:
+    window = _latent(1, 16, 2, 3, 4)
+
+    image = decode_preview(taew2_1, window)
+
+    with torch.inference_mode():
+        last = taew2_1.decode_video(window.transpose(1, 2))[0, -1]
+    expected = last.clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).numpy()
+    assert np.array_equal(np.asarray(image), expected)
+
+
+def test_a_one_frame_window_decodes_like_the_single_latent(taew2_1: TinyAutoencoderDecoder) -> None:
+    latent = _latent(1, 16, 3, 4)
+
+    assert np.array_equal(
+        np.asarray(decode_preview(taew2_1, latent.unsqueeze(2))), np.asarray(decode_preview(taew2_1, latent))
+    )
+
+
+def test_a_capped_window_pools_each_frame_in_space_and_keeps_them_all(
+    taew2_1: TinyAutoencoderDecoder, monkeypatch
+) -> None:
+    seen: list[torch.Tensor] = []
+
+    def record(window: torch.Tensor) -> torch.Tensor:
+        seen.append(window)
+        raise _Stop
+
+    monkeypatch.setattr(taew2_1, "max_preview_edge", 16)
+    monkeypatch.setattr(taew2_1, "decode_window", record)
+    window = _latent(1, 16, 2, 4, 4)
+
+    with pytest.raises(_Stop):
+        decode_preview(taew2_1, window)
+
+    [pooled] = seen
+    assert pooled.shape == (1, 16, 2, 2, 2)
+    for frame in range(2):
+        expected = torch.nn.functional.avg_pool2d(window[:, :, frame], 2)
+        torch.testing.assert_close(pooled[:, :, frame], expected)
+
+
+def test_a_taesd_decoder_refuses_a_latent_window(taesd: TaesdDecoder) -> None:
+    with pytest.raises(ValueError, match="not a \\(B, C, T, h, w\\) window"):
+        decode_preview(taesd, _latent(1, 4, 2, 3, 3))
+
+
+@pytest.mark.parametrize(
+    ("layout", "latent", "frames_per_latent", "stage_pixels"),
+    [
+        # 8x, no patches: the full-resolution stage is the image, 32 x 48 pixels; four frames per latent frame.
+        (TAEW2_1, (1, 16, 4, 6), 4, 32 * 48),
+        # 16x with 2x2 patches: the stage runs at half the 64 x 96 image.
+        (TAEW2_2, (1, 48, 4, 6), 4, 32 * 48),
+        # 32x with 4x4 patches and eight frames per latent frame: a quarter of the 128 x 192 image.
+        (TAELTX2_3, (1, 128, 4, 6), 8, 32 * 48),
+    ],
+    ids=["taew2_1", "taew2_2", "taeltx2_3"],
+)
+def test_a_video_decode_reserves_its_live_activations_and_workspace_per_output_frame(
+    layout, latent: tuple[int, ...], frames_per_latent: int, stage_pixels: int
+) -> None:
+    decoder = build_taehv_decoder(layout)
+
+    # 2.25 live 64-channel float32 activations and 2 of workspace per output frame of the full-resolution stage, and
+    # the fixed 5 MiB allowance.
+    per_output_frame = (2.25 + 2) * 64 * stage_pixels * 4
+    assert decode_working_memory_bytes(decoder, _latent(*latent)) == per_output_frame * frames_per_latent + 5 * MIB
+    window = _latent(latent[0], latent[1], 2, *latent[2:])
+    assert decode_working_memory_bytes(decoder, window) == per_output_frame * frames_per_latent * 2 + 5 * MIB
+
+
+def test_a_video_decode_is_priced_at_its_own_cap(taew2_1: TinyAutoencoderDecoder) -> None:
+    """taew2_1's 512-pixel cap decodes a 128 x 128 latent (1024 pixels) at 64 x 64."""
+    expected = (2.25 + 2) * 64 * 512 * 512 * 4 * 4 + 5 * MIB
+    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128)) == expected

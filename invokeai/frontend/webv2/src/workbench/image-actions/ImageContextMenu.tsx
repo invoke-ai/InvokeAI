@@ -143,7 +143,11 @@ export const ImageContextMenu = ({
     () => (itemTarget && isCompleteImageTarget ? { images, x: itemTarget.x, y: itemTarget.y } : null),
     [images, isCompleteImageTarget, itemTarget]
   );
-  const requestDeletion = useCallback((itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs), [actions]);
+  const returnFocus = itemTarget?.returnFocus;
+  const requestDeletion = useCallback(
+    (itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs, { returnFocus }),
+    [actions, returnFocus]
+  );
   const requestImageDeletion = useCallback(
     (imageNames: string[]) => requestDeletion(imageNames.map((name) => ({ kind: 'image', name }))),
     [requestDeletion]

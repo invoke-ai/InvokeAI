@@ -155,12 +155,10 @@ dependencies = [
 ]
 
 # The +cpu/+cu130/+xpu pins live on PyTorch's WHL indexes, the +rocm10.0.0 pins on AMD's, and
-# all are gated to the platforms the project resolves and tests them on: Windows x64 and Linux
-# x86_64. Windows ARM64 gets NVIDIA's build, the only torch there, in every extra. macOS is
-# capped below torch 2.8 (see the base requirement), and linux_aarch64 stays on the CPU-only
-# PyPI 2.7.1 it was set up with (an aarch64 install requesting `cuda` gets CPU torch), so both fall back to the base `torch` / `torchvision` from PyPI. The index has
-# carried aarch64 torchvision since 0.28, so moving aarch64 onto the pinned pairs -- and real
-# CUDA-on-aarch64 (e.g. Grace/GH200) -- is open, just untested.
+# all are gated to supported platforms: Windows x64 and Linux x86_64, with CUDA also on Linux
+# ARM64. Linux ARM64 uses the cu130 pins for `cuda` and PyPI 2.7.1 fallbacks for `cpu`, `rocm`,
+# and `xpu`. Windows ARM64 gets NVIDIA's build, the only torch there, in every extra. macOS is
+# capped below torch 2.8 (see the base requirement).
 #
 # cu130 builds cover compute capability 7.5 and newer (Turing through Blackwell) and need
 # an NVIDIA driver from the R580 series or newer. CUDA 13 cannot build for Maxwell, Pascal
@@ -179,14 +177,14 @@ dependencies = [
   "torchvision==0.29.0+cu134; sys_platform == 'win32' and platform_machine == 'ARM64'",
 ]
 "cuda" = [
-  "torch==2.13.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
-  "torchvision==0.28.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
+  "torch==2.13.0+cu130; (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine != 'ARM64')",
+  "torchvision==0.28.0+cu130; (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine != 'ARM64')",
   # The Linux torch wheel requires triton; the Windows wheel requires none. triton-windows is the Windows build
   # (no win_arm64 wheel); its minor version must match the Triton that torch 2.13 is built against.
   "triton-windows>=3.7,<3.8; sys_platform == 'win32' and platform_machine != 'ARM64'",
-  # macOS / linux_aarch64 fallback, see note under "cpu"
-  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
-  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  # macOS fallback, see note under "cpu"
+  "torch==2.7.1; sys_platform == 'darwin'",
+  "torchvision==0.22.1; sys_platform == 'darwin'",
   # Windows ARM64 fallback, see note under "cpu"
   "torch==2.14.0+cu134; sys_platform == 'win32' and platform_machine == 'ARM64'",
   "torchvision==0.29.0+cu134; sys_platform == 'win32' and platform_machine == 'ARM64'",
@@ -352,9 +350,8 @@ override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }, { extra = "xpu" }]]
 index-strategy = "unsafe-best-match"
 # Restrict resolution to the platforms we support: x86_64/aarch64 Linux, Windows
-# (x64 and ARM64 -- both are `win32`), and macOS. (ROCm and the PyTorch WHL-index
-# pins are x86_64-only; on aarch64 Linux torch/torchvision fall back to PyPI and on
-# Windows ARM64 to NVIDIA's index via the markers below.)
+# (x64 and ARM64 -- both are `win32`), and macOS. (ROCm, XPU, and +cpu accelerator pins are x86_64-only;
+# CUDA also supports Linux aarch64. On Windows ARM64, torch/torchvision use NVIDIA's index.)
 environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64'))"]
 # Windows on ARM64 must stay installable: uv refuses to lock a wheel-only package that has no
 # win_arm64 wheel. It does not cover packages that also publish an sdist (uv would happily lock
@@ -416,24 +413,21 @@ requires-dist = [
 provides-extras = ["libraries"]
 
 [tool.uv.sources]
-# Keep linux_aarch64 and macOS off the PyTorch and AMD indexes so that uv resolves their
-# 2.7.1 fallback pins from PyPI; see the note above the extras. Windows ARM64 is routed, with or without
-# an extra, to NVIDIA's out-of-tree index.
+# Linux aarch64's CUDA extra uses cu130; other ARM64 fallbacks and macOS use the default PyPI index.
+# Windows ARM64 is routed, with or without an extra, to NVIDIA's out-of-tree index.
 torch = [
   { index = "torch-nvidia-win-arm64", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" },
   { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
-  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
+  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
   { index = "torch-rocm", extra = "rocm", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
-  { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
   { index = "torch-nvidia-win-arm64", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" },
   { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
-  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
+  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
   { index = "torch-rocm", extra = "rocm", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
-  { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 # Only the rocm extra takes AMD's triton; cuda and the no-extra resolution keep PyPI's.
 triton = [

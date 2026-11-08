@@ -1,7 +1,7 @@
 import type { GalleryItemKey } from '@features/gallery';
 
 /**
- * Publish ephemeral tokenized trim-loop intents after selecting media and raising Preview. Expire stale requests
+ * Publish ephemeral tokenized trim-playback intents after selecting media and raising Preview. Expire stale requests
  * to prevent unexpected delayed audio; the player reports running state and stop control under the same token.
  */
 
@@ -65,8 +65,8 @@ export const subscribeVideoSpanPlaybackRequests = (listener: () => void): (() =>
 };
 
 /**
- * Report actual element playback for the current loop, null before use, after leaving its span, or while hidden.
- * Pausing keeps the loop armed for native resume.
+ * Report actual element playback for the current span, null before use, after leaving it, or while hidden.
+ * Pausing keeps the span armed for the player's resume.
  */
 export interface VideoSpanPlaybackState {
   isPlaying: boolean;
@@ -84,7 +84,7 @@ const notifyStateListeners = (): void => {
   }
 };
 
-/** The player's report. Replaces whatever stood before: one loop is on screen at a time. */
+/** The player's report. Replaces whatever stood before: one span is on screen at a time. */
 export const publishVideoSpanPlaybackState = (state: VideoSpanPlaybackState): void => {
   if (
     currentState !== null &&
@@ -99,7 +99,7 @@ export const publishVideoSpanPlaybackState = (state: VideoSpanPlaybackState): vo
   notifyStateListeners();
 };
 
-/** Retires `token`'s state. A report from a newer loop is left alone. */
+/** Retires `token`'s state. A report from a newer span is left alone. */
 export const clearVideoSpanPlaybackState = (token: number): void => {
   if (currentState?.token !== token) {
     return;

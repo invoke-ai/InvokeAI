@@ -194,7 +194,7 @@ Adds the configuration record; the config's `key` becomes the record's key. It r
 
 #### update_model(key, changes, allow_class_change=False) -> AnyModelConfig
 
-Applies a `ModelRecordChanges` to the record and returns the updated config. The changes are validated against the model's config class; with `allow_class_change`, a change may turn the record into another class (a LoRA into a Main model, say), which must validate as well. The record is locked while the update is applied, so concurrent updates of one model apply one after the other. Raises `UnknownModelException` for an unknown key, or pydantic's `ValidationError` for invalid changes.
+Applies a `ModelRecordChanges` to the record and returns the updated config. The changes are validated against the model's config class; with `allow_class_change`, a change may turn the record into another class (a LoRA into a Main model, say), which must validate as well. The record is locked while the update is applied, so concurrent updates of one model apply one after the other. Raises `UnknownModelException` for an unknown key, pydantic's `ValidationError` for invalid changes, and `ValueError` for a change of the key or a path longer than a record holds. With `allow_class_change`, a non-null change to a field that neither the current nor the resulting config class has also raises `ValueError`, so no change is silently dropped: `None` (clearing a value) is not refused this way, and a value only the current class stores is dropped when the class changes. Nothing is written when an update raises.
 
 #### replace_model(key, new_config) -> AnyModelConfig
 
@@ -1334,7 +1334,7 @@ loaded_model = mm.load.load_model(configs[0])
 
 ### mm.update_model_record(key, changes) -> AnyModelConfig
 
-Applies a `ModelRecordChanges` to the model's record, allowing its config class to change, and returns the stored result. When the change affects how the model loads (for example its path, format, `cpu_only` or `fp8_storage`), every cached instance of the model is dropped so its next load rebuilds. Raises `UnknownModelException` for an unknown key and `ValueError` for a change the record cannot take. Use this rather than `mm.store.update_model()` for changes that may affect loading.
+Applies a `ModelRecordChanges` to the model's record, allowing its config class to change, and returns the stored result. When the change affects how the model loads (for example its path, format, `cpu_only` or `fp8_storage`), every cached instance of the model is dropped so its next load rebuilds. Raises `UnknownModelException` for an unknown key and `ValueError` for a change the record cannot take, including a non-null value for a field neither the current nor the resulting config class has; nothing is written then. Use this rather than `mm.store.update_model()` for changes that may affect loading.
 
 ### mm.reidentify_model(key) -> AnyModelConfig
 

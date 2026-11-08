@@ -32,6 +32,7 @@ import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetada
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
+const METADATA_NAMESPACES = ['metadata', 'translation'] as const;
 
 const TAB_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'End', 'Home']);
 
@@ -124,7 +125,7 @@ const VideoDetailsQuery = ({
   itemKey: GalleryItemKey;
   videoName: string;
 }) => {
-  const { t } = useTranslation();
+  const { t } = useTranslation(METADATA_NAMESPACES, { nsMode: 'fallback', useSuspense: false });
   const metadataQuery = useQuery(galleryVideoMetadataOptions(captureAccountScope(), videoName));
   const workflowQuery = useQuery({
     queryFn: ({ signal }) => galleryVideos.workflow(videoName, signal),
@@ -249,7 +250,7 @@ const ImageDetails = ({
   isLoading: boolean;
   metadata: GalleryImageMetadata | null;
 }) => {
-  const { t } = useTranslation();
+  const { t } = useTranslation(METADATA_NAMESPACES, { nsMode: 'fallback', useSuspense: false });
   const entries = [
     ...parsePreviewMetadata(metadata, { kind: 'image', t }),
     ...(image

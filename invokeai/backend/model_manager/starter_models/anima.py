@@ -42,6 +42,20 @@ anima_base_int8 = StarterModel(
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
 
+_ANIMA_FP8 = "https://huggingface.co/Bedovyy/Anima-FP8/resolve/3be89fc9843df38b70c2a6be911368536ede31d3"
+
+anima_base_fp8 = StarterModel(
+    name="Anima Base 1.0 (fp8)",
+    base=BaseModelType.Anima,
+    source=f"{_ANIMA_FP8}/anima-base-v1.0-fp8.safetensors",
+    description="Anima Base 1.0 in Bedovyy's fp8 build, about half the size of the bf16 checkpoint. "
+    "FP8 Storage is switched on when it is installed. ~2.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
 _DERIVATIVE_LICENSE = (
     "A derivative of Anima under the CircleStone Labs Non-Commercial License: the model may not be used "
     "commercially (generated images may)."
@@ -92,6 +106,19 @@ anima_turbo_int8 = StarterModel(
     description="Anima Turbo v1.1, the distilled version of Anima for fast generations, in Bedovyy's int8_convrot "
     "build. Its int8 layers stay int8 on every supported GPU, about 2.7GB once loaded; int8 Compute can run them on "
     f"NVIDIA int8 tensor cores. Recommended: 8-12 steps, CFG 1. {_DERIVATIVE_LICENSE} ~2.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
+anima_turbo_fp8 = StarterModel(
+    name="Anima Turbo 1.1 (fp8)",
+    base=BaseModelType.Anima,
+    source=f"{_ANIMA_FP8}/anima-turbo-v1.1-fp8.safetensors",
+    description="Anima Turbo v1.1, the distilled version of Anima for fast generations, in Bedovyy's fp8 build: "
+    "about half the size of the bf16 checkpoint. FP8 Storage is switched on when it is installed. "
+    f"Recommended: 8-12 steps, CFG 1. {_DERIVATIVE_LICENSE} ~2.6GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
     variant=AnimaVariantType.Qwen3,
