@@ -1,0 +1,418 @@
+---
+title: Multi-User Administrator Guide
+description: Turn on multi-user mode, manage accounts, and keep a shared InvokeAI server safe.
+lastUpdated: 2026-10-26
+sidebar:
+  order: 4
+---
+
+import { Steps, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Multi-user mode puts a sign-in in front of InvokeAI and gives every person their own account, projects, boards and workflows on one shared server. This guide is for the administrator who sets it up and runs it. For what everyone else sees, read the [Multi-User Guide](/configuration/multi-user-mode/user-guide/).
+
+## Roles
+
+There are two roles. Any number of accounts can be administrators.
+
+|                                                                                               | Administrator                                                           | User                                                                                      |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Generate with every installed model                                                           | Yes                                                                     | Yes                                                                                       |
+| Open the Launchpad **Models** and **Nodes** pages to install and edit models and custom nodes | Yes                                                                     | No: these pages are hidden from users                                                     |
+| Manage accounts (Launchpad **Users**)                                                         | Yes                                                                     | No                                                                                        |
+| Server settings and maintenance (**Settings → Server**, database and gallery maintenance)     | Yes                                                                     | No                                                                                        |
+| Queue                                                                                         | Sees every item in full, cancels anyone's, pauses and resumes the queue | Sees their own items in full and other users' with details hidden; cancels only their own |
+| Boards                                                                                        | Opens and manages every user's boards                                   | Their own, and boards others share with them                                              |
+| Library workflows                                                                             | Sees every user's workflows                                             | Their own and public ones                                                                 |
+
+Roles are read from the database on every request, so promoting or demoting someone takes effect on their next action. See [When changes take effect](#when-changes-take-effect).
+
+## Turn on multi-user mode
+
+<Steps>
+
+1. **Back up.** Stop InvokeAI and copy the `databases` folder in your root directory. See [Backups](#backups).
+
+2. **Edit `invokeai.yaml`** in your root directory and add `multiuser: true`. To let other computers on your network reach the server, also add `host: 0.0.0.0`:
+
+   ```yaml
+   multiuser: true
+   host: 0.0.0.0                  # optional: listen on the network, not only this computer
+   strict_password_checking: true # optional: require strong passwords
+   ```
+
+3. **Start InvokeAI** from the launcher or with `invokeai-web`. With `host: 0.0.0.0`, other computers open `http://\<server-address>:9090`.
+
+4. **Create the first administrator.** The first browser to open InvokeAI shows **Set up Invoke**. Enter:
+
+   * **Email**: the sign-in name. It cannot be changed later. It must look like an email address, though `admin@localhost` also works; nothing is ever sent to it.
+   * **Display name** (optional): shown to other users instead of the email.
+   * **Password** and **Confirm password**.
+
+   Select **Create administrator account**, then sign in.
+
+5. **Add the other users** from the Launchpad's **Users** page, or with `invoke-useradd`. See [Manage users](#manage-users).
+
+</Steps>
+
+:::caution[Plain HTTP over the network]
+Browsers turn off the clipboard and Web Locks for plain-HTTP pages at a network address such as `http://192.168.1.20:9090`, so copy buttons stop working and open tabs cannot be told apart. See [Known Bugs](/troubleshooting/known-bugs/#plain-http-access-another-tab-can-take-a-still-open-tabs-unsaved-changes). Serve InvokeAI over [HTTPS](#https-and-internet-access), or open it at `localhost` on the server itself.
+:::
+
+:::caution[Keep the administrator's password]
+InvokeAI cannot recover a password. If you lose the last administrator's password, reset it from the command line with [`invoke-usermod`](#troubleshooting).
+:::
+
+To go back to single-user mode, set `multiuser: false` (or remove the line) and restart. Browsers that had InvokeAI open may need a hard refresh.
+
+### What happens to existing data
+
+Switching modes changes no data. Every record keeps its owner, and the mode decides who can see it. In single-user mode everything you create belongs to an internal account named `system`, which cannot sign in.
+
+| Data                   | Single-user → multi-user                                                                        | Multi-user → single-user                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Boards, images, videos | Owned by `system`: only administrators can open them                                            | All visible: the single-user mode user is an administrator                                                                 |
+| Projects               | Owned by `system`: no account can open them. They come back when you return to single-user mode | Only projects created in single-user mode are listed. Each account's projects come back when you return to multi-user mode |
+| Library workflows      | Public, owned by `system`: every user can open, duplicate or download them from **Shared**      | All visible                                                                                                                |
+| Accounts               | Kept. Created in multi-user mode only                                                           | Kept, unused until you switch back                                                                                         |
+
+Content that accounts create in multi-user mode stays theirs across any number of switches. There is no tool yet to move `system`-owned content to another account.
+
+### Upgrading from v6
+
+The first v7 start converts board sharing and projects in place, and logs a warning for anything it had to change beyond that:
+
+* **A project id held by more than one account.** Project ids are now unique across accounts. The oldest project keeps its id; each other one gets a new id, and the log names the account's id and the new project id. The project's document, boards, media, queue items and the account's open projects follow it. A browser tab still open on that project knows it by its old id, so its unsynced edits come back as a project-deleted conflict: export them first if you want them, then reopen the project from the Launchpad.
+* **Boards in a project that no longer exists**, for example boards of an account deleted before the upgrade. They move out of the project, and the log says how many.
+
+Board visibility becomes general access: private boards become **Restricted**, shared boards **Everyone can view**, and public boards **Everyone can contribute**, so every user can add media to them and remove only what they added. Any per-person shares stored in the old `shared_boards` table become **Viewer** roles for those people, and the boards appear under their **Shared with me**. The interface cannot list or remove these per-person roles; changing the board's general access does not remove them either. Administrators find boards that other users have not opened to them under **Other users' boards** in the Gallery, and can manage them from their menus as before, except that only a board's owner can move it between the Library and their projects.
+
+## Manage users
+
+<Tabs>
+  <TabItem label="Web UI">
+
+Open the Launchpad's **Users** page, or choose **Manage users** in your account menu (your name in the Launchpad's top bar, or the app menu in a project).
+
+| To                                        | Do this                                                                                                                                                                                            |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a user                                | **Add user**: email, optional display name, password, and the **Administrator** switch. **Generate** fills in a random 16-character password; reveal it with the eye icon and pass it on securely. |
+| Rename, reset a password, change the role | The pencil button. The email cannot be changed. Leave the password blank to keep it.                                                                                                               |
+| Block sign-in without deleting anything   | Turn off the user's **Active** switch. Turn it back on to restore access.                                                                                                                          |
+| Delete a user                             | The trash button. Read [Deleting a user](#deleting-a-user) first.                                                                                                                                  |
+| Clean up a user's intermediate files      | The brush button, which opens the intermediates settings for that user.                                                                                                                            |
+
+You cannot change your own role, deactivate yourself or delete yourself. Ask another administrator.
+
+  </TabItem>
+  <TabItem label="Command line">
+
+Four commands manage accounts from a terminal. Run them in the InvokeAI environment: from the launcher, open its command line with the `>` button; from a terminal, activate your install's virtual environment first. They work whether or not the server is running.
+
+| Command           | Does                                                                 | Example                                                                        |
+| ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `invoke-useradd`  | Adds a user. `--admin` makes them an administrator                   | `invoke-useradd --email ana@example.com --name "Ana" --password "Sunrise2026"` |
+| `invoke-usermod`  | Changes the display name, password or role (`--admin`, `--no-admin`) | `invoke-usermod --email ana@example.com --password "NewPassword7"`             |
+| `invoke-userdel`  | Deletes a user. Asks for confirmation unless you pass `--force`      | `invoke-userdel --email ana@example.com`                                       |
+| `invoke-userlist` | Lists every account. `--json` prints JSON                            | `invoke-userlist`                                                              |
+
+* **Prompts.** `invoke-useradd` prompts for everything unless you pass `--email` or `--password`, and then needs both. `invoke-usermod` and `invoke-userdel` prompt for everything unless you pass `--email`; without it, other options such as `--name` are ignored. `invoke-userlist` never prompts.
+* Passwords set here must always have at least 8 characters with an uppercase letter, a lowercase letter and a digit, whatever `strict_password_checking` says.
+* The commands cannot change an email or deactivate an account. Use the web UI for deactivation.
+* Every command takes `--root \<path>`. Without it the root is `$INVOKEAI_ROOT`, then the active virtual environment's parent folder, then `~/invokeai`.
+
+<details>
+<summary>`--help` output</summary>
+
+```text
+usage: invoke-useradd [-h] [--root ROOT] [--email EMAIL] [--password PASSWORD] [--name NAME] [--admin]
+
+Add a user to the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order:
+                        the $INVOKEAI_ROOT environment variable, the active virtual environment's parent
+                        directory, or $HOME/invokeai.
+  --email EMAIL, -e EMAIL
+                        User email address
+  --password PASSWORD, -p PASSWORD
+                        User password
+  --name NAME, -n NAME  User display name (optional)
+  --admin, -a           Make user an administrator
+
+If no arguments are provided, the script will run in interactive mode.
+```
+
+```text
+usage: invoke-usermod [-h] [--root ROOT] [--email EMAIL] [--name NAME] [--password PASSWORD]
+                      [--admin | --no-admin]
+
+Modify a user in the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order:
+                        the $INVOKEAI_ROOT environment variable, the active virtual environment's parent
+                        directory, or $HOME/invokeai.
+  --email EMAIL, -e EMAIL
+                        User email address
+  --name NAME, -n NAME  New display name
+  --password PASSWORD, -p PASSWORD
+                        New password
+  --admin, -a           Grant administrator privileges
+  --no-admin            Remove administrator privileges
+
+If no arguments are provided, the script will run in interactive mode.
+```
+
+```text
+usage: invoke-userdel [-h] [--root ROOT] [--email EMAIL] [--force]
+
+Delete a user from the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order:
+                        the $INVOKEAI_ROOT environment variable, the active virtual environment's parent
+                        directory, or $HOME/invokeai.
+  --email EMAIL, -e EMAIL
+                        User email address
+  --force, -f           Delete without confirmation prompt
+
+If no arguments are provided, the script will run in interactive mode.
+```
+
+```text
+usage: invoke-userlist [-h] [--root ROOT] [--json]
+
+List users from the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order:
+                        the $INVOKEAI_ROOT environment variable, the active virtual environment's parent
+                        directory, or $HOME/invokeai.
+  --json                Output users in JSON format instead of table
+
+Examples:
+  invoke-userlist
+  invoke-userlist --json
+```
+
+</details>
+
+  </TabItem>
+</Tabs>
+
+Two accounts are protected everywhere: you cannot delete, deactivate or demote the **last active administrator** (promote someone else first), and you cannot delete, deactivate, promote or set a password for the internal `system` account, which owns everything created in single-user mode.
+
+### Deleting a user
+
+:::danger[Deleting a user is permanent]
+
+**Kept, without an owner:** the user's boards (moved out of their projects), images, videos, Library workflows, queue items and style presets. Boards keep their general access, so a board open to everyone stays open; the rest of the media is visible only to administrators. The files stay in `outputs/`.
+
+To keep someone's work, move it or share it before you delete them. To remove it, delete it from the Gallery first. To only block access, deactivate the account instead.
+:::
+
+When someone leaves, deactivate their account first, hand over anything others need, and delete it later, or never: a deactivated account keeps everything and cannot sign in.
+
+Images left behind can be reviewed and deleted from the Gallery. To clean up image files and records that no longer match, see [Gallery maintenance](/users-guide/gallery/image-storage-maintenance/#gallery-maintenance).
+
+## The shared queue
+
+Every user's jobs go into one queue. With the default `generation_devices: auto`, InvokeAI runs one job per GPU at the same time; a machine with one GPU runs one job at a time. See [Multi-GPU Generation](/configuration/invokeai-yaml/#multi-gpu-generation).
+
+`session_queue_mode` decides which pending job starts next:
+
+| Mode                    | Order                                                                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `round_robin` (default) | Users take turns: the next job comes from the user served longest ago. Priority orders each user's own jobs but never jumps another user's turn, so one large batch cannot hold up everyone else. |
+| `FIFO`                  | Highest priority first, then oldest. A large batch runs to the end before the next user's jobs start.                                                                                             |
+
+```yaml
+session_queue_mode: FIFO # or round_robin
+```
+
+Turns between users apply only in multi-user mode. In single-user mode jobs run in submission order; on a multi-GPU machine `round_robin` lets a free GPU pick a job whose models it already has loaded, and `FIFO` turns that off.
+
+As an administrator, the queue shows everyone's jobs in full, and each item's details name the user who queued it. You can cancel or clear anyone's jobs and pause or resume the queue. There is no filter by user.
+
+Under **Settings → Server**, administrators can also choose **Generation devices** and the **Queue history** limit (finished items kept at startup; blank keeps all, `0` keeps none). Both take effect after a restart.
+
+## Security
+
+| Topic                                                   | In short                                                                                                                |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [Passwords](#passwords)                                 | Turn on `strict_password_checking` to require strong passwords.                                                         |
+| [Sessions](#sessions)                                   | A sign-in lasts 24 hours after the last change, or a week. Changing a password ends the account's other sessions.       |
+| [Signing key](#signing-key)                             | Anyone with a copy of the database can sign in as any user. Protect backups.                                            |
+| [Model downloads](#model-downloads)                     | The server refuses to download from private-network addresses.                                                          |
+| [Node filesystem access](#node-filesystem-access)       | Nodes that read or write files stay inside directories you designate. **Prompts from File** is for administrators only. |
+| [HTTPS and internet access](#https-and-internet-access) | Use HTTPS beyond `localhost`. Prefer a VPN to exposing InvokeAI to the internet.                                        |
+
+### Passwords
+
+Set `strict_password_checking: true` to require at least 8 characters with an uppercase letter, a lowercase letter and a digit. It is off by default: then any non-empty password is accepted, and the setup, user and account forms show its strength as weak, moderate or strong. The command-line tools always require the strong form. Passwords are stored as bcrypt hashes. Users change their own password under **Account settings**, which asks for the current one.
+
+### Sessions
+
+A sign-in lasts 24 hours from the last change a user makes, or 7 days with **Keep me signed in for a week**. The session is a signed token (JWT) kept in the browser. Each action that changes something renews it; browsing alone does not.
+
+Signing out deletes the token from that browser, but the server does not revoke it: to end every session of an account, change its password. Every request checks the account in the database, so the changes below apply without waiting for the token to expire.
+
+#### When changes take effect
+
+| Event                      | Effect                                                                                                                                                                                                    | When         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Promote or demote          | Gains or loses administrator access. The user stays signed in                                                                                                                                             | Next request |
+| Deactivate or delete       | Requests are refused and open connections closed. Running jobs are canceled: they stop at the next step or node, and pending ones are dropped when they reach the front of the queue. Finished work stays | Immediately  |
+| Change or reset a password | Every other session of that account is signed out, including a stolen token. The session that made the change stays signed in                                                                             | Immediately  |
+| Sign out                   | Removes the token from that browser only                                                                                                                                                                  | Immediately  |
+| Rotate the signing key     | Everyone is signed out                                                                                                                                                                                    | At restart   |
+
+Changes made with `invoke-usermod` or `invoke-userdel` apply to new requests at once, but connections that are already open, and jobs already running, are re-checked about every 30 seconds, so stopping them can take up to about a minute.
+
+<details>
+<summary>Limits of revocation</summary>
+
+* Revocation is enforced by this server. A revoked token stays cryptographically valid until it expires, so anything that accepts InvokeAI tokens without asking this server would still honor it.
+* Stopping a job does not undo it: media already delivered and outputs already written stay.
+* If the periodic check cannot read the database for three checks in a row, open connections lose administrator privileges and other users' events until it can read again. An administrator whose admin-only updates go quiet during database trouble is seeing this, not a change to their account. A deactivated or deleted account's connection still waits for a successful read before it closes, though every request it makes is already refused.
+
+</details>
+
+### Signing key
+
+Tokens are signed with a random key stored in the database, in the `jwt_secret` row of the `app_settings` table, so anyone with a copy of the database can sign in as any user. Protect database backups like passwords.
+
+To rotate the key, which signs everyone out:
+
+<Steps>
+
+1. Stop InvokeAI.
+
+2. Generate a key: `python -c "import secrets; print(secrets.token_hex(32))"` or `openssl rand -hex 32`.
+
+3. Store it with this SQL, the key filled in. The backticks around `key` are needed in MySQL and MariaDB, where `KEY` is a reserved word; SQLite accepts them too.
+
+   ```sql
+   UPDATE app_settings SET value = '<new-key>' WHERE `key` = 'jwt_secret';
+   ```
+
+   For SQLite, run it in `sqlite3 \<root>/databases/invokeai.db`. For a [MySQL or MariaDB database](/configuration/external-database/), run it in the server's client.
+
+4. Start InvokeAI. Everyone signs in again.
+
+</Steps>
+
+### Model downloads
+
+The server refuses to download from loopback, link-local and private-network addresses, so a model URL cannot reach services only the server can see. This covers every download the server makes for you, mainly model installs from a URL. Redirects are checked at every hop, so a public URL cannot bounce the server to a private address.
+
+* **Local mirror:** set `allow_private_download_urls: true` to allow private addresses.
+* **Proxy:** downloads ignore `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`. Set `download_proxy` to a proxy that itself blocks private addresses, because InvokeAI cannot check the addresses the proxy resolves. Don't turn on `allow_private_download_urls` just to make a proxy work; the two settings are independent.
+* `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` and `.netrc` are still honored.
+
+### Node filesystem access
+
+Workflow nodes that read or write files are confined to directories you designate, in both single-user and multi-user
+mode.
+
+The **Prompts from File** node reads prompt lists from the prompt files directory: `prompt_files_dir`, by default
+`\<root>/prompt_files`. Its `file_path` input is relative to that directory, and absolute paths, `..` traversal and
+symlinks pointing out of the directory are refused. Place a prompt list at `\<root>/prompt_files/lists/fantasy.txt` and
+the node addresses it as `lists/fantasy.txt`.
+
+In multi-user mode the node is also **restricted to administrators**, because every account shares the prompt files
+directory: a non-admin reading from it would be reading prompt lists belonging to other users. Unprivileged users should
+use wildcards instead, which are stored per account and can be imported from the prompt panel.
+
+To turn the node off entirely, deny it in `invokeai.yaml`:
+
+```yaml
+deny_nodes:
+  - prompt_from_file
+```
+
+The **Save Image (Gallery + File Export)** node is confined to the outputs directory on the same terms. Its filename
+prefix and suffix cannot contain path separators or `..`, so they cannot steer the exported file out of the chosen
+directory.
+
+### HTTPS and internet access
+
+Sign-in sends passwords and tokens, so serve InvokeAI over HTTPS whenever people reach it at a network address. Browsers also turn off the clipboard and Web Locks for plain-HTTP pages at a network address; see [Known Bugs](/troubleshooting/known-bugs/). Two ways:
+
+* **Built in:** set `ssl_certfile` and `ssl_keyfile` in `invokeai.yaml`.
+* **Reverse proxy** such as nginx, Caddy or Traefik. To serve under a path such as `/invoke`, see `base_url` and `forwarded_allow_ips` in the [configuration reference](/configuration/invokeai-yaml/).
+
+A minimal nginx site. The proxy must pass WebSocket upgrades, which carry the queue's live updates:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name invoke.example.com;
+    ssl_certificate     /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+With the proxy on the same machine, keep InvokeAI's default `host: 127.0.0.1` so it is reachable only through the proxy.
+
+:::danger[Exposing InvokeAI to the internet]
+InvokeAI has had no security audit and has no login rate limiting or lockout. Prefer a VPN. If you must expose it, you do so at your own risk: serve it over HTTPS, limit access to trusted networks and addresses, and rate-limit `POST /api/v1/auth/login` at the proxy. Router and firewall setup is beyond this guide.
+:::
+
+## Backups
+
+The `databases` folder holds the accounts, the signing key and every record; `outputs` holds the image and video files.
+
+* **What to copy:** `databases/`, `outputs/` and `invokeai.yaml`. `models/` is optional, since models can be downloaded again.
+* **Stop InvokeAI first.** The database runs in write-ahead log mode, and a running server can hold recent changes in `invokeai.db-wal` beside the database file. Copy the whole folder, never the `.db` file alone while the server runs.
+* **Automatic backups.** Before every database update, such as an upgrade, InvokeAI saves `databases/invokeai_backup_\<YYYYMMDD>-\<HHMMSS>.db`. Gallery maintenance saves its own in `databases/backup/`. InvokeAI never deletes either.
+* **MySQL or MariaDB.** InvokeAI makes no backups of a server database. Use `mysqldump` or `mariadb-dump`.
+
+To restore, follow [Restore a backup](/start-here/upgrading/#restore-a-backup): it explains which file to pick and how to handle the `-wal` and `-shm` files.
+
+## Troubleshooting
+
+| Symptom                                                                                          | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Incorrect email or password"                                                                    | Check the address with `invoke-userlist`, then reset the password from **Users** or with `invoke-usermod --email \<email> --password \<new>`.                                                                                                                                                                                                                                                              |
+| "User account is disabled"                                                                       | Turn the user's **Active** switch back on in **Users**.                                                                                                                                                                                                                                                                                                                                                                                      |
+| Lost the only administrator password                                                             | `invoke-usermod --email \<admin-email> --password \<new>`. It works with the server stopped or running.                                                                                                                                                                                                                                                                                                    |
+| "Cannot remove the last administrator"                                                           | Promote another account first.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| "The system user cannot be deleted, deactivated, promoted to administrator, or given a password" | `system` owns the content created in single-user mode. Leave it as it is.                                                                                                                                                                                                                                                                                                                                                                    |
+| **Set up Invoke** appears again                                                                  | The server found no active administrator in its database. Check that it uses the same root and database as before (`--root`, `INVOKEAI_ROOT`, `db_dir`, `db_url`).                                                                                                                                                                                                                                                                           |
+| Other computers cannot connect                                                                   | Set `host: 0.0.0.0`, restart, and allow port 9090 (or your `port`) through the server's firewall.                                                                                                                                                                                                                                                                                                                                            |
+| "Database is locked"                                                                             | InvokeAI already uses write-ahead logging and waits 5 seconds for a lock. Another program is holding the database: an open `sqlite3` shell, a backup or sync tool. Find it with `fuser databases/invokeai.db` on Linux. Keep the database on a local disk: write-ahead logging may not engage on network file systems.                                                                                                                       |
+| Database update fails at startup                                                                 | Set `log_level: debug` in `invokeai.yaml` and start again to see the error. With SQLite, the database was backed up first and each migration rolls back when it fails; see [Upgrading](/start-here/upgrading/) to restore the backup. With MySQL or MariaDB there is no automatic backup, and a failed migration's changes are not rolled back: it runs again from the start at the next start. Restore your own backup if it keeps failing. |
+| Slow on a large library                                                                          | An administrator can run **Compact database** under **Settings → Data & workspace**. It can take a long time and pauses database activity while it runs.                                                                                                                                                                                                                                                                                     |
+
+## Not supported
+
+| Feature                                       | Status                                                                                        |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Single sign-on (OAuth, OpenID Connect, LDAP)  | InvokeAI has its own accounts only.                                                           |
+| Per-user model access                         | Every user can use every installed model.                                                     |
+| Audit log                                     | None. The queue records who queued each job, and **Users** shows each account's last sign-in. |
+| Login rate limiting, lockout, password expiry | None. Add rate limiting at a reverse proxy.                                                   |
+
+## More
+
+<CardGrid>
+  <LinkCard title="Multi-User Guide" href="/configuration/multi-user-mode/user-guide/" description="Signing in, sharing boards and workflows, and the queue, for every user." />
+  <LinkCard title="Multi-User API Guide" href="/configuration/multi-user-mode/api-guide/" description="Authenticating scripts and integrations against a multi-user server." />
+</CardGrid>
+
+Ask on [Discord](https://discord.gg/ZmtBAhwWhy) or report problems on [GitHub](https://github.com/invoke-ai/InvokeAI/issues).
