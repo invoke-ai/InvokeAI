@@ -59,6 +59,9 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_conversion_utils import (
+    lora_model_from_ideogram4_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
     lora_model_from_krea2_state_dict,
 )
@@ -246,6 +249,10 @@ class LoRALoader(ModelLoader):
             # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
             # is what the published distilled accelerator (no .alpha tensors) expects.
             model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Ideogram4:
+            # Converted onto the vendored transformer every Ideogram 4 build loads into; diffusers' split q/k/v
+            # are fused into its single `attention.qkv`. Without .alpha tensors alpha = rank (unscaled).
+            model = lora_model_from_ideogram4_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.StableDiffusion3:
             # diffusers, PEFT, SimpleTuner LyCORIS and kohya MMDiT names, all onto diffusers' SD3Transformer2DModel
             # and the two CLIP encoders; T5 layers are dropped with a warning.
