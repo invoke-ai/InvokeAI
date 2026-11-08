@@ -9,7 +9,7 @@ from page to page.
 import functools
 import itertools
 import operator
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any, Literal, NamedTuple, Optional
 
 from sqlalchemy import (
@@ -18,6 +18,7 @@ from sqlalchemy import (
     FromClause,
     Row,
     Select,
+    String,
     Subquery,
     Table,
     and_,
@@ -41,8 +42,10 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
+    InBoundSet,
     JsonString,
     OrderedJoin,
+    bound_set,
     fixed_limit,
     like_contains,
 )
@@ -64,6 +67,13 @@ class _Half(NamedTuple):
 _HALVES = {
     "image": _Half(images, board_images, "image_name", "image_category", "image_origin"),
     "video": _Half(videos, board_videos, "video_name", "video_category", "video_origin"),
+}
+
+_ITEM_OWNERS = {
+    kind: select(half.media.c[half.name], half.media.c.user_id).where(
+        InBoundSet(half.media.c[half.name], bindparam("names", type_=String()))
+    )
+    for kind, half in _HALVES.items()
 }
 
 
@@ -463,3 +473,10 @@ class GalleryQueries(QueryModule):
                     BoardSummary(str(r[0]), int(r[1] or 0), int(r[2] or 0), int(r[3] or 0), int(r[4] or 0), r[5], r[6])
                 )
         return summaries
+
+    @read
+    def item_owners(
+        self, conn: Connection, kind: Literal["image", "video"], names: Collection[str]
+    ) -> list[tuple[str, str]]:
+        """(name, owner) of each named item of `kind` that exists."""
+        return [(str(r[0]), str(r[1])) for r in conn.execute(_ITEM_OWNERS[kind], {"names": bound_set(names)}).all()]

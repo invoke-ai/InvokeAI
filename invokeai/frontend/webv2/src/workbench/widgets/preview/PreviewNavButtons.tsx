@@ -104,8 +104,9 @@ const NavButton = ({
     insetInlineEnd={side === 'end' ? '2' : undefined}
     insetInlineStart={side === 'start' ? '2' : undefined}
     position="absolute"
-    // A video's controls run along the bottom of the stage; center over what is left above them.
-    top={isVideo ? 'calc(50% - 1.5rem)' : '50%'}
+    // A video's control bar (about 4.5rem) overlays the bottom of its frame, which is centered in the stage; center
+    // over the picture above the bar, so a short frame's scrubber never sits under an arrow.
+    top={isVideo ? 'calc(50% - 2.25rem)' : '50%'}
     transform="translateY(-50%)"
     zIndex="1"
   >

@@ -1,0 +1,49 @@
+---
+// One recommendation of the `MemoryPicker`. Its `id` ties it to a rule in `memory-picker.mjs`, which decides when it
+// shows; the content says what to do and links to the page that explains it. Without JavaScript every option shows,
+// so the content should also say when it applies.
+type Props = {
+  /** The rule id in `MEMORY_RULES`. */
+  id: string;
+  /** What to do, in a few words. */
+  title: string;
+};
+
+const { id, title } = Astro.props as Props;
+---
+
+<article class="memory-option" data-memory-option={id}>
+  <p class="memory-option__title">{title}</p>
+  <div class="memory-option__body"><slot /></div>
+</article>
+
+<style>
+  /* The app's launchpad tile, as `article.card` in custom.css. */
+  .memory-option {
+    --docs-wrap-pad: calc(var(--docs-text-offset, 13px) - 1px);
+    padding: 0.75rem var(--docs-wrap-pad);
+    border: 1px solid var(--invoke-neutral-600);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    font-size: var(--sl-text-sm);
+  }
+
+  .memory-option[hidden] {
+    display: none;
+  }
+
+  .memory-option__title {
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-weight: 600;
+  }
+
+  .memory-option__body {
+    margin-top: 0.25rem;
+    color: var(--docs-text-muted);
+
+    > :global(:first-child) {
+      margin-top: 0;
+    }
+  }
+</style>

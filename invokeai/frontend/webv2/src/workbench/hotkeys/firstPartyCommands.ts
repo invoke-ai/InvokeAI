@@ -221,6 +221,12 @@ export const useRegisterFirstPartyCommands = () => {
 
           return project ? getProjectWidgetValues(project, 'generate') : {};
         },
+        canvasTarget: {
+          commands,
+          projectId: activeProject.id,
+          getProject: () =>
+            queries.isActiveProject(activeProject.id) ? (queries.getProject(activeProject.id) ?? null) : null,
+        },
         image,
         isCanvasFrame: activeProject.invocation.sourceId === 'canvas',
         kind,

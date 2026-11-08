@@ -11,10 +11,11 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { createDocsProvider } from './docsSearchProvider';
 import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 import { createProjectsProvider } from './projectsProvider';
 
-/** Launchpad-only palette adapter: navigation, settings and projects; no editor providers. */
+/** Launchpad-only palette adapter: navigation, settings, projects and docs search; no editor providers. */
 const LaunchpadCommandPaletteDialog = ({
   isOpen,
   modifierKeyLabel,
@@ -106,6 +107,7 @@ const LaunchpadCommandPaletteDialog = ({
         openProjects,
         t,
       }),
+      createDocsProvider({ t }),
     ];
   }, [navigate, openProjectIds, projectLibrary, t]);
 
