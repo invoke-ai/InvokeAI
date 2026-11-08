@@ -5629,6 +5629,7 @@
         "negativePromptAdd": "Negative prompt…",
         "negativePromptHide": "Turn off negative prompt",
         "negativePromptPlaceholder": "Region negative prompt",
+        "negativesNeedCfg": "Negative prompts and Auto-Negative take effect only when CFG Scale is above 1.",
         "positivePrompt": "Positive prompt",
         "positivePromptPlaceholder": "Region positive prompt",
         "referenceImage": "Reference image",

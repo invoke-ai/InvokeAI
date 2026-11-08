@@ -1480,14 +1480,26 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(graph.nodes.denoise_latents?.type).toBe('krea2_denoise');
   });
 
-  it('omits Krea-2 negative conditioning while CFG is disabled, and adds it when enabled', () => {
+  it('omits Krea-2 negative conditioning while CFG is disabled, and collects it when enabled', () => {
     // Krea-2-Turbo runs at cfg_scale 1 by default, where the model takes no negative input.
-    expect(compile(krea2Diffusers, { cfgScale: 1 }).nodes.neg_cond).toBeUndefined();
+    const withoutCfg = compile(krea2Diffusers, { cfgScale: 1 });
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(withoutCfg.nodes.neg_cond_collect).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
 
     const withCfg = compile(krea2Diffusers, { cfgScale: 4.5 });
 
     expect(withCfg.nodes.neg_cond?.type).toBe('krea2_text_encoder');
-    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')).toBeDefined();
+    expect(withCfg.nodes.neg_cond_collect?.type).toBe('collect');
+    // Regional negatives join the global one through the collector.
+    expect(getEdge(withCfg, 'neg_cond_collect', 'item')?.source).toEqual({
+      field: 'conditioning',
+      node_id: 'neg_cond',
+    });
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+      field: 'collection',
+      node_id: 'neg_cond_collect',
+    });
   });
 
   it('passes standalone Krea-2 submodels to the loader for a non-diffusers transformer', () => {
@@ -2540,6 +2552,40 @@ describe('model-family tuning', () => {
     expect(quantized.nodes.pos_cond?.quantization).toBe('nf4');
     expect(quantized.nodes.neg_cond?.quantization).toBe('nf4');
     expect(getNodeByType(quantized, 'core_metadata')?.qwen_image_quantization).toBe('nf4');
+  });
+
+  describe('Qwen-Image LoRAs', () => {
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'A LoRA', type: 'lora' };
+    const loras = [{ isEnabled: true, model: qwenLora, weight: 0.7 }];
+
+    it('routes the Qwen2.5-VL encoder to both prompts through the LoRA collection loader', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, loader?.id ?? '', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    });
+
+    it('takes the encoder straight from the model loader without an active LoRA', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras: [{ ...loras[0]!, isEnabled: false }] });
+
+      expect(getNodeByType(graph, 'qwen_image_lora_collection_loader')).toBeUndefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+    });
+
+    it('keeps the encoder quantization on both prompts next to the LoRA edges', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras, qwenImageEncoderQuantization: 'int8' });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(graph.nodes.pos_cond?.quantization).toBe('int8');
+      expect(graph.nodes.neg_cond?.quantization).toBe('int8');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+    });
   });
 
   it('encodes the enabled Krea-2 style reference at the denoise size and feeds it to the denoise node', () => {
