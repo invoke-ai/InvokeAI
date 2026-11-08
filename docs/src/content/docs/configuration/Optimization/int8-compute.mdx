@@ -26,6 +26,7 @@ layer then rotates and quantizes its input to int8 per token and multiplies int8
   <BenchmarkRow label="FLUX.1 dev, 20 steps, 1536²" before={36.2} after={23.88} />
   <BenchmarkRow label="Krea-2 Turbo, 8 steps, 1024²" before={9.22} after={4.51} />
   <BenchmarkRow label="Krea-2 Turbo, 8 steps, 1536²" before={21.64} after={12.32} />
+  <BenchmarkRow label="FLUX.3 Klein, 16 steps, 1024²" before={7.01} after={4.07} />
 </BenchmarkChart>
 
 The gain shrinks at higher resolutions because attention, which `int8_compute` does not touch, takes a larger share of
@@ -43,9 +44,10 @@ Other int8 families use the same layers but have not been measured. A convrot in
 (`qwen_3_8b_int8_convrot` with FLUX.2 Klein 9B) works with it as well; its speed has not been measured.
 
 It is **opt-in** because quantizing the inputs changes the numbers: images made with `int8_compute` are not
-pixel-identical to the default path at the same seed. In the measurements above they were visually equivalent (PSNR
-30–46dB against the default path). Each path is bit-identical from run to run, and how much of the model is in VRAM does
-not change the image.
+pixel-identical to the default path at the same seed. In the Z-Image, FLUX.1 and Krea-2 measurements above they were
+visually equivalent (PSNR 30–46dB against the default path). FLUX.3 Klein was compared with bf16 instead: a mean PSNR of
+34.5dB with `int8_compute` and 33.2dB without. Each path is bit-identical from run to run, and how much of the model is
+in VRAM does not change the image.
 
 ## Requirements
 

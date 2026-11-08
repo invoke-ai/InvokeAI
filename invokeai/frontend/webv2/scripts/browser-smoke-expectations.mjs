@@ -39,9 +39,8 @@ export const isExpectedDocumentUnload = (event, { navigating, origin }) => {
 };
 
 /** Leaving the observed project retires its Gallery page reader, including a response whose body is still pending. */
-export const isExpectedGalleryProjectSwitchAbort = (event, { switchingProject, origin }) => {
+export const isExpectedGalleryProjectSwitchAbort = (event, { origin }) => {
   if (
-    !switchingProject ||
     event.kind !== 'requestfailed' ||
     event.method !== 'GET' ||
     event.responseStatus >= 400 ||

@@ -46,7 +46,7 @@ Nothing else changes: Starlight's routes, the language menu, `scripts/verify-dep
 
 ### Reviewing a Crowdin pull request
 
-Docs CI runs `pnpm test`, the build (links included) and the deploy checks on it. `src/lib/translation-checks.mjs` parses each translated page as the build does (Astro's frontmatter parser, then MDX or Markdown with the build's GitHub Flavored Markdown and Starlight directive plugins) and compares it with the English page at the same path. A translation may change prose, comments and code samples; anything else fails with the file and the offending key, element or value:
+Docs CI runs `pnpm test`, the build (links included) and the deploy checks on it. `src/lib/translation-checks.mjs` parses each translated page as the build does (Astro's frontmatter parser, then MDX or Markdown with the build's GitHub Flavored Markdown and Starlight directive plugins) and compares it with the English page at the same path. A translation may change prose, comments and code samples (Crowdin doesn't offer code blocks for translation, so they arrive as in English); anything else fails with the file and the offending key, element or value:
 
 - a directory in `src/content/docs/` or a file in `src/content/i18n/` for a locale `locales.mjs` doesn't configure;
 - a file in a locale directory that isn't a page, or a page with no English page at the same path;
@@ -58,19 +58,23 @@ Docs CI runs `pnpm test`, the build (links included) and the deploy checks on it
 - frontmatter beyond `title`, `description`, `hero.title`, `hero.tagline`, `sidebar.label` and `hero.actions[].text` that differs from English, such as `head`, `template` or a link, or any of those containing `<`;
 - a string in `<locale>.json` with a key `en.json` lacks (plural messages may use any of `_zero`, `_one`, `_two`, `_few`, `_many`, `_other`), different `{{placeholders}}` or tags, or `<script`, `on…=` or `javascript:`.
 
-Fix failures in Crowdin, not in the pull request. The checks don't judge language, so still read for meaning, tone and product names left in English (Invoke, node and model names), for edited commands and values in code samples, and for the rendering in a preview build (`pnpm build && pnpm preview`), especially Hindi.
+Fix failures in Crowdin, not in the pull request. The checks don't judge language, so still read for meaning, tone and product names left in English (Invoke, node and model names), for edited commands and values in inline code, and for the rendering in a preview build (`pnpm build && pnpm preview`), especially Hindi.
 
 Before merging the first real translation, run `pnpm test` on the first sync's pull request, or locally on `pnpm dlx @crowdin/cli download --pseudo` output (run from the repository root; it writes into the locale directories, so delete them afterwards). It confirms that Crowdin's MDX v2 export leaves imports, components and expressions byte-identical, which every later check relies on.
 
-### Crowdin parser settings
+### Crowdin settings
 
-`crowdin.yml` sets the file types: MDX v2 (`mdx_v2`) for `.mdx`, Markdown for `.md` and i18next JSON for `en.json`, so `_one`/`_other` keys become plural forms. In Crowdin's Settings → Parser configuration, exclude the frontmatter that isn't prose, for both MDX and Markdown:
+In Crowdin's Settings → Translations, turn on **Skip untranslated files** under export. Otherwise Crowdin exports every file in every locale with English in place of missing translations, and those copies replace the site's English fallback and its "not translated yet" notice. Leave **Skip untranslated strings** off: in MDX it drops untranslated paragraphs from the page.
 
-`lastUpdated`, `template`, `slug`, `sidebar.order`, `sidebar.hidden`, `pagefind`, `draft`, `alsoListedIn`, `hero.actions.link`, `hero.image.file`
+`crowdin.yml` sets the file types: MDX v2 (`mdx_v2`) for `.mdx`, Markdown for `.md` and i18next JSON for `en.json`, so `_one`/`_other` keys become plural forms. In Settings → Parser configuration, for both MDX and Markdown:
+
+- Turn on **Exclude code blocks**. Code blocks hold commands, config keys and values, and the translation checks let code samples change, so an edited command would pass CI.
+- Exclude the frontmatter that isn't prose: `lastUpdated`, `template`, `slug`, `sidebar.order`, `sidebar.hidden`, `pagefind`, `draft`, `alsoListedIn`, `hero.actions.link`, `hero.image.file`.
+- Export `_` for emphasis and `-` for list bullets, as the English pages use, so translated pages diff cleanly against them.
 
 ### Translator context notes
 
-After the first sync, paste these into each string's context in Crowdin.
+Each string's context in Crowdin holds its note below. Give a new short or ambiguous key a note there and here.
 
 | Key | Note |
 | --- | --- |

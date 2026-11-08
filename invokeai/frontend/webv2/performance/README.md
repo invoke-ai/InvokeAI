@@ -31,7 +31,7 @@ Reference modes:
 
 ## Running
 
-- CI’s 20-minute job timeout covers completion, including the three-engine lifecycle smoke.
+- CI’s 30-minute job timeout covers completion, including the three-engine lifecycle smoke and cold exact-base measurements; completion has already reached about 19 minutes.
 - CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
 - Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
@@ -144,14 +144,16 @@ held-edit scenario separately proves journal-only recovery. HTTP 4xx/5xx respons
 requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
 cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
 then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the
-shared observer because that owner's polling read retires during ordinary in-document switches. Only the explicit
-`measureProjectSwitch` phase also expects same-origin aborted `GET /api/v1/gallery/items/` reads: Query cancels the
-old project's listing when its last observer leaves, including after HTTP 200 while the body is pending. This phase
-covers temporary-project creation and return to the original project; live-page aborts, other endpoints/methods and
+shared observer because that owner's polling read retires during ordinary in-document switches. Only the concrete project-switch actions in
+`measureProjectSwitch` retire already pending same-origin `GET /api/v1/gallery/items/` request identities: Query cancels the
+old project's listing when its last observer leaves, including after HTTP 200 while the body is pending. These snapshots
+cover the switch to a temporary project and return to the original project; requests started during either action,
+setup/autosave reads, live-page aborts, other endpoints/methods and
 HTTP failures (including a later aborted error body) remain critical. The fault probes
 use independent strict diagnostics and separately assert that request and runtime failures reached the validator.
 
-Image readiness requires visible decoded images by default, or representative fixture pixels from both Canvas
+Image readiness bounds native decoding within the same readiness timeout and retries a legitimately changed image
+source. An explicit owner selector includes every cover, even below the fold. It requires visible decoded images by default, or representative fixture pixels from both Canvas
 owners in Canvas mode. Empty fixtures explicitly opt out of image requirements after their owner semantic-ready
 assertion. An early capturing image-error listener remembers failed images even when an owner's `onError` removes
 them. The smoke proves both corrupt-visible and corrupt-removed image failures, independently of console errors.

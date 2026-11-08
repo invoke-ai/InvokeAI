@@ -264,11 +264,10 @@ test('natural navigation scopes cancellation to the owned transition and retires
 });
 
 test('Gallery project-switch cancellation is an exact same-origin read expectation, never a live-page or HTTP waiver', async () => {
-  const phase = { switchingProject: true, origin: 'http://localhost:4180' };
+  const phase = { origin: 'http://localhost:4180' };
   const url = `${phase.origin}/api/v1/gallery/items/?board_id=fixture-project-board-01&offset=0`;
   const aborted = { kind: 'requestfailed', method: 'GET', url, responseStatus: 200, message: 'net::ERR_ABORTED' };
   assert.equal(isExpectedGalleryProjectSwitchAbort(aborted, phase), true);
-  assert.equal(isExpectedGalleryProjectSwitchAbort(aborted, { ...phase, switchingProject: false }), false);
   for (const event of [
     { ...aborted, url: url.replace('localhost', 'foreign') },
     { ...aborted, url: `${phase.origin}/api/v1/gallery/items/location` },
@@ -286,21 +285,39 @@ test('Gallery project-switch cancellation is an exact same-origin read expectati
     assert.equal(isExpectedGalleryProjectSwitchAbort(event, phase), false);
   }
   const page = new EventEmitter();
-  const diagnostics = await observeBrowserDiagnostics(page, {
-    expected: (event) => isExpectedGalleryProjectSwitchAbort(event, phase),
-  });
+  page.url = () => phase.origin;
+  const diagnostics = await observeBrowserDiagnostics(page);
   const request = () => ({ url: () => url, method: () => 'GET', failure: () => ({ errorText: 'net::ERR_ABORTED' }) });
   const retired = request();
+  page.emit('request', retired);
   page.emit('response', { url: () => url, status: () => 200, request: () => retired });
+  await diagnostics.withGalleryProjectSwitch(() => {
+    const newProject = request();
+    page.emit('request', newProject);
+    page.emit('requestfailed', newProject);
+  });
+  assert.equal(diagnostics.errors.length, 1, 'A new request with the very same URL must remain fatal');
+  // The retired request's body cancellation can be delivered after the switch action has completed.
   page.emit('requestfailed', retired);
-  await diagnostics.assertHealthy();
-  phase.switchingProject = false;
-  page.emit('requestfailed', retired);
-  phase.switchingProject = true;
+  assert.equal(diagnostics.errors.length, 1);
+  for (const phase of ['setup', 'first autosave', 'live project']) {
+    const live = request();
+    page.emit('request', live);
+    page.emit('requestfailed', live);
+    assert.equal(diagnostics.errors.at(-1).message, 'net::ERR_ABORTED', `${phase} reads are strict`);
+  }
+  const finished = request();
+  page.emit('request', finished);
+  await diagnostics.withGalleryProjectSwitch(() => {});
+  page.emit('requestfinished', finished);
+  page.emit('requestfailed', finished);
   const failed = request();
-  page.emit('response', { url: () => url, status: () => 500, request: () => failed });
-  page.emit('requestfailed', failed);
-  assert.equal(diagnostics.errors.length, 3, 'Live abort, HTTP failure and its aborted body all remain fatal');
+  page.emit('request', failed);
+  await diagnostics.withGalleryProjectSwitch(() => {
+    page.emit('response', { url: () => url, status: () => 500, request: () => failed });
+    page.emit('requestfailed', failed);
+  });
+  assert.equal(diagnostics.errors.length, 7, 'New, setup, autosave, live, settled and HTTP failures stay fatal');
   await assert.rejects(
     () => diagnostics.assertHealthy(),
     (error) => error.message.includes('500') && error.message.includes('ERR_ABORTED')

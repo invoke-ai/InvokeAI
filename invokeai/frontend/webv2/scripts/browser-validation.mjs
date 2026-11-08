@@ -1,4 +1,4 @@
-import { isExpectedDocumentUnload } from './browser-smoke-expectations.mjs';
+import { isExpectedDocumentUnload, isExpectedGalleryProjectSwitchAbort } from './browser-smoke-expectations.mjs';
 
 const navigations = new WeakMap();
 
@@ -33,6 +33,23 @@ export const observeBrowserDiagnostics = async (page, { expected = () => false, 
   const media = [];
   const responseStatuses = new WeakMap();
   const pendingConsoleDetails = new Set();
+  const pendingGalleryReads = new Set();
+  const retiredGalleryReads = new WeakSet();
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (
+      request.method?.() === 'GET' &&
+      url.origin === new URL(page.url?.() ?? request.url()).origin &&
+      url.pathname === '/api/v1/gallery/items/'
+    ) {
+      pendingGalleryReads.add(request);
+    }
+  });
+  page.on('requestfinished', (request) => {
+    pendingGalleryReads.delete(request);
+    retiredGalleryReads.delete(request);
+  });
+  page.once('close', () => pendingGalleryReads.clear());
   const socket404 = (url, status) => {
     const parsed = new URL(url);
     return parsed.pathname === '/ws/socket.io/' && parsed.searchParams.get('transport') === 'polling' && status === 404;
@@ -87,13 +104,21 @@ export const observeBrowserDiagnostics = async (page, { expected = () => false, 
     ) {
       return;
     }
-    record({
+    const event = {
       kind: 'requestfailed',
       url: request.url(),
       method: request.method?.(),
       message: request.failure()?.errorText,
       responseStatus: responseStatuses.get(request),
-    });
+    };
+    if (
+      !retiredGalleryReads.has(request) ||
+      !isExpectedGalleryProjectSwitchAbort(event, { origin: new URL(page.url()).origin })
+    ) {
+      record(event);
+    }
+    pendingGalleryReads.delete(request);
+    retiredGalleryReads.delete(request);
   });
   page.on('response', (response) => {
     const request = response.request?.();
@@ -111,6 +136,13 @@ export const observeBrowserDiagnostics = async (page, { expected = () => false, 
   return {
     errors,
     media,
+    /** Only readers already pending before this switch action retire; new-project reads remain strict. */
+    withGalleryProjectSwitch(action) {
+      for (const request of pendingGalleryReads) {
+        retiredGalleryReads.add(request);
+      }
+      return action();
+    },
     async assertHealthy() {
       await Promise.all(pendingConsoleDetails);
       if (errors.length) {
@@ -120,70 +152,123 @@ export const observeBrowserDiagnostics = async (page, { expected = () => false, 
   };
 };
 
-/** Mount marks are separate: this proves visible decoded images and raster pixels, without product test flags. */
-export const waitForRenderedMedia = async (page, { canvas = false, requireImage = !canvas, timeout = 20_000 } = {}) => {
-  await page.waitForFunction(
-    ({ canvasRequired, imageRequired }) => {
-      if (window.__browserMediaFailures?.length) {
-        throw new Error(
-          `Media failed to decode (including removed images): ${window.__browserMediaFailures.join(', ')}`
-        );
-      }
-      const visible = (element) => element.checkVisibility() && element.getBoundingClientRect().width > 0;
-      const images = [...document.images].filter(visible);
-      if (imageRequired && images.length === 0) {
-        return false;
-      }
-      if (images.some((image) => !image.complete)) {
-        return false;
-      }
-      const broken = images.find((image) => image.naturalWidth === 0);
-      if (broken) {
-        throw new Error(`Visible media failed to decode: ${broken.currentSrc || broken.src}`);
-      }
-      if (!canvasRequired) {
-        return true;
-      }
-      const hasPixels = (selector) =>
-        [...document.querySelectorAll(selector)].filter(visible).some((surface) => {
-          if (!surface.width || !surface.height) {
-            return false;
+/** Mount marks are separate: decode the selected images and verify pixels within one bounded readiness wait. */
+export const waitForRenderedMedia = async (
+  page,
+  { canvas = false, requireImage = !canvas, allImagesSelector, timeout = 20_000 } = {}
+) => {
+  const deadline = Date.now() + timeout;
+  // Playwright returns a promise's false result without repolling; reselect interrupted sources within one deadline.
+  while (Date.now() < deadline) {
+    const result = await page.waitForFunction(
+      ({ canvasRequired, imageRequired, allImagesSelector }) => {
+        const checkFailures = () => {
+          if (window.__browserMediaFailures?.length) {
+            throw new Error(
+              `Media failed to decode (including removed images): ${window.__browserMediaFailures.join(', ')}`
+            );
           }
-          const pixels = surface.getContext('2d')?.getImageData(0, 0, surface.width, surface.height).data;
-          if (!pixels) {
-            return false;
-          }
-          for (let i = 0; i < pixels.length; i += 4) {
-            if (
-              pixels[i + 3] > 0 &&
-              pixels[i + 2] === 128 &&
-              ((pixels[i] === 64 && pixels[i + 1] === 160) || (pixels[i] === 192 && pixels[i + 1] === 80))
-            ) {
-              return true;
-            }
-          }
+        };
+        checkFailures();
+        const visible = (element) => element.checkVisibility() && element.getBoundingClientRect().width > 0;
+        // An owner selector includes its below-fold and hidden images, not just the visible document surface.
+        const selectImages = () =>
+          allImagesSelector ? [...document.querySelectorAll(allImagesSelector)] : [...document.images].filter(visible);
+        const images = selectImages();
+        if (imageRequired && images.length === 0) {
           return false;
-        });
-      return (
-        hasPixels('[data-hotkey-widget-type-id="canvas"] canvas') &&
-        hasPixels('[data-hotkey-widget-type-id="layers"] [data-layer-row-id] canvas')
-      );
-    },
-    { canvasRequired: canvas, imageRequired: requireImage },
-    { timeout }
-  );
-  return page.evaluate(async (canvasRequired) => {
-    const images = [...document.images].filter((image) => image.checkVisibility());
-    await Promise.all(images.map((image) => image.decode()));
-    return {
-      images: images.map((image) => ({
-        url: image.currentSrc,
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-      })),
-      canvasPixelsVerified: canvasRequired,
-    };
-  }, canvas);
+        }
+        if (images.some((image) => !image.complete)) {
+          return false;
+        }
+        const broken = images.find((image) => image.naturalWidth === 0);
+        if (broken) {
+          throw new Error(`Media failed to decode: ${broken.currentSrc || broken.src}`);
+        }
+        const hasPixels = (selector) =>
+          [...document.querySelectorAll(selector)].filter(visible).some((surface) => {
+            if (!surface.width || !surface.height) {
+              return false;
+            }
+            const pixels = surface.getContext('2d')?.getImageData(0, 0, surface.width, surface.height).data;
+            if (!pixels) {
+              return false;
+            }
+            for (let i = 0; i < pixels.length; i += 4) {
+              if (
+                pixels[i + 3] > 0 &&
+                pixels[i + 2] === 128 &&
+                ((pixels[i] === 64 && pixels[i + 1] === 160) || (pixels[i] === 192 && pixels[i + 1] === 80))
+              ) {
+                return true;
+              }
+            }
+            return false;
+          });
+        if (
+          canvasRequired &&
+          !(
+            hasPixels('[data-hotkey-widget-type-id="canvas"] canvas') &&
+            hasPixels('[data-hotkey-widget-type-id="layers"] [data-layer-row-id] canvas')
+          )
+        ) {
+          return false;
+        }
+        const sources = images.map((image) => ({
+          image,
+          src: image.src,
+          currentSrc: image.currentSrc,
+          srcset: image.srcset,
+          sizes: image.sizes,
+        }));
+        const unchanged = ({ image, src, currentSrc, srcset, sizes }) =>
+          image.isConnected &&
+          image.src === src &&
+          image.currentSrc === currentSrc &&
+          image.srcset === srcset &&
+          image.sizes === sizes;
+        return (async () => {
+          try {
+            await Promise.all(images.map((image) => image.decode()));
+          } catch (error) {
+            checkFailures();
+            if (sources.some((source) => !unchanged(source))) {
+              return false;
+            }
+            throw new Error(`Media failed to decode: ${String(error)}`);
+          }
+          checkFailures();
+          const currentImages = selectImages();
+          if (
+            sources.some((source) => !unchanged(source)) ||
+            currentImages.length !== images.length ||
+            currentImages.some((image, index) => image !== images[index])
+          ) {
+            return false;
+          }
+          return {
+            images: images.map((image) => ({
+              url: image.currentSrc,
+              width: image.naturalWidth,
+              height: image.naturalHeight,
+            })),
+            canvasPixelsVerified: canvasRequired,
+          };
+        })();
+      },
+      { canvasRequired: canvas, imageRequired: requireImage, allImagesSelector },
+      { timeout: Math.max(1, deadline - Date.now()) }
+    );
+    try {
+      const media = await result.jsonValue();
+      if (media) {
+        return media;
+      }
+    } finally {
+      await result.dispose();
+    }
+  }
+  throw new Error(`Timeout ${timeout}ms exceeded waiting for rendered media.`);
 };
 
 export const assertRetirement = (samples, bounds) => {

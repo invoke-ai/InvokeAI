@@ -365,10 +365,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               // Cards appear after the library and cover index load; finish even below-fold cover reads before leaving.
               await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
               await page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' }).waitFor();
-              await waitForRenderedMedia(page);
-              await page
-                .locator('main img')
-                .evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
+              await waitForRenderedMedia(page, { allImagesSelector: 'main img' });
               await open();
               await expect(prompt, 'Route exit/re-entry must keep the edit').toHaveValue(marker);
               await prompt.focus();
@@ -430,6 +427,43 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             assert.equal(decoded.images[0].width, 4096);
             assert.equal(decoded.images[0].height, 4096);
             report.largeMediaDecode = 'passed';
+            // Cover readiness includes below-fold owners and bounds a decode that never settles.
+            const smallCover = `data:image/png;base64,${fixturePng(32, 48).toString('base64')}`;
+            const changedCover = `data:image/png;base64,${fixturePng(48, 32).toString('base64')}`;
+            await probe.setContent(
+              `<main><img id="cover" src="${smallCover}"><img id="below-fold" style="margin-top:200vh" src="${smallCover}"></main>`
+            );
+            await probe.evaluate(() => {
+              document.querySelector('#below-fold').decode = () => new Promise(() => {});
+            });
+            await assert.rejects(
+              () => waitForRenderedMedia(probe, { allImagesSelector: 'main img', timeout: 250 }),
+              /Timeout/
+            );
+            await probe.evaluate(() => {
+              delete document.querySelector('#below-fold').decode;
+            });
+            assert.equal((await waitForRenderedMedia(probe, { allImagesSelector: 'main img' })).images.length, 2);
+            report.boundedCoverDecode = 'passed';
+            // Trigger the browser's native decode interruption by changing its source while decode is pending.
+            await probe.evaluate((source) => {
+              const image = document.querySelector('#cover');
+              const decode = image.decode.bind(image);
+              let changed = false;
+              image.decode = () => {
+                const decoded = decode();
+                if (!changed) {
+                  changed = true;
+                  image.src = source;
+                }
+                return decoded;
+              };
+            }, changedCover);
+            const changed = await waitForRenderedMedia(probe, { allImagesSelector: 'main img' });
+            assert.equal(changed.images[0].width, 48);
+            assert.equal(changed.images[0].height, 32);
+            report.changingCoverDecode = 'passed';
+
             await probe.route('**/critical-probe', (route) => route.abort('failed'));
             const failedRequest = probe.waitForEvent('requestfailed');
             await probe.evaluate(() => fetch('/critical-probe').catch(() => {}));
