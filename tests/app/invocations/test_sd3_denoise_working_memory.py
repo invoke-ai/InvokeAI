@@ -43,7 +43,7 @@ def test_a_gguf_transformer_reserves_its_dequant_transient(monkeypatch: pytest.M
     )
     monkeypatch.setattr(SD3DenoiseInvocation, "_prepare_noise_tensor", lambda *_args: torch.zeros(1, 16, 2, 2))
     invocation = SD3DenoiseInvocation.model_construct(
-        transformer=SimpleNamespace(transformer=SimpleNamespace()),
+        transformer=SimpleNamespace(transformer=SimpleNamespace(), loras=[]),
         positive_conditioning=SimpleNamespace(conditioning_name="pos"),
         negative_conditioning=SimpleNamespace(conditioning_name="neg"),
         latents=None,

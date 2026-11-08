@@ -368,14 +368,27 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # This node has no activation estimate, so the cache floors its request at `device_working_mem_gb`, which then
         # stands in for the activations; without sidecar patches the dequantization copy is the whole request. Sidecar
         # patches stay on the device for the whole run, so they come on top of that floor rather than out of it,
-        # with one layer's transient: a layer's base forward frees its dequantized weight before its patches compute
-        # their residual, so the two transients follow each other and the larger one is reserved. Patches merged
-        # into the weights leave nothing resident.
+        # with one layer's transients. For plain LoRA layers those follow each other: the base forward frees its
+        # dequantized weight before `linear_lora_forward` runs, so the larger one is reserved. Any other patch (LoKR,
+        # LoHA, a full layer) goes through `_aggregate_patch_parameters`, which dequantizes the weight again and holds
+        # it beside the full delta it builds, so both are reserved. Patches merged into the weights leave nothing
+        # resident.
         working_mem_bytes: Optional[int] = dequant_bytes or None
         if lora_on_device:
             floor = int(context.config.get().device_working_mem_gb * 2**30)
             lora_bytes = sum(spec[0].calc_size() for spec in lora_patch_specs)
-            working_mem_bytes = floor + lora_bytes + max(_SIDECAR_TRANSIENT_BYTES, dequant_bytes)
+            aggregates_with_weight = any(
+                not isinstance(layer, LoRALayer)
+                for spec in lora_patch_specs
+                for key, layer in spec[0].layers.items()
+                if key.startswith(SD3_LORA_TRANSFORMER_PREFIX)
+            )
+            transient = (
+                _SIDECAR_TRANSIENT_BYTES + dequant_bytes
+                if aggregates_with_weight
+                else max(_SIDECAR_TRANSIENT_BYTES, dequant_bytes)
+            )
+            working_mem_bytes = floor + lora_bytes + transient
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(

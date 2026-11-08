@@ -508,6 +508,55 @@ describe('compileGenerateGraph', () => {
     ]);
   });
 
+  it('routes a GGUF SD3 transformer and its standalone CLIP encoders through the LoRAs that fit its size', () => {
+    const sd3Gguf: MainModelConfig = {
+      base: 'sd-3',
+      format: 'gguf_quantized',
+      key: 'sd3-gguf',
+      name: 'SD3.5 Medium GGUF',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+    const clipG: ComponentModelConfig = { ...clipEmbed, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+    const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
+    const lora = (key: string, variant: string): LoraModelConfig => ({
+      base: 'sd-3',
+      key,
+      name: key,
+      type: 'lora',
+      variant,
+    });
+
+    const graph = compile(sd3Gguf, {
+      clipGEmbedModel: clipG,
+      clipLEmbedModel: clipEmbed,
+      loras: [
+        { isEnabled: true, model: lora('medium-lora', 'sd3_medium'), weight: 0.6 },
+        { isEnabled: true, model: lora('large-lora', 'sd3_large'), weight: 1 },
+      ],
+      t5EncoderModel: t5Encoder,
+      vae: sd3Vae,
+    });
+    const loraLoader = getNodeByType(graph, 'sd3_lora_collection_loader');
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      clip_g_model: { key: 'clip-g' },
+      clip_l_model: { key: 'clip' },
+      t5_encoder_model: { key: 't5' },
+      vae_model: { key: 'sd3-vae' },
+    });
+    for (const field of ['transformer', 'clip_l', 'clip_g']) {
+      expect(getEdge(graph, loraLoader?.id ?? '', field)?.source.node_id).toBe('model_loader');
+    }
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    expect(getEdge(graph, 'pos_cond', 'clip_g')?.source.node_id).toBe(loraLoader?.id);
+    expect(getEdge(graph, 'pos_cond', 't5_encoder')?.source.node_id).toBe('model_loader');
+    // Only the LoRA trained for the GGUF's size reaches the graph.
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: { base: 'sd-3', key: 'medium-lora', name: 'medium-lora', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
   it('builds modern Diffusers-family graphs without separate component overrides', () => {
     expect(compile(sd3Model).nodes.model_loader?.type).toBe('sd3_model_loader');
     expect(compile(flux2Model).nodes.model_loader?.type).toBe('flux2_klein_model_loader');
