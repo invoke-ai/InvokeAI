@@ -239,8 +239,34 @@
         "type": "core_metadata",
         "width": 768,
         "ideogram4_color_palette": [],
+        "ideogram4_guidance_scale": null,
+        "ideogram4_mu": null,
         "ideogram4_sampler_preset": "V4_QUALITY_48",
-        "clip_skip": 0
+        "ideogram4_steps": null,
+        "clip_skip": 0,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              63,
+              250,
+              313,
+              750
+            ],
+            "prompt": "a red kite"
+          },
+          {
+            "bbox": [
+              625,
+              667,
+              1000,
+              1000
+            ],
+            "prompt": "a dog digging in the sand"
+          }
+        ]
       }
     }
   }

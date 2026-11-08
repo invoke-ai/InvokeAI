@@ -5,13 +5,17 @@ inputs:
     description: Directory to install dependencies in
     required: false
     default: invokeai/frontend/webv2
+  node-version-file:
+    description: Node version file relative to the workspace
+    required: false
+    default: .nvmrc
 runs:
   using: 'composite'
   steps:
     - name: setup node 22
       uses: actions/setup-node@v6
       with:
-        node-version-file: '.nvmrc'
+        node-version-file: ${{ inputs.node-version-file }}
 
     - name: setup pnpm
       uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

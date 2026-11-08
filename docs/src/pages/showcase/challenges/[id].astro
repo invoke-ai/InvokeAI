@@ -1,0 +1,222 @@
+---
+// One weekly challenge's winners, at a URL made to be shared: its preview image is the top-placed artwork.
+import ArrowLeft from '@lucide/astro/icons/arrow-left';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ChallengeWinners from '@components/ChallengeWinners.astro';
+
+import { withBase } from '../../../lib/base-path';
+import {
+  CHALLENGES_PATH,
+  adjacentChallenges,
+  challengePath,
+  formatChallengeDates,
+  placeLabel,
+  sortChallenges,
+  winnerAlt,
+} from '../../../lib/challenges.mjs';
+
+export const getStaticPaths = async () => {
+  const challenges = sortChallenges(await getCollection('challenges'));
+  return challenges.map((challenge) => ({
+    params: { id: challenge.id },
+    props: { challenge, ...adjacentChallenges(challenges, challenge.id) },
+  }));
+};
+
+type Props = {
+  challenge: CollectionEntry<'challenges'>;
+  older: CollectionEntry<'challenges'> | undefined;
+  newer: CollectionEntry<'challenges'> | undefined;
+};
+
+const { challenge, older, newer } = Astro.props;
+const { week, theme, brief, startDate, endDate, discordUrl, winners } = challenge.data;
+const base = import.meta.env.BASE_URL;
+/** The challenge's name in the links to the weeks either side: "Week 44: Bioluminescence", or the theme. */
+const linkTitle = ({ data: { week, theme } }: CollectionEntry<'challenges'>) =>
+  week === undefined ? theme : `Week ${week}: ${theme}`;
+
+// The top-placed winner: the schema keeps winners in display order, numbered places first.
+const [first] = winners;
+// A JPEG at the size link previews use (Discord, Open Graph), in place of the site-wide cover image.
+const preview = await getImage({ src: first.image, width: Math.min(first.image.width, 1200), format: 'jpeg' });
+const previewUrl = new URL(preview.src, Astro.site).href;
+const previewAlt = winnerAlt(first, theme);
+// "1st place by Revenant.", or with a title, "1st place: “Tidewater Lantern” by Ana Example."
+const firstCredit = `${placeLabel(first.place)}${first.title ? `: “${first.title}”` : ''} by ${first.artist}.`;
+const description =
+  `Winners of the ${week === undefined ? 'weekly' : `week ${week}`} art challenge on the Invoke Discord, ` +
+  `“${theme}”. ${firstCredit}`;
+const meta = (property: string, content: string) => ({ tag: 'meta' as const, attrs: { property, content } });
+---
+
+<StarlightPage
+  frontmatter={{
+    title: week === undefined ? `${theme}: weekly challenge` : `Week ${week}: ${theme}`,
+    description,
+    template: 'splash',
+    head: [
+      meta('og:image', previewUrl),
+      meta('og:image:width', String(preview.attributes.width)),
+      meta('og:image:height', String(preview.attributes.height)),
+      meta('og:image:alt', previewAlt),
+      { tag: 'meta', attrs: { name: 'twitter:image', content: previewUrl } },
+    ],
+  }}
+>
+  <div class="wide challenge not-content">
+    <div class="intro">
+      {brief && <p class="brief">{brief}</p>}
+      <p class="meta">
+        <span>{week !== undefined && 'Weekly challenge · '}{formatChallengeDates(startDate, endDate)}</span>
+        {
+          discordUrl && (
+            <a href={discordUrl}>
+              Winners on Discord
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
+          )
+        }
+      </p>
+    </div>
+
+    <ChallengeWinners challenge={challenge} eager="podium" />
+
+    <nav class="weeks" aria-label="Other challenges">
+      {
+        older && (
+          <a class="docs-link-card" href={withBase(challengePath(older.id), base)} rel="prev">
+            <span class="label docs-link-card__description">
+              <ArrowLeft class="docs-link-card__icon" size={14} aria-hidden="true" />
+              Previous week
+            </span>
+            <span class="docs-link-card__title">{linkTitle(older)}</span>
+          </a>
+        )
+      }
+      <a class="docs-link-card all" href={withBase(CHALLENGES_PATH, base)}>
+        <span class="label docs-link-card__description">Archive</span>
+        <span class="docs-link-card__title">All challenges</span>
+      </a>
+      {
+        newer && (
+          <a class="docs-link-card" href={withBase(challengePath(newer.id), base)} rel="next">
+            <span class="label docs-link-card__description">
+              Next week
+              <ArrowRight class="docs-link-card__icon" size={14} aria-hidden="true" />
+            </span>
+            <span class="docs-link-card__title">{linkTitle(newer)}</span>
+          </a>
+        )
+      }
+    </nav>
+  </div>
+</StarlightPage>
+
+<style>
+  .wide {
+    --wide-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    width: var(--wide-width);
+    margin-inline: calc((100% - var(--wide-width)) / 2);
+  }
+
+  .challenge {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 44rem;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .brief {
+    color: var(--docs-text-muted);
+    font-size: 1.0625rem;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-sm);
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--docs-accent);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--docs-accent-text);
+      }
+    }
+  }
+
+  /* Previous week, the archive and next week, in that order and in fixed columns, whichever exist. */
+  .weeks {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+
+    > a {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  @media (min-width: 50rem) {
+    .weeks {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    [rel='prev'] {
+      grid-column: 1;
+    }
+
+    .all {
+      grid-column: 2;
+      align-items: center;
+      text-align: center;
+    }
+
+    [rel='next'] {
+      grid-column: 3;
+      align-items: flex-end;
+      text-align: end;
+    }
+  }
+
+  /* The page title spans the wide column too. */
+  :global(main:has(.challenge) .page-heading) {
+    --wide-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    width: var(--wide-width);
+    margin-inline: calc((100% - var(--wide-width)) / 2);
+  }
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+</style>

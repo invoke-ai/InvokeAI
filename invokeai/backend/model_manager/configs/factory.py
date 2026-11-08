@@ -204,10 +204,12 @@ from invokeai.backend.model_manager.configs.textual_inversion import (
 from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_Flux2_Config,
     TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_LTX2_Config,
     TinyAutoencoder_Checkpoint_QwenImage21_Config,
     TinyAutoencoder_Checkpoint_SD1_Config,
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
@@ -536,6 +538,8 @@ AnyModelConfig = Annotated[
         Annotated[
             TinyAutoencoder_Checkpoint_QwenImage21_Config, TinyAutoencoder_Checkpoint_QwenImage21_Config.get_tag()
         ],
+        Annotated[TinyAutoencoder_Checkpoint_Wan_Config, TinyAutoencoder_Checkpoint_Wan_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_LTX2_Config, TinyAutoencoder_Checkpoint_LTX2_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -782,6 +786,33 @@ class ModelConfigFactory:
             )
 
     @staticmethod
+    def _gguf_file_refusal(mod: ModelOnDisk) -> InvalidMatchError | None:
+        """The reason a `.gguf` file cannot be installed whatever model it holds, or None.
+
+        Two files no loader reads: a part of a llama.cpp multi-part GGUF (gguf-py writes every key,
+        `general.architecture` included, into part 1 only and gives every part `split.*` keys), and a file whose
+        header cannot be parsed. Neither has an architecture key to match on, so without this they would
+        register as Unknown models, and part 1 would pass any family check that looks at metadata alone.
+        """
+        if mod.path.suffix != ".gguf" or not mod.path.is_file():
+            return None
+        if (error := mod.metadata_read_error()) is not None:
+            return InvalidMatchError(
+                f"{mod.path.name} could not be read as a GGUF file ({error}). If the file is incomplete or corrupt, "
+                "download it again."
+            )
+        metadata = mod.metadata()
+        count = metadata.get("split.count")
+        if isinstance(count, int) and count > 1:
+            part = metadata.get("split.no")
+            which = f"part {part + 1} of {count}" if isinstance(part, int) else f"one of {count} parts"
+            return InvalidMatchError(
+                f"{mod.path.name} is {which} of a multi-part GGUF, which cannot be loaded. Join the parts into "
+                "one file with llama.cpp's `llama-gguf-split --merge`, then install the joined file."
+            )
+        return None
+
+    @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
         model = AnyModelConfigValidator.validate_python(fields)
@@ -972,6 +1003,10 @@ class ModelConfigFactory:
         # Perform basic sanity checks before attempting any config matching
         # This rejects obviously non-model paths early, saving time
         ModelConfigFactory._validate_path_looks_like_model(mod.path)
+
+        # A property of the file, not of any model family: no candidate runs on a file nothing can load.
+        if refusal := ModelConfigFactory._gguf_file_refusal(mod):
+            return ModelClassificationResult(config=None, details={"gguf_file": refusal})
 
         # We will always need these fields to build any model config.
         fields = ModelConfigFactory.build_common_fields(mod, override_fields)
