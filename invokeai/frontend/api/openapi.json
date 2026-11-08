@@ -11581,6 +11581,52 @@
         }
       }
     },
+    "/api/v1/gallery/usage": {
+      "post": {
+        "tags": ["gallery"],
+        "summary": "Get Gallery Media Usage",
+        "description": "Reports what still uses media before it is deleted: the caller's saved documents and active queue work by\nname, other accounts' as counts. Deleting stays a separate request; this only reads.",
+        "operationId": "get_gallery_media_usage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMediaUsageRequest",
+                "description": "The media to check"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMediaUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/app/gallery/maintenance/preview": {
       "post": {
         "tags": ["gallery_maintenance"],
@@ -45456,6 +45502,263 @@
           "thumbnails_regenerated"
         ],
         "title": "GalleryMaintenanceResult"
+      },
+      "GalleryMediaUsage": {
+        "properties": {
+          "checked_image_count": {
+            "type": "integer",
+            "title": "Checked Image Count",
+            "description": "Images checked: the requested ones the caller may delete, or the images the board's deletion would delete."
+          },
+          "checked_video_count": {
+            "type": "integer",
+            "title": "Checked Video Count",
+            "description": "Videos checked: the requested ones the caller may delete, or the videos the board's deletion would delete."
+          },
+          "in_use_image_count": {
+            "type": "integer",
+            "title": "In Use Image Count",
+            "description": "Distinct checked images that anything below names."
+          },
+          "in_use_video_count": {
+            "type": "integer",
+            "title": "In Use Video Count",
+            "description": "Distinct checked videos that anything below names."
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/GalleryMediaUsageDocument"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "The caller's own documents naming checked media, by kind, then name, then id; at most 100."
+          },
+          "documents_total": {
+            "type": "integer",
+            "title": "Documents Total",
+            "description": "How many of the caller's documents name checked media."
+          },
+          "queue": {
+            "$ref": "#/components/schemas/GalleryMediaUsageQueue",
+            "description": "The caller's own active queue work naming checked media."
+          },
+          "other_accounts": {
+            "$ref": "#/components/schemas/GalleryMediaUsageOthers",
+            "description": "Other accounts' documents and queue work naming checked media, as counts only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_image_count",
+          "checked_video_count",
+          "in_use_image_count",
+          "in_use_video_count",
+          "documents",
+          "documents_total",
+          "queue",
+          "other_accounts"
+        ],
+        "title": "GalleryMediaUsage",
+        "description": "What still uses media a deletion would remove. Saved documents count conservatively: anything they name,\nhistory included."
+      },
+      "GalleryMediaUsageDocument": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["project", "workflow", "legacy_editor", "quarantined_project"],
+            "title": "Kind",
+            "description": "'project': a project's content and the caller's own workspace in it. 'workflow': a library workflow. 'legacy_editor': the legacy editor's saved state, all of it as one entry. 'quarantined_project': a project kept for repair."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The project or workflow id; 'legacy_editor' for the legacy editor's state."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The document's name; null for the legacy editor or a missing document."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images the document names, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos the document names, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images the document names, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos the document names, past the list's cap too."
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "For a project: its content revision when the names were read, as the project read reports it (`revision`). Null for other kinds, and for a project the caller does not own."
+          },
+          "workspace_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Revision",
+            "description": "For a project: the caller's workspace revision when the names were read, as the project read reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "image_names",
+          "video_names",
+          "image_count",
+          "video_count",
+          "revision",
+          "workspace_revision"
+        ],
+        "title": "GalleryMediaUsageDocument",
+        "description": "One of the caller's saved documents that names checked media."
+      },
+      "GalleryMediaUsageOthers": {
+        "properties": {
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count",
+            "description": "Other accounts' documents naming checked media."
+          },
+          "queue_item_count": {
+            "type": "integer",
+            "title": "Queue Item Count",
+            "description": "Other accounts' active queue items naming checked media."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "Distinct checked images other accounts' documents or queue work name."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "Distinct checked videos other accounts' documents or queue work name."
+          }
+        },
+        "type": "object",
+        "required": ["document_count", "queue_item_count", "image_count", "video_count"],
+        "title": "GalleryMediaUsageOthers",
+        "description": "Other accounts' documents and queue work that name checked media, without identifying them."
+      },
+      "GalleryMediaUsageQueue": {
+        "properties": {
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "The caller's active queue items (pending, in progress or waiting, and the completed children of an active root) whose sessions name checked media."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images those items name, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos those items name, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images those items name, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos those items name, past the list's cap too."
+          }
+        },
+        "type": "object",
+        "required": ["item_count", "image_names", "video_names", "image_count", "video_count"],
+        "title": "GalleryMediaUsageQueue",
+        "description": "The caller's active queue work that names checked media."
+      },
+      "GalleryMediaUsageRequest": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "Images to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /images/delete` skips them."
+          },
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "Videos to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /videos/delete` skips them."
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "Check the images and videos `DELETE /boards/{board_id}?include_images=true` would delete, under the same access rules. Not combined with names."
+          }
+        },
+        "type": "object",
+        "title": "GalleryMediaUsageRequest",
+        "description": "The media to check: named images and videos, or every item on one board."
       },
       "GeminiImageGenerationInvocation": {
         "category": "image",
