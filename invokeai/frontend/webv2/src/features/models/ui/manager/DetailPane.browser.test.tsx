@@ -194,7 +194,7 @@ describe('models DetailPane for a model installed before the probe recorded a fa
 
     const cancelled = await openConfirm();
     expect(cancelled.textContent).toContain('models.reidentifyConfirmBody');
-    await act(() => userEvent.click(dialogButton(cancelled, 'Cancel')));
+    await act(() => userEvent.click(dialogButton(cancelled, 'common.cancel')));
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
     expect(api.reidentifyModel).not.toHaveBeenCalled();
     // Cancel returns focus to the button that opened the dialog.

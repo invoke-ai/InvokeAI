@@ -11,10 +11,14 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
+  getDynamicPromptsConfig,
+  getDynamicPromptsSettingsPatch,
+  getGenerateValuesRevertPatch,
   getModelDefaultVae,
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -37,6 +41,7 @@ export {
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeDynamicPromptsSettings,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
@@ -53,9 +58,9 @@ export {
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
+  getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
   getSchedulerOptions,
@@ -63,11 +68,24 @@ export {
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isKnownScheduler,
+  isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
+  type GenerateModelSwitchChange,
+  type GenerateModelSwitchChangeKind,
+  type GenerateModelSwitchSubject,
 } from './core/baseGenerationPolicies';
+export {
+  describeGenerationIssue,
+  describeGenerationIssueFix,
+  getGenerationIssueFixPatch,
+  type GenerateSectionId,
+  type GenerationIssue,
+  type GenerationIssueFix,
+} from './core/generationIssues';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
@@ -91,15 +109,21 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isKrea2Qwen3VlEncoder,
+  isQwen3Vl4bEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
+export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
@@ -119,10 +143,12 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
-  hasDynamicPromptSyntax,
+  expandsDynamicPrompts,
   isDynamicPromptsSeedBehaviour,
   planGenerateSubmission,
   sanitizeDynamicPromptsConfig,
@@ -137,6 +163,7 @@ export {
   getPromptHistoryItemFromGenerateSettings,
   MAX_PROMPT_HISTORY,
   removePromptHistoryItem,
+  restorePromptHistoryItems,
 } from './core/promptHistory';
 export {
   applyProjectPromptDraft,

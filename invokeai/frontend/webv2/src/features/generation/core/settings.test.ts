@@ -56,6 +56,52 @@ const legacyStoredValues = {
 seedArchitectureCapabilities();
 
 describe('normalizeGenerateSettings', () => {
+  it.each([null, 0, 0.4])('preserves saved HiDiffusion ratio values (%s)', (ratio) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio })
+    ).toMatchObject({ hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio });
+  });
+
+  it.each([
+    [null, 0.2, 0, 0.2],
+    [0.4, null, 0.4, 0],
+  ])('normalizes mixed ratios to one manual mode', (t1, t2, expectedT1, expectedT2) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 })
+    ).toMatchObject({ hiDiffusionT1Ratio: expectedT1, hiDiffusionT2Ratio: expectedT2 });
+  });
+
+  it('round-trips remembered manual ratios without changing automatic generation settings', () => {
+    const saved = {
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    };
+    const normalized = normalizeGenerateSettings(JSON.parse(JSON.stringify(saved)));
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    });
+    expect(isGenerateSettings(normalized)).toBe(true);
+  });
+
+  it('normalizes malformed remembered positions without activating manual ratios', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 99, t2: Number.NaN },
+    });
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 1, t2: 0 },
+    });
+    expect(isGenerateSettings({ ...normalized, hiDiffusionManualRatios: null })).toBe(false);
+  });
+
   it('reads the seed mode saved before modes existed from the random toggle', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)?.seedMode).toBe('fixed');
     expect(normalizeGenerateSettings({ ...legacyStoredValues, shouldRandomizeSeed: true })?.seedMode).toBe('random');
@@ -270,8 +316,8 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.negativePromptEnabled).toBe(true);
     expect(normalized?.negativePromptHeightPx).toBe(56);
@@ -314,8 +360,8 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.vae).toBeNull();
     expect(normalized?.vaePrecision).toBe('fp32');
@@ -684,6 +730,31 @@ describe('LoRA settings helpers', () => {
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);
   });
+
+  it('keeps SD 3 Large LoRAs off Medium models, and lets records without a variant through', () => {
+    const medium: MainModelConfig = {
+      base: 'sd-3',
+      key: 'sd35m',
+      name: 'SD 3.5 Medium',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, medium)).toBe(false);
+    // Installed before the variant existed: the denoise node checks those at run time.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
+      true
+    );
+    // The API sends null, not undefined, for a record without one.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
+    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
+  });
 });
 
 describe('model defaults', () => {
@@ -729,6 +800,27 @@ describe('dimension helpers', () => {
     expect(wide.width % 8).toBe(0);
     expect(wide.height % 8).toBe(0);
     expect(wide.width / wide.height).toBeCloseTo(16 / 9, 1);
+  });
+
+  it('keeps the ratio at the size limits, scaling both sides instead of clamping one', () => {
+    // 6144² at 16:9 is 8192×4608; halved to fit 4096.
+    expect(calculateNewSize(16 / 9, 6144 * 6144)).toEqual({ height: 2304, width: 4096 });
+    // 2048² at 8:1 is 5792.6×724.1; scaled to fit 4096 wide, the height is exactly 512.
+    expect(calculateNewSize(8, 2048 * 2048)).toEqual({ height: 512, width: 4096 });
+    // 32² is below the 64px minimum on both sides.
+    expect(calculateNewSize(1, 32 * 32)).toEqual({ height: 64, width: 64 });
+    // 48² at 4:1 is 96×24; scaled so the short side is 64, then 256×64.
+    expect(calculateNewSize(4, 48 * 48)).toEqual({ height: 64, width: 256 });
+    // 64:1 is the widest ratio both limits allow: 4096×64 exactly.
+    expect(calculateNewSize(64, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+  });
+
+  it('caps the long side and holds the short side at the minimum for a ratio past 64:1', () => {
+    // 2000:1 at 1024² would be about 45795×23; no in-range size has that ratio, so the result is the closest corner.
+    expect(calculateNewSize(2000, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+    expect(calculateNewSize(1 / 2000, 1024 * 1024)).toEqual({ height: 4096, width: 64 });
+    // A tiny area goes up the same way: the short side reaches 64 and the long side stops at 4096.
+    expect(calculateNewSize(2000, 16 * 16)).toEqual({ height: 64, width: 4096 });
   });
 
   it('moves a reference image one step through the stack, and no-ops at the ends', () => {

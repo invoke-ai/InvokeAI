@@ -1,14 +1,19 @@
 export {
   ImageContextMenu,
-  getGalleryCanvasImportMenuItems,
   getImageContextMenuImages,
-  getImageContextMenuRecallRequestKey,
   type ImageContextMenuTarget,
+  type ImageContextMenuVariant,
 } from './ImageContextMenu';
+export {
+  GALLERY_CANVAS_IMPORT_DESTINATIONS,
+  ImageContinueGroup,
+  ImageUseGroups,
+  VideoUseGroups,
+} from './ImageItemMenuGroups';
+export { useImageRecallCapabilities } from './useImageRecallCapabilities';
 export {
   buildImageRecallSettings,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
-  getImageRecallCapabilities,
   getImageRecallMessage,
   getImageRecallTitle,
   type ImageRecallCapabilities,
@@ -16,9 +21,11 @@ export {
   type ImageRecallResult,
 } from './imageRecall';
 export { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+export { readRecordedModelRef } from './recordedModel';
 export {
   appendReferenceVideo,
   applyVideoRecallMetadata,
+  executeVideoRecall,
   getCurrentVideoValues,
   placeConditioningClip,
   placeInitialVideo,

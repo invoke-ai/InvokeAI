@@ -1,6 +1,6 @@
 """FLUX.2 [dev] model loader invocation.
 
-Loads a FLUX.2 [dev] transformer with its Mistral Small 3.1 text encoder and the
+Loads a FLUX.2 [dev] transformer with its Mistral Small 3.2 text encoder and the
 shared FLUX.2 32-channel VAE.
 """
 
@@ -59,7 +59,7 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
     """Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.
 
     FLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses
-    Mistral Small 3.1 (24B) as its sole text encoder, sharing the 32-channel
+    Mistral Small 3.2 (24B) as its sole text encoder, sharing the 32-channel
     AutoencoderKLFlux2 VAE with FLUX.2 Klein.
 
     When the transformer is a Diffusers-format checkpoint, both VAE and Mistral
@@ -159,7 +159,7 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 "No Mistral encoder source provided. Single-file / GGUF transformers require a separate "
                 "text encoder. Options:\n"
-                "  1. Set 'Mistral Encoder' to a standalone Mistral Small 3.1 text encoder model\n"
+                "  1. Set 'Mistral Encoder' to a standalone Mistral Small 3.2 text encoder model\n"
                 "  2. Set 'Mistral Source' to a Diffusers FLUX.2 [dev] model to extract the encoder from"
             )
 
@@ -182,10 +182,9 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
         variant-filtered in the workflow editor, so the *encoder* path is where variant gating
         belongs — see ``_validate_encoder_source``.
 
-        Note the [dev] linear UI is stricter than this: ``buildFLUXGraph`` sources from dev-only
-        pipelines and readiness gates on one, so the Klein-pipeline-as-VAE-source case is reachable
-        through the workflow editor only. (The Klein loader's linear UI *does* fall back to any
-        FLUX.2 diffusers pipeline for the VAE.)
+        Generate follows the same rule: with a standalone Mistral encoder it takes the VAE from any
+        FLUX.2 Diffusers pipeline, Klein ones included, and it never offers an SDNQ pipeline, which
+        this check rejects.
         """
         config = context.models.get_config(model)
         if config.format != ModelFormat.Diffusers:

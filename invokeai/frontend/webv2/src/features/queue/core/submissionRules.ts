@@ -37,3 +37,22 @@ export const isBackendSubmittableSourceId = (sourceId: QueueSourceId): boolean =
  */
 export const shouldSubmitPendingQueueItem = (queueItem: QueueItem): boolean =>
   queueItem.status === 'pending' && isBackendSubmittableSourceId(queueItem.snapshot.sourceId);
+
+/**
+ * The longest failure message a submission retry keeps. A 5xx without a JSON body is the whole response (an HTML page,
+ * a traceback), and the retry is written to state and recovery storage on every attempt. The final failure shows the
+ * message as the run's error, so it keeps the leading text rather than one line.
+ */
+const MAX_SUBMISSION_RETRY_MESSAGE_LENGTH = 500;
+
+/**
+ * The message cut to MAX_SUBMISSION_RETRY_MESSAGE_LENGTH, ending with an ellipsis when cut. The cut never keeps half
+ * of a surrogate pair.
+ */
+export const boundSubmissionRetryMessage = (message: string): string => {
+  if (message.length <= MAX_SUBMISSION_RETRY_MESSAGE_LENGTH) {
+    return message;
+  }
+  const kept = message.slice(0, MAX_SUBMISSION_RETRY_MESSAGE_LENGTH - 1);
+  return `${/[\uD800-\uDBFF]$/.test(kept) ? kept.slice(0, -1) : kept}…`;
+};

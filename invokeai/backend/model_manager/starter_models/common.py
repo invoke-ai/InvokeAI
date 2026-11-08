@@ -6,6 +6,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
+    Qwen3VLVariantType,
 )
 
 TINY_AUTOENCODER_NOTE = (
@@ -304,7 +305,7 @@ flux2_dev_comfy_mistral_fp8 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
-    description="Comfy-Org FP8 of BFL's 30-layer cow-mistral3-small. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
+    description="Comfy-Org FP8 of the 30-layer cow build of Mistral Small 3.2. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -312,7 +313,7 @@ flux2_dev_comfy_mistral_bf16 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
-    description="Comfy-Org BF16 of BFL's 30-layer cow-mistral3-small. Reference precision; embeds Tekken tokenizer. ~35.6GB",
+    description="Comfy-Org BF16 of the 30-layer cow build of Mistral Small 3.2. Reference precision; embeds Tekken tokenizer. ~35.6GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -320,17 +321,18 @@ flux2_dev_comfy_mistral_fp4 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
-    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
+    description="Comfy-Org FP4-mixed of the 30-layer cow build of Mistral Small 3.2; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
     type=ModelType.MistralEncoder,
 )
 
-# gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
+# gguf-org cow GGUFs: the 30-layer cow build in a GGUF container, with transformers tensor names and
+# order under architecture `cow` rather than llama.cpp's conversion; they embed Tekken too.
 # Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
 flux2_dev_cow_mistral_q4 = StarterModel(
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
-    description="cow-mistral3-small Q4_0 — 30-layer cow distillation BFL trained against. ~11.6GB",
+    description="cow-mistral3-small Q4_0 — the first 30 layers of Mistral Small 3, all FLUX.2 [dev] reads. ~11.6GB",
     type=ModelType.MistralEncoder,
     format=ModelFormat.GGUFQuantized,
 )
@@ -379,6 +381,17 @@ z_image_qwen3_encoder_fp4 = StarterModel(
     type=ModelType.Qwen3Encoder,
 )
 
+# The same community repack and commit as the FLUX.2 Klein Qwen3 8B int8 encoder, pinned for the same reason.
+z_image_qwen3_encoder_int8 = StarterModel(
+    name="Z-Image Qwen3 Text Encoder (int8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/text_encoders/qwen_3_4b_int8_convrot.safetensors",
+    description="Community int8_convrot Qwen3 4B text encoder for Z-Image, from supermind's repack. Its int8 "
+    "projections stay int8, about 4.4GB once loaded rather than the ~8GB of the full-precision encoder; int8 Compute "
+    "can run them on NVIDIA int8 tensor cores. ~4.4GB download",
+    type=ModelType.Qwen3Encoder,
+)
+
 # region Krea-2
 # Standalone Qwen3-VL text encoder used by Krea-2 (distinct from the Qwen2.5-VL encoder above). Pair
 # with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE
@@ -387,8 +400,8 @@ qwen3_vl_encoder_4b = StarterModel(
     name="Qwen3-VL 4B Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen3-VL-4B-Instruct",
-    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
-    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2 and FLUX.3, in HuggingFace folder "
+    "layout (includes tokenizer). Use with single-file / GGUF Krea-2 and FLUX.3 transformers. (~8GB)",
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.Qwen3VLEncoder,
 )
@@ -402,6 +415,112 @@ qwen3_vl_encoder_8b = StarterModel(
     "on. Distinct from the 4B encoder Krea-2 uses; the two are not interchangeable. ~9.9GB",
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.Checkpoint,
+)
+
+# More Qwen3-VL encoder builds, pinned to commits. The 4B is what Krea-2 and FLUX.3 condition on, the 8B what Ideogram 4
+# and Qwen-Image-2.1 condition on; the two are not interchangeable. The GGUF files hold the language tower only (the
+# vision tower lives in a separate mmproj file that is not accepted), so they encode text but cannot read Krea-2 edit
+# reference images.
+_QWEN3_VL_KREA2 = (
+    "https://huggingface.co/Comfy-Org/Krea-2/resolve/588feaf955b08b9ac4723eeb751752ab045dba71/text_encoders"
+)
+_QWEN3_VL_4B_GGUF = (
+    "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/1cd86afb9a95c410a6038ab3b40d8b578c892266"
+)
+_QWEN3_VL_8B_GGUF = (
+    "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/f982a07559d4a2f6c8744d840bf6fccab30eea96"
+)
+_QWEN3_VL_4B_USE = (
+    "the encoder Krea-2 and FLUX.3 condition on. Ideogram 4 and Qwen-Image-2.1 use the 8B encoder; the two are not "
+    "interchangeable."
+)
+_QWEN3_VL_8B_USE = (
+    "the encoder Ideogram 4 and Qwen-Image-2.1 condition on. Krea-2 and FLUX.3 use the 4B encoder; the two are not "
+    "interchangeable."
+)
+_QWEN3_VL_GGUF_NOTE = (
+    "The GGUF holds the language tower only, so it encodes text and cannot read Krea-2 edit reference images; use a "
+    "safetensors encoder for those."
+)
+
+qwen3_vl_encoder_4b_bf16 = StarterModel(
+    name="Qwen3-VL 4B Encoder (bf16)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_bf16.safetensors",
+    description=f"Qwen3-VL 4B text encoder in Comfy-Org's bf16 single file, {_QWEN3_VL_4B_USE} ~8.9GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+    variant=Qwen3VLVariantType.Qwen3VL_4B,
+)
+
+qwen3_vl_encoder_4b_fp8 = StarterModel(
+    name="Qwen3-VL 4B Encoder (fp8)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_fp8_scaled.safetensors",
+    description=f"Qwen3-VL 4B text encoder in Comfy-Org's scaled fp8 single file, {_QWEN3_VL_4B_USE} ~5.2GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+    variant=Qwen3VLVariantType.Qwen3VL_4B,
+)
+
+qwen3_vl_encoder_4b_int8 = StarterModel(
+    name="Qwen3-VL 4B Encoder (int8)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_int8_convrot.safetensors",
+    description=f"Qwen3-VL 4B text encoder in Comfy-Org's int8_convrot single file, {_QWEN3_VL_4B_USE} ~4.9GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+    variant=Qwen3VLVariantType.Qwen3VL_4B,
+)
+
+qwen3_vl_encoder_4b_gguf_q4_k_m = StarterModel(
+    name="Qwen3-VL 4B Encoder (Q4_K_M GGUF)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_4B_GGUF}/Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+    description=f"Qwen3-VL 4B text encoder quantized to GGUF Q4_K_M, {_QWEN3_VL_4B_USE} {_QWEN3_VL_GGUF_NOTE} ~2.5GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.GGUFQuantized,
+    variant=Qwen3VLVariantType.Qwen3VL_4B,
+)
+
+qwen3_vl_encoder_4b_gguf_q8_0 = StarterModel(
+    name="Qwen3-VL 4B Encoder (Q8_0 GGUF)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_4B_GGUF}/Qwen3VL-4B-Instruct-Q8_0.gguf",
+    description=f"Qwen3-VL 4B text encoder quantized to GGUF Q8_0, {_QWEN3_VL_4B_USE} {_QWEN3_VL_GGUF_NOTE} ~4.3GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.GGUFQuantized,
+    variant=Qwen3VLVariantType.Qwen3VL_4B,
+)
+
+qwen3_vl_encoder_8b_nvfp4 = StarterModel(
+    name="Qwen3-VL 8B Encoder (NVFP4)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d/text_encoders/qwen3vl_8b_nvfp4.safetensors",
+    description=f"Qwen3-VL 8B text encoder in Comfy-Org's nvfp4 single file, {_QWEN3_VL_8B_USE} ~6.3GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+    variant=Qwen3VLVariantType.Qwen3VL_8B,
+)
+
+qwen3_vl_encoder_8b_gguf_q4_k_m = StarterModel(
+    name="Qwen3-VL 8B Encoder (Q4_K_M GGUF)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_8B_GGUF}/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+    description=f"Qwen3-VL 8B text encoder quantized to GGUF Q4_K_M, {_QWEN3_VL_8B_USE} {_QWEN3_VL_GGUF_NOTE} ~5.0GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.GGUFQuantized,
+    variant=Qwen3VLVariantType.Qwen3VL_8B,
+)
+
+qwen3_vl_encoder_8b_gguf_q8_0 = StarterModel(
+    name="Qwen3-VL 8B Encoder (Q8_0 GGUF)",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_8B_GGUF}/Qwen3VL-8B-Instruct-Q8_0.gguf",
+    description=f"Qwen3-VL 8B text encoder quantized to GGUF Q8_0, {_QWEN3_VL_8B_USE} {_QWEN3_VL_GGUF_NOTE} ~8.7GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.GGUFQuantized,
+    variant=Qwen3VLVariantType.Qwen3VL_8B,
 )
 
 # region Wan 2.2 (local)

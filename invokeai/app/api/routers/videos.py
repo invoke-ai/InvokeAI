@@ -44,6 +44,7 @@ from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidato
 from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin, is_gallery_category
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException
 from invokeai.app.services.video_records.video_records_common import (
     VideoNamesResult,
     VideoRecordChanges,
@@ -760,7 +761,8 @@ def get_video_metadata(
     _assert_video_read_access(video_name, current_user)
     try:
         return ApiDependencies.invoker.services.videos.get_metadata(video_name)
-    except Exception:
+    except VideoRecordNotFoundException:
+        # See get_image_metadata: anything else, invalid stored metadata included, is a 500.
         raise HTTPException(status_code=404)
 
 
@@ -777,7 +779,7 @@ def get_video_workflow(
         workflow = ApiDependencies.invoker.services.videos.get_workflow(video_name)
         graph = ApiDependencies.invoker.services.videos.get_graph(video_name)
         return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
-    except Exception:
+    except (VideoRecordNotFoundException, VideoFileNotFoundException):
         raise HTTPException(status_code=404)
 
 

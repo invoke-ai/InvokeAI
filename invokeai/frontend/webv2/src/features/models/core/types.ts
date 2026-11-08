@@ -13,6 +13,7 @@ export type ModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
@@ -178,7 +179,6 @@ export interface ModelConfig {
   format: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -212,7 +212,6 @@ export interface ModelRecordChanges {
   format?: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -305,6 +304,7 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  previous_sources?: string[];
 }
 
 export interface StarterModelBundle {

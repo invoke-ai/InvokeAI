@@ -16,6 +16,10 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import has_qwen3_5_linear_attention
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
+from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
+from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
+from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
+from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -93,6 +97,27 @@ def _variant_from_checkpoint_shape(state_dict: dict[str | int, Any]) -> Qwen3VLV
             f"a Qwen3-VL encoder checkpoint must contain language-model layer {_QWEN3_VL_NUM_HIDDEN_LAYERS - 1}"
         )
     return variant
+
+
+def _raise_for_undecodable_nvfp4_layers(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+    """Refuse at install time an nvfp4 layer the loader would refuse at the first generation.
+
+    The loader's own check, over the tensors the loader reads -- so a visual tower or LM head it drops cannot
+    get a file refused. It turns away AWQ builds, packed weights without nvfp4's per-tensor global scale,
+    malformed layers, and layers neither a ComfyUI ``.comfy_quant`` marker nor the safetensors header names as
+    nvfp4 (ModelOpt-style exports among them). Identification holds meta tensors, whose markers have no bytes to
+    parse, so those are read from the file -- whenever a kept key is a marker, which is when the check consults
+    them -- and passed beside the header rather than over it: as at load, either one naming a layer nvfp4 is
+    enough.
+    """
+    consumed = drop_qwen3vl_unloaded_keys(state_dict)
+    markers = None
+    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in consumed):
+        markers = read_comfy_quant_markers(mod.path)
+    try:
+        find_nvfp4_layers(consumed, header_layers=parse_quantization_metadata(mod.metadata()), markers=markers)
+    except ValueError as e:
+        raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {e}") from e
 
 
 class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
@@ -215,6 +240,9 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _is_qwen3_vl_encoder_state_dict(state_dict):
             raise NotAMatchError("state dict does not look like a single-file Qwen3-VL encoder")
+        # Ahead of the variant, whose width is read off the embedding: an undecodable repack that packs the
+        # embedding too would fail there instead, and register as an unknown model with the reason only in the log.
+        _raise_for_undecodable_nvfp4_layers(mod, state_dict)
         variant = override_fields.pop("variant", None) or _variant_from_checkpoint_shape(state_dict)
 
         return cls(**override_fields, variant=variant)
@@ -249,11 +277,9 @@ def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
 def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVariantType:
     """Derive the variant from the tensors, and reject a file whose tensors are incomplete.
 
-    Deliberately not taken from the ``embedding_length``/``block_count`` metadata, though both are
-    present. A llama.cpp multi-part quant (``...-00002-of-00003.gguf``, routine for the larger 8B
-    quants) and an interrupted download both carry a complete KV block and only some of the tensors.
-    Matching on metadata alone would install such a file, offer it in the encoder picker, and fail
-    at the user's first generation rather than at install time.
+    Deliberately not taken from the ``embedding_length``/``block_count`` metadata: a file can carry a
+    complete KV block and only some of the tensors. Matching on metadata alone would install such a file,
+    offer it in the encoder picker, and fail at the user's first generation rather than at install time.
 
     Raises ``InvalidMatchError``, not ``NotAMatchError``: the caller runs this only after the
     architecture metadata identified the file as a Qwen3-VL encoder, so "recognised and unusable" is
@@ -277,9 +303,7 @@ def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVa
     if not any(isinstance(key, str) and key.startswith(f"blk.{last_layer}.") for key in state_dict):
         raise InvalidMatchError(
             f"this Qwen3-VL encoder GGUF is incomplete: it carries no 'blk.{last_layer}.*' tensors, but a "
-            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Multi-part quants "
-            "('...-00002-of-00003.gguf') must be joined before installing, and an interrupted download "
-            "must be re-fetched."
+            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Re-fetch the file."
         )
     return variant
 
@@ -318,7 +342,7 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         if mod.path.suffix.lower() != ".gguf":
             raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
 
-        # `mod.metadata()` reads and caches every GGUF string field, and identification probes many
+        # `mod.metadata()` reads and caches every scalar GGUF field, and identification probes many
         # configs against the same ModelOnDisk -- so this costs one shared read rather than a second
         # mmap plus the full GC that closing a reader forces.
         architecture = mod.metadata().get("general.architecture")
@@ -366,6 +390,7 @@ class Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Config_
     base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
     type: Literal[ModelType.Qwen3VLEncoder] = Field(default=ModelType.Qwen3VLEncoder)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

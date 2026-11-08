@@ -18,8 +18,10 @@ import {
 import { publishLayerPanelSelection } from '@workbench/layerPanelState';
 import {
   CANVAS_HISTORY_HOTKEYS,
+  CANVAS_MERGE_DOWN_HOTKEY,
   executeCanvasToolCommand,
   isCanvasToolCommand,
+  mergeSelectedLayerDown,
   type CanvasToolCommandContext,
   type HotkeyTableEntry,
 } from '@workbench/widgets/canvas/canvasToolCommands';
@@ -36,13 +38,12 @@ import {
   removeFromGroup,
   ungroupLayers,
 } from '@workbench/widgets/layers/layerGroupCommands';
-import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 
 /** Keys that act only while the Canvas itself holds focus; rows and fields own them elsewhere. */
 export const CANVAS_ONLY_HOTKEYS = [
   ...CANVAS_HISTORY_HOTKEYS,
-  // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
-  // then intercepted to cycle staging slots while any slot exists.
+  // With several results staged or generating `alt+[` / `alt+]` step through them; otherwise they walk the layers.
+  // Bare arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
   ['canvas.prevEntity', 'widgets.canvas.commands.previousEntity', ['alt+[']],
   ['canvas.nextEntity', 'widgets.canvas.commands.nextEntity', ['alt+]']],
   ['canvas.quickSwitch', 'widgets.canvas.commands.quickSwitch', ['q']],
@@ -69,7 +70,7 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
-  ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']],
+  CANVAS_MERGE_DOWN_HOTKEY,
   ['canvas.layerForward', 'widgets.canvas.commands.layerForward', ['mod+]']],
   ['canvas.layerBackward', 'widgets.canvas.commands.layerBackward', ['mod+[']],
   ['canvas.layerToFront', 'widgets.canvas.commands.layerToFront', ['mod+shift+]']],
@@ -140,10 +141,11 @@ const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEn
 export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'engine' | 'selectedLayerId'> {
   readonly document: CanvasDocumentContractV3;
   readonly engine: CanvasEngine | null;
-  /** Any staging slot exists, so left/right cycle candidates instead of nudging. */
-  readonly hasStagingSlots: boolean;
-  /** A staged candidate is selected, so Delete discards it instead of touching layers. */
-  readonly hasSelectedStagedCandidate: boolean;
+  /**
+   * More than one staging slot exists, so alt+[ / alt+] step through results (a placeholder shows its progress) instead
+   * of layers. With a single slot there is nothing to step to, and they walk the layers.
+   */
+  readonly hasMultipleStagingSlots: boolean;
   readonly selectedLayerIds: readonly string[];
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
@@ -158,12 +160,9 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
 }
 
 /**
- * Routes one canvas command id to its effect.
- *
- * Ordering is load-bearing and reads top-down as a precedence list: staging
- * cycling and staged-candidate discard win over layer commands, companion keys
- * apply their own lock rule, the interaction lock then blocks everything else,
- * and only after those do nudge, reorder, and the per-command table apply.
+ * Routes one canvas command id to its effect. Staged results never lock the canvas: only alt+[ / alt+] change
+ * meaning while several results are staged or generating (they step through them); every other key edits the
+ * document as usual.
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
@@ -173,27 +172,13 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   const selectedLayer = selected && !isGroupNode(selected.node) ? selected.node : undefined;
   const selectedFrozen = !!selected && (selected.ancestorsLocked || selected.node.isLocked);
 
-  if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nudgeLeft') && ctx.hasStagingSlots) {
-    dispatch({ direction: -1, type: 'cycleStagedImage' });
-    return;
-  }
-
-  if ((commandId === 'canvas.nextEntity' || commandId === 'canvas.nudgeRight') && ctx.hasStagingSlots) {
-    dispatch({ direction: 1, type: 'cycleStagedImage' });
-    return;
-  }
-
-  if (commandId === 'canvas.deleteSelected' && ctx.hasSelectedStagedCandidate) {
-    dispatch({ type: 'discardSelectedStagedImage' });
+  if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nextEntity') && ctx.hasMultipleStagingSlots) {
+    dispatch({ direction: commandId === 'canvas.nextEntity' ? 1 : -1, type: 'cycleStagedImage' });
     return;
   }
 
   if (isCanvasToolCommand(commandId)) {
     executeCanvasToolCommand(commandId, { ...ctx, selectedLayerId: selectedLayer?.id ?? null });
-    return;
-  }
-
-  if (ctx.isInteractionLocked) {
     return;
   }
 
@@ -339,16 +324,6 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       );
     }
   } else if (commandId === 'canvas.mergeDown') {
-    // Share canMergeLayerDown with the layer menu so shortcuts respect identical eligibility.
-    if (engine && selectedLayer && canMergeLayerDown(document, selectedLayer.id, true)) {
-      void engine.layers.mergeLayerDown(selectedLayer.id).then(
-        (result) => {
-          if (result !== 'merged') {
-            ctx.reportLayerOperation(result);
-          }
-        },
-        () => ctx.reportLayerOperation('failed')
-      );
-    }
+    mergeSelectedLayerDown(engine, document, ctx.reportLayerOperation);
   }
 };

@@ -24,9 +24,6 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.util.logging import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 
 
 def is_state_dict_likely_anima_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -149,18 +146,6 @@ def _convert_kohya_te_key(kohya_layer_name: str) -> str:
 
 
 def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
-    """Create a layer patch from a layer dict, handling DoRA+LoKR edge case.
-
-    Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2) weights.
-    The shared any_lora_layer_from_state_dict checks dora_scale first and expects
-    lora_up/lora_down keys, which don't exist in LoKR layers. We strip dora_scale
-    from LoKR layers so they fall through to the LoKR handler instead.
-    """
-    has_lokr = "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict
-    has_dora = "dora_scale" in layer_dict
-    if has_lokr and has_dora:
-        layer_dict = {k: v for k, v in layer_dict.items() if k != "dora_scale"}
-        logger.warning("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
     return any_lora_layer_from_state_dict(layer_dict)
 
 
@@ -183,6 +168,48 @@ _PEFT_EXTRA_SUFFIXES = [
     ".lokr_w2_a",
     ".lokr_w2_b",
 ]
+
+
+_DIFFUSERS_NON_BLOCK_KEY_MAP = {
+    "patch_embed.proj": "x_embedder.proj.1",
+    "time_embed.t_embedder.linear_1": "t_embedder.1.linear_1",
+    "time_embed.t_embedder.linear_2": "t_embedder.1.linear_2",
+    "norm_out.linear_1": "final_layer.adaln_modulation.1",
+    "norm_out.linear_2": "final_layer.adaln_modulation.2",
+    "proj_out": "final_layer.linear",
+}
+
+_DIFFUSERS_BLOCK_KEY_MAP = {
+    "attn1.to_q": "self_attn.q_proj",
+    "attn1.to_k": "self_attn.k_proj",
+    "attn1.to_v": "self_attn.v_proj",
+    "attn1.to_out.0": "self_attn.output_proj",
+    "attn2.to_q": "cross_attn.q_proj",
+    "attn2.to_k": "cross_attn.k_proj",
+    "attn2.to_v": "cross_attn.v_proj",
+    "attn2.to_out.0": "cross_attn.output_proj",
+    "ff.net.0.proj": "mlp.layer1",
+    "ff.net.2": "mlp.layer2",
+    "norm1.linear_1": "adaln_modulation_self_attn.1",
+    "norm1.linear_2": "adaln_modulation_self_attn.2",
+    "norm2.linear_1": "adaln_modulation_cross_attn.1",
+    "norm2.linear_2": "adaln_modulation_cross_attn.2",
+    "norm3.linear_1": "adaln_modulation_mlp.1",
+    "norm3.linear_2": "adaln_modulation_mlp.2",
+}
+
+_DIFFUSERS_BLOCK_KEY_RE = re.compile(r"^transformer_blocks\.(\d+)\.(.+)$")
+
+
+def _convert_diffusers_transformer_key(key: str) -> str:
+    if mapped := _DIFFUSERS_NON_BLOCK_KEY_MAP.get(key):
+        return mapped
+    if match := _DIFFUSERS_BLOCK_KEY_RE.match(key):
+        block, suffix = match.groups()
+        if mapped := _DIFFUSERS_BLOCK_KEY_MAP.get(suffix):
+            return f"blocks.{block}.{mapped}"
+        raise ValueError(f"Unsupported diffusers Anima LoRA layer: {key}")
+    return key
 
 
 def _group_keys_by_layer(
@@ -235,7 +262,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if alpha is not None:
+        if "alpha" in layer_dict:
+            values["alpha"] = layer_dict["alpha"]
+        elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         return values
     elif "lora_down.weight" in layer_dict:
@@ -299,6 +328,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if not is_text_encoder:
                 for prefix in [
                     "base_model.model.transformer.",
+                    "base_model.model.",
                     "transformer.",
                     "diffusion_model.",
                 ]:
@@ -309,7 +339,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if is_text_encoder:
                 final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
             else:
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{_convert_diffusers_transformer_key(clean_key)}"
 
             layer = _make_layer_patch(values)
             layers[final_key] = layer

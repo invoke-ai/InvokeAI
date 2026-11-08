@@ -35,7 +35,6 @@ const createCoordinator = (readAutoProcessPreference: () => boolean) => {
     exportSource: vi.fn(),
     invalidateOverlay: vi.fn(),
     isGuardCurrent: (candidate) => candidate === guard,
-    isInteractionLocked: () => false,
     isSamToolActive: () => true,
     prepareStart: () => ({
       guard,

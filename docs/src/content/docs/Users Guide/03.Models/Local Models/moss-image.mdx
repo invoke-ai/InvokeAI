@@ -1,7 +1,7 @@
 ---
 title: MOSS-Image
-description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts and layouts from canvas regions.
-lastUpdated: 2026-10-18
+description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts, layouts from canvas regions and a prompt enhancer.
+lastUpdated: 2026-11-06
 sidebar:
   order: 8
 ---
@@ -58,6 +58,16 @@ starter models.
 | MOSS-Image Base  | `OpenMOSS-Team/MOSS-Image-Base` (~27 GB) | nothing, everything is bundled |
 | MOSS-Image SFT   | `OpenMOSS-Team/MOSS-Image-SFT` (~27 GB)  | nothing, everything is bundled |
 
+The single-file builds are individual starter models. They hold only the transformer, so each also installs the
+**FLUX.2 VAE** and the **Qwen3.5 9B Encoder (int8)**:
+
+| Starter | Source | Size |
+| ------- | ------ | ---- |
+| MOSS-Image Base / SFT (single file) | Comfy-Org bf16 safetensors | ~10.2 GB each |
+| MOSS-Image Base / SFT (int8) | Comfy-Org `int8_convrot` safetensors | ~5.4 GB each |
+| MOSS-Image Base / SFT (GGUF Q4_K_M) | unsloth | ~3.2 GB each |
+| MOSS-Image Base / SFT (GGUF Q8_0) | unsloth | ~5.5 GB each |
+
 :::note[Installing both]
 Each pipeline brings its own copy of the 17 GB text encoder and the VAE, so installing Base and SFT downloads
 and stores the same encoder twice.
@@ -67,7 +77,7 @@ MOSS-Image needs three components:
 
 | Component                 | Diffusers install | Single-file install  |
 | ------------------------- | ----------------- | -------------------- |
-| Transformer               | bundled           | the `.safetensors` file, such as the ComfyUI export `moss-image-dit.safetensors` |
+| Transformer               | bundled           | a `.safetensors` or `.gguf` file, such as the ComfyUI export `moss-image-dit.safetensors` (see [Transformer formats](#transformer-formats)) |
 | Text encoder (Qwen3.5 9B) | bundled           | installed separately |
 | VAE (FLUX.2)              | bundled           | installed separately |
 
@@ -75,18 +85,51 @@ When a single-file MOSS-Image model is selected, the **Components** section next
 
 - **Qwen3.5 Encoder**: a single-file Qwen3.5 9B encoder, such as the ComfyUI export
   `moss-image-qwen35.safetensors`. A file that carries the vision tower as well loads; the vision tower stays
-  on disk. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
+  on disk. The bf16 files in Comfy-Org's MOSS-Image repository install as this encoder when installed from their URL. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
   work on their own: the first shard is refused at install with a message saying so, and the others install as
   unknown models. The shards in `transformer/` install as unknown models too. Install the whole Diffusers
   folder or a merged single file instead. Anima-3.8B uses the Qwen3.5 4B, which installs under the same encoder type. The two are
-  not interchangeable, so the picker lists only 9B encoders.
+  not interchangeable, so the picker lists only 9B encoders. ComfyUI's int8 build of the encoder works as well:
+  install it with the **Qwen3.5 9B Encoder (int8)** starter model or from its Comfy-Org URL. A local copy of the file is
+  identified as a Text LLM, because nothing in it distinguishes it from the FLUX.3 prompt upsampler. On an RTX 4090 it
+  renders the same scene as the bf16 encoder with shifted details, and the file is about half the size. The w4a8
+  build is refused at install.
 - **VAE**: a FLUX.2 VAE. MOSS-Image ships the FLUX.2 VAE with a smaller decoder (the ComfyUI export
   `moss-image-vae.safetensors`); it installs under the FLUX.2 base. Any other FLUX.2 VAE works too, for
   example the **FLUX.2 VAE** starter model.
 
-Quantized MOSS-Image transformers (fp8, int8, nvfp4, MXFP8 and GGUF) are not supported yet and are
-refused at install with a message saying so. Install the bf16 file, and to save VRAM turn on **FP8
-Storage** in the model's **Default Settings**.
+### Transformer formats
+
+A single-file transformer comes in these forms; the model type, not the file name, decides how it loads.
+
+| Form | Examples | Notes |
+| ---- | -------- | ----- |
+| bf16 safetensors | `moss-image-dit.safetensors`, Comfy-Org's `moss_image_base_bf16.safetensors` | Either key layout (see below). |
+| int8 convrot safetensors | Comfy-Org's `moss_image_base_int8_convrot.safetensors` | `int8_tensorwise` with convrot. The attention, output and feed-forward projections stay int8 in memory and are dequantized for each step. |
+| GGUF | `unsloth/MOSS-Image-Base-GGUF`, `leejet/MOSS-Image-SFT-GGUF` | The K-quants and `Q8_0` and the other llama.cpp types. The packed weights are dequantized for each step. |
+
+The community files come in two key layouts, and both install and load:
+
+- **Split**: each block has separate `proj.q`, `proj.k` and `proj.v` weights, as in OpenMOSS's Diffusers folder and
+  unsloth's GGUFs.
+- **Fused**: each block has one `proj.qkv` weight, as in Comfy-Org's single files and leejet's GGUFs. InvokeAI
+  splits it into its three parts when the model loads. A GGUF's packed rows are cut without being dequantized.
+
+A few layers stay in the compute dtype in every form, because the model reads their weight dtype to pick the
+dtype of the activations it passes on: the first layer of the image and time embeddings, the modulation and output
+layers, the text projection and the `q` projection of every block. For a quantized file this means they are
+dequantized when the model loads. The 42 `q` projections alone occupy about 0.74 GiB dense (bf16), so a Q4 GGUF takes
+more memory than its file size suggests.
+
+Not supported, and refused at install with a message saying so: fp8 transformers (scaled or not), torchao exports
+such as unsloth's FP8 and INT8 builds (`_weight_qdata`), nvfp4 and w4a8 builds, and the ComfyUI-GGUF `Q8_CR` and `Q4_CR`
+files. Install the
+bf16 file, the int8 build or a GGUF instead. To save VRAM with a bf16 file, turn on **FP8 Storage** in the model's
+**Default Settings**. FP8 Storage does nothing for a GGUF, and for the int8 build it applies only to the layers
+that are not already int8.
+
+The int8 build and the GGUFs save memory; they are not faster. In InvokeAI's measurements on an RTX 4090 they took
+3-15 % longer per image than bf16. Int8 and Q8_0 keep the scene of a bf16 image and shift its details.
 
 ## Generation settings
 
@@ -191,16 +234,74 @@ with *MOSS-Image needs a prompt to place regional guidance in its layout. Enter 
 regional guidance layers.* Regional negative prompts, auto-negative and regional reference images are not used
 with MOSS-Image; the layer hides its negative prompt and auto-negative controls.
 
-Without regions the prompt is sent unchanged. If the prompt already is a JSON layout in the format above, the
+Without regions the prompt is sent unchanged. If the prompt is a [layout draft](#prompt-enhancer), it is
+compiled and the regions follow its items. If it already is a JSON layout in the format above, the
 regions are added to its `items`; a layout with another `bbox_coord_space` or `bbox_format` makes the
 generation fail with a message. Any other prompt, including JSON that is not a layout, becomes the caption.
-The layout is built when the generation runs, so dynamic prompts and batches vary the caption inside it. The
-encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
+The layout is built when the generation runs, so for a plain-text prompt dynamic prompts and batches vary the
+caption inside it. A prompt that already is a JSON layout or draft is sent as written, without expanding
+dynamic prompts or wildcards and without a prompt template's positive text.
+
+The prompt the model encodes, in the Generate tab and on the Canvas, is saved in the image's metadata as
+`moss_image_layout_prompt`: the compiled layout when there is one, otherwise the prompt as sent.
+
+### Prompt enhancer
+
+MOSS-Image follows long, specific prompts best. **Expand Prompt** in the prompt toolbar can write them for
+you with the **MOSS-Image Prompt Enhancer** system prompt, derived from OpenMOSS's prompt-enhancer skill. See
+[Prompt Tools](/users-guide/image-generation/prompt-tools/#expand-prompt) for the tool itself.
+
+1. Select a MOSS-Image model and type a short idea, such as `a jazz festival poster titled "BLUE NOTES"`.
+2. Open **Expand prompt** in the Generate panel's prompt toolbar; Canvas generations use the same prompt.
+   With MOSS-Image selected it preselects the **MOSS-Image Prompt Enhancer** system prompt. The model saved for
+   the project stays selected; without one, **Gemma 4 E4B (Prompt Enhancer)** is preselected when installed.
+   When Gemma is installed but another model is selected, the popover shows **Recommended for this model** with
+   a **Use it** button; when it is not installed, the popover points you to that starter model. A model or
+   system prompt you pick in the open popover overrides the suggestion.
+3. Click **Expand**, check the result in the prompt box and press Invoke.
+
+The language model decides between two kinds of output:
+
+- **A caption**: one detailed paragraph, for photos, scenes and most images without precise placement.
+  It is sent as written.
+- **A layout draft**: JSON for posters, covers, infographics and other images where text or elements must sit
+  in particular places. It holds a `summary` with the scene caption, a list of `items` with a label, a caption,
+  the text to render for text items and a box, plus the `width` and `height` the boxes refer to. Boxes are
+  `[x1, y1, x2, y2]` pixel edges from the top-left corner (`"bbox_coord_space": "abs"`,
+  `"bbox_format": "xyxy"`).
+
+You can edit a draft in the prompt box like any other text. It is compiled into the model's
+[JSON layout](#json-layouts) when the generation runs:
+
+- **Size**: Expand Prompt never changes the image size. The draft's `width` and `height` only set its
+  coordinate frame, and its boxes are scaled to the width and height you generate at, so you can change the
+  size after expanding.
+- **Tolerance**: a Markdown code fence around the JSON (with or without a language tag such as `json`), unknown fields and unknown labels are accepted, boxes
+  that leave the image are clamped to it, and items whose box has no area are dropped. A draft without a scene
+  caption, without any usable item, or with a text item that has no text fails with a message naming the item.
+- **Canvas regions**: on the Canvas, enabled [regional guidance](#layout-with-canvas-regions) layers are
+  appended after the draft's items.
+
+A JSON object with `"bbox_coord_space": "abs"` is treated as a draft. When it lacks a summary caption, items,
+or a numeric width and height, or its `bbox_format` is not `xyxy`, Invoke is disabled with a message saying
+so. A compiled layout (`abs_centralized`, `yxyx`) is never blocked. Run Expand Prompt
+again or fix the JSON.
+
+#### Recommended language model
+
+Install **Gemma 4 E4B (Prompt Enhancer)** from the starter models (`google/gemma-4-E4B-it`, ~16 GB). It is
+optional and not part of the MOSS-Image bundle. In InvokeAI's tests on an RTX 4090 in bf16, it chose
+between caption and layout correctly for all 10 test requests and every draft it wrote was valid. A request
+took 8 to 26 s and peaked at about 15 GiB of VRAM.
+
+Small language models of about 1.5 to 1.7B parameters, such as **Qwen2.5 1.5B Instruct** or SmolLM-class
+models, are not recommended for this system prompt: they write layouts for nearly every request, and their
+drafts are often invalid.
 
 ## Limitations
 
 - LoRA is not supported.
-- Quantized transformers are refused at install (see [Installing](#installing)).
+- fp8, nvfp4, w4a8 and ComfyUI-GGUF `Q8_CR`/`Q4_CR` transformers are refused at install (see [Installing](#installing)).
 - ControlNet, reference images and seamless tiling are not available.
 - Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
 - MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
@@ -210,7 +311,7 @@ encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
 | Node                              | Purpose                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------- |
 | **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
-| **Layout Prompt - MOSS-Image**    | Builds a JSON layout from a prompt and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. The Canvas feeds it for regional guidance; its regions input has no editor widget |
+| **Layout Prompt - MOSS-Image**    | Builds the prompt the model encodes from a prompt, the image size and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. Compiles a layout draft at the given size. Every MOSS-Image graph from the Generate tab and the Canvas uses it; its regions input has no editor widget |
 | **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
 | **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
 | **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |

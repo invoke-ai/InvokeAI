@@ -5,7 +5,9 @@
 export type {
   QueueHistoryItemStatus,
   QueueItem,
+  QueueRunErrorCode,
   QueueState,
+  QueueSubmissionRetry,
   QueueSubmissionSnapshot,
   RunRecord,
 } from './core/historyTypes';
@@ -57,6 +59,8 @@ export {
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
 export { extractGenerationMeta, getResultImageName, type QueueGenerationMeta } from './core/generationMeta';
+export { getQueueItemSnapshotLabel } from './core/itemLabels';
+export { getQueueActivity, type QueueActivity } from './core/queueActivity';
 export {
   planGenerateSubmissionBatch,
   type GeneratePromptBatchPlan,

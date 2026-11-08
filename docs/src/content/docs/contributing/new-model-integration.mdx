@@ -215,7 +215,7 @@ Things to get right:
 
 - **Latent space.** If the architecture uses a VAE InvokeAI already supports, reuse its shared space from `facets/latent_space.py`:
   - `FLUX_16`: FLUX.1, Z-Image
-  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4, MOSS-Image
+  - `FLUX2_32`: FLUX.2, FLUX.3, ERNIE-Image, Ideogram 4, MOSS-Image
   - `WAN21_16`: Wan 2.1, Qwen-Image, Krea-2, Anima
   - `WAN22_48`
 
@@ -419,6 +419,10 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
    - stripping the ComfyUI prefix with `CheckpointPrefix.detect(sd).strip(sd)` (`invokeai/backend/model_manager/checkpoint_prefix.py`) rather than a hand-written loop
    - reserving RAM before materializing, exactly once: build the empty model first, take the fp8 and nvfp4 side channels out of the state dict, then reserve, and only then fold or widen anything. A fold before the reservation lands on a cache that was never asked for the room. For fp8, nvfp4 and dense files the reservation is `reserve_for_load` (`invokeai/backend/quantization/load_plan.py`).
    - quantized formats: ComfyUI `fp8_scaled`, `int8_convrot` and `nvfp4` (helpers in `invokeai/backend/quantization/`), and GGUF through `gguf_sd_loader`. For int8, call `install_int8_convrot_layers` instead of its individual steps. It makes the reservation itself through its `reserve` argument, so do not also call `reserve_for_load`; the steps' order matters, and skipping the first one loads a mixed checkpoint's fp8 weights without their scale.
+   - ComfyUI's packed int4 layers (`convrot_w4a4`, `int4_tensorwise`) install through the same call. Opt in only once a real int4 build of the model has been checked, and opt in everywhere the format is decided, as the Krea-2 loader and config do, or install and load disagree about the same file:
+     - pass `accept_int4=True` to `extract_int8_convrot_markers`, and pass the safetensors header (`header_layers=`) to it and to `reject_unmarked_int8_weights`: some converters name their layers only there;
+     - refuse at install what the loader cannot decode with `_raise_for_undecodable_int8_weights` in `configs/main.py`, given the same formats (`accepted_convrot_formats(accept_int4=True)`) and `read_header=True`;
+     - for GGUF, set the config's `DECODES_GGUF_CONVROT` to the same formats and load with `gguf_sd_loader(..., convrot="decode")`.
    - a loader that handles no quantization side channel (a VAE, an adapter, a non-strict `load_state_dict`) calls `reject_quantized_side_channel` so a quantized file is refused rather than loaded wrongly
    - opting into FP8 storage with `_apply_fp8_layerwise_casting`
 
@@ -605,7 +609,7 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device()`: `working_memory=` from an estimator that declares an `EstimatorSpec`, so that calibration runs measure the forward (the Z-Image denoise's is in `invokeai/backend/z_image/denoise_working_memory.py`, MOSS-Image's in `invokeai/backend/moss_image/working_memory.py`), or `working_mem_bytes=<int>` for a plain reservation. A model locked while the transformer is, such as a ControlNet adapter, reserves the estimate's `reservation_bytes` with `working_mem_bytes=`. See the VAE step below and the [model manager](/development/architecture/model-manager/).
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device()`: `working_memory=` from an estimator that declares an `EstimatorSpec`, so that calibration runs measure the forward (the Z-Image denoise's is in `invokeai/backend/z_image/denoise_working_memory.py`, FLUX.3's in `invokeai/backend/flux3/denoise_working_memory.py`, MOSS-Image's in `invokeai/backend/moss_image/working_memory.py`), or `working_mem_bytes=<int>` for a plain reservation. A model locked while the transformer is, such as a ControlNet adapter, reserves the estimate's `reservation_bytes` with `working_mem_bytes=`. See the VAE step below and the [model manager](/development/architecture/model-manager/).
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
@@ -848,7 +852,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    - `ModelTaxonomyType` in `types.ts`, and its label in the type list at the top of `taxonomy.ts`
    - `NULL_BASE_ALLOWANCES` and `SINGLETON_LINK_TYPES` in `relationships.ts`
    - the type label in `modelRequirements.ts`
-   - `CPU_ONLY_TYPES` in `src/features/models/ui/detail/CpuOnlySetting.tsx` if the config has `cpu_only`
+
+   The model detail's **Run on CPU** switch needs no entry: it appears for every config that carries `cpu_only`, so adding the field to the backend config is enough.
 
 8. **Per-family UI (only for controls unique to the architecture)**
 
@@ -908,12 +913,14 @@ A Tiny AutoEncoder (TAE) record serves every architecture whose step-callback sa
 
 A new latent space gets TAE previews only if a TAE exists for it. Then:
 
-- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). If another base's TAE has the same architecture and channel count, both TAEs' published names must be in `_TAE_NAME_PATTERNS`: identification tells them apart only by name.
+- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). Add the TAE's published name, base and latent width to `_TAE_NAMES`. Identification tells TAEs with the same network apart only by that name, read per path segment from the last, so it matters wherever another base's TAE has the same network. A published TAE with a supported network but for latents InvokeAI does not preview with it goes in `_TWINS`, with its name pattern and refusal message: a file named after it is refused even with an explicit base, and an unnamed file with that network needs the supported TAE's name or an explicit base.
 - **Loader:** one more `@ModelLoaderRegistry.register(base=..., type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)` on `TinyAutoencoderLoader` (`load/model_loaders/tiny_autoencoder.py`).
-- **Starter:** next to the family's VAE in its starter module, with a pinned `resolve/<sha>` URL and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle.
-- **Decoder:** a network the vendored code in `backend/tiny_autoencoder/` does not have is vendored there, and `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
+- **Starter:** next to the family's VAE in its starter module, with a URL pinned to a commit (`resolve/<sha>` on Hugging Face, `raw/<sha>` on GitHub) and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle. The URL must contain the TAE's `_TAE_NAMES` name: `tiny_autoencoder_starters(space)` finds the starter by it, for the log message that tells a user which starter to install.
+- **Decoder:** two decoder families are vendored in `backend/tiny_autoencoder/`: TAESD (`taesd.py`) for images and TAEHV (`taehv.py`) for video. Both subclass `TinyAutoencoderDecoder` (`decoder.py`), which declares the latent width, the spatial compression, `max_preview_edge` (the preview cap) and `preview_working_memory_bytes`, the working memory the TAE's lock reserves for a decode: the activations its structure keeps live at once, plus the convolution workspace, measured with cuDNN on an RTX 4090 (fp16 and bf16, single latents and two-frame windows; unmeasured on MIOpen, MPS and XPU, where the 3 GB `device_working_mem_gb` floor still covers every bound at the default settings), plus a fixed 5 MiB allowance. A new network of a known family is a new layout in `checkpoint.py` (for TAEHV, a `TaehvLayout` in `SUPPORTED_TAEHV_LAYOUTS`); a new family is vendored as another `TinyAutoencoderDecoder`. Either way `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
 
 The TAE decodes the latent the denoise node hands to the step callback, so check that this is the latent the TAE was trained on, with the same normalization and channel order. The previews must also go through `context.util.sd_step_callback` (or `flux_step_callback`/`flux2_step_callback`); a node that renders its own preview image does not get TAE previews.
+
+A video node may hand the callback a `(B, C, T, h, w)` window of latent frames instead of one frame. A video decoder renders the window's last frame through `decode_window`, with the earlier frames as temporal context; the linear preview reads only the last frame (`preview_frame` in `app/util/step_callback.py`). Wan's video denoise passes the middle frame and the one before it (`PREVIEW_LATENT_WINDOW`), because the middle frame decoded alone is no sharper than the linear preview.
 
 Send the first step callback, step 0 included, only once the denoise model is locked (`model_on_device`). The TAE is loaded at the first preview and locked only if it fits next to the models already in VRAM; before the main model is locked, it always fits.
 

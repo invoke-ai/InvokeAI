@@ -116,6 +116,31 @@ const createImages = (count) =>
     };
   });
 
+/**
+ * Wan text-to-video metadata in the shape the video graph builders record (`core_metadata`), so Preview Details
+ * parses rows and the media menu offers recall. The mock catalog serves no Wan main, so the model is a plausible
+ * identifier that recall reports as not installed.
+ */
+const wanT2vMetadata = (positivePrompt, seed) => ({
+  cfg_scale: 5,
+  fps: 16,
+  generation_mode: 'wan_t2v',
+  height: 480,
+  model: {
+    base: 'wan',
+    hash: 'blake3:fixture-wan-2-2-t2v-a14b',
+    key: 'fixture-wan-t2v-a14b',
+    name: 'Wan 2.2 T2V A14B',
+    type: 'main',
+  },
+  negative_prompt: 'blurry, low quality, static frame',
+  num_frames: 81,
+  positive_prompt: positivePrompt,
+  seed,
+  steps: 30,
+  width: 832,
+});
+
 const createVideos = () => [
   {
     board_id: null,
@@ -125,7 +150,7 @@ const createVideos = () => [
     graph: '{"nodes":[{"id":"fixture-video-output","type":"wan_l2v"}]}',
     height: 64,
     is_intermediate: false,
-    metadata: { codec: 'h264', prompt: 'wan fixture' },
+    metadata: wanT2vMetadata('wan fixture', 1234567),
     owner_user_id: 'fixture-user',
     starred: true,
     thumbnail_url: `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}/thumbnail`,
@@ -144,7 +169,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'board cover fixture' },
+    metadata: wanT2vMetadata('board cover fixture', 2345678),
     owner_user_id: 'fixture-user',
     starred: true,
     thumbnail_url: '/api/v1/videos/i/fixture-video-board.mp4/thumbnail',
@@ -221,7 +246,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'project board fixture' },
+    metadata: wanT2vMetadata('project board fixture', 3456789),
     owner_user_id: 'fixture-user',
     starred: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-project.mp4/thumbnail',
@@ -259,7 +284,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'previous-day fixture' },
+    metadata: wanT2vMetadata('previous-day fixture', 4567890),
     owner_user_id: 'fixture-user',
     starred: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-old.mp4/thumbnail',
@@ -450,7 +475,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://gemini/fixture-gemini-image',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -482,7 +506,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://openai/fixture-gpt-image',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -509,7 +532,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://seedream/fixture-seedream',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -535,7 +557,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: CATALOG_MANAGED_EXTERNAL_SOURCE,
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
 ];
@@ -555,9 +576,12 @@ const createLocalModels = (count) =>
         ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
         : MODEL_BASES[index % MODEL_BASES.length];
 
+    // Like the backend, a config serializes only the fields it stores: `cpu_only` on VAEs, `trigger_phrases` on main
+    // and LoRA models.
     return {
       base,
       cover_image: null,
+      ...(type === 'vae' ? { cpu_only: null } : {}),
       default_settings: type === 'main' ? { cfg_scale: 7, height: 1024, steps: 30, width: 1024 } : null,
       description: `Deterministic representative ${type} model ${id}.`,
       file_size: 512_000_000 + index * 1_024,
@@ -569,12 +593,16 @@ const createLocalModels = (count) =>
       source: `fixtures/models/fixture-model-${id}.safetensors`,
       source_type: 'path',
       source_url: null,
-      trigger_phrases: type === 'lora' ? [`fixture-style-${id}`] : null,
+      ...(type === 'lora' ? { trigger_phrases: [`fixture-style-${id}`] } : {}),
+      ...(type === 'main' ? { trigger_phrases: null } : {}),
       type,
     };
   });
 
-/** A model record in the shape the list endpoint serves; the seed sets below override only what they need. */
+/**
+ * A model record in the shape the list endpoint serves; the seed sets below override only what they need. Main,
+ * LoRA and Control LoRA seeds add `trigger_phrases`, which only those configs store.
+ */
 const seedModel = ({ key, name, ...fields }) => ({
   base: 'any',
   cover_image: null,
@@ -589,7 +617,6 @@ const seedModel = ({ key, name, ...fields }) => ({
   source: `seeds/${key}.safetensors`,
   source_type: 'path',
   source_url: null,
-  trigger_phrases: null,
   variant: null,
   ...fields,
 });
@@ -614,7 +641,15 @@ const controlSeed = (name, base, preprocessor, fields = {}) => ({
 export const MODEL_SEED_SETS = Object.freeze({
   // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
   'anima-lllite': [
-    { record: seedModel({ base: 'anima', key: 'seed-anima-main', name: 'Anima Preview', type: 'main' }) },
+    {
+      record: seedModel({
+        base: 'anima',
+        key: 'seed-anima-main',
+        name: 'Anima Preview',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
     {
       record: seedModel({
         base: 'anima',
@@ -684,12 +719,14 @@ export const MODEL_SEED_SETS = Object.freeze({
         base: 'flux',
         key: 'seed-flux-dev',
         name: 'FLUX.1 dev',
+        trigger_phrases: null,
         type: 'main',
         variant: 'dev',
       }),
     },
     controlSeed('flux-depth-control-lora', 'flux', 'depth_anything_image_processor', {
       format: 'lycoris',
+      trigger_phrases: null,
       type: 'control_lora',
     }),
     controlSeed('flux-controlnet-union-pro', 'flux', null),
@@ -1054,6 +1091,23 @@ const createWorkflows = (count) =>
       workflow_id: index % 4 === 0 ? `default_fixture-workflow-${id}` : `fixture-workflow-${id}`,
     };
   });
+
+/** Opt-in library workload; ordinary route fixtures and their budgets stay unchanged. */
+export const createLargeWorkflowLibraryFixture = () =>
+  createWorkflows(1000).map((record, index) => ({
+    ...record,
+    category: 'user',
+    workflow_id: `large-workflow-${String(index).padStart(4, '0')}`,
+    workflow: {
+      ...record.workflow,
+      nodes: range(40, (node) => ({
+        id: `node-${node}`,
+        type: 'invocation',
+        position: { x: node * 100, y: 0 },
+        data: { type: 'integer', inputs: { value: { name: 'value', value: node, label: '' } } },
+      })),
+    },
+  }));
 
 /** Per-project intermediates rows for the Settings manager; ids match the projects fixture so entry points preselect. */
 const createIntermediates = () => [

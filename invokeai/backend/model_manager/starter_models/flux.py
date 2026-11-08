@@ -127,6 +127,29 @@ flux_dev_int8 = StarterModel(
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 
+# Kijai's plain e4m3fn casts: the weights are stored in fp8 without per-tensor scales.
+flux_schnell_fp8 = StarterModel(
+    name="FLUX.1 schnell (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
+    "flux1-schnell-fp8-e4m3fn.safetensors",
+    description="FLUX schnell transformer in Kijai's fp8 (e4m3fn) cast, about half the size of the bfloat16 "
+    "transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+
+flux_dev_fp8 = StarterModel(
+    name="FLUX.1 dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
+    "flux1-dev-fp8-e4m3fn.safetensors",
+    description="FLUX dev transformer in Kijai's fp8 (e4m3fn) cast, about half the size of the bfloat16 "
+    "transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+
 flux_dev = StarterModel(
     name="FLUX.1 dev",
     base=BaseModelType.Flux,
@@ -164,6 +187,18 @@ flux_kontext_quantized = StarterModel(
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 
+flux_kontext_fp8 = StarterModel(
+    name="FLUX.1 Kontext dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/795e390e4a1200720e40af3780d5d8b96bc13ae3/"
+    "split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors",
+    description="FLUX.1 Kontext dev transformer in Comfy-Org's scaled fp8 build, about half the size of the "
+    "bfloat16 transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with "
+    "dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+
 flux_krea = StarterModel(
     name="FLUX.1 Krea dev",
     base=BaseModelType.Flux,
@@ -178,6 +213,29 @@ flux_krea_quantized = StarterModel(
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
     description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~12GB",
+    type=ModelType.Main,
+    dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+)
+
+flux_krea_fp8 = StarterModel(
+    name="FLUX.1 Krea dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Comfy-Org/Flux-1-Krea-Dev/resolve/d9d7c421e64d3a80b16a79c0fdc9989bfdaa6f01/split_files/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors",
+    description="FLUX.1 Krea dev transformer in Comfy-Org's scaled fp8 build. FP8 Storage is switched on when it is "
+    "installed, so its fp8 layers stay fp8, about 11.9GB once loaded. ~11.9GB; total size with dependencies: ~18GB",
+    type=ModelType.Main,
+    dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+)
+
+# A community repack, pinned to a commit for the same reason as FLUX.1 dev (int8) above: the decode follows the
+# file's own `comfy_quant` marker, and a reupload at the same path could change what that marker says.
+flux_krea_int8 = StarterModel(
+    name="FLUX.1 Krea dev (int8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/rockerBOO/flux.1-krea-dev-convrot-int8/resolve/b1487ea0f81f052852e9230537baefee8c2f73d6/flux1-krea-dev-int8convrot.safetensors",
+    description="FLUX.1 Krea dev transformer in ComfyUI int8_convrot, from rockerBOO's community repack (no "
+    "first-party int8 build of FLUX.1 exists). Its int8 layers stay int8 on every supported GPU, about 14.1GB once "
+    "loaded; int8 Compute can run them on NVIDIA int8 tensor cores. ~14.1GB; total size with dependencies: ~20GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )

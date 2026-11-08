@@ -1,4 +1,5 @@
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
@@ -7,7 +8,8 @@ import {
   isSupportedGenerateModel,
   isVaeModelConfig,
 } from '@features/generation/settings';
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
 import {
@@ -273,8 +275,9 @@ describe('buildRecallParametersSettings', () => {
       { key: 'refiner_cfg_scale', reason: 'incompatible', detail: flux.name },
     ]);
 
+    // Leaving SDXL keeps the refiner selected but idle (it runs only after an SDXL base); the recalled one is skipped.
     const away = build(current, { model: flux.key, refiner_model: refiner.key, refiner_steps: 15 });
-    expect(away.values.refinerModel).toBeNull();
+    expect(away.values.refinerModel).toEqual(refiner);
     expect(away.values.refinerSteps).toBe(35);
     expect(away.skipped.map(({ key }) => key)).toEqual(['refiner_model', 'refiner_steps']);
   });
@@ -583,7 +586,7 @@ describe('buildRecallParametersSettings', () => {
     expect(result.skipped).toEqual([{ detail: sd3.name, key: 'reference_images', reason: 'incompatible' }]);
   });
 
-  it('reports parameters the Generate panel has no home for, ignoring empty lists', () => {
+  it('leaves canvas parameters to the canvas owner, ignoring empty lists', () => {
     const result = build(currentFor(sdxl), {
       control_layers: [{ model_key: 'controlnet' }],
       denoise_strength: 0.5,
@@ -591,7 +594,7 @@ describe('buildRecallParametersSettings', () => {
     });
 
     expect(result.fields).toEqual(['prompts']);
-    expect(result.skipped.map((skip) => skip.key).sort()).toEqual(['control_layers', 'denoise_strength']);
+    expect(result.skipped).toEqual([]);
     expect(result.skipped.every((skip) => skip.reason === 'unsupported')).toBe(true);
 
     expect(build(currentFor(sdxl), { control_layers: [] }).skipped).toEqual([]);
@@ -621,13 +624,31 @@ describe('buildRecallParametersSettings', () => {
 });
 
 describe('getRecallParametersSkipMessage', () => {
+  const englishCatalog = Object.values(
+    import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+  )[0] as Record<string, unknown>;
+  const instance = i18n.createInstance();
+  const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+
+  beforeAll(async () => {
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+  });
+
   it('names every skipped parameter with its reason and detail', () => {
     expect(
-      getRecallParametersSkipMessage([
-        { detail: 'pixel-art', key: 'loras', reason: 'incompatible' },
-        { key: 'refiner_model', reason: 'unsupported' },
-        { detail: '5', key: 'reference_images', reason: 'limit' },
-      ])
+      getRecallParametersSkipMessage(
+        [
+          { detail: 'pixel-art', key: 'loras', reason: 'incompatible' },
+          { key: 'refiner_model', reason: 'unsupported' },
+          { detail: '5', key: 'reference_images', reason: 'limit' },
+        ],
+        t
+      )
     ).toBe(
       'loras: incompatible with the current model (pixel-art); refiner_model: not supported by the Generate panel; reference_images: over the reference image limit (5)'
     );

@@ -29,6 +29,7 @@ from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -118,6 +119,11 @@ _NON_BLOCK_RENAMES: dict[str, str] = {
     "time_in.in_layer": "time_guidance_embed.timestep_embedder.linear_1",
     "time_in.out_layer": "time_guidance_embed.timestep_embedder.linear_2",
 }
+
+# The final-layer modulation also orders its output halves differently: (shift, scale) in BFL's LastLayer,
+# (scale, shift) in diffusers' AdaLayerNormContinuous. Its patches are wrapped in a SwappedHalvesLayerPatch.
+_BFL_FINAL_MODULATION_KEY = "final_layer.adaLN_modulation.1"
+_DIFFUSERS_FINAL_MODULATION_KEY = "norm_out.linear"
 
 
 def is_state_dict_likely_in_flux_bfl_peft_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -339,6 +345,8 @@ def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -
         return [(f"{diff_prefix}.{rest}", layer)]
 
     # Non-block keys (embedders, modulations, output layers)
+    if bfl_key == _BFL_FINAL_MODULATION_KEY:
+        return [(_DIFFUSERS_FINAL_MODULATION_KEY, SwappedHalvesLayerPatch(layer))]
     if bfl_key in _NON_BLOCK_RENAMES:
         return [(_NON_BLOCK_RENAMES[bfl_key], layer)]
 
