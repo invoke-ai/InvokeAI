@@ -186,7 +186,10 @@ export interface CommitMaskImageResultOptions {
 }
 export type CommitMaskImageResult = { status: 'committed'; layerId: string } | { status: GuardedMutationRefusal };
 
+export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloading' | 'cancelling';
+
 export interface CanvasInteractionState {
+  psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
   bboxOptions: BboxToolOptions;
@@ -353,6 +356,7 @@ export interface CanvasDocumentSnapshot {
 export type PsdExportResult =
   | AdjustmentRefusal
   | LayerUnreadable
+  | 'busy'
   | 'exported'
   | 'nothing'
   | 'too-large'
@@ -360,6 +364,7 @@ export type PsdExportResult =
   | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'stale' | 'aborted'>;
 
 export interface CanvasPsdExportCapability {
+  cancelPsdExport(): void;
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
 }
 
@@ -806,8 +811,7 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   updateTransformSession(transform: LayerTransform): void;
 }
 
-export interface CanvasEngineExportCapability extends CanvasExportCapability {
-  exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
+export interface CanvasEngineExportCapability extends CanvasExportCapability, CanvasPsdExportCapability {
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
 }
 
@@ -955,7 +959,7 @@ export {
   type InpaintMaskMergeEligibility,
 } from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
-export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';
+export { bboxEquals, bboxMinSize, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
 export { ZOOM_PRESETS } from './math/snapping';
 export { isLeafPixelEditEligible } from './editing/controlPixelEdit';

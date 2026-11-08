@@ -5,6 +5,7 @@
 
 import { recordLogEvent } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import i18next from 'i18next';
 
 import { getDeploymentBasePath, getDeploymentBaseUrl } from './deploymentBase';
 
@@ -350,3 +351,36 @@ export const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
 
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+
+/** Bound an entire operation, including body consumption, while cancelling its underlying requests. */
+export const withRequestDeadline = async <T>(
+  request: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<T> => {
+  const controller = new AbortController();
+  const requestSignal = AbortSignal.any([controller.signal, captureAccountScope().signal, ...(signal ? [signal] : [])]);
+  const timer = setTimeout(() => controller.abort(new RequestDeadlineError()), Math.max(0, timeoutMs));
+  let rejectAborted: (() => void) | undefined;
+  try {
+    requestSignal.throwIfAborted();
+    return await new Promise<T>((resolve, reject) => {
+      rejectAborted = () => reject(requestSignal.reason);
+      requestSignal.addEventListener('abort', rejectAborted, { once: true });
+      // Attach both handlers even if cancellation wins, so a late rejection is always consumed.
+      request(requestSignal).then(resolve, reject);
+    });
+  } finally {
+    clearTimeout(timer);
+    if (rejectAborted) {
+      requestSignal.removeEventListener('abort', rejectAborted);
+    }
+  }
+};
+
+export class RequestDeadlineError extends Error {
+  constructor() {
+    super(i18next.t('common.requestTimedOut', { defaultValue: 'The request timed out. Retry the operation.' }));
+    this.name = 'RequestDeadlineError';
+  }
+}
