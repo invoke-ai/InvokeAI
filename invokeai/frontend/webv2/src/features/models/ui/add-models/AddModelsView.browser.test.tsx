@@ -1,4 +1,4 @@
-import type { FoundModel, ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { FoundModel, ModelConfig } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -672,7 +672,7 @@ describe('AddModelsView bundle preview decoder', () => {
     );
   const hint = () => document.querySelector<HTMLButtonElement>('button[aria-label="models.showStarterModel"]');
   const listedNames = () => [...document.querySelectorAll('[title]')].map((element) => element.getAttribute('title'));
-  const pickTypeFilter = async (type: ModelTaxonomyType) => {
+  const pickFilter = async (submenu: string, item: string) => {
     const menuItem = (startsWith: string) =>
       vi.waitFor(() => {
         const item = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((element) =>
@@ -684,8 +684,8 @@ describe('AddModelsView bundle preview decoder', () => {
     await act(() =>
       userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
     );
-    await act(async () => userEvent.click(await menuItem('models.modelType')));
-    await act(async () => userEvent.click(await menuItem(getModelTypeLabel(type))));
+    await act(async () => userEvent.click(await menuItem(submenu)));
+    await act(async () => userEvent.click(await menuItem(item)));
     await act(() => userEvent.keyboard('{Escape}'));
   };
 
@@ -751,6 +751,22 @@ describe('AddModelsView bundle preview decoder', () => {
     expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
   });
 
+  it('drops the revealed type even when the user changed only the base', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    act(() => updateModelsUi({ selectedBundleName: null }));
+    await pickFilter('models.baseArchitecture', 'models.allBases');
+
+    await selectBundle();
+
+    // The reveal's type filter alone would still hide every member of the bundle.
+    await expect.poll(listedNames).toContain(Z_IMAGE.name);
+    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
+  });
+
   it('keeps a filter the user picked after the reveal', async () => {
     useCatalog(false);
     await mount();
@@ -759,7 +775,7 @@ describe('AddModelsView bundle preview decoder', () => {
     await expect.poll(listedNames).toContain(TAEF1.name);
     // The user's own choice replaces the reveal's type, then they come back to the bundle.
     act(() => updateModelsUi({ selectedBundleName: null }));
-    await pickTypeFilter('qwen3_encoder');
+    await pickFilter('models.modelType', getModelTypeLabel('qwen3_encoder'));
 
     await selectBundle();
 

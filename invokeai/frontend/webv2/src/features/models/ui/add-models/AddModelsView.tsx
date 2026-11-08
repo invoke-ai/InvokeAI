@@ -184,7 +184,7 @@ export const AddModelsView = () => {
   const starterListRef = useRef<HTMLDivElement | null>(null);
   const starterFilterMenuRef = useRef<HTMLDivElement | null>(null);
   // The base and type a decoder reveal set. No bundle holds a decoder, so selecting a bundle by any path (a chip, the
-  // Launchpad) drops them while they are still the reveal's; a base or type the user picked since stays.
+  // Launchpad) drops each one still holding the reveal's value; a base or type the user picked since stays.
   const [revealedFilters, setRevealedFilters] = useState<Pick<StarterModelFilters, 'baseFilter' | 'typeFilter'> | null>(
     null
   );
@@ -193,12 +193,11 @@ export const AddModelsView = () => {
     setPreviousBundleName(selectedBundleName);
     if (selectedBundleName !== null && revealedFilters) {
       setRevealedFilters(null);
-      if (
-        starterFilters.baseFilter === revealedFilters.baseFilter &&
-        starterFilters.typeFilter === revealedFilters.typeFilter
-      ) {
-        setStarterFilters({ ...starterFilters, baseFilter: null, typeFilter: null });
-      }
+      setStarterFilters({
+        ...starterFilters,
+        baseFilter: starterFilters.baseFilter === revealedFilters.baseFilter ? null : starterFilters.baseFilter,
+        typeFilter: starterFilters.typeFilter === revealedFilters.typeFilter ? null : starterFilters.typeFilter,
+      });
     }
   }
 
