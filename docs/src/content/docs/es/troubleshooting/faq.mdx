@@ -1,0 +1,128 @@
+---
+title: FAQ
+lastUpdated: 2026-10-20
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+If the troubleshooting steps on this page don't get you up and running, please either [create an issue] or hop on [discord] for help.
+
+## How to Install
+
+<LinkCard title="Installation Guide" description="Step-by-step instructions to get Invoke up and running." href="../../start-here/installation" />
+
+## Downloading models and using existing models
+
+The Model Manager tab in the UI provides a few ways to install models, including using your already-downloaded models. You'll see a popup directing you there on first startup. For more information, see the [model install docs].
+
+## Missing models after updating from v3
+
+If you find some models are missing after updating from v3, it's likely they weren't correctly registered before the update and didn't get picked up in the migration.
+
+You can use the `Scan Folder` tab in the Model Manager UI to fix this. The models will either be in the old, now-unused `autoimport` folder, or your `models` folder.
+
+* Find and copy your install's old `autoimport` folder path, inside the main install folder.
+* Go to the Model Manager and click `Scan Folder`.
+* Paste the path and scan.
+* IMPORTANT: Uncheck `Inplace install`.
+* Click `Install All` to install all found models, or just install the models you want.
+
+Next, find and copy your install's `models` folder path (this could be your custom models folder path, or the `models` folder inside the main install folder).
+
+Follow the same steps to scan and import the missing models.
+
+## v6 won't start after trying v7
+
+Once v7 has run on an install, it has updated the database, and older versions cannot use it. v6.14 and later stop at startup with `Database contains unknown applied migration IDs`. v6.13 and earlier may start, but on a database they were not written for, where they can misbehave or damage it: stop them. Keep using v7, or restore the backup v7 made of your v6 database before you run any older version. [Upgrading to v7](/start-here/upgrading/) explains which backup to restore and how.
+
+## Slow generation
+
+* Check the [system requirements] to ensure that your system is capable of generating images.
+* Follow the [Low VRAM mode guide] to optimize performance.
+* Check that your generations are happening on your GPU (if you have one). Invoke will log what is being used for generation upon startup. If your GPU isn't used, reinstall and make sure you select the appropriate GPU option.
+* If you are on Windows with an Nvidia GPU, you may have exceeded your GPU's VRAM capacity and are triggering Nvidia's "sysmem fallback". There's a guide to opt out of this behaviour in the [Low VRAM mode guide].
+
+## Triton error on startup
+
+Invoke only uses Triton for [SageAttention](/configuration/optimization/sage-attention/), which is off unless you enable it. Installs without Triton can ignore the error: CPU, macOS, AMD on Windows, Windows on ARM64, and a manual Windows install without the `cuda` extra (`--torch-backend=cu126` installs included). Other NVIDIA installs include Triton (on Windows the `triton-windows` package), so there the error means Triton is broken or does not match PyTorch; repair the install from the launcher, or rerun the manual install command.
+
+## No ffmpeg exe could be found (Windows on ARM64)
+
+Video nodes and video thumbnails use `ffmpeg`. On every other platform the `imageio-ffmpeg` package bundles the binary; it has no Windows ARM64 build, so on ARM64 Invoke uses the `ffmpeg` on your `PATH`. Install one (an x64 build runs under Windows' emulation) or point the `IMAGEIO_FFMPEG_EXE` environment variable at an `ffmpeg.exe`, then restart Invoke.
+
+## Updating fails on Windows on ARM64 with a torch or `win_amd64` error
+
+Your install uses an x86_64 Python running under Windows' emulation, which is what the Invoke Launcher and `uv` set up on ARM64 Windows unless asked for the native interpreter. Python 3.12 reports the physical ARM64 CPU even when emulated, so the installer selects the ARM64 packages, which an x86_64 Python cannot install: the only torch build for Windows ARM64 is NVIDIA's native one. Reinstall with a native ARM64 Python as described in the [manual install](../../start-here/manual) guide (request `cpython-3.12-windows-aarch64-none`); your models, images and database stay where they are.
+
+## Unable to Copy on Firefox
+
+Firefox does not allow Invoke to directly access the clipboard by default. As a result, you may be unable to use certain copy functions. You can fix this by configuring Firefox to allow access to write to the clipboard:
+
+* Go to `about:config` and click the Accept button
+* Search for `dom.events.asyncClipboard.clipboardItem`
+* Set it to `true` by clicking the toggle button
+* Restart Firefox
+
+## Replicate image found online
+
+Most example images with prompts that you'll find on the internet have been generated using different software, so you can't expect to get identical results. In order to reproduce an image, you need to replicate the exact settings and processing steps, including (but not limited to) the model, the positive and negative prompts, the seed, the sampler, the exact image size, any upscaling steps, etc.
+
+## Same seed, different image after an update
+
+Invoke now draws its seeded noise in `float32`, because PyTorch 2.13 changed its half-precision random numbers. For SD1.5, SDXL, SD3, FLUX.1, FLUX.2, CogView4 and Z-Image's seed variance enhancer, a seed therefore gives a different image than it did before this update. On Windows and Linux the older images cannot be reproduced exactly. On macOS, set `noise_dtype: float16` in the [configuration file][configuration docs] to keep the images your seeds gave before.
+
+## Invalid configuration file
+
+Everything seems to install OK, but you get a `ValidationError` when starting up the app.
+
+This is caused by an invalid setting in the `invokeai.yaml` configuration file. The error message should tell you what is wrong.
+
+Check the [configuration docs] for more detail about the settings and how to specify them.
+
+## Out of Memory Errors
+
+The models are large, VRAM is expensive, and you may find yourself faced with Out of Memory errors when generating images. Follow our [Low VRAM mode guide] to configure Invoke to prevent these.
+
+## Memory Leak (Linux)
+
+If you notice a memory leak, it could be caused by memory fragmentation as models are loaded and/or moved from CPU to GPU.
+
+A workaround is to tune memory allocation with an environment variable:
+
+```bash
+# Force blocks >1MB to be allocated with `mmap` so that they are released to the system immediately when they are freed.
+MALLOC_MMAP_THRESHOLD_=1048576
+```
+
+:::caution[Speed vs Memory Tradeoff]
+Your generations may be slower overall when setting this environment variable.
+:::
+
+:::note[Possibly dependent on `libc` implementation]
+
+If you encounter this issue and your system uses a different implementation, please try this environment variable and let us know if it fixes the issue.
+:::
+
+<h3>Detailed Discussion</h3>
+
+Python (and PyTorch) relies on the memory allocator from the C Standard Library (`libc`). On Linux, with the GNU C Standard Library implementation (`glibc`), our memory access patterns have been observed to cause severe memory fragmentation.
+
+This fragmentation results in large amounts of memory that has been freed but can't be released back to the OS. Loading models from disk and moving them between CPU/CUDA seem to be the operations that contribute most to the fragmentation.
+
+This memory fragmentation issue can result in OOM crashes during frequent model switching, even if `max_cache_ram_gb` (the max RAM cache size) is set to a reasonable value (e.g. an OOM crash with `max_cache_ram_gb: 16` on a system with 32GB of RAM).
+
+This problem may also exist on other OSes, and other `libc` implementations. But, at the time of writing, it has only been investigated on Linux with `glibc`.
+
+To better understand how the `glibc` memory allocator works, see these references:
+
+* Basics: [The GNU Allocator](https://www.gnu.org/software/libc/manual/html_node/The-GNU-Allocator.html)
+* Details: [Malloc Internals](https://sourceware.org/glibc/wiki/MallocInternals)
+
+Note the differences between memory allocated as chunks in an arena vs. memory allocated with `mmap`. Under `glibc`'s default configuration, most model tensors get allocated as chunks in an arena making them vulnerable to the problem of fragmentation.
+
+[model install docs]: /users-guide/models/introduction/
+[system requirements]: ../../start-here/system-requirements
+[Low VRAM mode guide]: /configuration/optimization/low-vram-mode/
+[create an issue]: https://github.com/invoke-ai/InvokeAI/issues
+[discord]: https://discord.gg/ZmtBAhwWhy
+[configuration docs]: ../../configuration/invokeai-yaml
