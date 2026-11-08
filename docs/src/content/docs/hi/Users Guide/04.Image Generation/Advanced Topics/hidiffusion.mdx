@@ -1,0 +1,59 @@
+---
+title: HiDiffusion
+sidebar:
+  order: 12
+---
+
+# HiDiffusion
+
+HiDiffusion is an optional denoising enhancement that can improve detail and structure at higher resolutions for SD 1.5, SD 2.1, and SDXL. It modifies the UNet during denoising and is most noticeable at 1536px and above.
+
+The vendored implementation includes module-key definitions for SD 1.5 and SDXL. SD 2.1 intentionally reuses the SD 1.5 module-key mapping.
+
+Learn more: https://github.com/megvii-research/HiDiffusion
+
+## Where to find the switches
+
+1. Open the **Generate** widget and select an SD 1.5 or SDXL model.
+2. Expand **Advanced**.
+3. Enable **HiDiffusion** and optionally adjust its switches and ratios:
+   * **HiDiffusion: RAU‑Net**
+   * **HiDiffusion: Window Attention**
+   * **HiDiffusion: Automatic Ratios**
+   * **HiDiffusion: T1 Ratio**
+   * **HiDiffusion: T2 Ratio**
+
+## What the switches do
+
+* **HiDiffusion**: Enables the HiDiffusion patch for denoising. Use this for high‑resolution generations; the effect is subtle at lower sizes.
+
+* **HiDiffusion: RAU‑Net**: Enables RAU‑Net blocks. This typically improves structure and mid‑frequency detail, especially at larger resolutions.
+
+* **HiDiffusion: Window Attention**: Enables windowed attention blocks. This can boost local texture/detail, but may slightly affect global coherence in some prompts.
+
+* **HiDiffusion: Automatic Ratios**: Uses HiDiffusion's original discrete model- and resolution-specific T1/T2 presets behind the scenes. SDXL uses the 2048 preset while either latent dimension is below the 4096 reference threshold, and the 4096 preset only when both dimensions reach it. Automatic ratios are enabled by default for new Generate settings. Turning them on uses the automatic presets for generation while keeping the manual slider positions disabled. Turning them off restores those manual values, including after saving and reopening the project. Manual values start at T1 0.4 and T2 0 until changed. Existing saved numeric settings retain their values, including explicit zero.
+
+* **HiDiffusion: T1 Ratio**: Controls how long the primary RAU-Net stage remains active. At extreme resolutions, this is the later of the two RAU-Net cutoffs. Lower values switch earlier.
+
+* **HiDiffusion: T2 Ratio**: Manually controls the end of the additional early RAU-Net stage. For ordinary SDXL generation, this also controls when the primary stage begins. When automatic ratios are enabled, the original implementation uses a fixed `8 / 50` boundary for this early stage at the 2048 preset. Excessive manual values can reduce pose and background diversity or introduce artifacts. T2 cannot exceed T1; equal values, including 0/0, are allowed. T2 does not control window attention.
+
+The denoise node has one **Automatic Ratios** switch controlling both ratios. Its numeric inputs retain their manual values while disabled. API requests use `hidiffusion_auto_ratios` to select presets; explicit numeric zero remains a manual value. The denoise node and API use manual ratios by default; automatic ratios are opt-in with this switch. Generate enables automatic ratios for new projects and sends the mode explicitly. A null numeric API input becomes zero. Older saved workflows with both ratios explicitly null recover automatic mode when opened; incoming ratio connections retain manual mode.
+
+The T1/T2 input names are retained for API compatibility with the upstream implementation's code keys. T2 is the earlier boundary and T1 is the later boundary; do not interpret the names as chronological order. With automatic ratios at the SDXL 2048 preset, the additional stage runs for the first 8 of every 50 denoising steps, the primary stage then runs until T1, and the ordinary UNet is used afterward. Inpainting follows the upstream non-aggressive schedule and does not use the additional early stage.
+
+For img2img and inpainting, these phases retain their positions in the full denoising schedule. InvokeAI clips them to the sampler's actual selected steps instead of restarting HiDiffusion at the first remaining step. This also preserves the cutoffs for nonlinear schedules such as Karras, where denoising strength is not a linear fraction of the inference steps. If denoising begins after T1, RAU-Net is not applied.
+
+### Manual ratio constraint
+
+When setting the ratios manually, **T2 must be less than or equal to T1**. T2 controls an additional resolution-reduction stage that depends on the primary T1 stage. Allowing T2 to remain active after T1 has ended would produce an invalid RAU-Net stage order and can cause severe structural artifacts.
+
+Both manual inputs accept values from 0 to 1. Generation is blocked with an explanation when both overrides are set and `T2 > T1`; correct either value before generating. Workflows or API requests with an invalid resolved ratio order are rejected by the backend. Zero is an explicit override, distinct from automatic ratios.
+
+## Tips
+
+* Start around **1536–2048 px** for SDXL. Automatic ratios do not interpolate: the upstream 4096 preset is selected only when both image dimensions reach 4096 px (512 latent pixels). Test intermediate and non-square sizes explicitly before increasing either ratio manually.
+* Ordinary SDXL generation uses the upstream staged schedule: the additional RAU-Net path is active first, the primary path takes over at the early boundary, and the ordinary UNet takes over at T1. Inpainting does not use the initial aggressive stage.
+* HiDiffusion is applied only to the SDXL base denoise stage, not the optional refiner stage.
+* Window Attention falls back to ordinary global attention when a feature-map dimension cannot be divided into its 2x2 window layout. This avoids detail loss from resizing the feature map solely for window partitioning.
+* If results look worse, disable **Window Attention** first, then RAU‑Net.
+* Effects vary by scheduler and model; compare with the same seed for a fair test.
