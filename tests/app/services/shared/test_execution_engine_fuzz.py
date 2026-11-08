@@ -1,6 +1,8 @@
 """Execution-engine fuzzer.
 
-Run with ``uv run --no-sync pytest tests/app/services/shared/test_execution_engine_fuzz.py -m slow --durations=10``.
+Run serially with ``uv run --no-sync pytest tests/app/services/shared/test_execution_engine_fuzz.py -m slow --durations=10``.
+For local parallel execution across seeds, add ``-n <cpus> --dist load``; replace ``<cpus>`` with a worker count.
+The configured ``loadfile`` distribution otherwise keeps this single file on one worker.
 """
 
 from __future__ import annotations
