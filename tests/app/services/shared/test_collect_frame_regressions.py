@@ -1668,3 +1668,78 @@ def test_mid_run_reload_keeps_root_for_finals(
     assert _collect_runs(build(), compatibility_scheduler, *expected) == expected
 
     assert _run_with_reload(build(), compatibility_scheduler, reload_after, *expected) == expected
+
+
+def _nested_for_final_through_literal_if() -> Graph:  # fuzz-304
+    """A literal-False If selects a For final from the `(it0, it1)` frame; its other branch is in the `it0` frame."""
+    return _graph(
+        [[["c", "a"], [""]]],
+        2,
+        [
+            For(id="for"),
+            Marked(id="body", marker="F"),
+            ForReturn(id="ret"),
+            Marked(id="t", marker="T:"),
+            If(id="if", condition=False),
+            Collect(id="out"),
+        ],
+        """
+        it1.item -> for.collection
+        for.item -> body.value
+        body.value -> ret.output
+        for.loop_linkage -> ret.loop_linkage
+        it0.item -> t.value
+        t.value -> if.true_input
+        for.output_collection -> if.false_input
+        if.value -> out.item
+        """,
+    )
+
+
+def test_if_selecting_nested_for_final_gets_each_frames_final(compatibility_scheduler: bool) -> None:
+    runs = _collect_runs(_nested_for_final_through_literal_if(), compatibility_scheduler)["out"]
+
+    assert runs == [((0, 0), [["Fc", "Fa"]]), ((0, 1), [["F"]])]
+
+
+def _sibling_reiterate_into_if(computed_condition: bool) -> Graph:  # fuzz3-117
+    """`out` holds a nested per-item value and a sibling root value; an If after re-iterating it selects each item."""
+    condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=True)] if computed_condition else []
+    return _graph(
+        [[["c"]]],
+        2,
+        [
+            Marked(id="item", marker="a:"),
+            Concat(id="sibling_src", first=["p"]),
+            Iterate(id="sibling"),
+            Marked(id="sibling_value", marker="n"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Marked(id="re", marker="r"),
+            Value(id="other", value="RR"),
+            If(id="if", condition=True),
+            Collect(id="out2"),
+            *condition_node,
+        ],
+        """
+        it1.item -> item.value
+        item.value -> out.item
+        sibling_src.collection -> sibling.collection
+        sibling.item -> sibling_value.value
+        sibling_value.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> re.value
+        re.value -> if.true_input
+        other.value -> if.false_input
+        if.value -> out2.item
+        """
+        + ("cond.value -> if.condition" if computed_condition else ""),
+    )
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_if_after_reiterate_keeps_sibling_root_value(computed_condition: bool, compatibility_scheduler: bool) -> None:
+    """Without the If, out2 gets `(): ['rnp']` and `(0,): ["ra:['c']"]`; the If must not change that."""
+    runs = _collect_runs(_sibling_reiterate_into_if(computed_condition), compatibility_scheduler, "out2")["out2"]
+
+    assert runs == [((), ["rnp"]), ((0,), ["ra:['c']"])]
