@@ -98,8 +98,9 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 `text_projection` for SD 3 and is refused without it, as are extended-context CLIP-L variants such as Long-CLIP.
 FLUX.1 takes CLIP-L only.
 
-The Qwen3-VL and Qwen2.5-VL GGUF encoders are the language model only; a separate `mmproj` vision file is refused.
-Without the vision tower, Qwen-Image Edit cannot read reference images with the Qwen2.5-VL GGUF encoder and says so
+The Qwen3-VL and Qwen2.5-VL GGUF encoders are the language model only. The Qwen3-VL `mmproj` vision file installs
+as its own **Qwen3-VL Vision Tower** model, which Qwen-Image-2.1 edits read reference images through; a Qwen2.5-VL
+`mmproj` file is refused. Without the vision tower, Qwen-Image Edit cannot read reference images with the Qwen2.5-VL GGUF encoder and says so
 before generating. A Qwen2-VL GGUF, the previous generation under the same llama.cpp architecture name, is refused.
 Qwen3-VL nvfp4 single files keep their layers packed: ComfyUI's `qwen3vl_8b_nvfp4`, and repacks that name their nvfp4
 layers the same way, in `.comfy_quant` markers or the `_quantization_metadata` header. A repack that packs its vision

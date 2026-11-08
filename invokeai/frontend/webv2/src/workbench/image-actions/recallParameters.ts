@@ -21,7 +21,7 @@ import {
   getDefaultLoraWeight,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
-  getMaxReferenceImages,
+  getReferenceImageLimit,
   getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
@@ -31,7 +31,7 @@ import {
   isMainModelConfig,
   isRefinerModel,
   isRefinerSupported,
-  isReferenceImageSupported,
+  takesReferenceImages,
   isVaeCompatibleWithGenerateModel,
   MAX_REFINER_AESTHETIC_SCORE,
   MAX_REFINER_START,
@@ -604,7 +604,8 @@ export const buildRecallParametersSettings = ({
       recalledImages.push(image);
     }
 
-    const isSupported = isReferenceImageSupported(values.model);
+    // The base alone decides: an encoder without a vision tower is flagged by validation, not recalled away.
+    const isSupported = takesReferenceImages(values.model);
 
     if (recalled.length + recalledImages.length > 0 && !isSupported) {
       if (ipAdapters?.length) {
@@ -623,7 +624,7 @@ export const buildRecallParametersSettings = ({
       : kept;
     const addedImages = isSupported ? recalledImages : [];
     const recalledCount = withAdapters.length + addedImages.length - kept.length;
-    const limit = getMaxReferenceImages(values.model);
+    const limit = getReferenceImageLimit(values.model);
 
     if (withAdapters.length + addedImages.length > limit) {
       skip('reference_images', 'limit', String(limit));

@@ -29,10 +29,10 @@ export const appendReferenceImage = ({
   const supportedModels = models.filter(isSupportedGenerateModel);
   const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
 
-  if (!currentValues || !isReferenceImageSupported(currentValues.model)) {
+  if (!currentValues || !isReferenceImageSupported(currentValues.model, currentValues)) {
     return { status: 'unsupported' };
   }
-  if (currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model)) {
+  if (currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model, currentValues)) {
     return { status: 'full' };
   }
 
