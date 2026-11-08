@@ -2607,6 +2607,7 @@ class _ExecutionNodeBuilder:
     ) -> Iterable[list[tuple[str, str]]]:
         condition_edges = self._state.graph._get_input_edges(node_id, "condition")
         iterator_graph = self.iterator_graph(graph)
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         if condition_edges:
             condition_axes = self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph)
             condition_iterator_ids = set(condition_axes)
@@ -2622,6 +2623,13 @@ class _ExecutionNodeBuilder:
                     branch: self._state.graph._get_input_edges(node_id, branch)
                     for branch in ("true_input", "false_input")
                 }
+                branch_axes_by_field: dict[str, list[str]] = {}
+                for branch_field, edges in branch_edges.items():
+                    axes = self._get_ordered_iterator_axes_for_edges(edges, iterator_graph)
+                    reiterated_axes = graph_if_runtime._get_sibling_collect_iterate_axes_to_project(
+                        self._state, iterator_ancestry, axes
+                    )
+                    branch_axes_by_field[branch_field] = [axis_id for axis_id in axes if axis_id not in reiterated_axes]
 
                 def get_root_condition_mappings() -> Iterable[list[tuple[str, str]]]:
                     for mapping in condition_mappings:
@@ -2632,7 +2640,7 @@ class _ExecutionNodeBuilder:
                             self._state.results[condition_exec_id], condition_edges[0].source.field
                         )
                         selected_field = "true_input" if condition_value else "false_input"
-                        axes = self._get_ordered_iterator_axes_for_edges(branch_edges[selected_field], iterator_graph)
+                        axes = branch_axes_by_field[selected_field]
                         if not axes:
                             yield mapping
                             continue
@@ -2664,7 +2672,6 @@ class _ExecutionNodeBuilder:
 
         # This specialization derives one branch axis against a root-frame condition. Mixed or nested condition
         # axes use the general parent-mapping path.
-        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         if condition_edges:
             if all(
                 outer_id in iterator_ancestry.get_ordered_iterator_ancestors(inner_id)
@@ -3945,8 +3952,42 @@ class _ExecutionNodeBuilder:
                     create_results = self.create_execution_node(next_node_id, [], ())
                     new_node_ids.extend(create_results)
                 else:
+                    frame_iterators = tuple(iterator_ancestry.get_frame_iterators(next_node_id))
+                    reiterated_axes = graph_if_runtime._get_sibling_collect_iterate_axes_to_project(
+                        self._state, iterator_ancestry, frame_iterators
+                    )
+                    prepared_path_axes: dict[tuple[int, ...], tuple[str, ...]] = {}
+                    if reiterated_axes:
+                        frame_axes = tuple(axis_id for axis_id in frame_iterators if axis_id not in reiterated_axes)
+                    else:
+                        selected_edges = self._state.graph._get_input_edges(next_node_id, selected_field)
+                        frame_axes = tuple(
+                            self._get_ordered_iterator_axes_for_edges(selected_edges, self.iterator_graph(g))
+                        )
+                        prepared_frames: list[tuple[tuple[int, ...], tuple[str, ...]]] = []
+                        for edge in selected_edges:
+                            for prepared_id in self._get_prepared_nodes_for_source(edge.source.node_id):
+                                prepared_frames.append(
+                                    (
+                                        self._get_prepared_edge_iteration_path(edge, prepared_id),
+                                        self._get_prepared_edge_iteration_axes(edge, prepared_id),
+                                    )
+                                )
+                        projected_paths = graph_if_runtime._project_prepared_iteration_paths(prepared_frames, set())
+                        if projected_paths is not None:
+                            for path, axes in prepared_frames:
+                                if path in condition_paths:
+                                    prepared_path_axes.setdefault(path, axes)
                     for iteration_path in condition_paths:
-                        create_results = self.create_execution_node(next_node_id, [], iteration_path)
+                        iteration_axes = prepared_path_axes.get(iteration_path)
+                        if iteration_axes is None and len(frame_axes) >= len(iteration_path):
+                            iteration_axes = frame_axes[: len(iteration_path)]
+                        create_results = self.create_execution_node(
+                            next_node_id,
+                            [],
+                            iteration_path,
+                            iteration_axes=iteration_axes,
+                        )
                         new_node_ids.extend(create_results)
         else:
             parent_iterator_nodes = self.get_node_iterators(next_node_id)

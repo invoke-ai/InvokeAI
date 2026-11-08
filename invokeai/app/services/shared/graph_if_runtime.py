@@ -65,6 +65,144 @@ def _get_collects_before_iteration_boundary(state: "GraphExecutionState", edges:
     return collects
 
 
+def _is_sibling_collect_iterate_axis(
+    state: "GraphExecutionState", iterator_ancestry: _IteratorAncestry, axis_id: str
+) -> bool:
+    """Return whether an Iterate axis replays a Collect fed by sibling Iterates."""
+    prepared_ids = state.source_prepared_mapping.get(axis_id, ())
+    cached = iterator_ancestry.sibling_collect_iterate_axis_cache.get(axis_id)
+    if cached is not None and cached[0] is prepared_ids and cached[1] == len(prepared_ids):
+        return cached[2]
+
+    def cache_result(result: bool) -> bool:
+        iterator_ancestry.sibling_collect_iterate_axis_cache[axis_id] = (prepared_ids, len(prepared_ids), result)
+        return result
+
+    collection_edges = state.graph._get_input_edges(axis_id, COLLECTION_FIELD)
+    if len(collection_edges) != 1 or not isinstance(
+        state.graph.get_node(collection_edges[0].source.node_id), CollectInvocation
+    ):
+        return cache_result(False)
+    collect_id = collection_edges[0].source.node_id
+    item_edges = state.graph._get_input_edges(collect_id, ITEM_FIELD)
+    iterator_ids = [
+        (axes[-1] if axes else None)
+        for axes in (
+            _get_edge_frame_axes(state, iterator_ancestry, edge, iterator_ancestry.frame_axes_cache)
+            for edge in item_edges
+        )
+    ]
+    is_sibling_collect = (
+        len(iterator_ids) > 1
+        and not any(_get_if_final_axes_for_edge(state, iterator_ancestry, edge)[0] for edge in item_edges)
+        and all(iterator_id is not None for iterator_id in iterator_ids)
+        and len(set(iterator_ids)) == len(iterator_ids)
+        and all(
+            isinstance(state.graph.get_node(iterator_id), IterateInvocation)
+            for iterator_id in iterator_ids
+            if iterator_id
+        )
+    )
+    if not is_sibling_collect:
+        return cache_result(False)
+
+    # A numeric path alone is insufficient when prepared frames at that path carry different axes.
+    registry = state._prepared_registry()
+    axes_by_path: dict[tuple[int, ...], tuple[str, ...]] = {}
+    projected_axes_by_path: dict[tuple[int, ...], tuple[str, ...]] = {}
+    for prepared_id in prepared_ids:
+        path = registry.get_iteration_path(prepared_id)
+        axes = registry.get_iteration_axes(prepared_id)
+        if path is None or axes is None or len(path) != len(axes):
+            return cache_result(False)
+        previous_axes = axes_by_path.setdefault(path, axes)
+        if previous_axes != axes:
+            return cache_result(False)
+        projected_path = tuple(coordinate for axis, coordinate in zip(axes, path, strict=True) if axis != axis_id)
+        projected_axes = tuple(axis for axis in axes if axis != axis_id)
+        previous_projected_axes = projected_axes_by_path.setdefault(projected_path, projected_axes)
+        if previous_projected_axes != projected_axes:
+            return cache_result(False)
+    return cache_result(True)
+
+
+def _project_prepared_iteration_paths(
+    prepared_frames: list[tuple[tuple[int, ...], tuple[str, ...]]], reiterated_axes: set[str]
+) -> Optional[dict[tuple[int, ...], tuple[int, ...]]]:
+    """Project prepared paths only when the resulting numeric paths retain unique axis identities."""
+    axes_by_path: dict[tuple[int, ...], tuple[str, ...]] = {}
+    projected_axes_by_path: dict[tuple[int, ...], tuple[str, ...]] = {}
+    projected_paths: dict[tuple[int, ...], tuple[int, ...]] = {}
+    for path, axes in prepared_frames:
+        if len(path) != len(axes):
+            return None
+        previous_axes = axes_by_path.setdefault(path, axes)
+        if previous_axes != axes:
+            return None
+        projected_path = tuple(
+            coordinate for axis_id, coordinate in zip(axes, path, strict=True) if axis_id not in reiterated_axes
+        )
+        projected_axes = tuple(axis_id for axis_id in axes if axis_id not in reiterated_axes)
+        previous_projected_axes = projected_axes_by_path.setdefault(projected_path, projected_axes)
+        if previous_projected_axes != projected_axes:
+            return None
+        projected_paths[path] = projected_path
+    return projected_paths
+
+
+def _get_sibling_collect_iterate_axes_to_project(
+    state: "GraphExecutionState", iterator_ancestry: _IteratorAncestry, axis_ids: list[str] | tuple[str, ...]
+) -> set[str]:
+    """Return the sibling Collect re-Iterate axes whose combined projection preserves frame identity."""
+    if not axis_ids:
+        return set()
+    cache_key = tuple(axis_ids)
+    prepared_sets = tuple(state.source_prepared_mapping.get(axis_id, ()) for axis_id in cache_key)
+    prepared_set_token = tuple((prepared_ids, len(prepared_ids)) for prepared_ids in prepared_sets)
+    prepared_ids = state.source_prepared_mapping.get(cache_key[-1], ())
+    cached = iterator_ancestry.sibling_collect_iterate_projection_cache.get(cache_key)
+    if (
+        cached is not None
+        and len(cached[0]) == len(prepared_set_token)
+        and all(
+            cached_set is current_set and cached_count == current_count
+            for (cached_set, cached_count), (current_set, current_count) in zip(
+                cached[0], prepared_set_token, strict=True
+            )
+        )
+    ):
+        return set(cached[1])
+
+    def cache_result(result: set[str]) -> set[str]:
+        iterator_ancestry.sibling_collect_iterate_projection_cache[cache_key] = (
+            prepared_set_token,
+            frozenset(result),
+        )
+        return result
+
+    reiterated_axes = {
+        axis_id
+        for axis_id in axis_ids
+        if isinstance(state.graph.get_node(axis_id), IterateInvocation)
+        and _is_sibling_collect_iterate_axis(state, iterator_ancestry, axis_id)
+    }
+    if not reiterated_axes:
+        return cache_result(set())
+
+    registry = state._prepared_registry()
+    prepared_frames = [
+        (registry.get_iteration_path(prepared_id), registry.get_iteration_axes(prepared_id))
+        for prepared_id in prepared_ids
+    ]
+    if prepared_ids and (
+        len(prepared_frames) != len(prepared_ids)
+        or any(path is None or axes is None for path, axes in prepared_frames)
+        or _project_prepared_iteration_paths(prepared_frames, reiterated_axes) is None
+    ):
+        return cache_result(set())
+    return cache_result(reiterated_axes)
+
+
 def validate_if_iteration_axes(state: "GraphExecutionState") -> None:
     """Reject unrelated condition and branch axes using graph topology alone."""
     iterator_ancestry = _IteratorAncestry(state)
@@ -878,6 +1016,7 @@ def _get_if_iteration_paths_with_ancestry(
                     for axis_id in frame_iterators
                     if axis_id not in selected_axes_by_field[other_field] or axis_id in selected_axes
                 ]
+    preserve_projected_prefixes = False
     if frame_iterators:
         innermost_id = frame_iterators[-1]
         if innermost_id not in state.executed and innermost_id not in state.source_prepared_mapping:
@@ -894,6 +1033,26 @@ def _get_if_iteration_paths_with_ancestry(
             else {state._get_iteration_path(prepared_id) for prepared_id in prepared_ids}
         )
         branch_paths = paths
+        reiterated_axes = _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, frame_iterators)
+        if reiterated_axes:
+            registry = state._prepared_registry()
+            prepared_frames: list[tuple[tuple[int, ...], tuple[str, ...]]] = []
+            for prepared_id in prepared_ids:
+                path = (
+                    get_prepared_edge_iteration_path(iterator_edges[0], prepared_id)
+                    if iterator_edges
+                    else state._get_iteration_path(prepared_id)
+                )
+                axes = registry.get_iteration_axes(prepared_id)
+                if axes is None:
+                    prepared_frames = []
+                    break
+                prepared_frames.append((path, axes))
+            projected_paths = _project_prepared_iteration_paths(prepared_frames, reiterated_axes)
+            if projected_paths:
+                frame_paths = set(projected_paths.values())
+                paths = {projected_paths.get(path, path) for path in paths}
+                preserve_projected_prefixes = True
         paths = {
             frame_path
             for frame_path in frame_paths
@@ -911,6 +1070,8 @@ def _get_if_iteration_paths_with_ancestry(
             if not iterator_ancestry.has_iterator_ancestor(node_id):
                 return [()]
         return []
+    if preserve_projected_prefixes:
+        return sorted(paths)
     proper_prefixes = {path[:prefix_length] for path in paths for prefix_length in range(len(path))}
     return sorted(path for path in paths if path not in proper_prefixes)
 

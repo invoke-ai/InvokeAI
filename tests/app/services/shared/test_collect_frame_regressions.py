@@ -18,6 +18,7 @@ from invokeai.app.invocations.logic import IfInvocation as If
 from invokeai.app.invocations.loops import ForInvocation as For
 from invokeai.app.invocations.loops import ForReturnInvocation as ForReturn
 from invokeai.app.invocations.primitives import BooleanInvocation
+from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state, load_execution_state
 from invokeai.app.services.shared.graph import CollectInvocation as Collect
 from invokeai.app.services.shared.graph import (
@@ -27,6 +28,12 @@ from invokeai.app.services.shared.graph import (
     _GenericGraphSchedulerAdapter,
 )
 from invokeai.app.services.shared.graph import IterateInvocation as Iterate
+from invokeai.app.services.shared.graph_if_runtime import (
+    _get_sibling_collect_iterate_axes_to_project,
+    _is_sibling_collect_iterate_axis,
+    _project_prepared_iteration_paths,
+)
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_materializer import _ExecutionMaterializer
 from tests.test_nodes import AnyTypeTestInvocation as Value
 from tests.test_nodes import FixedCollectionTestInvocation as Truthy
@@ -1702,6 +1709,16 @@ def test_if_selecting_nested_for_final_gets_each_frames_final(compatibility_sche
     assert runs == [((0, 0), [["Fc", "Fa"]]), ((0, 1), [["F"]])]
 
 
+@pytest.mark.parametrize("reload_after", [4, 9])
+def test_if_selecting_nested_for_final_survives_reload(reload_after: int, compatibility_scheduler: bool) -> None:
+    expected = {"out": [((0, 0), [["Fc", "Fa"]]), ((0, 1), [["F"]])]}
+
+    assert (
+        _run_with_reload(_nested_for_final_through_literal_if(), compatibility_scheduler, reload_after, "out")
+        == expected
+    )
+
+
 def _sibling_reiterate_into_if(computed_condition: bool) -> Graph:  # fuzz3-117
     """`out` holds a nested per-item value and a sibling root value; an If after re-iterating it selects each item."""
     condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=True)] if computed_condition else []
@@ -1737,9 +1754,103 @@ def _sibling_reiterate_into_if(computed_condition: bool) -> Graph:  # fuzz3-117
     )
 
 
+def test_sibling_reiterate_projection_keeps_distinct_axes_at_same_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = GraphExecutionState(graph=_sibling_reiterate_into_if(computed_condition=False))
+    iterator_ancestry = _IteratorAncestry(state)
+    final_axis_checks = 0
+    get_final_axes = graph_if_runtime._get_if_final_axes_for_edge
+
+    def count_final_axis_checks(*args: AnyValue) -> AnyValue:
+        nonlocal final_axis_checks
+        final_axis_checks += 1
+        return get_final_axes(*args)
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_final_axes_for_edge", count_final_axis_checks)
+    assert _is_sibling_collect_iterate_axis(state, iterator_ancestry, "rit")
+    first_check_count = final_axis_checks
+    assert first_check_count > 0
+    assert _is_sibling_collect_iterate_axis(state, iterator_ancestry, "rit")
+    assert final_axis_checks == first_check_count
+
+    registry = state._prepared_registry()
+    registry_type = type(registry)
+    frame_metadata_reads = 0
+    get_iteration_path = registry_type.get_iteration_path
+    get_iteration_axes = registry_type.get_iteration_axes
+
+    def count_iteration_path_reads(self: AnyValue, exec_id: str) -> AnyValue:
+        nonlocal frame_metadata_reads
+        frame_metadata_reads += 1
+        return get_iteration_path(self, exec_id)
+
+    def count_iteration_axes_reads(self: AnyValue, exec_id: str) -> AnyValue:
+        nonlocal frame_metadata_reads
+        frame_metadata_reads += 1
+        return get_iteration_axes(self, exec_id)
+
+    monkeypatch.setattr(registry_type, "get_iteration_path", count_iteration_path_reads)
+    monkeypatch.setattr(registry_type, "get_iteration_axes", count_iteration_axes_reads)
+    registry.register("frame-a", "rit")
+    registry.set_iteration_path("frame-a", (0, 0))
+    registry.set_iteration_axes("frame-a", ("it0", "rit"))
+    assert _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, ("it0", "rit")) == {"rit"}
+    first_frame_scan_count = frame_metadata_reads
+    assert first_frame_scan_count > 0
+    assert _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, ("it0", "rit")) == {"rit"}
+    assert frame_metadata_reads == first_frame_scan_count
+
+    registry.register("parent-frame", "it0")
+    registry.set_iteration_path("parent-frame", (0,))
+    registry.set_iteration_axes("parent-frame", ("it0",))
+    assert _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, ("it0", "rit")) == {"rit"}
+    assert frame_metadata_reads > first_frame_scan_count
+    first_frame_scan_count = frame_metadata_reads
+    state.source_prepared_mapping["it0"] = set(state.source_prepared_mapping["it0"])
+    assert _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, ("it0", "rit")) == {"rit"}
+    assert frame_metadata_reads > first_frame_scan_count
+    first_frame_scan_count = frame_metadata_reads
+
+    registry.register("frame-b", "rit")
+    registry.set_iteration_path("frame-b", (0, 1))
+    registry.set_iteration_axes("frame-b", ("it0", "rit"))
+    assert _get_sibling_collect_iterate_axes_to_project(state, iterator_ancestry, ("it0", "rit")) == {"rit"}
+    assert frame_metadata_reads > first_frame_scan_count
+
+    registry.register("frame-c", "rit")
+    registry.set_iteration_path("frame-c", (0, 1))
+    registry.set_iteration_axes("frame-c", ("sibling", "rit"))
+
+    assert not _is_sibling_collect_iterate_axis(state, iterator_ancestry, "rit")
+    assert not _is_sibling_collect_iterate_axis(state, iterator_ancestry, "rit")
+
+
+def test_combined_sibling_reiterate_projection_rejects_ambiguous_axes() -> None:
+    prepared_frames = [
+        ((0, 0, 0, 1), ("it0", "rit_a", "keep_a", "rit_b")),
+        ((0, 1, 0, 0), ("it0", "rit_a", "keep_b", "rit_b")),
+    ]
+
+    assert _project_prepared_iteration_paths(prepared_frames, {"rit_a"}) is not None
+    assert _project_prepared_iteration_paths(prepared_frames, {"rit_b"}) is not None
+    assert _project_prepared_iteration_paths(prepared_frames, {"rit_a", "rit_b"}) is None
+    assert _project_prepared_iteration_paths([*prepared_frames, ((1, 0), ("rit_a",))], {"rit_a"}) is None
+
+
 @pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
 def test_if_after_reiterate_keeps_sibling_root_value(computed_condition: bool, compatibility_scheduler: bool) -> None:
     """Without the If, out2 gets `(): ['rnp']` and `(0,): ["ra:['c']"]`; the If must not change that."""
     runs = _collect_runs(_sibling_reiterate_into_if(computed_condition), compatibility_scheduler, "out2")["out2"]
 
     assert runs == [((), ["rnp"]), ((0,), ["ra:['c']"])]
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_if_after_reiterate_keeps_sibling_root_value_after_reload(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    expected = {"out2": [((), ["rnp"]), ((0,), ["ra:['c']"])]}
+
+    assert (
+        _run_with_reload(_sibling_reiterate_into_if(computed_condition), compatibility_scheduler, 12, "out2")
+        == expected
+    )

@@ -39,10 +39,16 @@ class _IteratorAncestry:
         self.frame_axes_cache: dict[str, Optional[tuple[str, ...]]] = {}
         self.if_final_axes_by_edge: dict[Edge, tuple[set[str], set[str]]] = {}
         self.effective_iteration_paths_by_edge: dict[Edge, set[tuple[int, ...]]] = {}
+        self.sibling_collect_iterate_axis_cache: dict[str, tuple[object, int, bool]] = {}
+        self.sibling_collect_iterate_projection_cache: dict[
+            tuple[str, ...], tuple[tuple[tuple[object, int], ...], frozenset[str]]
+        ] = {}
 
     def clear_effective_iteration_paths(self) -> None:
         """Invalidate prepared-path results when execution materialization advances."""
         self.effective_iteration_paths_by_edge.clear()
+        self.sibling_collect_iterate_axis_cache.clear()
+        self.sibling_collect_iterate_projection_cache.clear()
 
     def has_iterator_ancestor(self, node_id: str) -> bool:
         if self._has_iterator_ancestor is None:
