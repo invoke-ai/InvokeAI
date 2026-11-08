@@ -153,7 +153,10 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
                     return inner
     elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
         keys = set(val.keys())
-        if keys.issubset({"tokenizer", "text_encoder", "loras", "skipped_layers"}) and "text_encoder" in val:
+        if (
+            keys.issubset({"tokenizer", "text_encoder", "vision_tower", "connectors", "loras", "skipped_layers"})
+            and "text_encoder" in val
+        ):
             if not is_custom or not val.get("loras"):
                 inner = val["text_encoder"]
                 if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
