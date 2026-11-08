@@ -175,15 +175,16 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
             "guidance": effective_guidance,
             "ideogram4_sampler_preset": self.sampler_preset,
             "seed": self.seed,
-            "model": self.transformer.transformer,
         }
+        if getattr(self, "transformer", None) is not None:
+            updates["model"] = self.transformer.transformer
         if self.steps is not None:
             updates["ideogram4_steps"] = self.steps
         if self.guidance_scale is not None:
             updates["ideogram4_guidance_scale"] = self.guidance_scale
         if self.mu is not None:
             updates["ideogram4_mu"] = self.mu
-        if self.unconditional_transformer is not None:
+        if getattr(self, "unconditional_transformer", None) is not None:
             updates["ideogram4_unconditional_model"] = self.unconditional_transformer.transformer
 
         updates["loras"] = serialize_lora_metadata(

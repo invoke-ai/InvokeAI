@@ -40,7 +40,7 @@ register(
         )
     ),
     # Text-to-image only.
-    ModalityFacet(frozenset({"txt2img"}), metadata_slug="ernie_image"),
+    ModalityFacet(frozenset({"txt2img", "img2img"}), metadata_slug="ernie_image"),
     # ernie_image_denoise takes a negative_conditioning that is 'required when
     # guidance_scale != 1.0' — cfg-gated, exactly like the other distilled models. Its
     # scheduler set is ERNIE_IMAGE_SCHEDULER_MAP, a flow family.
