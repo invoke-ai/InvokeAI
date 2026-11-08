@@ -210,7 +210,7 @@ _CORPUS = json.loads(
     (
         Path(__file__).resolve().parents[3]
         / "invokeai/frontend/webv2/src/features/generation/core/__fixtures__/animaPromptAttention.json"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 )["cases"]
 
 
