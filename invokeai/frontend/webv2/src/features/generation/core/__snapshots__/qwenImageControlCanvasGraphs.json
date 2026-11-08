@@ -326,7 +326,35 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "q-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "q-control",
+            "model": {
+              "base": "qwen-image",
+              "key": "qwen-union",
+              "name": "Qwen Image ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "qwen_image_control",
+            "weight": 0.85
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -726,7 +754,35 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "q-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "q-control",
+            "model": {
+              "base": "qwen-image",
+              "key": "qwen-instantx",
+              "name": "Qwen Image InstantX ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:instantx"
+            },
+            "type": "qwen_image_control",
+            "weight": 0.85
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -1172,7 +1228,35 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "q-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "q-control",
+            "model": {
+              "base": "qwen-image",
+              "key": "qwen-union",
+              "name": "Qwen Image ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "qwen_image_control",
+            "weight": 0.85
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "infill": {
         "is_intermediate": true,
@@ -1520,7 +1604,35 @@
         "width": 768,
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "q-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "q-control",
+            "model": {
+              "base": "qwen-image",
+              "key": "qwen-union",
+              "name": "Qwen Image ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "qwen_image_control",
+            "weight": 0.85
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "qwen_image_control_q-control": {
         "is_intermediate": true,

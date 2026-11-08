@@ -18,6 +18,7 @@ export {
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -118,6 +119,11 @@ export {
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
+export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,

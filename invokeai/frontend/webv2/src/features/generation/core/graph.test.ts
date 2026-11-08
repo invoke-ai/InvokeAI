@@ -212,7 +212,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'unet')?.source.node_id).toBe('model_loader');
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('records the accelerator supplied by the orchestration boundary in metadata', () => {
@@ -227,10 +227,11 @@ describe('compileGenerateGraph', () => {
     expect(getNodeByType(graph, 'core_metadata')?.rand_device).toBe('xpu');
   });
 
-  it('passes SDXL color compensation to the VAE decode node when enabled', () => {
-    const graph = compile(sdxlModel, { colorCompensation: true });
+  it.each([true, false])('omits encoder-only color compensation from SDXL txt2img when enabled=%s', (enabled) => {
+    const graph = compile(sdxlModel, { colorCompensation: enabled });
 
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('SDXL');
+    expect(getNodeByType(graph, 'i2l')).toBeUndefined();
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('coerces invalid SD schedulers before graph submission', () => {

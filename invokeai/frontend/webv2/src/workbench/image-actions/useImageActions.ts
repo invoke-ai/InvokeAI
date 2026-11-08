@@ -1203,6 +1203,13 @@ export const useImageActions = ({
         const owner = captureAccountScope();
         const didRecall = await executeImageRecall({
           commands,
+          canvasTarget: projectId
+            ? {
+                commands,
+                projectId,
+                getProject: () => (queries.isActiveProject(projectId) ? (getLatestProject() ?? null) : null),
+              }
+            : undefined,
           getGenerateValues: getLatestGenerateValues,
           image,
           isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
