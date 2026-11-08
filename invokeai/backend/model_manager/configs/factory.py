@@ -174,6 +174,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
     Qwen3VLEncoder_GGUF_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
+    Qwen3VLVisionTower_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -626,6 +627,7 @@ AnyModelConfig = Annotated[
         # satisfies the text-only Qwen3 GGUF heuristic in full.
         Annotated[Qwen3VLEncoder_GGUF_Config, Qwen3VLEncoder_GGUF_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
+        Annotated[Qwen3VLVisionTower_GGUF_Config, Qwen3VLVisionTower_GGUF_Config.get_tag()],
         Annotated[Qwen35Encoder_Checkpoint_Config, Qwen35Encoder_Checkpoint_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
