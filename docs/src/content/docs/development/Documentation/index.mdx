@@ -40,7 +40,7 @@ The documentation is organized into a file tree structure. It should be very fam
       - lib/ utility functions and shared code
         - components/ reusable, custom components
       - pages/ non-documentation pages
-      - styles/ global styles and themes
+      - styles/ global styles; colors, tabs and buttons follow the app's Classic theme (`plugins/theme-tokens.mjs`)
 </FileTree>
 
 ## Development
@@ -103,6 +103,8 @@ There are 2 main ways to get your development environment set up for documentati
 
 If there's another local server running on port `4321` prior to running this, then use the port specified in the output.
 
+The docs' colors come from the app's theme, `invokeai/frontend/webv2/src/platform/ui/theme/themes.ts`. Saving that file restarts the dev server, so theme changes show up on their own; a change to `plugins/theme-tokens.mjs`, which turns the theme into the docs' tokens, needs a manual restart.
+
 ### Adding Pages
 
 Located within the `src/content/docs/` directory, this is where the documentation pages are stored and organized by category. These categories are file-based and are mirrored to the sidebar navigation.
@@ -132,39 +134,15 @@ For example, if we wanted to document a new feature called "Instant Bananas", we
 
 The way you organize your added pages dictates how the URL structure is generated for your documentation pages. In this example, the url for the `index.md` page would be `https://invoke.ai/features/instant-bananas/`, and the url for the `requirements.mdx` page would be `https://invoke.ai/features/instant-bananas/requirements/`.
 
-If you wish to add a top-level category, then one additional step is required for the category to appear in the sidebar.
+The sidebar is split into topics, such as Get Started, Guide and Models, and each page shows the sidebar of its own topic. `src/config/topics.ts` lists the topics with the label, description, icon and landing page that the topic switcher shows, and `src/config/sidebar.ts` gives each topic its sidebar items, usually a directory to autogenerate from. A new page in an existing directory joins its topic automatically. A new top-level directory needs a topic, or must be added to an existing topic's items, or the build fails with a message naming the page.
 
-Within the `src/config/sidebar.ts` file, you'll need to add a new sidebar category object to the array, since the fine-grained control over top-level categories needs to be a bit more explicit.
-
-```diff lang="js"
-const sidebar = [
+```diff lang="js" title="src/config/sidebar.ts"
+const topicItems = {
   // ...
-  {
-    label: 'Concepts',
-    items: [
-      {
-        autogenerate: { directory: 'concepts' },
-      },
-    ],
-  },
-+  {
-+    label: 'A New Category',
-+    items: [
-+      {
-+        autogenerate: { directory: 'new-category' },
-+      },
-+    ],
-+  },
-  {
-    label: 'Features',
-    items: [
-      {
-        autogenerate: { directory: 'features' },
-      },
-    ],
-  },
+  configure: [{ autogenerate: { directory: 'configuration' } }],
++  'new-topic': [{ autogenerate: { directory: 'new-category' } }],
   // ...
-]
+};
 ```
 
 ### Ordering Pages
@@ -206,29 +184,14 @@ To render the image, you'd just use a relative path in your markdown.
 ![Alt text here](./assets/demonstration.webp)
 ```
 
-### Adding Translations
+### Translations
 
-Currently, the documentation is only available in English. If you wish to add translations for other languages, we've already laid the ground work for you to do so.
+English is the source of truth: write and update the English pages and strings only. Translators work in [Crowdin](/contributing/translations/), which opens pull requests with their translations.
 
-Firstly, add a new folder within the `src/content/i18n` directory, and create your translated version of the markdown file into the same path as the original.
+- **Pages.** Translations of the user-facing trees (`start-here/`, `Users Guide/`, `configuration/`, `troubleshooting/` and the home page) land in `src/content/docs/<locale>/`, mirroring the English paths. Crowdin owns those directories, so don't edit them by hand. A page without a translation shows the English page with a notice. A translation changes only prose: `pnpm test` fails one that adds or changes imports, components, `{…}` expressions, links or frontmatter other than titles and descriptions.
+- **Interface strings.** Text in components and layouts comes from `src/content/i18n/en.json`. Add a key there and read it with `Astro.locals.t('key')`, or with the `Trans` component when the message contains markup such as a link. `pnpm test` fails when the code uses a key `en.json` lacks, or `en.json` has a key nothing uses.
 
-For example:
-
-<FileTree>
-  - src/
-    - content/
-      - docs/
-        - start-here/
-          - installation.mdx
-      - i18n/
-        - zh-CN Country code here
-          - start-here/
-            - installation.mdx
-</FileTree>
-
-We recommend simply copy/pasting the file and rewriting the text from there.
-
-Learn more about the intricacies of translating Astro Starlight docs [here](https://starlight.astro.build/guides/i18n).
+Maintainers: the [docs README](https://github.com/invoke-ai/InvokeAI/blob/main/docs/README.md) covers Crowdin setup, adding a locale and reviewing a translation pull request.
 
 ## Running a Build
 
@@ -297,6 +260,20 @@ The Invoke API is always evolving, and quite large. Documenting all this by hand
 
 These files are used for the [YAML Config](/configuration/invokeai-yaml) and [API Development](/development/guides/api-development) pages. If you're adding a feature that changes the yaml config, or the api then make sure to run `pnpm run generate-docs-data` to ensure tests pass, and that the docs are accurate in accordance to your updates.
 
+### App Search Index
+
+The app's command palette searches the docs from a copy of the docs index committed at `invokeai/frontend/webv2/src/workbench/palette/docsSearchIndex.json`. The build serves the index at `/app-search.json` (`src/pages/app-search.json.ts`). It lists the topics outside the Build group, with their labels, descriptions and landing pages, and each of their published pages, with its title, description, topic, and h2 and h3 headings. Developer and contributor pages are left out.
+
+Resync the copy whenever a change reaches the index: adding, removing, moving or renaming a page; changing a page's title, description, `draft` or `pagefind` frontmatter; adding, removing or renaming an h2 or h3 heading; or changing a topic in `src/config/topics.ts`. Rebuild, copy the index into the app, and commit the result:
+
+```sh
+cd docs
+pnpm build
+pnpm run sync-app-search-index
+```
+
+`pnpm run check-app-search-index` fails when the committed copy no longer matches a build.
+
 ## Testing
 
 The docs contain tests for the following:
@@ -306,6 +283,8 @@ The docs contain tests for the following:
 | Link Checker | Checks for invalid, malformed or misdirected internal link URLs | Dev Server, Build, Deploy |
 | Verify Deployment Output | Check to ensure the asset and page paths have the expected base paths dependent on deploy targets | Build, Deploy |
 | Check Docs Data | Checks to ensure the generated files are accurate | Deploy |
+| Check App Search Index | Checks that the app's copy of the docs search index matches the build | Deploy |
+| Translation Checks | Checks that translated pages and interface strings add no code, markup or links and keep their placeholders (`src/lib/translation-checks.mjs`, part of `pnpm test`) | Deploy |
 
 ## GitHub Actions
 

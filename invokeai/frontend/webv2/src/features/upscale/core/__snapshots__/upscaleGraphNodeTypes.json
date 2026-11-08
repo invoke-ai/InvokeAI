@@ -106,8 +106,9 @@
     "qwen_image_denoise latents qwen_image_l2i latents",
     "qwen_image_i2l latents krea2_denoise latents",
     "qwen_image_i2l latents qwen_image_denoise latents",
+    "qwen_image_lora_collection_loader qwen_vl_encoder qwen_image_text_encoder qwen_vl_encoder",
     "qwen_image_lora_collection_loader transformer qwen_image_denoise transformer",
-    "qwen_image_model_loader qwen_vl_encoder qwen_image_text_encoder qwen_vl_encoder",
+    "qwen_image_model_loader qwen_vl_encoder qwen_image_lora_collection_loader qwen_vl_encoder",
     "qwen_image_model_loader transformer qwen_image_lora_collection_loader transformer",
     "qwen_image_model_loader vae qwen_image_i2l vae",
     "qwen_image_model_loader vae qwen_image_l2i vae",
@@ -1308,6 +1309,7 @@
     "qwen_image_lora_collection_loader": {
       "inputs": [
         "loras",
+        "qwen_vl_encoder",
         "transformer"
       ],
       "literalInputs": {
@@ -1319,6 +1321,7 @@
         ]
       },
       "outputs": [
+        "qwen_vl_encoder",
         "transformer"
       ]
     },

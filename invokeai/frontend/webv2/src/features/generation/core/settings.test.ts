@@ -18,7 +18,7 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getGenerationDimensions } from './baseGenerationPolicies';
+import { getGenerationDimensions, getGenerationValidationIssues } from './baseGenerationPolicies';
 import {
   calculateNewSize,
   clampDimension,
@@ -670,6 +670,68 @@ describe('Generate widget value snapshots', () => {
     expect(synced.loras[0]?.model).toBe(currentLora);
   });
 
+  it('notices a CPU Only change on the GGUF encoder and its tower, and the policy then blocks references', () => {
+    const qwen21: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'enc',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const tower = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'mmproj',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant: 'qwen3_vl_8b',
+    };
+    const saved: GenerateWidgetValues = {
+      ...values,
+      model: qwen21,
+      modelKey: qwen21.key,
+      qwen3VLEncoderModel: encoder,
+      qwen3VLVisionTowerModel: tower,
+      referenceImages: [
+        {
+          config: {
+            image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
+            type: 'qwen_image_2_1_reference_image',
+          },
+          id: 'edit',
+          isEnabled: true,
+        },
+      ],
+    };
+    const cpuIssues = (candidate: GenerateWidgetValues) =>
+      getGenerationValidationIssues(qwen21, candidate).filter((issue) => issue.message.includes('CPU Only'));
+
+    expect(cpuIssues(saved)).toEqual([]);
+
+    // The Model Manager flips the encoder's CPU Only; the saved snapshot is refreshed from the catalog.
+    const flipped = { ...encoder, cpu_only: true };
+    const synced = syncGenerateWidgetValuesWithModels(saved, [qwen21, flipped, tower]);
+
+    expect(synced.qwen3VLEncoderModel).toBe(flipped);
+    expect(synced.qwen3VLVisionTowerModel).toBe(saved.qwen3VLVisionTowerModel);
+    expect(cpuIssues(synced)).toEqual([
+      expect.objectContaining({ target: { field: 'qwen3VLVisionTowerModel', section: 'components' } }),
+    ]);
+    // Matching again (tower flipped too) clears it, and an unchanged catalog keeps the same values object.
+    const bothFlipped = syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, { ...tower, cpu_only: true }]);
+
+    expect(cpuIssues(bothFlipped)).toEqual([]);
+    expect(syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, tower])).toBe(synced);
+  });
+
   it('does not resync cloned current model snapshots by reference alone', () => {
     const currentModel = { ...model, format: 'diffusers' as const, name: 'Current Model' };
     const currentComponent = { ...component, name: 'Current Qwen3' };
@@ -729,6 +791,31 @@ describe('LoRA settings helpers', () => {
     expect(
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);
+  });
+
+  it('keeps SD 3 Large LoRAs off Medium models, and lets records without a variant through', () => {
+    const medium: MainModelConfig = {
+      base: 'sd-3',
+      key: 'sd35m',
+      name: 'SD 3.5 Medium',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, medium)).toBe(false);
+    // Installed before the variant existed: the denoise node checks those at run time.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
+      true
+    );
+    // The API sends null, not undefined, for a record without one.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
+    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
   });
 });
 

@@ -31,7 +31,7 @@ from invokeai.app.api.routers._access import (
     item_action_for_changes,
     redact_project_ids,
 )
-from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE, MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
@@ -62,16 +62,6 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
 
-# Every name in a batch body costs at least one DB lookup, so an unbounded list lets an
-# authenticated client pin a worker with a single request. Mirrors MAX_VIDEO_BATCH_SIZE
-# in the videos router.
-#
-# "At least one" is doing real work in that sentence. The authorization helpers in _access.py
-# short-circuit for an admin (no query) and a direct owner (one), but a user acting on someone
-# else's item on a board they share costs three indexed reads per name: the item's owner, its
-# board, and that board's access facts. That is the case the bound has to hold, and it is why no
-# route gets a laxer one: the oversized selections this cap rejects are split client-side instead.
-MAX_IMAGE_BATCH_SIZE = 1000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.
 ImageName = Annotated[str, StringConstraints(max_length=255)]

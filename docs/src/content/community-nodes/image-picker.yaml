@@ -1,0 +1,8 @@
+title: Image Picker
+author: JPPhoto
+repo: https://github.com/JPPhoto/image-picker-node
+summary: Pick one image at random from a collection.
+description: >-
+  Useful when you have several poses to choose from for a ControlNet node, or several input images for another
+  purpose.
+categories: [utility]

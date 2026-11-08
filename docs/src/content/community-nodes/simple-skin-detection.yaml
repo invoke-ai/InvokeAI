@@ -1,0 +1,9 @@
+title: Simple Skin Detection
+author: VeyDlin
+repo: https://github.com/VeyDlin/simple-skin-detection-node
+summary: Detect skin in images from predefined color thresholds.
+categories: [masks]
+thumbnail: ./simple-skin-detection.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/simple-skin-detection-node/master/.readme/node.png
+    alt: The Simple Skin Detection node
