@@ -20,6 +20,7 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     MetadataField,
     MiniMaxH3FrameConditioningField,
+    TensorField,
     WithBoard,
     WithMetadata,
 )
@@ -1932,7 +1933,7 @@ def test_ip_adapter_weight_schedules_and_mask_roundtrip() -> None:
     )
 
     weight_schedule = [0.8, 0.4, 0.2]
-    mask_field = ImageField(image_name="test_mask.png")
+    mask_field = TensorField(tensor_name="test_mask_tensor")
     ipa_field = IPAdapterField(
         image=ImageField(image_name="test_ref.png"),
         ip_adapter_model=ipa_model,
@@ -1948,7 +1949,8 @@ def test_ip_adapter_weight_schedules_and_mask_roundtrip() -> None:
     assert len(refs) == 1
     cfg = refs[0]["config"]
     assert cfg["weight"] == weight_schedule
-    assert cfg["mask"] == {"image_name": "test_mask.png"}
+    # Ephemeral tensor masks must not be serialized into metadata
+    assert "mask" not in cfg
     assert cfg["image"]["original"]["image"]["width"] == 1024
     assert cfg["image"]["original"]["image"]["height"] == 768
 
@@ -1958,8 +1960,7 @@ def test_ip_adapter_weight_schedules_and_mask_roundtrip() -> None:
     assert len(out.ip_adapter_list) == 1
     rec = out.ip_adapter_list[0]
     assert rec.weight == weight_schedule
-    assert isinstance(rec.mask, ImageField)
-    assert rec.mask.image_name == "test_mask.png"
+    assert rec.mask is None
     assert rec.method == "style"
     assert rec.begin_step_percent == 0.15
     assert rec.end_step_percent == 0.85
@@ -1995,7 +1996,7 @@ def test_flux_control_lora_excluded_from_loras() -> None:
         metadata=None,
     )
     md = flux_node._build_metadata().root
-    assert "loras" not in md
+    assert md["loras"] == []
 
 
 def test_chained_denoise_parameter_isolation() -> None:
@@ -2051,10 +2052,10 @@ def test_chained_denoise_parameter_isolation() -> None:
         metadata=upstream_md,
     )
     downstream_md = downstream_pass._build_metadata(width=1024, height=1024)
-    assert "loras" not in downstream_md.root
-    assert "controlnets" not in downstream_md.root
-    assert "ref_images" not in downstream_md.root
-    assert "t2iAdapters" not in downstream_md.root
+    assert downstream_md.root["loras"] == []
+    assert downstream_md.root["controlnets"] == []
+    assert downstream_md.root["ref_images"] == []
+    assert downstream_md.root["t2iAdapters"] == []
 
 
 def test_chained_reference_images_authoritative_replace() -> None:
@@ -2091,7 +2092,7 @@ def test_chained_reference_images_authoritative_replace() -> None:
     assert md_pass_2.root["ref_images"][0]["config"]["image"]["original"]["image"]["image_name"] == "ref_2.png"
 
     md_pass_3 = build_denoise_metadata(md_pass_2, {"ref_images": []})
-    assert "ref_images" not in md_pass_3.root
+    assert md_pass_3.root["ref_images"] == []
 
 
 def test_anima_inpaint_adapter_stamped_in_metadata() -> None:
@@ -2188,3 +2189,572 @@ def test_minimax_h3_generation_mode_inspection() -> None:
 
     extend_md = MetadataField.model_validate({"generation_mode": "minimax_h3_extend_video"})
     assert _make_mm(["first"], existing_md=extend_md) == "minimax_h3_extend_video"
+
+
+# ---------------------------------------------------------------------------
+# PR #10083 Review Feedback Regression Tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_denoise_metadata_empty_lists_override_upstream_legacy() -> None:
+    """Finding 1: build_denoise_metadata retains explicit empty lists and pops legacy fields."""
+    legacy_md = MetadataField.model_validate(
+        {
+            "control_layers": [{"type": "controlnet", "model": {"key": "cn-1"}}],
+            "ipAdapters": [{"image": {"image_name": "ipa.png"}, "weight": 0.5}],
+            "loras": [{"model": {"key": "lora-1"}, "weight": 0.7}],
+            "t2iAdapters": [{"model": {"key": "t2i-1"}, "weight": 0.8}],
+        }
+    )
+
+    # Empty lists in updates must override upstream and pop legacy keys
+    updates = {
+        "controlnets": [],
+        "ref_images": [],
+        "loras": [],
+        "t2iAdapters": [],
+    }
+    merged = build_denoise_metadata(legacy_md, updates)
+    assert merged.root["controlnets"] == []
+    assert merged.root["ref_images"] == []
+    assert merged.root["loras"] == []
+    assert merged.root["t2iAdapters"] == []
+    assert "control_layers" not in merged.root
+    assert "ipAdapters" not in merged.root
+
+
+def test_all_denoise_nodes_overwrite_upstream_lists() -> None:
+    """Finding 2: All 13 denoise nodes unconditionally overwrite upstream loras/controlnets with [] when empty."""
+    lora_id = _make_model_id(key="up-lora", base=BaseModelType.Flux, model_type=ModelType.LoRA)
+    cn_id = _make_model_id(key="up-cn", base=BaseModelType.Flux, model_type=ModelType.ControlNet)
+    upstream_md = MetadataField.model_validate(
+        {
+            "loras": [{"model": lora_id.model_dump(), "weight": 0.9}],
+            "controlnets": [{"model": cn_id.model_dump(), "weight": 0.8}],
+        }
+    )
+
+    tf_id = _make_model_id(key="test-tf", base=BaseModelType.Flux)
+    tf_no_loras = TransformerField(transformer=tf_id, loras=[])
+
+    # 1. CogView4
+    from invokeai.app.invocations.cogview4.cogview4_denoise import CogView4DenoiseInvocation
+
+    node = CogView4DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        steps=10,
+        cfg_scale=3.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        noise=None,
+        latents=None,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 2. ErnieImage
+    from invokeai.app.invocations.ernie_image.ernie_image_denoise import ErnieImageDenoiseInvocation
+
+    node = ErnieImageDenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        steps=10,
+        guidance_scale=3.0,
+        scheduler="euler",
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=False,
+        seed=1,
+        latents=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 3. Flux2
+    from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
+
+    node = Flux2DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        control=None,
+        width=512,
+        height=512,
+        steps=10,
+        guidance=3.0,
+        cfg_scale=1.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=False,
+        noise=None,
+        latents=None,
+        seed=1,
+        vae=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+    assert node._build_metadata().root["controlnets"] == []
+
+    # 4. Ideogram4
+    from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
+
+    node = Ideogram4DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        unconditional_transformer=None,
+        sampler_preset="V4_DEFAULT_20",
+        width=512,
+        height=512,
+        steps=None,
+        guidance_scale=None,
+        mu=None,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 5. LTX2
+    from invokeai.app.invocations.ltx2.ltx2_denoise import LTX2DenoiseInvocation
+
+    node = LTX2DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        num_frames=9,
+        fps=24.0,
+        steps=10,
+        cfg_scale=3.0,
+        audio_cfg_scale=1.0,
+        stg_scale=1.0,
+        modality_scale=1.0,
+        guidance_rescale=0.0,
+        schedule="linear",
+        seed=1,
+        latents=None,
+        noise_scale=1.0,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 6. MiniMaxH3
+    from invokeai.app.invocations.minimax_h3.minimax_h3_denoise import MiniMaxH3DenoiseInvocation
+
+    node = MiniMaxH3DenoiseInvocation.model_construct(
+        transformer=MiniMaxH3TransformerField(transformer=tf_id, loras=[], adaln_overlay=None),
+        width=512,
+        height=512,
+        num_frames="9",
+        steps=10,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 7. MossImage
+    from invokeai.app.invocations.moss_image.moss_image_denoise import MossImageDenoiseInvocation
+
+    node = MossImageDenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        steps=10,
+        cfg_scale=3.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        uncond_skip_layers=[],
+        seed=1,
+        latents=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 8. QwenImage
+    from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDenoiseInvocation
+
+    node = QwenImageDenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        control=None,
+        width=512,
+        height=512,
+        steps=10,
+        cfg_scale=3.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        shift=None,
+        seed=1,
+        vae=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+    assert node._build_metadata().root["controlnets"] == []
+
+    # 9. QwenImage 2.1
+    from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import QwenImage21DenoiseInvocation
+
+    node = QwenImage21DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        steps=10,
+        cfg_scale=3.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        seed=1,
+        latents=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 10. SD3
+    from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
+
+    node = SD3DenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        width=512,
+        height=512,
+        steps=10,
+        cfg_scale=3.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        noise=None,
+        latents=None,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 11. WanDenoise
+    from invokeai.app.invocations.wan.wan_denoise import WanDenoiseInvocation
+
+    node = WanDenoiseInvocation.model_construct(
+        transformer=WanTransformerField(transformer=tf_id, loras=[]),
+        width=512,
+        height=512,
+        steps=10,
+        guidance_scale=3.0,
+        guidance_scale_low_noise=None,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=False,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 12. WanVideoDenoise
+    from invokeai.app.invocations.wan.wan_video_denoise import WanVideoDenoiseInvocation
+
+    node = WanVideoDenoiseInvocation.model_construct(
+        transformer=WanTransformerField(transformer=tf_id, loras=[]),
+        width=512,
+        height=512,
+        num_frames=9,
+        steps=10,
+        guidance_scale=3.0,
+        guidance_scale_low_noise=None,
+        seed=1,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+
+    # 13. ZImage
+    from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+
+    node = ZImageDenoiseInvocation.model_construct(
+        transformer=tf_no_loras,
+        control=None,
+        width=512,
+        height=512,
+        steps=10,
+        guidance=3.0,
+        cfg_scale=1.0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        noise=None,
+        latents=None,
+        seed=1,
+        vae=None,
+        metadata=upstream_md,
+    )
+    assert node._build_metadata().root["loras"] == []
+    assert node._build_metadata().root["controlnets"] == []
+
+
+def test_ip_adapter_mask_field_schema() -> None:
+    """Finding 3: IPAdapterField and IPAdapterInvocation mask field annotation is Optional[TensorField]."""
+    from typing import get_args
+
+    from invokeai.app.invocations.sd.ip_adapter import IPAdapterField, IPAdapterInvocation
+
+    field_ann = IPAdapterField.model_fields["mask"].annotation
+    inv_ann = IPAdapterInvocation.model_fields["mask"].annotation
+
+    # Verify neither has ImageField
+    assert ImageField not in get_args(field_ann)
+    assert ImageField not in get_args(inv_ann)
+    assert TensorField in get_args(field_ann)
+    assert TensorField in get_args(inv_ann)
+
+
+def test_anima_denoise_inpaint_adapter_selection_with_multiple_lllite() -> None:
+    """Finding 4: Anima denoise filters control_lllite for adapter with mask_name."""
+    m1 = _make_model_id(key="lllite-style", base=BaseModelType.Anima, model_type=ModelType.ControlLoRa)
+    m2 = _make_model_id(key="lllite-inpaint", base=BaseModelType.Anima, model_type=ModelType.ControlLoRa)
+
+    a1 = AnimaLLLiteField(image_name="style.png", control_model=m1, weight=0.6, mask_name=None)
+    a2 = AnimaLLLiteField(image_name="inpaint.png", control_model=m2, weight=0.95, mask_name="inpaint_mask.png")
+
+    tf_id = _make_model_id(key="anima-tf", base=BaseModelType.Anima)
+    node = AnimaDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[]),
+        control_lllite=[a1, a2],
+        denoise_mask=DenoiseMaskField(mask_name="inpaint_mask.png"),
+        width=512,
+        height=512,
+        steps=10,
+        guidance_scale=3.0,
+        scheduler="euler",
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=False,
+        seed=1,
+        latents=None,
+        ip_adapter=None,
+        metadata=None,
+    )
+    md = node._build_metadata().root
+    assert md["anima_inpaint_adapter"] == m2
+    assert md["anima_inpaint_adapter_weight"] == 0.95
+
+
+def test_unwrap_metadata_value_core_vs_custom_label() -> None:
+    """Finding 5: unwrap_metadata_value unwraps to ModelIdentifierField for core labels even with LoRAs,
+    while custom labels (user strings or CUSTOM_LABEL) preserve wrapper fields with LoRAs."""
+    from invokeai.app.invocations.metadata import CORE_MODEL_LABELS, CUSTOM_LABEL, unwrap_metadata_value
+    from invokeai.app.invocations.metadata_linked import MetadataItemLinkedInvocation
+
+    unet_id = _make_model_id(key="unet-core", base=BaseModelType.StableDiffusionXL, model_type=ModelType.Main)
+    lora_id = _make_model_id(key="lora-core", base=BaseModelType.StableDiffusionXL, model_type=ModelType.LoRA)
+
+    unet_with_loras = UNetField.model_construct(unet=unet_id, loras=[LoRAField(lora=lora_id, weight=0.8)])
+    unet_clean = UNetField.model_construct(unet=unet_id, loras=[])
+
+    # Core labels: always unwrap to inner ModelIdentifierField for gallery recall
+    for core_label in ("model", "clip_l_model", "vae", "t5_encoder", "refiner_model"):
+        assert core_label in CORE_MODEL_LABELS
+        unwrapped = unwrap_metadata_value(unet_with_loras, label=core_label)
+        assert isinstance(unwrapped, ModelIdentifierField)
+        assert unwrapped.key == "unet-core"
+
+    # Custom labels (CUSTOM_LABEL or arbitrary user-supplied string): preserve outer UNetField with LoRAs
+    for custom_lbl in (CUSTOM_LABEL, "my_custom_unet", "user_lora_model", None):
+        kept_custom = unwrap_metadata_value(unet_with_loras, label=custom_lbl)
+        assert isinstance(kept_custom, UNetField)
+        assert len(kept_custom.loras) == 1
+
+    # Custom label without LoRAs cleanly unwraps to ModelIdentifierField
+    unwrapped_clean_custom = unwrap_metadata_value(unet_clean, label="my_clean_unet")
+    assert isinstance(unwrapped_clean_custom, ModelIdentifierField)
+    assert unwrapped_clean_custom.key == "unet-core"
+
+    # Dict representation: core label unwraps to inner dict with "key", custom retains "loras"
+    raw_dict = {"unet": unet_id.model_dump(), "loras": [{"lora": lora_id.model_dump(), "weight": 0.8}]}
+    unwrapped_dict = unwrap_metadata_value(raw_dict, label="model")
+    assert unwrapped_dict["key"] == "unet-core"
+
+    kept_dict = unwrap_metadata_value(raw_dict, label="my_custom_unet")
+    assert "loras" in kept_dict
+
+    # Integration test with MetadataItemLinkedInvocation
+    from types import SimpleNamespace
+
+    ctx = SimpleNamespace()
+    # 1. Core label "model" -> unwrapped ModelIdentifierField in metadata
+    link_core = MetadataItemLinkedInvocation(label="model", value=unet_with_loras)
+    out_core = link_core.invoke(ctx)
+    assert isinstance(out_core.metadata.root["model"], ModelIdentifierField)
+
+    # 2. Custom label via custom_label -> preserves UNetField with LoRAs in metadata
+    link_custom = MetadataItemLinkedInvocation(label=CUSTOM_LABEL, custom_label="my_custom_unet", value=unet_with_loras)
+    out_custom = link_custom.invoke(ctx)
+    assert isinstance(out_custom.metadata.root["my_custom_unet"], UNetField)
+    assert len(out_custom.metadata.root["my_custom_unet"].loras) == 1
+
+
+def test_ernie_image_denoise_img2img_generation_mode() -> None:
+    """Finding 6: ErnieImage denoise stamps ernie_image_img2img when latents connected."""
+    from invokeai.app.invocations.metadata import GENERATION_MODES
+
+    assert "ernie_image_img2img" in GENERATION_MODES.__args__
+
+    tf_id = _make_model_id(key="ernie-tf", base=BaseModelType.ErnieImage)
+    txt_node = ErnieImageDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[]),
+        width=512,
+        height=512,
+        steps=10,
+        guidance_scale=3.0,
+        scheduler="euler",
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=False,
+        seed=1,
+        latents=None,
+        metadata=None,
+    )
+    assert txt_node._build_metadata().root["generation_mode"] == "ernie_image_txt2img"
+
+    img_node = ErnieImageDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[]),
+        width=512,
+        height=512,
+        steps=10,
+        guidance_scale=3.0,
+        scheduler="euler",
+        denoising_start=0.5,
+        denoising_end=1.0,
+        add_noise=False,
+        seed=1,
+        latents=LatentsField(latents_name="init_latents"),
+        metadata=None,
+    )
+    assert img_node._build_metadata().root["generation_mode"] == "ernie_image_img2img"
+
+
+def test_metadata_to_adapters_warning_on_unresolvable_model() -> None:
+    """Finding 7: MetadataTo* nodes log warning when an adapter cannot be loaded."""
+    from unittest.mock import MagicMock
+
+    mock_logger = MagicMock()
+    mock_ctx = SimpleNamespace(
+        logger=mock_logger,
+        models=SimpleNamespace(
+            exists=lambda key: False,
+            search_by_attrs=lambda **kwargs: [],
+        ),
+        images=SimpleNamespace(get_dto=lambda name: SimpleNamespace(width=512, height=512)),
+    )
+
+    # 1. ControlNet
+    cn_md = MetadataField.model_validate(
+        {"controlnets": [{"image": {"image_name": "c.png"}, "control_model": {"key": "missing-cn"}}]}
+    )
+    MetadataToControlnetsInvocation.model_construct(metadata=cn_md, control_list=None).invoke(mock_ctx)
+    assert mock_logger.warning.called
+    warning_calls = [c.args[0] for c in mock_logger.warning.call_args_list]
+    assert any("Could not resolve ControlNet model" in str(msg) for msg in warning_calls)
+
+    mock_logger.reset_mock()
+
+    # 2. IP-Adapter
+    ipa_md = MetadataField.model_validate(
+        {
+            "ref_images": [
+                {"config": {"type": "ip_adapter", "image": {"image_name": "i.png"}, "model": {"key": "missing-ipa"}}}
+            ]
+        }
+    )
+    MetadataToIPAdaptersInvocation.model_construct(metadata=ipa_md, ip_adapter_list=None).invoke(mock_ctx)
+    assert mock_logger.warning.called
+    warning_calls = [c.args[0] for c in mock_logger.warning.call_args_list]
+    assert any("Could not resolve IP-Adapter model" in str(msg) for msg in warning_calls)
+
+    mock_logger.reset_mock()
+
+    # 3. T2I-Adapter
+    t2i_md = MetadataField.model_validate(
+        {"t2iAdapters": [{"image": {"image_name": "t.png"}, "t2i_adapter_model": {"key": "missing-t2i"}}]}
+    )
+    MetadataToT2IAdaptersInvocation.model_construct(metadata=t2i_md, t2i_adapter_list=None).invoke(mock_ctx)
+    assert mock_logger.warning.called
+    warning_calls = [c.args[0] for c in mock_logger.warning.call_args_list]
+    assert any("Could not resolve T2I-Adapter model" in str(msg) for msg in warning_calls)
+
+
+def test_extract_adapters_respects_explicit_empty_list() -> None:
+    """Additional Issue 1: _extract_* functions return [] immediately when modern key is explicit [] without falling back."""
+    from invokeai.app.invocations.metadata_linked import (
+        _extract_controlnets_from_metadata,
+        _extract_ip_adapters_from_metadata,
+    )
+
+    data_with_empty_cn = {
+        "controlnets": [],
+        "control_layers": [
+            {
+                "type": "controlnet",
+                "image": {"image_name": "fallback.png"},
+                "model": {"key": "legacy-cn"},
+            }
+        ],
+    }
+    # Must return [] without falling back to control_layers
+    assert _extract_controlnets_from_metadata(data_with_empty_cn) == []
+
+    data_with_empty_ref = {
+        "ref_images": [],
+        "ipAdapters": [
+            {
+                "image": {"image_name": "fallback-ipa.png"},
+                "ip_adapter_model": {"key": "legacy-ipa"},
+            }
+        ],
+    }
+    # Must return [] without falling back to ipAdapters
+    assert _extract_ip_adapters_from_metadata(data_with_empty_ref) == []
+
+
+def test_metadata_to_ip_adapters_tensor_mask() -> None:
+    """Additional Issue 2: MetadataToIPAdaptersInvocation parses TensorField masks and passes to IPAdapterInvocation."""
+    from pydantic import ConfigDict
+
+    from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Config_Base
+
+    class _MockIPAConfig(IPAdapter_Checkpoint_Config_Base):
+        model_config = ConfigDict(extra="allow")
+
+    ipa_model = _make_model_id(key="ipa-sd15", base=BaseModelType.StableDiffusion1, model_type=ModelType.IPAdapter)
+    mock_ctx = SimpleNamespace(
+        models=SimpleNamespace(
+            exists=lambda key: key == "ipa-sd15",
+            get_config=lambda key: _MockIPAConfig.model_validate(
+                {
+                    "key": ipa_model.key,
+                    "hash": ipa_model.hash,
+                    "name": ipa_model.name,
+                    "base": ipa_model.base,
+                    "type": ipa_model.type,
+                }
+            ),
+            search_by_attrs=lambda **kwargs: [
+                SimpleNamespace(
+                    key="enc-1",
+                    hash="h",
+                    name="enc",
+                    base=BaseModelType.Any,
+                    type=ModelType.CLIPVision,
+                )
+            ],
+        ),
+        images=SimpleNamespace(get_dto=lambda name: SimpleNamespace(width=512, height=512)),
+    )
+
+    # Metadata record with a serialized TensorField mask
+    md = MetadataField.model_validate(
+        {
+            "ipAdapters": [
+                {
+                    "image": {"image_name": "ref.png"},
+                    "ip_adapter_model": {"key": "ipa-sd15"},
+                    "mask": {"tensor_name": "transient_tensor_mask_1"},
+                }
+            ]
+        }
+    )
+
+    out = MetadataToIPAdaptersInvocation.model_construct(metadata=md, ip_adapter_list=None).invoke(mock_ctx)
+    assert len(out.ip_adapter_list) == 1
+    adapter = out.ip_adapter_list[0]
+    assert isinstance(adapter.mask, TensorField)
+    assert adapter.mask.tensor_name == "transient_tensor_mask_1"

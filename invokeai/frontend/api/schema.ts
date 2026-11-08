@@ -11211,7 +11211,7 @@ export type components = {
              * @description The generation mode that output this image
              * @default null
              */
-            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "qwen_image_2_1_txt2img" | "qwen_image_2_1_img2img" | "qwen_image_2_1_inpaint" | "qwen_image_2_1_outpaint" | "flux3_txt2img" | "flux3_img2img" | "flux3_inpaint" | "flux3_outpaint" | "moss_image_txt2img" | "moss_image_img2img" | "moss_image_inpaint" | "moss_image_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_t2v" | "wan_i2v" | "wan_interpolate" | "wan_extend_video" | "minimax_h3_t2v" | "minimax_h3_i2v" | "ltx2_t2v" | "ltx2_i2v" | "ltx2_a2v" | "ltx2_v2a" | "ltx2_lf2v" | "ltx2_flf2v" | "ltx2_extend_video" | "minimax_h3_lf2v" | "minimax_h3_flf2v" | "minimax_h3_extend_video" | "minimax_h3_ref2v" | "minimax_h3_txt2img") | null;
+            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ernie_image_img2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "qwen_image_2_1_txt2img" | "qwen_image_2_1_img2img" | "qwen_image_2_1_inpaint" | "qwen_image_2_1_outpaint" | "flux3_txt2img" | "flux3_img2img" | "flux3_inpaint" | "flux3_outpaint" | "moss_image_txt2img" | "moss_image_img2img" | "moss_image_inpaint" | "moss_image_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_t2v" | "wan_i2v" | "wan_interpolate" | "wan_extend_video" | "minimax_h3_t2v" | "minimax_h3_i2v" | "ltx2_t2v" | "ltx2_i2v" | "ltx2_a2v" | "ltx2_v2a" | "ltx2_lf2v" | "ltx2_flf2v" | "ltx2_extend_video" | "minimax_h3_lf2v" | "minimax_h3_flf2v" | "minimax_h3_extend_video" | "minimax_h3_ref2v" | "minimax_h3_txt2img") | null;
             /**
              * Positive Prompt
              * @description The positive prompt parameter
@@ -19230,11 +19230,10 @@ export type components = {
              */
             end_step_percent?: number;
             /**
-             * Mask
              * @description The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.
              * @default null
              */
-            mask?: components["schemas"]["TensorField"] | components["schemas"]["ImageField"] | null;
+            mask?: components["schemas"]["TensorField"] | null;
         };
         /**
          * IP-Adapter - SD1.5, SDXL
@@ -19303,11 +19302,10 @@ export type components = {
              */
             end_step_percent?: number;
             /**
-             * Mask
              * @description A mask defining the region that this IP-Adapter applies to.
              * @default null
              */
-            mask?: components["schemas"]["TensorField"] | components["schemas"]["ImageField"] | null;
+            mask?: components["schemas"]["TensorField"] | null;
             /**
              * type
              * @default ip_adapter

@@ -174,13 +174,8 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
         if self.vae is not None:
             updates["vae"] = self.vae.vae
 
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
-
-        controlnets = serialize_adapter_metadata(self.control)
-        if controlnets:
-            updates["controlnets"] = controlnets
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
 
         if (
             self.noise is not None

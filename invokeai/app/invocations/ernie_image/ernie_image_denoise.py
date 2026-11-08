@@ -95,7 +95,9 @@ class ErnieImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
     def _build_metadata(self) -> MetadataField:
         updates: dict[str, Any] = {
-            "generation_mode": "ernie_image_txt2img",
+            "generation_mode": (
+                "ernie_image_img2img" if getattr(self, "latents", None) is not None else "ernie_image_txt2img"
+            ),
             "width": self.width,
             "height": self.height,
             "steps": self.steps,
@@ -106,9 +108,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation, WithMetadata):
             "add_noise": self.add_noise,
             "model": self.transformer.transformer,
         }
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         if self.seed is not None:
             updates["seed"] = self.seed

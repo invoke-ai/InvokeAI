@@ -435,9 +435,7 @@ class LTX2DenoiseInvocation(BaseInvocation, WithMetadata):
         if self.latents is not None:
             updates["ltx2_noise_scale"] = self.noise_scale
 
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

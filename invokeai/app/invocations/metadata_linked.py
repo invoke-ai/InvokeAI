@@ -28,6 +28,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.metadata import (
+    CUSTOM_LABEL,
     LatentsMetaOutput,
     MetadataOutput,
     build_denoise_metadata,
@@ -64,8 +65,6 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.version import __version__
-
-CUSTOM_LABEL: str = "* CUSTOM LABEL *"
 
 CORE_LABELS = Literal[
     f"{CUSTOM_LABEL}",
@@ -490,7 +489,7 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
         data: Dict[str, Any] = {} if self.metadata is None else dict(self.metadata.root)
         if self.value is not None:
             k = self.custom_label if self.label == CUSTOM_LABEL else self.label
-            v = unwrap_metadata_value(self.value)
+            v = unwrap_metadata_value(self.value, label=k)
             if v is not None:
                 data.update({str(k): v})
         data.update({"app_version": __version__})
@@ -1215,6 +1214,12 @@ def _resolve_ref_image_field(img_container: Any) -> Optional[dict[str, Any]]:
     return None
 
 
+def _warn(context: InvocationContext, msg: str) -> None:
+    logger = getattr(context, "logger", None)
+    if logger is not None:
+        logger.warning(msg)
+
+
 def _extract_canvas_control_layer_image(entity: dict[str, Any]) -> Optional[dict[str, Any]]:
     for obj in entity.get("objects") or []:
         if isinstance(obj, dict) and obj.get("type") == "image":
@@ -1228,15 +1233,17 @@ def _extract_canvas_control_layer_image(entity: dict[str, Any]) -> Optional[dict
 
 def _extract_controlnets_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    for item in data.get("controlnets") or []:
-        if not isinstance(item, dict):
-            continue
-        img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
-        if img is None or ("control_model" not in item and "model" not in item):
-            continue
-        normalized = dict(item)
-        normalized["image"] = img
-        result.append(normalized)
+    if "controlnets" in data:
+        for item in data.get("controlnets") or []:
+            if not isinstance(item, dict):
+                continue
+            img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+            if img is None or ("control_model" not in item and "model" not in item):
+                continue
+            normalized = dict(item)
+            normalized["image"] = img
+            result.append(normalized)
+        return result
     if not result:
         raw_control_layers = data.get("control_layers")
         if isinstance(raw_control_layers, list):
@@ -1297,36 +1304,38 @@ def _extract_controlnets_from_metadata(data: dict[str, Any]) -> list[dict[str, A
 
 def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    ref_images = data.get("ref_images")
-    if isinstance(ref_images, list):
-        for entry in ref_images:
-            if not isinstance(entry, dict) or entry.get("isEnabled", True) is False:
-                continue
-            cfg = entry.get("config")
-            if not isinstance(cfg, dict) or cfg.get("type") != "ip_adapter":
-                continue
-            img = _resolve_ref_image_field(cfg.get("image"))
-            model = cfg.get("model")
-            if img is None or not model:
-                continue
-            begin_end = cfg.get("beginEndStepPct") or [0.0, 1.0]
-            raw_weight = cfg.get("weight", 1.0)
-            if isinstance(raw_weight, (list, tuple)):
-                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
-            else:
-                weight = float(raw_weight)
-            entry: dict[str, Any] = {
-                "image": img,
-                "ip_adapter_model": model,
-                "weight": weight,
-                "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
-                "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
-                "clip_vision_model": cfg.get("clipVisionModel", "ViT-H"),
-                "method": cfg.get("method", "full"),
-            }
-            if cfg.get("mask") is not None:
-                entry["mask"] = cfg["mask"]
-            result.append(entry)
+    if "ref_images" in data:
+        ref_images = data.get("ref_images")
+        if isinstance(ref_images, list):
+            for entry in ref_images:
+                if not isinstance(entry, dict) or entry.get("isEnabled", True) is False:
+                    continue
+                cfg = entry.get("config")
+                if not isinstance(cfg, dict) or cfg.get("type") != "ip_adapter":
+                    continue
+                img = _resolve_ref_image_field(cfg.get("image"))
+                model = cfg.get("model")
+                if img is None or not model:
+                    continue
+                begin_end = cfg.get("beginEndStepPct") or [0.0, 1.0]
+                raw_weight = cfg.get("weight", 1.0)
+                if isinstance(raw_weight, (list, tuple)):
+                    weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+                else:
+                    weight = float(raw_weight)
+                res_entry: dict[str, Any] = {
+                    "image": img,
+                    "ip_adapter_model": model,
+                    "weight": weight,
+                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                    "clip_vision_model": cfg.get("clipVisionModel", "ViT-H"),
+                    "method": cfg.get("method", "full"),
+                }
+                if cfg.get("mask") is not None:
+                    res_entry["mask"] = cfg["mask"]
+                result.append(res_entry)
+        return result
     if not result:
         canvas_v2 = data.get("canvas_v2_metadata")
         ref_imgs = canvas_v2.get("referenceImages") if isinstance(canvas_v2, dict) else None
@@ -1507,13 +1516,19 @@ class MetadataToControlnetsInvocation(BaseInvocation, WithMetadata):
                 x, "model", "", ModelType.ControlNet, context
             )
             if not model_key:
+                _warn(context, f"Could not resolve ControlNet model from metadata: {x}")
                 continue
-            model = get_model(model_key, context)
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load ControlNet model '{model_key}': {e}")
+                continue
             if model.base not in (
                 BaseModelType.StableDiffusion1,
                 BaseModelType.StableDiffusion2,
                 BaseModelType.StableDiffusionXL,
             ):
+                _warn(context, f"Unsupported ControlNet base model '{model.base}' for SD ControlNet")
                 continue
 
             cn = ControlNetInvocation(
@@ -1574,22 +1589,24 @@ class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
                 x, "model", "", ModelType.IPAdapter, context
             )
             if not model_key:
+                _warn(context, f"Could not resolve IP-Adapter model from metadata: {x}")
                 continue
-            model = get_model(model_key, context)
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load IP-Adapter model '{model_key}': {e}")
+                continue
             if model.base not in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL):
+                _warn(context, f"Unsupported IP-Adapter base model '{model.base}' for SD IP-Adapter")
                 continue
 
             raw_mask = x.get("mask")
-            mask_field: Optional[Union[ImageField, TensorField]] = None
+            mask_field: Optional[TensorField] = None
             if raw_mask is not None:
-                if isinstance(raw_mask, (ImageField, TensorField)):
+                if isinstance(raw_mask, TensorField):
                     mask_field = raw_mask
-                elif isinstance(raw_mask, dict) and "image_name" in raw_mask:
-                    mask_field = ImageField.model_validate(raw_mask)
                 elif isinstance(raw_mask, dict) and "tensor_name" in raw_mask:
                     mask_field = TensorField.model_validate(raw_mask)
-                else:
-                    mask_field = raw_mask
 
             ipa = IPAdapterInvocation(
                 image=x["image"],
@@ -1652,9 +1669,15 @@ class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
                 x, "t2i_adapter_model", "", ModelType.T2IAdapter, context
             ) or extract_model_key(x, "model", "", ModelType.T2IAdapter, context)
             if not model_key:
+                _warn(context, f"Could not resolve T2I-Adapter model from metadata: {x}")
                 continue
-            model = get_model(model_key, context)
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load T2I-Adapter model '{model_key}': {e}")
+                continue
             if model.base not in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL):
+                _warn(context, f"Unsupported T2I-Adapter base model '{model.base}' for SD T2I-Adapter")
                 continue
 
             t2i = T2IAdapterInvocation(

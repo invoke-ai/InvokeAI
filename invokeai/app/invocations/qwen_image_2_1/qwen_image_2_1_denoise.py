@@ -277,9 +277,7 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata):
         }
         if used_prefix_cache is not None:
             updates[PREFIX_CACHE_METADATA_KEY] = used_prefix_cache
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

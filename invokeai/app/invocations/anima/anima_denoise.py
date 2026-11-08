@@ -278,12 +278,15 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
 
         if getattr(self, "denoise_mask", None) is not None and getattr(self, "control_lllite", None) is not None:
             lllite_list = self.control_lllite if isinstance(self.control_lllite, list) else [self.control_lllite]
-            if lllite_list:
-                adapter = lllite_list[0]
-                model = getattr(adapter, "control_model", getattr(adapter, "model", None))
+            inpaint_adapter = next(
+                (a for a in lllite_list if getattr(a, "mask_name", None) is not None),
+                None,
+            )
+            if inpaint_adapter is not None:
+                model = getattr(inpaint_adapter, "control_model", getattr(inpaint_adapter, "model", None))
                 if model is not None:
                     updates["anima_inpaint_adapter"] = model
-                    updates["anima_inpaint_adapter_weight"] = float(adapter.weight)
+                    updates["anima_inpaint_adapter_weight"] = float(inpaint_adapter.weight)
 
         if (
             self.noise is not None

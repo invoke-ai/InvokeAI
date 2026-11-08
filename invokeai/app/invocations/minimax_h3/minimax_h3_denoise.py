@@ -358,9 +358,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["minimax_h3_hybrid_base_model"] = self.transformer.transformer
             updates["minimax_h3_hybrid_start_block"] = self.transformer.adaln_overlay.start_block
 
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

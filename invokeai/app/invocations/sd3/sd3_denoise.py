@@ -88,9 +88,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
             "denoising_end": self.denoising_end,
             "model": self.transformer.transformer,
         }
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         if (
             self.noise is not None

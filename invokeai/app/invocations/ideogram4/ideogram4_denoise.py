@@ -157,14 +157,12 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         if self.unconditional_transformer is not None:
             updates["ideogram4_unconditional_model"] = self.unconditional_transformer.transformer
 
-        loras = serialize_lora_metadata(
+        updates["loras"] = serialize_lora_metadata(
             getattr(self.transformer, "loras", None),
             getattr(self.unconditional_transformer, "loras", None)
             if self.unconditional_transformer is not None
             else None,
         )
-        if loras:
-            updates["loras"] = loras
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

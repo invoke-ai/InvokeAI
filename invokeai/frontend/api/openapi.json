@@ -31205,6 +31205,7 @@
                   "z_image_inpaint",
                   "z_image_outpaint",
                   "ernie_image_txt2img",
+                  "ernie_image_img2img",
                   "ideogram4_txt2img",
                   "qwen_image_txt2img",
                   "qwen_image_img2img",
@@ -48892,15 +48893,11 @@
                 "$ref": "#/components/schemas/TensorField"
               },
               {
-                "$ref": "#/components/schemas/ImageField"
-              },
-              {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.",
-            "title": "Mask"
+            "description": "The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True."
           }
         },
         "required": ["image", "ip_adapter_model", "image_encoder_model"],
@@ -49053,9 +49050,6 @@
                 "$ref": "#/components/schemas/TensorField"
               },
               {
-                "$ref": "#/components/schemas/ImageField"
-              },
-              {
                 "type": "null"
               }
             ],
@@ -49064,8 +49058,7 @@
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
-            "orig_required": false,
-            "title": "Mask"
+            "orig_required": false
           },
           "type": {
             "const": "ip_adapter",

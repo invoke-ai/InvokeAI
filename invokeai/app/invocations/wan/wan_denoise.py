@@ -443,12 +443,10 @@ class WanDenoiseInvocation(BaseInvocation, WithMetadata):
         if getattr(self.transformer, "transformer_low_noise", None) is not None:
             updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
 
-        loras = serialize_lora_metadata(
+        updates["loras"] = serialize_lora_metadata(
             getattr(self.transformer, "loras", None),
             getattr(self.transformer, "loras_low_noise", None),
         )
-        if loras:
-            updates["loras"] = loras
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

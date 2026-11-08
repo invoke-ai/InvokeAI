@@ -111,9 +111,7 @@ class MossImageDenoiseInvocation(BaseInvocation, WithMetadata):
         }
         if getattr(self, "vae", None) is not None:
             updates["vae"] = self.vae.vae
-        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
-        if loras:
-            updates["loras"] = loras
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

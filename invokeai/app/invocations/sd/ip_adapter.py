@@ -38,7 +38,7 @@ class IPAdapterField(BaseModel):
     end_step_percent: float = Field(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
-    mask: Optional[Union[TensorField, ImageField]] = Field(
+    mask: Optional[TensorField] = Field(
         default=None,
         description="The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included "
         "regions should be set to True.",
@@ -105,7 +105,7 @@ class IPAdapterInvocation(BaseInvocation):
     end_step_percent: float = InputField(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
-    mask: Optional[Union[TensorField, ImageField]] = InputField(
+    mask: Optional[TensorField] = InputField(
         default=None, description="A mask defining the region that this IP-Adapter applies to."
     )
 
