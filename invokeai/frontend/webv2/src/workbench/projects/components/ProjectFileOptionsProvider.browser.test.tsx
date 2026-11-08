@@ -1,6 +1,6 @@
 import type * as projectsApi from '@workbench/projects/api';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -9,7 +9,7 @@ import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
 import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -49,7 +49,33 @@ const Harness = () => {
   );
 };
 
-const render = async () => {
+// Like the project menus, the menu is controlled: it closes in the same render that mounts the dialog.
+const MenuHarness = () => {
+  const { requestExportOptions } = useProjectFileOptions();
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Menu.Root
+      open={isOpen}
+      onOpenChange={(details) => setIsOpen(details.open)}
+      onSelect={() => {
+        void requestExportOptions('Typography', captureAccountScope()).then((result) => results.push(result));
+      }}
+    >
+      <Menu.Trigger asChild>
+        <button type="button">Project actions</button>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content>
+            <Menu.Item value="export">Export…</Menu.Item>
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const render = async (harness = <Harness />) => {
   await page.viewport(1280, 900);
   results = [];
   accountLifecycle.activate('fonts-test');
@@ -60,9 +86,7 @@ const render = async () => {
     root!.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
-          <ProjectFileOptionsProvider>
-            <Harness />
-          </ProjectFileOptionsProvider>
+          <ProjectFileOptionsProvider>{harness}</ProjectFileOptionsProvider>
         </I18nextProvider>
       </ChakraProvider>
     )
@@ -118,6 +142,21 @@ it('includes my workspace unless I turn it off, and remembers that choice for th
   } finally {
     await act(() => patchWorkbenchPreferences({ exportIncludesWorkspace: true }));
   }
+});
+
+it('exports again from a menu without the closing menu dismissing the dialog', async () => {
+  await render(<MenuHarness />);
+  // The first request loads the dialog module; later ones mount it at once, while the menu is still leaving.
+  for (const attempt of [1, 2, 3]) {
+    await act(() => page.getByRole('button', { name: 'Project actions', exact: true }).click());
+    await act(() => page.getByRole('menuitem', { name: 'Export…', exact: true }).click());
+    await settleAnimations();
+    await expect.element(page.getByRole('dialog')).toBeVisible();
+    expect(results).toHaveLength(attempt - 1);
+    await act(() => page.getByRole('button', { name: 'Export project', exact: true }).click());
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+  }
+  expect(results).toEqual(Array.from({ length: 3 }, () => ({ includeFonts: false, includeWorkspace: true })));
 });
 
 it('cancels a pending choice when its account goes away', async () => {
