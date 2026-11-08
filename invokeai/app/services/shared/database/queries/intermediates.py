@@ -60,10 +60,9 @@ from invokeai.app.services.shared.database.schema.intermediates import (
     intermediates_unmeasurable,
 )
 from invokeai.app.services.shared.database.schema.media_references import media_references
-from invokeai.app.services.shared.database.schema.projects import orphaned_projects_2026_08_06, projects
+from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.session_queue import session_queue
 from invokeai.app.services.shared.database.schema.videos import videos
-from invokeai.app.services.shared.database.schema.workflows import workflow_library
 
 MediaKind = Literal["image", "video"]
 Classification = Literal["safe", "referenced", "active", "recent"]
@@ -106,7 +105,7 @@ def _protected_items() -> Subquery:
 
 _PROTECTED = _protected_items()
 _ACTIVE_ITEMS = select(_PROTECTED.c.item_id, func.coalesce(_PROTECTED.c.session_revision, 0))
-_SESSIONS = select(_Q.item_id, func.coalesce(_Q.session_revision, 0), _Q.session).where(
+_SESSIONS = select(_Q.item_id, func.coalesce(_Q.session_revision, 0), _Q.user_id, _Q.session).where(
     _Q.item_id.in_(bindparam("item_ids", expanding=True))
 )
 _SESSION_IS_ACTIVE = select(literal(1)).where(
@@ -132,23 +131,6 @@ _RELEASE_LEASES = delete(intermediates_browser_holds).where(
 )
 
 _CLEAR_UNMEASURABLE = delete(intermediates_unmeasurable)
-
-_DOCUMENT_NAMES = {
-    "project": select(_P.user_id, _P.project_id, _P.name).where(_P.project_id.in_(bindparam("ids", expanding=True))),
-    # A workspace is named after its project, whose owner need not be the workspace's.
-    "project_workspace": select(null(), _P.project_id, _P.name).where(
-        _P.project_id.in_(bindparam("ids", expanding=True))
-    ),
-    "quarantined_project": select(
-        orphaned_projects_2026_08_06.c.user_id,
-        orphaned_projects_2026_08_06.c.project_id,
-        orphaned_projects_2026_08_06.c.name,
-    ).where(orphaned_projects_2026_08_06.c.project_id.in_(bindparam("ids", expanding=True))),
-    # Workflow ids are unique across accounts, so the owner is not part of the match.
-    "workflow": select(null(), workflow_library.c.workflow_id, workflow_library.c.name).where(
-        workflow_library.c.workflow_id.in_(bindparam("ids", expanding=True))
-    ),
-}
 
 
 def _is_intermediate(media: Table) -> ColumnElement[bool]:
@@ -437,13 +419,6 @@ def _hold_for_lease(kind: MediaKind, dialect_name: str) -> Any:
     )
 
 
-@functools.cache
-def _reference_owners(kind: MediaKind) -> Select[Any]:
-    return select(_R.media_name, _R.owner_kind, _R.user_id, _R.owner_id).where(
-        _R.media_kind == literal(kind), InBoundSet(_R.media_name, bindparam("names", type_=String()))
-    )
-
-
 def _unmeasured(kind: MediaKind) -> tuple[Table, list[ColumnElement[bool]]]:
     media, name_column, _ = _MEDIA[kind]
     marked = exists(select(literal(1)).where(_U.media_kind == literal(kind), _U.media_name == media.c[name_column]))
@@ -554,13 +529,15 @@ class IntermediateQueries(QueryModule):
         return {int(row[0]): int(row[1]) for row in conn.execute(_ACTIVE_ITEMS).all()}
 
     @read
-    def sessions(self, conn: Connection, item_ids: Collection[int]) -> list[tuple[int, int, Optional[str]]]:
-        """(item, revision, session JSON) of each named queue item."""
-        rows: list[tuple[int, int, Optional[str]]] = []
+    def sessions(
+        self, conn: Connection, item_ids: Collection[int]
+    ) -> list[tuple[int, int, Optional[str], Optional[str]]]:
+        """(item, revision, owner, session JSON) of each named queue item."""
+        rows: list[tuple[int, int, Optional[str], Optional[str]]] = []
         ordered = sorted(item_ids)
         for start in range(0, len(ordered), IN_CHUNK):
             chunk = ordered[start : start + IN_CHUNK]
-            rows.extend((int(r[0]), int(r[1]), r[2]) for r in conn.execute(_SESSIONS, {"item_ids": chunk}).all())
+            rows.extend((int(r[0]), int(r[1]), r[2], r[3]) for r in conn.execute(_SESSIONS, {"item_ids": chunk}).all())
         return rows
 
     @read
@@ -748,19 +725,9 @@ class IntermediateQueries(QueryModule):
         }
         return [(str(r[0]), str(r[1])) for r in conn.execute(_still_deletable(kind, mode, is_admin), parameters).all()]
 
-    @read
-    def reference_owners(
-        self, conn: Connection, kind: MediaKind, names: Collection[str]
-    ) -> list[tuple[str, str, str, str]]:
-        """(media, owner kind, owner account, owner id) of each document naming one of the named media."""
-        return [
-            (str(r[0]), str(r[1]), str(r[2]), str(r[3]))
-            for r in conn.execute(_reference_owners(kind), {"names": bound_set(names)}).all()
-        ]
-
     # endregion
 
-    # region documents and projects
+    # region projects
 
     @read
     def projects(self, conn: Connection, user_id: Optional[str]) -> list[tuple[str, str, str, Optional[str]]]:
@@ -768,19 +735,6 @@ class IntermediateQueries(QueryModule):
         on any of the project's boards that is not an intermediate."""
         statement = _OWNERS_PROJECTS if user_id is not None else _PROJECTS
         return [(str(r[0]), str(r[1]), str(r[2]), r[3]) for r in conn.execute(statement, {"user_id": user_id}).all()]
-
-    @read
-    def document_names(
-        self, conn: Connection, owner_kind: str, ids: Sequence[str]
-    ) -> list[tuple[Optional[str], str, Optional[str]]]:
-        """(owner, id, name) of the documents of `owner_kind` with the given ids; workflows have no owner here."""
-        rows: list[tuple[Optional[str], str, Optional[str]]] = []
-        for start in range(0, len(ids), IN_CHUNK):
-            chunk = list(ids[start : start + IN_CHUNK])
-            rows.extend(
-                (r[0], str(r[1]), r[2]) for r in conn.execute(_DOCUMENT_NAMES[owner_kind], {"ids": chunk}).all()
-            )
-        return rows
 
     # endregion
 

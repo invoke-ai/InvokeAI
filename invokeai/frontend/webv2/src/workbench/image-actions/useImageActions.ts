@@ -1,3 +1,4 @@
+import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
@@ -48,10 +49,12 @@ import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
+  type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -62,6 +65,7 @@ import {
   sendGalleryImageAsControl,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
+import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -71,6 +75,7 @@ import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from 
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { MediaUsageHost } from './mediaUsageReport';
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import type { VideoRecallKind } from './videoRecall';
 
@@ -100,7 +105,6 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
-import { collectMediaUsage } from './mediaUsage';
 import { buildPbrMapsGraph } from './pbrMapsGraph';
 
 /**
@@ -152,6 +156,64 @@ export interface ImageActions extends GalleryItemActions {
 }
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = {};
+/**
+ * How long a deletion without routine confirmation waits for the usage check, per stage (server, then closed
+ * projects), before asking instead: the user is waiting on a click.
+ */
+const UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS = 3_000;
+/** A usage check this quick finishes unnoticed; a slower one shows a progress toast until it does. */
+const PENDING_CHECK_NOTICE_DELAY_MS = 400;
+
+/**
+ * Items a deletion is under way for (checking, asking, or deleting), per account lifetime, shared by every surface
+ * that deletes (grid, selection bar, Preview, menus), each with its own image actions.
+ */
+const deletionsInFlight = new WeakMap<AccountScope, Set<GalleryItemKey>>();
+
+/** Claims the items for one deletion; null when any is already claimed. The release ends the claim. */
+const claimDeletion = (items: readonly GalleryItemRef[]): (() => void) | null => {
+  const owner = captureAccountScope();
+  const claimed = deletionsInFlight.get(owner) ?? new Set<GalleryItemKey>();
+  const keys = items.map(toGalleryItemKey);
+
+  if (keys.some((key) => claimed.has(key))) {
+    return null;
+  }
+
+  deletionsInFlight.set(owner, claimed);
+  keys.forEach((key) => claimed.add(key));
+
+  return () => keys.forEach((key) => claimed.delete(key));
+};
+
+/**
+ * The one "checking" notice for every silent-deletion check running at once, from any surface: shown once a check has
+ * run for a moment, and dismissed only when the last running check ends, however it ends.
+ */
+const PENDING_CHECK_NOTICE_ID = 'gallery-deletion-usage-check';
+let pendingChecks = 0;
+
+/** Counts a check as running until the returned release, which is safe to call more than once. */
+const holdPendingCheckNotice = (title: string): (() => void) => {
+  pendingChecks += 1;
+  const timer = setTimeout(() => {
+    // The same id updates a notice already showing instead of stacking a second one.
+    toaster.create({ duration: Number.POSITIVE_INFINITY, id: PENDING_CHECK_NOTICE_ID, title, type: 'loading' });
+  }, PENDING_CHECK_NOTICE_DELAY_MS);
+  let released = false;
+
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    clearTimeout(timer);
+    pendingChecks -= 1;
+    if (pendingChecks === 0) {
+      toaster.dismiss(PENDING_CHECK_NOTICE_ID);
+    }
+  };
+};
 
 /**
  * Selected as booleans so Video panel edits re-render action consumers only when an answer flips (the workbench
@@ -234,7 +296,9 @@ export const useImageActions = ({
       const values = getCurrentGenerateValues({ generateValues, supportedModels });
 
       return {
-        canUseAsReferenceImage: Boolean(values && values.referenceImages.length < getMaxReferenceImages(values.model)),
+        canUseAsReferenceImage: Boolean(
+          values && values.referenceImages.length < getMaxReferenceImages(values.model, values)
+        ),
         currentGenerateValues: values,
       };
     }, [generateValues, supportedModels])
@@ -570,21 +634,83 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems: ImageActions['deleteItems'] = (items, options) => {
-      const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
-      const usage = project ? collectMediaUsage(project, items) : [];
+    const deleteItems: ImageActions['deleteItems'] = async (items, options) => {
+      // A repeated Delete (key repeat, a second surface) for items already being checked, asked about or deleted is
+      // dropped: running it again would delete them twice and report the second, refused attempt as a failure.
+      const release = claimDeletion(items);
 
-      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media the
-      // project still uses always ask: the dialog names what goes, and authored work would point at nothing.
+      if (!release) {
+        return;
+      }
+
+      const usageHost: MediaUsageHost = {
+        getLoadedProjects: () => queries.getSnapshot().projects,
+        getSyncBase: (targetProjectId) => getProjectSyncSnapshot().projects[targetProjectId],
+        openProjectId: projectId ?? queries.getSnapshot().activeProject.id,
+      };
+      const request = { kind: 'items', refs: items } as const;
+      // The dialog shows the check running while its code loads; nothing of it is part of the editor's startup.
+      const checkUsage = (signal: AbortSignal) =>
+        import('./mediaUsageReport').then(({ resolveMediaUsage }) => resolveMediaUsage(request, usageHost, { signal }));
+      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media still in
+      // use always ask: the dialog names what goes, and authored work would point at nothing.
       const canSkipFutureConfirmations = items.length === 1 && options?.targetsOffScreen !== true;
+      const confirm = (usage?: GalleryMediaUsageReport) =>
+        requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
+          canSkipFutureConfirmations,
+          checkUsage,
+          returnFocus: options?.returnFocus,
+          usage,
+        });
 
-      return confirmImageDeletion || usage.length > 0 || !canSkipFutureConfirmations
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
-            canSkipFutureConfirmations,
-            returnFocus: options?.returnFocus,
-            usage,
-          })
-        : deleteItemsConfirmed(items);
+      try {
+        if (confirmImageDeletion || !canSkipFutureConfirmations) {
+          return await confirm();
+        }
+
+        // Without routine confirmation, one visible item goes silently only once the check finds nothing using it; a
+        // use, or a check that could not finish in time, still asks. A check slower than a moment says it is running.
+        const owner = captureAccountScope();
+        const releaseNotice = holdPendingCheckNotice(t('widgets.gallery.deleteInUse.checking'));
+        // The report the dialog shows when one asks; none when it must check again.
+        let usage: GalleryMediaUsageReport | undefined;
+        let isUnused = false;
+        let checkFailed = false;
+
+        try {
+          const [{ isUsedInLoadedProjects, resolveMediaUsage }, { isGalleryMediaUnused }] = await Promise.all([
+            import('./mediaUsageReport'),
+            import('@features/gallery/mediaUsage'),
+          ]);
+          const report = await resolveMediaUsage(request, usageHost, {
+            projectReadsTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
+            serverTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
+          });
+
+          if (!isGalleryMediaUnused(report)) {
+            usage = report;
+          } else {
+            // The answer can be seconds old. A use added in this tab since still asks; the dialog checks again rather
+            // than show an answer that missed it.
+            isUnused = !isUsedInLoadedProjects(items, usageHost);
+          }
+        } catch {
+          checkFailed = true;
+        } finally {
+          // Before any dialog opens: the notice is about the check, not the answer.
+          releaseNotice();
+        }
+
+        if (checkFailed) {
+          // The resolver rejects only on an account change, and the deletion belonged to the previous account. Its
+          // code failing to load leaves the check undone: the dialog runs it again, and offers Retry if it fails.
+          return isAccountScopeCurrent(owner) ? await confirm() : undefined;
+        }
+
+        return isUnused ? await deleteItemsConfirmed(items) : await confirm(usage);
+      } finally {
+        release();
+      }
     };
     /** Groups refs by a known prior value; refs whose prior value is unknown are left out. */
     const groupByPrior = <Value>(

@@ -8,6 +8,7 @@ are folded unless fp8 compute or the model's fp8 storage setting keeps them; the
 dtype is bf16, as in production: the packed global scale must not be cast.
 """
 
+import dataclasses
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -26,6 +27,7 @@ from invokeai.backend.model_manager.load.model_loaders.qwen_image import (
     QwenImageCheckpointModel,
     QwenVLEncoderCheckpointLoader,
 )
+from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_convrot
@@ -293,29 +295,191 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + fp8_marker.numel())
 
 
-def test_an_int8_convrot_checkpoint_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
-    """This encoder has no int8 branch, and `int8_tensorwise` shares the fp8 key layout, so the fold
-    applied the scale and skipped the inverse rotation.
+#: The shared encoder seam computes in float32; the int8 cells need bf16, since a blanket cast to it is what would ruin
+#: the float32 scales.
+BF16_ENCODER_SEAM = dataclasses.replace(ENCODER_SEAM, compute_dtype=COMPUTE_DTYPE)
 
-    The refusal has to come before `make_room`, thirty lines further down, and before the config
-    fetch between them: reserving room for a load that cannot finish evicts whatever else the user
-    had resident, and the fetch reaches for the network to do it. That
-    ordering is the half that went missing once already -- the guard was reported as moved ahead of
-    the reservation while the call was not in the tree at all, and nothing here would have noticed.
-    """
-    payload = quantize_convrot(torch.randn(64, 256), group_size=64)
-    state_dict = {
-        "model.layers.0.self_attn.q_proj.weight": payload.codes,
-        "model.layers.0.self_attn.q_proj.weight_scale": payload.scale,
-        "model.layers.0.self_attn.q_proj.comfy_quant": comfy_quant_marker(
-            {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 64}
-        ),
+
+def _expected_bias(source: dict[str, torch.Tensor], layer: Int8ConvrotLinear) -> torch.Tensor | None:
+    """The bias the source file holds, rounded to the compute dtype by the load. Only `q_proj` has one in the toy."""
+    bias = source.get("model.layers.0.self_attn.q_proj.bias")
+    return bias.to(COMPUTE_DTYPE).float() if layer.bias is not None else None
+
+
+def _tiny_encoder(monkeypatch: pytest.MonkeyPatch):
+    """Stand in for the 7B module tree: the vendored config is real, the model class is `_TinyQwenVL`."""
+    import transformers
+
+    monkeypatch.setattr(transformers, "Qwen2_5_VLForConditionalGeneration", _TinyQwenVL, raising=False)
+
+
+def _int8_encoder_state_dict(
+    rotated: bool, marked: bool = True
+) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+    """The two language-model projections int8, with the activation scale an unrotated build adds; and what each
+    must decode to, keyed by the path the module tree gives it."""
+    torch.manual_seed(2)
+    state_dict: dict[str, torch.Tensor] = {}
+    expected: dict[str, torch.Tensor] = {}
+    for legacy, shape in (("model.layers.0.self_attn.q_proj", (128, 64)), ("model.layers.0.mlp.down_proj", (128, 64))):
+        weight = torch.randn(shape)
+        if rotated:
+            payload = quantize_convrot(weight, group_size=64)
+            codes, scale, round_trip = payload.codes, payload.scale, payload.dequantized
+            marker = {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 64}
+        else:
+            scale = (weight.abs().max() / 127.0).to(torch.float32)
+            codes = torch.clamp(torch.round(weight / scale), -128, 127).to(torch.int8)
+            round_trip = codes.float() * scale
+            marker = {"format": "int8_tensorwise"}
+            state_dict[f"{legacy}.input_scale"] = torch.tensor(1.0)
+        state_dict[f"{legacy}.weight"] = codes
+        state_dict[f"{legacy}.weight_scale"] = scale
+        if marked:
+            state_dict[f"{legacy}.comfy_quant"] = comfy_quant_marker(marker)
+        expected[legacy.replace("model.", "model.language_model.", 1)] = round_trip
+    state_dict["model.layers.0.self_attn.q_proj.bias"] = torch.randn(128)
+    state_dict["lm_head.weight"] = torch.randn(32, 64)
+    state_dict["visual.proj.weight"] = torch.randn(4, 8)
+    state_dict["visual.proj.bias"] = torch.randn(4)
+    return state_dict, expected
+
+
+@pytest.mark.parametrize("rotated", [True, False], ids=["rotated_column_scale", "unrotated_scalar_scale"])
+def test_the_encoder_keeps_int8_layers_int8_under_their_transformers_paths(monkeypatch, tmp_path, rotated) -> None:
+    """The fold the encoder runs for fp8 would multiply the scale in and skip the inverse rotation, so the int8 layers
+    are claimed first. Their markers sit under the legacy names and follow the remap with their weights."""
+    state_dict, expected = _int8_encoder_state_dict(rotated)
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_int8.safetensors"
+    checkpoint.touch()
+    run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None, geometry=_tiny_encoder)
+
+    model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    for path, weight in expected.items():
+        layer = model.get_submodule(path)
+        assert isinstance(layer, Int8ConvrotLinear), path
+        assert layer.convrot is rotated, path
+        assert layer.weight.dtype is torch.int8, path
+        # The blanket cast to the compute dtype must not reach the scale.
+        assert layer.weight_scale.dtype is torch.float32, path
+        # A float32 activation: torch's CPU bf16 GEMM faults on part of the windows runner fleet.
+        x = torch.randn(3, 64)
+        bias = _expected_bias(state_dict, layer)
+        torch.testing.assert_close(layer(x), torch.nn.functional.linear(x, weight, bias), rtol=1e-4, atol=1e-4)
+        # The W8A8 activation scale has nothing to attach to.
+        assert not hasattr(layer, "input_scale")
+    assert model.lm_head.weight.dtype is COMPUTE_DTYPE
+    assert model.model.visual.proj.weight.dtype is COMPUTE_DTYPE
+    # Counted by hand: the int8 weights as stored, their fp32 scales, and the bias, `lm_head` and vision projection at
+    # bf16. Markers and activation scales are dropped and cost nothing.
+    int8 = 2 * 128 * 64
+    scales = (2 * 128 * 4) if rotated else 2 * 4
+    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    assert run.reserved == [int8 + scales + dense * COMPUTE_DTYPE.itemsize]
+
+
+@pytest.mark.parametrize("rotated", [True, False], ids=["rotated", "unrotated"])
+def test_an_encoder_build_that_names_its_layers_only_in_the_header_loads_under_the_remapped_paths(
+    monkeypatch, tmp_path, rotated
+) -> None:
+    """The header names the layers in the legacy layout, like the keys; the markers made from it follow the remap."""
+    state_dict, expected = _int8_encoder_state_dict(rotated, marked=False)
+    legacy = ("model.layers.0.self_attn.q_proj", "model.layers.0.mlp.down_proj")
+    entry = {"format": "int8_tensorwise", "convrot": rotated, **({"convrot_groupsize": 64} if rotated else {})}
+    metadata = {"_quantization_metadata": json.dumps({"layers": dict.fromkeys(legacy, entry)})}
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_header.safetensors"
+    checkpoint.touch()
+    run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=metadata, geometry=_tiny_encoder)
+
+    model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    for path, weight in expected.items():
+        layer = model.get_submodule(path)
+        assert isinstance(layer, Int8ConvrotLinear), path
+        assert layer.convrot is rotated, path
+        x = torch.randn(3, 64)
+        torch.testing.assert_close(
+            layer(x), torch.nn.functional.linear(x, weight, _expected_bias(state_dict, layer)), rtol=1e-4, atol=1e-4
+        )
+
+
+def test_an_encoder_header_entry_that_does_not_say_whether_the_weight_was_rotated_is_refused(
+    monkeypatch, tmp_path
+) -> None:
+    state_dict, _ = _int8_encoder_state_dict(rotated=True, marked=False)
+    layers = {
+        path: {"format": "int8_tensorwise"}
+        for path in ("model.layers.0.self_attn.q_proj", "model.layers.0.mlp.down_proj")
     }
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_ambiguous.safetensors"
+    checkpoint.touch()
+    run = prepare(
+        BF16_ENCODER_SEAM,
+        monkeypatch,
+        state_dict=state_dict,
+        metadata={"_quantization_metadata": json.dumps({"layers": layers})},
+    )
+
+    with pytest.raises(ValueError, match="does not say whether the weight was rotated"):
+        run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    assert run.reserved == []
+
+
+def test_an_encoder_file_mixing_int8_and_nvfp4_layers_loads_both_under_one_reservation(monkeypatch, tmp_path) -> None:
+    state_dict, expected = _int8_encoder_state_dict(rotated=True)
+    nvfp4_legacy = "model.layers.0.mlp.down_proj"
+    for suffix in ("weight", "weight_scale", "comfy_quant"):
+        del state_dict[f"{nvfp4_legacy}.{suffix}"]
+    del expected["model.language_model.layers.0.mlp.down_proj"]
+    tensors, nvfp4_weight = _nvfp4_tensors(nvfp4_legacy, (128, 64))
+    state_dict.update(tensors)
+    state_dict[f"{nvfp4_legacy}.comfy_quant"] = _marker("nvfp4")
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_nvfp4.safetensors"
+    checkpoint.touch()
+    run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None, geometry=_tiny_encoder)
+
+    model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    q_proj = model.get_submodule("model.language_model.layers.0.self_attn.q_proj")
+    assert isinstance(q_proj, Int8ConvrotLinear)
+    packed = model.get_submodule("model.language_model.layers.0.mlp.down_proj")
+    assert isinstance(packed, NVFP4Linear)
+    x = torch.randn(3, 64)
+    torch.testing.assert_close(packed(x), torch.nn.functional.linear(x, nvfp4_weight))
+    # The int8 q_proj with its fp32 scale, the packed layer as stored, and the dense bias, `lm_head` and vision
+    # projection at bf16: one call that covers both schemes.
+    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    assert run.reserved == [128 * 64 + 128 * 4 + _packed_bytes(128, 64) + dense * COMPUTE_DTYPE.itemsize]
+
+
+def test_an_encoder_int8_weight_without_a_marker_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
+    """Nothing says whether the codes were rotated, and cast as raw integers they generate noise. The refusal has to
+    come before `make_room`, and before the config fetch between them: reserving room for a load that cannot finish
+    evicts whatever else the user had resident."""
+    state_dict, _ = _int8_encoder_state_dict(rotated=True)
+    del state_dict["model.layers.0.mlp.down_proj.comfy_quant"]
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_convrot.safetensors"
     checkpoint.touch()
     run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
 
-    with pytest.raises(ValueError, match="quantized with convrot"):
+    with pytest.raises(ValueError, match="no readable int8_tensorwise marker"):
+        run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    assert run.reserved == []
+
+
+def test_an_encoder_marked_only_convrot_is_refused(monkeypatch, tmp_path) -> None:
+    """A marker without a format names no scheme; the folds that used to take it would have rotated nothing."""
+    state_dict, _ = _int8_encoder_state_dict(rotated=True)
+    for legacy in ("model.layers.0.self_attn.q_proj", "model.layers.0.mlp.down_proj"):
+        state_dict[f"{legacy}.comfy_quant"] = comfy_quant_marker({"convrot": True})
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_convrot_only.safetensors"
+    checkpoint.touch()
+    run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
+
+    with pytest.raises(ValueError, match=r"int8 weight\(s\) with no readable int8_tensorwise marker"):
         run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
 
     assert run.reserved == []

@@ -164,3 +164,21 @@ test('cold namespaces load separately in production and development, preserving 
     await server.close();
   }
 });
+
+test('availability distinguishes translated content from declared readiness and omits empty catalogs', async (context) => {
+  const projectRoot = await createFixture(context);
+  await writeFile(
+    resolve(projectRoot, 'public/locales/en.json'),
+    JSON.stringify({ common: { retry: 'Retry', close: 'Close' } })
+  );
+  await writeFile(
+    resolve(projectRoot, 'public/locales/fr.json'),
+    JSON.stringify({ common: { retry: 'Réessayer' }, unused: 'Ancien' })
+  );
+  await writeFile(resolve(projectRoot, 'public/locales/ar.json'), '{}');
+  const plugin = localeAssetsPlugin({ projectRoot });
+  const { define } = await plugin.config();
+  const availability = JSON.parse(JSON.parse(define['import.meta.env.LOCALE_AVAILABILITY']));
+  assert.deepEqual(availability, { en: { translated: 2, ready: true }, fr: { translated: 1 } });
+  assert.equal(plugin.transformIndexHtml('const ready=__READY_CONTENT_LANGUAGES__;'), 'const ready=["en"];');
+});

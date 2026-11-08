@@ -48,15 +48,24 @@ from invokeai.backend.quantization.fp8_scaled import (
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
-from invokeai.backend.quantization.int8_convrot import reject_int8_layers_a_plain_fold_cannot_decode
+from invokeai.backend.quantization.int8_convrot import (
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+)
 from invokeai.backend.quantization.load_plan import reserve_for_load
-from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers
+from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers, predict_nvfp4_install_size
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_config_dict,
     load_bundled_qwen2_5_vl_tokenizer,
 )
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
+from invokeai.backend.util.state_dict_loading import (
+    load_state_dict_ignoring_extras,
+    log_unexpected_keys,
+    reject_incomplete_load,
+)
 
 
 def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
@@ -250,10 +259,11 @@ class QwenImageGGUFCheckpointModel(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.QwenImage, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class QwenImageCheckpointModel(ModelLoader):
     """Loads Qwen Image transformer models from single-file safetensors checkpoints
-    (e.g. ComfyUI fp8_scaled or nvfp4, plain bf16/fp16). nvfp4 layers stay packed. Scaled
+    (e.g. ComfyUI fp8_scaled, nvfp4 or int8_tensorwise, plain bf16/fp16). nvfp4 layers stay packed and
+    int8_tensorwise(+convrot) layers stay int8 (`Int8ConvrotLinear`), both dequantized per forward. Scaled
     fp8 layers keep their fp8 weight and scale when fp8 compute is available or the model's
     `default_settings.fp8_storage` is on (which then also casts the dense remainder to fp8);
-    otherwise they are dequantized to bf16 at load time."""
+    otherwise they are dequantized to bf16 at load time. A file carries int8 or scaled fp8, not both."""
 
     _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
 
@@ -307,13 +317,28 @@ class QwenImageCheckpointModel(ModelLoader):
         )
         nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
 
-        # ComfyUI 'scaled fp8': an fp8 weight plus its `weight_scale`, named in the header or by a per-layer marker.
-        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
-        # Kept fp8 only when something uses them: the fp8 matmul, or fp8 storage the user asked of this model. For
-        # storage the checkpoint's own scale is exact, where the layerwise cast of a folded weight has none. Without
-        # either, a dequantize per forward would cost speed for memory nobody asked to save, so they are folded.
-        use_fp8_storage = bool(fp8_layers) and self._should_use_fp8(config, SubModelType.Transformer)
-        keep_fp8 = bool(fp8_layers) and keep_checkpoint_fp8
+        # ComfyUI 'int8_tensorwise' (+convrot) shares the fp8 key layout (`.weight` beside `.weight_scale`), and the
+        # fp8 extraction below pops every `.weight_scale`, so the int8 layers are claimed first. Outside the branch
+        # on purpose: an int8 weight whose marker is missing would otherwise be cast as raw codes and generate noise.
+        int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
+        reject_unmarked_int8_weights(sd, int8_markers, "Qwen Image", header_layers=header_layers)
+
+        if int8_markers:
+            sd = drop_unconsumed_quantization_sidecars(sd)
+            fp8_layers = {}
+            # Nothing scaled to keep for fp8 storage; the outer `_apply_fp8_layerwise_casting` still casts the dense
+            # remainder when the model asks for fp8 storage.
+            use_fp8_storage = False
+            keep_fp8 = False
+        else:
+            # ComfyUI 'scaled fp8': an fp8 weight plus its `weight_scale`, named in the header or by a per-layer marker.
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
+            # Kept fp8 only when something uses them: the fp8 matmul, or fp8 storage the user asked of this model. For
+            # storage the checkpoint's own scale is exact, where the layerwise cast of a folded weight has none.
+            # Without either, a dequantize per forward would cost speed for memory nobody asked to save, so they are
+            # folded.
+            use_fp8_storage = bool(fp8_layers) and self._should_use_fp8(config, SubModelType.Transformer)
+            keep_fp8 = bool(fp8_layers) and keep_checkpoint_fp8
 
         is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
         model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
@@ -324,26 +349,44 @@ class QwenImageCheckpointModel(ModelLoader):
             model = QwenImageTransformer2DModel(**model_config)
         skip_patterns = _model_declared_skip_patterns(model)
 
-        # One reservation, before the fold or the split widens a single weight: `make_room` makes that much room
-        # rather than adding to an earlier one.
-        reserve_for_load(
-            self._ram_cache.make_room,
-            sd,
-            model_dtype,
-            keep_fp8=keep_fp8,
-            model=model,
-            skip_patterns=skip_patterns,
-            fp8_layers=fp8_layers,
-            nvfp4_payloads=nvfp4_payloads,
-        )
+        if int8_markers:
+            # The checkpoint's keys already match diffusers' module tree, so the markers need no renaming. The one
+            # reservation also covers the nvfp4 layers held beside the int8 ones.
+            quantized = install_int8_convrot_layers(
+                model,
+                sd,
+                int8_markers,
+                model_dtype,
+                architecture="Qwen Image",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=skip_patterns,
+                extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+            )
+            logger.info(
+                f"Qwen Image: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(int8_tensorwise checkpoint, dequantized per forward)"
+            )
+        else:
+            # One reservation, before the fold or the split widens a single weight: `make_room` makes that much room
+            # rather than adding to an earlier one.
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads=nvfp4_payloads,
+            )
 
-        if fp8_layers and not keep_fp8:
-            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
-            logger.info(f"Qwen Image: folded {len(fp8_layers)} scaled fp8 layer(s) into {model_dtype}.")
-            fp8_layers = {}
-        # Layers the cast would widen anyway are folded here with their scale applied, so the cast never drops one.
-        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
-        cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            if fp8_layers and not keep_fp8:
+                dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+                logger.info(f"Qwen Image: folded {len(fp8_layers)} scaled fp8 layer(s) into {model_dtype}.")
+                fp8_layers = {}
+            # Layers the cast would widen anyway are folded here with their scale applied, so the cast never drops one.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+            cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
         if nvfp4_payloads:
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
@@ -352,6 +395,10 @@ class QwenImageCheckpointModel(ModelLoader):
         load_state_dict_ignoring_extras(
             model, sd, source="Qwen-Image transformer checkpoint", assign=True, allow_missing=True
         )
+        if int8_markers:
+            # `allow_missing` lets a partial file through; a quantized layer that lost a tensor would otherwise fail
+            # on the first forward with a meta-tensor error.
+            reject_incomplete_load(model, what="Qwen Image int8 transformer checkpoint")
         # `assign=True` aliases every param to its `sd` tensor: without this, the fp8 storage cast below would hold
         # each dense weight at bf16 and fp8 at once, past the reservation.
         sd.clear()
@@ -463,14 +510,18 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         # Comfy's nvfp4 build keeps the language model's projections in nvfp4, beside scaled fp8 embeddings. Take those
         # layers out before the fold: `_dequantize_comfyui_fp8` multiplies every `.weight_scale` into its weight,
         # nvfp4's block scales included. `install_nvfp4_layers` puts them back, packed.
-        nvfp4_payloads = pop_nvfp4_layers(
-            sd, header_layers=parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
-        )
+        header_layers = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
 
-        # Ahead of the config fetch and the reservation below, rather than where the fold reaches it:
-        # a load that cannot finish should not go to the network first, nor evict the cache for room
-        # it will never use.
-        reject_int8_layers_a_plain_fold_cannot_decode(sd, "Qwen2.5-VL encoder checkpoint")
+        # ComfyUI 'int8_tensorwise' (+convrot) shares the fp8 key layout, and the fold below multiplies every
+        # `.weight_scale` into its weight, which for a rotated layer leaves a weight of the right shape and no
+        # relation to the one stored. The int8 layers are claimed first and stay int8. Ahead of the reservation, so a
+        # load that cannot finish does not evict the cache for room it will never use. The refusal is outside the
+        # branch on purpose: an int8 weight with no marker is refused in every case.
+        int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
+        reject_unmarked_int8_weights(sd, int8_markers, "Qwen2.5-VL encoder", header_layers=header_layers)
+        if int8_markers:
+            sd = drop_unconsumed_quantization_sidecars(sd)
 
         # The architecture config is vendored rather than fetched: these constants decide the
         # module tree that the weights below are folded into, and a re-upload changing one of them
@@ -482,39 +533,57 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         with accelerate.init_empty_weights():
             model = Qwen2_5_VLForConditionalGeneration(qwen_config)
         skip_patterns = _model_declared_skip_patterns(model)
-        # The packed layers are named in the same legacy layout as the keys.
+        # The packed and int8 layers are named in the same legacy layout as the keys.
         nvfp4_payloads = _remap_qwen_vl_checkpoint_keys(nvfp4_payloads)
-
-        # One reservation, before the fold widens a single weight: `make_room` makes that much room rather than adding
-        # to an earlier one. Every fp8 layer is folded to the compute dtype.
-        reserve_for_load(
-            self._ram_cache.make_room,
-            sd,
-            model_dtype,
-            keep_fp8=False,
-            model=model,
-            skip_patterns=skip_patterns,
-            fp8_layers={},
-            nvfp4_payloads=nvfp4_payloads,
-        )
-
-        # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization
-        # metadata (`scale_input` is the activation scale ComfyUI's fp8 matmul kernels
-        # use at runtime — we run the encoder in bf16 after dequantization).
-        dequantized_count = _dequantize_comfyui_fp8(sd, model_dtype, "Qwen2.5-VL encoder checkpoint")
-        if dequantized_count > 0:
-            logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
-        _strip_quantization_metadata(sd)
+        int8_markers = _remap_qwen_vl_checkpoint_keys(int8_markers)
 
         # ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
         # (`visual.X`, `model.X`); remap to the `model.visual.X` / `model.language_model.X`
         # layout transformers expects. See `_remap_qwen_vl_checkpoint_keys` for details.
         sd = _remap_qwen_vl_checkpoint_keys(sd)
 
-        # Cast to compute dtype (skip integer/index tensors)
-        for k in list(sd.keys()):
-            if sd[k].is_floating_point():
-                sd[k] = sd[k].to(model_dtype)
+        if int8_markers:
+            # The dense tensors are cast inside, and the fp32 scales are left alone: a blanket cast would ruin them.
+            quantized = install_int8_convrot_layers(
+                model,
+                sd,
+                int8_markers,
+                model_dtype,
+                architecture="Qwen2.5-VL encoder",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=skip_patterns,
+                extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+            )
+            logger.info(
+                f"Qwen VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(int8_tensorwise checkpoint, dequantized per forward)"
+            )
+        else:
+            # One reservation, before the fold widens a single weight: `make_room` makes that much room rather than
+            # adding to an earlier one. Every fp8 layer is folded to the compute dtype.
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=False,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers={},
+                nvfp4_payloads=nvfp4_payloads,
+            )
+
+            # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization
+            # metadata (`scale_input` is the activation scale ComfyUI's fp8 matmul kernels
+            # use at runtime; we run the encoder in bf16 after dequantization).
+            dequantized_count = _dequantize_comfyui_fp8(sd, model_dtype, "Qwen2.5-VL encoder checkpoint")
+            if dequantized_count > 0:
+                logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
+            _strip_quantization_metadata(sd)
+
+            # Cast to compute dtype (skip integer/index tensors)
+            for k in list(sd.keys()):
+                if sd[k].is_floating_point():
+                    sd[k] = sd[k].to(model_dtype)
 
         if nvfp4_payloads:
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)

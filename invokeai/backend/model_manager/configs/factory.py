@@ -65,6 +65,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
+    LoRA_Diffusers_Ideogram4_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
     LoRA_Diffusers_SD3_Config,
@@ -74,6 +75,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_Flux3_Config,
     LoRA_LyCORIS_FLUX_Config,
+    LoRA_LyCORIS_Ideogram4_Config,
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
@@ -174,6 +176,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
     Qwen3VLEncoder_GGUF_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
+    Qwen3VLVisionTower_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -576,6 +579,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # Ideogram 4 shares Z-Image's block names; it needs a patched weight at an Ideogram 4 width, which
+        # Z-Image's probe now rejects, so the two are mutually exclusive regardless of order (locked in by
+        # `test_ideogram4_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_Ideogram4_Config, LoRA_LyCORIS_Ideogram4_Config.get_tag()],
         # SD 3 shares Qwen-Image's diffusers attention names; it is told apart by its width (1536 / 2432 against
         # 3072), which Qwen-Image's probe now checks too, so the two are mutually exclusive regardless of order
         # (locked in by `test_sd3_lora_probe_independence.py`).
@@ -601,6 +608,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
+        Annotated[LoRA_Diffusers_Ideogram4_Config, LoRA_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
@@ -626,6 +634,7 @@ AnyModelConfig = Annotated[
         # satisfies the text-only Qwen3 GGUF heuristic in full.
         Annotated[Qwen3VLEncoder_GGUF_Config, Qwen3VLEncoder_GGUF_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
+        Annotated[Qwen3VLVisionTower_GGUF_Config, Qwen3VLVisionTower_GGUF_Config.get_tag()],
         Annotated[Qwen35Encoder_Checkpoint_Config, Qwen35Encoder_Checkpoint_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
