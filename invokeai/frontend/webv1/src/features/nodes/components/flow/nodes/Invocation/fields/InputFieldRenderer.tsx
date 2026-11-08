@@ -30,8 +30,6 @@ import {
   isColorFieldInputTemplate,
   isEnumFieldInputInstance,
   isEnumFieldInputTemplate,
-  isFileFieldInputInstance,
-  isFileFieldInputTemplate,
   isFloatFieldCollectionInputInstance,
   isFloatFieldCollectionInputTemplate,
   isFloatFieldInputInstance,
@@ -80,7 +78,6 @@ import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
-import FileFieldInputComponent from './inputs/FileFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import StylePresetFieldInputComponent from './inputs/StylePresetFieldInputComponent';
@@ -230,13 +227,6 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ImageFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
-  }
-
-  if (isFileFieldInputTemplate(template)) {
-    if (!isFileFieldInputInstance(field)) {
-      return null;
-    }
-    return <FileFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isVideoFieldInputTemplate(template)) {
