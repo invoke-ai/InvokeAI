@@ -16,6 +16,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 
 ## React and product quality
 
+- Polished desktop experience: deliberate layouts, responsive interactions, cohesive accessible controls, complete loading/empty/error/recovery states.
 - No direct `useEffect`. Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters.
 - `@platform/react/useMountEffect`: only mount/unmount registration with stable dependencies and complete cleanup. No changing-dependency refs, wrapper aliases, layout-effect evasions. Layout effects only for pre-paint DOM measurement.
 - Changing an effect's behavior: migrate it. No unrelated sweeps. Identity changes use store/runtime lifecycles or deliberate keyed remounts, without accidental state loss.

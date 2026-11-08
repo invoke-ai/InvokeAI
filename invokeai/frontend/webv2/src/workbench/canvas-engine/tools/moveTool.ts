@@ -214,9 +214,11 @@ export const createMoveTool = (): Tool => {
     },
     onKeyCommand: (ctx, command) => {
       // Enter commits the float; engine Escape abandons it regardless of active tool.
-      if (command === 'apply' && !state) {
-        ctx.commitFloatingSelection?.();
+      if (command !== 'apply' || state || !ctx.getFloatingSelection?.()) {
+        return false;
       }
+      ctx.commitFloatingSelection?.();
+      return true;
     },
     onPointerCancel: (ctx) => {
       if (state?.mode.kind === 'float') {

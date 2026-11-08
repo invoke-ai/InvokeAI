@@ -156,9 +156,9 @@ export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
 export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
 export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
-export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
-export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
-export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
+export const DEFAULT_HIDIFFUSION_T1_RATIO = null;
+export const DEFAULT_HIDIFFUSION_T2_RATIO = null;
+export const MIN_HIDIFFUSION_T1_RATIO = 0;
 export const MAX_HIDIFFUSION_RATIO = 1;
 /** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
 export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
@@ -181,21 +181,33 @@ export const DEFAULT_LORA_WEIGHT_CONFIG = {
 export const clampDimension = (value: number, grid = DIMENSION_GRID): number =>
   Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, Math.round(value / grid) * grid));
 
-/** Fit a width/height of the given ratio into approximately the given pixel area, snapped to the grid. */
+/**
+ * Fit a width/height of the given ratio into approximately the given pixel area, snapped to the grid. At the dimension
+ * limits both sides scale together (the larger side down to the maximum, else the smaller up to the minimum), so for a
+ * ratio within MAX_DIMENSION / MIN_DIMENSION (64:1) only grid snapping moves it. A ratio past that cannot fit both
+ * limits: the long side is capped at the maximum and the short side held at the minimum.
+ */
 export const calculateNewSize = (
   ratio: number,
   area: number,
   grid = DIMENSION_GRID
 ): { width: number; height: number } => {
   const exactWidth = Math.sqrt(area * ratio);
+  const exactHeight = exactWidth / ratio;
+  const larger = Math.max(exactWidth, exactHeight);
+  const smaller = Math.min(exactWidth, exactHeight);
+  const scale = larger > MAX_DIMENSION ? MAX_DIMENSION / larger : smaller < MIN_DIMENSION ? MIN_DIMENSION / smaller : 1;
 
-  return { height: clampDimension(exactWidth / ratio, grid), width: clampDimension(exactWidth, grid) };
+  return { height: clampDimension(exactHeight * scale, grid), width: clampDimension(exactWidth * scale, grid) };
 };
 
 /** A preset ratio implies the lock; Free holds its ratio only while the lock is on. */
 export const isAspectRatioLocked = (
   settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
 ): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
+/** How far apart two ratios may be and still count as the same one. */
+export const ASPECT_RATIO_TOLERANCE = 0.0001;
 
 /** Best-matching preset for existing dimensions, falling back to Free. */
 export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
@@ -206,7 +218,7 @@ export const deriveAspectRatioId = (width: number, height: number): AspectRatioI
   const ratio = width / height;
 
   for (const [id, entry] of Object.entries(ASPECT_RATIO_MAP)) {
-    if (Math.abs(entry.ratio - ratio) < 0.0001) {
+    if (Math.abs(entry.ratio - ratio) < ASPECT_RATIO_TOLERANCE) {
       return id as AspectRatioId;
     }
   }
@@ -340,7 +352,7 @@ export const isValidMossImageSkipLayers = (layers: readonly number[]): boolean =
 export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
   Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
-const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
+export const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
 
 export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
@@ -890,6 +902,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     return null;
   }
 
+  const manualHiDiffusion =
+    hasFiniteNumber(values, 'hiDiffusionT1Ratio') || hasFiniteNumber(values, 'hiDiffusionT2Ratio');
   const width = values.width as number;
   const height = values.height as number;
 
@@ -916,20 +930,32 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       typeof values.hiDiffusionRauNetEnabled === 'boolean' ? values.hiDiffusionRauNetEnabled : true,
     hiDiffusionWindowAttentionEnabled:
       typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' ? values.hiDiffusionWindowAttentionEnabled : true,
-    hiDiffusionT1Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT1Ratio',
-      MIN_HIDIFFUSION_T1_RATIO,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T1_RATIO
-    ),
-    hiDiffusionT2Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT2Ratio',
-      0,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T2_RATIO
-    ),
+    ...(Object.hasOwn(values, 'hiDiffusionManualRatios')
+      ? {
+          hiDiffusionManualRatios: {
+            t1: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't1',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0.4
+            ),
+            t2: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't2',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0
+            ),
+          },
+        }
+      : {}),
+    hiDiffusionT1Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0),
+    hiDiffusionT2Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
     ...normalizeDynamicPromptsSettings(values),
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],

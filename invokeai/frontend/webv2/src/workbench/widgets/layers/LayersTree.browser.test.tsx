@@ -53,19 +53,32 @@ import { buildLayerStackRows } from './layerTreeRows';
 vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
 /** Most cases use a stand-in header; geometry cases render the real one with the real action order. */
-const realStackHeader = vi.hoisted(() => ({ on: false }));
+const realStackHeader = vi.hoisted(() => ({ on: false, exporting: false }));
 vi.mock('./useLayerStackActions', async () => {
   const { getStackActions } = await import('./layerStackActions');
   const { PlusIcon } = await import('lucide-react');
   const labels = {
     exportPsd: 'Export to PSD',
+    cancelExportPsd: 'Cancel PSD export',
     mergeVisible: 'Merge visible',
     new: 'New layer',
     toggleVisibility: 'Hide all on canvas',
   };
   return {
-    useLayerStackActions: (stack: Parameters<typeof getStackActions>[0]) =>
-      getStackActions(stack).map((id) => ({ disabled: false, icon: PlusIcon, id, label: labels[id], run: () => {} })),
+    useLayerStackActions: (stack: Parameters<typeof getStackActions>[0]) => {
+      const ids = getStackActions(stack);
+      if (stack === 'raster' && realStackHeader.exporting) {
+        ids.splice(2, 0, 'cancelExportPsd');
+      }
+      return ids.map((id) => ({
+        disabled: realStackHeader.exporting && id === 'exportPsd',
+        icon: PlusIcon,
+        id,
+        label: labels[id],
+        status: realStackHeader.exporting && id === 'exportPsd' ? 'Writing PSD…' : undefined,
+        run: () => {},
+      }));
+    },
   };
 });
 const StubStackHeader = ({
@@ -415,6 +428,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => root?.unmount());
   realStackHeader.on = false;
+  realStackHeader.exporting = false;
   host?.remove();
   host = null;
   root = null;
@@ -858,6 +872,30 @@ describe('LayersTree selection, surfaces and structure', () => {
     const container = treeitem('Inner').parentElement!.querySelector<HTMLElement>('[data-tree-guides]')!;
     expect(container).toHaveAttribute('aria-hidden', 'true');
     expect(document.elementFromPoint(line!.left, centreY(line!))!.closest('[role="treeitem"]')).toBe(treeitem('Inner'));
+  });
+
+  it('keeps PSD progress and cancellation visible as the layers panel narrows', async () => {
+    realStackHeader.on = true;
+    realStackHeader.exporting = true;
+    await renderTree([paint('layer')]);
+    const panel = host!.querySelector<HTMLElement>('div[style*="width: 480px"]')!;
+    for (const width of [280, 350, 440]) {
+      panel.style.width = `${width}px`;
+      await settle();
+      const header = host!.querySelector<HTMLElement>('[role="treeitem"][aria-label="Raster Layers"]')!;
+      const status = header.querySelector<HTMLElement>('[role="status"]')!;
+      const cancel = header.querySelector<HTMLButtonElement>('button[aria-label="Cancel PSD export"]')!;
+      const exportButton = header.querySelector<HTMLButtonElement>('button[aria-label="Export to PSD"]')!;
+      const bounds = header.getBoundingClientRect();
+      const progress = status.getBoundingClientRect();
+      expect(status.textContent).toBe('Writing PSD…');
+      expect(progress.width).toBeGreaterThanOrEqual(50);
+      expect(progress.left).toBeGreaterThanOrEqual(bounds.left);
+      expect(progress.right).toBeLessThanOrEqual(exportButton.getBoundingClientRect().left);
+      expect(cancel.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
+      expect(exportButton.disabled).toBe(true);
+      expect(cancel.disabled).toBe(false);
+    }
   });
 
   it('puts the stack headers’ and child rows’ eyes in the layer rows’ eye column', async () => {

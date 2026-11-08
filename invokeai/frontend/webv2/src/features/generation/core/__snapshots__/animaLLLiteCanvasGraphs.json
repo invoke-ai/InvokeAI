@@ -395,7 +395,10 @@
           "hash": "blake3:inpaint"
         },
         "anima_inpaint_adapter_weight": 0.75,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -877,7 +880,83 @@
           "hash": "blake3:qwen3"
         },
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 0.9,
+            "control_mode": null,
+            "image": {
+              "image_name": "sketch-layer-composite.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "sketch-layer",
+            "model": {
+              "base": "anima",
+              "hash": "blake3:sketch",
+              "key": "sketch",
+              "name": "sketch",
+              "type": "controlnet"
+            },
+            "type": "anima_lllite",
+            "weight": 0.8
+          },
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 0.9,
+            "control_mode": null,
+            "image": {
+              "image_name": "depth-layer-composite.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "depth-layer",
+            "model": {
+              "base": "anima",
+              "hash": "blake3:depth",
+              "key": "depth",
+              "name": "depth",
+              "type": "controlnet"
+            },
+            "type": "anima_lllite",
+            "weight": -1
+          },
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 0.9,
+            "control_mode": null,
+            "image": {
+              "image_name": "pose-layer-composite.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "pose-layer",
+            "model": {
+              "base": "anima",
+              "hash": "blake3:pose",
+              "key": "pose",
+              "name": "pose",
+              "type": "controlnet"
+            },
+            "type": "anima_lllite",
+            "weight": 2
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -1446,7 +1525,35 @@
           "hash": "blake3:inpaint"
         },
         "anima_inpaint_adapter_weight": 0.75,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 0.9,
+            "control_mode": null,
+            "image": {
+              "image_name": "sketch-layer-composite.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "sketch-layer",
+            "model": {
+              "base": "anima",
+              "hash": "blake3:sketch",
+              "key": "sketch",
+              "name": "sketch",
+              "type": "controlnet"
+            },
+            "type": "anima_lllite",
+            "weight": 0.8
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "infill": {
         "is_intermediate": true,

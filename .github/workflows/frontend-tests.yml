@@ -77,11 +77,9 @@ jobs:
         shell: bash
 
       # A pull request into main, or a merge group, is compared with the base branch's
-      # own measurements, restored from the cache every push to main fills below: the exact base
-      # commit when it has an entry, otherwise the most recent main entry (a main job that failed or
-      # is still running leaves no hole). Anything else compares against the committed baseline. The
-      # gate also honors deliberately re-recorded byte baselines. It logs which reference it used,
-      # and the restored key is passed through so reports can name it.
+      # own measurements at the exact base commit. A skipped or failed main run may leave no cache
+      # entry; measure that base in isolation rather than compare with an older main's smaller payload.
+      # Other events compare against the committed baseline. Candidate gates remain strict in every case.
       - name: restore performance reference
         id: perf-ref
         if: ${{ (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) && ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/main')) }}
@@ -89,29 +87,88 @@ jobs:
         with:
           path: invokeai/frontend/webv2/artifacts/perf-reference
           key: webv2-perf-reference-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          restore-keys: webv2-perf-reference-
 
-      - name: note a missing performance reference
-        if: ${{ steps.perf-ref.outcome == 'success' && steps.perf-ref.outputs.cache-matched-key == '' }}
-        run: 'echo "::warning::No performance reference was restored; byte budgets are compared against the committed baseline."'
+      - name: check out missing performance base
+        id: perf-base
+        if: ${{ steps.perf-ref.outcome == 'success' && steps.perf-ref.outputs.cache-hit != 'true' }}
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          path: .perf-base
+          persist-credentials: false
+
+      - name: install performance base dependencies
+        if: ${{ steps.perf-base.outcome == 'success' }}
+        uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: .perf-base/invokeai/frontend/webv2
+          node-version-file: .perf-base/.nvmrc
+
+      - name: measure missing performance base
+        if: ${{ steps.perf-base.outcome == 'success' }}
+        working-directory: .perf-base/invokeai/frontend/webv2
+        env:
+          WEBV2_PERF_REFERENCE_DIR: ''
+          WEBV2_PERF_REFERENCE_LABEL: ''
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec vite build
+          rm -f artifacts/architecture-performance/build-reference.json artifacts/architecture-performance/browser-reference.json
+          # Measurements are written before budget checks. Both must exist even if the base has outgrown its budgets.
+          node --experimental-strip-types scripts/check-architecture-performance.mjs || echo "::notice::Base build check failed; validating its measurements below."
+          node scripts/measure-architecture-performance.mjs || echo "::notice::Base browser check failed; validating its measurements below."
+          node --input-type=module <<'NODE'
+          import { copyFile, mkdir, readFile } from 'node:fs/promises';
+          import { resolve } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          const candidate = resolve(process.env.GITHUB_WORKSPACE, 'invokeai/frontend/webv2');
+          const { applyBuildReference, applyBrowserReference, loadPerformanceReference, BUILD_METRIC_KEYS, BROWSER_RESOURCE_METRIC_KEYS } =
+            await import(pathToFileURL(resolve(candidate, 'scripts/performance-budgets.mjs')));
+          for (const [kind, metricKeys, baselineFile] of [
+            ['build', BUILD_METRIC_KEYS, 'architecture-baseline.json'],
+            ['browser', BROWSER_RESOURCE_METRIC_KEYS, 'browser-baseline.json'],
+          ]) {
+            const fileName = `${kind}-reference.json`;
+            const { reference, reason } = await loadPerformanceReference({
+              directory: 'artifacts/architecture-performance', fileName, kind, metricKeys, root: process.cwd(),
+            });
+            if (reason) throw new Error(`Invalid exact-base ${kind} reference: ${reason}`);
+            const baseline = JSON.parse(await readFile(`performance/${baselineFile}`, 'utf8'));
+            const applied = kind === 'build' ? applyBuildReference(baseline.build, reference) : applyBrowserReference(baseline.routes, reference);
+            if (applied.uncovered.length) throw new Error(`Incomplete exact-base ${kind} reference: ${applied.uncovered.join(', ')}`);
+          }
+          const destination = resolve(candidate, 'artifacts/perf-reference');
+          await mkdir(destination, { recursive: true });
+          for (const kind of ['build', 'browser']) {
+            await copyFile(`artifacts/architecture-performance/${kind}-reference.json`, resolve(destination, `${kind}-reference.json`));
+          }
+          NODE
         shell: bash
+
+      - name: restore candidate Node version
+        if: ${{ steps.perf-base.outcome == 'success' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
 
       - name: release completion gates
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         run: 'pnpm check:release:tests'
         shell: bash
         env:
-          WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}
-          WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outputs.cache-matched-key }}
+          WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outcome == 'success' && 'artifacts/perf-reference' || '' }}
+          WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outcome == 'success' && format('webv2-perf-reference-{0}', github.event.pull_request.base.sha || github.event.merge_group.base_sha) || '' }}
 
       # Recorded even when the gate failed: a main that has outgrown the committed baseline is
       # still the right thing for a pull request to be compared with. A main job that ran the gate
       # but produced no reference (a failure before the browser stage) records nothing and says so;
-      # one that left webv2 untouched has nothing to record. Pull requests based on either restore
-      # the most recent main entry instead.
+      # one that left webv2 untouched has nothing to record. Pull requests based on either measure
+      # that exact base instead.
       - name: stage performance reference
         id: perf-ref-stage
         if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+        env:
+          REFERENCE_SHA: ${{ github.sha }}
         run: |
           if [ -f artifacts/architecture-performance/build-reference.json ] && [ -f artifacts/architecture-performance/browser-reference.json ]; then
             mkdir -p artifacts/perf-reference
@@ -119,7 +176,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No performance reference recorded for ${{ github.sha }}; pull requests based on it fall back to the most recent main reference."
+            echo "::warning::No performance reference recorded for $REFERENCE_SHA; pull requests based on it measure their exact base."
           fi
         shell: bash
 

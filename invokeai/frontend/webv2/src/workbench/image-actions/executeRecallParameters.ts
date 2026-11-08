@@ -4,6 +4,9 @@ import type { TFunction } from 'i18next';
 
 import { getEffectiveReferenceImage, isSupportedGenerateModel, isVaeModelConfig } from '@features/generation/settings';
 import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { DEFAULT_CANVAS_DENOISING_STRENGTH } from '@workbench/widgets/canvas/invoke/canvasStrength';
+
+import type { CanvasRecallTarget } from './canvasRecall';
 
 import {
   filterAvailableReferenceImages,
@@ -66,6 +69,7 @@ const verifyRecalledReferenceImages = async (
 /** Apply one recall payload; stop quietly if the project disappears. Return true when at least one field commits. */
 export const executeRecallParameters = async ({
   commands,
+  canvasTarget,
   getGenerateValues,
   models,
   owner,
@@ -74,6 +78,7 @@ export const executeRecallParameters = async ({
   t,
 }: {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  canvasTarget?: CanvasRecallTarget;
   getGenerateValues: () => Record<string, unknown> | null;
   models: readonly ComponentModelConfig[];
   owner: AccountScope;
@@ -82,6 +87,11 @@ export const executeRecallParameters = async ({
   t: TFunction;
 }): Promise<boolean> => {
   if (!isAccountScopeCurrent(owner)) {
+    return false;
+  }
+
+  const originalProject = canvasTarget?.getProject();
+  if (canvasTarget && !originalProject) {
     return false;
   }
 
@@ -115,11 +125,17 @@ export const executeRecallParameters = async ({
       return false;
     }
 
-    const result = buildRecallParametersSettings({ currentValues, models, parameters, supportedModels, vaeModels });
+    let result = buildRecallParametersSettings({ currentValues, models, parameters, supportedModels, vaeModels });
 
+    let availableReferenceNames: Set<string> | null = null;
     if (result.fields.includes('referenceImages')) {
       const existingIds = new Set(currentValues.referenceImages.map((referenceImage) => referenceImage.id));
       await verifyRecalledReferenceImages(result, existingIds, owner.signal);
+      availableReferenceNames = new Set(
+        result.values.referenceImages
+          .filter((ref) => !existingIds.has(ref.id))
+          .flatMap((ref) => (ref.config.image ? [getEffectiveReferenceImage(ref.config.image).image_name] : []))
+      );
       assertAccountScopeCurrent(owner);
 
       if (getGenerateValues() === null) {
@@ -127,6 +143,91 @@ export const executeRecallParameters = async ({
       }
     }
 
+    const canvasRecall =
+      canvasTarget && originalProject && ('control_layers' in parameters || 'denoise_strength' in parameters)
+        ? await import('./canvasRecall')
+        : null;
+    const canvasPlan = canvasRecall
+      ? await canvasRecall.prepareCanvasRecall({
+          metadata: {
+            ...parameters,
+            ...(parameters.denoise_strength === null ? { denoise_strength: DEFAULT_CANVAS_DENOISING_STRENGTH } : {}),
+            ...(parameters.control_layers === null ? { control_layers: [] } : {}),
+          },
+          model: result.values.model,
+          models,
+          owner,
+          isCurrent: () => canvasTarget?.getProject()?.canvas.document === originalProject?.canvas.document,
+        })
+      : null;
+    if (canvasPlan && canvasRecall && canvasTarget) {
+      await canvasRecall.settleCanvasRecall(canvasPlan, canvasTarget, owner);
+    }
+    assertAccountScopeCurrent(owner);
+    const latestRaw = getGenerateValues();
+    if (latestRaw === null || (canvasTarget && !canvasTarget.getProject())) {
+      return false;
+    }
+    const latest = getCurrentGenerateValues({ generateValues: latestRaw, supportedModels });
+    if (!latest) {
+      return false;
+    }
+    // Rebuild after every awaited lookup so newer prompt/model edits are not overwritten by an old snapshot.
+    const previous = result;
+    result = buildRecallParametersSettings({ currentValues: latest, models, parameters, supportedModels, vaeModels });
+    if (availableReferenceNames !== null && result.fields.includes('referenceImages')) {
+      const existingIds = new Set(latest.referenceImages.map((ref) => ref.id));
+      const kept = result.values.referenceImages.filter(
+        (ref) =>
+          existingIds.has(ref.id) ||
+          (ref.config.image && availableReferenceNames.has(getEffectiveReferenceImage(ref.config.image).image_name))
+      );
+      const anyRecalled = kept.some((ref) => !existingIds.has(ref.id));
+      if (
+        !anyRecalled &&
+        ((Array.isArray(parameters.ip_adapters) && parameters.ip_adapters.length > 0) ||
+          (Array.isArray(parameters.reference_images) && parameters.reference_images.length > 0))
+      ) {
+        result.values.referenceImages = result.retainedReferenceImages;
+        result.fields = result.fields.filter((field) => field !== 'referenceImages');
+      } else {
+        result.values.referenceImages = kept;
+      }
+      result.skipped.push(
+        ...previous.skipped.filter((skip) => skip.key === 'reference_images' && skip.reason === 'unresolved')
+      );
+    }
+    let canvasApplied = false;
+    if (canvasPlan && canvasRecall && canvasTarget && originalProject) {
+      if (previous.values.model.key !== result.values.model.key) {
+        canvasPlan.problems.push('model-changed');
+      } else {
+        canvasApplied = canvasRecall.commitCanvasRecall({
+          plan: canvasPlan,
+          target: canvasTarget,
+          expectedDocument: originalProject.canvas.document,
+          append: parameters.append === true,
+          restorePointName: t('widgets.gallery.itemActions.recall.beforeCanvasRecall'),
+        });
+      }
+      result.skipped.push(
+        ...canvasPlan.problems.map((detail) => ({
+          key: 'control_layers',
+          reason: 'unresolved' as const,
+          detail: canvasRecall.getCanvasRecallProblemsMessage([detail], t),
+        }))
+      );
+    }
+    if (canvasApplied) {
+      result.fields.push('canvas');
+    }
+    if (!canvasTarget) {
+      for (const key of ['control_layers', 'denoise_strength']) {
+        if (key in parameters) {
+          result.skipped.push({ key, reason: 'unsupported' });
+        }
+      }
+    }
     const skipMessage = result.skipped.length > 0 ? getRecallParametersSkipMessage(result.skipped, t) : null;
 
     if (result.fields.length === 0) {
@@ -138,7 +239,9 @@ export const executeRecallParameters = async ({
       return false;
     }
 
-    commands.generation.setSettings(result.values, projectId);
+    if (result.fields.some((field) => field !== 'canvas')) {
+      commands.generation.setSettings(result.values, projectId);
+    }
     commands.notifications.add({
       kind: 'success',
       message: getRecallParametersMessage(result.fields, t),
@@ -150,6 +253,16 @@ export const executeRecallParameters = async ({
         message: skipMessage,
         title: t('widgets.gallery.itemActions.recall.parameters.partiallyApplied'),
       });
+    }
+    if (canvasApplied && canvasPlan && canvasRecall && canvasTarget) {
+      const durable = await canvasRecall.finalizeCanvasRecallAssets(canvasPlan, canvasTarget, owner);
+      if (!durable && isAccountScopeCurrent(owner) && canvasTarget.getProject()) {
+        commands.notifications.add({
+          kind: 'info',
+          title: t('widgets.gallery.itemActions.recall.parameters.partiallyApplied'),
+          message: t('widgets.gallery.itemActions.recall.canvasImagesTemporary'),
+        });
+      }
     }
     return true;
   } catch (error: unknown) {

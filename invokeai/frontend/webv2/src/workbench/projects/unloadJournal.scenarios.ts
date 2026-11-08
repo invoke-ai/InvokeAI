@@ -2,6 +2,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createUuid } from '@platform/browser/randomUuid';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { RequestDeadlineError } from '@platform/transport/http';
 import {
   createDraftProject,
   createInitialWorkbenchState,
@@ -1232,6 +1233,77 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       { id: project.id, promptHistory: [{ positivePrompt: 'The same held edit' }] },
     ]);
   });
+
+  it.each(['content', 'workspace'] as const)(
+    'keeps a newer journal across timeout reconciliation of older %s and fences its queued undo',
+    async (half) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const edit = half === 'content' ? named : prompted;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let started!: () => void;
+      const committed = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const timeOutAfterCommit = async (): Promise<never> => {
+        started();
+        await gate;
+        throw new RequestDeadlineError();
+      };
+      let restore: () => void;
+      if (half === 'content') {
+        const update = api.updateProject;
+        api.updateProject = async (...args) => {
+          await update(...args);
+          return timeOutAfterCommit();
+        };
+        restore = () => {
+          api.updateProject = update;
+        };
+      } else {
+        const update = api.saveProjectWorkspace;
+        api.saveProjectWorkspace = async (...args) => {
+          await update(...args);
+          return timeOutAfterCommit();
+        };
+        restore = () => {
+          api.saveProjectWorkspace = update;
+        };
+      }
+      const saving = tab.saveWorkbench(edit(loaded.state, 'Committed before its response timed out'));
+      await committed;
+      const undoing = tab.flushProjectToServer(loaded.state.projects[0]!);
+      const latest = edit(loaded.state, 'Newer held edit during timeout');
+      const journal = tab.journalBeforeUnload(latest);
+      expect(journal.kind).toBe('journaled');
+      if (journal.kind === 'journaled') {
+        expect(await journal.written).toBe(true);
+      }
+      restore();
+      release();
+      await expect(saving).resolves.toMatchObject({ conflicts: [], shouldRetry: false });
+      await expect(undoing).resolves.toMatchObject({ kind: 'unsynced' });
+      expect(half === 'content' ? server.updates : server.workspaceUpdates).toBe(1);
+
+      const reloaded = openTab();
+      const recovered = await reloaded.loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(serializeProjectDocumentV3(recovered.state.projects[0]!)).toEqual(
+        serializeProjectDocumentV3(latest.projects[0]!)
+      );
+      await expect(reloaded.saveWorkbench(recovered.state)).resolves.toMatchObject({ hasPendingChanges: false });
+      const saved = server.records.get(project.id)!;
+      expect(half === 'content' ? saved.name : saved.workspace?.data.promptHistory).toEqual(
+        half === 'content'
+          ? 'Newer held edit during timeout'
+          : [{ negativePrompt: null, positivePrompt: 'Newer held edit during timeout' }]
+      );
+      expect(half === 'content' ? saved.revision : saved.workspace?.revision).toBe(3);
+    }
+  );
 
   it('keeps a newer journal across an older acknowledgement, rebased onto it', async () => {
     const tab = openTab();
