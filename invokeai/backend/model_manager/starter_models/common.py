@@ -182,6 +182,17 @@ qwen_vl_encoder_nvfp4 = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
+qwen_vl_encoder_gguf_q4_k_m = StarterModel(
+    name="Qwen2.5-VL Encoder (GGUF Q4_K_M)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+    description="unsloth's Q4_K_M GGUF of the Qwen2.5-VL 7B language model. Text only: it cannot read reference "
+    "images, so Qwen-Image Edit with reference images needs a safetensors or Diffusers encoder. Its tokenizer and "
+    "config ship with InvokeAI. ~4.7GB",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 qwen_vl_encoder_diffusers = StarterModel(
     name="Qwen2.5-VL Encoder (Diffusers)",
     base=BaseModelType.Any,
@@ -419,8 +430,8 @@ qwen3_vl_encoder_8b = StarterModel(
 
 # More Qwen3-VL encoder builds, pinned to commits. The 4B is what Krea-2 and FLUX.3 condition on, the 8B what Ideogram 4
 # and Qwen-Image-2.1 condition on; the two are not interchangeable. The GGUF files hold the language tower only (the
-# vision tower lives in a separate mmproj file that is not accepted), so they encode text but cannot read Krea-2 edit
-# reference images.
+# vision tower lives in a separate mmproj file), so they encode text but cannot read Krea-2 edit reference images.
+# Qwen-Image-2.1 edits read them through the 8B's mmproj, installed as `qwen3_vl_vision_tower_8b`.
 _QWEN3_VL_KREA2 = (
     "https://huggingface.co/Comfy-Org/Krea-2/resolve/588feaf955b08b9ac4723eeb751752ab045dba71/text_encoders"
 )
@@ -521,6 +532,18 @@ qwen3_vl_encoder_8b_gguf_q8_0 = StarterModel(
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.GGUFQuantized,
     variant=Qwen3VLVariantType.Qwen3VL_8B,
+)
+
+# llama.cpp keeps a GGUF Qwen3-VL encoder's vision tower in this companion file, which Qwen-Image-2.1 edits read
+# reference images through. Standalone: no starter depends on it.
+qwen3_vl_vision_tower_8b = StarterModel(
+    name="Qwen3-VL 8B Vision Tower",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_8B_GGUF}/mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+    description="The vision tower (llama.cpp mmproj, F16) of Qwen3-VL 8B. Select it as the Vision Tower beside a GGUF "
+    "Qwen3-VL 8B encoder so Qwen-Image-2.1 can read reference images. Not needed with other encoders. ~1.1GB",
+    type=ModelType.Qwen3VLVisionTower,
+    format=ModelFormat.GGUFQuantized,
 )
 
 # region Wan 2.2 (local)

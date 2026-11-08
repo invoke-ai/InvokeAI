@@ -457,7 +457,7 @@ const drawRectShapePreview = (ctx: Ctx, state: OverlayState, preview: RectShapeP
   ctx.lineWidth = 1;
   ctx.setLineDash([...SHAPE_PREVIEW_DASH]);
   // The same path the rasterizer commits, so the outline is the shape it makes.
-  buildParametricShapePath(ctx, preview.kind, screen.x, screen.y, Math.abs(screen.width), Math.abs(screen.height), 0);
+  buildParametricShapePath(ctx, preview.kind, screen.x, screen.y, Math.abs(screen.width), Math.abs(screen.height));
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();

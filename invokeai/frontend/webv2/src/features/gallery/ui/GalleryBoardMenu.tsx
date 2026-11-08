@@ -1,14 +1,22 @@
+import type {
+  GalleryMediaUsageCheck,
+  GalleryMediaUsageReport,
+  GalleryMediaUsageSettledCheck,
+} from '@features/gallery/core/mediaUsage';
 import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
 import { chakra, Checkbox, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
+import { galleryBoardMediaUsageQueryOptions } from '@features/gallery/data/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -25,6 +33,7 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
+import { GalleryMediaUsagePanel } from './GalleryMediaUsagePanel';
 import { getBoardCounts, getGalleryIntendedDestinationId } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -238,6 +247,7 @@ export const GalleryBoardMenu = ({
       </Dialog.Root>
       <BoardDeleteDialog
         board={deleteTarget}
+        getMediaUsage={actions.getBoardMediaUsage}
         onCancel={handleCancelDelete}
         onDelete={handleDelete}
         onOpenChange={handleDeleteDialogOpenChange}
@@ -255,31 +265,91 @@ export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
  */
 const BoardDeleteDialog = ({
   board,
+  getMediaUsage,
   onCancel,
   onDelete,
   onOpenChange,
 }: {
   board: GalleryBoard | null;
+  /** Where the board's media is still used, checked once deleting it is ticked. */
+  getMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   onCancel: () => void;
   onDelete: (includeMedia: boolean) => void;
   onOpenChange: (event: { open: boolean }) => void;
 }) => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   // The board and the choices stay shown while the dialog animates out; the choices belong to one opening and start
   // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
   const [shownBoard, setShownBoard] = useState(board);
   const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
-  const [choices, setChoices] = useState({ includeMedia: false, typedName: '' });
+  // `hasTyped`: the user has typed into the name field this opening, which then stays (see `needsTypedName`).
+  const [choices, setChoices] = useState({ hasTyped: false, includeMedia: false, typedName: '' });
+  // Each opening asks where the media is used afresh; ticking and unticking within one opening does not.
+  const [opening, setOpening] = useState(0);
   if (board !== null && board !== shownBoard) {
     setShownBoard(board);
   }
   if ((board?.id ?? null) !== openedBoardId) {
     setOpenedBoardId(board?.id ?? null);
     if (board !== null) {
-      setChoices({ includeMedia: false, typedName: '' });
+      setChoices({ hasTyped: false, includeMedia: false, typedName: '' });
+      setOpening((current) => current + 1);
     }
   }
-  const { includeMedia, typedName } = choices;
+  const { hasTyped, includeMedia, typedName } = choices;
+  const isOpen = board !== null;
+  const checksUsage = includeMedia && shownBoard !== null;
+  const boardId = shownBoard?.id ?? '';
+  const owner = captureAccountScope();
+  // An opening's check lives under its own key while the dialog is open. However the dialog closes (Cancel, Escape,
+  // Delete, or the board revoked or deleted elsewhere), the observer leaves that key, and Query stops a check still
+  // running there (its server call and project reads) and drops it.
+  const usageOptions = useMemo(
+    () => galleryBoardMediaUsageQueryOptions({ boardId, load: getMediaUsage, opening: isOpen ? opening : null, owner }),
+    [boardId, getMediaUsage, isOpen, opening, owner]
+  );
+  const { queryKey: usageQueryKey } = usageOptions;
+  const usageQuery = useQuery({ ...usageOptions, enabled: isOpen && checksUsage });
+  const { data: usageReport, isFetching: isCheckingUsage, refetch: refetchUsage, status: usageStatus } = usageQuery;
+  // The opening's last answer, kept while the box is unticked and as the dialog closes, so neither the report nor the
+  // counts it gives come and go.
+  const [keptAnswer, setKeptAnswer] = useState<{ check: GalleryMediaUsageSettledCheck; opening: number } | null>(null);
+  const answer: GalleryMediaUsageSettledCheck | null =
+    usageStatus === 'success' && usageReport
+      ? { report: usageReport, status: 'ready' }
+      : usageStatus === 'error'
+        ? { status: 'failed' }
+        : null;
+  const keptCheck = keptAnswer?.opening === opening ? keptAnswer.check : null;
+  if (
+    isOpen &&
+    answer &&
+    (answer.status === 'ready'
+      ? keptCheck?.status !== 'ready' || keptCheck.report !== answer.report
+      : keptCheck?.status !== 'failed')
+  ) {
+    setKeptAnswer({ check: answer, opening });
+  }
+  // Unticking stops a check still running too; it reverts, so ticking again asks again. An answer stays for the opening.
+  const cancelUsageCheck = useCallback(
+    () => void queryClient.cancelQueries({ exact: true, queryKey: usageQueryKey }),
+    [queryClient, usageQueryKey]
+  );
+  const usageCheck = useMemo<GalleryMediaUsageCheck | null>(() => {
+    if (!checksUsage) {
+      return null;
+    }
+
+    // A retry keeps the last answer on screen while it runs.
+    return isCheckingUsage || !keptCheck ? { previous: keptCheck ?? undefined, status: 'checking' } : keptCheck;
+  }, [checksUsage, isCheckingUsage, keptCheck]);
+  // A closing dialog's Retry stays in place, disabled: running it would ask on the closed key, which nothing stops.
+  const handleRetryUsage = useCallback(() => {
+    if (isOpen) {
+      void refetchUsage();
+    }
+  }, [isOpen, refetchUsage]);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const mediaHintId = useId();
   const nameInputId = useId();
@@ -291,24 +361,71 @@ const BoardDeleteDialog = ({
     uploads: counts?.uploads ?? 0,
     videos: counts?.videos ?? 0,
   });
-  const needsTypedName = includeMedia && itemCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS;
+  // Deleting the media takes what the check counted, once it has: on a shared board only the caller's own items, while
+  // the board's counts include everyone's; the rest moves to Uncategorized, as when the media is kept. An administrator
+  // overriding takes everything, so a lower count there is only a board count gone stale.
+  const keptReport = keptCheck?.status === 'ready' ? keptCheck.report : undefined;
+  const deletedCount = keptReport?.checkedCount ?? itemCount;
+  const deletesOwnMedia = deletedCount < itemCount && shownBoard?.access?.adminOverride !== true;
+  const deletesNoMedia = deletesOwnMedia && deletedCount === 0;
+  const deletedMedia =
+    deletedCount === itemCount || !keptReport
+      ? media
+      : t(keptReport.onlyImages ? 'widgets.gallery.imageCount' : 'widgets.gallery.deleteInUse.itemCount', {
+          count: deletedCount,
+        });
+  const includeMediaLabel = deletesNoMedia
+    ? t('widgets.gallery.deleteBoardIncludeOwnMediaNone')
+    : t(deletesOwnMedia ? 'widgets.gallery.deleteBoardIncludeOwnMedia' : 'widgets.gallery.deleteBoardIncludeMedia', {
+        count: deletedCount,
+      });
+  const withMediaDescription = deletesNoMedia
+    ? t('widgets.gallery.deleteBoardWithNoOwnMediaDescription')
+    : t(
+        deletesOwnMedia
+          ? 'widgets.gallery.deleteBoardWithOwnMediaDescription'
+          : 'widgets.gallery.deleteBoardWithMediaDescription',
+        { count: deletedCount, media: deletedMedia }
+      );
+  const deleteLabel =
+    !includeMedia || deletesNoMedia
+      ? t('widgets.gallery.deleteBoard')
+      : t(deletesOwnMedia ? 'widgets.gallery.deleteBoardAndOwnMedia' : 'widgets.gallery.deleteBoardAndMedia', {
+          count: deletedCount,
+        });
+  // The board's count until the check answers, then what deleting the media actually takes. Once the user has typed
+  // into the field this opening it stays, with its requirement: an answer arriving mid-typing never takes their text.
+  const needsTypedName = includeMedia && (hasTyped || deletedCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS);
   const canDelete = !needsTypedName || typedName.trim() === boardName.trim();
   const handleIncludeMediaChange = useCallback(
-    (details: { checked: boolean | 'indeterminate' }) =>
-      setChoices((current) => ({ ...current, includeMedia: details.checked === true })),
-    []
+    (details: { checked: boolean | 'indeterminate' }) => {
+      if (details.checked !== true) {
+        cancelUsageCheck();
+      }
+      setChoices((current) => ({ ...current, includeMedia: details.checked === true }));
+    },
+    [cancelUsageCheck]
   );
   const handleTypedNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const typed = event.currentTarget.value;
 
-    setChoices((current) => ({ ...current, typedName: typed }));
+    setChoices((current) => ({ ...current, hasTyped: current.hasTyped || typed !== '', typedName: typed }));
   }, []);
   const getInitialFocus = useCallback(() => cancelRef.current, []);
-  const handleConfirm = useCallback(() => onDelete(includeMedia), [includeMedia, onDelete]);
+  // With none of the media the caller's, nothing is asked to be deleted: the board goes, and its notices say only that.
+  const deletesMedia = includeMedia && !deletesNoMedia;
+  const handleConfirm = useCallback(() => onDelete(deletesMedia), [deletesMedia, onDelete]);
 
   return (
     // Cancel takes focus, not the checkbox that would delete the media.
-    <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
+    // Top-anchored: the usage report arrives after the dialog opens, and grows it downward instead of moving it.
+    <Dialog.Root
+      initialFocusEl={getInitialFocus}
+      open={board !== null}
+      placement="top"
+      role="alertdialog"
+      onOpenChange={onOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -318,11 +435,13 @@ const BoardDeleteDialog = ({
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="3">
-                <Text fontSize="md">
+                <Dialog.Description color="fg" fontSize="md" lineHeight="inherit">
                   {itemCount === 0
                     ? t('widgets.gallery.deleteBoardEmptyDescription')
-                    : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
-                </Text>
+                    : includeMedia
+                      ? withMediaDescription
+                      : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
+                </Dialog.Description>
                 {itemCount > 0 ? (
                   <Stack gap="1">
                     <Checkbox.Root
@@ -335,14 +454,22 @@ const BoardDeleteDialog = ({
                       <Checkbox.Control>
                         <Checkbox.Indicator />
                       </Checkbox.Control>
-                      <Checkbox.Label fontSize="md">
-                        {t('widgets.gallery.deleteBoardIncludeMedia', { count: itemCount })}
-                      </Checkbox.Label>
+                      <Checkbox.Label fontSize="md">{includeMediaLabel}</Checkbox.Label>
                     </Checkbox.Root>
                     <Text color="fg.muted" fontSize="sm" id={mediaHintId} ps="5">
                       {t('widgets.gallery.deleteBoardIncludeMediaHint')}
                     </Text>
                   </Stack>
+                ) : null}
+                {itemCount > 0 && usageCheck ? (
+                  <GalleryMediaUsagePanel
+                    // Once the answer says none of the media is the caller's, nothing goes and there is no use to
+                    // report: the panel only reads out the description that changed with it.
+                    announcement={deletesNoMedia ? withMediaDescription : undefined}
+                    check={usageCheck}
+                    isRetryDisabled={!isOpen}
+                    onRetry={handleRetryUsage}
+                  />
                 ) : null}
                 {needsTypedName ? (
                   <Stack gap="1">
@@ -365,9 +492,7 @@ const BoardDeleteDialog = ({
                 {t('common.cancel')}
               </Button>
               <Button colorPalette="red" disabled={!canDelete} onClick={handleConfirm}>
-                {includeMedia
-                  ? t('widgets.gallery.deleteBoardAndMedia', { count: itemCount })
-                  : t('widgets.gallery.deleteBoard')}
+                {deleteLabel}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

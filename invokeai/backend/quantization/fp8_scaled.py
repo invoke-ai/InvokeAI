@@ -416,19 +416,30 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
 _MX_SCALE_DTYPES = tuple(dtype for dtype in (torch.uint8, getattr(torch, "float8_e8m0fnu", None)) if dtype is not None)
 
 
+def unparsed_fp8_scale_keys(sd: Mapping[str, Any]) -> list[str]:
+    """The scale keys beside an fp8 weight in a spelling this module does not parse, such as ``.weight_scale_inv``.
+
+    Read off the key names beside each ``<module>.weight``, so it is only right in the namespace the scale was
+    written in: a loader that renames keys has to ask before renaming, or a scale its converter does not carry is
+    left behind under the old name, sits beside no weight any more, and its weight loads unscaled.
+    """
+    return sorted(
+        key
+        for key in sd
+        if isinstance(key, str)
+        and "scale" in key.rsplit(".", 1)[-1]
+        and not key.endswith(WEIGHT_SCALE_SUFFIXES + INPUT_SCALE_SUFFIXES)
+        and getattr(sd.get(f"{key.rsplit('.', 1)[0]}.weight"), "dtype", None) in FP8_WEIGHT_DTYPES
+    )
+
+
 def _reject_unparsed_scales(sd: Mapping[str, Any]) -> None:
     """Refuse a scale spelling this module does not parse when it sits beside an fp8 weight.
 
     Loaders ignore unexpected keys (logged at DEBUG), so a leftover ``.weight_scale_inv``-style
     key would otherwise let its weight load unscaled and generate noise instead of failing here.
     """
-    unparsed = sorted(
-        key
-        for key in sd
-        if isinstance(key, str)
-        and "scale" in key.rsplit(".", 1)[-1]
-        and getattr(sd.get(f"{key.rsplit('.', 1)[0]}.weight"), "dtype", None) in FP8_WEIGHT_DTYPES
-    )
+    unparsed = unparsed_fp8_scale_keys(sd)
     if unparsed:
         raise NotImplementedError(
             f"Unsupported fp8 scale layout: {unparsed[:8]}{' ...' if len(unparsed) > 8 else ''}. InvokeAI reads "

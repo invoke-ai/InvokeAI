@@ -108,6 +108,14 @@ export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
 export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
 
+/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the 8B one only. */
+export const isQwen3Vl8bVisionTower: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_8b';
+
+/** A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file), so references need the tower model. */
+export const isGgufQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
+  isQwen3Vl8bEncoder(model) && model.format === 'gguf_quantized';
+
 /** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
   model.type === 'main' &&

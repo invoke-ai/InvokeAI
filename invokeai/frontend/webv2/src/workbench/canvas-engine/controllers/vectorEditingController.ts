@@ -406,5 +406,5 @@ export class VectorEditingController implements Tool {
     if (this.drag) { const before = this.drag.before; this.drag = null; this.publish({ ...before, selectionRect: null }); }
   };
   onDeactivate = (): void => this.onPointerCancel();
-  onKeyCommand = (_ctx: ToolContext, command: 'apply' | 'cancel'): void => { if (command === 'apply') { this.apply(); } else { this.cancel(); } };
+  onKeyCommand = (_ctx: ToolContext, command: 'apply' | 'cancel'): boolean => { if (!this.hasSession()) { return false; } if (command === 'apply') { this.apply(); } else { this.cancel(); } return true; };
 }

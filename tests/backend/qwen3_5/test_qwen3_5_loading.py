@@ -320,7 +320,7 @@ def test_an_int8_layer_without_an_int8_tensorwise_marker_is_refused(tmp_path: Pa
     path = tmp_path / "qwen3.5_9b_int8_convrot.safetensors"
     save_file(file, path)
 
-    with pytest.raises(ValueError, match="no `comfy_quant` marker"):
+    with pytest.raises(ValueError, match="no readable int8_tensorwise marker"):
         load_qwen3_5_text_encoder(loader, [path], _config(), final_norm=True, keep_fp8=False, what="test")
     loader._ram_cache.make_room.assert_not_called()
 

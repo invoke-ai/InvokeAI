@@ -49,6 +49,7 @@ export type ModelTaxonomyType =
   | 'qwen3_encoder'
   | 'qwen_vl_encoder'
   | 'qwen3_vl_encoder'
+  | 'qwen3_vl_vision_tower'
   | 'qwen3_5_encoder'
   | 'wan_t5_encoder'
   | 'mistral_encoder'
@@ -179,7 +180,6 @@ export interface ModelConfig {
   format: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -213,7 +213,6 @@ export interface ModelRecordChanges {
   format?: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;

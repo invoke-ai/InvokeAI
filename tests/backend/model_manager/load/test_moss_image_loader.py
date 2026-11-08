@@ -516,7 +516,9 @@ class TestFusedAndInt8Checkpoints:
         path = tmp_path / "moss-int8-unmarked.safetensors"
         save_file(stored, str(path))
 
-        with pytest.raises(ValueError, match=r"no `comfy_quant` marker, e\.g\. \['layers\.0\.proj\.o\.weight'\]"):
+        with pytest.raises(
+            ValueError, match=r"no readable int8_tensorwise marker, e\.g\. \['layers\.0\.proj\.o\.weight'\]"
+        ):
             self._load(monkeypatch, path)
 
     def test_fp8_storage_leaves_the_int8_layers_alone_and_still_runs(

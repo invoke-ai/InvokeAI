@@ -11,8 +11,9 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_image_action as _assert_image_action,
 )
+from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
-from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
+from invokeai.app.api.routers.images import ImageName
 from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult

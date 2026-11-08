@@ -1,5 +1,5 @@
 import type { ModelConfig } from '@features/models';
-import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { InvocationTemplatesSnapshot, ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasLayerContract, CanvasRegionalGuidanceLayerContract } from '@workbench/canvas-engine/api';
 import type {
   DynamicPromptsExpansionSource,
@@ -359,7 +359,8 @@ export const resolveInvocationRoute = (
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[],
   /** Validate a specific project workflow (a captured submission target) instead of the active one. */
-  workflowDocument?: ProjectGraphState
+  workflowDocument?: ProjectGraphState,
+  templates?: Readonly<InvocationTemplatesSnapshot>
 ): ResolvedInvocationRoute =>
   resolveInvocationRouteInput(
     workflowDocument
@@ -367,14 +368,16 @@ export const resolveInvocationRoute = (
       : getInvocationRouteInput(project),
     mode,
     route,
-    models
+    models,
+    templates
   );
 
 export const resolveInvocationRouteInput = (
   input: InvocationRouteInput,
   mode: InvocationMode = 'global',
   route: InvocationRoute = input.invocation,
-  models?: readonly ModelConfig[]
+  models?: readonly ModelConfig[],
+  templates?: Readonly<InvocationTemplatesSnapshot>
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
@@ -382,7 +385,7 @@ export const resolveInvocationRouteInput = (
   // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
-      ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
+      ? getProjectGraphReadiness(input.projectGraph, templates ?? getInvocationTemplatesSnapshot(), {
           batchCount: sanitizeBatchCount(input.workflowValues.batchCount),
         })
       : null;

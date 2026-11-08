@@ -271,6 +271,8 @@ export interface GenerateSettings {
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** The mmproj file that lets a GGUF Qwen3-VL 8B encoder read Qwen-Image-2.1 reference images. */
+  qwen3VLVisionTowerModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
   /**

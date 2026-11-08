@@ -21,9 +21,15 @@ export interface CreateStrokeEditsDeps {
   readonly reportRefusal: (status: EditRefusal) => void;
 }
 
+const STROKE_COMMIT_LABELS: Record<StrokeCommittedEvent['tool'], string> = {
+  brush: 'Brush stroke',
+  eraser: 'Eraser stroke',
+  shape: 'Draw shape',
+  'shape-cutout': 'Cut out shape',
+};
+
 /** The history label for a committed pixel stroke. */
-export const strokeCommitLabel = (tool: StrokeCommittedEvent['tool']): string =>
-  tool === 'eraser' ? 'Eraser stroke' : tool === 'shape' ? 'Draw shape' : 'Brush stroke';
+export const strokeCommitLabel = (tool: StrokeCommittedEvent['tool']): string => STROKE_COMMIT_LABELS[tool];
 
 export interface StrokeEdits {
   /**

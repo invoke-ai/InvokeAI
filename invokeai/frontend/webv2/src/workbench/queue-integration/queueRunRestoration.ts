@@ -151,7 +151,10 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
     if ((snapshot.sourceId === 'canvas' || snapshot.sourceId === 'generate') && isRecord(rawRecall?.generateValues)) {
       const values = normalizeGenerateWidgetValues(rawRecall.generateValues);
       if (values) {
-        recall = { generateValues: cloneGenerateWidgetValues(values) };
+        recall = {
+          generateValues: cloneGenerateWidgetValues(values),
+          ...(isRecord(rawRecall?.canvasMetadata) ? { canvasMetadata: rawRecall.canvasMetadata } : {}),
+        };
       }
     } else if (snapshot.sourceId === 'video' && isRecord(rawRecall?.videoValues)) {
       const values = normalizeVideoWidgetValues(rawRecall.videoValues);

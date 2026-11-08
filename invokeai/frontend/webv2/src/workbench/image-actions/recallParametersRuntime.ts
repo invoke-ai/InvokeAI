@@ -20,7 +20,7 @@ export const createRecallParametersRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets'>;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets' | 'canvas'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>;
@@ -33,6 +33,7 @@ export const createRecallParametersRuntime = ({
     apply: async ({ parameters }, { models, owner, projectId }) => {
       const applied = await executeRecallParameters({
         commands,
+        canvasTarget: { commands, projectId, getProject: () => queries.getProject(projectId) ?? null },
         t,
         getGenerateValues: () => {
           const project = queries.getProject(projectId);

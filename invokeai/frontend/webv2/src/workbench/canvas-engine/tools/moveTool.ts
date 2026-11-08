@@ -218,11 +218,13 @@ export const createMoveTool = (getVectorEditor?: () => Tool & { hasSession(): bo
     },
     onKeyCommand: (ctx, command) => {
       const editor = getVectorEditor?.();
-      if (editor?.hasSession()) { editor.onKeyCommand?.(ctx, command); return; }
+      if (editor?.hasSession()) { return editor.onKeyCommand?.(ctx, command) ?? false; }
       // Enter commits the float; engine Escape abandons it regardless of active tool.
-      if (command === 'apply' && !state) {
-        ctx.commitFloatingSelection?.();
+      if (command !== 'apply' || state || !ctx.getFloatingSelection?.()) {
+        return false;
       }
+      ctx.commitFloatingSelection?.();
+      return true;
     },
     onPointerCancel: (ctx) => {
       const editor = getVectorEditor?.();

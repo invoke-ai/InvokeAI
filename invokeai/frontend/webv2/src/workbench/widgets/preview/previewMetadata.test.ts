@@ -9,7 +9,7 @@ const englishCatalog = Object.values(
   import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
 )[0] as Record<string, unknown>;
 const instance = i18n.createInstance();
-const t = ((key: string) => instance.t(key)) as TFunction;
+const t = instance.t.bind(instance) as TFunction;
 
 beforeAll(async () => {
   await instance.init({
@@ -141,4 +141,136 @@ describe('parsePreviewMetadata', () => {
     expect(parsePreviewMetadata(null, image)).toEqual([]);
     expect(parsePreviewMetadata(null, video)).toEqual([]);
   });
+
+  it('keeps basic rows while omitting extra rows whose labels have not loaded', () => {
+    const unavailableLabels = ((key: string) =>
+      key.startsWith('widgets.preview.metadataLabels.') ? key : t(key)) as TFunction;
+    expect(
+      parsePreviewMetadata(
+        {
+          seed: 17,
+          strength: 0.4,
+          vae: { name: 'VAE' },
+          ideogram4_color_palette: ['green'],
+          control_layers: [{ model: { name: 'Depth model' } }],
+          canvas_v3_metadata: { document: { stacks: { control: [{ id: 'control', name: 'Depth map' }] } } },
+        },
+        { kind: 'image', t: unavailableLabels }
+      )
+    ).toEqual([{ key: 'seed', label: 'Seed', value: '17' }]);
+  });
 });
+
+it('shows useful controls, authored layers, adapters and family settings with raw records left intact', () => {
+  const metadata = {
+    strength: 0.4,
+    refiner_scheduler: 'euler',
+    wan_guidance_scale_low_noise: 2.5,
+    ideogram4_color_palette: ['green', 'gold'],
+    ref_images: [
+      { config: { type: 'ip_adapter', model: { name: 'Style' }, image: { image_name: 'style.png' }, weight: 0.6 } },
+    ],
+    control_layers: [
+      { model: { name: 'Edges' }, image: { image_name: 'edges.png' }, type: 'controlnet', weight: 0.75 },
+    ],
+    canvas_v3_metadata: {
+      document: {
+        stacks: {
+          control: [{ id: 'c', type: 'control', name: 'My edges', adapter: { model: 'control-key', weight: 0.75 } }],
+        },
+      },
+      controlModels: { c: { name: 'Edges' } },
+    },
+  };
+  const entries = parsePreviewMetadata(metadata, image);
+  expect(values(entries)).toMatchObject({
+    strength: '0.4',
+    refiner_scheduler: 'euler',
+    wan_guidance_scale_low_noise: '2.5',
+    ideogram4_color_palette: 'green, gold',
+    'control_layers-0': 'Edges · controlnet · edges.png · Weight 0.75',
+    'ref_images-0': 'Style · ip_adapter · style.png · Weight 0.6',
+    canvasLayerCount: '1 layer',
+  });
+  expect(entries.some((entry) => entry.value.includes('My edges') && entry.value.includes('Edges'))).toBe(true);
+  expect(metadata.canvas_v3_metadata.document.stacks.control[0]?.id).toBe('c');
+});
+
+it('describes v4 IP-Adapters including model, image, vision, method, weight and schedule', () => {
+  const entry = {
+    ip_adapter_model: { model_name: 'Portrait', base_model: 'sdxl' },
+    image: { image_name: 'portrait.png' },
+    clip_vision_model: 'ViT-G',
+    method: 'style_precise',
+    weight: 0.65,
+    begin_step_percent: 0.2,
+    end_step_percent: 0.9,
+  };
+  const parsed = parsePreviewMetadata({ ipAdapters: [entry] }, image);
+  expect(parsed).toHaveLength(1);
+  expect(parsed[0]?.value).toBe('Portrait · portrait.png · ViT-G · style_precise · Weight 0.65 · Steps 0.2–0.9');
+  expect(parsePreviewMetadata({ ref_images: [], ipAdapters: [entry] }, image)).toEqual([]);
+});
+
+it.each(['array', 'entities'] as const)(
+  'summarizes historical global references in a %s without counting them as Canvas layers',
+  (shape) => {
+    const reference = {
+      id: 'global-style',
+      type: 'reference_image',
+      name: 'Global style',
+      isEnabled: true,
+      ipAdapter: {
+        type: 'ip_adapter',
+        model: { key: 'style', name: 'Historical style', base: 'sdxl', type: 'ip_adapter' },
+        image: { image_name: 'style.png', width: 320, height: 200 },
+        weight: 0.6,
+        method: 'composition',
+        clipVisionModel: 'ViT-L',
+        beginEndStepPct: [0.1, 0.8],
+      },
+    };
+    const canvas = {
+      rasterLayers: [{ id: 'raster', type: 'raster_layer', name: 'Authored raster' }],
+      controlLayers: [],
+      inpaintMasks: [],
+      regionalGuidance: [],
+      referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+    };
+    const metadata = {
+      canvas_v2_metadata: canvas,
+      ipAdapters: [{ ip_adapter_model: { name: 'Duplicate alias' }, image: { image_name: 'style.png' }, weight: 0.6 }],
+    };
+    const parsed = parsePreviewMetadata(metadata, image);
+    expect(values(parsed)).toMatchObject({
+      'ref_images-0': 'Historical style · ip_adapter · style.png · ViT-L · composition · Weight 0.6 · Steps 0.1–0.8',
+      canvasLayerCount: '1 layer',
+    });
+    expect(parsed.find((entry) => entry.key === 'ref_images-0')?.label).toBe('Reference images');
+    expect(parsed.filter((entry) => entry.value.includes('Historical style'))).toHaveLength(1);
+    expect(
+      parsed.some((entry) => entry.value.includes('Duplicate alias') || entry.value.includes('Global style'))
+    ).toBe(false);
+    for (const ref_images of [
+      [],
+      [
+        {
+          id: 'modern',
+          config: {
+            type: 'ip_adapter',
+            model: { name: 'Modern style' },
+            image: { image_name: 'modern.png' },
+            weight: 0.4,
+          },
+        },
+      ],
+    ]) {
+      const modern = parsePreviewMetadata({ ...metadata, ref_images }, image);
+      expect(
+        modern.some((entry) => entry.value.includes('Historical style') || entry.value.includes('Duplicate alias'))
+      ).toBe(false);
+      expect(modern.filter((entry) => entry.key.startsWith('ref_images-'))).toHaveLength(ref_images.length);
+      expect(values(modern).canvasLayerCount).toBe('1 layer');
+    }
+  }
+);

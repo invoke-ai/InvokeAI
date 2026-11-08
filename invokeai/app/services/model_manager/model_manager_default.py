@@ -91,6 +91,9 @@ class ModelManagerService(ModelManagerServiceBase):
             override_fields["type"] = config.type
         result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
         if result.config is None:
+            # A model that was recognised and refused as unusable names its reason; the stored record stays as it is.
+            if invalid := result.invalid_matches:
+                raise InvalidModelException(f"Unable to identify model format: {invalid[0]}")
             raise InvalidModelException("Unable to identify model format")
 
         # Retain user-editable fields from the original config

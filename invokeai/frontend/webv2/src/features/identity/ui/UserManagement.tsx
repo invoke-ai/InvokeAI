@@ -37,7 +37,7 @@ export const UsersManagementPanel = ({
   if (!session.multiuserEnabled || session.user?.is_admin !== true) {
     return (
       <Center h="full" w="full">
-        <Text color="fg.subtle" fontSize="lg">
+        <Text color="fg.muted" fontSize="lg">
           {t('users.adminOnly')}
         </Text>
       </Center>
@@ -119,7 +119,7 @@ const UsersDirectory = ({
               <Text fontSize="xl" fontWeight="700">
                 {t('users.title')}
               </Text>
-              <Text color="fg.subtle" fontSize="md">
+              <Text color="fg.muted" fontSize="md">
                 {users ? t('users.accountCount', { count: users.length }) : t('users.description')}
               </Text>
             </Stack>

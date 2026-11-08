@@ -13,11 +13,12 @@ from invokeai.app.services.session_processor.session_processor_common import Pro
 from invokeai.app.services.shared.invocation_context import InvocationContextData, UtilInterface
 from invokeai.app.util import tiny_autoencoder_previews
 from invokeai.app.util.step_callback import render_linear_preview
-from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
+from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews, tiny_autoencoder_starters
+from invokeai.backend.architectures import resolve_latent_space
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
-from invokeai.backend.tiny_autoencoder import preview
+from invokeai.backend.tiny_autoencoder.checkpoint import TAEW2_1, build_taehv_decoder
 from invokeai.backend.tiny_autoencoder.taesd import Decoder
 
 LOGGER_NAME = "test.tiny_autoencoder_previews"
@@ -245,8 +246,8 @@ def test_the_tae_lock_reserves_the_working_memory_of_a_decode() -> None:
     previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
 
     # One lock for the invocation, keeping three live 64-channel float32 activations of the 128 x 192 image and two
-    # of convolution workspace free.
-    assert load.loaded.working_mem_requests == [(3 + 2) * 64 * (128 * 192) * 4]
+    # of convolution workspace free, and the fixed 5 MiB allowance.
+    assert load.loaded.working_mem_requests == [(3 + 2) * 64 * (128 * 192) * 4 + 5 * 2**20]
 
 
 def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> None:
@@ -261,9 +262,10 @@ def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> N
     assert image.mode == "RGB"
 
 
-def test_capped_tae_frame_still_reports_the_full_generation_size(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 96)
-    previews = _previews(_services(_Store([_tae_config()]), _load()))
+def test_capped_tae_frame_still_reports_the_full_generation_size() -> None:
+    decoder = _decoder()
+    decoder.max_preview_edge = 96
+    previews = _previews(_services(_Store([_tae_config()]), _load(decoder)))
 
     image, size = previews.render(BaseModelType.StableDiffusion1, _sample(height=32, width=48))
 
@@ -301,9 +303,9 @@ def test_family_without_any_tae_is_told_so_rather_than_sent_to_the_starters(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     previews = _previews(_services(_Store([_tae_config()]), _load()))
-    wan_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
+    cogview4_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
 
-    previews.render(BaseModelType.Wan, wan_sample)
+    previews.render(BaseModelType.CogView4, cogview4_sample)
 
     [info] = _messages(caplog, logging.INFO)
     assert "has no Tiny AutoEncoder" in info and "starter" not in info
@@ -568,3 +570,74 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
     assert len(decodes) == 3
     # Only the frames after a TAE frame wait for the TAE's device; once it fell back, there is none to wait for.
     assert len(syncs) == 2
+
+
+def _wan_window(frames: int = 2) -> torch.Tensor:
+    """What the Wan video denoiser reports: the middle latent frame and the one before it."""
+    return torch.randn(1, 16, frames, 6, 8, generator=torch.Generator().manual_seed(3))
+
+
+def test_a_latent_window_renders_linearly_as_its_last_frame() -> None:
+    window = _wan_window()
+
+    image, size = render_linear_preview(BaseModelType.Wan, window)
+    last, last_size = render_linear_preview(BaseModelType.Wan, window[:, :, -1])
+
+    assert np.array_equal(np.asarray(image), np.asarray(last))
+    assert size == last_size == (64, 48)
+
+
+def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
+    torch.manual_seed(0)
+    taew2_1 = build_taehv_decoder(TAEW2_1).eval()
+    config = SimpleNamespace(
+        key="taew2_1", name="TAEW2.1", type=ModelType.TinyAutoencoder, base=BaseModelType.Wan, latent_channels=16
+    )
+    load = _load(taew2_1)
+    previews = _previews(_services(_Store([config]), load))
+    window = _wan_window()
+
+    image, size = previews.render(BaseModelType.Wan, window)
+
+    with torch.inference_mode():
+        last = taew2_1.decode_video(window.transpose(1, 2))[0, -1]
+    expected = last.clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).numpy()
+    assert np.array_equal(np.asarray(image), expected)
+    assert size == (64, 48)
+    # The lock keeps the whole window's decode free: two latent frames, four output frames each, of the 48 x 64
+    # image, at 2.25 live float32 activations and 2 of workspace per output frame, and the fixed 5 MiB allowance.
+    assert load.loaded.working_mem_requests == [(2.25 + 2) * 64 * (48 * 64) * 4 * 8 + 5 * 2**20]
+
+
+def test_a_missing_tae_names_the_starter_of_its_space_even_under_another_base(caplog: pytest.LogCaptureFixture) -> None:
+    """Anima denoises in the Wan 2.1 VAE's space, whose TAE is filed under Wan in the starter list."""
+    previews = _previews(_services(_Store([]), _load()))
+    anima_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
+
+    previews.render(BaseModelType.Anima, anima_sample)
+
+    [info] = _messages(caplog, logging.INFO)
+    assert "anima" in info
+    assert "the TAEW2.1 (Wan 2.1 VAE preview decoder) starter model (listed under wan)" in info
+
+
+def _space_of(base: BaseModelType, channels: int):
+    return resolve_latent_space(base, torch.zeros(1, channels, 2, 2))
+
+
+@pytest.mark.parametrize(
+    ("base", "channels", "starters"),
+    [
+        (BaseModelType.StableDiffusion2, 4, ["TAESD (SD 1.x/2.x preview decoder)"]),
+        (BaseModelType.ZImage, 16, ["TAEF1 (FLUX.1 preview decoder)"]),
+        (BaseModelType.Ideogram4, 32, ["TAEF2 (FLUX.2 preview decoder)"]),
+        (BaseModelType.QwenImage21, 64, ["TAEQI2.1 (Qwen-Image-2.1 preview decoder)"]),
+        (BaseModelType.Anima, 16, ["TAEW2.1 (Wan 2.1 VAE preview decoder)"]),
+        (BaseModelType.Wan, 48, ["TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)"]),
+        (BaseModelType.LTX2, 128, ["TAELTX2.3 (LTX-2.5 preview decoder)"]),
+        (BaseModelType.CogView4, 16, []),
+        (BaseModelType.MiniMaxH3, 24, []),
+    ],
+)
+def test_the_starters_that_install_a_tae_for_a_space(base: BaseModelType, channels: int, starters: list[str]) -> None:
+    assert [starter.name for starter in tiny_autoencoder_starters(_space_of(base, channels))] == starters

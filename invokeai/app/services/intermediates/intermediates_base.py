@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from invokeai.app.services.intermediates.intermediates_common import (
+    ActiveQueueMediaUse,
     IntermediatesBrowserHoldRequest,
     IntermediatesOperation,
     IntermediatesOperationRequest,
@@ -28,6 +29,12 @@ class IntermediatesServiceBase(ABC):
     @abstractmethod
     def hold_cached_media(self, session_id: str, references: MediaReferences) -> bool:
         """Pin existing cached media until the consuming queue session ends; False means recompute."""
+        pass
+
+    @abstractmethod
+    def get_active_queue_uses(self, references: MediaReferences) -> list[ActiveQueueMediaUse]:
+        """The active queue items whose sessions name any of these media, with each item's account: the work the
+        cleanup treats as active."""
         pass
 
     @abstractmethod

@@ -19,6 +19,7 @@ export const ConfirmDialog = ({
   onClose,
   onConfirm,
   onExitComplete,
+  placement = 'center',
   title,
 }: {
   body: ReactNode;
@@ -43,6 +44,11 @@ export const ConfirmDialog = ({
   onConfirm: () => Promise<void> | void;
   /** After the close animation; hosts that retain the dialog's subject release it here. */
   onExitComplete?: () => void;
+  /**
+   * `top` anchors the dialog's top edge, for a body that grows after it opens (an answer still loading): a centered
+   * dialog would move up by half of every change.
+   */
+  placement?: 'center' | 'top';
   title: string;
 }) => {
   const { t } = useTranslation();
@@ -125,6 +131,7 @@ export const ConfirmDialog = ({
       finalFocusEl={finalFocusEl}
       initialFocusEl={initialFocusEl ?? (text.isDestructive ? getInitialFocus : undefined)}
       open={isOpen}
+      placement={placement}
       role="alertdialog"
       size="sm"
       onExitComplete={handleExitComplete}

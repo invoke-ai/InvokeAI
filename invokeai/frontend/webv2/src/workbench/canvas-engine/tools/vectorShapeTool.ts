@@ -273,11 +273,13 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       return code === 'Space' || code === 'Alt' && isBoxKind(session.kind);
     },
     onKeyCommand: (ctx, command) => {
+      if (!session) { return false; }
       if (command === 'cancel') {
         reset(ctx);
       } else if (isCurrent(ctx) && session?.kind === 'polygon') {
         commit(ctx, anchorsToBezierPoints(session.points), false);
       }
+      return true;
     },
     onPointerDown: (ctx, rawInput) => {
       if ((rawInput.buttons & 1) === 0 || !eligible(ctx)) {

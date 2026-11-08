@@ -24,6 +24,7 @@ import {
 import {
   addGalleryBoardToCaches,
   canAddToCachedGalleryBoard,
+  getGalleryBoardDestinationIds,
   ensureGalleryBoardDestinations,
   getCachedGalleryBoard,
   getGalleryItemBoardIdsFromCaches,
@@ -723,6 +724,7 @@ describe('patchGalleryBoardCaches', () => {
     expect(canAddToCachedGalleryBoard('viewed', client)).toBe(false);
     expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
     expect(canAddToCachedGalleryBoard('never-listed', client)).toBe(false);
+    expect(getGalleryBoardDestinationIds(client)).toEqual(['own']);
   });
 
   it('takes an archived board the caller may add to as a destination, and a board the archived listing lacks as gone', () => {
@@ -760,6 +762,7 @@ describe('patchGalleryBoardCaches', () => {
 
     expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
     expect(canAddToCachedGalleryBoard('archived-viewed', client)).toBe(false);
+    expect(getGalleryBoardDestinationIds(client)).toEqual(['own', 'archived']);
     expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
     // Only a listing of live boards is cached: an unlisted board may be archived, so it is not a destination until
     // the archived listing is ensured, and gone once that listing lacks it.
@@ -786,6 +789,7 @@ describe('patchGalleryBoardCaches', () => {
     expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
     // Absence still counts: the failed listing is the one that would have held a board that exists.
     expect(canAddToCachedGalleryBoard('gone', client)).toBe(false);
+    expect(getGalleryBoardDestinationIds(client)).toEqual(['archived', 'own']);
   });
 
   const getArchivedBoardsKey = (orderBy: 'board_name' | 'created_at' = 'created_at') =>

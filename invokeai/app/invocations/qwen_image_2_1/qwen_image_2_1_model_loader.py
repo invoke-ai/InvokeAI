@@ -37,7 +37,7 @@ class QwenImage21ModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Qwen-Image-2.1",
     tags=["model", "qwen_image_2_1", "qwen-image-2.1"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class QwenImage21ModelLoaderInvocation(BaseInvocation):
@@ -71,6 +71,14 @@ class QwenImage21ModelLoaderInvocation(BaseInvocation):
         ui_model_base=BaseModelType.Any,
         ui_model_type=ModelType.Qwen3VLEncoder,
         title="Qwen3-VL Encoder",
+    )
+    qwen3_vl_vision_tower_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Qwen3-VL 8B vision tower (the llama.cpp mmproj file). Lets a GGUF encoder read reference images.",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.Any,
+        ui_model_type=ModelType.Qwen3VLVisionTower,
+        title="Vision Tower",
     )
 
     def invoke(self, context: InvocationContext) -> QwenImage21ModelLoaderOutput:
@@ -110,11 +118,42 @@ class QwenImage21ModelLoaderInvocation(BaseInvocation):
             tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
+        vision_tower = self._vision_tower(context)
+
         return QwenImage21ModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
-            qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[]),
+            qwen3_vl_encoder=Qwen3VLEncoderField(
+                tokenizer=tokenizer, text_encoder=text_encoder, vision_tower=vision_tower, loras=[]
+            ),
             vae=VAEField(vae=vae),
         )
+
+    def _vision_tower(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
+        """The mmproj tower for a GGUF encoder, checked against it; None when none was selected.
+
+        Refused beside any other encoder rather than ignored: those bring a tower of their own, and a stale
+        selection would silently decide nothing while looking as if it did.
+        """
+        if self.qwen3_vl_vision_tower_model is None:
+            return None
+        tower_config = context.models.get_config(self.qwen3_vl_vision_tower_model)
+        tower_variant = getattr(tower_config, "variant", None)
+        if tower_config.type is not ModelType.Qwen3VLVisionTower:
+            raise ValueError(f"'{tower_config.name}' is not a Qwen3-VL vision tower (the llama.cpp mmproj file).")
+        if tower_variant is not Qwen3VLVariantType.Qwen3VL_8B:
+            raise ValueError(
+                f"'{tower_config.name}' is the Qwen3-VL {variant_label(tower_variant)} vision tower. "
+                "Qwen-Image-2.1 reads references with the 8B one (hidden size 4096)."
+            )
+        encoder_config = (
+            context.models.get_config(self.qwen3_vl_encoder_model) if self.qwen3_vl_encoder_model is not None else None
+        )
+        if encoder_config is None or encoder_config.format is not ModelFormat.GGUFQuantized:
+            raise ValueError(
+                f"The vision tower '{tower_config.name}' pairs only with a GGUF Qwen3-VL encoder, which has none. "
+                "Any other encoder brings its own: clear the vision tower."
+            )
+        return self.qwen3_vl_vision_tower_model
 
     @staticmethod
     def _require_diffusers(name: str, model_format: ModelFormat, component: str) -> None:

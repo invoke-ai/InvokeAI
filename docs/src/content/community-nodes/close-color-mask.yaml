@@ -1,0 +1,9 @@
+title: Close Color Mask
+author: VeyDlin
+repo: https://github.com/VeyDlin/close-color-mask-node
+summary: Mask the parts of an image close to a chosen color, for color-based selections.
+categories: [masks]
+thumbnail: ./close-color-mask.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/close-color-mask-node/master/.readme/node.png
+    alt: The Close Color Mask node

@@ -248,6 +248,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         grid_width: int,
         dtype: torch.dtype,
         device: torch.device,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> Krea2RegionalPromptingExtension:
         conditioning_fields = (
             [conditioning_field] if isinstance(conditioning_field, Krea2ConditioningField) else conditioning_field
@@ -293,6 +295,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return Krea2RegionalPromptingExtension.from_text_conditionings(
             text_conditionings=text_conditionings,
             image_seq_len=grid_height * grid_width,
+            unmasked_covers_whole_image=unmasked_covers_whole_image,
         )
 
     def _get_noise(self, height: int, width: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
@@ -559,6 +562,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_extension: Krea2RegionalPromptingExtension | None = None
         neg_prompt_embeds = None
         if do_cfg and self.negative_conditioning is not None:
+            # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
             neg_extension = self._load_text_conditioning(
                 context,
                 self.negative_conditioning,
@@ -566,6 +570,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 grid_width,
                 inference_dtype,
                 device,
+                unmasked_covers_whole_image=True,
             )
             neg_prompt_embeds = neg_extension.regional_text_conditioning.prompt_embeds
 
@@ -650,15 +655,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 style_ref_position_ids = position_ids
 
         step_callback = self._build_step_callback(context)
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps_sched[0].item()) if total_steps > 0 else 0,
-                latents=unpack_latents(latents, latent_height, latent_width),
-            ),
-        )
 
         num_train_timesteps = scheduler.config.num_train_timesteps
 
@@ -688,6 +684,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(working_memory=working_memory)
+            )
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps_sched[0].item()) if total_steps > 0 else 0,
+                    latents=unpack_latents(latents, latent_height, latent_width),
+                ),
             )
 
             # Whether LoRA has to go on as a sidecar. Asked of the loaded module tree rather than the

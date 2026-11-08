@@ -12,10 +12,12 @@ import type {
 
 import { ChakraProvider, HStack } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createDeferredResource } from '@workbench/deferredResource';
 import { createExtensionRegistry, type ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider, type WorkbenchFocusController } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { closeWorkbenchSettings, settingsDialogStore } from '@workbench/settings/settingsDialogStore';
+import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import i18next from 'i18next';
 import { MapIcon, TagsIcon } from 'lucide-react';
 import { act, useState } from 'react';
@@ -61,7 +63,13 @@ const project = {
   },
 };
 
+const recoveryOwner = vi.hoisted(() => ({
+  widgetRecovery: new Map(),
+  getSnapshot: () => ({ activeProject: project }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchInternalStore: () => recoveryOwner,
+  useWorkbenchReload: () => async () => {},
   useActiveProjectSelector: (selector: (project: unknown) => unknown) => selector(project),
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
@@ -161,19 +169,16 @@ const implementation: WidgetImplementation = {
   view: () => <MapBody />,
 };
 
-const implementationPromise = Promise.resolve(implementation);
+const implementationResource = createDeferredResource(() => Promise.resolve(implementation));
+const implementationPromise = implementationResource.load();
 const registeredWidget = {
-  implementation: { load: () => implementationPromise, retry: () => {} },
+  implementation: implementationResource,
   manifest,
   status: 'enabled',
 } as unknown as RegisteredWidget;
 
-const failedLoad = Promise.reject(new Error('chunk unavailable'));
-// Nothing awaits this before the render that consumes it; an unhandled
-// rejection would fail the run on its own.
-failedLoad.catch(() => undefined);
 const failingWidget = {
-  implementation: { load: () => failedLoad, retry: () => {} },
+  implementation: createDeferredResource<WidgetImplementation>(() => Promise.reject(new Error('chunk unavailable'))),
   // The body isolates its own failure, so only the title bar's containment is
   // under test here.
   manifest: { ...manifest, failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' } },
@@ -272,12 +277,14 @@ beforeEach(async () => {
   windowMocks.closeFloating.mockClear();
   windowMocks.raiseFloating.mockClear();
   windowMocks.setFloatingGeometry.mockClear();
+  recoveryOwner.widgetRecovery.set('image-map-instance', createWidgetRecovery());
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 });
 
 afterEach(async () => {
+  recoveryOwner.widgetRecovery.clear();
   await act(() => root?.unmount());
   host?.remove();
   host = null;

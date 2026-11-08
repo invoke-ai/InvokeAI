@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  '@zag-js/react@1.43.3':
+    hash: a0448ebf0273ebd3cc9b57d2f1421568477fd5e4c673fa13180dfe6e8de2d3b5
+    path: patches/@zag-js__react@1.43.3.patch
   react-hook-tanstack-virtual:
     hash: a650424c322ec56178110e945f70d9e11d270c144f2c0df5527ba7d327ccb285
     path: patches/react-hook-tanstack-virtual.patch
@@ -2433,7 +2436,7 @@ snapshots:
       '@zag-js/qr-code': 1.43.3
       '@zag-js/radio-group': 1.43.3
       '@zag-js/rating-group': 1.43.3
-      '@zag-js/react': 1.43.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@zag-js/react': 1.43.3(patch_hash=a0448ebf0273ebd3cc9b57d2f1421568477fd5e4c673fa13180dfe6e8de2d3b5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@zag-js/scroll-area': 1.43.3
       '@zag-js/select': 1.43.3
       '@zag-js/signature-pad': 1.43.3
@@ -3766,7 +3769,7 @@ snapshots:
       '@zag-js/types': 1.43.3
       '@zag-js/utils': 1.43.3
 
-  '@zag-js/react@1.43.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@zag-js/react@1.43.3(patch_hash=a0448ebf0273ebd3cc9b57d2f1421568477fd5e4c673fa13180dfe6e8de2d3b5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@zag-js/core': 1.43.3
       '@zag-js/store': 1.43.3

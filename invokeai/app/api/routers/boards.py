@@ -167,13 +167,7 @@ def delete_board(
 ) -> DeleteBoardResult:
     """Deletes a board: its owner's, or an admin's, to do"""
     access = _assert_board_changes(board_id, current_user, [BoardAction.Delete])
-
-    # An owner deleting their board, admin or not, only deletes their own contributions, so what
-    # other users put on a shared board is preserved (it cascades to "uncategorized" via the FK on
-    # board_videos / board_images). Only an admin overriding, deleting someone else's board,
-    # deletes everything on it; that is the case the DTO reports as `admin_override`, so the client
-    # can warn before it.
-    cascade_user_id: Optional[str] = None if access.admin_override else current_user.user_id
+    cascade_user_id = access.media_deleted_with_board(current_user.user_id)
     deleted_images: list[str] = []
     deleted_videos: list[str] = []
     board_deleted = False

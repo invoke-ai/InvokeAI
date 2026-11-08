@@ -1,0 +1,169 @@
+---
+/*
+ * "Which memory option do I need?": the shared setup picker (OS and GPU, saved across pages), then the NVIDIA
+ * generation, VRAM and model format, and below them the `MemoryOption`s that apply, in page order. The
+ * rules are in `memory-picker.mjs`. Every option is rendered; the inline script after them hides the others before
+ * they paint. Without JavaScript the rows stay hidden and every option shows.
+ *
+ *   <MemoryPicker>
+ *     <MemoryOption id="low-vram-mode" title="…">…</MemoryOption>
+ *   </MemoryPicker>
+ */
+import { pluralForms } from '../../i18n.mjs';
+import SetupPicker from '../SetupPicker.astro';
+import {
+  checkOptions,
+  localizeChoices,
+  MEMORY_ROWS,
+  MEMORY_RULES,
+  MEMORY_STORAGE_KEY,
+  mountMemoryPicker,
+  recommend,
+  resolveMemoryRows,
+  ROW_VISIBILITY,
+} from './memory-picker.mjs';
+import { pageLang } from './page-lang.mjs';
+
+const { t } = Astro.locals;
+const lang = pageLang(Astro.locals);
+
+const options = await Astro.slots.render('default');
+const { missing, unknown } = checkOptions(options);
+if (missing.length || unknown.length) {
+  throw new Error(
+    `MemoryPicker: ${[
+      missing.length ? `no MemoryOption for ${missing.join(', ')}` : '',
+      unknown.length ? `unknown or repeated MemoryOption ${unknown.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('; ')}`
+  );
+}
+
+const legends = {
+  series: t('memoryPicker.row.series'),
+  vram: t('memoryPicker.row.vram'),
+  format: t('memoryPicker.row.format'),
+};
+const rows = (Object.keys(MEMORY_ROWS) as (keyof typeof MEMORY_ROWS)[]).map((id) => ({
+  id,
+  legend: legends[id],
+  choices: localizeChoices(MEMORY_ROWS[id].options, t),
+}));
+
+const config = {
+  rows: MEMORY_ROWS,
+  rules: MEMORY_RULES,
+  visibility: ROW_VISIBILITY,
+  storageKey: MEMORY_STORAGE_KEY,
+  countForms: pluralForms(t, 'memoryPicker.count'),
+  lang,
+};
+// Escaping `<` keeps translated strings from closing the script.
+const configJson = JSON.stringify(config).replaceAll('<', '\\u003c');
+const mountScript =
+  `(() => { const root = document.currentScript.parentElement; ` +
+  `(${mountMemoryPicker})(root, root.querySelector('[data-memory-options]'), ${configJson}, ${recommend}, ${resolveMemoryRows}); })();`;
+---
+
+<div class="memory-picker" data-memory-picker>
+  <div class="memory-picker__controls not-content" data-pagefind-ignore>
+    <p class="memory-picker__fallback">{t('memoryPicker.fallback')}</p>
+    <div class="memory-picker__panel">
+      <SetupPicker embedded />
+      {
+        rows.map((row) => (
+          <fieldset class="memory-picker__row" data-memory-row={row.id}>
+            <legend class="docs-eyebrow">{row.legend}</legend>
+            <div class="memory-picker__segments docs-segment-tabs">
+              {row.choices.map((choice) => (
+                <label class="docs-segment-tab">
+                  <input type="radio" name={`memory-${row.id}`} value={choice.id} data-memory-input />
+                  {choice.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ))
+      }
+      <p class="memory-picker__summary" aria-live="polite" aria-atomic="true" data-memory-summary></p>
+    </div>
+  </div>
+  <div class="memory-picker__options" data-memory-options>
+    <Fragment set:html={options} />
+  </div>
+  <script is:inline set:html={mountScript} />
+</div>
+
+<style>
+  .memory-picker__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /*
+   * One panel for the setup picker's rows and these: the setup picker's border, inset and label offsets (see
+   * SetupPicker.astro), which drops its own border when embedded.
+   */
+  .memory-picker__panel {
+    display: none;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 6px;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  :global(:root[data-setup-os]) .memory-picker__panel {
+    display: flex;
+  }
+
+  .memory-picker__fallback {
+    margin: 0;
+    color: var(--docs-text-subtle);
+  }
+
+  :global(:root[data-setup-os]) .memory-picker__fallback {
+    display: none;
+  }
+
+  .memory-picker__row {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .memory-picker__row[hidden] {
+    display: none;
+  }
+
+  .memory-picker__row legend {
+    padding: 0.375rem var(--docs-tab-pad-x) 0.25rem;
+  }
+
+  .memory-picker__segments {
+    flex-wrap: wrap;
+  }
+
+  .memory-picker__summary {
+    margin: 0;
+    padding: 0.25rem var(--docs-tab-pad-x) 0.375rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  .memory-picker__options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+
+    /* The gap spaces the options; Starlight's sibling margin would also count options hidden before them. */
+    > :global(*) {
+      margin: 0;
+    }
+  }
+</style>

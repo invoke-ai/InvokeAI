@@ -1,0 +1,182 @@
+---
+// Every weekly challenge, newest first, each a card linking to its page.
+import { getCollection } from 'astro:content';
+import { Image } from 'astro:assets';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+import { withBase } from '../../../lib/base-path';
+import {
+  DISCORD_INVITE_URL,
+  challengePath,
+  formatChallengeDates,
+  sortChallenges,
+} from '../../../lib/challenges.mjs';
+
+const base = import.meta.env.BASE_URL;
+// A card shows the top place large and the next two winners beside it; the schema keeps winners in display order.
+const challenges = sortChallenges(await getCollection('challenges')).map((challenge) => ({
+  ...challenge,
+  thumbnails: challenge.data.winners.slice(0, 3),
+}));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Weekly challenges',
+    description: 'Winners of the weekly art challenges on the Invoke Discord, with their artwork and credits.',
+    template: 'splash',
+    hero: {
+      title: 'Weekly challenges',
+      tagline: 'Every week the Invoke Discord sets a theme. These are the winners, newest first.',
+      actions: [
+        {
+          text: 'Join the Discord',
+          link: DISCORD_INVITE_URL,
+          variant: 'secondary',
+          icon: 'external',
+          attrs: { class: 'docs-button docs-button--secondary docs-button--xl' },
+        },
+      ],
+    },
+  }}
+>
+  {
+    challenges.length > 0 ? (
+      <ul class="wide cards not-content" role="list">
+        {challenges.map(({ id, data: { week, theme, startDate, endDate }, thumbnails }) => (
+          <li>
+            <a class="docs-link-card card" href={withBase(challengePath(id), base)}>
+              {/* The card's text names it; the thumbnails are a preview of the winners' page. */}
+              <span class="thumbs" data-count={thumbnails.length}>
+                {thumbnails.map((winner, index) => (
+                  <Image
+                    src={winner.image}
+                    alt=""
+                    widths={[240, 480, 720].filter((width) => width < winner.image.width).concat(winner.image.width)}
+                    sizes={index === 0 ? '(min-width: 50rem) 20rem, 66vw' : '(min-width: 50rem) 10rem, 33vw'}
+                  />
+                ))}
+              </span>
+              <span class="card__text">
+                <h2 class="docs-link-card__title">{theme}</h2>
+                <span class="docs-link-card__description">
+                  {week !== undefined && `Week ${week} · `}{formatChallengeDates(startDate, endDate)}
+                </span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <div class="empty not-content">
+        <h2>No challenges yet</h2>
+        <p>
+          The winners of each weekly art challenge on the Invoke Discord appear here, credited by name. Join the Discord
+          to take part in the next one.
+        </p>
+        <a class="docs-button docs-button--primary docs-button--lg" href={DISCORD_INVITE_URL}>
+          Join the Discord
+        </a>
+      </div>
+    )
+  }
+</StarlightPage>
+
+<style>
+  .wide {
+    --wide-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    width: var(--wide-width);
+    margin-inline: calc((100% - var(--wide-width)) / 2);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+    margin-block: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    height: 100%;
+    padding: 0.5rem 0.5rem 0.875rem;
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /* 1st place on the left, the next two stacked on the right. Thumbnails crop to fill. */
+  .thumbs {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-radius: calc(var(--docs-radius-container) - 0.5rem + 1px);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background-color: var(--docs-control);
+    }
+
+    img:first-child {
+      grid-row: span 2;
+    }
+  }
+
+  .thumbs[data-count='1'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thumbs[data-count='2'] img {
+    grid-row: span 2;
+  }
+
+  .card__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-inline: 0.375rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+  }
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 36rem;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 1rem + 3vw, 3rem);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    text-align: center;
+
+    h2 {
+      margin: 0;
+      color: var(--docs-text-strong);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--docs-text-muted);
+    }
+  }
+</style>

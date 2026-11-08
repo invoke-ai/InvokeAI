@@ -46,6 +46,14 @@ cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mo
 checkpoints that ship fp8 weights are kept in fp8 with
 [FP8 Storage](/configuration/optimization/fp8-storage/), which is switched on for them when they are installed.
 
+ComfyUI's `int8_tensorwise` builds, rotated (`int8_convrot`) or not, load for the transformer and for the Qwen2.5-VL
+encoder. Comfy-Org publishes `int8_convrot` transformers for Qwen Image Edit 2509 and 2511; the Qwen2.5-VL int8
+encoders are community uploads. The int8 layers stay int8 in memory (about half the bf16 size) and are dequantized
+layer by layer as they run, on every device. That is the default: on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
+can run them on the int8 tensor cores instead. The main benefit is memory; no speed-up is promised. DoRA LoRAs do not
+run on an int8 transformer. A file whose int8 layers carry only a `{"convrot": true}` marker, with no format, is
+refused at install for the transformer and when the encoder loads. Int4 builds are refused at install.
+
 ## Installing
 
 The easiest path is the **Qwen Image** bundle in the Model Manager's Starter Models. It installs the
@@ -75,9 +83,19 @@ Qwen Image needs three components:
   keep part of it in RAM. The 2512 file is plain fp8 without scales: loading it briefly needs about 41 GB of
   free system RAM, because it is widened to bf16 before FP8 Storage casts it back.
 
-Three Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
-bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), and **Diffusers** (~16 GB,
-full precision). The single-file encoders ship with their tokenizer and config inside InvokeAI.
+Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), **GGUF Q4_K_M** (~4.7 GB, text
+only) and **Diffusers** (~16 GB, full precision). The single-file and GGUF encoders ship with their
+tokenizer and config inside InvokeAI.
+
+The **GGUF** encoders are llama.cpp builds of Qwen2.5-VL-7B-Instruct (e.g. from
+`unsloth/Qwen2.5-VL-7B-Instruct-GGUF`) and hold only the language model. They encode text prompts, but cannot
+read reference images: with one selected, an Edit model's reference images block **Invoke** with a message
+saying so, and the workflow node fails before it loads anything. The separate `mmproj` vision file in those
+repositories is refused at install, and so is a Qwen2-VL GGUF: the previous generation shares the llama.cpp
+architecture name and would condition Qwen Image with the wrong model. Measured on the CPU against the bf16
+encoder, the prompt embeddings of the Q8_0 build agree to a mean cosine similarity of 0.9999 and those of
+Q4_K_M to 0.996. The prompt node's **Quantization** option has no effect on a GGUF encoder.
 
 When a GGUF or single-file Qwen Image model is selected, pick the **Qwen VL Encoder** and **VAE** in the
 **Components** section next to the model. Alternatively, set **Component source** to an installed
@@ -132,7 +150,8 @@ then describe the change you want in the prompt. The text-to-image variant does 
 images.
 
 - All reference images are given to the Qwen2.5-VL encoder together with your prompt, so you can refer
-  to them in the instruction.
+  to them in the instruction. This needs the fp8 scaled, NVFP4 or Diffusers encoder: a GGUF encoder has no
+  vision tower.
 - The **first** reference image is also encoded by the VAE and supplied to the transformer as a
   pixel-level reference.
 
@@ -142,8 +161,15 @@ Image**; connect an **Image to Latents - Qwen Image** node to the **Reference La
 
 ## LoRA
 
-Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer.
-In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**.
+Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer and,
+when the file has text-encoder layers, to the Qwen2.5-VL encoder too. This holds for every encoder build,
+including the **Encoder quantization** setting. DoRA layers on the encoder need unpacked weights: they fail
+with int8 or nf4 quantization and with packed nvfp4 encoders, so set **Encoder quantization** to **None** and
+use a bf16 or fp8 encoder. A LoRA that holds only text-encoder layers is not recognized on install.
+
+In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**. Route the
+encoder through the LoRA node as well as the transformer: connect the node's **Qwen VL Encoder** output to
+the prompt nodes, otherwise the LoRA's text-encoder layers stay unused. The LoRA node logs a warning when it sees this.
 
 Plain LoRAs saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw PEFT adapters
 (`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers (`img_mod`,

@@ -109,18 +109,21 @@ export const createLassoTool = (): Tool => {
     },
     onKeyCommand: (ctx, command) => {
       if (!session) {
-        return;
+        return false;
       }
       if (command === 'cancel') {
+        // Drops the outline only; the committed selection stays.
         reset();
         clearPreview(ctx);
-        return;
+        return true;
       }
-      if (session.kind === 'polygon') {
-        // Enter closes the polygon. No modifiers are in play on a key command,
-        // so the persistent op mode applies.
-        closePolygon(ctx, session, { alt: false, shift: false });
+      if (session.kind !== 'polygon') {
+        return false;
       }
+      // Enter closes the polygon. No modifiers are in play on a key command,
+      // so the persistent op mode applies.
+      closePolygon(ctx, session, { alt: false, shift: false });
+      return true;
     },
     onPointerCancel: (ctx) => {
       reset();

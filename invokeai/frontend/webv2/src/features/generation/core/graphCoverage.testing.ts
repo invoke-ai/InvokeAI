@@ -4,6 +4,7 @@ import type {
   ComponentPolicyContext,
   ComponentSlotPolicy,
   GenerateComponentValueKey,
+  ReferenceVisionComponents,
   SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import type {
@@ -26,6 +27,8 @@ import { getIsPidSupportedBase } from './pid';
 export interface ModelShape {
   label: string;
   overrides: Partial<MainModelConfig>;
+  /** Qwen-Image-2.1: read the references with a GGUF encoder and its Vision Tower instead of a safetensors encoder. */
+  ggufEncoder?: true;
 }
 
 const DEFAULT_SHAPES: readonly ModelShape[] = [
@@ -51,6 +54,11 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'dev-diffusers', overrides: { format: 'diffusers', variant: 'dev' } },
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
     { label: 'klein-9b-standalone', overrides: { format: 'gguf_quantized', variant: 'klein_9b' } },
+  ],
+  // The Vision Tower slot opens only beside a GGUF encoder, so that path needs its own shape.
+  'qwen-image-2-1': [
+    ...DEFAULT_SHAPES,
+    { ggufEncoder: true, label: 'standalone-gguf-encoder', overrides: { format: 'gguf_quantized' } },
   ],
   // FLUX.3 Klein samples without CFG; Klein Base compiles the negative branch at its CFG default.
   flux3: [
@@ -174,16 +182,34 @@ const createModel = (base: SupportedGenerateBase, shape: ModelShape): MainModelC
 
 export const satisfiedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const model = createModel(base, shape);
+  const required = satisfyRequiredComponents(model, {
+    ...getDefaultGenerateSettings(model),
+    positivePrompt: 'a test prompt',
+    seed: 1,
+    seedMode: 'fixed',
+  });
 
-  return {
-    model,
-    ...satisfyRequiredComponents(model, {
-      ...getDefaultGenerateSettings(model),
-      positivePrompt: 'a test prompt',
-      seed: 1,
-      seedMode: 'fixed',
-    }),
+  if (!shape.ggufEncoder || !required.settings.qwen3VLEncoderModel) {
+    return { model, ...required };
+  }
+
+  // The tower is optional, so it stays out of `filled` (the required components): pick the GGUF encoder, then what its slot offers.
+  const settings = {
+    ...required.settings,
+    qwen3VLEncoderModel: { ...required.settings.qwen3VLEncoderModel, format: 'gguf_quantized' },
   };
+  const slot = getComponentSectionPolicy(model, settings).slots.find(
+    (candidate) => candidate.key === 'qwen3VLVisionTowerModel'
+  );
+  const tower = slot && candidatesForSlot(slot).find((c) => slot.filter?.(c, buildContext(model, settings, [slot])));
+
+  return tower
+    ? {
+        model,
+        filled: required.filled,
+        settings: { ...settings, qwen3VLVisionTowerModel: tower },
+      }
+    : { model, ...required, settings };
 };
 
 /** Every supported base in each of its component shapes. */
@@ -228,14 +254,16 @@ export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: Model
 /** References for the families whose builders wire them through their own nodes rather than an adapter. */
 const tunedReferenceImagesFor = (
   model: MainModelConfig,
-  image: GenerateReferenceImageAsset
+  image: GenerateReferenceImageAsset,
+  components: ReferenceVisionComponents
 ): GenerateReferenceImage[] | undefined => {
   if (model.base === 'krea-2') {
     return [{ config: { image, styleStrength: 1, type: 'krea2_reference_image' }, id: 'style', isEnabled: true }];
   }
 
-  // Only the Diffusers pipeline's own encoder reads references; other shapes compile without them.
-  if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)) {
+  // Only an encoder with a vision tower reads references: a Diffusers pipeline's own, or a standalone safetensors
+  // one; other shapes compile without them.
+  if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model, components)) {
     return [{ config: { image, type: 'qwen_image_2_1_reference_image' }, id: 'edit', isEnabled: true }];
   }
 
@@ -267,7 +295,7 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
       fluxDypeScale: 3,
       qwenImageEncoderQuantization: 'nf4' as const,
       qwenImageShift: 3,
-      referenceImages: tunedReferenceImagesFor(model, image) ?? settings.referenceImages,
+      referenceImages: tunedReferenceImagesFor(model, image, settings) ?? settings.referenceImages,
       zImageSeedVarianceEnabled: true,
       zImageSeedVarianceStrength: 0.2,
       zImageShift: 3,

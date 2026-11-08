@@ -992,3 +992,37 @@ describe('createWorkbenchStore', () => {
     expect(placementWatcher.changeCount).toBe(0);
   });
 });
+
+it('owns recovery entries before rendering, preserves edits, and discards removed or previous-project entries', () => {
+  const initial = createInitialWorkbenchState();
+  const project = initial.projects[0]!;
+  const id = 'recovery-fixture';
+  project.widgetInstances[id] = { ...Object.values(project.widgetInstances)[0]!, id };
+  const store = createWorkbenchStore(initial);
+  const first = store.getSnapshot().activeProject;
+  const recovery = store.widgetRecovery.get(id!)!;
+  recovery.fail('actions', new Error('Old render'));
+  store.commands.widgets.patchInstanceValues(id!, { retained: true });
+  expect(store.widgetRecovery.get(id!)).toBe(recovery);
+  const removed = {
+    ...store.getState(),
+    projects: store.getState().projects.map((p) =>
+      p.id === first.id
+        ? {
+            ...p,
+            widgetInstances: Object.fromEntries(Object.entries(p.widgetInstances).filter(([key]) => key !== id)),
+          }
+        : p
+    ),
+  };
+  store.internal.persistence.hydrate(removed);
+  expect(store.widgetRecovery.has(id!)).toBe(false);
+  store.internal.persistence.hydrate({ ...removed, projects: [first] });
+  expect(store.widgetRecovery.get(id!)).not.toBe(recovery);
+  expect(store.widgetRecovery.get(id!)!.getSnapshot().errors).toEqual({});
+  const replacement = store.widgetRecovery.get(id!);
+  store.commands.projects.create();
+  store.commands.projects.switchTo(first.id);
+  expect(store.widgetRecovery.get(id!)).not.toBe(replacement);
+  expect(store.widgetRecovery.size).toBe(Object.keys(store.getSnapshot().activeProject.widgetInstances).length);
+});

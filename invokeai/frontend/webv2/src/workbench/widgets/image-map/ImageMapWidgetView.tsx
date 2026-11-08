@@ -26,6 +26,7 @@ import {
   imageMapStore,
   refreshImageIndexStatus,
   refreshImageMapPoints,
+  requestImageMapRecompute,
   setClusterEps,
   setClusterLabelsEnabled,
   setImageMapMediaKind,
@@ -51,6 +52,11 @@ const ImageMapPlot = lazy(() => import('./ImageMapPlot'));
 const handleRefresh = () => {
   void refreshImageMapPoints();
   // Retry counts as well as points; stale progress is often why retry was requested.
+  refreshImageIndexStatus();
+};
+
+const handleRecompute = () => {
+  void requestImageMapRecompute();
   refreshImageIndexStatus();
 };
 
@@ -286,7 +292,8 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
           <Text color="fg.muted" fontSize="lg">
             {t('widgets.imageMap.computing')}
           </Text>
-          <Button onClick={handleRefresh} variant="outline">
+          {/* A failed fit also sits here during the cooldown, so this has to be able to bypass it. */}
+          <Button onClick={handleRecompute} variant="outline">
             {t('widgets.imageMap.checkAgain')}
           </Button>
         </Stack>

@@ -27,6 +27,7 @@ import {
   isSupportedVideoModel,
   isValidVideoNumFrames,
   LTX2_NUM_FRAMES_STEP,
+  MINIMAX_H3_FPS,
   MINIMAX_H3_HYBRID_BLOCK_RANGE,
   snapLtx2FramesDown,
   snapVideoNumFrames,
@@ -51,6 +52,7 @@ import {
  * aliases for pre-1.0 records and are never written again.
  */
 const METADATA_KEY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  vae: ['wan_vae_model'],
   wan_guidance_scale_low_noise: ['guidance_scale_low_noise'],
   wan_t5_encoder_model: ['wan_t5_encoder'],
   wan_transformer_low_noise: ['transformer_low_noise'],
@@ -357,6 +359,17 @@ export const parseVideoRecallRecord = (metadata: unknown): VideoRecallRecord | n
   const sourceVideoName = getVideoName(metadata, 'source_video');
   const sourceStartFrame = getInteger(metadata, 'source_video_start_frame');
   const sourceEndFrame = getInteger(metadata, 'source_video_end_frame');
+  const oldH3Duration =
+    mode?.startsWith('minimax_h3_') && VIDEO_GENERATION_MODE_IDS.has(mode)
+      ? getIntegerIn(metadata, 'minimax_h3_duration_seconds', 5, 14)
+      : null;
+  // The legacy 24 fps slider's 14-second stop explicitly selected 345 frames, beyond nearest-grid rounding.
+  const legacyH3Frames =
+    oldH3Duration === null
+      ? null
+      : oldH3Duration === 14
+        ? 345
+        : Math.round((oldH3Duration * MINIMAX_H3_FPS - 5) / 17) * 17 + 5;
   const recordedReferences = Array.isArray(metadata.minimax_h3_references) ? metadata.minimax_h3_references : null;
 
   return {
@@ -389,7 +402,7 @@ export const parseVideoRecallRecord = (metadata: unknown): VideoRecallRecord | n
     modalityScale: getNumberFrom(metadata, 'ltx2_modality_scale', 1),
     model: toRecordedModelRef(getRecord(metadata, 'model')),
     negativePrompt: getNullableString(metadata, 'negative_prompt'),
-    numFrames: getIntegerIn(metadata, 'num_frames', 1),
+    numFrames: getIntegerIn(metadata, 'num_frames', 1) ?? legacyH3Frames,
     positivePrompt: getString(metadata, 'positive_prompt'),
     referenceList: recordedReferences === null ? 'absent' : recordedReferences.length === 0 ? 'empty' : 'entries',
     references: recordedReferences ? getReferences(recordedReferences) : [],

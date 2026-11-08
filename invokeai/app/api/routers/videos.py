@@ -38,7 +38,7 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_video_read_access as _assert_video_read_access,
 )
-from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE, MAX_VIDEO_BATCH_SIZE
 from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.board_access.board_access_common import ItemAction
@@ -135,7 +135,6 @@ MAX_CONCURRENT_VIDEO_UPLOADS = 2
 # Per-user bound (multiuser mode only): keeps one tenant's slow uploads from holding
 # every global slot and starving the other users into 429s.
 MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER = 1
-MAX_VIDEO_BATCH_SIZE = 1000
 VideoName = Annotated[str, StringConstraints(max_length=255)]
 
 

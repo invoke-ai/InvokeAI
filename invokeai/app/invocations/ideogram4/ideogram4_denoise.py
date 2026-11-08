@@ -1,3 +1,4 @@
+import re
 from contextlib import ExitStack
 from typing import Literal, Optional
 
@@ -16,16 +17,21 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import resolve_latent_space
 from invokeai.backend.ideogram4 import run_ideogram4_denoise
 from invokeai.backend.ideogram4.latent_norm import get_latent_norm
-from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer
+from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer, compute_dtype_of
 from invokeai.backend.ideogram4.sampler_configs import PRESETS
 from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN, unpatchify_and_denormalize
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import IDEOGRAM4_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.fp8 import get_model_compute_dtype
+from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES, get_model_compute_dtype
 
 # Named sampler presets bundle step count, guidance schedule (with polish tail), and the
 # logit-normal schedule mean/std. V4_QUALITY_48 is the reference default.
@@ -42,6 +48,30 @@ IDEOGRAM4_MIN_RESIDENT_SECOND_BRANCH_BYTES = 2 * 2**30
 # It is a term in the target, not a guarantee -- see `_second_branch_residency_target` for what the
 # reservation's own error does to it.
 IDEOGRAM4_LEAVE_FREE_FOR_THE_SYSTEM_BYTES = 3 * 2**30
+
+# The LoRAs on 'Transformer' are applied to both branches. Every published Ideogram 4 LoRA is one set of weights
+# trained on the conditional model, and the references disagree on the unconditional pass: ai-toolkit samples both
+# passes through one LoRA-patched transformer, diffusers loads LoRAs into the conditional transformer only. Rendered
+# side by side (GGUF pair, same seeds), the conditional-only variant overshoots -- guidance scales the LoRA's whole
+# effect, so a style LoRA comes out oversaturated and TurboTime's images crush to dark, high-contrast frames --
+# while both-branch patching keeps the style at the same strength without that.
+# Listed in patch order: a patch object both branches share ends up on the device of the branch patched last, and the
+# conditional branch is the one partial loading and the residency cap leave on the GPU.
+_LORA_BRANCHES = ("unconditional", "conditional")
+
+
+# The Linears that read the timestep embedding: it has one row per sample, however long the sequence.
+_PER_SAMPLE_LINEAR = re.compile(r"t_embedding\.mlp_(in|out)|adaln_proj|(layers\.\d+|final_layer)\.adaln_modulation")
+
+
+def _branch_weights(
+    cached_weights: Optional[dict[str, torch.Tensor]], branch: str
+) -> Optional[dict[str, torch.Tensor]]:
+    """A pair's RAM copy of its weights, narrowed to one branch and keyed like that branch's own parameters."""
+    if cached_weights is None:
+        return None
+    prefix = f"{branch}."
+    return {key[len(prefix) :]: value for key, value in cached_weights.items() if key.startswith(prefix)}
 
 
 def _effective_guidance_schedule(
@@ -75,7 +105,7 @@ def _effective_guidance_schedule(
     title="Denoise - Ideogram 4",
     tags=["image", "ideogram4"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class Ideogram4DenoiseInvocation(BaseInvocation):
@@ -181,7 +211,11 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
         with ExitStack() as stack:
             conditional, unconditional = self._load_branches(
-                context, stack, self._estimate_working_memory(int(llm_features.shape[0]))
+                context,
+                stack,
+                self._estimate_working_memory(int(llm_features.shape[0])),
+                lora_rows=int(llm_features.shape[0])
+                + (self.height // PIXELS_PER_IMAGE_TOKEN) * (self.width // PIXELS_PER_IMAGE_TOKEN),
             )
             packed = run_ideogram4_denoise(
                 conditional_transformer=conditional,
@@ -248,13 +282,20 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         resident size and has to fit inside the caller's reservation. Zero for a bf16 or fp8 build --
         which is why it is measured from the model rather than from the resolution: the two branches
         are separate models and may be different builds.
+
+        The row-wise fp8 build's `Fp8Linear` dequantizes per forward as well, but one fp8 weight cast is
+        what `_estimate_working_memory`'s fixed base was sized to hold, for this build and the scaled-fp8
+        single files alike. Counting it again cost the 24 GB card its full residency: measured at
+        1024x1024, V4_DEFAULT_20, the pair dropped from 100% to 96.8% resident and from 34.0 s to 41-42 s.
         """
         if not isinstance(model, torch.nn.Module):
+            return 0
+        if any(isinstance(module, Fp8Linear) for module in model.modules()):
             return 0
         return peak_dequant_transient_bytes(model, get_model_compute_dtype(model))
 
     def _load_branches(
-        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int
+        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int, lora_rows: int
     ) -> tuple[Ideogram4Transformer, Ideogram4Transformer]:
         """Put both transformer branches on the device and keep them there for the whole loop.
 
@@ -297,13 +338,45 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
             )
 
         second = self.unconditional_transformer
+        if second is not None and second.loras:
+            raise ValueError(
+                "LoRAs on 'Transformer (Unconditional)' are not applied. Connect the LoRA loader to 'Transformer'; "
+                "the node applies those LoRAs to both branches."
+            )
         unconditional_info = None if second is None else context.models.load(second.transformer)
         reservation = working_mem_bytes + max(
             self._dequant_transient(conditional_info.model),
             0 if unconditional_info is None else self._dequant_transient(unconditional_info.model),
         )
 
-        primary = stack.enter_context(conditional_info.model_on_device(working_mem_bytes=reservation))[1]
+        # How each branch takes the LoRAs, decided before the locks: sidecar patches stay on the device for the whole
+        # loop, and a layer that partial loading leaves on the CPU is copied over for every forward, so the
+        # reservation has to include them. One patch object serves both branches; each branch's own format decides
+        # what it costs, and the dearer one is reserved.
+        lora_branches = self._lora_branch_models(context, conditional_info, unconditional_info)
+        sidecar = {
+            branch: requires_sidecar_patching(model, model_format)
+            or any(p.dtype in FP8_STORAGE_DTYPES for p in model.parameters())
+            for branch, (model, model_format) in lora_branches.items()
+        }
+        if lora_branches:
+            patches = [spec[0] for spec in self._materialize_lora_patches(context)]
+            reservation += max(
+                lora_sidecar_bytes(
+                    patches,
+                    model,
+                    model_format,
+                    prefix=IDEOGRAM4_LORA_TRANSFORMER_PREFIX,
+                    rows=lora_rows,
+                    per_sample_rows={
+                        name: 1 for name, _module in model.named_modules() if _PER_SAMPLE_LINEAR.fullmatch(name)
+                    },
+                    dtype=compute_dtype_of(model.input_proj),
+                )
+                for model, model_format in lora_branches.values()
+            )
+
+        primary_cached, primary = stack.enter_context(conditional_info.model_on_device(working_mem_bytes=reservation))
         if unconditional_info is None:
             # Narrowing, not validation: `both_in_one` was decided from this same object above, and
             # locking it does not change what it is. The user-facing refusals are the two checks
@@ -314,6 +387,9 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
             # single record would stream both branches instead of one. Such a build is also the
             # smaller problem — `transformer_pair.py` notes its co-residency is what makes the nf4
             # build fit in 24 GB in the first place.
+            for branch, use_sidecar in sidecar.items():
+                branch_model = getattr(primary, branch)
+                self._apply_loras(context, stack, branch_model, _branch_weights(primary_cached, branch), use_sidecar)
             return primary.conditional, primary.unconditional
 
         # Told to the cache *before* the lock, so the branch settles near its target instead of
@@ -328,7 +404,9 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
             free_bytes, _total = torch.cuda.mem_get_info(unconditional_info.compute_device)
             second_reservation = max(reservation, free_bytes - target)
 
-        unconditional = stack.enter_context(unconditional_info.model_on_device(working_mem_bytes=second_reservation))[1]
+        unconditional_cached, unconditional = stack.enter_context(
+            unconditional_info.model_on_device(working_mem_bytes=second_reservation)
+        )
         for role, branch in (("Transformer", primary), ("Transformer (Unconditional)", unconditional)):
             if not isinstance(branch, Ideogram4Transformer):
                 raise ValueError(
@@ -339,7 +417,86 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         # unload it will never use.
         if target is not None:
             self._hold_the_second_branch_to(context, unconditional_info, target)
+        # Patched only now: a weight patched in place and then streamed out by the hold above would come back from
+        # the unpatched RAM copy.
+        locked = {"conditional": (primary, primary_cached), "unconditional": (unconditional, unconditional_cached)}
+        for branch, use_sidecar in sidecar.items():
+            model, cached_weights = locked[branch]
+            self._apply_loras(context, stack, model, cached_weights, use_sidecar)
         return primary, unconditional
+
+    def _lora_branch_models(
+        self, context: InvocationContext, conditional_info: LoadedModel, unconditional_info: Optional[LoadedModel]
+    ) -> dict[str, tuple[torch.nn.Module, ModelFormat]]:
+        """For each branch the LoRAs go to, its unlocked model and format.
+
+        Read from the unlocked models. A branch that is no Ideogram 4 transformer gets nothing here; the check after
+        the locks refuses it with a message.
+        """
+        if not self.transformer.loras:
+            return {}
+        if unconditional_info is not None and not all(
+            isinstance(info.model, Ideogram4Transformer) for info in (conditional_info, unconditional_info)
+        ):
+            return {}
+        if unconditional_info is None:
+            pair = conditional_info.model
+            assert isinstance(pair, Ideogram4TransformerPair)
+            model_format = context.models.get_config(self.transformer.transformer).format
+            branches = {branch: (getattr(pair, branch), model_format) for branch in _LORA_BRANCHES}
+        else:
+            assert self.unconditional_transformer is not None
+            by_branch = {
+                "conditional": (conditional_info.model, self.transformer.transformer),
+                "unconditional": (unconditional_info.model, self.unconditional_transformer.transformer),
+            }
+            branches = {
+                branch: (by_branch[branch][0], context.models.get_config(by_branch[branch][1]).format)
+                for branch in _LORA_BRANCHES
+            }
+        return branches
+
+    def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
+        """Load every LoRA on 'Transformer' into (patch, weight, cache-pin) specs.
+
+        A pin can be entered only once, so every patcher call gets a list of its own. A pin that is never entered
+        (the sizing pass before the locks) takes nothing.
+        """
+        patch_specs: list[PatchSpec] = []
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            patch_specs.append((lora_info.model, lora.weight, lora_info.model_in_ram()))
+        return patch_specs
+
+    def _apply_loras(
+        self,
+        context: InvocationContext,
+        stack: ExitStack,
+        model: torch.nn.Module,
+        cached_weights: Optional[dict[str, torch.Tensor]],
+        use_sidecar: bool,
+    ) -> None:
+        """Patch one branch for the rest of the loop.
+
+        The patches are cast to the dtype the branch computes in, read the way the loop reads it. A model-level
+        guess goes by the first parameter, and on the nf4 build that is a packed uint8 weight: the LoRA would be
+        cast to uint8, and the cache's own copy of it come back from the patcher corrupted.
+        """
+        assert isinstance(model, Ideogram4Transformer)
+        stack.enter_context(
+            LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=self._materialize_lora_patches(context),
+                prefix=IDEOGRAM4_LORA_TRANSFORMER_PREFIX,
+                dtype=compute_dtype_of(model.input_proj),
+                cached_weights=cached_weights,
+                force_sidecar_patching=use_sidecar,
+            )
+        )
 
     @staticmethod
     def _second_branch_residency_target(

@@ -663,7 +663,7 @@ describe('pointer pipeline: injected key owner', () => {
     const resolveKeyOwner = vi.fn((_event: KeyboardEvent) => owner);
     const h = createHarness({ handleEscape, resolveKeyOwner, tools: ['view', 'brush', 'bbox', 'colorPicker'] });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands, handleEscape, resolveKeyOwner };
   };
   const BODY = { tagName: 'BODY' };
@@ -748,7 +748,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
   const applyHarness = () => {
     const h = createHarness();
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands };
   };
 
@@ -771,7 +771,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     const handleEscape = vi.fn();
     const h = createHarness({ handleEscape });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     h.pipeline.onPointerEnter();
     const body = { tagName: 'BODY' };
     const release = registerModalPresence();

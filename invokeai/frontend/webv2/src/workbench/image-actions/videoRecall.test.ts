@@ -1725,3 +1725,68 @@ describe('recall of what the video graphs record', () => {
     expect(result?.mediaNames.conditioningClip).toEqual({ name: 'song.mp4', role: 'audio' });
   });
 });
+
+it('reads the legacy Wan VAE slot', () => {
+  const vae = { key: 'legacy-vae', base: 'wan', name: 'Wan VAE', type: 'vae' };
+  expect(parseVideoRecallRecord({ generation_mode: 'wan_t2v', wan_vae_model: vae })?.components).toContainEqual({
+    modelType: 'vae',
+    valuesKey: 'vae',
+    ref: { key: vae.key, base: vae.base, name: vae.name, type: vae.type, hash: null },
+  });
+});
+
+describe('legacy H3 duration recall', () => {
+  const model = h3Model();
+  const currentValues = { ...createDefaultVideoWidgetValues([model]), numFrames: 175 };
+  const metadata = (duration: unknown, extra: Record<string, unknown> = {}) => ({
+    generation_mode: 'minimax_h3_t2v',
+    model: { key: model.key },
+    minimax_h3_duration_seconds: duration,
+    ...extra,
+  });
+
+  it.each([
+    [5, 124],
+    [6, 141],
+    [7, 175],
+    [8, 192],
+    [9, 209],
+    [10, 243],
+    [11, 260],
+    [12, 294],
+    [13, 311],
+    [14, 345],
+  ])('restores the emitted frame count for the legacy %is duration', (duration, expectedFrames) => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: metadata(duration),
+      models: [model],
+    });
+    expect(result?.fields).toContain('frames');
+    expect(result?.values).toMatchObject({ numFrames: expectedFrames, fps: 24 });
+  });
+
+  it('prefers an explicit frame count and keeps H3 at its fixed fps', () => {
+    const record = metadata(14, { num_frames: 260, fps: 12 });
+    const result = buildVideoRecallSettings({ currentValues, kind: 'remix', metadata: record, models: [model] });
+    expect(parseVideoRecallRecord(record)?.numFrames).toBe(260);
+    expect(result?.values).toMatchObject({ numFrames: 260, fps: 24 });
+    expect(parseVideoRecallRecord(metadata(11, { fps: 12 }))?.numFrames).toBe(260);
+  });
+
+  it.each([4, 15, 5.5, '11', null, NaN, Infinity])('ignores a malformed or unsupported duration: %s', (duration) => {
+    const record = metadata(duration);
+    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: record, models: [model] });
+    expect(parseVideoRecallRecord(record)?.numFrames).toBeNull();
+    expect(result?.fields).not.toContain('frames');
+    expect(result?.values.numFrames).toBe(175);
+  });
+
+  it.each([undefined, 'wan_t2v', 'sdxl_txt2img', 'minimax_h3_txt2img', 'minimax_h3_unknown'])(
+    'does not interpret duration as H3 video frames for mode %s',
+    (generation_mode) => {
+      expect(parseVideoRecallRecord(metadata(14, { generation_mode }))?.numFrames).toBeNull();
+    }
+  );
+});

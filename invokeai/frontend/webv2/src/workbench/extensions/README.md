@@ -46,21 +46,11 @@ Field metadata: stable IDs, localized labels, optional descriptions/groups/searc
 
 Optional `WidgetImplementation.settingsActions` adds owner-rendered actions below quick preferences, e.g. Canvas diagnostics. These stay actions with their own availability checks, not persisted fields. Ordinary widget header actions stay available independent of settings.
 
-Settings catalog is composed from first-party manifests, not live instance registration, so preferences stay discoverable while a widget is closed. Missing project or instance is an explicit unavailable state, not a request to create one. Settings navigation carries the originating instance and returns focus to its gear on close.
+Settings catalog is composed from first-party manifests, not live instance registration, so preferences stay discoverable while a widget is closed. Layered fields without a project or owning widget edit account defaults. An explicitly requested stale project/instance target is unavailable; it never creates a widget. Settings navigation carries the originating instance and returns focus to its gear on close.
 
-## Discovery Options
+## Discovery
 
-Custom nodes today are server-discovered. Backend scans `custom_nodes_path`, skips hidden/underscore directories, requires `__init__.py`, imports each pack with Python `importlib`. Management API can clone a git repo into that directory, reload nodes, list installed packs.
-
-Widgets should not mirror Python import execution directly in the browser. Safer server-first shape:
-
-- Add configured `widgets_path` beside `custom_nodes_path`.
-- Require each widget pack directory to include a manifest file, e.g. `invokeai-widget.json`.
-- Server lists widget packs and exposes static compiled assets from each pack.
-- Browser fetches a signed/validated widget catalog from the server.
-- Shell dynamically imports approved widget entrypoints by URL only after the server validated the pack manifest.
-
-This avoids symlink assumptions and lets multi-user/admin rules follow the existing custom-node management pattern.
+The browser composes first-party widget manifests from its bundled registry. Server-discovered custom nodes are a separate system. There is no widget-pack installation, remote asset discovery, signing, permission, or reload protocol.
 
 ## Implemented Shell Systems
 
@@ -71,16 +61,8 @@ This avoids symlink assumptions and lets multi-user/admin rules follow the exist
 - Scoped provider search, fixed section ordering with ranked results inside each section, persistent command recents.
 - Created-at date filtering for providers that explicitly advertise range support.
 
-## Missing Core Systems
+## Commands and hotkeys
 
-Contribution registries exist in `extensionRegistry.ts` (one registry per Workbench mount, constructed by `WorkbenchProvider`), but these systems still need real shell features:
+Each Workbench mount owns its extension registry. Commands, hotkeys, palette entries and search providers carry their widget instance/project source and release their registrations on unmount. The hotkey runtime resolves current focus and editable/modal eligibility; Settings owns customized bindings and conflict presentation. Widget header actions and menus render from the loaded implementation in shell-owned slots.
 
-- Command registry UI and lifecycle ownership.
-- Hotkey manager with context-aware `when` clauses.
-- Menu contribution rendering. `menus.register` stores contributions, but nothing reads them yet, widget header menus included.
-- Toolbar contribution rendering for locations like `center.tabs.trailing` and status bar slots.
-- Extension install/uninstall/reload API for widget packs.
-- Widget pack trust, signing, permission prompts, admin policy.
-- Extension asset serving and cache invalidation.
-
-Undo/redo history controls were removed from normal widget registration: they render buttons and do not belong inside another button-like widget tab/slot. They should return as command and toolbar contributions once command/toolbar systems exist.
+There is no menu or toolbar contribution API. Shell layout controls and implementation header actions are the implemented surfaces; widget packs have no external compatibility contract.

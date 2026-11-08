@@ -10,6 +10,7 @@ import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -55,6 +56,13 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
     negativePrompt: 'avoid blur',
     positivePrompt: 'a canvas prompt',
     seed: 123,
+    steps: 23,
+    cfgScale: 6,
+    cfgRescaleMultiplier: 0.1,
+    scheduler: 'euler',
+    clipSkip: 1,
+    seamlessXAxis: false,
+    seamlessYAxis: true,
     ...generateOverrides,
   };
   // Following the selected board, so the board under test is where saves go.
@@ -63,17 +71,21 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
   return project;
 };
 
-const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ bbox }) as unknown as CanvasDocumentContractV3;
+const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ ...createEmptyCanvasDocument(), bbox });
 
 const createHarness = (
   options: {
     document?: CanvasDocumentContractV3 | null;
     exportResult?: RasterCompositeExportResult;
     onFlush?: () => void;
+    project?: Project;
   } = {}
 ) => {
   const order: string[] = [];
   let document = options.document === undefined ? createDocument(defaultRect) : options.document;
+  let project = options.project ?? createProject();
+  project = { ...project, canvas: { ...project.canvas, document: document ?? project.canvas.document } };
+  const getProject = vi.fn((projectId: string) => (projectId === project.id ? project : null));
   const exportResult = options.exportResult ?? { blob: defaultBlob, rect: defaultRect, status: 'ok' };
   const flushPendingUploads = vi.fn(() => {
     order.push('flush');
@@ -103,9 +115,18 @@ const createHarness = (
     exportRasterComposite,
     flushPendingUploads,
     getDocument,
+    getProject,
     order,
+    project,
     setDocument: (next: CanvasDocumentContractV3 | null) => {
       document = next;
+      if (next) {
+        project = { ...project, canvas: { ...project.canvas, document: next } };
+      }
+    },
+    setProject: (next: Project) => {
+      project = next;
+      document = next.canvas.document;
     },
     uploadImage,
   };
@@ -137,6 +158,7 @@ const listGalleryBoardsInCache = (...boardIds: string[]) =>
 describe('saveCanvasToGallery', () => {
   afterEach(() => {
     queryClient.clear();
+    vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
@@ -154,14 +176,15 @@ describe('saveCanvasToGallery', () => {
     await expect(
       saveCanvasToGallery({
         engine: harness.engine,
-        project: createProject(),
+        getProject: harness.getProject,
+        project: harness.project,
         region: 'canvas',
         scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
     ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
 
-    expect(harness.order).toEqual(['flush', 'document', 'export', 'upload']);
+    expect(harness.order).toEqual(['flush', 'document', 'export', 'document', 'upload']);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'content' });
     expect(harness.uploadImage).toHaveBeenCalledWith(defaultBlob, {
       boardId: 'board-1',
@@ -169,11 +192,22 @@ describe('saveCanvasToGallery', () => {
       imageCategory: 'general',
       isIntermediate: false,
       metadata: {
+        metadata_source: 'canvas_save',
+        vae: null,
+        steps: 23,
+        cfg_scale: 6,
+        cfg_rescale_multiplier: 0.1,
+        scheduler: 'euler',
+        clip_skip: 1,
+        seamless_x: false,
+        seamless_y: true,
+        loras: [],
+        ref_images: [],
         height: 456,
         model: { base: 'sd-1', hash: 'model-hash', key: 'model-key', name: 'Test Model', type: 'main' },
         negative_prompt: 'avoid blur',
         positive_prompt: 'a canvas prompt',
-        seed: 123,
+        canvas_v3_metadata: expect.objectContaining({ version: 1, document: createDocument(defaultRect) }),
         width: 123,
       },
       signal: expect.any(AbortSignal),
@@ -191,7 +225,8 @@ describe('saveCanvasToGallery', () => {
 
     await saveCanvasToGallery({
       engine: harness.engine,
-      project: createProject(),
+      getProject: harness.getProject,
+      project: harness.project,
       region: 'bbox',
       scopedDefaults: {},
       uploadImage: harness.uploadImage,
@@ -201,16 +236,191 @@ describe('saveCanvasToGallery', () => {
     expect(harness.uploadImage).toHaveBeenCalledWith(defaultBlob, expect.objectContaining({ fileName: 'bbox.png' }));
   });
 
+  it('captures the post-flush document and settings after a cold board read, keeping the click-time destination', async () => {
+    queryClient.clear();
+    const boards = deferred<Response>();
+    const fetchBoards = vi.fn<typeof fetch>((url) =>
+      new URL(String(url)).pathname === '/api/v1/boards/'
+        ? boards.promise
+        : Promise.resolve(Response.json({ total: 0 }))
+    );
+    vi.stubGlobal('fetch', fetchBoards);
+    const harness = createHarness();
+    const flush = deferred<void>();
+    harness.flushPendingUploads.mockReturnValueOnce(flush.promise);
+
+    const save = saveCanvasToGallery({
+      engine: harness.engine,
+      getProject: harness.getProject,
+      project: harness.project,
+      region: 'bbox',
+      scopedDefaults: {},
+      uploadImage: harness.uploadImage,
+    });
+
+    await vi.waitFor(() => expect(fetchBoards).toHaveBeenCalled());
+    expect(harness.flushPendingUploads).not.toHaveBeenCalled();
+    const whileListingBoards = structuredClone(harness.project);
+    whileListingBoards.canvas.document.bbox = { height: 40, width: 30, x: 5, y: 6 };
+    getProjectWidgetInstance(whileListingBoards, 'generate')!.state.values.positivePrompt =
+      'edited during board lookup';
+    getProjectWidgetInstance(whileListingBoards, 'canvas')!.state.values.denoisingStrength = 0.4;
+    getProjectWidgetInstance(whileListingBoards, 'gallery')!.state.values.selectedBoardId = 'board-physical';
+    harness.setProject(whileListingBoards);
+    boards.resolve(
+      Response.json(
+        ['board-1', 'board-physical'].map((board_id) => ({
+          archived: false,
+          asset_count: 0,
+          board_id,
+          board_name: board_id,
+          image_count: 0,
+        }))
+      )
+    );
+
+    await vi.waitFor(() => expect(harness.flushPendingUploads).toHaveBeenCalledOnce());
+    const afterUploads = structuredClone(whileListingBoards);
+    const capturedBbox = { height: 80, width: 60, x: 15, y: 16 };
+    afterUploads.canvas.document.bbox = capturedBbox;
+    Object.assign(getProjectWidgetInstance(afterUploads, 'generate')!.state.values, {
+      positivePrompt: 'edited while paint was uploading',
+      steps: 31,
+    });
+    Object.assign(getProjectWidgetInstance(afterUploads, 'canvas')!.state.values, {
+      denoisingStrength: 0.6,
+      maskBlur: 8,
+      scaleMethod: 'manual',
+      scaledHeight: 768,
+      scaledWidth: 1024,
+    });
+    harness.setProject(afterUploads);
+    flush.resolve();
+
+    await expect(save).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
+    expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'rect', rect: capturedBbox });
+    expect(harness.uploadImage.mock.calls[0]?.[1]).toMatchObject({
+      boardId: 'board-1',
+      metadata: {
+        positive_prompt: 'edited while paint was uploading',
+        steps: 31,
+        canvas_v3_metadata: {
+          document: { bbox: capturedBbox },
+          settings: {
+            strength: 0.6,
+            compositing: { maskBlur: 8 },
+            scaling: { height: 768, method: 'manual', width: 1024 },
+          },
+        },
+      },
+    });
+  });
+
+  it('captures current settings with the unchanged document after async export', async () => {
+    const harness = createHarness();
+    const exported = deferred<RasterCompositeExportResult>();
+    harness.exportRasterComposite.mockReturnValueOnce(exported.promise);
+    const save = saveCanvasToGallery({
+      engine: harness.engine,
+      getProject: harness.getProject,
+      project: harness.project,
+      region: 'canvas',
+      scopedDefaults: {},
+      uploadImage: harness.uploadImage,
+    });
+
+    await vi.waitFor(() => expect(harness.exportRasterComposite).toHaveBeenCalledOnce());
+    const edited = structuredClone(harness.project);
+    edited.canvas.document = harness.project.canvas.document;
+    Object.assign(getProjectWidgetInstance(edited, 'generate')!.state.values, {
+      positivePrompt: 'edited during export',
+      steps: 51,
+    });
+    getProjectWidgetInstance(edited, 'canvas')!.state.values.denoisingStrength = 0.2;
+    harness.setProject(edited);
+    exported.resolve({ blob: defaultBlob, rect: defaultRect, status: 'ok' });
+
+    await expect(save).resolves.toMatchObject({ status: 'saved' });
+    expect(harness.uploadImage.mock.calls[0]?.[1]?.metadata).toMatchObject({
+      positive_prompt: 'edited during export',
+      steps: 51,
+      canvas_v3_metadata: { document: { bbox: defaultRect }, settings: { strength: 0.2 } },
+    });
+  });
+
+  it.each(['closed-project', 'mismatched-document', 'expired-account'] as const)(
+    'does not upload a %s after pending paint uploads finish',
+    async (reason) => {
+      const harness = createHarness();
+      const flush = deferred<void>();
+      harness.flushPendingUploads.mockReturnValueOnce(flush.promise);
+      const save = saveCanvasToGallery({
+        engine: harness.engine,
+        getProject: harness.getProject,
+        project: harness.project,
+        region: 'canvas',
+        scopedDefaults: {},
+        uploadImage: harness.uploadImage,
+      });
+
+      await vi.waitFor(() => expect(harness.flushPendingUploads).toHaveBeenCalledOnce());
+      if (reason === 'closed-project') {
+        harness.getProject.mockReturnValue(null);
+      } else if (reason === 'mismatched-document') {
+        harness.getDocument.mockReturnValue(createDocument({ ...defaultRect, x: 999 }));
+      } else {
+        accountLifecycle.activate('another-account');
+      }
+      flush.resolve();
+
+      await expect(save).resolves.toEqual({ status: 'stale' });
+      expect(harness.uploadImage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['edited-document', 'project-document-mismatch', 'closed-project'] as const)(
+    'does not upload a %s after async export',
+    async (reason) => {
+      const harness = createHarness();
+      const exported = deferred<RasterCompositeExportResult>();
+      harness.exportRasterComposite.mockReturnValueOnce(exported.promise);
+      const save = saveCanvasToGallery({
+        engine: harness.engine,
+        getProject: harness.getProject,
+        project: harness.project,
+        region: 'canvas',
+        scopedDefaults: {},
+        uploadImage: harness.uploadImage,
+      });
+
+      await vi.waitFor(() => expect(harness.exportRasterComposite).toHaveBeenCalledOnce());
+      if (reason === 'edited-document') {
+        harness.setDocument(createDocument({ ...defaultRect, x: 999 }));
+      } else if (reason === 'project-document-mismatch') {
+        const edited = structuredClone(harness.project);
+        edited.canvas.document.bbox.x = 999;
+        harness.getProject.mockReturnValue(edited);
+      } else {
+        harness.getProject.mockReturnValue(null);
+      }
+      exported.resolve({ blob: defaultBlob, rect: defaultRect, status: 'ok' });
+
+      await expect(save).resolves.toEqual({ status: 'stale' });
+      expect(harness.uploadImage).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     ['board-physical', 'board-physical'],
     ['none', undefined],
     ['by_date:2026-07-15', undefined],
   ])('normalizes selected board %s to upload board %s', async (selectedBoardId, expectedBoardId) => {
-    const harness = createHarness();
+    const harness = createHarness({ project: createProject(selectedBoardId) });
 
     await saveCanvasToGallery({
       engine: harness.engine,
-      project: createProject(selectedBoardId),
+      getProject: harness.getProject,
+      project: harness.project,
       region: 'canvas',
       scopedDefaults: {},
       uploadImage: harness.uploadImage,
@@ -224,7 +434,7 @@ describe('saveCanvasToGallery', () => {
     ['a date bucket is selected', 'by_date:2026-07-15'],
   ])('saves to the project board when %s', async (_case, selectedBoardId) => {
     const harness = createHarness();
-    const project = createProject();
+    const project = harness.project;
     const gallery = getProjectWidgetInstance(project, 'gallery')!;
 
     gallery.state.values = {
@@ -236,6 +446,7 @@ describe('saveCanvasToGallery', () => {
 
     await saveCanvasToGallery({
       engine: harness.engine,
+      getProject: harness.getProject,
       project,
       region: 'canvas',
       scopedDefaults: {},
@@ -252,24 +463,29 @@ describe('saveCanvasToGallery', () => {
       name: 'Unsupported Model',
       type: 'main',
     };
-    const harness = createHarness();
-
-    await saveCanvasToGallery({
-      engine: harness.engine,
+    const harness = createHarness({
       project: createProject('none', {
         model: unsupportedModel,
         modelKey: unsupportedModel.key,
         negativePromptEnabled: false,
       }),
+    });
+
+    await saveCanvasToGallery({
+      engine: harness.engine,
+      getProject: harness.getProject,
+      project: harness.project,
       region: 'canvas',
       scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
     const metadata = harness.uploadImage.mock.calls[0]?.[1]?.metadata;
+    expect(metadata).not.toHaveProperty('seed');
+    expect(metadata).not.toHaveProperty('generation_mode');
     expect(metadata).not.toHaveProperty('model');
     expect(metadata).not.toHaveProperty('negative_prompt');
-    expect(metadata).toMatchObject({ height: 456, positive_prompt: 'a canvas prompt', seed: 123, width: 123 });
+    expect(metadata).toMatchObject({ height: 456, positive_prompt: 'a canvas prompt', width: 123 });
   });
 
   it.each(['empty', 'stale', 'not-ready'] as const)('returns %s without uploading', async (status) => {
@@ -278,7 +494,8 @@ describe('saveCanvasToGallery', () => {
     await expect(
       saveCanvasToGallery({
         engine: harness.engine,
-        project: createProject(),
+        getProject: harness.getProject,
+        project: harness.project,
         region: 'canvas',
         scopedDefaults: {},
         uploadImage: harness.uploadImage,
@@ -294,7 +511,8 @@ describe('saveCanvasToGallery', () => {
     await expect(
       saveCanvasToGallery({
         engine: harness.engine,
-        project: createProject(),
+        getProject: harness.getProject,
+        project: harness.project,
         region: 'bbox',
         scopedDefaults: {},
         uploadImage: harness.uploadImage,
@@ -312,7 +530,8 @@ describe('saveCanvasToGallery', () => {
     await expect(
       saveCanvasToGallery({
         engine: harness.engine,
-        project: createProject(),
+        getProject: harness.getProject,
+        project: harness.project,
         region: 'canvas',
         scopedDefaults: {},
         uploadImage: harness.uploadImage,
@@ -329,7 +548,8 @@ describe('saveCanvasToGallery', () => {
     await expect(
       saveCanvasToGallery({
         engine: harness.engine,
-        project: createProject(),
+        getProject: harness.getProject,
+        project: harness.project,
         region: 'canvas',
         scopedDefaults: {},
         uploadImage: harness.uploadImage,
@@ -344,7 +564,8 @@ describe('saveCanvasToGallery', () => {
     harness.exportRasterComposite.mockReturnValueOnce(exportResult.promise);
     const save = saveCanvasToGallery({
       engine: harness.engine,
-      project: createProject(),
+      getProject: harness.getProject,
+      project: harness.project,
       region: 'canvas',
       scopedDefaults: {},
       uploadImage: harness.uploadImage,

@@ -72,6 +72,7 @@ const MODEL_TYPE_LABELS: Record<string, string> = {
   pid_decoder: 'PID decoder',
   qwen3_encoder: 'Qwen3 encoder',
   qwen3_vl_encoder: 'Qwen3 VL encoder',
+  qwen3_vl_vision_tower: 'Qwen3 VL vision tower',
   qwen3_5_encoder: 'Qwen3.5 encoder',
   qwen_vl_encoder: 'Qwen VL encoder',
   siglip: 'SigLIP',

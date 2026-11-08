@@ -7,11 +7,13 @@ import { parseQueueItemOrigin, parseQueueItemOriginProjectId } from '@features/q
 import { normalizeVideoWidgetValues, type VideoWidgetValues } from '@features/video';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQuery } from '@tanstack/react-query';
+import { isRecord } from '@workbench/canvasMigration';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 import { createAccountOwnedQueueRecallCache } from './queueRecallCache';
 
 export interface LocalRecallSnapshot {
+  canvasMetadata?: Record<string, unknown>;
   generateValues?: GenerateWidgetValues;
   sourceId: InvocationSourceId;
   videoValues?: VideoWidgetValues;
@@ -65,6 +67,7 @@ export const useLocalRecallSnapshot = (origin?: string | null): LocalRecallSnaps
         const snapshot = result.snapshot;
         return {
           sourceId: snapshot.sourceId,
+          ...(isRecord(snapshot.canvasMetadata) ? { canvasMetadata: snapshot.canvasMetadata } : {}),
           generateValues: snapshot.generateValues
             ? (normalizeGenerateWidgetValues(snapshot.generateValues) ?? undefined)
             : undefined,

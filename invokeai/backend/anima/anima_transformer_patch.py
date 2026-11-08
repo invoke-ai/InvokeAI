@@ -1,32 +1,34 @@
 """Utilities for patching the AnimaTransformer to support regional cross-attention masks."""
 
 from contextlib import contextmanager
-from typing import Optional
+from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 
-from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
+
+@dataclass
+class AnimaRegionalPromptingState:
+    """The active CFG branch's mask, scoped to one denoise invocation."""
+
+    cross_attn_mask: torch.Tensor | None = None
 
 
 def _patched_cross_attn_forward(
     original_forward,
-    attn_mask: torch.Tensor,
+    state: AnimaRegionalPromptingState,
 ):
     """Create a patched forward for CosmosAttention that injects a cross-attention mask.
 
     Args:
         original_forward: The original CosmosAttention.forward method (bound to self).
-        attn_mask: Cross-attention mask of shape (img_seq_len, context_seq_len).
+        state: Selects the current pass's cross-attention mask.
     """
 
     def forward(x, context=None, rope_emb=None):
-        # If the context sequence length doesn't match the mask (e.g. negative conditioning
-        # has a different number of tokens than positive regional conditioning), skip masking
-        # and use the original unmasked forward.
-        actual_context = x if context is None else context
-        if actual_context.shape[-2] != attn_mask.shape[1]:
+        attn_mask = state.cross_attn_mask
+        if attn_mask is None:
             return original_forward(x, context, rope_emb=rope_emb)
 
         self = original_forward.__self__
@@ -53,14 +55,8 @@ def _patched_cross_attn_forward(
         k = rearrange(k, "b ... h d -> b h ... d").reshape(in_k_shape[0], in_k_shape[-2], -1, in_k_shape[-1])
         v = rearrange(v, "b ... h d -> b h ... d").reshape(in_k_shape[0], in_k_shape[-2], -1, in_k_shape[-1])
 
-        # Convert boolean mask to float additive mask for SDPA
-        # True (attend) -> 0.0, False (block) -> -inf
-        # Shape: (img_seq_len, context_seq_len) -> (1, 1, img_seq_len, context_seq_len)
-        float_mask = torch.zeros_like(attn_mask, dtype=q.dtype)
-        float_mask[~attn_mask] = float("-inf")
-        expanded_mask = float_mask.unsqueeze(0).unsqueeze(0)
-
-        result = F.scaled_dot_product_attention(q, k, v, attn_mask=expanded_mask)
+        # SDPA accepts the shared boolean mask directly: True allows attention.
+        result = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask.unsqueeze(0).unsqueeze(0))
         result = rearrange(result, "b h s d -> b s (h d)")
         return self.output_dropout(self.output_proj(result))
 
@@ -70,7 +66,7 @@ def _patched_cross_attn_forward(
 @contextmanager
 def patch_anima_for_regional_prompting(
     transformer,
-    regional_extension: Optional[AnimaRegionalPromptingExtension],
+    state: AnimaRegionalPromptingState,
 ):
     """Context manager to temporarily patch the Anima transformer for regional prompting.
 
@@ -80,27 +76,18 @@ def patch_anima_for_regional_prompting(
 
     Args:
         transformer: The AnimaTransformer instance.
-        regional_extension: The regional prompting extension. If None or no mask, no patching.
+        state: The caller selects a branch's mask before each transformer pass.
 
     Yields:
         The (possibly patched) transformer.
     """
-    if regional_extension is None or regional_extension.cross_attn_mask is None:
-        yield transformer
-        return
-
-    # Store original forwards
     original_forwards = []
-    for block_idx, block in enumerate(transformer.blocks):
-        original_forwards.append(block.cross_attn.forward)
-
-        mask = regional_extension.get_cross_attn_mask(block_idx)
-        if mask is not None:
-            block.cross_attn.forward = _patched_cross_attn_forward(block.cross_attn.forward, mask)
-
     try:
+        for block in transformer.blocks[::2]:
+            original_forwards.append((block.cross_attn, block.cross_attn.forward))
+            block.cross_attn.forward = _patched_cross_attn_forward(block.cross_attn.forward, state)
         yield transformer
     finally:
-        # Restore original forwards
-        for block_idx, block in enumerate(transformer.blocks):
-            block.cross_attn.forward = original_forwards[block_idx]
+        state.cross_attn_mask = None
+        for attention, original_forward in reversed(original_forwards):
+            attention.forward = original_forward

@@ -1,5 +1,5 @@
 import type { GenerationIssue } from '@features/generation/contracts';
-import type { WorkflowReadinessReason } from '@features/workflow/contracts';
+import type { InvocationTemplatesSnapshot, WorkflowReadinessReason } from '@features/workflow/contracts';
 import type { ControlLayerIssue } from '@workbench/controlLayerChecks';
 
 export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
@@ -85,4 +85,12 @@ export interface ResolvedInvocationRoute extends InvocationRoute {
 
 export interface InvocationControllerState extends InvocationRoute {
   lastSubmittedRunId?: string;
+}
+
+/** Ephemeral values captured at dispatch, never persisted or treated as server authorization. */
+export interface InvocationRuntimeInputs {
+  /** GPU noise choice; the aggregate still applies the project's current CPU-noise preference. */
+  readonly noiseDevice: string;
+  readonly templates: Readonly<InvocationTemplatesSnapshot>;
+  readonly boardDestinationIds: readonly string[];
 }

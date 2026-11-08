@@ -103,6 +103,7 @@ class ModelType(str, Enum):
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
+    Qwen3VLVisionTower = "qwen3_vl_vision_tower"
     Qwen35Encoder = "qwen3_5_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
@@ -290,6 +291,19 @@ class WanLoRAVariantType(str, Enum):
 
     Wan5B = "5b"
     """Targets the Wan 2.2 TI2V-5B main (inner_dim=3072)."""
+
+
+class SD3VariantType(str, Enum):
+    """SD 3 transformer sizes, which decide the LoRAs that fit a model.
+
+    The values carry the family name because variant values share one namespace and `large` is already a CLIP variant.
+    """
+
+    Medium = "sd3_medium"
+    """SD 3 Medium and SD 3.5 Medium (24 blocks, 1536 wide; 3.5 Medium adds dual attention to its first 13)."""
+
+    Large = "sd3_large"
+    """SD 3.5 Large and Large Turbo (38 blocks, 2432 wide)."""
 
 
 class Qwen3VariantType(str, Enum):
@@ -514,6 +528,7 @@ AnyVariant: TypeAlias = Union[
     QwenImageVariantType,
     WanVariantType,
     WanLoRAVariantType,
+    SD3VariantType,
     Qwen3VariantType,
     Qwen3VLVariantType,
     Qwen35VariantType,
@@ -535,6 +550,7 @@ variant_type_adapter = TypeAdapter[
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
     | Qwen35VariantType
@@ -555,6 +571,7 @@ variant_type_adapter = TypeAdapter[
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
     | Qwen35VariantType

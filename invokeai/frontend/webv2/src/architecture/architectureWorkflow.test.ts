@@ -39,7 +39,53 @@ describe('architecture workflow', () => {
       step.run?.startsWith('pnpm check:')
     );
     expect(completion.run).toBe('pnpm check:release:tests');
-    expect(completion.env.WEBV2_PERF_REFERENCE_DIR).toContain('steps.perf-ref.outputs.cache-matched-key');
+    expect(completion.env.WEBV2_PERF_REFERENCE_DIR).toContain('steps.perf-ref.outcome');
+    expect(completion['continue-on-error']).toBeUndefined();
+  });
+
+  it('measures only a missing exact main base, with isolated credentials, dependencies and runtime', () => {
+    const sources = import.meta.glob('../../../../../.github/workflows/frontend-tests.yml', {
+      eager: true,
+      import: 'default',
+      query: '?raw',
+    }) as Record<string, string>;
+    const workflow = parse(Object.values(sources)[0] ?? '');
+    const steps = workflow.jobs['frontend-webv2-tests'].steps;
+    const restore = steps.find((step: { id?: string }) => step.id === 'perf-ref');
+    expect(restore.if).toContain("github.event_name == 'pull_request' && github.base_ref == 'main'");
+    expect(restore.if).toContain("github.event_name == 'merge_group'");
+    expect(restore.if).toContain("github.event.merge_group.base_ref == 'refs/heads/main'");
+    expect(restore.if).toContain(
+      "steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true"
+    );
+    expect(restore.with.key).toContain('github.event.pull_request.base.sha || github.event.merge_group.base_sha');
+    expect(restore.with['restore-keys']).toBeUndefined();
+    const checkout = steps.find((step: { id?: string }) => step.id === 'perf-base');
+    expect(checkout.if).toContain("steps.perf-ref.outcome == 'success'");
+    expect(checkout.if).toContain("steps.perf-ref.outputs.cache-hit != 'true'");
+    expect(checkout.uses).toBe(steps[0].uses);
+    expect(checkout.with.ref).toMatch(
+      /^\$\{\{ github.event.pull_request.base.sha \|\| github.event.merge_group.base_sha \}\}$/
+    );
+    expect(checkout.with['persist-credentials']).toBe(false);
+    const install = steps.find((step: { name?: string }) => step.name === 'install performance base dependencies');
+    expect(install.uses).toBe('./.github/actions/install-frontend-deps');
+    expect(install.with['working-directory']).toBe(`${checkout.with.path}/invokeai/frontend/webv2`);
+    expect(install.with['node-version-file']).toBe(`${checkout.with.path}/.nvmrc`);
+    const measure = steps.find((step: { name?: string }) => step.name === 'measure missing performance base');
+    expect(measure['working-directory']).toBe(install.with['working-directory']);
+    expect(measure.env.WEBV2_PERF_REFERENCE_DIR).toBe('');
+    expect(measure.run).toContain('node --experimental-strip-types scripts/check-architecture-performance.mjs');
+    const candidateNode = steps.find((step: { name?: string }) => step.name === 'restore candidate Node version');
+    expect(candidateNode.with['node-version-file']).toBe('.nvmrc');
+    expect(steps.indexOf(candidateNode)).toBeGreaterThan(steps.indexOf(measure));
+    expect(steps.indexOf(candidateNode)).toBeLessThan(
+      steps.findIndex((step: { run?: string }) => step.run === 'pnpm check:release:tests')
+    );
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    for (const event of ['push', 'pull_request', 'merge_group', 'workflow_dispatch', 'workflow_call']) {
+      expect(workflow.on).toHaveProperty(event);
+    }
   });
 
   it('runs each completion gate once locally and across the frontend CI jobs', () => {
@@ -139,9 +185,12 @@ describe('architecture workflow', () => {
       { eager: true, import: 'default', query: '?raw' }
     ) as Record<string, string>;
     const action = parse(Object.entries(sources).find(([path]) => path.endsWith('/action.yml'))![1]);
-    const nodeVersionFile = action.runs.steps.find((step: { uses?: string }) =>
+    const nodeVersionInput = action.runs.steps.find((step: { uses?: string }) =>
       step.uses?.startsWith('actions/setup-node@')
     ).with['node-version-file'];
+    expect(nodeVersionInput).toMatch(/^\$\{\{ inputs.node-version-file \}\}$/);
+    const nodeVersionFile = action.inputs['node-version-file'].default;
+    expect(nodeVersionFile).toBe('.nvmrc');
     const workflows = Object.entries(sources).filter(([path]) => path.includes('/workflows/'));
     expect(workflows).toHaveLength(4);
     for (const [path, source] of workflows) {

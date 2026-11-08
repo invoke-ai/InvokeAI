@@ -1,0 +1,10 @@
+title: AutoExpress
+author: deepratna-awale
+repo: https://github.com/deepratna-awale/AutoExpress
+summary: Build one prompt per facial expression for a character, then inpaint a full expression set from one image.
+description: >-
+  Builds up to 28 prompts, for expressions such as joy, anger and surprise, in the prompt style of the model family
+  (Danbooru, e621, Pony, Illustrious, SDXL or natural language), plus the matching negative prompt. Iterate over the
+  prompts to inpaint the face once per expression.
+categories: [prompts]
+dependencies: true

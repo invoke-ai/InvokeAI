@@ -1,28 +1,106 @@
 ---
-import PageFooter from '@astrojs/starlight/components/Footer.astro';
+import { Icon } from '@astrojs/starlight/components';
+import Pagination from 'virtual:starlight/components/Pagination';
+
+import { socialConfig } from '../../config/social';
+import { withBase } from '../base-path';
+import PageTools from './PageTools.astro';
+import Trans from './Trans.astro';
+
+const { entry, toc } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
+// Splash pages (home, download) are not documentation pages, so they get no page tools.
+const showPageTools = entry.data.template !== 'splash';
 ---
 
-<PageFooter {...Astro.props} />
-
-<div class="built-by">
-  This site was designed and developed by <a
-    target="_blank"
-    rel="noreferrer noopener"
-    href="https://aetherfox.studio">Aether Fox Studio</a
-  >.
-</div>
+<footer class="docs-footer">
+  {
+    showPageTools && (
+      // The right rail shows the page tools on wide screens.
+      <div class:list={['tools', { 'lg:sl-hidden': Boolean(toc) }]}>
+        <PageTools instance="footer" />
+      </div>
+    )
+  }
+  <Pagination />
+  <div class="bottom">
+    <p>
+      <Trans message={t('footer.credit')}>
+        {(text: string) => <a href="https://aetherfox.studio" target="_blank" rel="noreferrer noopener">{text}</a>}
+      </Trans>
+    </p>
+    <ul class="social">
+      <li>
+        <a href={withBase('/showcase/', import.meta.env.BASE_URL)}>
+          <Icon name="star" size="16px" />
+          {t('nav.showcase')}
+        </a>
+      </li>
+      {
+        (socialConfig ?? []).map(({ label, href, icon }) => (
+          <li>
+            <a href={href} rel="me">
+              <Icon name={icon} size="16px" />
+              {label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</footer>
 
 <style>
-  /*footer {
+  /* At the bottom of a short page (see the full-height layout in custom.css), at least 3rem below the content. */
+  .docs-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
     margin-top: auto;
-  }*/
+    padding-top: 3rem;
+  }
 
-  .built-by {
-    text-align: center;
+  .tools {
+    max-width: 22rem;
+  }
+
+  .bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--docs-border-subtle);
+    color: var(--docs-text-subtle);
     font-size: var(--sl-text-2xs);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--docs-text-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--docs-accent-text);
+    }
+  }
+
+  .social {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 
     a {
-      color: #edc69c;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
     }
   }
 </style>

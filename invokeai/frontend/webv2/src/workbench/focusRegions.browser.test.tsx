@@ -1,8 +1,10 @@
-import { Box, ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider, Portal } from '@chakra-ui/react';
+import { Dialog } from '@platform/ui/Dialog';
 import { system } from '@theme/system';
-import { act, useCallback, useState } from 'react';
+import { act, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 vi.mock('./settings/store', () => ({
   useWorkbenchPreferenceSelector: (selector: (preferences: { showFocusRegionHighlight: boolean }) => unknown) =>
@@ -168,14 +170,17 @@ const frames = (count: number) =>
   });
 
 describe('focusRegion', () => {
-  const renderHarness = async (onOpen: (open: () => void, focusRegion: FocusRegion) => void = (open) => open()) => {
+  const renderHarness = async (
+    onOpen: (open: () => void, focusRegion: FocusRegion) => void = (open) => open(),
+    controller = createTestFocusController()
+  ) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider controller={createTestFocusController()}>
+          <FocusRegionProvider controller={controller}>
             <OpeningHarness onOpen={onOpen} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -186,6 +191,34 @@ describe('focusRegion', () => {
       opener: [...host.querySelectorAll('button')].find((button) => button.textContent === 'Open editor')!,
     };
   };
+
+  it.each(['navigation', 'project', 'clear'] as const)(
+    'cancels recovery focus on %s while its resource is pending',
+    async (cancel) => {
+      let projectId = 'project-1';
+      const controller = createTestFocusController({ getProjectId: () => projectId });
+      let settle!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      const { opener } = await renderHarness(
+        (_open, focusRegion) => focusRegion('center', undefined, undefined, ready),
+        controller
+      );
+      opener.focus();
+      await act(() => opener.click());
+      if (cancel === 'navigation') {
+        controller.activate({ kind: 'region', region: 'left' }, { byPointer: true });
+      } else if (cancel === 'project') {
+        projectId = 'project-2';
+      } else {
+        controller.clear();
+      }
+      await act(() => settle());
+      await frames(4);
+      expect(document.activeElement).toBe(opener);
+    }
+  );
 
   it('moves focus and the highlight to the region once the opened widget shows', async () => {
     const { center, opener } = await renderHarness();
@@ -272,6 +305,105 @@ describe('focusRegion', () => {
     await frames(4);
 
     expect(document.activeElement).toBe(centerControl());
+  });
+});
+
+/** A lazy destination and an actual modal compete for focus; only the later user action should own it. */
+const ModalMoveHarness = ({ ready, requestOnClose }: { ready: Promise<void>; requestOnClose: boolean }) => {
+  const [open, setOpen] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const { focusRegion } = useWorkbenchFocus();
+  const show = useCallback(() => {
+    if (!requestOnClose) {
+      focusRegion('center', undefined, undefined, ready);
+    }
+    setOpen(true);
+  }, [focusRegion, ready, requestOnClose]);
+  const close = useCallback(() => setOpen(false), []);
+  const confirm = useCallback(() => {
+    focusRegion('center', undefined, undefined, ready);
+    setOpen(false);
+  }, [focusRegion, ready]);
+  const change = useCallback((event: { open: boolean }) => setOpen(event.open), []);
+  const initialFocus = useCallback(() => cancel.current, []);
+  const returnFocus = useCallback(() => opener.current, []);
+  return (
+    <>
+      <button ref={opener} type="button" onClick={show}>
+        Open confirmation
+      </button>
+      <Box data-testid="center" {...useFocusRegionProps('center')}>
+        Destination
+      </Box>
+      <Dialog.Root
+        finalFocusEl={returnFocus}
+        initialFocusEl={initialFocus}
+        open={open}
+        restoreFocus={!requestOnClose}
+        role="alertdialog"
+        onOpenChange={change}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Title>Confirm navigation</Dialog.Title>
+              <button ref={cancel} type="button" onClick={close}>
+                Cancel
+              </button>
+              <button type="button" onClick={confirm}>
+                Show destination
+              </button>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    </>
+  );
+};
+
+describe('focus moves across modal lifetimes', () => {
+  it.each([
+    { name: 'abandons an earlier move when a newer modal opens and closes', requestOnClose: false },
+    { name: 'keeps a move requested while the current dialog closes', requestOnClose: true },
+  ])('$name', async ({ requestOnClose }) => {
+    let resolve!: () => void;
+    const ready = new Promise<void>((done) => {
+      resolve = done;
+    });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root!.render(
+        <ChakraProvider value={system}>
+          <FocusRegionProvider controller={createTestFocusController()}>
+            <ModalMoveHarness ready={ready} requestOnClose={requestOnClose} />
+          </FocusRegionProvider>
+        </ChakraProvider>
+      )
+    );
+    const opener = page.getByRole('button', { name: 'Open confirmation', exact: true });
+    await opener.click();
+    const dialog = page.getByRole('alertdialog', { name: 'Confirm navigation' });
+    await expect.element(dialog.getByRole('button', { name: 'Cancel', exact: true })).toHaveFocus();
+    if (requestOnClose) {
+      await dialog.getByRole('button', { name: 'Show destination', exact: true }).click();
+    } else {
+      await userEvent.keyboard('{Escape}');
+    }
+    await expect.element(dialog).not.toBeInTheDocument();
+    if (!requestOnClose) {
+      await expect.element(opener).toHaveFocus();
+    }
+    await act(() => resolve());
+    await frames(4);
+    if (requestOnClose) {
+      expect(document.activeElement).toBe(host!.querySelector('[data-testid="center"]'));
+    } else {
+      await expect.element(opener).toHaveFocus();
+    }
   });
 });
 

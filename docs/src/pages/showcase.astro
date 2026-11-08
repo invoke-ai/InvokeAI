@@ -1,0 +1,216 @@
+---
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
+import { getCollection } from 'astro:content';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ChallengeWinners from '@components/ChallengeWinners.astro';
+import ShowcaseGrid from '@components/ShowcaseGrid.astro';
+
+import { withBase } from '../lib/base-path';
+import { CHALLENGES_PATH, challengePath, formatChallengeDates, sortChallenges } from '../lib/challenges.mjs';
+import { SHOWCASE_SUBMIT_URL, sortShowcase } from '../lib/showcase.mjs';
+
+const base = import.meta.env.BASE_URL;
+const entries = sortShowcase(await getCollection('showcase'));
+const [challenge] = sortChallenges(await getCollection('challenges'));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Showcase',
+    description: 'Artwork made with Invoke by its community, credited to the artists who shared it.',
+    template: 'splash',
+    hero: {
+      title: 'Made with Invoke',
+      tagline: 'Artwork from the Invoke community, shown with permission and credited to the artists who made it.',
+      actions: [
+        {
+          text: 'Submit your artwork',
+          link: SHOWCASE_SUBMIT_URL,
+          variant: 'primary',
+          icon: 'external',
+          attrs: { class: 'docs-button docs-button--primary docs-button--xl' },
+        },
+      ],
+    },
+  }}
+>
+  {
+    challenge && (
+      <section class="wide challenge not-content" aria-labelledby="weekly-challenge">
+        <div class="challenge__top">
+          <div class="challenge__heading">
+            <p class="eyebrow">
+              Weekly challenge{challenge.data.week !== undefined && ` · Week ${challenge.data.week}`}
+            </p>
+            <h2 id="weekly-challenge">{challenge.data.theme}</h2>
+            {challenge.data.brief && <p class="challenge__brief">{challenge.data.brief}</p>}
+            <p class="challenge__meta">
+              <span>{formatChallengeDates(challenge.data.startDate, challenge.data.endDate)}</span>
+              {challenge.data.discordUrl && (
+                <a href={challenge.data.discordUrl}>
+                  Winners on Discord
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </a>
+              )}
+            </p>
+          </div>
+          <div class="challenge__links">
+            <a
+              class="docs-button docs-button--secondary docs-button--lg"
+              href={withBase(challengePath(challenge.id), base)}
+            >
+              {challenge.data.week === undefined ? 'Winners page' : `Week ${challenge.data.week} winners`}
+            </a>
+            <a class="docs-button docs-button--ghost docs-button--lg" href={withBase(CHALLENGES_PATH, base)}>
+              All challenges
+              <ArrowRight aria-hidden="true" />
+            </a>
+          </div>
+        </div>
+        <ChallengeWinners challenge={challenge} eager="lead" />
+      </section>
+    )
+  }
+  {challenge && entries.length > 0 && <h2 class="wide grid-heading">From the community</h2>}
+  {
+    entries.length > 0 ? (
+      <div class="wide">
+        <ShowcaseGrid entries={entries} />
+      </div>
+    ) : (
+      <div class="empty not-content">
+        <h2>Be the first</h2>
+        <p>
+          No submitted artwork here yet. Made something with Invoke you are proud of? Send it in with the submission
+          form, and once a maintainer has reviewed it, it appears here with your name and a link to your work.
+        </p>
+        <a class="docs-button docs-button--primary docs-button--lg" href={SHOWCASE_SUBMIT_URL}>
+          Submit your artwork
+        </a>
+      </div>
+    )
+  }
+</StarlightPage>
+
+<style>
+  /* The grid is wider than the splash column, centred, with the page's gutters. */
+  .wide {
+    --wide-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    width: var(--wide-width);
+    margin-inline: calc((100% - var(--wide-width)) / 2);
+  }
+
+  /* The latest weekly challenge, above the community's own submissions. */
+  .challenge {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+    border-bottom: 1px solid var(--docs-border-subtle);
+  }
+
+  .challenge__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+  }
+
+  .challenge__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 44rem;
+
+    p {
+      margin: 0;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--docs-text-strong);
+      font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.25rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+  }
+
+  .eyebrow {
+    color: var(--docs-accent);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .challenge__brief {
+    color: var(--docs-text-muted);
+  }
+
+  .challenge__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-sm);
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--docs-accent);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--docs-accent-text);
+      }
+    }
+  }
+
+  .challenge__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .grid-heading {
+    margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+    margin-bottom: 1.5rem;
+    color: var(--docs-text-strong);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .challenge + .empty {
+    margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+  }
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 36rem;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 1rem + 3vw, 3rem);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    text-align: center;
+
+    h2 {
+      margin: 0;
+      color: var(--docs-text-strong);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--docs-text-muted);
+    }
+  }
+</style>

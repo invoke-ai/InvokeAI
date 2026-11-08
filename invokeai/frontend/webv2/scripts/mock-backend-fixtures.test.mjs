@@ -2405,6 +2405,41 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
   }
 });
 
+test('image PATCH adopts an intermediate as hidden durable Canvas pixels on every read', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const form = new FormData();
+    form.append('file', new Blob(['paint'], { type: 'image/png' }), 'paint.png');
+    const response = await fetch(`${backend.origin}/api/v1/images/upload?image_category=general&is_intermediate=true`, {
+      method: 'POST',
+      body: form,
+    });
+    const temporary = await response.json();
+    assert.equal(temporary.is_intermediate, true);
+    const path = `/api/v1/images/i/${encodeURIComponent(temporary.image_name)}`;
+    const adopted = await getJson(backend, path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false, image_category: 'other' }),
+    });
+    assert.deepEqual(adopted, { ...temporary, is_intermediate: false, image_category: 'other' });
+    assert.deepEqual(await getJson(backend, path), adopted);
+    assert.deepEqual(
+      await getJson(backend, '/api/v1/images/images_by_names', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image_names: [temporary.image_name] }),
+      }),
+      [adopted]
+    );
+    const missing = await fetch(`${backend.origin}/api/v1/images/i/missing.png`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false }),
+    });
+    assert.equal(missing.status, 404);
+  });
+});
+
 test('opt-in large library has pageable metadata, representative documents, retry and revision scenarios', async () => {
   const backend = await startMockBackend(0, { profile: 'representative' });
   try {

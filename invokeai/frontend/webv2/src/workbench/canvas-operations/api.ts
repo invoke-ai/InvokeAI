@@ -12,6 +12,8 @@ export type {
 } from './contracts';
 export {
   importGalleryImagesToCanvas,
+  commitCanvasRecall,
+  prepareLegacyCanvasMetadata,
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
@@ -60,7 +62,12 @@ export type {
 export { getCanvasOperations } from './operationAccess';
 export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
 export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
-export { resolveCanvasSaveBoardId, saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
+export {
+  recordCanvasMetadata,
+  resolveCanvasSaveBoardId,
+  saveCanvasToGallery,
+  type CanvasGallerySaveRegion,
+} from './saveCanvasToGallery';
 export {
   retryStagedResultBoard,
   saveStagedResultToGallery,

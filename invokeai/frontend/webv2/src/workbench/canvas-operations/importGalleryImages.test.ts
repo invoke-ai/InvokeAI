@@ -110,6 +110,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen3VLVisionTowerModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,

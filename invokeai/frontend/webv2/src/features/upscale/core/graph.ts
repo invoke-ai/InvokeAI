@@ -856,6 +856,7 @@ const buildQwenImageUpscalePath: UpscalePathBuilder = ({
   const loraSource = activeLoras.length
     ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_lora_collection_loader', modelLoader, [
         'transformer',
+        'qwen_vl_encoder',
       ])
     : modelLoader;
   const imageToLatents = addNode(graph, {
@@ -886,7 +887,7 @@ const buildQwenImageUpscalePath: UpscalePathBuilder = ({
   addPromptConditioning(graph, {
     collect: false,
     denoise,
-    encoderFields: [{ field: 'qwen_vl_encoder', source: modelLoader }],
+    encoderFields: [{ field: 'qwen_vl_encoder', source: loraSource }],
     encoderType: 'qwen_image_text_encoder',
     negativePrompt: wiresUpscaleNegativePrompt(model, settings.cfgScale) ? negativePrompt : null,
     positivePrompt,

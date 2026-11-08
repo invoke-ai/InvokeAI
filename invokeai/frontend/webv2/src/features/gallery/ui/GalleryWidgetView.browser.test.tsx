@@ -103,6 +103,7 @@ const adapter: GalleryUiAdapter = {
   ImageContextMenu: () => null,
   antialiasProgressImages: false,
   exportProject: noop,
+  getBoardMediaUsage: vi.fn(),
   followedProgressSessionId: null,
   followProgressSession: noop,
   gallery: {

@@ -330,7 +330,7 @@ def _load_qwen3vl_visual_tower(
     """Build a Qwen3-VL vision tower from the ``visual.*`` tensors of `files`, reading nothing else.
 
     Serves `SubModelType.VisionEncoder`: the encoders here drop their tower (see `drop_qwen3vl_visual_tower`),
-    and Krea-2's edit mode loads it as its own cache entry, only when a prompt has reference images.
+    and edit modes (Krea-2, Qwen-Image-2.1) load it as its own cache entry, only when a prompt has reference images.
 
     The tower ends up at the compute dtype whatever the container, except for its quantized Linears, which are
     handled as on the encoder path: a ComfyUI ``int8_tensorwise`` repack's stay int8 as `Int8ConvrotLinear`, and
@@ -345,8 +345,8 @@ def _load_qwen3vl_visual_tower(
     if not sd:
         raise RuntimeError(
             f"{', '.join(str(f) for f in files) or 'This encoder'} carries no Qwen3-VL vision tower weights, so it "
-            "cannot read Krea-2 edit reference images. Use the Krea-2 Diffusers model's own encoder, or a Qwen3-VL "
-            "single file or folder that includes the vision weights (e.g. qwen3vl_4b_bf16 or qwen3vl_4b_fp8_scaled)."
+            "cannot read reference images. Use a Diffusers model's own encoder, or a Qwen3-VL encoder file or folder "
+            "that includes the vision tower."
         )
     # The nvfp4 layers leave first, as on the encoder path: the sidecar drop below strips the markers that name
     # them, and the fp8 extraction discards their block scales. Each header names its layers in the key space `sd`
@@ -357,7 +357,7 @@ def _load_qwen3vl_visual_tower(
     try:
         nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
     except ValueError as e:
-        raise ValueError(f"The {what}, which Krea-2 edit needs for reference images, cannot be loaded: {e}") from e
+        raise ValueError(f"The {what}, which reference images need, cannot be loaded: {e}") from e
     # Markers are read in the checkpoint's key space, before the rename, as on the encoder path.
     int8_markers = extract_int8_convrot_markers(sd)
     reject_unmarked_int8_weights(sd, int8_markers, what)
@@ -974,8 +974,8 @@ def _reject_incomplete_load(model: Any, *, what: str) -> None:
 
 QWEN3VL_GGUF_HAS_NO_VISION_TOWER = (
     "The GGUF Qwen3-VL encoder '{name}' has no vision tower (llama.cpp keeps it in a separate mmproj file, which "
-    "is not supported), so it cannot read reference images. Use a safetensors Qwen3-VL encoder or the Krea-2 "
-    "Diffusers model's own encoder."
+    "only Qwen-Image-2.1 edits take), so it cannot read reference images. Use a Qwen3-VL encoder file that includes the vision "
+    "tower, or a Diffusers model's own encoder."
 )
 
 

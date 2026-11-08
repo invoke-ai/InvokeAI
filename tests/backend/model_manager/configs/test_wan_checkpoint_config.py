@@ -6,14 +6,16 @@ at all ("unidentified model") because only Diffusers folders and GGUF files had
 a matching config class.
 """
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import gguf
 import pytest
 import torch
+from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Wan_Config,
     _detect_wan_expert,
@@ -22,6 +24,7 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.fixtures.quantized_payloads import comfy_quant_marker
 
 A14B_DIM = 5120
 TI2V_DIM = 3072
@@ -281,6 +284,122 @@ class TestRejects:
         count with."""
         with pytest.raises(NotAMatchError, match="variant"):
             _probe(tmp_path, f"wan22-{label.replace(' ', '-')}.safetensors", _native_sd(in_channels, dim=dim))
+
+
+INT8_MARKER = {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 256, "per_row": True}
+INT8_LAYERS = ["blocks.0.self_attn.q", "blocks.0.cross_attn.q", "blocks.0.ffn.0"]
+SUPPORTED = r"Only ComfyUI's int8_tensorwise \(convrot\) build is supported\."
+
+
+def _probe_int8(
+    tmp_path: Path,
+    sd: dict,
+    *,
+    marker: dict | None = INT8_MARKER,
+    prefix: str = "",
+    header_prefix: str | None = None,
+) -> Main_Checkpoint_Wan_Config:
+    """Probe ``sd`` with its ``INT8_LAYERS`` turned into int8 weights.
+
+    Identification sees dtypes but not tensor bytes, so the markers are read from the file itself: a small real
+    safetensors file holds them (and only them), while the expanded ``sd`` stands in for the weights. With
+    ``header_prefix`` the layers are declared in the file's ``_quantization_metadata`` instead, under that prefix.
+    """
+    sd = dict(sd)
+    for layer in INT8_LAYERS:
+        key = f"{prefix}{layer}.weight"
+        sd[key] = _t(*sd[key].shape, dtype=torch.int8)
+    path = tmp_path / "wan2.2_t2v_high_noise_14B_int8_convrot.safetensors"
+    on_disk: dict[str, torch.Tensor] = {"unrelated": torch.zeros(1)}
+    metadata = None
+    if header_prefix is not None:
+        entry = {key: value for key, value in INT8_MARKER.items() if key != "per_row"}
+        layers = {f"{header_prefix}{layer}": entry for layer in INT8_LAYERS}
+        metadata = {"_quantization_metadata": json.dumps({"format_version": "1.0", "layers": layers})}
+    elif marker is not None:
+        on_disk = {f"{prefix}{layer}.comfy_quant": comfy_quant_marker(marker) for layer in INT8_LAYERS}
+    save_file(on_disk, path, metadata=metadata)
+    if header_prefix is None:
+        mod = _make_mod(path, sd)
+    else:
+        # The real header, read by the real `ModelOnDisk`; only the (huge) weights are stood in for.
+        mod = ModelOnDisk(path)
+        mod.load_state_dict = lambda _path=None: sd
+    return Main_Checkpoint_Wan_Config.from_model_on_disk(mod, _build_overrides(path, path.stem))
+
+
+class TestInt8Convrot:
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
+    def test_accepts_the_comfyui_int8_build(self, tmp_path: Path, prefix: str) -> None:
+        config = _probe_int8(tmp_path, _native_sd(16, prefix=prefix), prefix=prefix)
+
+        assert config.variant == WanVariantType.T2V_A14B
+        assert config.expert == "high"
+
+    @pytest.mark.parametrize(
+        ("prefix", "header_prefix"),
+        [("", ""), ("model.diffusion_model.", ""), ("model.diffusion_model.", "model.diffusion_model.")],
+        ids=["bare", "prefixed-tensors", "prefixed-tensors-and-header"],
+    )
+    def test_accepts_a_build_that_declares_its_layers_only_in_the_header(
+        self, tmp_path: Path, prefix: str, header_prefix: str
+    ) -> None:
+        config = _probe_int8(tmp_path, _native_sd(16, prefix=prefix), prefix=prefix, header_prefix=header_prefix)
+
+        assert config.variant == WanVariantType.T2V_A14B
+
+    @pytest.mark.parametrize(
+        ("marker", "refusal"),
+        [
+            pytest.param(
+                None,
+                r"3 int8 weight\(s\) in this Wan transformer carry no readable marker of a format it loads "
+                rf"\('int8_tensorwise'; e\.g\. 'blocks\.0\.[a-z_.0-9]+\.weight'\).*{SUPPORTED}",
+                id="no marker",
+            ),
+            pytest.param(
+                {"convrot": True},
+                r"in this Wan transformer carry no readable marker of a format it loads.*" + SUPPORTED,
+                id="convrot flag without format",
+            ),
+            pytest.param(
+                {"format": "int4_tensorwise", "convrot": True},
+                r"3 int8 weight\(s\) in this Wan transformer are marked 'int4_tensorwise'.*" + SUPPORTED,
+                id="int4",
+            ),
+        ],
+    )
+    def test_refuses_int8_weights_the_loader_cannot_decode(
+        self, tmp_path: Path, marker: dict | None, refusal: str
+    ) -> None:
+        """The loader refuses these, so the installer has to say so instead of registering a model that fails at
+        its first render. `InvalidMatchError` keeps the reason visible rather than falling back to unknown."""
+        with pytest.raises(InvalidMatchError, match=refusal):
+            _probe_int8(tmp_path, _native_sd(16), marker=marker)
+
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
+    def test_unmarked_int8_weights_in_a_bundled_text_encoder_do_not_block_the_install(
+        self, tmp_path: Path, prefix: str
+    ) -> None:
+        """An all-in-one file bundles a text encoder the loader drops before it reads any marker, so an int8
+        weight there is not the transformer's business."""
+        sd = _native_sd(16, prefix=prefix)
+        sd[f"{prefix}text_encoders.umt5xxl.encoder.block.0.layer.0.SelfAttention.q.weight"] = _t(
+            64, 64, dtype=torch.int8
+        )
+
+        config = _probe(tmp_path, "Wan2.2-T2V-A14B-high_noise-aio.safetensors", sd)
+
+        assert config.variant == WanVariantType.T2V_A14B
+
+    def test_animate_stays_an_unknown_model_rather_than_a_quantization_refusal(self, tmp_path: Path) -> None:
+        sd = _native_sd(36)
+        sd["face_adapter.fuser_blocks.0.k_norm.weight"] = _t(A14B_DIM)
+        sd["motion_encoder.dec.direction.weight"] = _t(512, 512)
+        sd["img_emb.proj.0.bias"] = _t(1280)
+
+        with pytest.raises(NotAMatchError, match="Animate"):
+            _probe_int8(tmp_path, sd, marker=None)
 
 
 class TestWan21Marker:

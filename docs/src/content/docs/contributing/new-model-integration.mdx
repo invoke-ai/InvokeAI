@@ -761,7 +761,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
      model: MainModelConfig,
      outputIsIntermediate: boolean,
      projectSettings: GenerationProjectSettings
-   ): BackendGraphContract => {
+   ): FamilyGraph => {
      const vaeModel = getCompatibleVae(settings, model);
      const graph: BackendGraphContract = { edges: [], id: createId('new_model_graph'), nodes: {} };
      const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -774,7 +774,6 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
        vae_model: vaeModel ?? undefined,
      });
      const posCond = addNode(graph, { id: 'pos_cond', type: 'new_model_text_encoder' });
-     const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
      const size = getDenoiseSize(settings, model);
      const denoise = addNode(graph, {
        cfg_scale: settings.cfgScale,
@@ -792,23 +791,39 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
      addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
      addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
      addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
-     addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
-     addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
-     // …the same chain for `negative_prompt` → `neg_cond` → `neg_cond_collect` when useCfg…
+     addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+     // …the same chain for `negative_prompt` → `neg_cond` when useCfg…
      addEdge(graph, seed, 'value', denoise, 'seed');
      addEdge(graph, denoise, 'latents', output, 'latents');
      addEdge(graph, modelLoader, 'vae', output, 'vae');
      addMetadata(graph, output, settings, model, 'new_model_txt2img', projectSettings, {
        vae: vaeModel ?? undefined,
      });
-     return graph;
+     return {
+       // Mask-based regional guidance needs conditioning collectors, which this record then names.
+       conditioning: null,
+       denoise,
+       denoiseSize: { height: denoise.height, width: denoise.width },
+       graph,
+       // Null when the architecture has no image-to-latents node; Canvas then refuses the image modes.
+       latents: { encodeType: 'new_model_i2l', vae: { field: 'vae', node: modelLoader } },
+       layoutPrompt: null,
+     };
    };
    ```
 
-   The builder produces the **txt2img** graph only; the canvas grafts img2img, inpaint and outpaint onto it. That depends on these conventions:
-   - Node ids `positive_prompt`, `negative_prompt`, `seed`, `model_loader`, `pos_cond`, `neg_cond`, `pos_cond_collect`, `neg_cond_collect` and `denoise_latents`.
-   - An output node `canvas_output` whose `vae` input has an edge (`requireVaeSource`).
+   The builder produces the **txt2img** graph only; the canvas grafts img2img, inpaint and outpaint onto it. It grafts onto the nodes the returned `FamilyGraph` (`familyGraph.ts`) names, not onto guessed ids:
+   - `denoise` and `denoiseSize`: the base denoise and the size it works at, which PiD native shrinks to a quarter. Read the size from that node; SD reads it from its noise node.
+   - `latents`: the encode node type and the VAE the graph decodes with, the same source the decode reads. SD families also name the UNet and the fp32 switch.
+   - `conditioning`: the global prompt nodes and collectors regional guidance copies and joins, plus any reference-image collectors the builder wired. Mask-based regional guidance requires this record to be non-null.
+   - `layoutPrompt`: the node a layout architecture places regions on.
+
+   It still depends on these conventions:
+   - Node ids `positive_prompt`, `negative_prompt` and `seed`.
+   - An output node `canvas_output`.
    - `addDecodeOutput` if the architecture supports PiD decoding, otherwise `addImageOutputNode`.
+
+   `FamilyGraph` requires each fact field, but its types do not prove that a nullable fact is present for the family's capabilities or that a node reference names the right node. Verify that the new base and every graph-changing variant participate in `generateGraphCases` (`graphCoverage.testing.ts`), which derives its bases from `SUPPORTED_GENERATE_BASES`. Extend `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` as needed, and update the per-base expectations in `graph.test.ts`'s `family graph facts` tests. Those tests check the facts against emitted VAE, UNet, denoise and conditioning wiring.
 
    Validation that only one architecture needs belongs in `getModelFamilyValidationReasons` (`baseGenerationPolicies.ts`).
 
@@ -827,7 +842,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 5. **Canvas**
 
-   - Map the encode node in `CANVAS_I2L_NODE_TYPES` (`canvas/compileCanvasGraph.ts`). The map is `Partial`, so a missing entry only fails at runtime.
+   - Name the encode node in the builder's `latents` record (step 3). Leave it `null` only when the architecture has no image-to-latents node.
    - If the architecture uses the `strength^0.2` denoising-start curve, add it to `canvasDenoisingStart`.
    - Add a case to `BASE_CASES` in `canvas/compileCanvasGraph.test.ts`.
 
@@ -852,7 +867,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    - `ModelTaxonomyType` in `types.ts`, and its label in the type list at the top of `taxonomy.ts`
    - `NULL_BASE_ALLOWANCES` and `SINGLETON_LINK_TYPES` in `relationships.ts`
    - the type label in `modelRequirements.ts`
-   - `CPU_ONLY_TYPES` in `src/features/models/ui/detail/CpuOnlySetting.tsx` if the config has `cpu_only`
+
+   The model detail's **Run on CPU** switch needs no entry: it appears for every config that carries `cpu_only`, so adding the field to the backend config is enough.
 
 8. **Per-family UI (only for controls unique to the architecture)**
 
@@ -873,7 +889,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 - [ ] `contracts.ts`, `supportedBases.ts` and its test
 - [ ] Builder in `graph.ts` and registered in `GRAPH_BUILDERS`
 - [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
-- [ ] `CANVAS_I2L_NODE_TYPES` and `BASE_CASES`
+- [ ] `FamilyGraph` facts checked through `generateGraphCases`, with `latents` and Canvas `BASE_CASES`
+- [ ] Non-null `conditioning` naming the global prompt nodes and collectors for mask-based regional guidance
 - [ ] Recall
 - [ ] Model registry, labels, `en.json`
 - [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
@@ -894,13 +911,13 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 ### Reference images
 
-- Backend: set `FeaturesFacet.max_reference_images`, plus `reference_images_require_variant` if only one variant supports them or `reference_images_require_format` if only one format does. Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
+- Backend: set `FeaturesFacet.max_reference_images`, plus `reference_images_require_variant` if only one variant supports them or `reference_images_require_vision_tower` if the images are read by a Qwen3-VL vision tower the effective encoder must carry. Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
 - webv2: extend the reference-image config union (`types.ts`); the config-type set and the normalize, clone and sync switches in `settings.ts`; the persisted union in `src/workbench/canvasMigration.ts`; and `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`). Wire the images in the builder, and report any setting that keeps them from running in `getReferenceImageValidationReasons`, not only from the builder.
 
 ### Control and regional guidance
 
 - Control: set `FeaturesFacet.control_kinds`. Add the config (`configs/controlnet.py`, base class `ControlNet_Checkpoint_Config_Base`) and the node. In webv2, update `canvas/controlValidation.ts`, `canvas/addControlLayers.ts` and `src/workbench/widgets/layers/controlModelOptions.ts`.
-- Regional guidance: set `FeaturesFacet.supports_regional_guidance` and honor the conditioning `mask` in the denoise node. In webv2, update `canvas/addRegionalGuidance.ts`.
+- Regional guidance: set `FeaturesFacet.supports_regional_guidance` and honor the conditioning `mask` in the denoise node. In webv2, update `canvas/addRegionalGuidance.ts`. For mask-based regions, the builder must also return non-null `FamilyGraph.conditioning` naming the global prompt nodes and the collectors they join. Layout-based regions instead name `FamilyGraph.layoutPrompt`. Cover the new wiring through `generateGraphCases` and the `family graph facts` tests in `graph.test.ts`.
 
 ### PiD decoding
 
@@ -912,12 +929,14 @@ A Tiny AutoEncoder (TAE) record serves every architecture whose step-callback sa
 
 A new latent space gets TAE previews only if a TAE exists for it. Then:
 
-- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). If another base's TAE has the same architecture and channel count, both TAEs' published names must be in `_TAE_NAME_PATTERNS`: identification tells them apart only by name.
+- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). Add the TAE's published name, base and latent width to `_TAE_NAMES`. Identification tells TAEs with the same network apart only by that name, read per path segment from the last, so it matters wherever another base's TAE has the same network. A published TAE with a supported network but for latents InvokeAI does not preview with it goes in `_TWINS`, with its name pattern and refusal message: a file named after it is refused even with an explicit base, and an unnamed file with that network needs the supported TAE's name or an explicit base.
 - **Loader:** one more `@ModelLoaderRegistry.register(base=..., type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)` on `TinyAutoencoderLoader` (`load/model_loaders/tiny_autoencoder.py`).
-- **Starter:** next to the family's VAE in its starter module, with a pinned `resolve/<sha>` URL and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle.
-- **Decoder:** a network the vendored code in `backend/tiny_autoencoder/` does not have is vendored there, and `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
+- **Starter:** next to the family's VAE in its starter module, with a URL pinned to a commit (`resolve/<sha>` on Hugging Face, `raw/<sha>` on GitHub) and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle. The URL must contain the TAE's `_TAE_NAMES` name: `tiny_autoencoder_starters(space)` finds the starter by it, for the log message that tells a user which starter to install.
+- **Decoder:** two decoder families are vendored in `backend/tiny_autoencoder/`: TAESD (`taesd.py`) for images and TAEHV (`taehv.py`) for video. Both subclass `TinyAutoencoderDecoder` (`decoder.py`), which declares the latent width, the spatial compression, `max_preview_edge` (the preview cap) and `preview_working_memory_bytes`, the working memory the TAE's lock reserves for a decode: the activations its structure keeps live at once, plus the convolution workspace, measured with cuDNN on an RTX 4090 (fp16 and bf16, single latents and two-frame windows; unmeasured on MIOpen, MPS and XPU, where the 3 GB `device_working_mem_gb` floor still covers every bound at the default settings), plus a fixed 5 MiB allowance. A new network of a known family is a new layout in `checkpoint.py` (for TAEHV, a `TaehvLayout` in `SUPPORTED_TAEHV_LAYOUTS`); a new family is vendored as another `TinyAutoencoderDecoder`. Either way `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
 
 The TAE decodes the latent the denoise node hands to the step callback, so check that this is the latent the TAE was trained on, with the same normalization and channel order. The previews must also go through `context.util.sd_step_callback` (or `flux_step_callback`/`flux2_step_callback`); a node that renders its own preview image does not get TAE previews.
+
+A video node may hand the callback a `(B, C, T, h, w)` window of latent frames instead of one frame. A video decoder renders the window's last frame through `decode_window`, with the earlier frames as temporal context; the linear preview reads only the last frame (`preview_frame` in `app/util/step_callback.py`). Wan's video denoise passes the middle frame and the one before it (`PREVIEW_LATENT_WINDOW`), because the middle frame decoded alone is no sharper than the linear preview.
 
 Send the first step callback, step 0 included, only once the denoise model is locked (`model_on_device`). The TAE is loaded at the first preview and locked only if it fits next to the models already in VRAM; before the main model is locked, it always fits.
 
@@ -1071,9 +1090,9 @@ For **img2img, inpaint and outpaint**, add:
 - invokeai
   - app/invocations/vae
     - new_model_image_to_latents.py
-  - frontend/webv2/src/features/generation/core/canvas
-    - compileCanvasGraph.ts `CANVAS_I2L_NODE_TYPES`
-    - compileCanvasGraph.test.ts `BASE_CASES`
+  - frontend/webv2/src/features/generation/core
+    - graph.ts the builder's `latents`
+    - canvas/compileCanvasGraph.test.ts `BASE_CASES`
 </FileTree>
 
 ---

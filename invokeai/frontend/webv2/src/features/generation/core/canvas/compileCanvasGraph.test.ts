@@ -7,7 +7,10 @@ import type {
   VaeModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
@@ -17,6 +20,7 @@ import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
 import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
 
+import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
@@ -2193,6 +2197,113 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(getEdge(backendGraph, 'neg_cond_collect', 'item')?.source.node_id).toBe('neg_cond');
   });
 
+  describe.each([
+    ['Z-Image', zImageModel, 'z_image_text_encoder', 'qwen3_encoder'],
+    ['Anima', animaModel, 'anima_text_encoder', 'qwen3_encoder'],
+    ['Krea-2', krea2Model, 'krea2_text_encoder', 'qwen3_vl_encoder'],
+  ] as const)('%s regional negatives', (_label, model, encoderType, encoderField) => {
+    it('collects masked negatives and inverted positives alongside the global negative', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [
+          region('r1', { autoNegative: true, negativePrompt: 'blurry' }),
+          region('r2', { negativePrompt: 'text', positivePrompt: null }),
+        ],
+        settings: { cfgScale: 4 },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r2).toMatchObject({ prompt: 'text', type: encoderType });
+      expect(graph.nodes.rg_pos_cond_r2).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(getEdge(graph, 'rg_neg_cond_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_neg_cond_r2', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r2');
+      expect(getEdge(graph, 'rg_invert_mask_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_pos_cond_inverted_r1', 'mask')?.source.node_id).toBe('rg_invert_mask_r1');
+      for (const nodeId of ['rg_neg_cond_r1', 'rg_neg_cond_r2', 'rg_pos_cond_inverted_r1']) {
+        expect(getEdge(graph, nodeId, encoderField)?.source.node_id).toBe('model_loader');
+      }
+      expect(
+        graph.edges.filter((edge) => edge.destination.node_id === 'neg_cond_collect').map((edge) => edge.source.node_id)
+      ).toEqual(['neg_cond', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1', 'rg_neg_cond_r2']);
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+        field: 'collection',
+        node_id: 'neg_cond_collect',
+      });
+    });
+
+    it('does not encode regional negatives or auto-negatives while CFG is off', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+        settings: { cfgScale: 1 },
+      });
+
+      expect(graph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r1).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
+      expect(graph.nodes.rg_invert_mask_r1).toBeUndefined();
+      expect(graph.nodes.neg_cond_collect).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    });
+  });
+
+  // The canvas settings and the region collector decide from the support row which regional negatives a graph keeps,
+  // so the row has to agree with where each base graph actually has a negative collector.
+  const modelsByBase: Record<string, MainModelConfig> = Object.fromEntries(
+    [sd1Model, sd2Model, sdxlModel, zImageModel, animaModel, krea2Model].map((model) => [model.base, model])
+  );
+  // Collected before capabilities are seeded, so straight from the fixture the tests run against.
+  const negativeMaskBases = [
+    ...new Set(
+      architectureCapabilitiesFixture
+        .filter((row) => row.features.supports_regional_guidance && row.features.regional_negative)
+        .map((row) => row.base)
+    ),
+  ];
+
+  it('covers every mask base that reads regional negatives', () => {
+    expect(negativeMaskBases.length).toBeGreaterThan(0);
+    for (const base of negativeMaskBases) {
+      expect(modelsByBase[base], base).toBeDefined();
+    }
+  });
+
+  it.each(negativeMaskBases)('reads regional negatives on %s exactly at the CFG Scales its support names', (base) => {
+    const support = getRegionalGuidanceSupport(base);
+    expect(support).toMatchObject({ mode: 'masks', negativePrompt: true });
+    for (const cfgScale of [1, 1.5, 4]) {
+      const { backendGraph: graph } = compile(modelsByBase[base]!, 'txt2img', {
+        regionalGuidance: [region('r1', { negativePrompt: 'blurry' })],
+        settings: { cfgScale },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1 !== undefined, `cfg ${cfgScale}`).toBe(
+        areRegionalNegativesActive(support!, cfgScale)
+      );
+    }
+  });
+
+  it('copies both Anima-3.8B encoders to regional negatives and auto-negatives', () => {
+    const { backendGraph: graph } = compile({ ...animaModel, variant: 'anima_qwen35' }, 'txt2img', {
+      regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+      settings: {
+        cfgScale: 4,
+        qwen35EncoderModel: {
+          base: 'any',
+          key: 'qwen35',
+          name: 'Qwen3.5 4B',
+          type: 'qwen3_5_encoder',
+          variant: 'qwen3_5_4b',
+        },
+      },
+    });
+
+    for (const nodeId of ['rg_pos_cond_r1', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1']) {
+      for (const field of ['qwen3_encoder', 'qwen3_5_encoder']) {
+        expect(getEdge(graph, nodeId, field)?.source).toEqual({ field, node_id: 'model_loader' });
+      }
+    }
+  });
+
   it('coexists with control layers in one graph', () => {
     const control: ControlLayerGraphInput = {
       beginEndStepPct: [0, 0.75],
@@ -2217,6 +2328,56 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('joins regional FLUX Redux references to the collector the builder feeds from the global ones', () => {
+    const reduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' } as const;
+    const { backendGraph } = compile(fluxModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', {
+          referenceImages: [
+            {
+              id: 'regional',
+              imageName: 'regional-redux.png',
+              model: reduxModel,
+              settings: { downsampling_factor: 1, weight: 1 },
+              type: 'flux_redux',
+            },
+          ],
+        }),
+      ],
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'global-redux.png', width: 512 } } },
+              imageInfluence: 'medium',
+              model: reduxModel,
+              type: 'flux_redux',
+            },
+            id: 'global',
+            isEnabled: true,
+          },
+        ],
+      },
+    });
+    const reduxInputs = backendGraph.edges.filter(
+      (edge) => edge.destination.node_id === 'denoise_latents' && edge.destination.field === 'redux_conditioning'
+    );
+
+    expect(reduxInputs).toHaveLength(1);
+    const builderCollector = reduxInputs[0]!.source.node_id;
+    expect(builderCollector).toMatch(/^flux_redux_collector_/);
+    expect(backendGraph.nodes.regional_flux_redux_collector).toBeUndefined();
+    expect(getEdge(backendGraph, builderCollector, 'item')).toBeDefined();
+    expect(
+      backendGraph.edges.some(
+        (edge) =>
+          edge.source.node_id === 'flux_redux_regional' &&
+          edge.source.field === 'redux_cond' &&
+          edge.destination.node_id === builderCollector
+      )
+    ).toBe(true);
   });
 
   it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {

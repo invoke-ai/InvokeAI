@@ -475,7 +475,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://gemini/fixture-gemini-image',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -507,7 +506,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://openai/fixture-gpt-image',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -534,7 +532,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: 'external://seedream/fixture-seedream',
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
   {
@@ -560,7 +557,6 @@ const EXTERNAL_MODEL_FIXTURES = [
     source: CATALOG_MANAGED_EXTERNAL_SOURCE,
     source_type: 'external',
     source_url: null,
-    trigger_phrases: null,
     type: 'external_image_generator',
   },
 ];
@@ -580,9 +576,12 @@ const createLocalModels = (count) =>
         ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
         : MODEL_BASES[index % MODEL_BASES.length];
 
+    // Like the backend, a config serializes only the fields it stores: `cpu_only` on VAEs, `trigger_phrases` on main
+    // and LoRA models.
     return {
       base,
       cover_image: null,
+      ...(type === 'vae' ? { cpu_only: null } : {}),
       default_settings: type === 'main' ? { cfg_scale: 7, height: 1024, steps: 30, width: 1024 } : null,
       description: `Deterministic representative ${type} model ${id}.`,
       file_size: 512_000_000 + index * 1_024,
@@ -594,12 +593,16 @@ const createLocalModels = (count) =>
       source: `fixtures/models/fixture-model-${id}.safetensors`,
       source_type: 'path',
       source_url: null,
-      trigger_phrases: type === 'lora' ? [`fixture-style-${id}`] : null,
+      ...(type === 'lora' ? { trigger_phrases: [`fixture-style-${id}`] } : {}),
+      ...(type === 'main' ? { trigger_phrases: null } : {}),
       type,
     };
   });
 
-/** A model record in the shape the list endpoint serves; the seed sets below override only what they need. */
+/**
+ * A model record in the shape the list endpoint serves; the seed sets below override only what they need. Main,
+ * LoRA and Control LoRA seeds add `trigger_phrases`, which only those configs store.
+ */
 const seedModel = ({ key, name, ...fields }) => ({
   base: 'any',
   cover_image: null,
@@ -614,7 +617,6 @@ const seedModel = ({ key, name, ...fields }) => ({
   source: `seeds/${key}.safetensors`,
   source_type: 'path',
   source_url: null,
-  trigger_phrases: null,
   variant: null,
   ...fields,
 });
@@ -639,7 +641,15 @@ const controlSeed = (name, base, preprocessor, fields = {}) => ({
 export const MODEL_SEED_SETS = Object.freeze({
   // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
   'anima-lllite': [
-    { record: seedModel({ base: 'anima', key: 'seed-anima-main', name: 'Anima Preview', type: 'main' }) },
+    {
+      record: seedModel({
+        base: 'anima',
+        key: 'seed-anima-main',
+        name: 'Anima Preview',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
     {
       record: seedModel({
         base: 'anima',
@@ -709,12 +719,14 @@ export const MODEL_SEED_SETS = Object.freeze({
         base: 'flux',
         key: 'seed-flux-dev',
         name: 'FLUX.1 dev',
+        trigger_phrases: null,
         type: 'main',
         variant: 'dev',
       }),
     },
     controlSeed('flux-depth-control-lora', 'flux', 'depth_anything_image_processor', {
       format: 'lycoris',
+      trigger_phrases: null,
       type: 'control_lora',
     }),
     controlSeed('flux-controlnet-union-pro', 'flux', null),

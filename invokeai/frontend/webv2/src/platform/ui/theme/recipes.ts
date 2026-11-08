@@ -61,6 +61,10 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       // would fade out. Default off-screen, as Zag does for a positioner with no placement.
       '--x': '0px',
       '--y': '-100vh',
+      // Zag lets the pointer through a non-interactive tip's content but not its positioner, the box around it: an open
+      // tip over a neighbouring control (the next row's button in a dense list) would take that control's click.
+      // Interactive content sets its own `pointer-events: auto`, which this does not override.
+      pointerEvents: 'none',
     },
   },
 });
