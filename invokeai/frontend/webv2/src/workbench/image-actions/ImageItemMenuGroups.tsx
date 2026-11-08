@@ -1,14 +1,17 @@
-import type { GalleryImage } from '@features/gallery';
+import type { GalleryImage, GalleryVideoItem } from '@features/gallery';
 import type { ModelsSnapshot } from '@features/models';
 import type { SpandrelModelConfig } from '@features/upscale';
+import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { Menu, Text } from '@chakra-ui/react';
+import { galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
+import { useQuery } from '@tanstack/react-query';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -16,9 +19,12 @@ import { LAYER_KIND_ICONS } from '@workbench/widgets/layers/layerTypeIcon';
 import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   AsteriskIcon,
+  AudioLinesIcon,
   ClapperboardIcon,
   FileImageIcon,
+  FilmIcon,
   ImageIcon,
+  ImagePlayIcon,
   LayersIcon,
   PencilIcon,
   QuoteIcon,
@@ -39,6 +45,12 @@ import type { ImageRecallCapabilities, ImageRecallKind } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
 import { ContextSubMenu } from './ContextSubMenu';
+import {
+  EMPTY_VIDEO_RECALL_CAPABILITIES,
+  getVideoRecallCapabilities,
+  type VideoRecallCapabilities,
+  type VideoRecallKind,
+} from './videoRecall';
 
 /*
  * The image menus' shared groups, by intent: what to continue working on with the image, and what to take from it.
@@ -389,6 +401,193 @@ const ReuseMenuItem = ({
       label={t(item.label)}
       shortcut={shortcut}
       value={item.value}
+      onSelect={handleSelect}
+    />
+  );
+};
+
+interface VideoReuseItem {
+  capability: keyof VideoRecallCapabilities;
+  /** The viewer command that recalls the same from the selected video, for its keycaps. */
+  commandId: string;
+  icon: LucideIcon;
+  kind: VideoRecallKind;
+  label: string;
+  value: string;
+}
+
+/** In the image list's order: remix leads, the full recall follows, then the single settings. */
+const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
+  {
+    capability: 'remix',
+    commandId: 'viewer.remix',
+    icon: ShuffleIcon,
+    kind: 'remix',
+    label: 'widgets.gallery.itemMenu.remixVideo',
+    value: 'video-remix',
+  },
+  {
+    capability: 'all',
+    commandId: 'viewer.recallAll',
+    icon: AsteriskIcon,
+    kind: 'all',
+    label: 'widgets.gallery.itemMenu.allSettings',
+    value: 'video-recall-all',
+  },
+  {
+    capability: 'prompts',
+    commandId: 'viewer.recallPrompts',
+    icon: QuoteIcon,
+    kind: 'prompts',
+    label: 'widgets.gallery.itemActions.recall.verbs.prompts',
+    value: 'video-use-prompt',
+  },
+  {
+    capability: 'seed',
+    commandId: 'viewer.recallSeed',
+    icon: SproutIcon,
+    kind: 'seed',
+    label: 'widgets.gallery.itemActions.recall.verbs.seed',
+    value: 'video-use-seed',
+  },
+  {
+    capability: 'size',
+    commandId: 'viewer.useSize',
+    icon: RulerIcon,
+    kind: 'size',
+    label: 'widgets.gallery.itemActions.recall.verbs.dimensions',
+    value: 'video-use-size',
+  },
+];
+
+/**
+ * "Use video as" and "Reuse from video": the video as a Video panel input, then its recorded settings. Reads the
+ * video's metadata when it mounts, so hosts mount it with their open menu. The entry is the gallery's shared one,
+ * which Preview Details and recall commands also read; a failed read holds no answer, so the next open reads it again.
+ */
+export const VideoUseGroups = ({
+  actions,
+  item,
+  presentation,
+}: {
+  actions: ImageActions;
+  item: GalleryVideoItem;
+  presentation: ImageMenuPresentation;
+}) => {
+  const { t } = useTranslation();
+  const metadataQuery = useQuery(galleryVideoMetadataOptions(captureAccountScope(), item.name));
+  const capabilities = metadataQuery.isSuccess
+    ? getVideoRecallCapabilities(metadataQuery.data)
+    : EMPTY_VIDEO_RECALL_CAPABILITIES;
+  const handleExtendInVideo = useCallback(() => actions.sendToInitialVideo(item), [actions, item]);
+  // eslint-disable-next-line react/hooks -- `useAsReferenceVideo` is a plain action method; the compiler reads its name as a hook.
+  const handleUseAsReferenceVideo = useCallback(() => actions.useAsReferenceVideo(item), [actions, item]);
+  const reuseItems = VIDEO_REUSE_ITEMS.map((reuseItem) => (
+    <VideoReuseMenuItem
+      key={reuseItem.kind}
+      actions={actions}
+      disabled={metadataQuery.isPending || !capabilities[reuseItem.capability]}
+      guided={presentation === 'guided'}
+      item={item}
+      reuseItem={reuseItem}
+    />
+  ));
+
+  return (
+    <>
+      <Menu.ItemGroup>
+        <Menu.ItemGroupLabel>{t('widgets.gallery.itemMenu.useVideoAs')}</Menu.ItemGroupLabel>
+        <MenuActionItem
+          icon={ClapperboardIcon}
+          label={t('widgets.gallery.itemMenu.extendInVideo')}
+          value="extend-in-video"
+          onSelect={handleExtendInVideo}
+        />
+        <MenuActionItem
+          disabled={!actions.canUseAsReferenceVideo}
+          icon={FilmIcon}
+          label={t('widgets.gallery.itemMenu.useAsReferenceVideo')}
+          value="use-as-reference-video"
+          onSelect={handleUseAsReferenceVideo}
+        />
+        <ContextSubMenu icon={AudioLinesIcon} label={t('widgets.gallery.itemMenu.useAsConditioningClip')}>
+          <ConditioningClipMenuItem actions={actions} conditioningRole="audio" item={item} />
+          <ConditioningClipMenuItem actions={actions} conditioningRole="video" item={item} />
+        </ContextSubMenu>
+      </Menu.ItemGroup>
+      {/* As for images: outside the "Use video as" group, so it is not announced under that heading. */}
+      {presentation === 'guided' ? (
+        <>
+          <Menu.Separator borderColor="border.subtle" />
+          <Menu.ItemGroup>
+            <Menu.ItemGroupLabel>{t('widgets.gallery.itemMenu.reuseFromVideo')}</Menu.ItemGroupLabel>
+            {reuseItems}
+          </Menu.ItemGroup>
+        </>
+      ) : (
+        <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.reuseFromVideo')}>
+          {reuseItems}
+        </ContextSubMenu>
+      )}
+    </>
+  );
+};
+
+const ConditioningClipMenuItem = ({
+  actions,
+  conditioningRole: role,
+  item,
+}: {
+  actions: ImageActions;
+  conditioningRole: VideoConditioningRole;
+  item: GalleryVideoItem;
+}) => {
+  const { t } = useTranslation();
+  // eslint-disable-next-line react/hooks -- `useAsConditioningClip` is a plain action method; the compiler reads its name as a hook.
+  const handleSelect = useCallback(() => actions.useAsConditioningClip(item, role), [actions, item, role]);
+
+  return (
+    <MenuActionItem
+      // A wrapped audio upload's picture is a placeholder, so it has nothing to lend.
+      disabled={!actions.canUseAsConditioningClip[role] || (role === 'video' && item.mediaOrigin === 'audio_upload')}
+      icon={role === 'audio' ? AudioLinesIcon : ImagePlayIcon}
+      label={t(role === 'audio' ? 'widgets.video.conditioningRoleAudio' : 'widgets.video.conditioningRoleVideo')}
+      value={`use-as-conditioning-${role}`}
+      onSelect={handleSelect}
+    />
+  );
+};
+
+const VideoReuseMenuItem = ({
+  actions,
+  disabled,
+  guided,
+  item,
+  reuseItem,
+}: {
+  actions: ImageActions;
+  disabled: boolean;
+  guided: boolean;
+  item: GalleryVideoItem;
+  reuseItem: VideoReuseItem;
+}) => {
+  const { t } = useTranslation();
+  const handleSelect = useCallback(
+    () => void actions.recallVideoData(item, reuseItem.kind),
+    [actions, item, reuseItem.kind]
+  );
+  const shortcut = useMemo(
+    () => (guided ? <CommandKeycaps commandId={reuseItem.commandId} /> : undefined),
+    [guided, reuseItem.commandId]
+  );
+
+  return (
+    <MenuActionItem
+      disabled={disabled}
+      icon={reuseItem.icon}
+      label={t(reuseItem.label)}
+      shortcut={shortcut}
+      value={reuseItem.value}
       onSelect={handleSelect}
     />
   );

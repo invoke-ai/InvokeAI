@@ -387,6 +387,18 @@ describe('compileCanvasGraph', () => {
     });
   });
 
+  describe.each(['img2img', 'inpaint', 'outpaint'] as const)('SDXL %s color compensation', (mode) => {
+    it.each([
+      { colorCompensation: true, expected: 'SDXL' },
+      { colorCompensation: false, expected: 'None' },
+    ])('sets $expected on the encoder when enabled=$colorCompensation', ({ colorCompensation, expected }) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: { colorCompensation } });
+
+      expect(getNodeByType(backendGraph, 'i2l')).toMatchObject({ color_compensation: expected, fp32: true });
+      expect(getNodeByType(backendGraph, 'l2i')).not.toHaveProperty('color_compensation');
+    });
+  });
+
   describe('img2img per base', () => {
     it.each(BASE_CASES)(
       'grafts a $model.base image-to-latents encode node',
@@ -442,11 +454,16 @@ describe('compileCanvasGraph', () => {
       expect(getNodeByType(fp32.backendGraph, 'i2l')?.fp32).toBe(true);
     });
 
-    it('does not attach fp32 to non-SD encode nodes', () => {
-      const { backendGraph } = compile(fluxModel, 'img2img');
+    it.each(BASE_CASES.filter(({ encodeType }) => encodeType !== 'i2l'))(
+      'does not attach SD-only VAE settings to $model.base encode nodes',
+      ({ model, encodeType }) => {
+        const { backendGraph } = compile(model, 'img2img', { settings: { colorCompensation: true } });
+        const encode = getNodeByType(backendGraph, encodeType);
 
-      expect(getNodeByType(backendGraph, 'flux_vae_encode')?.fp32).toBeUndefined();
-    });
+        expect(encode).not.toHaveProperty('fp32');
+        expect(encode).not.toHaveProperty('color_compensation');
+      }
+    );
 
     it('threads the composite image name into the encode node', () => {
       const { backendGraph } = compile(sdxlModel, 'img2img', { compositeImageName: 'my-upload.png' });

@@ -30,8 +30,9 @@ const BBOX = { height: 512, width: 768, x: 31, y: 47 };
 
 const engineWith = (composite: unknown) => {
   const intents: ControlLayerIntent[] = [];
+  const document = { ...documentFrom([]), bbox: BBOX };
   const engine = {
-    document: { getDocument: () => ({ bbox: BBOX }) },
+    document: { getDocument: () => document },
     exports: { exportRasterComposite: () => composite },
     lifecycle: { flushPendingUploads: () => Promise.resolve() },
     projectId: 'project-1',

@@ -60,6 +60,10 @@ section next to the model, you can replace any of them with a model you have ins
 - **CLIP G**
 - **VAE**: only SD3 VAEs are offered
 
+The T5 encoder can also be one of the single files ComfyUI uses: `t5xxl_fp16`, or `t5xxl_fp8_e4m3fn_scaled` for
+about half the VRAM. A single-file T5 run on the CPU is held in float32 (about 19 GB of RAM for
+T5-XXL).
+
 The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; with a Diffusers
 model, SD 3 then still tokenizes with the main model's tokenizers.
 
@@ -86,10 +90,11 @@ until all four are set. Paste these sources into the Model Manager:
 
 If you already have an SD3.5 Diffusers model installed, you can reuse its parts instead: install its
 `text_encoder` (CLIP L), `text_encoder_2` (CLIP G) and `vae` subfolders by path. Its T5 subfolder,
-`text_encoder_3`, is not recognized as a T5 encoder on its own, so take T5 from the starter models.
+`text_encoder_3`, is not recognized as a T5 encoder on its own, so take T5 from the starter models or
+use one of ComfyUI's single files, `t5xxl_fp16` or `t5xxl_fp8_e4m3fn_scaled`.
 
-The `t5xxl_*` files that some repositories ship beside `clip_g`, single-file safetensors or GGUFs in
-transformers' naming, are not recognized as T5 encoders; see
+The `t5xxl_*` GGUFs that some repositories ship beside `clip_g` keep transformers' tensor names rather than
+llama.cpp's, and are not recognized as T5 encoders; see
 [Model Format Support](/users-guide/models/model-format-support/#text-encoders). A single-file SD3 VAE
 from elsewhere works too, if its name or folder says SD3 (such as `sd3_vae.safetensors`); otherwise change
 its **Base** to SD 3.x after installing it.
@@ -99,14 +104,19 @@ CLIP-G tokenizer does, so its conditioning matches the Diffusers pipeline's.
 
 ## Generation settings
 
-When you select an SD3 model, InvokeAI applies these defaults. They come from Stability's reference
-settings for SD3.5 Medium and, for a model whose name contains "turbo", for SD3.5 Large Turbo:
+When you select an SD3 model, InvokeAI applies these defaults. A model whose name contains "turbo",
+Diffusers models included, gets the Large Turbo column:
 
 | Setting    | Default     | Large Turbo |
 | ---------- | ----------- | ----------- |
 | Steps      | 40          | 4           |
 | CFG Scale  | 4.5         | 1 (off)     |
 | Resolution | 1024 × 1024 | 1024 × 1024 |
+
+The default steps and CFG follow Stability's reference settings for SD3.5 Medium; the Large Turbo ones
+follow Stability's step count and guidance for SD3.5 Large Turbo. They are not Stability's full reference
+settings: Stability's reference also shifts the noise schedule (by 3.0 for Large Turbo), and InvokeAI's SD3
+denoise does not apply that shift.
 
 - **CFG Scale** applies true classifier-free guidance. Stability's reference setting for **Large** is
   about **28 steps at CFG 3.5**. Large gets Medium's defaults, so use that as a starting point when you

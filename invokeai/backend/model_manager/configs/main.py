@@ -1716,7 +1716,9 @@ def _raise_for_undecodable_int8_weights(
     )
 
 
-def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str) -> None:
+def _raise_for_unsupported_comfy_quantization(
+    mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str, *, supported: str | None = None
+) -> None:
     """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
 
     `InvalidMatchError`, not `NotAMatchError`: the file *is* a `family` transformer, so the
@@ -1745,13 +1747,13 @@ def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict
     """
     if any(isinstance(key, str) and key.endswith("._weight_qdata") for key in state_dict):
         raise InvalidMatchError(
-            f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 build is), which "
-            "is not supported. Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead."
+            f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 and INT8 builds "
+            f"are), which is not supported. {supported or 'Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead.'}"
         )
     if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
         raise InvalidMatchError(
             f"this is an nvfp4-quantized {family} transformer, which is not supported yet. "
-            "Install the fp8_scaled or int8_convrot build instead."
+            f"{supported or 'Install the fp8_scaled or int8_convrot build instead.'}"
         )
 
     # Per-tensor `.comfy_quant` markers only: neither the Ideogram 4 nor the Qwen-Image-2.1 loader reads the
@@ -1762,7 +1764,7 @@ def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict
         accepted_convrot_formats(accept_int4=False),
         read_header=False,
         what=f"{family} transformer",
-        supported="Only Comfy-Org's int8_convrot build is supported.",
+        supported=supported or "Only Comfy-Org's int8_convrot build is supported.",
     )
 
 
@@ -4585,28 +4587,53 @@ def _has_moss_image_keys(state_dict: dict[str | int, Any]) -> bool:
     )
 
 
-def _moss_image_quantized_key(state_dict: dict[str | int, Any]) -> str | None:
-    """The first key that shows the checkpoint is quantized, or None for a dense one.
+_MOSS_IMAGE_SUPPORTED = "Install the bf16 or Comfy-Org int8_convrot build, or a GGUF (Q8_0, Q4_K, ...), instead."
 
-    A side channel (`weight_scale`, `input_scale`, `.comfy_quant` markers) or a weight stored as fp8 or as packed
-    integer codes. Identification reads the header on the meta device, so the dtype is all there is to go on.
+
+def _raise_for_unsupported_moss_image_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+    """Refuse every quantization a MOSS-Image safetensors loader cannot build; Comfy-Org's int8 convrot passes.
+
+    `InvalidMatchError`, not `NotAMatchError`: the file *is* a MOSS-Image transformer, so the installer shows the
+    reason instead of registering it as an unknown model nothing can load. What the loader builds is dense weights and
+    `int8_tensorwise` layers, nothing else. The shared helper names torchao builds, nvfp4 and int8 weights whose marker
+    is missing or of another scheme (W4A8 stores I8 weights with a codebook); the checks here cover what it does not:
+    packed `uint8` and fp8 weights, and a scale or marker on a weight that is not int8.
     """
-    quantized_dtypes = (*FP8_WEIGHT_DTYPES, torch.uint8, torch.int8)
-    for key, value in state_dict.items():
-        if not isinstance(key, str):
-            continue
-        if is_scale_metadata_key(key) or getattr(value, "dtype", None) in quantized_dtypes:
-            return key
-    return None
+    _raise_for_unsupported_comfy_quantization(mod, state_dict, "MOSS-Image", supported=_MOSS_IMAGE_SUPPORTED)
+
+    keys = [key for key in state_dict if isinstance(key, str)]
+    for key in keys:
+        dtype = getattr(state_dict[key], "dtype", None)
+        if key.endswith(".weight") and dtype is torch.uint8:
+            raise InvalidMatchError(
+                f"'{key}' holds packed 4-bit codes (a W4A8 or nvfp4 build), which MOSS-Image does not load yet. "
+                f"{_MOSS_IMAGE_SUPPORTED}"
+            )
+        if key.endswith(".weight") and dtype in FP8_WEIGHT_DTYPES:
+            raise InvalidMatchError(
+                f"fp8-quantized MOSS-Image transformers are not supported yet (found '{key}'). {_MOSS_IMAGE_SUPPORTED}"
+            )
+    # A scale or marker on a weight that is not int8 belongs to a scheme the loader would drop without applying.
+    int8_layers = {
+        key[: -len(".weight")]
+        for key in keys
+        if key.endswith(".weight") and getattr(state_dict[key], "dtype", None) is torch.int8
+    }
+    for key in keys:
+        if is_scale_metadata_key(key) and key.rsplit(".", 1)[0] not in int8_layers:
+            raise InvalidMatchError(
+                f"this MOSS-Image transformer carries a quantization side channel on a weight that is not int8 "
+                f"(found '{key}'), which is not supported yet. {_MOSS_IMAGE_SUPPORTED}"
+            )
 
 
 class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
 
     The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
-    the loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with
-    `InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown
-    model instead.
+    the loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both
+    may fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with
+    `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead.
     """
 
     base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
@@ -4623,15 +4650,36 @@ class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base,
             raise NotAMatchError("state dict does not look like a MOSS-Image transformer")
 
         if _has_ggml_tensors(state_dict):
-            raise InvalidMatchError(
-                "GGUF-quantized MOSS-Image checkpoints are not supported yet. Install the bf16 transformer instead."
-            )
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
-        quantized_key = _moss_image_quantized_key(state_dict)
-        if quantized_key is not None:
-            raise InvalidMatchError(
-                f"quantized MOSS-Image checkpoints are not supported yet (found '{quantized_key}'). "
-                "Install the bf16 transformer instead."
-            )
+        _raise_for_unsupported_moss_image_quantization(mod, state_dict)
+
+        return cls(**override_fields)
+
+
+class Main_GGUF_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized MOSS-Image transformers (single-file).
+
+    Two layouts: unsloth's builds declare `general.architecture = moss_image` and keep `proj.q`, `proj.k`, `proj.v`;
+    leejet's carry no metadata at all and fuse them into `proj.qkv`. The key fingerprint identifies both, so
+    identification does not depend on the metadata. ComfyUI-GGUF's own convrot quantization (`comfy.gguf.quant.*`) is
+    refused by the factory, since `DECODES_GGUF_CONVROT` stays empty.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_moss_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MOSS-Image transformer")
+
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
         return cls(**override_fields)
