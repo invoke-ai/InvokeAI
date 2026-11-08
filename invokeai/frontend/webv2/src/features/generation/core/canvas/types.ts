@@ -77,6 +77,8 @@ export interface CompileCanvasGraphInput {
   compositing: CanvasCompositingSettings;
   /** Processing-size policy; absent means the bbox snapped to the model grid. */
   scaling?: CanvasScalingSettings;
+  /** Opaque Workbench-owned authored canvas record, captured with the composites. */
+  canvasMetadata?: Record<string, unknown>;
   /** Prevalidated per-layer composites, each uploaded separately. */
   controlLayers?: readonly ControlLayerGraphInput[];
   /** Resolved inputs for each supported region. */

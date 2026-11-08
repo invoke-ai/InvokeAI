@@ -25,6 +25,8 @@ export const NULL_BASE_ALLOWANCES: Readonly<Partial<Record<ModelTaxonomyType, Re
   qwen3_encoder: new Set(['anima', 'flux2', 'z-image']),
   /** krea2_model_loader, qwen_image_2_1_model_loader, flux3_model_loader. */
   qwen3_vl_encoder: new Set(['flux3', 'krea-2', 'qwen-image-2-1']),
+  /** qwen_image_2_1_model_loader (mmproj of a GGUF 8B encoder). */
+  qwen3_vl_vision_tower: new Set(['qwen-image-2-1']),
   /** anima_model_loader (Anima-3.8B's semantic connector), moss_image_model_loader. */
   qwen3_5_encoder: new Set(['anima', 'moss-image']),
   /** qwen_image_model_loader. */
@@ -120,6 +122,7 @@ const SINGLETON_LINK_TYPES: ReadonlySet<ModelTaxonomyType> = new Set<ModelTaxono
   'qwen3_encoder',
   'qwen_vl_encoder',
   'qwen3_vl_encoder',
+  'qwen3_vl_vision_tower',
   'qwen3_5_encoder',
   'mistral_encoder',
   'gemma2_encoder',

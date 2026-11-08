@@ -8,7 +8,11 @@ import type {
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import { AspectRatioPreview, GenerationSettingsSection, SeedField } from '@features/generation/components';
-import { sanitizeBatchCount } from '@features/generation/settings';
+import {
+  getDynamicPromptsConfig,
+  normalizeDynamicPromptsSettings,
+  sanitizeBatchCount,
+} from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import {
   getVideoAspectRatioParts,
@@ -121,6 +125,11 @@ const VideoModelReconciler = ({
     const normalized = normalizeVideoWidgetValues(rawValues);
 
     if (normalized && areVideoValuesEqual(normalized, values)) {
+      // Pin whether this panel expands prompts while the record still says which kind it is: a later partial edit
+      // (a prompt resize) would make an unseeded panel read as one saved before Video expanded prompts.
+      if (typeof rawValues.dynamicPromptsEnabled !== 'boolean') {
+        patchValues(normalizeDynamicPromptsSettings(values), 'system');
+      }
       return;
     }
 
@@ -448,6 +457,34 @@ export const VideoWidgetView = () => {
     () => getVideoExpandPromptSuggestion(promptEnhancer, firstFrameImage),
     [promptEnhancer, firstFrameImage]
   );
+  const {
+    dynamicPromptsCombinatorial,
+    dynamicPromptsEnabled,
+    dynamicPromptsMaxPrompts,
+    dynamicPromptsResample,
+    dynamicPromptsSampleSeed,
+    dynamicPromptsSeedBehaviour,
+  } = values;
+  // Memoized on its fields for the same check: patches recreate `values`.
+  const dynamicPrompts = useMemo(
+    () =>
+      getDynamicPromptsConfig({
+        dynamicPromptsCombinatorial,
+        dynamicPromptsEnabled,
+        dynamicPromptsMaxPrompts,
+        dynamicPromptsResample,
+        dynamicPromptsSampleSeed,
+        dynamicPromptsSeedBehaviour,
+      }),
+    [
+      dynamicPromptsCombinatorial,
+      dynamicPromptsEnabled,
+      dynamicPromptsMaxPrompts,
+      dynamicPromptsResample,
+      dynamicPromptsSampleSeed,
+      dynamicPromptsSeedBehaviour,
+    ]
+  );
   const supportsExtend = policy.modes.includes('extend');
   const supportsReferences = policy.modes.includes('reference');
   const supportsConditioningClip = policy.modes.includes('audio-to-video') || policy.modes.includes('video-to-audio');
@@ -524,7 +561,10 @@ export const VideoWidgetView = () => {
       </Stack>
 
       <VideoPromptFields
+        batchCount={values.batchCount}
+        dynamicPrompts={dynamicPrompts}
         expandPromptSuggestion={expandPromptSuggestion}
+        isSeedFixed={values.seedMode === 'fixed'}
         loras={values.loras}
         model={values.model}
         negativeHelpText={policy.prompt.negativeHelpTextKey ? t(policy.prompt.negativeHelpTextKey) : undefined}

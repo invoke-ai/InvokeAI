@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import { Box, ChakraProvider, HStack, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createInstance } from 'i18next';
 import { act, type ComponentType, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -118,7 +119,13 @@ vi.mock('@workbench/widgetRegistry', () => ({
     typeId === 'preview' ? { manifest: { id: 'preview', label: 'Preview' }, status: 'enabled' } : undefined,
   getWidgetsForRegion: () => [],
 }));
+const recoveryOwner = vi.hoisted(() => ({
+  widgetRecovery: new Map(),
+  getSnapshot: () => ({ activeProject: { id: 'test-project', widgetInstances: { 'test-instance': {} } } }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchInternalStore: () => recoveryOwner,
+  useWorkbenchReload: () => async () => {},
   useActiveProjectId: () => centerAreaMocks.project.id,
   useActiveProjectSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
     selector(centerAreaMocks.project),
@@ -132,7 +139,10 @@ vi.mock('@workbench/widget-frame', () => ({
   // Loading state is not what this suite measures; the real component would
   // suspend on a chunk that does not exist under the mocked registry.
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
-  WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' }) => {
+  WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' | 'icon' }) => {
+    if (slot === 'icon') {
+      return <Box boxSize="3.5" />;
+    }
     const Slot = centerAreaMocks.chromeSlots?.[slot];
 
     if (Slot) {
@@ -196,6 +206,7 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const render = async (children: ReactNode, width = 571) => {
+  recoveryOwner.widgetRecovery.set('test-instance', createWidgetRecovery());
   host = document.createElement('div');
   host.style.cssText = `display:flex;height:320px;width:${width}px;`;
   document.body.append(host);
@@ -212,6 +223,7 @@ const render = async (children: ReactNode, width = 571) => {
 };
 
 afterEach(async () => {
+  recoveryOwner.widgetRecovery.clear();
   await act(async () => {
     root?.unmount();
     await Promise.resolve();

@@ -125,6 +125,11 @@ def accepted_convrot_formats(accept_int4: bool) -> frozenset[str]:
 # `drop_unconsumed_quantization_sidecars`.
 _UNCONSUMED_SIDECAR_SUFFIXES = (COMFY_QUANT_SUFFIX, *INPUT_SCALE_SUFFIXES)
 
+# Rows `dequantize_convrot_weight` decodes per pass. Its float32 intermediates are two copies of what it decodes, so an
+# LLM's embedding or LM head (248320 x 4096, widened on load) decoded whole would need 7.6 GiB of them on top of the
+# result; 16384 rows of that width need 512 MiB. A weight of at most that many rows decodes in one pass, as before.
+DEQUANTIZE_ROWS_PER_PASS = 16384
+
 
 def check_hadamard_size(size: int) -> None:
     """Refuse a rotation width this scheme has no Hadamard for.
@@ -288,10 +293,38 @@ def dequantize_convrot_weight(
     *,
     packed_int4: bool = False,
 ) -> torch.Tensor:
-    """Recover the bf16/fp16 weight from int8 or packed int4 storage (and undo convrot if applied)."""
+    """Recover the bf16/fp16 weight from int8 or packed int4 storage (and undo convrot if applied).
+
+    A 2-D weight taller than `DEQUANTIZE_ROWS_PER_PASS` is decoded that many rows at a time into the result, which
+    bounds the float32 intermediates. Scale, int4 packing and rotation all act within a row, so the passes decode the
+    rows one pass would.
+    """
+    scale = as_column_scale(weight_q, weight_scale)
+    rows = weight_q.shape[0] if weight_q.dim() == 2 else 0
+    if rows <= DEQUANTIZE_ROWS_PER_PASS:
+        return _dequantize_convrot_rows(weight_q, scale, convrot, dtype, group_size, packed_int4)
+    per_row = scale.dim() == 2 and scale.shape[0] == rows
+    columns = weight_q.shape[1] * (2 if packed_int4 else 1)
+    result = torch.empty((rows, columns), dtype=dtype, device=weight_q.device)
+    for start in range(0, rows, DEQUANTIZE_ROWS_PER_PASS):
+        block = slice(start, start + DEQUANTIZE_ROWS_PER_PASS)
+        result[block] = _dequantize_convrot_rows(
+            weight_q[block], scale[block] if per_row else scale, convrot, dtype, group_size, packed_int4
+        )
+    return result
+
+
+def _dequantize_convrot_rows(
+    weight_q: torch.Tensor,
+    scale: torch.Tensor,
+    convrot: bool,
+    dtype: torch.dtype,
+    group_size: int,
+    packed_int4: bool,
+) -> torch.Tensor:
     if packed_int4:
         weight_q = unpack_int4_codes(weight_q, torch.float32)
-    w = weight_q.to(torch.float32) * as_column_scale(weight_q, weight_scale).to(torch.float32)
+    w = weight_q.to(torch.float32) * scale.to(torch.float32)
     if convrot:
         out_features, in_features = w.shape
         if in_features % group_size != 0:
@@ -772,8 +805,9 @@ def reject_unmarked_int8_weights(
         else f" A build that names its quantization only in the safetensors header is not supported for {architecture}."
     )
     raise ValueError(
-        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no `comfy_quant` marker, "
-        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header}"
+        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no readable int8_tensorwise marker, "
+        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header} "
+        "Use another build of this model."
     )
 
 
@@ -933,9 +967,8 @@ def predict_int8_cast_size(
 
     Loaders call this to size their ``make_room()`` reservation, and call it *before* the split so
     that the tensors the split widens are already reserved for when they appear. (The split's own
-    per-layer fp32 transient is absorbed by that reservation's slack rather than modelled: it runs
-    one widened layer at a time, and the widened set is by construction the small one -- skip-pattern
-    and non-Linear layers.)
+    fp32 transient is absorbed by that reservation's slack rather than modelled: it widens one layer
+    at a time, and at most ``DEQUANTIZE_ROWS_PER_PASS`` rows of it at once.)
 
     Three widths are in play and only one of them is ``dtype.itemsize``. A payload that stays int8
     occupies one byte, and charging it two asks the cache to free ~12 GB a Krea-2 build never uses.
@@ -989,6 +1022,47 @@ def _pinned_quantized_keys(quantized: Mapping[str, Any]) -> set[str]:
     return {key for path in quantized for key in (f"{path}.weight", f"{path}.weight_scale")}
 
 
+def check_int8_layer_layout(
+    path: str, marker: Mapping[str, Any], weight: torch.Tensor | None, scale: torch.Tensor | None
+) -> ConvrotLayout:
+    """Refuse a marked layer the int8/int4 linears cannot be built from, and return its layout.
+
+    Both tensors present, a 2-D weight, a scale granularity the decode implements, a readable marker. Whether the
+    rotation fits the layer's width is :func:`check_int8_rotation_width`, kept apart so the swap can report a payload
+    that does not match the architecture first. Only shapes are read, so an installer can ask it of meta tensors.
+    """
+    fmt = marker.get("format")
+    if weight is None or scale is None:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
+        )
+    if weight.dim() != 2:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
+            "Only a Linear weight can be kept quantized; dequantize this one instead."
+        )
+    check_int8_scale_layout(path, weight, scale)
+    return marker_layout(marker)
+
+
+def check_int8_rotation_width(path: str, layout: ConvrotLayout, weight: torch.Tensor) -> None:
+    """Refuse a rotation group that is not a power of 4 or does not divide the decoded input width."""
+    if layout.convrot:
+        try:
+            check_hadamard_size(layout.group_size)
+        except ValueError:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}; a rotation is undone only in groups of a "
+                "power of 4 (256 in every release)."
+            ) from None
+        in_features = weight.shape[1] * (2 if layout.packed_int4 else 1)
+        if in_features % layout.group_size != 0:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}, which do not divide its input width "
+                f"{in_features}."
+            )
+
+
 def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: dict[str, dict[str, Any]]) -> None:
     """Replace each quantized ``nn.Linear`` with an ``Int8ConvrotLinear`` or, for a packed int4 marker, an
     ``Int4ConvrotLinear``, sized from the state dict.
@@ -1015,17 +1089,8 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
     for path, marker in quantized.items():
         fmt = marker.get("format")
         weight, scale = sd.get(f"{path}.weight"), sd.get(f"{path}.weight_scale")
-        if weight is None or scale is None:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
-            )
-        if weight.dim() != 2:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
-                "Only a Linear weight can be kept quantized; dequantize this one instead."
-            )
-        check_int8_scale_layout(path, weight, scale)
-        layout = marker_layout(marker)
+        layout = check_int8_layer_layout(path, marker, weight, scale)
+        assert weight is not None
         parent, attribute, target = _resolve_int8_target(model, path)
         decoded = (weight.shape[0], weight.shape[1] * (2 if layout.packed_int4 else 1))
         if decoded != (target.out_features, target.in_features):
@@ -1046,6 +1111,7 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
                 f"'{path}' is marked {fmt} and the {extra}'s Linear has a bias, but the "
                 f"{missing} has none. The checkpoint does not match this architecture."
             )
+        check_int8_rotation_width(path, layout, weight)
         layer: Int4ConvrotLinear | Int8ConvrotLinear
         if layout.packed_int4:
             layer = Int4ConvrotLinear(

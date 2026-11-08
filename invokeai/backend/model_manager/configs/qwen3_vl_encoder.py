@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_k
 from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
 from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
 from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_config_dict
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -250,38 +251,14 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
 _QWEN3_VL_GGUF_ARCHITECTURE = "qwen3vl"
 _QWEN3_VL_GGUF_EMBED_KEY = "token_embd.weight"
-# llama.cpp writes the Qwen3-VL visual tower to a companion file under the generic "clip"
-# architecture; this projector name is what makes it recognisably Qwen3-VL's rather than some other
-# model's vision tower.
-_QWEN3_VL_MMPROJ_PROJECTOR = "qwen3vl_merger"
-
-
-def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
-    """Reject the companion visual tower with the reason, rather than letting it pass as unknown.
-
-    Installing the HuggingFace GGUF repo hands the user both files, and the ``mmproj`` one looks like
-    a plausible second encoder. Nothing else claims it either, so without this it registers as an
-    ``Unknown`` model (``allow_unknown_models`` defaults to True) and the user is left with a dead
-    entry and no reason for it.
-    """
-    if mod.metadata().get("clip.projector_type") != _QWEN3_VL_MMPROJ_PROJECTOR:
-        return
-    raise InvalidMatchError(
-        "this is the Qwen3-VL visual tower ('mmproj'), not a text encoder. Install the language tower "
-        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'). GGUF encoders read text only; Krea-2 edit "
-        "reference images need a Qwen3-VL encoder with its vision weights, such as the Krea-2 Diffusers "
-        "model's encoder or a single-file Qwen3-VL checkpoint."
-    )
 
 
 def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVariantType:
     """Derive the variant from the tensors, and reject a file whose tensors are incomplete.
 
-    Deliberately not taken from the ``embedding_length``/``block_count`` metadata, though both are
-    present. A llama.cpp multi-part quant (``...-00002-of-00003.gguf``, routine for the larger 8B
-    quants) and an interrupted download both carry a complete KV block and only some of the tensors.
-    Matching on metadata alone would install such a file, offer it in the encoder picker, and fail
-    at the user's first generation rather than at install time.
+    Deliberately not taken from the ``embedding_length``/``block_count`` metadata: a file can carry a
+    complete KV block and only some of the tensors. Matching on metadata alone would install such a file,
+    offer it in the encoder picker, and fail at the user's first generation rather than at install time.
 
     Raises ``InvalidMatchError``, not ``NotAMatchError``: the caller runs this only after the
     architecture metadata identified the file as a Qwen3-VL encoder, so "recognised and unusable" is
@@ -305,9 +282,7 @@ def _variant_from_gguf_state_dict(state_dict: dict[str | int, Any]) -> Qwen3VLVa
     if not any(isinstance(key, str) and key.startswith(f"blk.{last_layer}.") for key in state_dict):
         raise InvalidMatchError(
             f"this Qwen3-VL encoder GGUF is incomplete: it carries no 'blk.{last_layer}.*' tensors, but a "
-            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Multi-part quants "
-            "('...-00002-of-00003.gguf') must be joined before installing, and an interrupted download "
-            "must be re-fetched."
+            f"Qwen3-VL encoder has {_QWEN3_VL_NUM_HIDDEN_LAYERS} layers. Re-fetch the file."
         )
     return variant
 
@@ -317,9 +292,9 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     ``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).
 
     llama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a
-    companion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.
-    Only the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,
-    so a GGUF encoder encodes text only.
+    companion ``mmproj-*.gguf`` holding the visual tower. Only the language tower is accepted here, so a
+    GGUF encoder encodes text only; the ``mmproj`` file installs as a ``Qwen3VLVisionTower_GGUF_Config``,
+    which an edit that reads reference images takes beside the encoder.
 
     Identified by the ``general.architecture`` metadata, which is the only honest discriminator: a
     Qwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same
@@ -355,7 +330,6 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # Deliberately exact: the MoE Qwen3-VL variants report "qwen3vlmoe" and need a different
         # transformers architecture than the one the loader builds.
         if architecture != _QWEN3_VL_GGUF_ARCHITECTURE:
-            _raise_if_qwen3_vl_mmproj(mod)
             raise NotAMatchError(f"GGUF architecture is {architecture!r}, not {_QWEN3_VL_GGUF_ARCHITECTURE!r}")
 
         # Run unconditionally, even when the caller overrode `variant`. This is the only check that
@@ -367,6 +341,79 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # be mutated: popping here would erase a user's variant override for every class probed after
         # this one, and the probe order is a set iteration (see `Config_Base.CONFIG_CLASSES`).
         return cls(**{"variant": variant, **override_fields})
+
+
+_MMPROJ_PROJECTOR = "qwen3vl_merger"
+
+
+def _variant_from_mmproj(mod: ModelOnDisk) -> Qwen3VLVariantType:
+    """The Qwen3-VL a llama.cpp ``mmproj`` belongs to, from the width its projector emits.
+
+    ``clip.vision.projection_dim`` is the language model's hidden size, which the tower's merger projects
+    into. Raises ``InvalidMatchError`` once the file is known to be a Qwen3-VL projector: ``NotAMatchError``
+    would let it register as an ``Unknown`` model with the reason only in the server log.
+    """
+    metadata = mod.metadata()
+    try:
+        variant = _variant_from_hidden_size(metadata.get("clip.vision.projection_dim"))
+    except NotAMatchError as e:
+        raise InvalidMatchError(f"unsupported Qwen3-VL vision tower: {e}") from e
+
+    depth = load_bundled_qwen3_vl_config_dict(variant)["vision_config"]["depth"]
+    state_dict = mod.load_state_dict()
+    required = (f"v.blk.{depth - 1}.attn_qkv.weight", "v.patch_embd.weight.1", "v.position_embd.weight", "mm.2.weight")
+    absent = [name for name in required if name not in state_dict]
+    if metadata.get("clip.vision.block_count") != depth or absent:
+        raise InvalidMatchError(
+            f"this Qwen3-VL {variant.value} vision tower is incomplete or of another build: expected {depth} "
+            f"blocks (tensors {', '.join(required)}); the file declares "
+            f"{metadata.get('clip.vision.block_count')} and lacks {absent or 'none of them'}."
+        )
+    return variant
+
+
+class Qwen3VLVisionTower_GGUF_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for the vision tower of a llama.cpp Qwen3-VL (``mmproj-*.gguf``).
+
+    llama.cpp keeps the tower out of the language-tower GGUF, so a GGUF encoder cannot read reference images
+    by itself. This file is that tower; the loader renames it into the HuggingFace ``Qwen3VLVisionModel`` the
+    other encoders' towers are, so it stands in for the tower they would bring.
+
+    Identified by its ``clip`` architecture, ``mmproj`` type and the ``qwen3vl_merger`` projector, which is
+    what tells it from another model's vision tower; the variant is the width that projector emits.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3VLVisionTower] = Field(default=ModelType.Qwen3VLVisionTower)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Qwen3VLVariantType = Field(
+        description="Which Qwen3-VL this tower belongs to. It pairs only with the encoder of the same variant."
+    )
+    cpu_only: bool | None = Field(
+        default=None,
+        description="Whether this model should run on CPU only. Set it like the encoder's: they must share a device",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".gguf":
+            raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
+
+        metadata = mod.metadata()
+        if metadata.get("general.architecture") != "clip" or metadata.get("general.type") != "mmproj":
+            raise NotAMatchError("not a llama.cpp mmproj GGUF")
+        if metadata.get("clip.projector_type") != _MMPROJ_PROJECTOR:
+            raise NotAMatchError(
+                f"mmproj projector is {metadata.get('clip.projector_type')!r}, not {_MMPROJ_PROJECTOR!r}"
+            )
+
+        # Run even when the caller overrode `variant`: an override says which Qwen3-VL the file is, not that
+        # its tensors are all there. `override_fields` is shared by every candidate config, so it is not popped.
+        return cls(**{"variant": _variant_from_mmproj(mod), **override_fields})
 
 
 _MINIMAX_H3_TE_METADATA_KEY = "minimax_h3_te"
@@ -394,6 +441,7 @@ class Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Config_
     base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
     type: Literal[ModelType.Qwen3VLEncoder] = Field(default=ModelType.Qwen3VLEncoder)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

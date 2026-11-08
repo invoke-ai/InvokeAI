@@ -19,6 +19,7 @@ export type {
   QueueHistoryItemStatus,
   QueueItem,
   QueueState,
+  QueueSubmissionRetry,
   QueueSubmissionSnapshot,
   RunRecord,
 } from './core/historyTypes';
@@ -40,6 +41,7 @@ export {
 } from './core/historySummary';
 export {
   BACKEND_SUBMITTABLE_SOURCE_IDS,
+  boundSubmissionRetryMessage,
   getQueueSourceResultSelection,
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,

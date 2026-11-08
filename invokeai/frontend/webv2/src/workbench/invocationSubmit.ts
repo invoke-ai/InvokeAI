@@ -3,13 +3,13 @@
  * sources through reducer submission. Inject Canvas preparation to keep this decision independent of the engine.
  */
 
-import type { GenerateSettings } from '@features/generation/contracts';
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type {
+  DynamicPromptsExpansionSource,
   ExpandedPositivePrompts,
   ResolvedInvocationRoute,
   UpscaleSourceMetadata,
@@ -19,12 +19,7 @@ import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
-import {
-  expandsDynamicPrompts,
-  getEffectivePrompts,
-  normalizeGenerateSettings,
-  sanitizeBatchCount,
-} from '@features/generation/settings';
+import { sanitizeBatchCount } from '@features/generation/settings';
 import { normalizeUpscaleWidgetValues } from '@features/upscale';
 import { getWorkflowBatchCapReason } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -36,6 +31,8 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
 
+import { getDynamicPromptsExpansionSource } from './invocation';
+import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { getActiveProjectWorkflow } from './projectWorkflows';
 import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
@@ -113,40 +110,18 @@ export interface SubmitResolvedInvocationDeps {
 }
 
 /**
- * Return merged Generate prompts only for routes that expand them: dynamic prompts on and dynamic syntax present.
- * Templates may introduce syntax and must consume their own placeholders before expansion.
- */
-const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
-  if (route.sourceId === 'upscale' || route.sourceId === 'video' || route.sourceId === 'workflow') {
-    return null;
-  }
-
-  const settings = normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
-
-  if (!settings) {
-    return null;
-  }
-
-  const effectiveSettings = { ...settings, ...getEffectivePrompts(settings) };
-
-  return expandsDynamicPrompts(effectiveSettings.positivePrompt, effectiveSettings.dynamicPromptsEnabled)
-    ? effectiveSettings
-    : null;
-};
-
-/**
  * Expand here to avoid a gallery → queue → generation cycle. Treat null or response.error as failure even if
  * prompts are present.
  */
 const resolveExpandedPrompts = async (
-  settings: GenerateSettings,
+  source: DynamicPromptsExpansionSource,
   sampleSeed: number | null
 ): Promise<ParseDynamicPromptsResponse | null> => {
   try {
     return await resolveDynamicPrompts(queryClient, {
-      combinatorial: settings.dynamicPromptsCombinatorial,
-      max_prompts: settings.dynamicPromptsMaxPrompts,
-      prompt: settings.positivePrompt,
+      combinatorial: source.combinatorial,
+      max_prompts: source.maxPrompts,
+      prompt: source.positivePrompt,
       seed: sampleSeed,
     });
   } catch {
@@ -288,14 +263,13 @@ export const submitResolvedInvocation = async ({
     workflowGenerators = resolved;
   }
 
-  const expandableSettings = getExpandableSettings(project, route);
+  const expansionSource = getDynamicPromptsExpansionSource(project, route.sourceId);
 
   // Only dynamic prompts require a round trip.
-  if (expandableSettings) {
-    const sampleSeed = expandableSettings.dynamicPromptsCombinatorial
-      ? null
-      : expandableSettings.dynamicPromptsSampleSeed;
-    const expansion = await resolveExpandedPrompts(expandableSettings, sampleSeed);
+  if (expansionSource) {
+    const { sampleSeed: drawSeed, ...expandedFrom } = expansionSource;
+    const sampleSeed = expandedFrom.combinatorial ? null : drawSeed;
+    const expansion = await resolveExpandedPrompts(expandedFrom, sampleSeed);
     if (!isAccountScopeCurrent(owner)) {
       return;
     }
@@ -326,9 +300,8 @@ export const submitResolvedInvocation = async ({
         scopedDefaults,
         workflowId,
       },
-      expansion.prompts.length > 0
-        ? { positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed }
-        : undefined,
+      // Sent even when empty: the reducer checks the source against what it compiles either way.
+      { expandedFrom, positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed },
       workflowGenerators,
       workflowDocument?.id,
       pendingBoards,
@@ -429,6 +402,7 @@ const dispatchResolvedInvocation = async (
   }
 
   commands.generation.submitResolved({
+    runtime: captureInvocationRuntimeInputs(route.sourceId),
     backendSupportsCancellation: true,
     models,
     ...expansion,

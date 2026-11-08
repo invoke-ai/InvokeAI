@@ -1,5 +1,5 @@
 import type { GenerationIssue } from '@features/generation/contracts';
-import type { WorkflowReadinessReason } from '@features/workflow/contracts';
+import type { InvocationTemplatesSnapshot, WorkflowReadinessReason } from '@features/workflow/contracts';
 import type { ControlLayerIssue } from '@workbench/controlLayerChecks';
 
 export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
@@ -8,8 +8,18 @@ export type InvocationMode = 'global' | 'dialog';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
+/** The prompt and settings an expansion was computed from. The sample seed travels on its own: it may rotate. */
+export interface DynamicPromptsExpansionSource {
+  combinatorial: boolean;
+  maxPrompts: number;
+  /** The effective (template-merged) positive prompt. */
+  positivePrompt: string;
+}
+
 /** A dynamic prompt expansion, with the sample seed it drew from (null for All combinations). */
 export interface ExpandedPositivePrompts {
+  /** A submission whose source no longer matches what it compiles is refused rather than queued. */
+  expandedFrom: DynamicPromptsExpansionSource;
   positivePrompts: string[];
   /** Recall reproduces this draw, and a resampling submission rotates only while the project still holds it. */
   positivePromptsSampleSeed: number | null;
@@ -75,4 +85,12 @@ export interface ResolvedInvocationRoute extends InvocationRoute {
 
 export interface InvocationControllerState extends InvocationRoute {
   lastSubmittedRunId?: string;
+}
+
+/** Ephemeral values captured at dispatch, never persisted or treated as server authorization. */
+export interface InvocationRuntimeInputs {
+  /** GPU noise choice; the aggregate still applies the project's current CPU-noise preference. */
+  readonly noiseDevice: string;
+  readonly templates: Readonly<InvocationTemplatesSnapshot>;
+  readonly boardDestinationIds: readonly string[];
 }

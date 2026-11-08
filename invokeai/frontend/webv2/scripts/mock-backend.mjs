@@ -9,6 +9,7 @@ import {
   CATALOG_MANAGED_EXTERNAL_SOURCE,
   collectCanvasLeaves,
   createMockBackendFixture,
+  createLargeWorkflowLibraryFixture,
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
@@ -506,6 +507,8 @@ const createState = (profile, clock) => {
     nextWorkflowThumbnailVersion: 1,
     /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
     workflowRequests: [],
+    libraryScenario: null,
+    hasLibraryPageFailed: false,
   };
 };
 
@@ -647,6 +650,167 @@ const readJsonBody = async (request, fallback = {}) => {
   const body = await readBody(request);
 
   return body ? JSON.parse(body) : fallback;
+};
+
+const MEDIA_IMAGE_NAME_KEYS = new Set(['imageName', 'image_name']);
+const MEDIA_VIDEO_NAME_KEYS = new Set(['videoName', 'video_name', 'source_video_name']);
+const MEDIA_USAGE_NAME_CAP = 1000;
+const MEDIA_USAGE_DOCUMENT_CAP = 100;
+const ACTIVE_QUEUE_STATUSES = new Set(['pending', 'in_progress', 'waiting']);
+
+/** Every name under the server's media keys, at any depth, as its `media_references` extractor reads documents. */
+const collectReferencedMedia = (roots) => {
+  const images = new Set();
+  const videos = new Set();
+  const pending = [...roots];
+
+  while (pending.length > 0) {
+    const node = pending.pop();
+
+    if (Array.isArray(node)) {
+      pending.push(...node);
+    } else if (node && typeof node === 'object') {
+      for (const [key, value] of Object.entries(node)) {
+        if (typeof value === 'string') {
+          if (MEDIA_IMAGE_NAME_KEYS.has(key)) {
+            images.add(value);
+          } else if (MEDIA_VIDEO_NAME_KEYS.has(key)) {
+            videos.add(value);
+          }
+        } else if (value && typeof value === 'object') {
+          pending.push(value);
+        }
+      }
+    }
+  }
+
+  return { images, videos };
+};
+
+const usedNamesOf = (referenced, checked) => {
+  const imageNames = [...checked.images].filter((name) => referenced.images.has(name)).sort();
+  const videoNames = [...checked.videos].filter((name) => referenced.videos.has(name)).sort();
+
+  return {
+    image_count: imageNames.length,
+    image_names: imageNames.slice(0, MEDIA_USAGE_NAME_CAP),
+    video_count: videoNames.length,
+    video_names: videoNames.slice(0, MEDIA_USAGE_NAME_CAP),
+  };
+};
+
+const parseClientStateValue = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Mirrors `POST /api/v1/gallery/usage` over the fixtures: projects (content and the caller's workspace), library
+ * workflows, legacy editor client state and active queue items that name checked media. The mock has one account, so
+ * other accounts never use anything.
+ */
+const galleryMediaUsage = (state, faults, body) => {
+  const imageNames = Array.isArray(body.image_names) ? body.image_names : [];
+  const videoNames = Array.isArray(body.video_names) ? body.video_names : [];
+  const boardId = typeof body.board_id === 'string' ? body.board_id : null;
+
+  if (boardId !== null && imageNames.length + videoNames.length > 0) {
+    return [422, { detail: 'board_id cannot be combined with image_names or video_names' }];
+  }
+
+  // As the server: only media the caller may delete is checked, images and videos alike (fixture images carry no
+  // owner and are the caller's).
+  const isCallers = (item) => (item.owner_user_id ?? MOCK_USER_ID) === MOCK_USER_ID;
+  let checked;
+
+  if (boardId !== null) {
+    const board = state.boards.get(boardId);
+
+    if (!board) {
+      return [404, { detail: 'Board not found' }];
+    }
+    if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows('delete')) {
+      return BOARD_ACTION_FORBIDDEN;
+    }
+    const onBoard = (items) => [...items].filter((item) => item.board_id === boardId && isCallers(item));
+    checked = {
+      images: new Set(onBoard(state.images.values()).map((image) => image.image_name)),
+      videos: new Set(onBoard(state.videos.values()).map((video) => video.video_name)),
+    };
+  } else {
+    const deletable = (store, names) => names.filter((name) => store.has(name) && isCallers(store.get(name)));
+    checked = {
+      images: new Set(deletable(state.images, imageNames)),
+      videos: new Set(deletable(state.videos, videoNames)),
+    };
+  }
+
+  const documents = [];
+  // As the server: a project reports the content and workspace revisions its names were read at; other kinds none.
+  const addDocument = (kind, id, name, roots, revisions = { revision: null, workspace_revision: null }) => {
+    const used = usedNamesOf(collectReferencedMedia(roots), checked);
+
+    if (used.image_count + used.video_count > 0) {
+      documents.push({ id, kind, name, ...used, ...revisions });
+    }
+  };
+
+  for (const project of state.projects.values()) {
+    addDocument('project', project.project_id, project.name, [project.data, project.workspace?.data], {
+      revision: project.revision,
+      workspace_revision: project.workspace?.revision ?? null,
+    });
+  }
+  for (const workflow of state.workflows.values()) {
+    if (workflow.category !== 'default') {
+      addDocument('workflow', workflow.workflow_id, workflow.name, [workflow.workflow]);
+    }
+  }
+  addDocument(
+    'legacy_editor',
+    'legacy_editor',
+    null,
+    [...state.clientState].filter(([key]) => !key.startsWith('webv2:')).map(([, value]) => parseClientStateValue(value))
+  );
+
+  const kindOrder = ['legacy_editor', 'project', 'quarantined_project', 'workflow'];
+  documents.sort(
+    (left, right) =>
+      kindOrder.indexOf(left.kind) - kindOrder.indexOf(right.kind) ||
+      (left.name ?? '').localeCompare(right.name ?? '') ||
+      left.id.localeCompare(right.id)
+  );
+
+  const activeItems = [...state.queueItems.values()].filter((item) => ACTIVE_QUEUE_STATUSES.has(item.status));
+  const queueItemsUsing = activeItems.filter((item) => {
+    const used = usedNamesOf(collectReferencedMedia([item.session, item.field_values]), checked);
+
+    return used.image_count + used.video_count > 0;
+  });
+  const queueUsed = usedNamesOf(
+    collectReferencedMedia(queueItemsUsing.flatMap((item) => [item.session, item.field_values])),
+    checked
+  );
+  // The fixture lists stay far below the name cap, so their union is every name in use.
+  const inUseImages = new Set([...documents.flatMap((document) => document.image_names), ...queueUsed.image_names]);
+  const inUseVideos = new Set([...documents.flatMap((document) => document.video_names), ...queueUsed.video_names]);
+
+  return [
+    200,
+    {
+      checked_image_count: checked.images.size,
+      checked_video_count: checked.videos.size,
+      documents: documents.slice(0, MEDIA_USAGE_DOCUMENT_CAP),
+      documents_total: documents.length,
+      in_use_image_count: inUseImages.size,
+      in_use_video_count: inUseVideos.size,
+      other_accounts: { document_count: 0, image_count: 0, queue_item_count: 0, video_count: 0 },
+      queue: { item_count: queueItemsUsing.length, ...queueUsed },
+    },
+  ];
 };
 
 const invocationNodeCount = (state) =>
@@ -2256,7 +2420,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(404, { detail: 'Model not found' });
         }
         if (method === 'PATCH') {
-          // Mirrors ModelRecordService.update_model: submitted fields replace stored ones wholesale; the key stays.
+          // Submitted fields replace stored ones wholesale and the key stays, as in ModelRecordService.update_model.
+          // Unlike the backend, it accepts any field: no validation and no 409 for a field the model's config lacks.
           const updated = { ...model, ...(await readJsonBody(request)), key };
           state.models.set(key, updated);
           return json(200, clone(updated));
@@ -2952,6 +3117,10 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, listGalleryItemNames(state, url, faults));
       }
 
+      if (method === 'POST' && path === '/api/v1/gallery/usage') {
+        return json(...galleryMediaUsage(state, faults, await readJsonBody(request)));
+      }
+
       const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
       if (method === 'GET' && imageAssetMatch) {
         const imageName = decodeURIComponent(imageAssetMatch[1]);
@@ -2974,11 +3143,29 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       const imageMatch = /^\/api\/v1\/images\/i\/([^/]+)$/.exec(path);
-      if (imageMatch) {
+      if ((method === 'GET' || method === 'PATCH') && imageMatch) {
         const imageName = decodeURIComponent(imageMatch[1]);
         const image = state.images.get(imageName);
-
-        return image ? json(200, image) : json(404, { detail: 'Image not found' });
+        if (!image) {
+          return json(404, { detail: 'Image not found' });
+        }
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+          if (
+            ('is_intermediate' in changes && typeof changes.is_intermediate !== 'boolean') ||
+            ('image_category' in changes &&
+              !['general', 'control', 'mask', 'user', 'other'].includes(changes.image_category))
+          ) {
+            return json(422, { detail: 'Invalid image changes' });
+          }
+          if ('is_intermediate' in changes) {
+            image.is_intermediate = changes.is_intermediate;
+          }
+          if ('image_category' in changes) {
+            image.image_category = changes.image_category;
+          }
+        }
+        return json(200, image);
       }
 
       if (method === 'POST' && path === '/api/v1/videos/upload') {
@@ -3183,6 +3370,19 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           : json(404, { detail: 'Video not found' });
       }
 
+      if (method === 'POST' && path === '/__workflow-library') {
+        const { scenario = 'large' } = await readJsonBody(request);
+        if (!['large', 'empty', 'failed-page', 'slow-detail', 'changed-revision'].includes(scenario)) {
+          return json(400, { detail: 'Unknown workflow library scenario' });
+        }
+        const workflows = scenario === 'empty' ? [] : createLargeWorkflowLibraryFixture();
+        state.workflows = new Map(workflows.map((workflow) => [workflow.workflow_id, workflow]));
+        state.libraryScenario = scenario;
+        state.hasLibraryPageFailed = false;
+        state.workflowRequests = [];
+        return json(200, { count: workflows.length, nodesPerDocument: 40, scenario });
+      }
+
       if (path.startsWith('/api/v1/workflows')) {
         state.workflowRequests.push({ method, path });
       }
@@ -3334,6 +3534,14 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
 
         if (method === 'GET') {
+          if (state.libraryScenario === 'slow-detail') {
+            await new Promise((resolve) => {
+              setTimeout(resolve, 300);
+            });
+          }
+          if (state.libraryScenario === 'changed-revision' && workflow.revision === 1) {
+            workflow.revision = 2;
+          }
           return json(200, workflowRecord(workflow));
         }
 
@@ -3430,6 +3638,10 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
+        if (state.libraryScenario === 'failed-page' && page === 2 && !state.hasLibraryPageFailed) {
+          state.hasLibraryPageFailed = true;
+          return json(503, { detail: 'Synthetic page failure; retry succeeds' });
+        }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
         // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.

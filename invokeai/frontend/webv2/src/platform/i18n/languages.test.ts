@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBytes, formatCount } from './languages';
+import {
+  formatBytes,
+  formatCount,
+  getEffectiveWorkbenchLanguage,
+  getWorkbenchLanguageAvailability,
+  getWorkbenchLanguageDirection,
+  normalizeWorkbenchLanguage,
+} from './languages';
 
 describe('formatBytes', () => {
   it('renders a dash for missing or invalid sizes', () => {
@@ -35,5 +42,23 @@ describe('formatCount', () => {
   it('groups digits for the locale', () => {
     expect(formatCount(12_345, 'en')).toBe('12,345');
     expect(formatCount(12_345, 'de')).toBe('12.345');
+  });
+});
+
+describe('content language availability', () => {
+  const catalogs = { en: { translated: 10, ready: true }, fr: { translated: 2 } };
+  it('keeps saved unavailable and incomplete choices while serving English', () => {
+    for (const language of ['ar', 'fr', 'ua']) {
+      const normalized = normalizeWorkbenchLanguage(language)!;
+      expect(normalized).toBe(language === 'ua' ? 'uk' : language);
+      const effective = getEffectiveWorkbenchLanguage(normalized, catalogs);
+      expect(effective).toBe('en');
+      expect(getWorkbenchLanguageDirection(effective)).toBe('ltr');
+    }
+    expect(getWorkbenchLanguageAvailability('ar', catalogs)).toBe('unavailable');
+    expect(getWorkbenchLanguageAvailability('fr', catalogs)).toBe('incomplete');
+  });
+  it('inherits available English content for regional preferences', () => {
+    expect(getEffectiveWorkbenchLanguage('en-GB', catalogs)).toBe('en-GB');
   });
 });

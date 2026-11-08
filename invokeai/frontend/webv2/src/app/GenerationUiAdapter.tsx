@@ -37,6 +37,7 @@ import { shallowEqual } from '@platform/state/selectors';
 import { createActionToast } from '@platform/ui/toaster';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
+import { useAspectRatioPresets } from '@workbench/settings/aspectRatioPresets';
 import {
   getWorkbenchPreferences,
   patchWorkbenchPreferences,
@@ -364,6 +365,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     }),
     [session.multiuserEnabled, session.user?.user_id]
   );
+  const aspectRatioPresets = useAspectRatioPresets();
   const krea2RebalancePresets = useWorkbenchPreferenceSelector((preferences) => preferences.krea2RebalancePresets);
   const rebalancePresetsGroup = useMemo<GenerationUiAdapter['rebalancePresets']>(
     () => ({
@@ -464,6 +466,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       CanvasGenerationSections: GenerateCanvasSections,
       CanvasRenderSize: GenerateCanvasRenderSize,
       account: accountGroup,
+      aspectRatioPresets,
       capabilities: capabilitiesGroup,
       gallery: galleryGroup,
       generateValues,
@@ -479,6 +482,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     }),
     [
       accountGroup,
+      aspectRatioPresets,
       capabilitiesGroup,
       galleryGroup,
       generateValues,

@@ -10,6 +10,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
+import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import {
   areWorkbenchPreferencesReady,
@@ -125,6 +126,19 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       },
       galleryValues,
       generateValues,
+      // Loaded on first use, beside the item actions it shares with the item deletion dialog.
+      getBoardMediaUsage: (boardId, signal) =>
+        import('@workbench/image-actions/mediaUsageReport').then(({ resolveMediaUsage }) =>
+          resolveMediaUsage(
+            { boardId, kind: 'board' },
+            {
+              getLoadedProjects: () => queries.getSnapshot().projects,
+              getSyncBase: (targetProjectId) => getProjectSyncSnapshot().projects[targetProjectId],
+              openProjectId: projectId,
+            },
+            { signal }
+          )
+        ),
       getItemLabel,
       noteBoardBrowsed: (boardId) => {
         const values = getGalleryValues(queries.getProject(projectId), queries.getSnapshot().scopedDefaults);
