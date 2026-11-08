@@ -1,18 +1,22 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
 import inspect
+import os
+import stat
 import threading
 import time
 import weakref
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable
+from typing import Callable, Iterator
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import torch
 from PIL import Image
+from sqlalchemy import event
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
@@ -47,8 +51,8 @@ from tests.test_nodes import TestEventService
 
 MODEL_ID = "test-model-hash"
 DIM = 8
-# An encoder swap evicts the retired model from every per-device cache; most tests have none.
-_NO_MODEL_CACHES = SimpleNamespace(ram_caches={})
+# An encoder swap evicts the retired model from the model caches; these tests have nothing cached.
+_NO_MODEL_CACHES = SimpleNamespace(drop_cached_models=lambda keys: 0)
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
@@ -97,6 +101,13 @@ def _fake_encode(images: list[Image.Image]) -> np.ndarray:
 def db() -> Database:
     config = InvokeAIAppConfig(use_memory_db=True)
     return create_mock_sqlite_database(config=config, logger=InvokeAILogger.get_logger())
+
+
+@pytest.fixture(autouse=True)
+def isolate_index_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Migrations and cache retirement touch files even when the records database is in-memory.
+    monkeypatch.setattr(InvokeAIAppConfig, "root_path", property(lambda self: tmp_path))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
 
 
 @pytest.fixture
@@ -679,6 +690,8 @@ def test_deleted_encoder_becomes_unavailable_and_reinstall_resumes_without_dupli
         service._cpu_model = object()
         service._text_encoder_failure = "previous installation was incomplete"
         service._vocab_cache = (["old"], np.ones((1, DIM), dtype=np.float32))
+        assert service.get_accessible_embeddings("system")[0] == imgs("before.png")
+        assert service._search_cache_bytes == 32
 
         installed.clear()
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
@@ -693,6 +706,8 @@ def test_deleted_encoder_becomes_unavailable_and_reinstall_resumes_without_dupli
         assert service._processor is None
         assert service._cpu_model is None
         assert service._vocab_cache is None
+        assert service._search_cache == {}
+        assert service._search_cache_bytes == 0
 
         _save_image(image_records, "during.png")
         images_service._on_changed(_dto_for(image_records, "during.png"))
@@ -709,6 +724,8 @@ def test_deleted_encoder_becomes_unavailable_and_reinstall_resumes_without_dupli
         assert service._cpu_model is None
         assert service._text_encoder_failure is None
         assert service._vocab_cache is None
+        assert service.get_accessible_embeddings("system")[0] == imgs("before.png", "during.png")
+        assert service._search_cache_bytes == 64
     finally:
         service.stop()
 
@@ -757,12 +774,22 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         ImageIndexService, "_resolve_model_config", lambda self, name: installed[0] if installed else None
     )
     monkeypatch.setattr(ImageIndexService, "_encode_with_model", encode)
+    # Each call's keys: the swap must evict both the retired and the replacement encoder.
+    drops: list[set[str]] = []
+
+    def drop_cached_models(keys) -> int:
+        drops.append(set(keys))
+        return 0
+
+    model_manager = SimpleNamespace(load=SimpleNamespace(drop_cached_models=drop_cached_models))
     service = ImageIndexService()
     query = None
     try:
         if background_batch:
             _save_image(image_records, "pending.png")
-        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        service.start(
+            _make_invoker(images_service, index_records, image_records=image_records, model_manager=model_manager)
+        )
         if not background_batch:
             query = threading.Thread(target=lambda: service.embed_image(Image.new("RGB", (16, 16))))
             query.start()
@@ -795,6 +822,7 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         else:
             service.embed_image(Image.new("RGB", (16, 16)))
         assert seen_models == [encoder_config, replacement]
+        assert {encoder_config.key, replacement.key} in drops
     finally:
         release.set()
         if query is not None:
@@ -1271,6 +1299,163 @@ def test_disabled_service_does_not_discard_embeddings(
         assert index_records.get_embeddings(imgs("a.png"), "stale-model-hash")[0] == imgs("a.png")
     finally:
         service.stop()
+
+
+@pytest.mark.parametrize("late_activation", [False, True], ids=["startup", "late-activation"])
+def test_activation_prunes_only_obsolete_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    late_activation: bool,
+) -> None:
+    model_id = "blake3:613228c1fd904fb8e0123456789abcdef"
+    # Literal expected writer names catch using the full hash instead of its truncated tag.
+    kept_names = ["cluster_vocab_blake3_613228c1fd904fb8e.npz", "cluster_vocab_custom_blake3_613228c1fd904fb8e.npz"]
+    stale_names = ["cluster_vocab_old.npz", "cluster_vocab_custom_old.npz"]
+    other_names = [
+        "cluster_vocab_old.npz123.tmp.npz",
+        "cluster_vocab_old.npz.random.tmp.npz",
+        "cluster_vocab_custom_old.npz.random.tmp.npz",
+        "cluster_vocab_old.npz.uppercase.TMP.NPZ",
+        "cluster_vocab_old.npz.bak",
+        "other-cache.npz",
+        "invokeai.db",
+    ]
+    preserved = {}
+    for name in kept_names + stale_names + other_names:
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        if name not in stale_names:
+            preserved[path] = path.read_bytes()
+    directory = tmp_path / "cluster_vocab_directory.npz"
+    directory.mkdir()
+    nested_cache = directory / "cluster_vocab_old.npz"
+    nested_cache.write_bytes(b"not owned by this database directory")
+
+    if late_activation:
+        service = ImageIndexService()
+        resolved = SimpleNamespace(key="encoder-key", hash=model_id)
+        model_manager = SimpleNamespace(
+            store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES
+        )
+        with patch.object(service, "_resolve_model_config", side_effect=[None, resolved]):
+            try:
+                service.start(_make_invoker(images_service, index_records, model_manager=model_manager))
+                assert all((tmp_path / name).exists() for name in stale_names)
+                service._last_activation_attempt = 0
+                assert service.try_activate()
+                assert service._worker is not None and service._worker.is_alive()
+                assert all(not (tmp_path / name).exists() for name in stale_names)
+            finally:
+                service.stop()
+    else:
+        service = ImageIndexService(encode_fn=_fake_encode, model_id=model_id)
+        try:
+            service.start(_make_invoker(images_service, index_records))
+            assert service._worker is not None and service._worker.is_alive()
+            assert all(not (tmp_path / name).exists() for name in stale_names)
+        finally:
+            service.stop()
+
+    assert all(path.read_bytes() == contents for path, contents in preserved.items())
+    assert nested_cache.read_bytes() == b"not owned by this database directory"
+
+
+def test_vocabulary_pruning_continues_after_one_file_cannot_be_deleted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    caches = {tmp_path / "cluster_vocab_old.npz", tmp_path / "cluster_vocab_custom_old.npz"}
+    for cache in caches:
+        cache.write_bytes(b"obsolete archive")
+    attempted: list[Path] = []
+    original_unlink = Path.unlink
+
+    def unlink(path: Path, *args, **kwargs) -> None:
+        if path in caches:
+            attempted.append(path)
+            if len(attempted) == 1:
+                raise PermissionError("simulated cache sharing violation")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert len(attempted) == 2
+    assert attempted[0].read_bytes() == b"obsolete archive"
+    assert not attempted[1].exists()
+    assert "Could not remove stale cluster vocabulary cache" in caplog.text
+
+
+def test_vocabulary_pruning_scan_failure_does_not_prevent_indexing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    original_glob = Path.glob
+
+    def glob(path: Path, pattern: str, *args, **kwargs):
+        if path == tmp_path and pattern == "cluster_vocab_*.npz":
+            raise PermissionError("simulated unreadable cache directory")
+        return original_glob(path, pattern, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "glob", glob)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert "Could not prune obsolete cluster vocabulary caches" in caplog.text
+
+
+@pytest.mark.parametrize("enabled", [False, True], ids=["disabled", "missing-model"])
+def test_inactive_service_preserves_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    enabled: bool,
+) -> None:
+    path = tmp_path / "cluster_vocab_old.npz"
+    path.write_bytes(b"preserved until a replacement model is active")
+    service = ImageIndexService()
+    model_manager = SimpleNamespace(store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES)
+    with patch.object(service, "_resolve_model_config", return_value=None):
+        try:
+            service.start(_make_invoker(images_service, index_records, enabled=enabled, model_manager=model_manager))
+            assert path.read_bytes() == b"preserved until a replacement model is active"
+            assert service._worker is None
+        finally:
+            service.stop()
+
+
+def test_vocabulary_pruning_preserves_symlinks_and_their_targets(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    target = tmp_path / "unrelated.npz"
+    target.write_bytes(b"not a service-owned archive")
+    link = tmp_path / "cluster_vocab_link.npz"
+    try:
+        link.symlink_to(target)
+    except OSError as error:
+        pytest.skip(f"Host cannot create symlinks: {error}")
+
+    service.start(_make_invoker(images_service, index_records))
+
+    assert link.is_symlink()
+    assert target.read_bytes() == b"not a service-owned archive"
 
 
 def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
@@ -2258,6 +2443,62 @@ def test_unchanged_scope_does_not_recompute_the_projection(
         service.stop()
 
 
+def test_a_pca_fallback_map_is_refit_once_umap_is_installed(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A map the PCA fallback drew is stale once umap-learn imports, even though the gallery is unchanged.
+
+    The scope hash alone would keep serving the PCA map until the gallery changed.
+    """
+    from invokeai.app.services.image_index import projection
+
+    fits = {"n": 0}
+
+    def counting_umap(matrix: np.ndarray) -> np.ndarray:
+        # A stub, as in test_unchanged_scope_does_not_recompute_the_projection: the claim is about
+        # whether the fit runs.
+        fits["n"] += 1
+        return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+    def stored_method() -> str:
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        return projection.stored_projection_method(record.params)
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        # Four points: three or fewer are always PCA, whatever is installed.
+        for i in range(4):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+        monkeypatch.setattr(image_index_default, "compute_umap", counting_umap)
+
+        with monkeypatch.context() as no_umap:
+            no_umap.setattr(projection, "is_windows_arm64", lambda: True)
+            no_umap.setattr(projection, "_umap_class", lambda: None)
+            service.request_projection("system")
+            _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+            assert fits["n"] == 1
+            assert stored_method() == "pca"
+
+        # umap-learn now imports (stated outright: the suite also runs on Windows ARM64, where it does not).
+        monkeypatch.setattr(projection, "is_windows_arm64", lambda: False)
+        service.request_projection("system")
+        _wait_until(lambda: fits["n"] == 2, timeout=30.0)
+        _wait_until(lambda: stored_method() == "umap", timeout=30.0)
+
+        for _ in range(2):
+            service.request_projection("system")
+            _wait_until(lambda: not service._projection_requests, timeout=30.0)
+        assert fits["n"] == 2, "a UMAP map over an unchanged scope must be reused"
+    finally:
+        service.stop()
+
+
 def test_failed_batch_uses_the_escalating_backoff(service: ImageIndexService) -> None:
     """Pin the CALL SITE, not just the helper.
 
@@ -2284,6 +2525,184 @@ def test_projection_job_is_popped_before_running(service: ImageIndexService) -> 
 
     assert job == ("u1", False)
     assert service._projection_requests == {}, "the job must be removed when it is taken"
+    assert service._next_projection_job() is None
+
+
+class _CoolingScope:
+    """A started service whose "system" scope has had one fit, on a clock the test moves (`skew`)."""
+
+    def __init__(self, image_records, images_service, index_records, monkeypatch, fit_seconds: float = 0.0) -> None:
+        self.skew = 0.0
+        self.fits = 0
+        self.image_records = image_records
+        self.images_service = images_service
+        self.index_records = index_records
+
+        def counting_umap(matrix: np.ndarray) -> np.ndarray:
+            # A stub, as in test_unchanged_scope_does_not_recompute_the_projection. It takes
+            # `fit_seconds` of the service's clock.
+            self.fits += 1
+            self.skew += fit_seconds
+            return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+        # The module's own clock only: patching time.monotonic itself would skew every thread in the process.
+        monkeypatch.setattr(
+            image_index_default, "time", SimpleNamespace(monotonic=lambda: time.monotonic() + self.skew)
+        )
+        monkeypatch.setattr(image_index_default, "compute_umap", counting_umap)
+        self.service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        self.invoker = _make_invoker(images_service, index_records)
+        self.service.start(self.invoker)
+        _wait_until(lambda: not self.service._backfill_pending.is_set())
+        # The first fit of a scope has nothing to cool down from.
+        self.service.request_projection("system")
+        _wait_until(lambda: "system" in self.service._projection_not_before, timeout=30.0)
+        assert self.fits == 1
+
+    def ready_count(self) -> int:
+        from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+        return sum(isinstance(e, ImageMapProjectionReadyEvent) for e in self.invoker.services.events.events)
+
+    def change_scope(self) -> None:
+        _save_image(self.image_records, "new.png")
+        self.images_service._on_changed(_dto_for(self.image_records, "new.png"))
+        _wait_until(
+            lambda: self.index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"), timeout=30.0
+        )
+
+    def refit_stored(self) -> bool:
+        record = self.index_records.get_projection("system", MODEL_ID)
+        return record is not None and record.point_count == 4
+
+
+@pytest.mark.parametrize(
+    ("floor", "multiplier", "fit_seconds", "still_cooling_at", "due_at"),
+    [(100.0, 0.0, 0.0, 50.0, 101.0), (0.0, 2.0, 100.0, 250.0, 301.0)],
+    ids=["floor", "multiplier"],
+)
+def test_a_polled_refit_waits_out_the_cooldown_of_the_last_fit(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+    floor: float,
+    multiplier: float,
+    fit_seconds: float,
+    still_cooling_at: float,
+    due_at: float,
+) -> None:
+    """On a busy server something embeds during almost every fit, so a client refetching /points on
+    projection_ready would otherwise queue the next full fit at once, and the worker would fit forever.
+    The multiplier case's fit ends at clock 100, so its cooldown runs to 300."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", floor)
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_MULTIPLIER", multiplier)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch, fit_seconds)
+    try:
+        scope.change_scope()
+        scope.service.request_projection("system")
+        scope.skew = still_cooling_at
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1, "a refit nobody asked for must wait out the cooldown"
+        assert "system" in scope.service._projection_requests, "the deferred refit stays promised"
+
+        scope.skew = due_at
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def test_a_short_circuited_refresh_keeps_the_cooldown(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A refresh over an unchanged scope fits nothing, so it must not free the next poll to refit at once."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        cooldown = scope.service._projection_not_before["system"]
+        _wait_until(lambda: scope.ready_count() == 1)
+
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(lambda: scope.ready_count() == 2)
+        assert scope.service._projection_not_before == {"system": cooldown}
+
+        scope.change_scope()
+        scope.service.request_projection("system")
+        time.sleep(0.2)  # Ten worker polls.
+        assert scope.fits == 1
+    finally:
+        scope.service.stop()
+
+
+def test_a_refresh_whose_read_fails_during_a_cooldown_is_retried_at_once(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The refresh lost its exemption when it was taken; the requeue must not leave it to the cooldown."""
+    monkeypatch.setattr(image_index_default, "_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS", 100.0)
+    scope = _CoolingScope(image_records, images_service, index_records, monkeypatch)
+    try:
+        scope.change_scope()
+        real_list = index_records.list_accessible_embedded_items
+        failures = {"n": 0}
+
+        def fails_once(user_id, model_id):
+            if failures["n"] == 0:
+                failures["n"] += 1
+                raise LockTimeoutError("database is locked")
+            return real_list(user_id, model_id)
+
+        index_records.list_accessible_embedded_items = fails_once  # type: ignore[method-assign]
+        scope.service.request_projection("system", user_initiated=True)
+        _wait_until(scope.refit_stored, timeout=30.0)
+        assert failures["n"] == 1
+        assert scope.fits == 2
+    finally:
+        scope.service.stop()
+
+
+def _fake_running_worker(service: ImageIndexService) -> None:
+    """Make request_projection accept jobs without a worker that would take them. It lives until the
+    service fixture's stop()."""
+    service._model_id = MODEL_ID
+    service._worker = threading.Thread(target=service._stop_event.wait, daemon=True)
+    service._worker.start()
+
+
+def test_a_user_requested_refit_skips_the_cooldown_even_when_a_poll_follows(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["u1"] = time.monotonic() + 1000
+
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+    assert service.request_projection("u1", user_initiated=True)
+    # A poll landing before the worker takes the job must not turn it back into a deferred one.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() == ("u1", False)
+
+    # The exemption went with the job it came with.
+    assert service.request_projection("u1")
+    assert service._next_projection_job() is None
+
+
+def test_a_cooling_scope_does_not_block_another_users_due_refit(service: ImageIndexService) -> None:
+    _fake_running_worker(service)
+    service._projection_not_before["a"] = time.monotonic() + 1000
+
+    assert service.request_projection("a", all_images=True)
+    assert service.request_projection("b")
+
+    assert service._next_projection_job() == ("b", False)
+    assert service._projection_requests == {"a": True}, "the deferred job stays queued"
     assert service._next_projection_job() is None
 
 
@@ -2555,6 +2974,464 @@ def test_search_similar_returns_empty_when_not_running(service: ImageIndexServic
     assert service.search_similar(None, np.ones(DIM, dtype=np.float32), limit=5) == []
 
 
+@pytest.fixture
+def search_scope_users(
+    db: Database,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> tuple[str, str]:
+    """Two non-admin owners and admin ALL, with 32, 96 and 128 decoded bytes respectively."""
+    from invokeai.app.services.users.users_common import UserCreateRequest
+    from invokeai.app.services.users.users_default import UserService
+
+    users = UserService(db)
+    owner = users.create(
+        UserCreateRequest(email="owner@example.com", display_name="Owner", password="TestPass123", is_admin=False)
+    )
+    other = users.create(
+        UserCreateRequest(email="cache@example.com", display_name="Cache", password="TestPass123", is_admin=False)
+    )
+    assert owner.is_admin is False
+    assert other.is_admin is False
+    # Seed every embedding before the worker starts, so backfill cannot overwrite the one-hot vectors.
+    for axis, name in enumerate(("a.png", "b.png", "c.png", "d.png")):
+        image_records.save(
+            image_name=name,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            width=16,
+            height=16,
+            has_workflow=False,
+            user_id=owner.user_id if axis == 0 else other.user_id,
+        )
+        vector = np.zeros(DIM, dtype=np.float32)
+        vector[axis] = 1
+        index_records.upsert_embedding(IndexedItem("image", name), MODEL_ID, vector)
+    backfill_done = threading.Event()
+    list_unembedded_items = index_records.list_unembedded_items
+
+    def empty_backfill(model_id: str, limit: int) -> list[IndexedItem]:
+        rows = list_unembedded_items(model_id, limit)
+        assert rows == []
+        backfill_done.set()
+        return rows
+
+    with patch.object(index_records, "list_unembedded_items", side_effect=empty_backfill):
+        service.start(_make_invoker(images_service, index_records))
+        assert backfill_done.wait(timeout=10)
+    return owner.user_id, other.user_id
+
+
+@pytest.fixture
+def embedding_blob_selects(db: Database) -> Iterator[list[str]]:
+    selects: list[str] = []
+
+    def record_select(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT") and "image_embeddings.embedding" in statement:
+            selects.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", record_select)
+    try:
+        yield selects
+    finally:
+        event.remove(db.engine, "before_cursor_execute", record_select)
+
+
+@pytest.mark.parametrize("all_images", [False, True], ids=["owner", "all"])
+def test_search_cache_retires_previous_gallery_versions_during_growth(
+    all_images: bool,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 4096)
+    service.get_accessible_embeddings(other)
+    user_id = None if all_images else owner
+    names = ["a.png", "b.png", "c.png", "d.png"] if all_images else ["a.png"]
+    axes = [0, 1, 2, 3] if all_images else [0]
+    query = np.arange(DIM, 0, -1, dtype=np.float32)
+    for refresh in range(4):
+        if refresh:
+            # Grow the real gallery AFTER startup and each preceding refresh, as new embeddings land.
+            name = f"new-{refresh}.png"
+            axis = refresh + 3
+            image_records.save(
+                image_name=name,
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+                width=16,
+                height=16,
+                has_workflow=False,
+                user_id=owner,
+            )
+            index_records.upsert_embedding(IndexedItem("image", name), MODEL_ID, np.eye(DIM, dtype=np.float32)[axis])
+            names.append(name)
+            axes.append(axis)
+        items, matrix = service.get_accessible_embeddings(user_id)
+        assert items == imgs(*names)
+        np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[axes])
+        assert service.search_similar(user_id, query, 10) == [
+            (IndexedItem("image", name), float(DIM - axis)) for name, axis in zip(names, axes, strict=True)
+        ]
+        assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
+        assert len(embedding_blob_selects) == refresh + 2
+        assert service._search_cache_bytes == 96 + len(names) * 32
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == service._search_cache_bytes
+        assert len(service._search_cache) == 2
+
+
+@pytest.mark.parametrize("all_images", [False, True], ids=["owner", "all"])
+def test_search_cache_empty_gallery_retires_its_previous_matrix(
+    all_images: bool,
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+) -> None:
+    owner, other = search_scope_users
+    service.get_accessible_embeddings(other)
+    user_id = None if all_images else owner
+    previous_items, _ = service.get_accessible_embeddings(user_id)
+    for item in previous_items:
+        index_records.delete_embedding(item)
+    for _ in range(2):
+        items, matrix = service.get_accessible_embeddings(user_id)
+        assert items == []
+        assert matrix.shape == (0, 0)
+        assert service.search_similar(user_id, _unit_vec(), 10) == []
+        assert len(embedding_blob_selects) == 2
+        assert len(service._search_cache) == 1
+        assert service._search_cache_bytes == 96
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 96
+
+
+def test_search_cache_reuses_three_scopes_within_byte_budget(
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    # All three differently sized matrices fit exactly; entry count must not evict them.
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 256)
+    query = np.array([1, 0.5, -0.5, -1, 0, 0, 0, 0], dtype=np.float32)
+    cases = [
+        (owner, imgs("a.png"), [[1, 0, 0, 0, 0, 0, 0, 0]], [1]),
+        (
+            other,
+            imgs("b.png", "c.png", "d.png"),
+            [[0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 0], [0, 0, 0, 1, 0, 0, 0, 0]],
+            [0.5, -0.5, -1],
+        ),
+        (
+            None,
+            imgs("a.png", "b.png", "c.png", "d.png"),
+            [
+                [1, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0, 0, 0],
+            ],
+            [1, 0.5, -0.5, -1],
+        ),
+    ]
+    with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
+        for cycle in range(4):
+            for user_id, expected_items, expected_matrix, expected_scores in cases:
+                items, matrix = service.get_accessible_embeddings(user_id)
+                assert items == expected_items
+                np.testing.assert_array_equal(matrix, np.array(expected_matrix, dtype=np.float32))
+                results = service.search_similar(user_id, query, limit=10)
+                assert [item for item, _ in results] == expected_items
+                assert [score for _, score in results] == pytest.approx(expected_scores)
+            if cycle == 0:
+                assert reads.call_count == 3
+        assert reads.call_count == 3, "warmed scopes within the byte budget must not re-read embedding BLOBs"
+
+
+@pytest.mark.parametrize("budget", [128, 160])
+def test_search_cache_evicts_lru_by_matrix_bytes(
+    budget: int,
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", budget)
+    with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
+        service.get_accessible_embeddings(owner)  # 32 bytes
+        service.get_accessible_embeddings(other)  # 96 bytes
+        assert service._search_cache_bytes == 128
+        service.get_accessible_embeddings(owner)  # Touch: the other owner is now LRU.
+        assert reads.call_count == 2
+        service.get_accessible_embeddings(None)  # 128 bytes: evicts the other owner, keeps the touched one.
+        assert reads.call_count == 3
+        assert service._search_cache_bytes == 160
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 160
+        service.get_accessible_embeddings(owner)
+        assert reads.call_count == 3
+        service.get_accessible_embeddings(other)  # Admin ALL is now LRU.
+        assert reads.call_count == 4
+        assert service._search_cache_bytes == 128
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
+
+
+def test_search_cache_alternating_scopes_over_budget_do_not_evict_each_other(
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 96)
+    with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
+        for _ in range(3):
+            assert service.get_accessible_embeddings(owner)[0] == imgs("a.png")
+            items, matrix = service.get_accessible_embeddings(None)  # 128 bytes: over budget on its own.
+            assert items == imgs("a.png", "b.png", "c.png", "d.png")
+            np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[:4])
+            assert service.search_similar(None, np.arange(DIM, 0, -1, dtype=np.float32), 10) == list(
+                zip(imgs("a.png", "b.png", "c.png", "d.png"), [8, 7, 6, 5], strict=True)
+            )
+            assert service._search_cache_bytes == 160
+            assert reads.call_count == len(embedding_blob_selects) == 2
+        # A third scope replaces the LRU one, so at most two stay over budget.
+        assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
+        assert reads.call_count == 3
+        assert service._search_cache_bytes == 224
+        assert len(service._search_cache) == 2
+
+
+def test_search_cache_evicts_several_scopes_down_to_the_two_most_recent(
+    db: Database,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.users.users_common import UserCreateRequest
+    from invokeai.app.services.users.users_default import UserService
+
+    owner, other = search_scope_users
+    third = UserService(db).create(
+        UserCreateRequest(email="third@example.com", display_name="Third", password="TestPass123", is_admin=False)
+    )
+    image_records.save(
+        image_name="e.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=16,
+        height=16,
+        has_workflow=False,
+        user_id=third.user_id,
+    )
+    index_records.upsert_embedding(imgs("e.png")[0], MODEL_ID, np.eye(DIM, dtype=np.float32)[4])
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 160)
+    with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
+        for user_id in (owner, third.user_id, other):  # 32 + 32 + 96 bytes fit exactly.
+            service.get_accessible_embeddings(user_id)
+        assert service._search_cache_bytes == 160
+        assert len(service._search_cache) == 3
+        service.get_accessible_embeddings(None)  # 160 bytes: both older small scopes go.
+        assert reads.call_count == 4
+        assert service._search_cache_bytes == 256
+        service.get_accessible_embeddings(other)
+        service.get_accessible_embeddings(None)
+        assert reads.call_count == 4
+        service.get_accessible_embeddings(third.user_id)
+        assert reads.call_count == 5
+
+
+def test_search_cache_does_not_retain_empty_matrices_after_embeddings_disappear(
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    get_embeddings = index_records.get_embeddings
+
+    def delete_before_read(items, model_id):
+        # The visibility query succeeded, but its rows disappear before the BLOB read.
+        for item in items:
+            index_records.delete_embedding(item)
+        return get_embeddings(items, model_id)
+
+    monkeypatch.setattr(index_records, "get_embeddings", delete_before_read)
+    for user_id in (owner, other, None):
+        items, matrix = service.get_accessible_embeddings(user_id)
+        assert items == []
+        assert matrix.shape == (0, 0)
+        assert service._search_cache == {}
+        assert service._search_cache_bytes == 0
+
+
+@pytest.mark.parametrize("newer_finishes_first", [False, True])
+def test_search_cache_out_of_order_gallery_fills_keep_one_version_per_owner(
+    newer_finishes_first: bool,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 256)
+    service.get_accessible_embeddings(other)
+    entered = [threading.Event(), threading.Event()]
+    release = [threading.Event(), threading.Event()]
+    get_embeddings = index_records.get_embeddings
+    calls = 0
+
+    def read_then_wait(items, model_id):
+        nonlocal calls
+        # Submissions are gated by entered, so the first two reads have a deterministic order.
+        index = calls
+        calls += 1
+        result = get_embeddings(items, model_id)
+        if index < 2:
+            entered[index].set()
+            assert release[index].wait(timeout=10)
+        return result
+
+    with patch.object(index_records, "get_embeddings", side_effect=read_then_wait):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            try:
+                older = pool.submit(service.get_accessible_embeddings, owner)
+                assert entered[0].wait(timeout=10)
+                image_records.save(
+                    image_name="new.png",
+                    image_origin=ResourceOrigin.INTERNAL,
+                    image_category=ImageCategory.GENERAL,
+                    width=16,
+                    height=16,
+                    has_workflow=False,
+                    user_id=owner,
+                )
+                index_records.upsert_embedding(imgs("new.png")[0], MODEL_ID, np.eye(DIM, dtype=np.float32)[4])
+                newer = pool.submit(service.get_accessible_embeddings, owner)
+                assert entered[1].wait(timeout=10)
+                futures = [older, newer]
+                for index in [1, 0] if newer_finishes_first else [0, 1]:
+                    release[index].set()
+                    items, matrix = futures[index].result(timeout=10)
+                    assert items == (imgs("a.png", "new.png") if index else imgs("a.png"))
+                    np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[[0, 4] if index else [0]])
+                    assert len(service._search_cache) == 2
+                    assert service._search_cache_bytes == 96 + (64 if index else 32)
+                    assert (
+                        sum(entry[-1].nbytes for entry in service._search_cache.values()) == service._search_cache_bytes
+                    )
+            finally:
+                for pending in release:
+                    pending.set()
+        # A late old fill may replace the newer matrix, but must keep its OLD fingerprint:
+        # the next current-gallery request must never hit the old rows as if they were current.
+        for _ in range(2):
+            items, matrix = service.get_accessible_embeddings(owner)
+            assert items == imgs("a.png", "new.png")
+            np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[[0, 4]])
+            assert service._search_cache_bytes == 160
+            assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
+        assert len(embedding_blob_selects) == (4 if newer_finishes_first else 3)
+
+
+def test_search_cache_concurrent_same_scope_fills_are_charged_once(
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 128)
+    service.get_accessible_embeddings(owner)
+    entered = [threading.Event(), threading.Event()]
+    release = [threading.Event(), threading.Event()]
+    calls_lock = threading.Lock()
+    calls = 0
+    get_embeddings = index_records.get_embeddings
+
+    def read_then_wait(items, model_id):
+        nonlocal calls
+        with calls_lock:
+            index = calls
+            calls += 1
+        result = get_embeddings(items, model_id)
+        entered[index].set()
+        assert release[index].wait(timeout=10)
+        return result
+
+    with patch.object(index_records, "get_embeddings", side_effect=read_then_wait) as reads:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            try:
+                first = pool.submit(service.get_accessible_embeddings, other)
+                assert entered[0].wait(timeout=10)
+                second = pool.submit(service.get_accessible_embeddings, other)
+                assert entered[1].wait(timeout=10)
+                release[0].set()
+                first_result = first.result(timeout=10)
+                release[1].set()
+                second_result = second.result(timeout=10)
+            finally:
+                for event in release:
+                    event.set()
+        assert first_result[0] == second_result[0] == imgs("b.png", "c.png", "d.png")
+        np.testing.assert_array_equal(first_result[1], second_result[1])
+        assert first_result[1].nbytes == second_result[1].nbytes == 96
+        assert len(service._search_cache) == 2
+        assert service._search_cache_bytes == 128
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
+        service.get_accessible_embeddings(owner)
+        service.get_accessible_embeddings(other)
+        assert reads.call_count == 2
+
+
+def test_search_cache_rechecks_board_visibility_with_multiple_cached_scopes(
+    search_scope_users: tuple[str, str],
+    db: Database,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    from invokeai.app.services.board_access.board_access_common import GeneralAccess
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_common import BoardChanges
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 1024)
+    boards = BoardRecordStorage(db)
+    board = boards.save("Private", user_id=other)
+    BoardImageRecordStorage(db).add_image_to_board(board.board_id, "b.png")
+    query = np.array([1, 0.5, -0.5, -1, 0, 0, 0, 0], dtype=np.float32)
+    a, b, c, d = imgs("a.png", "b.png", "c.png", "d.png")
+    assert service.search_similar(owner, query, 10) == [(a, 1)]
+    assert service.search_similar(other, query, 10) == [(b, 0.5), (c, -0.5), (d, -1)]
+    assert service.search_similar(None, query, 10) == [(a, 1), (b, 0.5), (c, -0.5), (d, -1)]
+    boards.update(board.board_id, BoardChanges(general_access=GeneralAccess.Viewer))
+    assert service.search_similar(owner, query, 10) == [(a, 1), (b, 0.5)]
+    boards.update(board.board_id, BoardChanges(general_access=GeneralAccess.Restricted))
+    assert service.search_similar(owner, query, 10) == [(a, 1)]
+    boards.update(board.board_id, BoardChanges(archived=True))
+    assert service.search_similar(other, query, 10) == [(c, -0.5), (d, -1)]
+    assert service.search_similar(None, query, 10) == [(a, 1), (c, -0.5), (d, -1)]
+    boards.update(board.board_id, BoardChanges(archived=False))
+    assert service.search_similar(None, query, 10) == [(a, 1), (b, 0.5), (c, -0.5), (d, -1)]
+
+
 def test_search_similar_scopes_to_the_requesting_user(
     db: Database,
     image_records: ImageRecordStorage,
@@ -2791,6 +3668,144 @@ def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.n
     return svc
 
 
+@pytest.mark.parametrize("build_fails", [False, True], ids=["successful-build", "failed-build"])
+def test_vocab_requests_do_not_wait_for_an_in_flight_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, build_fails: bool
+) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    entered = threading.Event()
+    release = threading.Event()
+    request_done = threading.Event()
+    build_errors: list[Exception] = []
+    request_errors: list[Exception] = []
+    builds = 0
+
+    def _embed(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        nonlocal builds
+        builds += 1
+        entered.set()
+        if not release.wait(timeout=15):
+            raise TimeoutError("The test did not release the vocabulary encoder")
+        if build_fails:
+            raise RuntimeError("simulated encoder failure")
+        return matrix
+
+    def _build() -> None:
+        try:
+            service._build_vocab_embeddings()
+        except Exception as error:
+            build_errors.append(error)
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            request_errors.append(error)
+        finally:
+            request_done.set()
+
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _embed)
+    builder = threading.Thread(target=_build)
+    caller = threading.Thread(target=_request)
+    builder.start()
+    try:
+        assert entered.wait(timeout=5), "The worker never reached the vocabulary encoder"
+        assert service.get_vocab_build_state() == ("building", None)
+        caller.start()
+        # A hang ceiling, not a throughput budget: the encoder cannot finish
+        # until this test releases it, but the request must already be done.
+        assert request_done.wait(timeout=5), "The labels request waited for the vocabulary build"
+        assert len(request_errors) == 1
+        assert isinstance(request_errors[0], TextSearchUnavailableError)
+        assert "still being prepared" in str(request_errors[0])
+        assert not service._vocab_build_requested.is_set()
+    finally:
+        release.set()
+        builder.join(timeout=5)
+        if caller.ident is not None:
+            caller.join(timeout=5)
+
+    assert not builder.is_alive() and not caller.is_alive()
+    assert not build_errors
+    failed_at = service._vocab_failed_at
+    service._build_vocab_embeddings()
+    assert builds == 1
+    if build_fails:
+        with pytest.raises(RuntimeError, match="simulated encoder failure"):
+            service.get_vocab_embeddings()
+        assert service._vocab_failed_at == failed_at
+        assert service.get_vocab_build_state() == ("error", "simulated encoder failure")
+    else:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+        assert vocabulary == ["a cat", "a dog", "a car"]
+        assert np.array_equal(embeddings, matrix)
+        assert service.get_vocab_build_state() == ("ready", None)
+
+
+def test_a_ready_vocabulary_answers_while_another_reader_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    service._build_vocab_embeddings()
+    # Stands in for a concurrent get_vocab_embeddings / get_vocab_build_state.
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+    finally:
+        service._vocab_lock.release()
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(embeddings, matrix)
+
+    service._stop_event.set()
+    with pytest.raises(TextSearchUnavailableError, match="The image index is not running"):
+        service.get_vocab_embeddings()
+
+
+@pytest.mark.parametrize("unavailable", ["stopped", "no-model", "no-invoker"])
+def test_a_busy_vocabulary_reports_unavailability_during_shutdown(service: ImageIndexService, unavailable: str) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+    if unavailable == "stopped":
+        service._stop_event.set()
+    elif unavailable == "no-model":
+        service._model_id = None
+    else:
+        service._invoker = None
+    done = threading.Event()
+    errors: list[Exception] = []
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            errors.append(error)
+        finally:
+            done.set()
+
+    caller = threading.Thread(target=_request)
+    try:
+        with service._vocab_lock:
+            caller.start()
+            assert done.wait(timeout=5), "The unavailable index waited for the vocabulary lock"
+    finally:
+        if caller.ident is not None:
+            caller.join(timeout=5)
+    assert not caller.is_alive()
+    assert len(errors) == 1
+    assert isinstance(errors[0], TextSearchUnavailableError)
+    assert str(errors[0]) == "The image index is not running"
+    assert not service._vocab_build_requested.is_set()
+
+
 def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     # np.savez appends `.npz` to a path that lacks it, so a staging name ending
     # in `.tmp` produced `.tmp.npz` on disk and the rename that followed looked
@@ -2857,6 +3872,146 @@ def test_a_failed_cache_write_says_what_went_wrong(tmp_path, monkeypatch: pytest
     assert exc_info is True
     # The run itself is unaffected — which is why the warning has to carry it.
     assert service._vocab_cache is not None
+
+
+def test_overlapping_vocabulary_writers_cannot_modify_a_published_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Separate services model processes sharing a directory. Their PID-based
+    # staging names collide even though their in-process locks are independent.
+    first_matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    second_matrix = -first_matrix
+    first = _vocab_build_service(tmp_path, monkeypatch, first_matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    opened = threading.Event()
+    second_published = threading.Event()
+    first_written = threading.Event()
+    finish_first = threading.Event()
+    errors: list[BaseException] = []
+    save = np.savez
+
+    def _save(file, **arrays) -> None:
+        if threading.current_thread() is not writer:
+            save(file, **arrays)
+            return
+        # Keep the actual handle open across the other writer's publication.
+        # Accept either np.savez's path or file interface, without pinning the
+        # staging-name implementation. Windows refuses to rename a shared open
+        # path; POSIX publishes an inode that the first writer can still alter.
+        context = open(file, "wb") if isinstance(file, (str, Path)) else nullcontext(file)
+        with context as handle:
+            opened.set()
+            # Production swallows exceptions raised here, so record them.
+            try:
+                assert second_published.wait(10), "The second writer did not finish"
+                save(handle, **arrays)
+                handle.flush()
+                first_written.set()
+                assert finish_first.wait(10), "The first writer was not released"
+            except AssertionError as error:
+                errors.append(error)
+                raise
+
+    def _build_first() -> None:
+        try:
+            first._build_vocab_embeddings()
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(image_index_default.np, "savez", _save)
+    writer = threading.Thread(target=_build_first)
+    writer.start()
+    try:
+        assert opened.wait(10), "The first writer did not open its staging file"
+        second = _vocab_build_service(tmp_path, monkeypatch, second_matrix)
+        second._build_vocab_embeddings()
+        assert cache_path.exists(), "A concurrent writer could not publish its cache"
+        with np.load(cache_path, allow_pickle=False) as cached:
+            assert np.array_equal(cached["embeddings"], second_matrix)
+        published = cache_path.read_bytes()
+        second_published.set()
+        assert first_written.wait(10), "The first writer did not finish serialization"
+        assert cache_path.read_bytes() == published, "An unpublished writer altered the live cache"
+    finally:
+        second_published.set()
+        finish_first.set()
+        writer.join(timeout=10)
+
+    assert not writer.is_alive()
+    assert not errors
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], first_matrix)
+    assert sorted(tmp_path.iterdir()) == [cache_path]
+
+
+@pytest.mark.parametrize("existing_cache", [False, True], ids=["first-build", "replacement"])
+@pytest.mark.parametrize("failure", ["serialization", "publication"])
+def test_failed_vocabulary_publication_cleans_only_its_staging_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, existing_cache: bool, failure: str
+) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    previous: bytes | None = None
+    if existing_cache:
+        np.savez(cache_path, embeddings=-matrix, fingerprint=np.str_("older vocabulary"))
+        previous = cache_path.read_bytes()
+    # Another writer's staging file must not be swept on failure.
+    other_staging = tmp_path / f"{cache_path.name}.other.tmp.npz"
+    other_staging.write_bytes(b"another writer's incomplete cache")
+    recorded: list[tuple[str, object]] = []
+    service._invoker.services.logger = SimpleNamespace(  # type: ignore[union-attr]
+        warning=lambda message, exc_info=False: recorded.append((str(message), exc_info))
+    )
+
+    def _fail_save(file, **arrays) -> None:
+        if isinstance(file, (str, Path)):
+            Path(file).write_bytes(b"partial archive")
+        else:
+            file.write(b"partial archive")
+        raise OSError("simulated serialization failure")
+
+    def _fail_replace(src: object, dst: object) -> None:
+        raise PermissionError("simulated publication failure")
+
+    if failure == "serialization":
+        monkeypatch.setattr(image_index_default.np, "savez", _fail_save)
+    else:
+        monkeypatch.setattr(image_index_default.os, "replace", _fail_replace)
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    assert service._vocab_failure is None
+    vocabulary, cached_matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(cached_matrix, matrix)
+    assert len(recorded) == 1
+    assert "Could not write cluster vocabulary cache" in recorded[0][0]
+    assert recorded[0][1] is True
+    assert other_staging.read_bytes() == b"another writer's incomplete cache"
+    if previous is not None:
+        assert cache_path.read_bytes() == previous
+    else:
+        assert not cache_path.exists()
+    expected_files = {other_staging}
+    if existing_cache:
+        expected_files.add(cache_path)
+    assert set(tmp_path.iterdir()) == expected_files
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes are not supported on this platform")
+def test_vocabulary_cache_uses_normal_file_mode(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    reference_path = tmp_path / "reference.npz"
+    np.savez(reference_path, embeddings=matrix, fingerprint=np.str_("reference vocabulary"))
+
+    service._build_vocab_embeddings()
+
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    assert stat.S_IMODE(cache_path.stat().st_mode) == stat.S_IMODE(reference_path.stat().st_mode)
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], matrix)
 
 
 def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:

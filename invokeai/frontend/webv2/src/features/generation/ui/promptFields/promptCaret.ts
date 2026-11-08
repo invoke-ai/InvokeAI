@@ -5,6 +5,35 @@ export interface CaretRect {
   y: number;
 }
 
+/**
+ * The width a textarea wraps its text in: its padding box minus any vertical scrollbar, which is what `clientWidth`
+ * reports, but without `clientWidth`'s rounding to whole pixels. At a fractional layout width a mirror sized from the
+ * rounded value is up to half a pixel wider than the textarea and can keep a word on a line the textarea wraps.
+ *
+ * Pass the textarea's live computed style when measuring repeatedly, so it is looked up once.
+ */
+export const getTextareaWrapWidth = (
+  textarea: HTMLTextAreaElement,
+  computed: CSSStyleDeclaration = window.getComputedStyle(textarea)
+): number => {
+  const width = Number.parseFloat(computed.width);
+
+  if (!Number.isFinite(width)) {
+    return textarea.clientWidth;
+  }
+
+  const borderInline =
+    (Number.parseFloat(computed.borderLeftWidth) || 0) + (Number.parseFloat(computed.borderRightWidth) || 0);
+  const paddingBoxWidth =
+    computed.boxSizing === 'border-box'
+      ? width - borderInline
+      : width + (Number.parseFloat(computed.paddingLeft) || 0) + (Number.parseFloat(computed.paddingRight) || 0);
+  // A scrollbar takes whole pixels, so the rounded box sizes measure it exactly; overlay scrollbars measure 0.
+  const scrollbar = Math.max(0, Math.round(textarea.offsetWidth - textarea.clientWidth - borderInline));
+
+  return paddingBoxWidth - scrollbar;
+};
+
 const MIRRORED_STYLES = [
   'direction',
   'fontFamily',
@@ -66,7 +95,7 @@ export const getTextareaCaretRect = (textarea: HTMLTextAreaElement, index: numbe
   mirror.style.overflow = 'hidden';
   mirror.style.boxSizing = 'border-box';
   mirror.style.border = '0';
-  mirror.style.width = `${textarea.clientWidth}px`;
+  mirror.style.width = `${getTextareaWrapWidth(textarea, computed)}px`;
 
   mirror.textContent = textarea.value.slice(0, index);
   marker.textContent = textarea.value.slice(index) || '​';

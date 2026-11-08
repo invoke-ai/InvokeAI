@@ -31,6 +31,7 @@ vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
     success: toolbarMocks.success,
   }),
   useWorkflowPreferencesSelector: () => false,
+  useWorkflowUi: () => ({ CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd> }),
   useWorkflowProjectSelector: (selector: (project: unknown) => unknown) =>
     selector({ activeWorkflow: { document: { name: toolbarMocks.workflowName } } }),
 }));
@@ -73,7 +74,14 @@ beforeEach(() => {
 
 const render = async (
   nodeOpacity: number,
-  arrangeProps: { arrangeScope?: 'all' | 'selection' | null; onArrangeNodes?: () => void } = {}
+  arrangeProps: {
+    arrangeScope?: 'all' | 'selection' | null;
+    canRedo?: boolean;
+    canUndo?: boolean;
+    onArrangeNodes?: () => void;
+    onRedo?: () => void;
+    onUndo?: () => void;
+  } = {}
 ) => {
   applyThemeToRoot('mono');
   host = document.createElement('div');
@@ -138,6 +146,62 @@ describe('editor toolbar', () => {
     await render(1, { arrangeScope: 'selection', onArrangeNodes });
     await settle(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Arrange selected nodes"]')!.click());
     expect(onArrangeNodes).toHaveBeenCalledTimes(1);
+  });
+
+  it('undoes and redoes from the toolbar only while the history has an edit to step over', async () => {
+    const onRedo = vi.fn();
+    const onUndo = vi.fn();
+    const undo = () => host!.querySelector<HTMLButtonElement>('button[aria-label="Undo"]')!;
+    const redo = () => host!.querySelector<HTMLButtonElement>('button[aria-label="Redo"]')!;
+
+    await render(1, { canRedo: false, canUndo: false, onRedo, onUndo });
+    expect(undo().getAttribute('aria-disabled')).toBe('true');
+    expect(redo().getAttribute('aria-disabled')).toBe('true');
+    await settle(() => undo().click());
+    await settle(() => redo().click());
+    expect(onUndo).not.toHaveBeenCalled();
+    expect(onRedo).not.toHaveBeenCalled();
+
+    await render(1, { canRedo: true, canUndo: true, onRedo, onUndo });
+    await settle(() => undo().click());
+    await settle(() => redo().click());
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(onRedo).toHaveBeenCalledOnce();
+  });
+
+  it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {
+    const renderHistory = (canUndo: boolean) =>
+      settle(() => {
+        root?.render(
+          <I18nextProvider i18n={i18n}>
+            <ChakraProvider value={system}>
+              <EditorToolbar
+                canRedo={!canUndo}
+                canUndo={canUndo}
+                nodeOpacity={1}
+                tool="pan"
+                onExportPrepare={toolbarMocks.onExportPrepare}
+                onExportComplete={toolbarMocks.onExportComplete}
+                onNodeOpacityChange={vi.fn()}
+                onRedo={vi.fn()}
+                onToolChange={vi.fn()}
+                onUndo={vi.fn()}
+              />
+            </ChakraProvider>
+          </I18nextProvider>
+        );
+      });
+
+    await render(1);
+    await renderHistory(true);
+    const undo = host!.querySelector<HTMLButtonElement>('button[aria-label="Undo"]')!;
+    undo.focus();
+    await settle(() => undo.click());
+    // The history is now empty: the button says so but keeps focus, so the keyboard user is not dropped to the page.
+    await renderHistory(false);
+
+    expect(undo.getAttribute('aria-disabled')).toBe('true');
+    expect(document.activeElement).toBe(undo);
   });
 
   it('keeps every button on one shared square toolbar box', async () => {

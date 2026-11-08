@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models';
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
-import { ModelsUiProvider } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
@@ -48,8 +48,11 @@ const externalMain = createModel({ base: 'external', key: 'gpt-image', name: 'GP
 const MODELS_UI_ADAPTER = {
   canManageModels: true,
   enableModelDescriptions: false,
+  installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
 };
 const SECTION_MODEL = { base: 'flux', key: 'flux-main', type: 'main' } as const;
 

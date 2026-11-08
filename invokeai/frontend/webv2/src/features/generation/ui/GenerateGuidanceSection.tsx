@@ -1,8 +1,12 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Badge, Separator, Stack } from '@chakra-ui/react';
-import { isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import { Badge, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  getKrea2EditLoraState,
+  getReferenceImageUnavailableReason,
+  isReferenceImageSupported,
+} from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -11,7 +15,8 @@ import {
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useTranslation } from 'react-i18next';
 
-import { GenerateConceptsContent, isCompatibleLora } from './GenerateConceptsSection';
+import { GenerateConceptsContent, isCompatibleLora, isConceptInstalled } from './GenerateConceptsSection';
+import { useGenerationUi } from './GenerationUiContext';
 import { GenerateReferenceImagesContent } from './reference-images/GenerateReferenceImagesSection';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
@@ -28,7 +33,12 @@ interface GenerateGuidanceSectionProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
-const selectGuidanceSettings = pickGenerateSettings(['loras', 'referenceImages']);
+const selectGuidanceSettings = pickGenerateSettings([
+  'loras',
+  'qwen3VLEncoderModel',
+  'qwen3VLVisionTowerModel',
+  'referenceImages',
+]);
 
 export const GenerateGuidanceSection = ({
   draft,
@@ -42,13 +52,15 @@ export const GenerateGuidanceSection = ({
 }: GenerateGuidanceSectionProps) => {
   const { t } = useTranslation();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectGuidanceSettings);
-  const referenceImagesSupported = isReferenceImageSupported(selectedModel);
+  const referenceImagesSupported = isReferenceImageSupported(selectedModel, settings);
   const referenceImageCount = settings.referenceImages.length;
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
     : 0;
+  const catalogStatus = useGenerationUi().models.status;
   const activeConcepts = settings.loras.filter(
-    (lora) => lora.isEnabled && isCompatibleLora(lora, selectedModel)
+    (lora) =>
+      lora.isEnabled && isCompatibleLora(lora, selectedModel) && isConceptInstalled(lora, loraModels, catalogStatus)
   ).length;
   const hasIncompatible =
     (!referenceImagesSupported && referenceImageCount > 0) ||
@@ -80,12 +92,23 @@ export const GenerateGuidanceSection = ({
       <Stack gap="2" p="2">
         <GenerateReferenceImagesContent
           models={models}
+          visionComponents={settings}
           referenceImages={settings.referenceImages}
           selectedModel={selectedModel}
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
-        {referenceImagesSupported || referenceImageCount > 0 ? <Separator borderColor="bg.subtle" /> : null}
+        {/* Not blocking: the run works, but without an edit LoRA it only copies the references. */}
+        {getKrea2EditLoraState(selectedModel, settings) === 'noLora' ? (
+          <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">
+            {t('widgets.generate.krea2EditReferencesNeedLora')}
+          </Text>
+        ) : null}
+        {referenceImagesSupported ||
+        referenceImageCount > 0 ||
+        getReferenceImageUnavailableReason(selectedModel, settings) ? (
+          <Separator borderColor="bg.subtle" />
+        ) : null}
         <GenerateConceptsContent
           loraModels={loraModels}
           loras={settings.loras}

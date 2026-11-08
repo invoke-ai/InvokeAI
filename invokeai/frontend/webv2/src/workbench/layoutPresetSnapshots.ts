@@ -26,9 +26,12 @@ export const getLayoutPresetCommandTitleOverrides = (
 ): Readonly<Record<string, string>> =>
   Object.fromEntries(
     builtInLayoutPresetDescriptors.flatMap(({ hotkeyId, preset }) => {
-      const savedLabel = resolveSavedLayoutPreset(account, preset.id).label;
+      const saved = resolveSavedLayoutPreset(account, preset.id);
 
-      return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
+      // Only a rename: a preset still on its shipped name keeps the catalog title.
+      return saved.labelKey !== undefined || saved.label === preset.label
+        ? []
+        : [[`app.${hotkeyId}`, formatTitle(saved.label)]];
     })
   );
 
@@ -48,9 +51,23 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
   const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return metadata || override || defaultRoute !== builtInPreset.defaultRoute
-    ? { ...builtInPreset, ...metadata, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
-    : builtInPreset;
+  if (!metadata && !override && defaultRoute === builtInPreset.defaultRoute) {
+    return builtInPreset;
+  }
+
+  const resolved: LayoutPreset = {
+    ...builtInPreset,
+    ...metadata,
+    defaultRoute,
+    snapshot: override ?? builtInPreset.snapshot,
+  };
+
+  // A renamed preset is shown by the name the account gave it, in every language.
+  if (metadata?.label !== undefined) {
+    delete resolved.labelKey;
+  }
+
+  return resolved;
 };
 
 /** Built-in presets always exist; a custom one exists while the account still has it. */

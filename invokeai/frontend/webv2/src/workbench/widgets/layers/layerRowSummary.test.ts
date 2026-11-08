@@ -1,3 +1,4 @@
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
 import { layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
@@ -20,10 +21,33 @@ describe('layerRowSummary', () => {
     );
   });
 
-  it('shows an adapter and weight, a prompt or reference count, and denoise bounds', () => {
-    expect(layerRowSummary(layerContract('c', 'control'), t)).toMatch(
-      /^widgets\.layers\.control\.kinds\.\w+ · \d\.\d\d$/
+  it('asks a new untyped control layer for its type, a typed empty one for an image, and else names type, detector and weight', () => {
+    const control = layerContract('c', 'control') as CanvasControlLayerContract;
+    const image = { image: { height: 8, imageName: 'c.png', width: 8 }, type: 'image' } as const;
+    expect(layerRowSummary({ ...control, source: image }, t)).toBe('widgets.layers.control.summary.noType');
+    // A legacy layer that picked its model keeps the adapter summary it always had.
+    expect(
+      layerRowSummary({ ...control, adapter: { ...control.adapter, model: 'sdxl-depth' }, source: image }, t)
+    ).toBe('widgets.layers.control.kinds.controlnet · 1.00');
+    expect(layerRowSummary({ ...control, controlType: 'depth', source: { bitmap: null, type: 'paint' } }, t)).toBe(
+      'widgets.layers.control.summary.noImage'
     );
+    const detected = {
+      ...control,
+      adapter: { ...control.adapter, weight: 0.75 },
+      controlType: 'depth',
+      detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+      source: image,
+    } satisfies CanvasControlLayerContract;
+    expect(layerRowSummary(detected, t)).toBe(
+      'widgets.layers.control.types.depth · widgets.layers.control.filters.depth_anything_depth_estimation · 0.75'
+    );
+    expect(layerRowSummary({ ...detected, detection: null }, t)).toBe(
+      'widgets.layers.control.types.depth · common.none · 0.75'
+    );
+  });
+
+  it('shows a prompt or reference count, and denoise bounds', () => {
     const regional = layerContract('g', 'regional_guidance');
     expect(layerRowSummary({ ...regional, positivePrompt: ' a red barn ' } as typeof regional, t)).toBe('a red barn');
     expect(layerRowSummary(regional, t)).toBe('widgets.layers.types.regional_guidance');

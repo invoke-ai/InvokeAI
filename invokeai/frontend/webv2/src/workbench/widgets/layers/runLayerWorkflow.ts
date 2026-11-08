@@ -10,6 +10,7 @@ import type {
 } from '@features/workflow/graph';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
 import type {
+  AdjustmentRefusal,
   CanvasStagingCandidateContract,
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
@@ -41,12 +42,14 @@ export type RunLayerWorkflowResult =
         | 'unsupported'
         | 'empty'
         | 'not-ready'
+        | 'unreadable'
         | 'over-budget'
         | 'locked'
         | 'stale'
         | 'busy';
     }
-  | { status: 'failed'; message: string; stage: LayerWorkflowFailureStage };
+  | { status: 'failed'; message: string; stage: LayerWorkflowFailureStage }
+  | AdjustmentRefusal;
 
 export interface RunLayerWorkflowDeps {
   /** Plans this run's seeds from the project graph; see `reserveLayerWorkflowSeeds`. */

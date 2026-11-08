@@ -22,17 +22,21 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH, ModelQueries
 from invokeai.app.services.shared.database.schema.models import models
 from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SD1_Config, LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_SD1_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
     Main_Diffusers_SDXL_Config,
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -137,6 +141,41 @@ def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordS
     assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 
+@pytest.mark.parametrize("class_order", ["by name", "reversed"])
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/tmp/flux-3-image-klein-pup", TextLLM_Diffusers_Config),
+        ("/tmp/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", TextLLM_Checkpoint_Config),
+    ],
+    ids=["folder", "single file"],
+)
+def test_a_type_change_picks_the_class_of_the_records_container(
+    store: ModelRecordServiceBase, monkeypatch: pytest.MonkeyPatch, path: str, expected: type, class_order: str
+) -> None:
+    """An unidentified FLUX.3 prompt upsampler, made a Text LLM by hand. Its `unknown` format names no Text LLM
+    class, so each class of the type is tried without it, and both validate: the record's path has to decide, in
+    whatever order the classes come. `CONFIG_CLASSES` is a set, and taking the first class it yielded made the
+    outcome differ between processes."""
+    ordered = sorted(Config_Base.CONFIG_CLASSES, key=lambda cls: cls.__name__, reverse=class_order == "reversed")
+    monkeypatch.setattr(Config_Base, "CONFIG_CLASSES", ordered)
+    config = Unknown_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path=path,
+        file_size=1024,
+        name="FLUX.3 Prompt Upsampler",
+        hash="ABC123",
+    )
+    store.add_model(config)
+    changes = ModelRecordChanges(type=ModelType.TextLLM, base=BaseModelType.Any)
+
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+
+    assert type(new_config) is expected
+
+
 @pytest.mark.parametrize("allow_class_change", [False, True])
 def test_rejected_update_preserves_the_complete_stored_record(
     store: ModelRecordServiceBase, allow_class_change: bool
@@ -155,6 +194,30 @@ def test_rejected_update_preserves_the_complete_stored_record(
     assert after.model_dump() == before.model_dump()
 
 
+@pytest.mark.parametrize("new_key", ["key2", "../../pwned"])
+def test_update_refuses_to_change_the_key(store: ModelRecordServiceBase, new_key: str) -> None:
+    """The row keeps its key, so a different key written into the stored config would leave a record that reports
+    a key nothing can look it up by."""
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+
+    with pytest.raises(ValueError, match="key cannot be changed"):
+        store.update_model(original.key, ModelRecordChanges(key=new_key, name="renamed"), allow_class_change=True)
+
+    assert store.get_model(original.key).model_dump() == before.model_dump()
+    assert not store.exists(new_key)
+
+
+def test_update_accepts_the_unchanged_key_echoed_back(store: ModelRecordServiceBase) -> None:
+    """The edit form posts the whole record back, key included."""
+    store.add_model(example_ti_config("key1"))
+
+    updated = store.update_model("key1", ModelRecordChanges(key="key1", name="renamed"))
+
+    assert (updated.key, updated.name) == ("key1", "renamed")
+
+
 def test_rejected_class_change_preserves_the_original_record(store: ModelRecordServiceBase) -> None:
     original = example_ti_config("key1")
     store.add_model(original)
@@ -168,6 +231,129 @@ def test_rejected_class_change_preserves_the_original_record(store: ModelRecordS
     after = store.get_model(original.key)
     assert isinstance(after, TI_File_SD1_Config)
     assert after.model_dump() == before.model_dump()
+
+
+def test_minimax_h3_text_encoder_stores_its_cpu_only_setting(store: ModelRecordServiceBase) -> None:
+    """Issue #9865: the switch reported success while the record kept no setting."""
+    config = Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(
+        key="h3-encoder",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        file_size=1024,
+        name="MiniMax H3 Text Encoder (int8)",
+        hash="ABC123",
+    )
+    store.add_model(config)
+
+    store.update_model(config.key, ModelRecordChanges(cpu_only=True), allow_class_change=True)
+    assert store.get_model(config.key).cpu_only is True
+
+    store.update_model(config.key, ModelRecordChanges(cpu_only=None), allow_class_change=True)
+    assert store.get_model(config.key).cpu_only is None
+
+
+def test_update_refuses_a_value_the_model_cannot_store(store: ModelRecordServiceBase) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+
+    with pytest.raises(ValueError, match="'old name' does not support cpu_only"):
+        store.update_model(original.key, ModelRecordChanges(cpu_only=True, name="renamed"), allow_class_change=True)
+
+    assert store.get_model(original.key).model_dump() == before.model_dump()
+
+
+def test_update_accepts_clearing_a_field_the_model_does_not_have(store: ModelRecordServiceBase) -> None:
+    """The identity form sends null for prediction_type and variant whatever the model's class."""
+    store.add_model(example_ti_config("key1"))
+
+    changes = ModelRecordChanges(cpu_only=None, prediction_type=None, variant=None, name="renamed")
+    updated = store.update_model("key1", changes, allow_class_change=True)
+
+    assert updated.name == "renamed"
+
+
+def test_class_change_drops_values_only_the_previous_class_stores(store: ModelRecordServiceBase) -> None:
+    """The edit form re-sends the old class's values when the type changes."""
+    store.add_model(
+        Main_Checkpoint_SD1_Config(
+            key="key1",
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+            path="/tmp/model.safetensors",
+            file_size=1024,
+            name="model",
+            hash="ABC123",
+            prediction_type=SchedulerPredictionType.VPrediction,
+            variant=ModelVariantType.Normal,
+        )
+    )
+
+    changes = ModelRecordChanges(
+        type=ModelType.LoRA,
+        format=ModelFormat.LyCORIS,
+        prediction_type=SchedulerPredictionType.VPrediction,
+        variant=ModelVariantType.Normal,
+    )
+    store.update_model("key1", changes, allow_class_change=True)
+
+    assert isinstance(store.get_model("key1"), LoRA_LyCORIS_SD1_Config)
+
+
+def test_class_change_stores_values_only_the_new_class_has(store: ModelRecordServiceBase) -> None:
+    store.add_model(
+        LoRA_LyCORIS_SD1_Config(
+            key="key1",
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+            path="/tmp/model.safetensors",
+            file_size=1024,
+            name="model",
+            hash="ABC123",
+        )
+    )
+
+    changes = ModelRecordChanges(
+        type=ModelType.Main,
+        format=ModelFormat.Checkpoint,
+        prediction_type=SchedulerPredictionType.VPrediction,
+        variant=ModelVariantType.Inpaint,
+    )
+    store.update_model("key1", changes, allow_class_change=True)
+
+    stored = store.get_model("key1")
+    assert isinstance(stored, Main_Checkpoint_SD1_Config)
+    assert (stored.prediction_type, stored.variant) == (SchedulerPredictionType.VPrediction, ModelVariantType.Inpaint)
+
+
+def _diffusers_vae_config() -> VAE_Diffusers_SD1_Config:
+    return VAE_Diffusers_SD1_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/vae",
+        file_size=1024,
+        name="old name",
+        hash="ABC123",
+        repo_variant=ModelRepoVariant.Default,
+    )
+
+
+@pytest.mark.parametrize(
+    "make_config", [lambda: example_ti_config("key1"), _diffusers_vae_config], ids=["embedding", "vae"]
+)
+def test_a_record_posted_back_with_an_edit_is_accepted(store: ModelRecordServiceBase, make_config: Any) -> None:
+    """The legacy edit form submits the whole record; every field it holds is one its class stores."""
+    store.add_model(make_config())
+    record = store.get_model("key1").model_dump()
+    echoed = {field: value for field, value in record.items() if field in ModelRecordChanges.model_fields}
+
+    updated = store.update_model(
+        "key1", ModelRecordChanges.model_validate({**echoed, "name": "renamed"}), allow_class_change=True
+    )
+
+    assert updated.model_dump() == {**record, "name": "renamed"}
 
 
 @pytest.mark.parametrize("field", ["type", "base"])

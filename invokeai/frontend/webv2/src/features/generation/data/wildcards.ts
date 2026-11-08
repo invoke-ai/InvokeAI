@@ -47,6 +47,23 @@ export const deleteWildcard = async (id: string): Promise<void> => {
   await apiFetch(`/api/v1/wildcards/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
+/** The most ids one batch delete takes (`MAX_WILDCARD_BATCH_SIZE` on the server). */
+export const WILDCARD_DELETE_BATCH_SIZE = 1000;
+
+/**
+ * Deletes those of the ids the caller owns; the result names them. Ids the server does not know as the caller's are
+ * absent from it, so a wildcard deleted meanwhile reads as not deleted here.
+ */
+export const deleteWildcards = async (ids: readonly string[], signal?: AbortSignal): Promise<string[]> => {
+  const result = await apiFetchJson<{ deleted_ids: string[] }>('/api/v1/wildcards/delete', {
+    body: JSON.stringify({ wildcard_ids: ids }),
+    method: 'POST',
+    signal,
+  });
+
+  return result.deleted_ids;
+};
+
 /** Infinite staleTime and request-only keys require dependent invalidation and staleness-aware readers. */
 export const invalidateWildcardDependents = async (queryClient: QueryClient): Promise<void> => {
   await Promise.all([

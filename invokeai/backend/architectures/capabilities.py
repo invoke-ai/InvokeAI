@@ -72,6 +72,11 @@ class ArchitectureFeatures(BaseModel):
         default=None,
         description="If set, reference images are only accepted for models of this variant.",
     )
+    reference_images_require_vision_tower: bool = Field(
+        default=False,
+        description="If true, reference images are read by the Qwen3-VL vision tower: the effective encoder "
+        "(the model's own or a standalone one) must carry one.",
+    )
     supports_regional_guidance: bool = False
     regional_negative: bool = Field(
         default=False, description="Whether a region's negative prompt is masked, rather than applied globally."
@@ -137,6 +142,7 @@ def _features_of(facet: FeaturesFacet, variant: AnyVariant | None = None) -> Arc
         control_kinds=sorted(facet.control_kinds),
         max_reference_images=facet.max_reference_images,
         reference_images_require_variant=facet.reference_images_require_variant,
+        reference_images_require_vision_tower=facet.reference_images_require_vision_tower,
         supports_regional_guidance=facet.supports_regional_guidance,
         regional_negative=facet.regional_negative,
         clip_skip_max=facet.clip_skip_max,
@@ -171,7 +177,8 @@ def architecture_capabilities() -> list[ArchitectureCapabilities]:
     is rendered in full, so a client never has to know which fields a variant row is allowed to omit.
 
     Differences too small to have earned a mapping are expressed on the base row instead, by
-    `features.reference_images_require_variant`; Qwen-Image is the only one.
+    `features.reference_images_require_variant` (Qwen-Image and Anima) and
+    `features.reference_images_require_vision_tower` (Qwen-Image-2.1).
 
     Sorted by base value, then variant, so the response is stable and diffable.
     """

@@ -4,6 +4,8 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { SelectedShapeAppearanceSettings } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
+import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';
@@ -31,7 +33,7 @@ import { PropertiesSection } from './PropertiesSection';
 
 type LayerSectionEngine = Pick<
   CanvasEngineHandle,
-  'document' | 'exports' | 'interaction' | 'layers' | 'projectId' | 'tools'
+  'document' | 'exports' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'tools'
 >;
 
 // Reference equality is exact: the document index hands back the same node
@@ -162,7 +164,7 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} onOperationStarted={noop} />;
+      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'raster':
       return (
         <RasterLayerSettings
@@ -204,6 +206,11 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
+      {layer.source.type === 'shape' ? (
+        <PropertyGroup id="layer-shape-appearance" label={t('widgets.properties.groups.appearance')}>
+          <SelectedShapeAppearanceSettings engine={engine} layer={layer} source={layer.source} />
+        </PropertyGroup>
+      ) : null}
       <Switch.Root checked={isLocked} onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>

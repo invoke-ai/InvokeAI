@@ -1,6 +1,6 @@
 ---
 title: PiD Super-Resolution Decode
-lastUpdated: 2026-08-06
+lastUpdated: 2026-10-18
 sidebar:
   order: 11
 ---
@@ -23,13 +23,15 @@ PiD works with these base models:
 |---|---|
 | FLUX.1 | PiD Decoder FLUX |
 | FLUX.2 Klein (4B / 9B) | PiD Decoder FLUX.2 |
+| FLUX.3 Klein / Klein Base | **PiD Decoder FLUX.2** (FLUX.3 shares FLUX.2's VAE) |
 | Stable Diffusion 3 | PiD Decoder SD3 |
 | SDXL | PiD Decoder SDXL |
 | Z-Image / Z-Image Turbo | **PiD Decoder FLUX** (Z-Image shares FLUX.1's VAE) |
 | Qwen-Image | PiD Decoder Qwen-Image |
+| MOSS-Image | **PiD Decoder FLUX.2** (MOSS-Image shares FLUX.2's VAE) |
 
 <Aside type="tip">
-Z-Image has no PiD decoder of its own — when a Z-Image model is active, the decoder picker lists the **FLUX** decoders. That's expected.
+Z-Image has no PiD decoder of its own — when a Z-Image model is active, the decoder picker lists the **FLUX** decoders. That's expected. Likewise, MOSS-Image uses the **FLUX.2** decoders.
 </Aside>
 
 ## What you need to install
@@ -70,6 +72,8 @@ Open the **Generation** settings for a supported model and expand the advanced o
 When PiD mode is not *Off*, pick your **PiD Decoder** and **Gemma-2 Encoder** below the mode selector. The **PiD Steps** control (default 4) sets how many decode steps run — the released checkpoints are trained for 4.
 
 PiD is available in both the **Generate** tab (text-to-image) and on the **Canvas** (image-to-image), in both Fit and Native modes.
+
+In the Workflow editor, each base has its own PiD decode node, such as *Latents to Image - Qwen-Image + PiD (4x SR)*. They take the denoised latent as the model produced it; only the **FLUX.2** node also needs the FLUX.2 VAE connected, because it reads the VAE's latent statistics to bring the latent into the form PiD was trained on.
 
 ## Running PiD on an existing image
 

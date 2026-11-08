@@ -42,7 +42,7 @@ export const addEdge = (
 };
 
 /** Rename every matching node ID and edge reference. */
-const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
+export const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
   const node = graph.nodes[oldId];
   if (!node) {
     throw new Error(`Could not find the "${oldId}" node to rename.`);
@@ -145,7 +145,7 @@ export const addMetadata = (
   generationMode: string | null,
   projectSettings: GenerationProjectSettings & { randDevice?: string },
   extras: Record<string, unknown> = {}
-) => {
+): BackendInvocationContract => {
   const loadedLoras = getLoadedLoras(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const metadata = addNode(graph, {
@@ -174,6 +174,7 @@ export const addMetadata = (
     addEdge(graph, graph.nodes.negative_prompt, 'value', metadata, 'negative_prompt');
   }
   addEdge(graph, metadata, 'metadata', outputNode, 'metadata');
+  return metadata;
 };
 
 export const toGraphContract = (backendGraph: BackendGraphContract, label: string) => ({

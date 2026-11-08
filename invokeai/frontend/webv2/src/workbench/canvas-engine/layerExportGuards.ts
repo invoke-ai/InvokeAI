@@ -8,13 +8,35 @@ import type { RasterizationJob } from '@workbench/canvas-engine/controllers/rast
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
-import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
+import { getDocumentLayer, getDocumentNode } from '@workbench/canvas-engine/document/documentIndex';
 import {
   getSourceContentRect,
   isEmptyPolygonShape,
   renderableSourceOf,
 } from '@workbench/canvas-engine/document/sources';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
+
+/**
+ * An operation refused because one layer's pixels could not be read: its image is gone or does not decode. Waiting
+ * cannot fix it, so the message names the layer for the user to disable, delete or replace.
+ */
+export interface LayerUnreadable {
+  readonly status: 'unreadable';
+  readonly layerId: string;
+  /** The layer's name, or its id when it has none or is gone. */
+  readonly layerName: string;
+}
+
+/** The refusal for `layerId`, named from `document`. */
+export const layerUnreadable = (document: CanvasDocumentContractV3 | null, layerId: string): LayerUnreadable => ({
+  layerId,
+  layerName: getDocumentNode(document, layerId)?.name || layerId,
+  status: 'unreadable',
+});
+
+/** Type guard for results that mix string statuses with a {@link LayerUnreadable}. */
+export const isLayerUnreadable = (value: unknown): value is LayerUnreadable =>
+  typeof value === 'object' && value !== null && (value as { status?: unknown }).status === 'unreadable';
 
 /** A pointless polygon shape has no raster, so it can never back an export. */
 export const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean =>

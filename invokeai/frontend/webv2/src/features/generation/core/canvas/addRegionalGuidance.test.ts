@@ -8,6 +8,9 @@ import type { AddRegionalGuidanceOptions, RegionalGuidanceInput, RegionalReferen
 
 import {
   addRegionalGuidance,
+  getLayoutDraftRejectionReason,
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   isRegionalGuidanceSupportedForBase,
@@ -160,6 +163,7 @@ const ipModel = (base: string): RegionalReferenceModel => ({
 const region = (overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanceInput => ({
   autoNegative: false,
   id: 'r1',
+  maskBounds: { height: 64, width: 64, x: 0, y: 0 },
   maskImageName: 'mask1.png',
   negativePrompt: null,
   positivePrompt: 'a cat',
@@ -167,8 +171,27 @@ const region = (overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanc
   ...overrides,
 });
 
-const run = (graph: TestGraph, options: AddRegionalGuidanceOptions): TestGraph => {
-  addRegionalGuidance(graph as never, options);
+type RunOptions = Omit<AddRegionalGuidanceOptions, 'conditioning' | 'denoise'> &
+  Partial<Pick<AddRegionalGuidanceOptions, 'conditioning'>>;
+
+/** The facts a family builder hands out for these graphs: the global conditioning nodes the fixture created. */
+const conditioningOf = (graph: TestGraph): AddRegionalGuidanceOptions['conditioning'] => ({
+  fluxReduxCollector: null,
+  ipAdapterCollector: null,
+  negative:
+    graph.nodes.neg_cond && graph.nodes.neg_cond_collect
+      ? { collector: graph.nodes.neg_cond_collect, node: graph.nodes.neg_cond }
+      : null,
+  positive: graph.nodes.pos_cond,
+  positiveCollector: graph.nodes.pos_cond_collect,
+});
+
+const run = (graph: TestGraph, options: RunOptions): TestGraph => {
+  addRegionalGuidance(graph as never, {
+    conditioning: conditioningOf(graph),
+    denoise: graph.nodes.denoise_latents,
+    ...options,
+  });
   return graph;
 };
 
@@ -181,11 +204,22 @@ const hasEdge = (graph: TestGraph, s: string, sf: string, d: string, df: string)
 seedArchitectureCapabilities();
 
 describe('isRegionalGuidanceSupportedForBase', () => {
-  it('supports every base whose encoder takes a mask and whose denoiser takes a conditioning list', () => {
-    for (const base of ['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima']) {
+  it('supports every base that masks conditioning or places regions in a layout prompt', () => {
+    for (const base of [
+      'sd-1',
+      'sd-2',
+      'sdxl',
+      'flux',
+      'flux2',
+      'krea-2',
+      'z-image',
+      'anima',
+      'moss-image',
+      'ideogram-4',
+    ]) {
       expect(isRegionalGuidanceSupportedForBase(base), base).toBe(true);
     }
-    for (const base of ['sd-3', 'cogview4', 'qwen-image', 'ideogram-4', 'wan', 'external']) {
+    for (const base of ['sd-3', 'cogview4', 'qwen-image', 'wan', 'external']) {
       expect(isRegionalGuidanceSupportedForBase(base), base).toBe(false);
     }
   });
@@ -220,15 +254,53 @@ describe('getRegionalGuidanceSupport', () => {
       negativePrompt: false,
       referenceImages: 'flux_redux',
     });
-    for (const base of ['flux2', 'krea-2', 'z-image', 'anima']) {
+    for (const base of ['krea-2', 'z-image', 'anima']) {
       expect(getRegionalGuidanceSupport(base), base).toMatchObject({
-        autoNegative: false,
-        negativePrompt: false,
+        autoNegative: true,
+        mode: 'masks',
+        negativePrompt: true,
         referenceImages: null,
       });
     }
+    expect(getRegionalGuidanceSupport('flux2')).toMatchObject({
+      autoNegative: false,
+      negativePrompt: false,
+      referenceImages: null,
+    });
     expect(getRegionalGuidanceSupport('sd-3')).toBeNull();
     expect(getRegionalGuidanceSupport(null)).toBeNull();
+  });
+
+  it('places MOSS-Image, Ideogram 4 and FLUX.3 regions as layout boxes, with no negative or reference-image side', () => {
+    expect(getRegionalGuidanceSupport('moss-image')).toEqual({
+      autoNegative: false,
+      label: 'MOSS-Image',
+      layoutKinds: ['object', 'character', 'text'],
+      mode: 'layout',
+      negativePrompt: false,
+      negativesNeedCfg: false,
+      referenceImages: null,
+    });
+    // The structured caption has object elements only.
+    expect(getRegionalGuidanceSupport('ideogram-4')).toEqual({
+      autoNegative: false,
+      label: 'Ideogram 4',
+      layoutKinds: ['object'],
+      mode: 'layout',
+      negativePrompt: false,
+      negativesNeedCfg: false,
+      referenceImages: null,
+    });
+    // Regions become rows of the box table.
+    expect(getRegionalGuidanceSupport('flux3')).toEqual({
+      autoNegative: false,
+      label: 'FLUX.3',
+      layoutKinds: ['object'],
+      mode: 'layout',
+      negativePrompt: false,
+      negativesNeedCfg: false,
+      referenceImages: null,
+    });
   });
 });
 
@@ -236,7 +308,7 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
   it.each([
     ['z-image', 'z_image_text_encoder'],
     ['anima', 'anima_text_encoder'],
-  ] as const)('%s wires a masked positive prompt through its Qwen3 encoder, positive only', (base, encoderType) => {
+  ] as const)('%s wires masked prompts through its Qwen3 encoder', (base, encoderType) => {
     const g = run(qwen3BaseGraph(encoderType), {
       base,
       regions: [region({ autoNegative: true, negativePrompt: 'blurry' })],
@@ -246,10 +318,13 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
     expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_pos_cond_r1', 'qwen3_encoder')).toBe(true);
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_pos_cond_r1', 'mask')).toBe(true);
     expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
-    // These backends discard negative masks even when a negative collector exists.
-    expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
-    expect(g.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
-    expect(g.edges.some((e) => e.destination.node_id === 'neg_cond_collect')).toBe(false);
+    expect(g.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+    expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_neg_cond_r1', 'qwen3_encoder')).toBe(true);
+    expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_neg_cond_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_neg_cond_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
+    expect(g.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+    expect(hasEdge(g, 'rg_invert_mask_r1', 'mask', 'rg_pos_cond_inverted_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_pos_cond_inverted_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
   });
 });
 
@@ -372,6 +447,35 @@ describe('addRegionalGuidance — SD1', () => {
     expect(collectorEdge).toBeDefined();
     expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', collectorEdge!.source.node_id, 'item')).toBe(true);
   });
+  it('joins the ip_adapter collector the builder already feeds the denoise from', () => {
+    const graph = sdBaseGraph();
+    const builderCollector = { id: 'ip_adapter_collector', type: 'collect' };
+    graph.nodes[builderCollector.id] = builderCollector;
+    const g = run(graph, {
+      base: 'sd-1',
+      conditioning: { ...conditioningOf(graph), ipAdapterCollector: builderCollector },
+      regions: [
+        region({
+          referenceImages: [
+            {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              id: 'ref1',
+              imageName: 'ref.png',
+              method: 'full',
+              model: ipModel('sd-1'),
+              type: 'ip_adapter',
+              weight: 0.8,
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', 'ip_adapter_collector', 'item')).toBe(true);
+    expect(g.nodes.regional_ip_adapter_collector).toBeUndefined();
+    expect(g.edges.filter((e) => e.destination.field === 'ip_adapter')).toEqual([]);
+  });
 });
 
 describe('addRegionalGuidance — SD2', () => {
@@ -471,6 +575,7 @@ describe('addRegionalGuidance — multiple regions coexist', () => {
 
 describe('getRegionalGuidanceRejectionReason', () => {
   const params = {
+    cfgScale: 7,
     hasContent: true,
     layerName: 'Region 1',
     mainBase: 'sd-1',
@@ -522,9 +627,6 @@ describe('getRegionalGuidanceRejectionReason', () => {
   it.each([
     ['flux', 'FLUX', 0],
     ['flux2', 'FLUX.2', 1],
-    ['krea-2', 'Krea-2', 1],
-    ['z-image', 'Z-Image', 1],
-    ['anima', 'Anima', 1],
   ])('rejects a %s region that carries only what the base ignores', (mainBase, label, referenceImageCount) => {
     expect(
       getRegionalGuidanceRejectionReason({
@@ -537,9 +639,248 @@ describe('getRegionalGuidanceRejectionReason', () => {
     ).toBe(`Regional guidance "Region 1" has no prompt or reference image ${label} can use.`);
   });
 
+  it.each(['krea-2', 'z-image', 'anima'])(
+    'accepts a %s region with only a negative prompt only while CFG is above 1',
+    (mainBase) => {
+      const negativeOnly = { ...params, mainBase, negativePrompt: 'blurry', positivePrompt: null };
+
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1.5 })).toBeNull();
+      for (const cfgScale of [1, 0.5]) {
+        expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale })).toMatch(/no prompt or reference/);
+      }
+      // A positive prompt still carries the region at CFG 1.
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1, positivePrompt: 'a cat' })).toBeNull();
+      expect(
+        getRegionalGuidanceRejectionReason({ ...params, mainBase, positivePrompt: null, referenceImageCount: 1 })
+      ).toMatch(/no prompt or reference/);
+    }
+  );
+
+  it('accepts an SD region with only a negative prompt at CFG 1, where its graph still reads negatives', () => {
+    expect(
+      getRegionalGuidanceRejectionReason({ ...params, cfgScale: 1, negativePrompt: 'blurry', positivePrompt: null })
+    ).toBeNull();
+  });
+
   it('keeps a FLUX region that only carries a Redux reference image', () => {
     expect(
       getRegionalGuidanceRejectionReason({ ...params, mainBase: 'flux', positivePrompt: null, referenceImageCount: 1 })
     ).toBeNull();
+  });
+});
+
+describe('getRegionalGuidanceRejectionReason — layout bases', () => {
+  const params = {
+    cfgScale: 7,
+    hasContent: true,
+    layerName: 'Sign',
+    mainBase: 'moss-image',
+    negativePrompt: null as string | null,
+    positivePrompt: 'a shop sign' as string | null,
+    referenceImageCount: 0,
+  };
+
+  it('keeps a captioned region of every kind once a text region has its text', () => {
+    expect(getRegionalGuidanceRejectionReason(params)).toBeNull();
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'character' } })).toBeNull();
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text', text: 'OPEN' } })).toBeNull();
+  });
+
+  it('rejects a region without a caption even when it carries what mask bases would use', () => {
+    for (const positivePrompt of [null, '   ']) {
+      expect(
+        getRegionalGuidanceRejectionReason({
+          ...params,
+          negativePrompt: 'blurry',
+          positivePrompt,
+          referenceImageCount: 1,
+        })
+      ).toBe('Regional guidance "Sign" has no prompt to place in the MOSS-Image layout.');
+    }
+  });
+
+  it('rejects a text region without visible text', () => {
+    for (const text of [undefined, '', ' \n ']) {
+      expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text', text } })).toBe(
+        'Regional guidance "Sign" is a text region without visible text.'
+      );
+    }
+  });
+
+  it('ignores a stored layout role on a mask base', () => {
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text' }, mainBase: 'z-image' })).toBeNull();
+  });
+
+  it('still rejects an empty mask first', () => {
+    expect(getRegionalGuidanceRejectionReason({ ...params, hasContent: false, positivePrompt: null })).toMatch(
+      /no masked region/
+    );
+  });
+});
+
+describe('getLayoutRegionIssue', () => {
+  const allKinds = ['object', 'character', 'text'] as const;
+
+  it('ignores text the object and character kinds keep for a later switch back', () => {
+    expect(
+      getLayoutRegionIssue({ layout: { kind: 'object', text: '' }, positivePrompt: 'a cat' }, allKinds)
+    ).toBeNull();
+    expect(getLayoutRegionIssue({ layout: { kind: 'character' }, positivePrompt: 'a cat' }, allKinds)).toBeNull();
+  });
+
+  it('names the caption before the text when both are missing', () => {
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: null }, allKinds)).toBe('missing_prompt');
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' }, allKinds)).toBe('missing_text');
+  });
+
+  it('places a stored text role as an object on a base without text regions', () => {
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' }, ['object'])).toBeNull();
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: ' ' }, ['object'])).toBe('missing_prompt');
+  });
+});
+
+describe('getLayoutPromptRejectionReason', () => {
+  const placeable = { layout: { kind: 'object' as const }, positivePrompt: 'a cup' };
+
+  it('refuses placeable regions around a blank prompt on a layout base', () => {
+    expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: ' \n', regions: [placeable] })).toBe(
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('counts a stored text role without visible text as placeable on Ideogram 4', () => {
+    expect(
+      getLayoutPromptRejectionReason({
+        base: 'ideogram-4',
+        prompt: '',
+        regions: [{ layout: { kind: 'text' }, positivePrompt: 'a sign' }],
+      })
+    ).toBe(
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('lets a prompt, regions the layout cannot place, or a mask base through', () => {
+    expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: 'a cafe', regions: [placeable] })).toBeNull();
+    expect(
+      getLayoutPromptRejectionReason({
+        base: 'moss-image',
+        prompt: '',
+        regions: [{ positivePrompt: null }, { layout: { kind: 'text' }, positivePrompt: 'a sign' }],
+      })
+    ).toBeNull();
+    expect(getLayoutPromptRejectionReason({ base: 'z-image', prompt: '', regions: [placeable] })).toBeNull();
+  });
+});
+
+describe('getLayoutDraftRejectionReason', () => {
+  // The 1536x1024 example from the OpenMOSS prompt-enhancer skill's layout reference.
+  const draft = {
+    width: 1536,
+    height: 1024,
+    bbox_coord_space: 'abs',
+    bbox_format: 'xyxy',
+    summary: {
+      meta: ['product campaign', 'studio photography'],
+      canvas: 'single',
+      caption:
+        'A warm studio campaign for a handmade ceramic cup, with an ivory backdrop, soft side lighting and restrained dark-green typography. Keep the ceramic texture tactile and the composition calm.',
+    },
+    items: [
+      {
+        label: 'object',
+        caption:
+          'An ivory ceramic cup with a rounded handle, fine speckled glaze and a soft contact shadow, photographed at a three-quarter angle.',
+        bbox: [176, 224, 800, 864],
+      },
+      {
+        label: 'text',
+        caption:
+          'Large dark-green Chinese title in crisp, moderately heavy lettering, with generous spacing and no backing panel.',
+        text: '把日常，过成诗。',
+        bbox: [928, 272, 1408, 448],
+      },
+      {
+        label: 'text',
+        caption: 'Smaller dark-green Chinese supporting copy, comfortably legible on two lines.',
+        text: '一杯温暖\n一刻从容',
+        bbox: [928, 512, 1376, 656],
+      },
+    ],
+  };
+  const reason = (prompt: string, base = 'moss-image') =>
+    getLayoutDraftRejectionReason({ base, positivePrompt: prompt });
+
+  it('accepts a well-formed draft, bare or fenced, and leaves plain prompts and other bases alone', () => {
+    expect(reason(JSON.stringify(draft, null, 2))).toBeNull();
+    expect(reason(`  \`\`\`json\n${JSON.stringify(draft, null, 2)}\n\`\`\`\n`)).toBeNull();
+    expect(reason('a cafe with {curly} braces and "bbox_coord_space" words')).toBeNull();
+    expect(reason('{"bbox_coord_space": ', 'z-image')).toBeNull();
+    // Ideogram 4 is a layout base too, but passes `{` prompts through and has no draft to compile.
+    expect(
+      reason('{"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"x"},"items":[', 'ideogram-4')
+    ).toBeNull();
+  });
+
+  it('passes compiled layouts, fenced or not, with or without regions', () => {
+    const compiled = {
+      bbox_coord_space: 'abs_centralized',
+      bbox_format: 'yxyx',
+      summary: { caption: 'a cafe' },
+      items: [{ bbox: [-288, -592, 352, 32], caption: 'a cup', label: 'object' }],
+    };
+    expect(reason(JSON.stringify(compiled))).toBeNull();
+    expect(reason(JSON.stringify({ ...compiled, items: [] }))).toBeNull();
+    expect(reason(`\`\`\`json\r\n${JSON.stringify(compiled, null, 2)}\r\n\`\`\``)).toBeNull();
+    expect(reason('{"bbox_coord_space": "abs_centralized", "items": [')).toBeNull();
+  });
+
+  it('checks a draft both as authored and as the template makes it', () => {
+    const notJson =
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.';
+    const prefix = { id: 'photo', name: 'Photo', negativePrompt: '', positivePrompt: 'photo of {prompt}' };
+    const scaffold = {
+      id: 'poster',
+      name: 'Poster',
+      negativePrompt: '',
+      positivePrompt: JSON.stringify({ ...draft, summary: { ...draft.summary, caption: '{prompt}' } }),
+    };
+    const withTemplate = (positivePrompt: string, promptTemplate: typeof prefix) =>
+      getLayoutDraftRejectionReason({ base: 'moss-image', positivePrompt, promptTemplate });
+
+    expect(withTemplate('{"bbox_coord_space": "abs", "items": [', prefix)).toBe(notJson);
+    expect(withTemplate('a "neon" sign', scaffold)).toBe(notJson);
+    expect(withTemplate('a neon sign', scaffold)).toBeNull();
+    expect(withTemplate(JSON.stringify(draft), prefix)).toBeNull();
+  });
+
+  it('refuses a draft in a box format the layout node does not compile', () => {
+    expect(reason(JSON.stringify({ ...draft, bbox_format: 'xywh' }))).toBe(
+      'The MOSS-Image layout draft in the prompt uses a bbox_format other than xyxy. Run Expand Prompt again or fix it.'
+    );
+  });
+
+  it('refuses a draft that does not parse', () => {
+    expect(reason('```json\n{"bbox_coord_space": "abs", "items": [\n```')).toBe(
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.'
+    );
+  });
+
+  it('refuses a draft missing what the layout node starts from', () => {
+    const message =
+      'The MOSS-Image layout draft in the prompt needs a summary with a caption, at least one item, and a numeric width and height. Run Expand Prompt again or fix it.';
+    const { summary: _summary, ...withoutSummary } = draft;
+    for (const broken of [
+      withoutSummary,
+      { ...draft, summary: 'a cafe' },
+      { ...draft, summary: null },
+      { ...draft, summary: { ...draft.summary, caption: ' ' } },
+      { ...draft, items: [] },
+      { ...draft, items: {} },
+      { ...draft, width: '1536' },
+      { ...draft, height: null },
+    ]) {
+      expect(reason(JSON.stringify(broken))).toBe(message);
+    }
   });
 });

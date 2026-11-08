@@ -8,7 +8,9 @@ import type { WorkflowLibraryWriteRefusedError, WorkflowRecordDTO } from './api'
 
 import {
   createLibraryWorkflowRecord,
+  getWorkflowRecordCategory,
   getLibraryWorkflowRecord,
+  setLibraryWorkflowPublic,
   toWorkflowLibraryWriteRefusal,
   updateLibraryWorkflow,
 } from './api';
@@ -30,17 +32,33 @@ export interface WorkflowPublicationRequest {
   workflowId: string;
   /** The serialized document as it stood when the user confirmed; later edits are not part of this publication. */
   workflow: Record<string, unknown>;
+  /** When true, create the template privately first and then request public visibility. */
+  isPublic?: boolean;
   destination: WorkflowPublicationDestination;
 }
 
 export type WorkflowPublicationResult =
-  | { status: 'published'; kind: 'created' | 'updated'; libraryWorkflowId: string; revision: number; name: string }
+  | {
+      status: 'published';
+      kind: 'created' | 'updated';
+      libraryWorkflowId: string;
+      ownerUserId?: string;
+      revision: number;
+      name: string;
+    }
   /** The template moved past the expected revision, or its revision was never known. */
   | { status: 'conflict'; libraryWorkflowId: string; currentRevision: number | null }
   /** The destination cannot be written: it is gone, someone else's, or bundled. Saving as new still works. */
   | { status: 'unavailable'; libraryWorkflowId: string; reason: 'missing' | 'forbidden' | 'bundled' }
   /** The server rejected the content itself. */
   | { status: 'invalid'; message: string }
+  /** The template exists privately, but the requested visibility change did not settle. */
+  | {
+      status: 'partial';
+      libraryWorkflowId: string;
+      message: string;
+      retry: () => Promise<WorkflowPublicationResult>;
+    }
   /** Nothing definitive came back; `retry` resends the same captured request under the same reserved id. */
   | { status: 'failed'; message: string; retry: () => Promise<WorkflowPublicationResult> }
   /** The account changed underneath the publication; nothing more will be reported. */
@@ -53,6 +71,7 @@ export interface WorkflowPublicationDeps {
   getRecord: typeof getLibraryWorkflowRecord;
   invalidateCache: typeof invalidateWorkflowLibraryCache;
   reserveId: () => string;
+  setPublic: typeof setLibraryWorkflowPublic;
   updateRecord: typeof updateLibraryWorkflow;
 }
 
@@ -61,6 +80,7 @@ const PRODUCTION_DEPS: WorkflowPublicationDeps = {
   getRecord: getLibraryWorkflowRecord,
   invalidateCache: invalidateWorkflowLibraryCache,
   reserveId: createUuid,
+  setPublic: setLibraryWorkflowPublic,
   updateRecord: updateLibraryWorkflow,
 };
 
@@ -107,12 +127,14 @@ export const isWorkflowContentEquivalent = (
 
 const toPublished = (
   kind: 'created' | 'updated',
-  record: WorkflowRecordDTO
+  record: WorkflowRecordDTO,
+  revision = record.revision
 ): Extract<WorkflowPublicationResult, { status: 'published' }> => ({
   kind,
   libraryWorkflowId: record.workflow_id,
   name: record.name,
-  revision: record.revision,
+  ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
+  revision,
   status: 'published',
 });
 
@@ -179,7 +201,7 @@ export const createWorkflowPublicationController = (
         return { status: 'cancelled' };
       }
 
-      if (result.status === 'published') {
+      if (result.status === 'published' || result.status === 'partial') {
         deps.invalidateCache(result.libraryWorkflowId);
       }
 
@@ -204,6 +226,35 @@ export const createWorkflowPublicationController = (
   };
 
   const create = (request: WorkflowPublicationRequest, name: string, reservedId: string) => {
+    const retryVisibility = (
+      libraryWorkflowId: string,
+      creationRevision: number
+    ): Promise<WorkflowPublicationResult> => {
+      const attempt = (): Promise<WorkflowPublicationResult> =>
+        settle(request, async () => {
+          try {
+            return toPublished(
+              'created',
+              await deps.setPublic(libraryWorkflowId, true, request.owner.signal),
+              creationRevision
+            );
+          } catch (error) {
+            if (!isAccountScopeCurrent(request.owner)) {
+              return { status: 'cancelled' };
+            }
+
+            return {
+              libraryWorkflowId,
+              message: getApiErrorMessage(error, 'The library did not answer.'),
+              retry: attempt,
+              status: 'partial',
+            };
+          }
+        });
+
+      return attempt();
+    };
+
     const attempt = (): Promise<WorkflowPublicationResult> =>
       settle(request, async () => {
         try {
@@ -213,6 +264,27 @@ export const createWorkflowPublicationController = (
             { ...request.workflow, name },
             { reservedId, signal: request.owner.signal }
           );
+
+          if (request.isPublic === true) {
+            try {
+              return toPublished(
+                'created',
+                await deps.setPublic(record.workflow_id, true, request.owner.signal),
+                record.revision
+              );
+            } catch (error) {
+              if (!isAccountScopeCurrent(request.owner)) {
+                return { status: 'cancelled' };
+              }
+
+              return {
+                libraryWorkflowId: record.workflow_id,
+                message: getApiErrorMessage(error, 'The library did not answer.'),
+                retry: () => retryVisibility(record.workflow_id, record.revision),
+                status: 'partial',
+              };
+            }
+          }
 
           return toPublished('created', record);
         } catch (error) {

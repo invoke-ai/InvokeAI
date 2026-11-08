@@ -5,7 +5,7 @@ The fit runs from 256 tokens to 4096 -- a 1024x1024 frame. Evaluated past that i
 `denoising_start` is clipped by index here, the step count survives and the entry point moves
 instead, so a pass asked to refine an image starts from noise and generates a new one.
 
-The cells that matter drive the real `_run_diffusion`: the real `_calculate_shift`, the real
+The cells that matter drive the real `_run_diffusion`: the real shift fit, the real
 `_get_sigmas`, the real clipping and the real img2img blend all run, and the entry sigma is read
 back out of the blended tensor rather than recomputed here. A test that recomputed the arithmetic
 would agree with a broken node as readily as with a working one.
@@ -17,10 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
-from invokeai.app.invocations.z_image.z_image_denoise import (
-    Z_IMAGE_MU_FIT_MAX_SEQ_LEN,
-    ZImageDenoiseInvocation,
-)
+from invokeai.app.invocations.z_image.z_image_denoise import Z_IMAGE_SHIFT_FIT, ZImageDenoiseInvocation
 
 # Canvas img2img is the path that reaches this node today. `canvasDenoisingStart` sends
 # `1 - strength` for Z-Image (`features/generation/core/canvas/compileCanvasGraph.ts`), so a
@@ -128,22 +125,26 @@ def drive_to_blend(px: int, steps: int, shift: float | None = None) -> tuple[flo
 @pytest.mark.parametrize(
     ["px", "expected_shift"],
     [
+        (16, 1.579),  # 1 token: below the lower point the line keeps running, e^(0.5 - 0.65 * 255 / 3840)
         (512, 1.878),  # interpolation, below the fit's upper point
         (1024, 3.158),  # 4096 tokens: the upper point, where the fit ends
-        (1536, 3.158),  # beyond it, held -- extrapolation would give 7.5
-        (2048, 3.158),  # extrapolation would give 25.3
-        (3072, 3.158),  # extrapolation would give 809.7
-        (4096, 3.158),  # extrapolation would give 103_777
+        (2048, 3.158),  # beyond it, held -- extrapolation would give 25.3
     ],
 )
-def test_the_shift_is_not_extrapolated_past_the_fit(px: int, expected_shift: float):
-    assert invocation()._calculate_shift(seq_len(px)) == pytest.approx(expected_shift, abs=1e-3)
+def test_the_shift_follows_its_anchors_and_holds_past_the_fit(px: int, expected_shift: float):
+    assert Z_IMAGE_SHIFT_FIT.shift(seq_len(px)) == pytest.approx(expected_shift, abs=1e-3)
 
 
-def test_the_fit_is_still_live_below_its_upper_point():
-    """Holding the fit at its endpoint is not the same as replacing it with a constant."""
-    node = invocation()
-    assert node._calculate_shift(256) < node._calculate_shift(1024) < node._calculate_shift(Z_IMAGE_MU_FIT_MAX_SEQ_LEN)
+@pytest.mark.parametrize(
+    ["shift", "num_steps", "expected"],
+    [
+        (3.0, 1, [1.0, 0.0]),  # one step is the whole range
+        (3.0, 4, [1.0, 0.9, 0.75, 0.5, 0.0]),  # 3 / (3 + 1/t - 1) at t = 0.75, 0.5, 0.25
+        (0.0, 3, [1.0, 0.0, 0.0, 0.0]),  # a shift of 0 keeps the ends and flattens the rest
+    ],
+)
+def test_the_sigmas_keep_their_ends_at_any_shift(shift: float, num_steps: int, expected: list[float]):
+    assert invocation()._get_sigmas(shift, num_steps) == pytest.approx(expected, abs=1e-12)
 
 
 @pytest.mark.parametrize("px", [1024, 1536, 2048, 3072, 4096])
@@ -170,8 +171,8 @@ def test_the_entry_sigma_does_not_depend_on_the_step_count():
 def test_an_explicit_shift_overrides_the_clamp():
     """The node exposes `shift` so a user can ask for the pre-clamp behaviour back.
 
-    Both halves go through `_run_diffusion`, so deleting the override in favour of always calling
-    `_calculate_shift` fails here rather than passing on a recomputed schedule.
+    Both halves go through `_run_diffusion`, so deleting the override in favour of always using
+    the fit fails here rather than passing on a recomputed schedule.
     """
     auto_shift, auto_entry = drive_to_blend(2048, 30)
     forced_shift, forced_entry = drive_to_blend(2048, 30, shift=UNCLAMPED_SHIFT_AT_2048)

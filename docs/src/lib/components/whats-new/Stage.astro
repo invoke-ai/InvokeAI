@@ -1,0 +1,70 @@
+---
+/*
+ * The drawing surface of a What's new motif: `width` × `height` units, scaled to fit the tile's visual area, which
+ * must be a size container. Children are placed with `box()` and the `wn-abs` class, and sized in stage units with
+ * `var(--u)`; an SVG overlay with the `wn-svg` class takes the same numbers as its viewBox. A motif therefore keeps its
+ * proportions at every tile size.
+ */
+type Props = { width: number; height: number };
+
+const { width, height } = Astro.props;
+---
+
+<div class="wn-stage" style={`--stage-w: ${width}; --stage-h: ${height}`}>
+  <slot />
+</div>
+
+<style>
+  .wn-stage {
+    /* Unregistered, so `cqw` resolves where `--u` is used: inside the stage, against the stage itself. */
+    --u: calc(100cqw / var(--stage-w));
+    --wn-panel: var(--docs-surface);
+    --wn-raised: var(--docs-control);
+    --wn-shown: var(--docs-tab-shown);
+    --wn-line: var(--docs-border);
+    --wn-ink: var(--docs-text-subtle);
+    --wn-strong: var(--docs-text-strong);
+    --wn-faint: color-mix(in oklab, var(--docs-text-subtle) 22%, transparent);
+    --wn-ease: cubic-bezier(0.65, 0, 0.35, 1);
+    position: relative;
+    flex: none;
+    width: var(--stage-width, min(100cqw, 100cqh * var(--stage-w) / var(--stage-h)));
+    aspect-ratio: var(--stage-w) / var(--stage-h);
+    container-type: inline-size;
+    isolation: isolate;
+    color: var(--wn-ink);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+
+  /*
+   * On the stage itself `cqw` would measure the visual area, so text sizes start on its children. Without
+   * specificity, so a motif's own sizes win.
+   */
+  :where(.wn-stage) > :global(*) {
+    font-size: calc(var(--u) * 8.5);
+  }
+
+  :global(.wn-abs) {
+    position: absolute;
+    left: calc(var(--x) * var(--u));
+    top: calc(var(--y) * var(--u));
+    width: calc(var(--w) * var(--u));
+    height: calc(var(--h) * var(--u));
+  }
+
+  :global(.wn-svg) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Images fill their box; a motif sets `object-position` for its crop. */
+  :global(img.wn-abs) {
+    display: block;
+    object-fit: cover;
+  }
+</style>

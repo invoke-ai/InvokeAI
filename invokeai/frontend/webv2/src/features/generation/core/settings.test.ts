@@ -18,7 +18,7 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getGenerationDimensions } from './baseGenerationPolicies';
+import { getGenerationDimensions, getGenerationValidationIssues } from './baseGenerationPolicies';
 import {
   calculateNewSize,
   clampDimension,
@@ -29,8 +29,10 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
+  isValidMossImageSkipLayers,
   moveReferenceImage,
   normalizeGenerateSettings,
+  parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
 } from './settings';
@@ -54,6 +56,52 @@ const legacyStoredValues = {
 seedArchitectureCapabilities();
 
 describe('normalizeGenerateSettings', () => {
+  it.each([null, 0, 0.4])('preserves saved HiDiffusion ratio values (%s)', (ratio) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio })
+    ).toMatchObject({ hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio });
+  });
+
+  it.each([
+    [null, 0.2, 0, 0.2],
+    [0.4, null, 0.4, 0],
+  ])('normalizes mixed ratios to one manual mode', (t1, t2, expectedT1, expectedT2) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 })
+    ).toMatchObject({ hiDiffusionT1Ratio: expectedT1, hiDiffusionT2Ratio: expectedT2 });
+  });
+
+  it('round-trips remembered manual ratios without changing automatic generation settings', () => {
+    const saved = {
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    };
+    const normalized = normalizeGenerateSettings(JSON.parse(JSON.stringify(saved)));
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    });
+    expect(isGenerateSettings(normalized)).toBe(true);
+  });
+
+  it('normalizes malformed remembered positions without activating manual ratios', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 99, t2: Number.NaN },
+    });
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 1, t2: 0 },
+    });
+    expect(isGenerateSettings({ ...normalized, hiDiffusionManualRatios: null })).toBe(false);
+  });
+
   it('reads the seed mode saved before modes existed from the random toggle', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)?.seedMode).toBe('fixed');
     expect(normalizeGenerateSettings({ ...legacyStoredValues, shouldRandomizeSeed: true })?.seedMode).toBe('random');
@@ -191,6 +239,46 @@ describe('normalizeGenerateSettings', () => {
     ).toBe(false);
   });
 
+  // Qwen-Image-2.1 references are their own flavor, so a stored one must not fold into Qwen-Image Edit's.
+  it('keeps persisted Qwen-Image-2.1 reference images as their own flavor', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        {
+          id: 'edit-1',
+          isEnabled: false,
+          config: {
+            type: 'qwen_image_2_1_reference_image',
+            image: {
+              height: 640,
+              imageName: 'edit.png',
+              imageUrl: '/api/v1/images/i/edit.png/full',
+              queuedAt: '2026-01-01T00:00:00.000Z',
+              sourceQueueItemId: 'backend-gallery',
+              thumbnailUrl: '/api/v1/images/i/edit.png/thumbnail',
+              width: 480,
+            },
+          },
+        },
+        { id: 'empty', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: null } },
+        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: { width: 1 } } },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: false,
+      },
+      { config: { image: null, type: 'qwen_image_2_1_reference_image' }, id: 'empty', isEnabled: true },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
   it('keeps more than five valid persisted reference images for provider-specific caps', () => {
     const referenceImages = Array.from({ length: 6 }, (_, index) => ({
       id: `ref-${index}`,
@@ -228,8 +316,8 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.negativePromptEnabled).toBe(true);
     expect(normalized?.negativePromptHeightPx).toBe(56);
@@ -272,11 +360,69 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.vae).toBeNull();
     expect(normalized?.vaePrecision).toBe('fp32');
+  });
+
+  it('keeps valid hosted-provider options and drops the rest back to provider defaults', () => {
+    const kept = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    expect(kept).toMatchObject({
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    const dropped = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '',
+      geminiTemperature: 2.5,
+      geminiThinkingLevel: 'max',
+      openaiBackground: 'clear',
+      openaiInputFidelity: 'medium',
+      openaiQuality: 'ultra',
+      seedreamOptimizePrompt: 'yes',
+      seedreamWatermark: 1,
+    });
+
+    expect(dropped).toMatchObject({
+      externalImageSize: null,
+      geminiTemperature: null,
+      geminiThinkingLevel: null,
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+      seedreamOptimizePrompt: false,
+      seedreamWatermark: false,
+    });
+  });
+
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
   });
 
   it('bounds the model-family tuning fields and defaults the rest', () => {
@@ -333,6 +479,30 @@ describe('normalizeGenerateSettings', () => {
       { image, styleStrength: 2, type: 'krea2_reference_image' },
     ]);
     expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
+  it('keeps a Krea-2 edit reference as its image alone and reads the K/V cache switch only when true', () => {
+    const image = { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      krea2ReferenceKvCache: true,
+      referenceImages: [
+        // A style strength carried over from the other mode does not belong to an edit reference.
+        { config: { image, styleStrength: 1.5, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+        { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      { config: { image, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+      { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+    ]);
+    expect(normalized?.krea2ReferenceKvCache).toBe(true);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, krea2ReferenceKvCache: 'yes' })?.krea2ReferenceKvCache
+    ).toBe(false);
+    expect(normalizeGenerateSettings(legacyStoredValues)?.krea2ReferenceKvCache).toBe(false);
   });
 
   it('drops malformed persisted model identifiers missing a base', () => {
@@ -392,6 +562,54 @@ describe('the Anima inpaint adapter settings', () => {
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
   });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
+  });
+});
+
+describe('the MOSS-Image skip layers', () => {
+  it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
+    expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
+    // A trailing comma is a list being typed, not a mistake.
+    expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
+    expect(parseMossImageSkipLayers('')).toEqual([]);
+    expect(parseMossImageSkipLayers(' , ')).toEqual([]);
+  });
+
+  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
+    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
+      expect(parseMossImageSkipLayers(text)).toBeNull();
+    }
+    expect(parseMossImageSkipLayers('42')).toEqual([42]);
+    expect(isValidMossImageSkipLayers([42])).toBe(false);
+    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
+    expect(isValidMossImageSkipLayers([])).toBe(true);
+  });
+
+  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
+    ).toEqual([]);
+    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22, 26, 50]);
+    // A list that is not all integers is not one the user chose, so the default takes its place.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22]);
+  });
 });
 
 describe('Generate widget value snapshots', () => {
@@ -450,6 +668,68 @@ describe('Generate widget value snapshots', () => {
     expect(synced.qwen3EncoderModel).toBe(currentComponent);
     expect(synced.vae).toBe(currentVae);
     expect(synced.loras[0]?.model).toBe(currentLora);
+  });
+
+  it('notices a CPU Only change on the GGUF encoder and its tower, and the policy then blocks references', () => {
+    const qwen21: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'enc',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const tower = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'mmproj',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant: 'qwen3_vl_8b',
+    };
+    const saved: GenerateWidgetValues = {
+      ...values,
+      model: qwen21,
+      modelKey: qwen21.key,
+      qwen3VLEncoderModel: encoder,
+      qwen3VLVisionTowerModel: tower,
+      referenceImages: [
+        {
+          config: {
+            image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
+            type: 'qwen_image_2_1_reference_image',
+          },
+          id: 'edit',
+          isEnabled: true,
+        },
+      ],
+    };
+    const cpuIssues = (candidate: GenerateWidgetValues) =>
+      getGenerationValidationIssues(qwen21, candidate).filter((issue) => issue.message.includes('CPU Only'));
+
+    expect(cpuIssues(saved)).toEqual([]);
+
+    // The Model Manager flips the encoder's CPU Only; the saved snapshot is refreshed from the catalog.
+    const flipped = { ...encoder, cpu_only: true };
+    const synced = syncGenerateWidgetValuesWithModels(saved, [qwen21, flipped, tower]);
+
+    expect(synced.qwen3VLEncoderModel).toBe(flipped);
+    expect(synced.qwen3VLVisionTowerModel).toBe(saved.qwen3VLVisionTowerModel);
+    expect(cpuIssues(synced)).toEqual([
+      expect.objectContaining({ target: { field: 'qwen3VLVisionTowerModel', section: 'components' } }),
+    ]);
+    // Matching again (tower flipped too) clears it, and an unchanged catalog keeps the same values object.
+    const bothFlipped = syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, { ...tower, cpu_only: true }]);
+
+    expect(cpuIssues(bothFlipped)).toEqual([]);
+    expect(syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, tower])).toBe(synced);
   });
 
   it('does not resync cloned current model snapshots by reference alone', () => {
@@ -512,6 +792,31 @@ describe('LoRA settings helpers', () => {
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);
   });
+
+  it('keeps SD 3 Large LoRAs off Medium models, and lets records without a variant through', () => {
+    const medium: MainModelConfig = {
+      base: 'sd-3',
+      key: 'sd35m',
+      name: 'SD 3.5 Medium',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, medium)).toBe(false);
+    // Installed before the variant existed: the denoise node checks those at run time.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
+      true
+    );
+    // The API sends null, not undefined, for a record without one.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
+    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
+  });
 });
 
 describe('model defaults', () => {
@@ -559,6 +864,27 @@ describe('dimension helpers', () => {
     expect(wide.width / wide.height).toBeCloseTo(16 / 9, 1);
   });
 
+  it('keeps the ratio at the size limits, scaling both sides instead of clamping one', () => {
+    // 6144² at 16:9 is 8192×4608; halved to fit 4096.
+    expect(calculateNewSize(16 / 9, 6144 * 6144)).toEqual({ height: 2304, width: 4096 });
+    // 2048² at 8:1 is 5792.6×724.1; scaled to fit 4096 wide, the height is exactly 512.
+    expect(calculateNewSize(8, 2048 * 2048)).toEqual({ height: 512, width: 4096 });
+    // 32² is below the 64px minimum on both sides.
+    expect(calculateNewSize(1, 32 * 32)).toEqual({ height: 64, width: 64 });
+    // 48² at 4:1 is 96×24; scaled so the short side is 64, then 256×64.
+    expect(calculateNewSize(4, 48 * 48)).toEqual({ height: 64, width: 256 });
+    // 64:1 is the widest ratio both limits allow: 4096×64 exactly.
+    expect(calculateNewSize(64, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+  });
+
+  it('caps the long side and holds the short side at the minimum for a ratio past 64:1', () => {
+    // 2000:1 at 1024² would be about 45795×23; no in-range size has that ratio, so the result is the closest corner.
+    expect(calculateNewSize(2000, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+    expect(calculateNewSize(1 / 2000, 1024 * 1024)).toEqual({ height: 4096, width: 64 });
+    // A tiny area goes up the same way: the short side reaches 64 and the long side stops at 4096.
+    expect(calculateNewSize(2000, 16 * 16)).toEqual({ height: 64, width: 4096 });
+  });
+
   it('moves a reference image one step through the stack, and no-ops at the ends', () => {
     const referenceImages = ['a', 'b', 'c'].map((id) => ({
       config: { image: null, model: null, type: 'flux_kontext_reference_image' as const },
@@ -588,6 +914,8 @@ describe('dimension helpers', () => {
     expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
+    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
+    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
     expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
   });
 });

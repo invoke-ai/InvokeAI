@@ -16,6 +16,15 @@ export const getGalleryMediaFilter = (values: Record<string, unknown>): GalleryM
 export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind | undefined =>
   filter === 'all' ? undefined : filter;
 
+/**
+ * Where a search looks: the selected board, or every board the caller may read plus their Uncategorized items. It
+ * applies only while a search is active; clearing the search returns it to `board`.
+ */
+export type GallerySearchScope = 'board' | 'all';
+
+/** The most project groups under Other projects whose collapse is remembered; the newest are kept. */
+export const GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT = 200;
+
 /** The collapsible groups in the board panel, in render order. */
 export const GALLERY_BOARD_SECTION_IDS = [
   'project',
@@ -42,16 +51,23 @@ export const GALLERY_MIN_GRID_HEIGHT_PX = 128;
 export const GALLERY_BOARD_PANEL_MIN_WIDTH_PX = 180;
 export const GALLERY_BOARD_PANEL_MAX_WIDTH_PX = 420;
 
-/** The auto-add choice that sends results to whichever board the gallery has selected. */
-export const GALLERY_AUTO_ADD_FOLLOW = 'follow';
+/**
+ * The stored auto-add value earlier builds wrote for "follow the selected board", their default. It now reads as the
+ * default destination: following became the opt-in `followSelectedBoard`, so browsing a board never moves results.
+ */
+const LEGACY_AUTO_ADD_FOLLOW = 'follow';
+
+/** Whether the stored values still hold the legacy follow-the-selected-board auto-add value. */
+export const isLegacyFollowAutoAdd = (values: Readonly<Record<string, unknown>>): boolean =>
+  values.autoAddBoardId === LEGACY_AUTO_ADD_FOLLOW;
 
 /** User-tunable gallery settings, persisted in the widget's `values` record. */
 export interface GallerySettings {
   /**
-   * Where results without a board of their own go: `follow` (the selected board), `none` (Uncategorized), or a
-   * board id. Workflow nodes set to Auto use it too.
+   * Where results without a board of their own go: a board id, `none` (Uncategorized), or null for the default, the
+   * project's inbox (Uncategorized where the gallery has none). Workflow nodes set to Auto use it too.
    */
-  autoAddBoardId: string;
+  autoAddBoardId: string | null;
   boardOrderBy: GalleryBoardOrderBy;
   boardOrderDir: GalleryOrderDir;
   /** Board panel disclosure controlled by the region-independent widget header. */
@@ -59,8 +75,12 @@ export interface GallerySettings {
   boardPanelHeightPx: number;
   boardPanelWidthPx: number;
   collapsedBoardSections: GalleryBoardSectionId[];
+  /** Project groups under Other projects that are collapsed, by project id; oldest first. */
+  collapsedProjectGroupIds: string[];
   /** The groups that start collapsed which have been opened. */
   expandedBoardSections: GalleryBoardSectionId[];
+  /** Opt-in: results go to whichever board the gallery shows, in place of `autoAddBoardId`. */
+  followSelectedBoard: boolean;
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
   mediaFilter: GalleryMediaFilter;
@@ -74,20 +94,23 @@ export interface GallerySettings {
   showOtherProjectBoards: boolean;
   showPendingItems: boolean;
   progressSectionCollapsed: boolean;
+  searchScope: GallerySearchScope;
   /** Disclosure of the starred strip at the top of the grid. */
   starredSectionCollapsed: boolean;
   thumbnailFit: GalleryThumbnailFit;
 }
 
 export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
-  autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW,
+  autoAddBoardId: null,
   boardOrderBy: 'created_at',
   boardOrderDir: 'DESC',
   boardPanelCollapsed: false,
   boardPanelHeightPx: 280,
   boardPanelWidthPx: 240,
   collapsedBoardSections: [],
+  collapsedProjectGroupIds: [],
   expandedBoardSections: [],
+  followSelectedBoard: false,
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
   mediaFilter: 'all',
@@ -99,6 +122,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   showOtherProjectBoards: false,
   showPendingItems: true,
   progressSectionCollapsed: false,
+  searchScope: 'board',
   starredSectionCollapsed: false,
   thumbnailFit: 'square',
 };
@@ -122,6 +146,41 @@ const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSecti
   Array.isArray(value)
     ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
     : [];
+
+/**
+ * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
+ * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
+ */
+const getCollapsedProjectGroupIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const kept = new Set<string>();
+
+  for (let index = value.length - 1; index >= 0 && kept.size < GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT; index--) {
+    const entry: unknown = value[index];
+
+    if (typeof entry === 'string') {
+      kept.add(entry);
+    }
+  }
+
+  return [...kept].reverse();
+};
+
+/** The settings change that collapses or expands one project's group under Other projects. */
+export const toggleGalleryProjectGroup = (
+  settings: GallerySettings,
+  projectId: string,
+  isOpen: boolean
+): Pick<GallerySettings, 'collapsedProjectGroupIds'> => {
+  const others = settings.collapsedProjectGroupIds.filter((id) => id !== projectId);
+
+  return {
+    collapsedProjectGroupIds: isOpen ? others : [...others, projectId].slice(-GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT),
+  };
+};
 
 export const isGalleryBoardSectionOpen = (settings: GallerySettings, sectionId: GalleryBoardSectionId): boolean =>
   GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
@@ -149,7 +208,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
 
   return {
     autoAddBoardId:
-      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== ''
+      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
         ? values.autoAddBoardId
         : DEFAULT_GALLERY_SETTINGS.autoAddBoardId,
     boardOrderBy: isBoardOrderBy(values.boardOrderBy) ? values.boardOrderBy : DEFAULT_GALLERY_SETTINGS.boardOrderBy,
@@ -172,7 +231,9 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
       values.collapsedBoardSections,
       GALLERY_BOARD_SECTION_IDS.filter((sectionId) => !GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId))
     ),
+    collapsedProjectGroupIds: getCollapsedProjectGroupIds(values.collapsedProjectGroupIds),
     expandedBoardSections: getBoardSections(values.expandedBoardSections, GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT),
+    followSelectedBoard: values.followSelectedBoard === true,
     imageDensityPercent:
       typeof values.imageDensityPercent === 'number' && Number.isFinite(values.imageDensityPercent)
         ? Math.min(100, Math.max(0, values.imageDensityPercent))
@@ -200,6 +261,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
         ? values.showPendingItems
         : DEFAULT_GALLERY_SETTINGS.showPendingItems,
     progressSectionCollapsed: values.progressSectionCollapsed === true,
+    searchScope: values.searchScope === 'all' ? 'all' : DEFAULT_GALLERY_SETTINGS.searchScope,
     starredSectionCollapsed:
       typeof values.starredSectionCollapsed === 'boolean'
         ? values.starredSectionCollapsed

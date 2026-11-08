@@ -1,4 +1,5 @@
 import logging
+from fractions import Fraction
 
 import pytest
 from PIL import Image
@@ -291,28 +292,31 @@ def test_generate_snaps_unlisted_ratio_when_model_has_no_bucket_sizes() -> None:
     assert (provider.last_request.width, provider.last_request.height) == (1360, 765)
 
 
-def _starter_sizes() -> list[tuple[str, str, int, int]]:
+def _starter_sizes() -> list[tuple[str, str, int, int, bool]]:
     """Every fixed size a txt2img external starter model offers: its resolution presets and ratio buckets."""
-    cases: list[tuple[str, str, int, int]] = []
+    cases: list[tuple[str, str, int, int, bool]] = []
     for starter in STARTER_MODELS:
         capabilities = starter.capabilities
         if capabilities is None or "txt2img" not in capabilities.modes:
             continue
         cases.extend(
-            (starter.source, preset.label, preset.width, preset.height)
+            (starter.source, preset.aspect_ratio, preset.width, preset.height, False)
             for preset in capabilities.resolution_presets or []
         )
         cases.extend(
-            (starter.source, ratio, size.width, size.height)
+            (starter.source, ratio, size.width, size.height, True)
             for ratio, size in (capabilities.aspect_ratio_sizes or {}).items()
         )
     return cases
 
 
-@pytest.mark.parametrize("source, label, width, height", _starter_sizes())
-def test_starter_model_offered_sizes_are_accepted(source: str, label: str, width: int, height: int) -> None:
+@pytest.mark.parametrize("source, ratio, width, height, is_bucket_size", _starter_sizes())
+def test_starter_model_offered_sizes_are_accepted(
+    source: str, ratio: str, width: int, height: int, is_bucket_size: bool
+) -> None:
     """A size a model offers in its own presets must be accepted at (nearly) that size, even when its declared ratio
     is not in lowest terms ("21:9") and the preset is only approximately that ratio (1024x439)."""
+    # The frontend's Canvas picks its provider request size from these capabilities and relies on this acceptance.
     starter = next(model for model in STARTER_MODELS if model.source == source)
     assert starter.capabilities is not None
     provider_id, provider_model_id = source.removeprefix("external://").split("/", 1)
@@ -328,10 +332,18 @@ def test_starter_model_offered_sizes_are_accepted(source: str, label: str, width
 
     service.generate(_build_request(model=model, width=width, height=height))
 
-    assert provider.last_request is not None
-    # Snapping to an exact 21:9 moves in 21x9 px steps, so a small preset (512x219 -> 504x216) can shift ~2%.
-    assert provider.last_request.width == pytest.approx(width, rel=0.02)
-    assert provider.last_request.height == pytest.approx(height, rel=0.02)
+    sent = provider.last_request
+    assert sent is not None
+    if is_bucket_size:
+        # Bucket sizes pass unchanged: the Canvas frames its output crop around this exact size.
+        assert (sent.width, sent.height) == (width, height)
+    else:
+        # An approximate preset may snap onto its exact declared ratio (1024x819 -> 1025x820), never onto another
+        # ratio. Exact 21:9 moves in 21x9 px steps, so a small preset (512x219 -> 504x216) can shift ~2%.
+        ratio_width, ratio_height = (int(part) for part in ratio.split(":"))
+        assert Fraction(sent.width, sent.height) == Fraction(ratio_width, ratio_height)
+        assert sent.width == pytest.approx(width, rel=0.02)
+        assert sent.height == pytest.approx(height, rel=0.02)
 
 
 def test_generate_matches_declared_ratio_not_in_lowest_terms() -> None:

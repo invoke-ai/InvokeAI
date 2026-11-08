@@ -25,7 +25,6 @@ import functools
 import inspect
 import math
 import re
-import threading
 from collections import Counter
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -37,6 +36,13 @@ import torch
 
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.oom import is_oom_error
+from invokeai.backend.util.triton_kernels import (
+    TRITON_REQUIREMENT,
+    FailureOutcome,
+    TritonKernelHealth,
+    is_missing_triton,
+    relative_error,
+)
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -61,44 +67,41 @@ _FIRST_CALL_MAX_ERROR = 0.5
 # tile is among them. A kernel that never ran garbles every row, so a slice catches what the whole output would; the
 # whole output costs ~14 bytes per element to compare -- about 5 GB for one call of Wan 2.2 14B at 720p.
 _FIRST_CALL_ROWS = 1024
-# Triton failing to write a compiled kernel to its cache (on Windows, when two GPUs compile the same kernel at once)
-# says nothing about the kernel: that call falls back and the next tries again. A device that fails this way this many
-# times in a row is retired like any other, so a cache that can never be written does not recompile on every call.
-_MAX_CACHE_FAILURES = 3
 
-DOCS_URL = "https://invoke-ai.github.io/InvokeAI-7/configuration/optimization/sage-attention/"
+# The published page. The old GitHub Pages path under InvokeAI-7 returns 404.
+DOCS_URL = "https://v7.invoke.ai/configuration/optimization/sage-attention/"
 
 
 @dataclass
-class _Usage:
-    """What one scope's attention calls ran on. Logged at DEBUG when the scope closes."""
+class SageAttentionUsage:
+    """What one scope's attention calls ran on. Logged at DEBUG when the scope closes; `sage_attention_scope` yields
+    it, so a caller that has to know whether SageAttention served its calls can read it."""
 
     served: int = 0
     fell_back: Counter[str] = field(default_factory=Counter)
+    """Calls PyTorch SDPA served instead, by `_ineligible`'s reason or the wrapper's (``memory``, ``device``, ``cache``,
+    ``error``)."""
     # Set once SageAttention's quantized copies did not fit; the rest of the scope then stays on SDPA.
     memory_short: bool = False
 
 
-_scope: ContextVar[_Usage | None] = ContextVar("invokeai_sage_attention_scope", default=None)
-_lock = threading.Lock()
-_disabled_devices: set[int] = set()
-# (device, dtype, head size): the kernel variants whose first result was compared with SDPA.
-_validated: set[tuple[int, torch.dtype, int]] = set()
-_cache_failures: Counter[int] = Counter()
-_announced_devices: set[int] = set()
+_scope: ContextVar[SageAttentionUsage | None] = ContextVar("invokeai_sage_attention_scope", default=None)
+# Keyed by CUDA index; validated variants by (index, dtype, head size), the inputs that pick a different kernel.
+_health = TritonKernelHealth()
 
 
 @contextmanager
-def sage_attention_scope() -> Iterator[None]:
-    """Let SageAttention serve the eligible attention calls this thread makes inside the block.
+def sage_attention_scope() -> Iterator[SageAttentionUsage]:
+    """Let SageAttention serve the eligible attention calls this thread makes inside the block, and count them in the
+    usage it yields.
 
-    A no-op unless ``install_sage_attention`` installed the wrapper. Denoise invocations enter it around the
-    transformer forward passes of architectures whose output was validated against SDPA.
+    A no-op unless ``install_sage_attention`` installed the wrapper: the usage then stays empty. Denoise invocations
+    enter it around the transformer forward passes of architectures whose output was validated against SDPA.
     """
-    usage = _Usage()
+    usage = SageAttentionUsage()
     token = _scope.set(usage)
     try:
-        yield
+        yield usage
     finally:
         _scope.reset(token)
         if usage.served or usage.fell_back:
@@ -250,41 +253,23 @@ def _check_first_result(
     group = query.shape[1] // key.shape[1]
     rows = slice(-_FIRST_CALL_ROWS, None)
     expected = original(query[:1, :group, rows], key[:1, :1], value[:1, :1], scale=scale, enable_gqa=group > 1)
-    difference = torch.linalg.vector_norm(out[:1, :group, rows] - expected, dtype=torch.float32)
-    reference = torch.linalg.vector_norm(expected, dtype=torch.float32).clamp_min(1e-6)
-    error = (difference / reference).item()
+    error = relative_error(out[:1, :group, rows], expected)
     if not math.isfinite(error) or error > _FIRST_CALL_MAX_ERROR:
         raise RuntimeError(f"its first result differs from PyTorch SDPA by {error:.2f} (relative L2)")
-    with _lock:
-        _validated.add((index, query.dtype, query.shape[-1]))
+    _health.mark_validated((index, query.dtype, query.shape[-1]))
 
 
-def _cache_failure(index: int) -> bool:
-    """Count a Triton cache failure on this device; True once it failed too often in a row to keep retrying."""
-    with _lock:
-        _cache_failures[index] += 1
-        return _cache_failures[index] >= _MAX_CACHE_FAILURES
-
-
-def _disable(index: int, error: Exception, query: torch.Tensor, key: torch.Tensor) -> None:
-    with _lock:
-        first = index not in _disabled_devices
-        _disabled_devices.add(index)
-    if first:
-        logger.warning(
-            f"SageAttention failed on cuda:{index} for query {tuple(query.shape)}, key {tuple(key.shape)}, "
-            f"{query.dtype} ({error!r}). Attention on this device uses PyTorch SDPA until restart; set "
-            "`attention_backend: auto` to stop using SageAttention."
-        )
+def _warn_retired(index: int, error: Exception, query: torch.Tensor, key: torch.Tensor) -> None:
+    logger.warning(
+        f"SageAttention failed on cuda:{index} for query {tuple(query.shape)}, key {tuple(key.shape)}, "
+        f"{query.dtype} ({error!r}). Attention on this device uses PyTorch SDPA until restart; set "
+        "`attention_backend: auto` to stop using SageAttention."
+    )
 
 
 def _announce(index: int, version: str, kernel: Callable[..., torch.Tensor]) -> None:
-    if index in _announced_devices:
+    if not _health.first_use(index):
         return
-    with _lock:
-        if index in _announced_devices:
-            return
-        _announced_devices.add(index)
     major, minor = torch.cuda.get_device_capability(index)
     name = getattr(kernel, "func", kernel).__name__
     logger.info(
@@ -293,30 +278,31 @@ def _announce(index: int, version: str, kernel: Callable[..., torch.Tensor]) -> 
     )
 
 
-def install_sage_attention() -> None:
-    """Rebind ``F.scaled_dot_product_attention`` so ``sage_attention_scope`` can route calls to SageAttention.
+def install_sage_attention() -> bool:
+    """Rebind ``F.scaled_dot_product_attention`` so ``sage_attention_scope`` can route calls to SageAttention, and say
+    whether it is bound now.
 
-    Idempotent and never raises: a machine that cannot run SageAttention logs why and keeps PyTorch's SDPA. Never
-    installs on ROCm, which also keeps ``rocm_sdpa_chunks_math`` reading the ROCm guard's sentinel on the live binding.
-    Installed once at startup via ``apply_monkeypatches`` when ``attention_backend`` is ``sage``.
+    Idempotent and never raises: a machine that cannot run SageAttention logs why, keeps PyTorch's SDPA and gets False.
+    Never installs on ROCm, which also keeps ``rocm_sdpa_chunks_math`` reading the ROCm guard's sentinel on the live
+    binding. Installed once at startup via ``apply_monkeypatches`` when ``attention_backend`` is ``sage``.
     """
     from importlib.metadata import PackageNotFoundError
 
     functional = torch.nn.functional
     if getattr(functional.scaled_dot_product_attention, _SENTINEL, False):
-        return
+        return True
     unavailable = "attention_backend is 'sage', but SageAttention is unavailable here: "
     see_docs = f"See {DOCS_URL}. Using PyTorch SDPA."
     try:
         if torch.version.hip is not None or torch.version.cuda is None or not torch.cuda.is_available():
             logger.warning(unavailable + "it needs an NVIDIA GPU with CUDA. Using PyTorch SDPA.")
-            return
+            return False
         capabilities = {index: torch.cuda.get_device_capability(index) for index in range(torch.cuda.device_count())}
         if not any(capability >= (8, 0) for capability in capabilities.values()):
             logger.warning(
                 unavailable + "it needs an NVIDIA GPU with compute capability 8.0 or newer. Using PyTorch SDPA."
             )
-            return
+            return False
         version, sageattention = _import_sageattention()
         parsed = _parse_version(version)
         if parsed is None or parsed < _MIN_VERSION:
@@ -324,7 +310,7 @@ def install_sage_attention() -> None:
                 unavailable + f"version {version} is installed, and {'.'.join(map(str, _MIN_VERSION))} or newer is "
                 f"required (the `sageattention` release on PyPI is SageAttention 1). {see_docs}"
             )
-            return
+            return False
         cuda = _parse_version(torch.version.cuda) or (0, 0, 0)
         kernels = {
             index: kernel for index, cap in capabilities.items() if (kernel := _kernel(sageattention, cap, cuda[:2]))
@@ -335,22 +321,22 @@ def install_sage_attention() -> None:
                     unavailable + f"its {kernel.func.__name__} does not take {', '.join(unaccepted)}, so this "
                     f"SageAttention {version} differs from the version InvokeAI was validated with. {see_docs}"
                 )
-                return
+                return False
     except PackageNotFoundError:
         logger.warning(
             unavailable + f"`sageattention` imports, but has no package metadata to check its version. {see_docs}"
         )
-        return
+        return False
     except ModuleNotFoundError as e:
-        if (e.name or "").split(".")[0] == "triton":
-            hint = "it needs Triton, which on Windows is the `triton-windows` package"
+        if is_missing_triton(e):
+            hint = f"it needs {TRITON_REQUIREMENT}"
         else:
             hint = "the `sageattention` package is not installed"
         logger.warning(unavailable + f"{hint}. {see_docs}")
-        return
+        return False
     except Exception as e:
         logger.warning(unavailable + f"loading it failed ({e!r}). {see_docs}")
-        return
+        return False
 
     original = functional.scaled_dot_product_attention
 
@@ -374,7 +360,7 @@ def install_sage_attention() -> None:
                 reason = "memory"
             if reason is None:
                 index = _cuda_index(query, key, value)
-                kernel = kernels.get(index) if index is not None and index not in _disabled_devices else None
+                kernel = kernels.get(index) if index is not None and not _health.is_retired(index) else None
                 if index is None or kernel is None:
                     reason = "device"
                 else:
@@ -388,7 +374,7 @@ def install_sage_attention() -> None:
                                 is_causal=False,
                                 sm_scale=scale if scale is not None else query.shape[-1] ** -0.5,
                             )
-                            if (index, query.dtype, query.shape[-1]) not in _validated:
+                            if not _health.is_validated((index, query.dtype, query.shape[-1])):
                                 _check_first_result(index, original, query, key, value, scale, out)
                     except Exception as e:
                         if isinstance(e, RuntimeError) and is_oom_error(e):
@@ -402,15 +388,13 @@ def install_sage_attention() -> None:
                                 f"SageAttention ran out of memory on cuda:{index} for query {tuple(query.shape)}; "
                                 "the rest of this generation uses PyTorch SDPA."
                             )
-                        elif isinstance(e, OSError) and not _cache_failure(index):
-                            reason = "cache"
                         else:
-                            _disable(index, e, query, key)
-                            reason = "error"
+                            outcome = _health.record_failure(index, e)
+                            if outcome is FailureOutcome.RETIRED:
+                                _warn_retired(index, e, query, key)
+                            reason = "cache" if outcome is FailureOutcome.TRANSIENT else "error"
                     else:
-                        if _cache_failures[index]:
-                            with _lock:
-                                _cache_failures.pop(index, None)
+                        _health.record_success(index)
                         usage.served += 1
                         _announce(index, version, kernel)
                         return out
@@ -427,3 +411,4 @@ def install_sage_attention() -> None:
         "(attention_backend: sage). Text encoders, VAEs and masked attention keep PyTorch SDPA"
         + (f"; no SageAttention kernel for cuda:{', cuda:'.join(map(str, unserved))}." if unserved else ".")
     )
+    return True

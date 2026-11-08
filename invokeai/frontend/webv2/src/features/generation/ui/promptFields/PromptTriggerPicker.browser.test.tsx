@@ -27,7 +27,9 @@ const WILDCARDS = [
   { id: 'w2', name: 'moods', values: ['calm'] },
 ];
 
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),

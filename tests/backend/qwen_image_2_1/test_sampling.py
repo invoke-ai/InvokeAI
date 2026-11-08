@@ -10,7 +10,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import QwenImage21VariantType
-from invokeai.backend.qwen_image_2_1.sampling import TURBO_SIGMAS, build_sigmas, calculate_mu
+from invokeai.backend.qwen_image_2_1.sampling import BASE_SHIFT_FIT, TURBO_SIGMAS, build_sigmas
 
 BASE = QwenImage21VariantType.Base
 TURBO = QwenImage21VariantType.Turbo
@@ -55,7 +55,7 @@ def test_above_its_fit_the_base_schedule_holds_the_shift_at_the_fits_end(
 
 def test_just_below_the_fits_end_the_shift_still_follows_the_line() -> None:
     # 1440x1440 is 90x90 = 8100 tokens, 7844 of the line's 7936 tokens from 0.5 towards 0.9.
-    assert calculate_mu(8100) == pytest.approx(0.5 + 0.4 * 7844 / 7936, abs=1e-12)
+    assert BASE_SHIFT_FIT.mu(8100) == pytest.approx(0.5 + 0.4 * 7844 / 7936, abs=1e-12)
     sigmas = build_sigmas(BASE, 40, 8100)
     torch.testing.assert_close(sigmas[:3], torch.tensor([1.0, 0.989205, 0.978081]), atol=1e-6, rtol=0)
     torch.testing.assert_close(sigmas[-3:], torch.tensor([0.077366, 0.02, 0.0]), atol=1e-6, rtol=0)

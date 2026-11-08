@@ -8,6 +8,7 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { isGroupNode, isHideableLayer, isNodeHidden, isOverlayStack } from '@workbench/canvas-engine/api';
 import {
   ChevronRightIcon,
+  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderIcon,
@@ -16,28 +17,26 @@ import {
   LockIcon,
   LockOpenIcon,
 } from 'lucide-react';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 import type { LayerTreeRow } from './layerTreeRows';
 
+import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
-import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
-import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
+import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
-import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { anchorFromPoint } from './layerRowCommands';
 import { layerRowSummary } from './layerRowSummary';
-import { LayerRowSurface } from './LayerRowSurface';
+import { LAYER_LEADING_BOX_PX, LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
 import { LayerThumbnail, type LayerThumbnailEngine } from './LayerThumbnail';
 import { layerTypeIcon } from './layerTypeIcon';
 
 const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 
-const THUMBNAIL_SIZE = '8';
+const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
-const GROUP_PILE_CARD_PX = 24;
 
 /** How a row takes part in the current drag. */
 export type LayerRowDragState = 'source' | 'travelling' | null;
@@ -114,6 +113,11 @@ const LayerRowComponent = ({
     },
     [setDragRef, setDropRef]
   );
+  // Keyed by node id, so a row re-renders only for its own owner's status.
+  const adjustmentStatus = useAdjustmentStatus(engine, node.id);
+  const adjustmentStatusId = useId();
+  // The warning icon is pointer-only like every row control; focusing the row reads its explanation instead.
+  const adjustmentWarned = adjustmentStatus !== 'idle' && adjustmentStatus !== 'computing';
   const nameInput = useRef<HTMLInputElement | null>(null);
   // Escape abandons the draft; the blur that follows refocusing the row must not commit it.
   const renameCancelled = useRef(false);
@@ -121,8 +125,6 @@ const LayerRowComponent = ({
   useLayoutEffect(() => {
     recordLayerRowCommit(row.id);
   });
-
-  const indentStyle = useMemo(() => ({ paddingLeft: `${vm.depth * LAYER_TREE_INDENT_PX}px` }), [vm.depth]);
 
   const handleSelect = useCallback(
     (event: MouseEvent<HTMLElement>) =>
@@ -163,8 +165,11 @@ const LayerRowComponent = ({
     [commands, row.id]
   );
   const handleToggleVisible = useCallback(
-    (checked: boolean) => commands.setEnabled(row.id, checked),
-    [commands, row.id]
+    (event: { stopPropagation: () => void }) => {
+      event.stopPropagation();
+      commands.setEnabled(row.id, !node.isEnabled);
+    },
+    [commands, node.isEnabled, row.id]
   );
   const handleToggleHidden = useCallback(
     (event: { stopPropagation: () => void }) => {
@@ -286,6 +291,7 @@ const LayerRowComponent = ({
       ref={setRowRef}
       {...dragListeners}
       aria-current={primary ? 'true' : undefined}
+      aria-describedby={adjustmentWarned ? adjustmentStatusId : undefined}
       aria-expanded={group ? row.expanded : childCount > 0 ? childrenExpanded : undefined}
       aria-label={node.name}
       aria-level={vm.depth + 2}
@@ -322,16 +328,7 @@ const LayerRowComponent = ({
           w="2px"
         />
       ) : null}
-      <LayerRowSurface active={tone} cursor={drag === 'source' ? 'grabbing' : 'default'} indentStyle={indentStyle}>
-        <LayerActiveDot
-          checked={node.isEnabled}
-          disabled={editingLocked}
-          gated={disabledByAncestor}
-          label={t('widgets.layers.actions.toggleActive')}
-          tooltip={disabledByAncestor ? t('widgets.layers.actions.groupDisabled') : undefined}
-          onCheckedChange={handleToggleVisible}
-          onKeepRowFocus={keepRowFocus}
-        />
+      <LayerRowSurface active={tone} cursor={drag === 'source' ? 'grabbing' : 'default'} depth={vm.depth}>
         {group ? (
           <GroupPreview engine={engine} expanded={row.expanded} node={node} thumbnails={thumbnails} />
         ) : !thumbnails ? (
@@ -434,19 +431,26 @@ const LayerRowComponent = ({
             />
           )}
         </Box>
-        {layer ? <ControlLayerWarningIcon contributing={vm.contributionEnabled} layer={layer} /> : null}
-        {/* One control cluster on the same rhythm as the stack header; slots a row cannot use are held open. */}
-        <HStack flexShrink="0" gap="0.5" onClick={stopPropagation} onMouseDown={keepRowFocus}>
-          {hideable ? (
+        <AdjustmentStatusIcon descriptionId={adjustmentStatusId} status={adjustmentStatus} />
+        {layer?.type === 'control' ? (
+          <ControlLayerStatusIcon contributing={vm.contributionEnabled} engine={engine} layer={layer} />
+        ) : null}
+        {/* Trailing cluster on the stack header's rhythm: the eye sits left of the lock as an overlay header's eye sits
+            left of its New button, so eyes and locks each form one column at every depth. */}
+        <HStack flexShrink="0" gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepRowFocus}>
+          {hideable && vm.documentHidden && vm.contributionEnabled ? (
+            // Hidden on the canvas only (an overlay put out of the way): it still shapes generation. The row menu
+            // sets it; this says so and brings it back. Rendered only when it applies, left of the eye column.
             <Tooltip
               content={
-                hiddenByAncestor ? t('widgets.layers.actions.groupHidden') : t('widgets.layers.actions.toggleHidden')
+                hiddenByAncestor
+                  ? t('widgets.layers.actions.groupHidden')
+                  : t('widgets.layers.actions.canvasHiddenTooltip')
               }
             >
               <IconButton
-                aria-label={t('widgets.layers.actions.toggleHidden')}
-                aria-pressed={!ownHidden}
-                color={vm.documentHidden ? 'fg.muted' : 'fg'}
+                aria-label={t('widgets.layers.actions.showOnCanvas')}
+                color="fg.muted"
                 disabled={editingLocked || hiddenByAncestor}
                 size="sm"
                 tabIndex={-1}
@@ -454,12 +458,34 @@ const LayerRowComponent = ({
                 onClick={handleToggleHidden}
                 onPointerDown={stopPropagation}
               >
-                {vm.documentHidden ? <EyeOffIcon /> : <EyeIcon />}
+                <EyeClosedIcon />
               </IconButton>
             </Tooltip>
-          ) : (
-            <Box boxSize="6" />
-          )}
+          ) : null}
+          {/* One visibility control: a hidden layer is off the canvas and out of generation alike. */}
+          <Tooltip
+            content={
+              disabledByAncestor
+                ? t('widgets.layers.actions.groupDisabled')
+                : node.isEnabled
+                  ? t('widgets.layers.actions.hideLayerTooltip')
+                  : t('widgets.layers.actions.showLayerTooltip')
+            }
+          >
+            <IconButton
+              aria-label={t('widgets.layers.actions.toggleActive')}
+              aria-pressed={node.isEnabled}
+              color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
+              disabled={editingLocked}
+              size="sm"
+              tabIndex={-1}
+              variant="ghost"
+              onClick={handleToggleVisible}
+              onPointerDown={stopPropagation}
+            >
+              {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
+            </IconButton>
+          </Tooltip>
           <Tooltip
             content={
               lockedByAncestor ? t('widgets.layers.actions.groupLocked') : t('widgets.layers.actions.toggleLock')
@@ -521,14 +547,14 @@ const GroupPreview = ({
   thumbnails: boolean;
 }) => {
   const leaves = useMemo(() => (thumbnails ? groupLeafPreviews(node) : []), [node, thumbnails]);
-  const cardStyles = useMemo(
-    () =>
-      leaves.map((_, index): CSSProperties => {
-        const offset = index * GROUP_PILE_OFFSET_PX;
-        return { height: GROUP_PILE_CARD_PX, left: offset, top: offset, width: GROUP_PILE_CARD_PX };
-      }),
-    [leaves]
-  );
+  // Cards shrink by one offset per extra card so the pile always spans the whole leading box; one card fills it.
+  const cardStyles = useMemo(() => {
+    const card = LAYER_LEADING_BOX_PX - (leaves.length - 1) * GROUP_PILE_OFFSET_PX;
+    return leaves.map((_, index): CSSProperties => {
+      const offset = index * GROUP_PILE_OFFSET_PX;
+      return { height: card, left: offset, top: offset, width: card };
+    });
+  }, [leaves]);
   if (leaves.length === 0) {
     return (
       <Box

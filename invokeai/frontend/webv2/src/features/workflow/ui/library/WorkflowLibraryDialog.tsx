@@ -1,17 +1,39 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
-import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
+import type {
+  WorkflowLibraryBrowseSnapshot,
+  WorkflowLibraryEntry,
+  WorkflowLibrarySort,
+} from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import {
+  Box,
+  createListCollection,
+  HStack,
+  Input,
+  Portal,
+  Spinner,
+  Stack,
+  type SystemStyleObject,
+  Text,
+} from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
+  selectWorkflowLibraryEntry,
   setWorkflowLibraryBrowseFilter,
+  setWorkflowLibrarySelectedDemand,
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowPreferencesSelector,
+  useWorkflowProjectSelector,
+  useWorkflowUi,
+} from '@features/workflow/ui/WorkflowUiContext';
 import {
   requestLibraryCopyChoice,
   setWorkflowLibrarySelection,
@@ -22,6 +44,8 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Select } from '@platform/ui/Select';
 import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -38,20 +62,88 @@ import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
+import { WorkflowThumbnailFitContext } from './workflowThumbnail';
 
 const SEARCH_DEBOUNCE_MS = 300;
+// Short windows need the panes' full shared height; reclaim modal margins before compressing the toolbar.
+const CONTENT_CSS: SystemStyleObject = {
+  containerName: 'workflow-library-content',
+  containerType: 'size',
+  overflowY: 'auto',
+  '@media (height < 40rem)': {
+    h: 'calc(100dvh - 2rem)',
+    maxH: 'calc(100dvh - 2rem)',
+    maxW: 'min(72rem, calc(100vw - 1rem))',
+  },
+};
+// A 180px card, 18rem rail, gap and body padding need 32rem; below that, keep the stacked layout.
+const BODY_CSS: SystemStyleObject = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    flexDirection: 'column',
+  },
+  // Finite panes enter modal scroll flow when they cannot share the remaining height.
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+  },
+};
 
 const TAB_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibraryTab }> = [
   { labelKey: 'workflowLibrary.thisProject', value: 'project' },
   { labelKey: 'workflowLibrary.browse', value: 'default' },
   { labelKey: 'workflowLibrary.yours', value: 'user' },
+  { labelKey: 'workflowLibrary.shared', value: 'shared' },
 ];
+
+const SORT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibrarySort }> = [
+  { labelKey: 'workflowLibrary.sortUpdated', value: 'updated' },
+  { labelKey: 'workflowLibrary.sortOpened', value: 'opened' },
+  { labelKey: 'workflowLibrary.sortCreated', value: 'created' },
+  { labelKey: 'workflowLibrary.sortName', value: 'name' },
+];
+
+const THUMBNAIL_FIT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowThumbnailFit }> = [
+  { labelKey: 'workflowLibrary.thumbnailFitCover', value: 'cover' },
+  { labelKey: 'workflowLibrary.thumbnailFitContain', value: 'contain' },
+];
+
+const SORT_SELECT_WIDTH = '9.5rem';
+
+/**
+ * Title, search, tabs and Close need about 36rem side by side. Below that header width Close stays beside the title,
+ * the search and the tabs take full rows of their own (in focus order), and the tag chips sit above Sort and Fit.
+ */
+const NARROW_HEADER = '@container workflow-library-header (width < 36rem)';
+const HEADER_CSS: SystemStyleObject = { containerName: 'workflow-library-header', containerType: 'inline-size' };
+const HEADER_TOP_CSS: SystemStyleObject = {
+  alignItems: 'center',
+  columnGap: '3',
+  display: 'grid',
+  gridTemplateAreas: '"title lead tabs close"',
+  gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
+  rowGap: '2',
+  [NARROW_HEADER]: {
+    gridTemplateAreas: '"title close" "lead lead" "tabs tabs"',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+  },
+};
+const HEADER_FILTERS_CSS: SystemStyleObject = {
+  [NARROW_HEADER]: { flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: '2' },
+};
+// An empty strip (the project tab, or no tags) keeps only its spacer role, so it adds no row.
+const TAG_STRIP_CSS: SystemStyleObject = { [NARROW_HEADER]: { flexBasis: 'full', '&:empty': { flexBasis: '0' } } };
+const SORT_SELECT_CSS: SystemStyleObject = { [NARROW_HEADER]: { flex: '1', minW: '0', w: 'auto' } };
 
 /** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
 const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
+  viewKey: JSON.stringify(snapshot.filter),
   category: snapshot.filter.category,
   entries: snapshot.entries,
+  startIndex: snapshot.startIndex ?? 0,
+  filter: snapshot.filter,
+  total: snapshot.total,
+  selectedEntry: snapshot.selectedEntry,
   error: snapshot.error,
+  isPublic: snapshot.filter.isPublic,
   status: snapshot.status,
   tag: snapshot.filter.tag,
   tagCounts: snapshot.tagCounts,
@@ -66,12 +158,12 @@ const selectLibraryNavigation = (snapshot: ReturnType<typeof workflowUiStore.get
  * On a template tab's first open, load the first page and choose defaults for empty accounts only if filters have
  * not changed during the probe. The project view never loads library pages.
  */
-const WorkflowLibraryBrowseSession = () => {
+const WorkflowLibraryBrowseSession = ({ sort }: { sort: WorkflowLibrarySort }) => {
   useMountEffect(() => {
-    void ensureWorkflowLibraryBrowseLoaded().then(() => {
+    void ensureWorkflowLibraryBrowseLoaded(sort).then(() => {
       const { filter, userTotal } = getWorkflowLibraryBrowseSnapshot();
 
-      if (userTotal === 0 && filter.category === 'user' && !filter.search) {
+      if (userTotal === 0 && filter.category === 'user' && !filter.isPublic && !filter.search) {
         setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
         setWorkflowLibraryTab('default');
       }
@@ -94,13 +186,31 @@ export const WorkflowLibraryDialog = ({
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
-  const { category, entries, error, status, tag, tagCounts } = useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const {
+    category,
+    entries,
+    error,
+    isPublic,
+    status,
+    tag,
+    tagCounts,
+    startIndex,
+    filter,
+    total,
+    selectedEntry,
+    viewKey,
+  } = useWorkflowLibraryBrowseSelector(selectBrowseView);
   const { selection, tab } = workflowUiStore.useSelector(selectLibraryNavigation);
+  const authSession = useAuthSession();
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const projectWorkflows = useWorkflowProjectSelector((project) => project.workflows);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
+  const { setLibraryPreferences } = useWorkflowUi();
+  const sort = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibrarySort);
+  const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [removedWorkflowId, setRemovedWorkflowId] = useState<string | null>(null);
   // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
   // them on reopen.
   const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
@@ -124,10 +234,26 @@ export const WorkflowLibraryDialog = ({
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
 
   // Derive a fallback selection when filtering/deletion removes the selected row.
-  const activeWorkflowId = entries.some((entry) => entry.item.workflow_id === selectedWorkflowId)
-    ? selectedWorkflowId
-    : (entries[0]?.item.workflow_id ?? null);
-  const activeEntry = entries.find((entry) => entry.item.workflow_id === activeWorkflowId) ?? null;
+  const desiredWorkflowId = selectedWorkflowId ?? selectedEntry?.item.workflow_id ?? null;
+  const activeWorkflowId =
+    selectedEntry?.item.workflow_id === desiredWorkflowId ||
+    entries.some((entry) => entry.item.workflow_id === desiredWorkflowId)
+      ? desiredWorkflowId
+      : (entries[0]?.item.workflow_id ?? null);
+  const activeEntry = selectWorkflowLibraryEntry({ entries, selectedEntry }, activeWorkflowId) ?? null;
+  const isCurrentLibraryOwner =
+    authSession.phase === 'ready' &&
+    (authSession.multiuserEnabled
+      ? Boolean(activeEntry?.item.user_id && activeEntry.item.user_id === authSession.user?.user_id)
+      : true);
+  const canEditLibraryEntry = activeEntry?.item.category === 'user' && isCurrentLibraryOwner;
+  const isReadOnlyLibraryEntry = activeEntry?.item.category === 'user' && !isCurrentLibraryOwner;
+  const canChangeVisibility =
+    tab === 'user' &&
+    authSession.phase === 'ready' &&
+    authSession.multiuserEnabled &&
+    activeEntry?.item.category === 'user' &&
+    isCurrentLibraryOwner;
   // The project selection belongs to the project it was made in; another project starts from its active workflow.
   const projectSelectionId = selection?.projectId === projectId ? selection.workflowId : null;
 
@@ -214,18 +340,44 @@ export const WorkflowLibraryDialog = ({
         return;
       }
 
-      // The store applies filter patches literally, so clearing the tag when the
-      // category changes (its chips do not carry over) is the UI's job.
+      const nextCategory = value === 'default' ? 'default' : 'user';
+      const nextIsPublic = value === 'shared' ? true : undefined;
+
       setWorkflowLibraryTab(value);
 
-      if (category !== value) {
-        setWorkflowLibraryBrowseFilter({ category: value, tag: null });
+      if (category !== nextCategory || isPublic !== nextIsPublic) {
+        setWorkflowLibraryBrowseFilter({ category: nextCategory, isPublic: nextIsPublic, tag: null });
       }
     },
-    [category]
+    [category, isPublic]
   );
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
+  const sortCollection = useMemo(
+    () => createListCollection({ items: SORT_ITEMS.map((item) => ({ label: t(item.labelKey), value: item.value })) }),
+    [t]
+  );
+  const sortValue = useMemo(() => [sort], [sort]);
+  const handleSortChange = useCallback(
+    ({ value }: { value: string[] }) => {
+      const next = SORT_ITEMS.find((item) => item.value === value[0])?.value;
+
+      if (next) {
+        setLibraryPreferences({ workflowLibrarySort: next });
+        setWorkflowLibraryBrowseFilter({ sort: next });
+      }
+    },
+    [setLibraryPreferences]
+  );
+  const thumbnailFitOptions = useMemo(
+    () => THUMBNAIL_FIT_ITEMS.map((item) => ({ label: t(item.labelKey), value: item.value })),
+    [t]
+  );
+  const handleThumbnailFitChange = useCallback(
+    (value: string) =>
+      setLibraryPreferences({ workflowLibraryThumbnailFit: value === 'contain' ? 'contain' : 'cover' }),
+    [setLibraryPreferences]
+  );
 
   // The first copy is added directly; with one already in the project, the host asks what opening should do.
   const handleOpenItem = useCallback(
@@ -253,9 +405,10 @@ export const WorkflowLibraryDialog = ({
   );
 
   const handleDeleted = useCallback(() => {
+    setRemovedWorkflowId(activeWorkflowId);
     setSelectedWorkflowId(null);
     setContextMenuPoint(null);
-  }, []);
+  }, [activeWorkflowId]);
   const handleCardContextMenu = useCallback(
     (workflowId: string, point: WorkflowCardMenuAnchor) => {
       if (tab === 'project') {
@@ -293,10 +446,18 @@ export const WorkflowLibraryDialog = ({
     [projectId]
   );
 
+  const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
   const isProjectTab = tab === 'project';
   const tabsIdBase = useId();
-  const activeTab: WorkflowLibraryTab = isProjectTab ? 'project' : category;
-  const tabItems = useMemo(() => TAB_ITEMS.map((item) => ({ id: item.value, label: t(item.labelKey) })), [t]);
+  const activeTab: WorkflowLibraryTab = tab;
+  const tabItems = useMemo(
+    () =>
+      TAB_ITEMS.filter((item) => item.value !== 'shared' || authSession.multiuserEnabled).map((item) => ({
+        id: item.value,
+        label: t(item.labelKey),
+      })),
+    [authSession.multiuserEnabled, t]
+  );
 
   return (
     <>
@@ -306,6 +467,7 @@ export const WorkflowLibraryDialog = ({
           <Dialog.Positioner>
             <Dialog.Content
               ref={preloadGraphPreview}
+              css={CONTENT_CSS}
               aria-busy={isLoadPending}
               h="80vh"
               maxH="80vh"
@@ -330,17 +492,19 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               ) : null}
               <Dialog.Header>
-                <Stack gap="2" minW="0" w="full">
-                  <HStack gap="3" minW="0">
-                    <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
+                <Stack css={HEADER_CSS} gap="2" minW="0" w="full">
+                  <Box css={HEADER_TOP_CSS} minW="0">
+                    <Dialog.Title gridArea="title" minW="0" truncate>
+                      {t('workflowLibrary.title')}
+                    </Dialog.Title>
                     {isProjectTab ? (
-                      <Text color="fg.subtle" flex="1" fontSize="md" minW="0" truncate>
+                      <Text color="fg.subtle" fontSize="md" gridArea="lead" minW="0" truncate>
                         {t('workflowLibrary.thisProjectHint')}
                       </Text>
                     ) : (
                       <Input
                         aria-label={t('workflowLibrary.searchPlaceholder')}
-                        flex="1"
+                        gridArea="lead"
                         minW="0"
                         placeholder={t('workflowLibrary.searchPlaceholder')}
                         type="search"
@@ -348,31 +512,59 @@ export const WorkflowLibraryDialog = ({
                         onChange={handleSearchChange}
                       />
                     )}
-                    <SegmentTabs
-                      activeId={activeTab}
-                      ariaLabel={t('workflowLibrary.title')}
-                      idBase={tabsIdBase}
-                      isCompact
-                      tabs={tabItems}
-                      onSelect={handleTabChange}
-                    />
-
+                    <Box gridArea="tabs" minW="0">
+                      <SegmentTabs
+                        activeId={activeTab}
+                        ariaLabel={t('workflowLibrary.title')}
+                        idBase={tabsIdBase}
+                        isCompact
+                        tabs={tabItems}
+                        onSelect={handleTabChange}
+                      />
+                    </Box>
                     <Dialog.CloseTrigger asChild>
                       <CloseButton
                         disabled={isLoadPending}
-                        flexShrink={0}
+                        gridArea="close"
                         insetEnd="auto"
                         position="static"
                         top="auto"
                       />
                     </Dialog.CloseTrigger>
+                  </Box>
+                  <HStack css={HEADER_FILTERS_CSS} gap="3" minW="0">
+                    <Box css={TAG_STRIP_CSS} flex="1" minW="0">
+                      {isProjectTab ? null : (
+                        <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+                      )}
+                    </Box>
+                    {/* Bundled templates always list by name, and project workflows keep their own order. */}
+                    {category === 'user' && !isProjectTab ? (
+                      <Select
+                        aria-label={t('workflowLibrary.sortLabel')}
+                        collection={sortCollection}
+                        css={SORT_SELECT_CSS}
+                        flexShrink={0}
+                        size="sm"
+                        value={sortValue}
+                        w={SORT_SELECT_WIDTH}
+                        onValueChange={handleSortChange}
+                      />
+                    ) : null}
+                    <SegmentedControl
+                      ariaLabel={t('workflowLibrary.thumbnailFit')}
+                      flexShrink={0}
+                      isFullWidth={false}
+                      options={thumbnailFitOptions}
+                      size="sm"
+                      value={thumbnailFit}
+                      onChange={handleThumbnailFitChange}
+                    />
                   </HStack>
-                  {isProjectTab ? null : (
-                    <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
-                  )}
                 </Stack>
               </Dialog.Header>
               <Dialog.Body
+                css={BODY_CSS}
                 aria-labelledby={segmentTabsTabId(tabsIdBase, activeTab)}
                 data-library-tab={tab}
                 data-pending-preview={previewGraphId || undefined}
@@ -383,46 +575,60 @@ export const WorkflowLibraryDialog = ({
                 minH="0"
                 role="tabpanel"
               >
-                {isProjectTab ? (
-                  <ProjectWorkflowsView
-                    contextMenuPoint={contextMenuPoint}
-                    contextMenuTriggerId={contextMenuTriggerId}
-                    selectedWorkflowId={projectSelectionId}
-                    onClose={closeDialog}
-                    onContextMenu={handleCardContextMenu}
-                    onContextMenuClose={closeContextMenu}
-                    onPreview={handleProjectPreviewRequest}
-                    onSelect={handleProjectSelect}
-                  />
-                ) : (
-                  <>
-                    <WorkflowLibraryGrid
-                      entries={entries}
-                      error={error}
-                      missingCounts={missingCounts}
-                      openMenuAnchor={contextMenuPoint}
-                      selectedWorkflowId={activeWorkflowId}
-                      status={status}
-                      onContextMenu={handleCardContextMenu}
-                      onOpen={handleOpenWorkflow}
-                      onSelect={setSelectedWorkflowId}
-                    />
-                    <WorkflowLibraryDetailPanel
+                <WorkflowThumbnailFitContext value={thumbnailFit}>
+                  {isProjectTab ? (
+                    <ProjectWorkflowsView
                       contextMenuPoint={contextMenuPoint}
                       contextMenuTriggerId={contextMenuTriggerId}
-                      entry={activeEntry}
-                      projectWorkflows={projectWorkflows}
+                      selectedWorkflowId={projectSelectionId}
                       onClose={closeDialog}
+                      onContextMenu={handleCardContextMenu}
                       onContextMenuClose={closeContextMenu}
-                      onDeleted={handleDeleted}
-                      onDuplicated={setSelectedWorkflowId}
-                      onOpen={handleOpenItem}
-                      onPreview={handlePreviewRequest}
+                      onPreview={handleProjectPreviewRequest}
+                      onSelect={handleProjectSelect}
                     />
-                  </>
-                )}
+                  ) : (
+                    <>
+                      {isOpen ? (
+                        <SelectedDemand
+                          key={`${authSession.user?.user_id}:${viewKey}:${activeWorkflowId}`}
+                          id={activeWorkflowId}
+                        />
+                      ) : null}
+                      <WorkflowLibraryGrid
+                        key={`${authSession.user?.user_id}:${viewKey}`}
+                        window={browseWindow}
+                        removedWorkflowId={removedWorkflowId}
+                        entries={entries}
+                        error={error}
+                        missingCounts={missingCounts}
+                        openMenuAnchor={contextMenuPoint}
+                        showVisibilityStatus
+                        selectedWorkflowId={activeWorkflowId}
+                        status={status}
+                        onContextMenu={handleCardContextMenu}
+                        onOpen={handleOpenWorkflow}
+                        onSelect={setSelectedWorkflowId}
+                      />
+                      <WorkflowLibraryDetailPanel
+                        contextMenuPoint={contextMenuPoint}
+                        contextMenuTriggerId={contextMenuTriggerId}
+                        entry={activeEntry}
+                        canChangeVisibility={canChangeVisibility}
+                        isReadOnly={isReadOnlyLibraryEntry || !canEditLibraryEntry}
+                        projectWorkflows={projectWorkflows}
+                        onClose={closeDialog}
+                        onContextMenuClose={closeContextMenu}
+                        onDeleted={handleDeleted}
+                        onDuplicated={setSelectedWorkflowId}
+                        onOpen={handleOpenItem}
+                        onPreview={handlePreviewRequest}
+                      />
+                    </>
+                  )}
+                </WorkflowThumbnailFitContext>
               </Dialog.Body>
-              {isOpen && !isProjectTab ? <WorkflowLibraryBrowseSession /> : null}
+              {isOpen && !isProjectTab ? <WorkflowLibraryBrowseSession sort={sort} /> : null}
             </Dialog.Content>
           </Dialog.Positioner>
         </Portal>
@@ -442,4 +648,20 @@ export const WorkflowLibraryDialog = ({
       ) : null}
     </>
   );
+};
+
+let selectedLease = 0;
+const SelectedDemand = ({ id }: { id: string | null }) => {
+  useMountEffect(() => {
+    const lease = ++selectedLease;
+    setWorkflowLibrarySelectedDemand(id);
+    return () => {
+      queueMicrotask(() => {
+        if (lease === selectedLease) {
+          setWorkflowLibrarySelectedDemand(null);
+        }
+      });
+    };
+  });
+  return null;
 };

@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type {
   GalleryBoard,
@@ -15,9 +16,13 @@ import { createContext, use, useMemo, type ComponentType, type ReactNode } from 
 export interface GalleryItemActions {
   /**
    * `returnFocus` names where keyboard focus goes when a confirmation dialog closes, resolved then: the deletion can
-   * remove the control that opened it.
+   * remove the control that opened it. `targetsOffScreen` says some item is not on screen, so the deletion asks even
+   * when the user turned routine confirmations off; so does any deletion of more than one item.
    */
-  deleteItems(items: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }): Promise<void>;
+  deleteItems(
+    items: GalleryItemRef[],
+    options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
+  ): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
   downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
@@ -50,6 +55,13 @@ export interface GalleryItemContextMenuTarget {
   allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
+  /** The board the listing the targets were selected in reads, where targets `items` omits sit. */
+  listingBoardId?: string;
+  /**
+   * Where focus goes when a dialog the menu opens (a deletion's confirmation) closes, resolved then: the menu, which
+   * had focus as the dialog opened, is gone by then.
+   */
+  returnFocus?: () => HTMLElement | null;
   x: number;
   y: number;
 }
@@ -80,12 +92,21 @@ export interface GalleryCommandsPort {
   setView(view: GalleryView): void;
   /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
   toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
-  updateSettings(settings: Partial<GallerySettings>): void;
+  /**
+   * Writes the gallery settings of the open project while it is active; with `projectId`, of that project while it is
+   * open, for work that finishes after the user moved on (an Undo).
+   */
+  updateSettings(settings: Partial<GallerySettings>, projectId?: string): void;
 }
 
 export interface GalleryNotificationsPort {
   add(notification: { kind: 'info' | 'success'; message?: string; title: string }): void;
   reportError(error: { area: string; message: string; namespace: 'gallery' }): void;
+  /**
+   * Reports a reversible change that already happened, with an Undo that may run minutes later. Absent on hosts without
+   * one, which report a plain success instead. A newer Undo with the same `supersedes` key withdraws the older one.
+   */
+  undoable?(title: string, notice: { message?: string; onUndo: () => void; supersedes?: string }): void;
 }
 
 export interface GalleryWidgetRuntime {
@@ -113,6 +134,15 @@ export interface GalleryUiAdapter {
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
   generateValues: Record<string, unknown>;
+  /**
+   * Where a board's media is still used, for deleting the board with its media: the host narrows the server's check
+   * with its projects' own scans. Rejects when the check cannot run at all.
+   */
+  getBoardMediaUsage(boardId: string, signal: AbortSignal): Promise<GalleryMediaUsageReport>;
+  /** A project's gallery values as they are now, or null once it is closed; absent for hosts without projects. */
+  getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
+  /** The user picked a board in the board list to look at it: the host may explain where new results still go. */
+  noteBoardBrowsed?(boardId: string): void;
   /** Resolves an item's best image-map vocabulary label, or null when it has none. */
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
   notifications: GalleryNotificationsPort;
@@ -226,6 +256,23 @@ const GalleryHostContext = createContext<GalleryHost | null>(null);
 export const GalleryHostProvider = ({ children, host }: { children: ReactNode; host: GalleryHost }) => (
   <GalleryHostContext value={host}>{children}</GalleryHostContext>
 );
+
+/** The project a gallery host lists boards against: what board pickers outside the gallery need to group them. */
+export type GalleryHostProjectContext = Pick<GalleryHost, 'projectId' | 'projectName' | 'projects'>;
+
+/** `useGalleryHost`'s project context, or null without a gallery host, for surfaces that work without one. */
+export const useOptionalGalleryHostProjectContext = (): GalleryHostProjectContext | null => {
+  const source = use(GalleryHostContext) ?? use(GalleryUiContext);
+  const hasSource = source !== null;
+  const projectId = source?.projectId;
+  const projectName = source?.projectName;
+  const projects = source?.projects;
+
+  return useMemo(
+    () => (hasSource ? { projectId, projectName: projectName ?? '', projects } : null),
+    [hasSource, projectId, projectName, projects]
+  );
+};
 
 export const useGalleryHost = (): GalleryHost => {
   const host = use(GalleryHostContext);

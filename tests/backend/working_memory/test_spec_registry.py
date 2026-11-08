@@ -3,6 +3,7 @@
 import pytest
 
 from invokeai.backend.working_memory import spec as spec_module
+from invokeai.backend.working_memory.fit import convolution_line
 from invokeai.backend.working_memory.spec import EstimatorSpec, register, registered_specs
 
 
@@ -32,6 +33,7 @@ def _spec(terms, version: int = 1) -> EstimatorSpec:
         coefficients=frozenset({"k"}),
         platform_keys=("conv_backend",),
         terms=terms,
+        line=convolution_line,
     )
 
 

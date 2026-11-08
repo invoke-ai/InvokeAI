@@ -21,16 +21,18 @@ class BoardDTO(BoardRecord):
     """The name of the cover video, set when the most-recent item on the board is a video rather than an image."""
     image_count: int = Field(description="The number of images in the board.")
     """The number of images in the board."""
-    video_count: int = Field(default=0, description="The number of videos in the board.")
-    """The number of videos in the board."""
+    video_count: int = Field(
+        default=0, description="The number of videos in the board that the gallery's Media or Uploads view lists."
+    )
+    """Generated ('general') and asset videos together. Like images, a video of a category neither view lists is
+    not counted."""
     asset_count: int = Field(description="The number of assets in the board.")
     """The number of assets in the board."""
     asset_video_count: int = Field(
-        default=0, description="The number of asset-category (non-'general') videos in the board."
+        default=0, description="The number of asset-category videos in the board, which the Uploads view lists."
     )
-    """Uploaded videos are assets ('user' category) while generated videos are 'general', mirroring
-    images. `video_count` stays the total so "delete board with N videos" copy remains honest; this
-    field lets clients split the total across the Media/Assets views."""
+    """Uploaded videos are assets ('user' category) while generated videos are 'general', mirroring images. Part of
+    `video_count`; it lets clients split that count across the Media and Uploads views."""
     owner_username: Optional[str] = Field(
         default=None,
         description=(

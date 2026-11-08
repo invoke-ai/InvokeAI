@@ -40,7 +40,13 @@ from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDeno
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
-from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, Krea2VariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    Flux2VariantType,
+    Krea2VariantType,
+    ModelFormat,
+    ModelType,
+)
 
 FIXTURE = (
     Path(__file__).parents[3]
@@ -288,8 +294,12 @@ def krea2_entry(case: dict) -> tuple[list[float], float]:
 
     context = MagicMock()
     context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
-    context.models.get_config.return_value = SimpleNamespace(variant=Krea2VariantType(case["variant"]))
+    context.models.get_config.return_value = SimpleNamespace(
+        format=ModelFormat.Diffusers, variant=Krea2VariantType(case["variant"])
+    )
     context.models.get_absolute_path.return_value = Path("no-such-krea2-model")
+    # A text-only prompt: encoded with no reference images, as the node has no reference latents.
+    context.conditioning.load.return_value = SimpleNamespace(conditionings=[SimpleNamespace(num_reference_images=0)])
     conditioning = SimpleNamespace(regional_text_conditioning=SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 12, 8)))
     with ExitStack() as stack:
         stack.enter_context(patch(f"{KREA2_MODULE}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
@@ -518,8 +528,8 @@ def flux2_entry(denoising_start: float) -> tuple[float, list[str]]:
         # float32 noise: the node works in bfloat16, which would keep three digits of the entry sigma.
         stack.enter_context(patch.object(node, "_prepare_noise_tensor", return_value=torch.ones(1, 32, 8, 8)))
         stack.enter_context(patch.object(node, "_prep_inpaint_mask", capture))
-        # The first call after the scheduler is decided.
-        stack.enter_context(patch.object(node, "_estimate_working_memory", side_effect=_Stop))
+        # Where the node prices its working memory: after the scheduler is decided, before the transformer runs.
+        stack.enter_context(patch(f"{FLUX2_MODULE}.estimate_flux2_denoise_working_memory", side_effect=_Stop))
         with pytest.raises(_Stop):
             node._run_diffusion(context)
 

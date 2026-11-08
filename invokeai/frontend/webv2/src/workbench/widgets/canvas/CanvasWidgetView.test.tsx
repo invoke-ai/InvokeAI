@@ -4,6 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
@@ -17,6 +18,11 @@ vi.mock('@dnd-kit/core', () => ({ useDndMonitor: () => undefined }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => harness.project!.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project!),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      Object.values(harness.project!.widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ??
+        {}
+    ),
   useWorkbenchSubscription: () => () => () => {},
   useOptionalWorkbenchCommands: () => null,
   useWorkbenchCommands: () => ({
@@ -84,18 +90,20 @@ const renderView = (): string =>
   renderToStaticMarkup(
     <ChakraProvider value={system}>
       <I18nextProvider i18n={testI18n}>
-        <CanvasWidgetView
-          {...({
-            instance: harness.project!.widgetInstances.canvas,
-            runtime: { commands: {}, hotkeys: {} },
-          } as unknown as WidgetViewProps)}
-        />
+        <QueryClientProvider client={new QueryClient()}>
+          <CanvasWidgetView
+            {...({
+              instance: harness.project!.widgetInstances.canvas,
+              runtime: { commands: {}, hotkeys: {} },
+            } as unknown as WidgetViewProps)}
+          />
+        </QueryClientProvider>
       </I18nextProvider>
     </ChakraProvider>
   );
 
 const getAcceptButtonTag = (markup: string): string => {
-  const labelIndex = markup.indexOf('Accept to Layer');
+  const labelIndex = markup.indexOf('Accept to layer');
   const buttonIndex = markup.lastIndexOf('<button', labelIndex);
   return markup.slice(buttonIndex, markup.indexOf('>', buttonIndex) + 1);
 };

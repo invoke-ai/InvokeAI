@@ -53,9 +53,13 @@ describe('PendingWorkflowLoader', () => {
   beforeEach(() => {
     addWorkflow = vi.fn();
     api.getLibraryWorkflowRecord.mockReset().mockResolvedValue({
+      created_at: '2026-10-20T00:00:00Z',
+      is_public: false,
       name: 'Portrait',
       revision: 2,
-      workflow: { edges: [], name: 'Portrait', nodes: [] },
+      updated_at: '2026-10-20T00:00:00Z',
+      user_id: 'user-a',
+      workflow: { edges: [], meta: { category: 'user' }, name: 'Portrait', nodes: [] },
       workflow_id: 'lib-portrait',
     });
     workflowUiStore.patchSnapshot({ libraryCopyChoice: null, pendingWorkflowLoad: null });
@@ -93,7 +97,7 @@ describe('PendingWorkflowLoader', () => {
     await vi.waitFor(() => expect(addWorkflow).toHaveBeenCalledTimes(1));
     expect(addWorkflow.mock.calls[0]?.[1]).toMatchObject({
       reusePlaceholder: true,
-      source: { libraryWorkflowId: 'lib-portrait', revision: 2 },
+      source: { libraryWorkflowId: 'lib-portrait', ownerUserId: 'user-a', revision: 2 },
     });
     expect(workflowUiStore.getSnapshot().libraryCopyChoice).toBeNull();
   });

@@ -170,7 +170,7 @@ def test_an_int8_weight_without_a_per_tensor_marker_is_refused(monkeypatch, tmp_
             },
         )
 
-    with pytest.raises(ValueError, match=r"int8 weight\(s\) with no `comfy_quant` marker"):
+    with pytest.raises(ValueError, match=r"int8 weight\(s\) with no readable int8_tensorwise marker"):
         run.load(config)
 
 
@@ -422,7 +422,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
     """The degraded half-state, at this seam rather than at the detector.
 
     A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the shape a guard keyed
-    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `find_nvfp4_layers`
     refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
     reaches the detector before it asks the cache for room, which nothing but the order of those two
     statements secures.

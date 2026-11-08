@@ -8,7 +8,7 @@ from diffusers.pipelines.ltx2.utils import STAGE_2_DISTILLED_SIGMA_VALUES
 
 from invokeai.backend.ltx2.constants import (
     LTX2_DISTILLED_SIGMAS,
-    LTX2_MAX_SEQ_LEN,
+    LTX2_SHIFT_FIT,
     LTX2_STAGE_2_NOISE_SCALE,
 )
 from invokeai.backend.ltx2.packing import video_sequence_length
@@ -16,7 +16,6 @@ from invokeai.backend.ltx2.sampling import (
     LTX2_SHIFT_TERMINAL,
     build_refine_sigmas,
     build_sigmas,
-    calculate_shift,
     flow_step,
 )
 
@@ -96,12 +95,12 @@ def test_the_shift_interpolates_between_the_anchors_and_holds_outside_them() -> 
     """Independently: mu is 0.95 at 1024 tokens and 2.05 at 4096, linear in between, flat outside.
 
     Extrapolating instead is what makes the schedule degenerate at real canvases -- see below."""
-    assert calculate_shift(1024) == pytest.approx(0.95)
-    assert calculate_shift(4096) == pytest.approx(2.05)
-    assert calculate_shift(2560) == pytest.approx(1.5)
-    assert calculate_shift(320) == pytest.approx(0.95)
-    assert calculate_shift(7168) == pytest.approx(2.05)
-    assert calculate_shift(13728) == pytest.approx(2.05)
+    assert LTX2_SHIFT_FIT.mu(1024) == pytest.approx(0.95)
+    assert LTX2_SHIFT_FIT.mu(4096) == pytest.approx(2.05)
+    assert LTX2_SHIFT_FIT.mu(2560) == pytest.approx(1.5)
+    assert LTX2_SHIFT_FIT.mu(320) == pytest.approx(0.95)
+    assert LTX2_SHIFT_FIT.mu(7168) == pytest.approx(2.05)
+    assert LTX2_SHIFT_FIT.mu(13728) == pytest.approx(2.05)
 
 
 def test_the_schedule_keeps_spending_steps_where_the_clip_is_formed() -> None:
@@ -120,7 +119,7 @@ def test_the_schedule_keeps_spending_steps_where_the_clip_is_formed() -> None:
 def test_every_canvas_the_panel_offers_samples_the_released_schedule() -> None:
     """All three presets are past the 4096-token anchor, so all three get the released pipeline's
     own schedule rather than three different extrapolations of it."""
-    reference = build_sigmas(distilled=False, num_steps=30, video_seq_len=LTX2_MAX_SEQ_LEN)
+    reference = build_sigmas(distilled=False, num_steps=30, video_seq_len=LTX2_SHIFT_FIT.max_seq_len)
 
     for width, height in ((928, 512), (1248, 704), (1376, 768)):
         sigmas = build_sigmas(distilled=False, num_steps=30, video_seq_len=video_sequence_length(121, height, width))
@@ -183,7 +182,7 @@ def test_a_zero_eta_ancestral_step_is_the_deterministic_one() -> None:
 def test_the_shifted_schedule_matches_the_reference_transformation() -> None:
     """Independently: shift sigma -> e^mu / (e^mu + 1/sigma - 1), then stretch onto the terminal."""
     num_steps, seq_len = 10, 2048
-    mu = math.exp(calculate_shift(seq_len))
+    mu = math.exp(0.95 + 1.1 * (seq_len - 1024) / 3072)
     raw = [mu / (mu + 1 / s - 1) for s in torch.linspace(1.0, 0.1, num_steps).tolist()]
     scale = (1 - raw[-1]) / (1 - LTX2_SHIFT_TERMINAL)
     expected = [1 - (1 - s) / scale for s in raw]

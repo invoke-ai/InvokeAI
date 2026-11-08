@@ -126,6 +126,7 @@ vi.mock('@workbench/widgetRegistry', () => ({
 vi.mock('./BottomPanel', () => ({ BottomPanel: () => null }));
 vi.mock('./CenterArea', () => ({ CenterArea: () => null }));
 vi.mock('./DocumentTitleProgress', () => ({ DocumentTitleProgress: () => null }));
+vi.mock('./LayoutUndoNotices', () => ({ LayoutUndoNotices: () => null }));
 vi.mock('./notifications', () => ({ WorkbenchNotificationToaster: () => null }));
 vi.mock('./Panels', () => ({ LeftPanel: () => null, RightPanel: () => null }));
 vi.mock('./PasteMediaRuntime', () => ({ PasteMediaRuntime: () => null }));

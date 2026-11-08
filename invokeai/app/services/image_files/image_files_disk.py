@@ -23,6 +23,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileSaveException,
 )
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.util.no_replace import file_signature, publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -244,6 +245,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
         image_path: Optional[Path] = None
         thumbnail_path: Optional[Path] = None
@@ -269,6 +271,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if graph is not None:
                 info_dict["invokeai_graph"] = graph
                 pnginfo.add_text("invokeai_graph", graph)
+            if resolved_inputs is not None:
+                info_dict["invokeai_resolved_inputs"] = resolved_inputs
+                pnginfo.add_text("invokeai_resolved_inputs", resolved_inputs)
 
             thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
             thumbnail_existed = thumbnail_path.exists()
@@ -277,6 +282,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # palette transparency there, and it must remain available to make_thumbnail().
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
+
+            # PNG has no 32-bit integer mode, and Pillow 13 no longer clips "I" to 16 bits on save: do it here.
+            if image.mode == "I":
+                image = image.convert("I;16")
+            else:
+                # The object cached below must be ours alone: the caller keeps mutating its image, and the info
+                # assignment must not reach it.
+                image = image.copy()
 
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
@@ -293,8 +306,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             thumbnail_image.save(thumbnail_path)
 
-            self.__set_cache(image_path, image)
-            self.__set_cache(thumbnail_path, thumbnail_image)
+            self.__replace_cache({image_path: image, thumbnail_path: thumbnail_image})
         except Exception as e:
             # A thumbnail failure must not leave a full-size image with no thumbnail. The
             # names are normally new, but preserve any pre-existing files when save() is
@@ -323,7 +335,6 @@ class DiskImageFileStorage(ImageFileStorageBase):
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path: Path | None = None
         thumbnail: PILImageType | None = None
-        published_identity: tuple[int, int] | None = None
         try:
             with Image.open(image_path) as source_image:
                 thumbnail = make_thumbnail(source_image, thumbnail_size)
@@ -335,21 +346,19 @@ class DiskImageFileStorage(ImageFileStorageBase):
             thumbnail.save(temporary_path, format="WEBP")
             with open(temporary_path, "rb+") as completed_file:
                 os.fsync(completed_file.fileno())
-            temporary_stat = temporary_path.stat()
-            temporary_identity = (temporary_stat.st_dev, temporary_stat.st_ino)
             try:
-                # Linking publishes the fully written temporary file atomically and refuses to
-                # replace a thumbnail another writer created after our first existence check.
-                os.link(temporary_path, thumbnail_path)
+                # Publishes the fully written temporary file, refusing to replace a thumbnail another
+                # writer created after our first existence check. Where the drive forces a copy, the
+                # published thumbnail is a different file than the temporary one.
+                published_signature = publish_noreplace(temporary_path, thumbnail_path)
             except FileExistsError:
                 return False
-            published_identity = temporary_identity
             try:
                 self.__fsync_directory(thumbnail_path.parent)
             except Exception:
                 try:
-                    current_stat = thumbnail_path.lstat()
-                    if (current_stat.st_dev, current_stat.st_ino) == published_identity:
+                    # Only our own thumbnail goes: not a replacement, nor one save() rewrote in place.
+                    if file_signature(thumbnail_path.lstat()) == published_signature:
                         thumbnail_path.unlink()
                         self.evict_cache_paths([thumbnail_path])
                         try:
@@ -686,6 +695,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
             return graph
         return None
 
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> str | None:
+        image = self.get(image_name, image_subfolder=image_subfolder)
+        resolved_inputs = image.info.get("invokeai_resolved_inputs", None)
+        if isinstance(resolved_inputs, str):
+            return resolved_inputs
+        return None
+
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
@@ -768,10 +784,28 @@ class DiskImageFileStorage(ImageFileStorageBase):
         with self.__cache_lock:
             if generation is not None and generation != self.__cache_generation:
                 return
-            if image_name not in self.__cache:
-                self.__cache[image_name] = image
-                self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
-                if len(self.__cache) > self.__max_cache_size:
-                    cache_id = self.__cache_ids.get()
-                    if cache_id in self.__cache:
-                        del self.__cache[cache_id]
+            if image_name in self.__cache:
+                return
+            self.__insert_cache_locked(image_name, image)
+
+    def __replace_cache(self, items: dict[Path, PILImageType]) -> None:
+        """Caches freshly written files, replacing entries of an earlier file under the same path.
+
+        The generation bump discards any `get` that read the old file and has not cached it yet. An existing
+        entry is overwritten in place, so its id is not queued twice.
+        """
+        with self.__cache_lock:
+            self.__cache_generation += 1
+            for path, image in items.items():
+                self.__insert_cache_locked(path, image)
+
+    def __insert_cache_locked(self, image_name: Path, image: PILImageType) -> None:
+        if image_name in self.__cache:
+            self.__cache[image_name] = image
+            return
+        self.__cache[image_name] = image
+        self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
+        if len(self.__cache) > self.__max_cache_size:
+            cache_id = self.__cache_ids.get()
+            if cache_id in self.__cache:
+                del self.__cache[cache_id]

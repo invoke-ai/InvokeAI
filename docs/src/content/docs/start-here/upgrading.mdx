@@ -1,0 +1,155 @@
+---
+title: Upgrading to v7
+lastUpdated: 2026-10-20
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+
+Upgrading an existing install to v7 is one-way. This page covers what the upgrade changes, where the backup of your database is, how to go back to an older version and return to v7, and how to try v7 without touching your current install.
+
+## The upgrade is one-way
+
+The first time v7 starts on an existing install, it updates the database at `<root>/databases/invokeai.db` in place. After that, older versions cannot use it:
+
+- v6.14 and later, and earlier v7 builds, stop at startup with an error that begins `Database contains unknown applied migration IDs`.
+- v6.13 and earlier do not recognize the update. They start, log `Database update needed`, write a backup, and log `Database updated successfully`, though they changed nothing. They then run on a database they were not written for, where they can misbehave or damage it. They do this on every start, and each of these backups holds the v7 database, not a v6 one.
+
+Restore a backup before you run any older version on this install.
+
+The update changes the database only. Your images in `outputs/` and your models are left as they are.
+
+## Backups
+
+Before every update of the database, Invoke copies it to a backup in the same folder, `<root>/databases/`:
+
+```text
+invokeai_backup_<YYYYMMDD>-<HHMMSS>.db
+```
+
+When two backups are made in the same second, the later one gets a number, e.g. `invokeai_backup_20261019-093000-1.db`. Before the update, the startup log shows a warning that names the backup:
+
+```text
+Updating the database at <root>/databases/invokeai.db. Older versions of InvokeAI cannot use it after this update. Its current state is backed up to <root>/databases/invokeai_backup_20261019-093000.db; ...
+```
+
+Invoke never deletes backups. Delete old ones yourself once you no longer need them.
+
+### Which backup to restore
+
+To go back to v6, restore the backup written when you **first started v7**. It holds your database as v6 left it. Its name carries the date and time of that first start, in your computer's local time, and the names sort by time: it is the first backup at or after that start.
+
+- **Not an older backup.** v6 writes backups with the same name when it updates the database itself, so older files are earlier v6 states, without your work since then.
+- **Not a newer backup.** Each holds a database v6 cannot use: v7 writes one each time it updates the database, and v6.13 and earlier write one each time they start on it, as described above. If you already started an older version on the v7 database, the newest backup is one of these.
+
+The log of that first v7 start names the file in the line `Backing up database to <root>/databases/invokeai_backup_<YYYYMMDD>-<HHMMSS>.db`. v7.0.0-alpha.1 to alpha.3 log only that line; later versions also name it in the warning shown above. Without that log, go by the time of the first start.
+
+Nothing you did in v7 after that start is in the backup. Images you generated in v7 stay in `outputs/`, but v6's gallery does not show them. Models you installed in v7 stay in the models folder, but v6's model list does not have them.
+
+:::caution[Models installed in v7]
+v6 lists the models you installed in v7 as orphaned, and its **Sync Models** in the Model Manager offers to delete them. Keep them if you may go back to v7: the v7 database you set aside, `invokeai.db.v7`, still uses them.
+:::
+
+### MySQL and MariaDB
+
+Invoke makes no backup of a server database. Back it up yourself before upgrading, as [MySQL and MariaDB](/configuration/external-database/) describes. To go back, restore that backup.
+
+## Restore a backup
+
+<Steps>
+
+1. Stop Invoke.
+
+2. Open the `databases` folder in your root directory.
+
+3. Move the current database aside: rename `invokeai.db` to `invokeai.db.v7`.
+
+4. **Required:** if `invokeai.db-wal` or `invokeai.db-shm` exist, rename them to `invokeai.db.v7-wal` and `invokeai.db.v7-shm`. Left in place, the v7 database's write-ahead log would be applied to the restored file and could corrupt it. Renamed this way, the three files stay a complete copy of your v7 database.
+
+5. Copy the backup you chose to `invokeai.db`. Copy it rather than rename it, so the backup stays as it is.
+
+6. Start the older version.
+
+</Steps>
+
+Steps 3 to 5 as commands, with your root directory and the backup's name filled in:
+
+<Tabs syncKey="operatingSystem">
+  <TabItem label="Windows" icon="seti:windows">
+    ```ps
+    cd <root>\databases
+    Rename-Item invokeai.db invokeai.db.v7
+    if (Test-Path invokeai.db-wal) { Rename-Item invokeai.db-wal invokeai.db.v7-wal }
+    if (Test-Path invokeai.db-shm) { Rename-Item invokeai.db-shm invokeai.db.v7-shm }
+    Copy-Item invokeai_backup_<YYYYMMDD>-<HHMMSS>.db invokeai.db
+    ```
+  </TabItem>
+  <TabItem label="Linux/MacOS" icon="linux">
+    ```bash
+    cd <root>/databases
+    mv invokeai.db invokeai.db.v7
+    if [ -e invokeai.db-wal ]; then mv invokeai.db-wal invokeai.db.v7-wal; fi
+    if [ -e invokeai.db-shm ]; then mv invokeai.db-shm invokeai.db.v7-shm; fi
+    cp invokeai_backup_<YYYYMMDD>-<HHMMSS>.db invokeai.db
+    ```
+  </TabItem>
+</Tabs>
+
+Starting v7 on the restored database updates it again, as your first v7 start did: v7 writes another backup and logs the warning. The updated database has none of your earlier v7 work; that is in `invokeai.db.v7`. To continue with it, switch back to it instead.
+
+## Switch back to the v7 database
+
+To return to v7 after restoring a backup, put the v7 database you set aside back in place. What you did in v6 since the restore is not in it. Models you installed in v6 since then are missing from v7's model list, and v7 lists them as orphaned.
+
+<Steps>
+
+1. Stop Invoke.
+
+2. Open the `databases` folder in your root directory.
+
+3. Move the restored database aside: rename `invokeai.db` to `invokeai.db.v6`, and, if they exist, `invokeai.db-wal` and `invokeai.db-shm` to `invokeai.db.v6-wal` and `invokeai.db.v6-shm`.
+
+4. Rename `invokeai.db.v7` to `invokeai.db`.
+
+5. **Required:** if `invokeai.db.v7-wal` or `invokeai.db.v7-shm` exist, rename them to `invokeai.db-wal` and `invokeai.db-shm`. The write-ahead log can hold changes not yet written to the database file, and SQLite finds it only under the database's name.
+
+6. Start v7.
+
+</Steps>
+
+Steps 3 to 5 as commands:
+
+<Tabs syncKey="operatingSystem">
+  <TabItem label="Windows" icon="seti:windows">
+    ```ps
+    cd <root>\databases
+    Rename-Item invokeai.db invokeai.db.v6
+    if (Test-Path invokeai.db-wal) { Rename-Item invokeai.db-wal invokeai.db.v6-wal }
+    if (Test-Path invokeai.db-shm) { Rename-Item invokeai.db-shm invokeai.db.v6-shm }
+    Rename-Item invokeai.db.v7 invokeai.db
+    if (Test-Path invokeai.db.v7-wal) { Rename-Item invokeai.db.v7-wal invokeai.db-wal }
+    if (Test-Path invokeai.db.v7-shm) { Rename-Item invokeai.db.v7-shm invokeai.db-shm }
+    ```
+  </TabItem>
+  <TabItem label="Linux/MacOS" icon="linux">
+    ```bash
+    cd <root>/databases
+    mv invokeai.db invokeai.db.v6
+    if [ -e invokeai.db-wal ]; then mv invokeai.db-wal invokeai.db.v6-wal; fi
+    if [ -e invokeai.db-shm ]; then mv invokeai.db-shm invokeai.db.v6-shm; fi
+    mv invokeai.db.v7 invokeai.db
+    if [ -e invokeai.db.v7-wal ]; then mv invokeai.db.v7-wal invokeai.db-wal; fi
+    if [ -e invokeai.db.v7-shm ]; then mv invokeai.db.v7-shm invokeai.db-shm; fi
+    ```
+  </TabItem>
+</Tabs>
+
+## Run v7 alongside v6
+
+Each install's root directory holds its own database, images and models. Give v7 a root of its own, and your v6 install stays as it is. The v7 install starts with an empty gallery and no models.
+
+- **Launcher:** install v7 into a new, empty folder. Do not select your existing install: that upgrades it in place. The folder you install into is v7's root directory.
+- **Manual install:** install v7 into a new directory, as [Manual Installation](/start-here/manual/) describes, and start it with `--root` set to that directory, or set the `INVOKEAI_ROOT` environment variable. `--root` takes precedence over `INVOKEAI_ROOT`, which takes precedence over the directory of the active virtual environment; see [InvokeAI Root Directory](/configuration/invokeai-yaml/#invokeai-root-directory).
+
+:::caution[Keep the models folders apart]
+Do not point both installs' `models_dir` at the same folder. Each install knows only the models it installed itself, so **Clean up orphaned models** in one install's Model Manager lists the other install's models as orphaned and offers to delete them.
+:::

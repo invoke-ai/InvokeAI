@@ -73,6 +73,21 @@ describe('planScreenComposition', () => {
     expect(plan.isolationLayerId).toBe('c1');
   });
 
+  it('hides mask and region stacks as staging does, while an isolated mask still draws', () => {
+    const nodes = [
+      layer('m1', 'inpaint_mask'),
+      groupContract('regions', [layer('g1', 'regional_guidance')]),
+      layer('c1', 'control'),
+      layer('r1', 'raster'),
+    ];
+    const staging = { control: true, inpaint_mask: false, regional_guidance: false };
+
+    expect(drawn(planScreenComposition(leaves(nodes), view({ showOverlayStacks: staging })))).toEqual(['r1', 'c1']);
+    expect(
+      drawn(planScreenComposition(leaves(nodes), view({ isolationLayerId: 'm1', showOverlayStacks: staging })))
+    ).toEqual(['m1']);
+  });
+
   it('isolates a group as every leaf beneath it', () => {
     const plan = planScreenComposition(
       leaves([

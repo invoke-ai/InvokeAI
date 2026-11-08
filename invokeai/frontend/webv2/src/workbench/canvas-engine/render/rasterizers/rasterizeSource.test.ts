@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ImageResolver, RasterizeDeps } from './types';
 
+import { CanvasImageMissingError, ImageUnavailableError } from './imageRasterizer';
 import { rasterizeSource } from './index';
 
 const imageRef = (imageName: string, width = 32, height = 16): CanvasImageRef => ({ height, imageName, width });
@@ -33,6 +34,30 @@ const makeDeps = (resolver: ImageResolver, backend: RasterBackend): RasterizeDep
   documentSize: { height: 200, width: 300 },
   resolver,
   store: createLayerCacheStore(backend),
+});
+
+describe('rasterizeSource — image resolution failures', () => {
+  const rasterizeWith = (resolver: ImageResolver, backend = createSpyBackend().backend) =>
+    rasterizeSource({ image: imageRef('cat'), type: 'image' }, makeDeps(resolver, backend));
+
+  it('passes a missing image on as missing, so the layer reads as unreadable', async () => {
+    const missing = new CanvasImageMissingError('cat');
+    await expect(rasterizeWith(() => Promise.reject(missing))).rejects.toBe(missing);
+  });
+
+  it('wraps any other resolver failure as unavailable, keeping the cause', async () => {
+    const outage = new Error('Failed to load canvas image "cat" (503)');
+    const rejection = rasterizeWith(() => Promise.reject(outage));
+    await expect(rejection).rejects.toBeInstanceOf(ImageUnavailableError);
+    await expect(rejection).rejects.toMatchObject({ cause: outage, imageName: 'cat' });
+  });
+
+  it('leaves an image that was fetched but does not decode as a plain failure', async () => {
+    const { backend } = createSpyBackend();
+    const corrupt = new Error('decode failed');
+    backend.createImageBitmap = vi.fn(() => Promise.reject(corrupt));
+    await expect(rasterizeWith(() => Promise.resolve(new Blob()), backend)).rejects.toBe(corrupt);
+  });
 });
 
 describe('rasterizeSource — image', () => {

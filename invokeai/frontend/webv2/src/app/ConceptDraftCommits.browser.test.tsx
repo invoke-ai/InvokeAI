@@ -15,7 +15,7 @@ import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -43,9 +43,12 @@ const models = [
   model('upscale-main', 'sdxl', 'main'),
   model('upscale-first', 'sdxl', 'lora', 'Upscale Ink Wash'),
   model('upscale-second', 'sdxl', 'lora', 'Upscale Detail'),
+  // Not listed by `render`: only offered through the concept picker.
+  model('picked-video', 'minimax-h3', 'lora'),
+  model('picked-upscale', 'sdxl', 'lora'),
 ];
 const modelSnapshot = { models, status: 'loaded' };
-const { notify } = vi.hoisted(() => ({ notify: vi.fn() }));
+const { notify, picker } = vi.hoisted(() => ({ notify: vi.fn(), picker: { pick: null as unknown } }));
 const noop = () => undefined;
 const generationAdapter = {
   sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
@@ -73,9 +76,18 @@ vi.mock('@features/models', async (importOriginal) => ({
   useOpenModelInManager: () => undefined,
 }));
 // Picker transport and prompt suggestions are unrelated to concept commits; retain the real list, rows, and controls.
+// The concept picker hands over `picker.pick` unfiltered, as a stale picker would.
 vi.mock('@features/models/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  ModelSelect: () => null,
+  ModelSelect: ({ modelTypes, onChange }: { modelTypes?: readonly string[]; onChange: (model: unknown) => void }) =>
+    modelTypes?.includes('lora') ? (
+      <button
+        aria-label="Add concept"
+        data-testid="concept-picker"
+        type="button"
+        onClick={() => onChange(picker.pick)}
+      />
+    ) : null,
 }));
 vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -86,7 +98,10 @@ vi.mock('@features/generation/components', async (importOriginal) => ({
   NegativePromptField: () => null,
   PositivePromptField: () => null,
 }));
-vi.mock('@platform/ui/toaster', () => ({ toaster: { create: notify } }));
+vi.mock('@platform/ui/toaster', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toaster: { create: notify },
+}));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkbenchPreferenceSelector: () => false,
@@ -96,6 +111,11 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    return selector(getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults));
+  },
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchQueries: () => store.queries,
 }));
@@ -110,7 +130,7 @@ const currentLoras = (widget: Widget): GenerateLora[] =>
 
 const render = async (widget: Widget) => {
   const loras = models
-    .filter((candidate) => candidate.type === 'lora' && candidate.key.startsWith(widget))
+    .filter((candidate) => candidate.type === 'lora' && candidate.key.startsWith(`${widget}-`))
     .map((candidate, index) => ({ isEnabled: true, model: candidate, weight: index === 0 ? 0.75 : 0.5 }));
   const defaults =
     widget === 'video' ? createDefaultVideoWidgetValues(models) : createDefaultUpscaleWidgetValues(models);
@@ -199,36 +219,31 @@ describe('concept drafts through widget adapters', () => {
     }
   );
 
-  it.each(['upscale', 'video'] as const)(
-    'does not restore a removed %s concept when another draft flushes',
-    async (widget) => {
-      const rows = await render(widget);
-      await act(() => step(rows[1]!));
-      await act(() => {
-        rows[0]!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.removeConceptNamed"]')?.click();
-        flushWorkbenchDrafts();
-      });
+  it('applies the accelerator rule when a video concept is removed beside a pending draft', async () => {
+    const rows = await render('video');
+    await act(() => step(rows[1]!));
+    await act(() => {
+      rows[0]!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.removeConceptNamed"]')?.click();
+      flushWorkbenchDrafts();
+    });
 
-      expect(currentLoras(widget).map((lora) => ({ key: lora.model.key, weight: lora.weight }))).toEqual([
-        { key: `${widget}-second`, weight: 0.55 },
-      ]);
-      if (widget === 'video') {
-        expect(getProjectWidgetValues(store.getSnapshot().activeProject, widget)).toMatchObject({
-          acceleratorEnabled: false,
-          acceleratorLoraKeys: [],
-          steps: 50,
-        });
-        expect(notify).toHaveBeenCalledExactlyOnceWith({
-          description: 'widgets.video.acceleratorBrokenDescription',
-          title: 'widgets.video.acceleratorBroken',
-          type: 'info',
-        });
-      }
-    }
-  );
+    expect(currentLoras('video').map((lora) => ({ key: lora.model.key, weight: lora.weight }))).toEqual([
+      { key: 'video-second', weight: 0.55 },
+    ]);
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
+      acceleratorEnabled: false,
+      acceleratorLoraKeys: [],
+      steps: 50,
+    });
+    expect(notify).toHaveBeenCalledExactlyOnceWith({
+      description: 'widgets.video.acceleratorBrokenDescription',
+      title: 'widgets.video.acceleratorBroken',
+      type: 'info',
+    });
+  });
 
   it.each(['upscale', 'video'] as const)(
-    'writes only the removal when a %s row is removed with its own pending weight',
+    'writes only the removal when a %s row is double-clicked away with its own pending weight',
     async (widget) => {
       const rows = await render(widget);
       await act(() => step(rows[0]!));
@@ -236,13 +251,43 @@ describe('concept drafts through widget adapters', () => {
       const unsubscribe = store.subscribe(() => projects.add(store.getSnapshot().activeProject));
 
       await act(() => {
-        rows[0]!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.removeConceptNamed"]')?.click();
+        const remove = rows[0]!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.removeConceptNamed"]');
+        remove?.click();
+        remove?.click();
       });
       await act(() => flushWorkbenchDrafts());
       unsubscribe();
 
       expect(projects.size).toBe(1);
       expect(currentLoras(widget).map((lora) => lora.model.key)).toEqual([`${widget}-second`]);
+    }
+  );
+
+  it.each([
+    ['upscale', 'picked-upscale', 'picked-video'],
+    ['video', 'picked-video', 'picked-upscale'],
+  ] as const)(
+    'adds a picked %s concept once, and only when its model can load it',
+    async (widget, compatible, incompatible) => {
+      await render(widget);
+      const pick = (key: string) =>
+        act(() => {
+          picker.pick = models.find((candidate) => candidate.key === key);
+          host.querySelector<HTMLButtonElement>('[data-testid="concept-picker"]')?.click();
+        });
+
+      await pick(compatible);
+      expect(currentLoras(widget).map((lora) => [lora.model.key, lora.weight])).toEqual([
+        [`${widget}-first`, 0.75],
+        [`${widget}-second`, 0.5],
+        [compatible, 0.75],
+      ]);
+
+      const project = store.getSnapshot().activeProject;
+      await pick(compatible);
+      await pick(`${widget}-first`);
+      await pick(incompatible);
+      expect(store.getSnapshot().activeProject).toBe(project);
     }
   );
 });

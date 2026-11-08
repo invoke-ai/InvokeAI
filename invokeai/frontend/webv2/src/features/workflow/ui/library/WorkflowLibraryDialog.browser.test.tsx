@@ -6,6 +6,7 @@ import type {
   ProjectGraphState,
   ProjectWorkflowEntry,
 } from '@features/workflow/core/types';
+import type * as libraryBrowseStoreModule from '@features/workflow/data/libraryBrowseStore';
 import type {
   WorkflowLibraryBrowseSnapshot,
   WorkflowLibraryEntry,
@@ -13,6 +14,7 @@ import type {
 } from '@features/workflow/data/libraryBrowseStore';
 import type {
   WorkflowGraphPreviewPort,
+  WorkflowPreferences,
   WorkflowReadPort,
   WorkflowUiAdapter,
 } from '@features/workflow/ui/WorkflowUiContext';
@@ -27,12 +29,13 @@ import {
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
 import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 // Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
@@ -69,9 +72,22 @@ const TEMPLATES_SNAPSHOT: InvocationTemplatesSnapshot = {
   templates: { integer: PREVIEW_NODE_TEMPLATE },
 };
 
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: false, phase: 'ready', user: null } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
 }));
 
 // Stub preview rendering while exposing compiled graph, hideInvoke, and close behavior owned by dialog wiring.
@@ -114,17 +130,18 @@ const browse = vi.hoisted(() => ({
   ensureWorkflowLibraryBrowseLoaded: vi.fn(() => Promise.resolve()),
   // Assigned by the module factory below, which owns the store instance.
   getSnapshot: null as null | (() => WorkflowLibraryBrowseSnapshot),
-  loadNextWorkflowLibraryPage: vi.fn(),
+  loadWorkflowLibraryRange: vi.fn((_start: number, _end: number) => Promise.resolve(true)),
   setSnapshot: null as null | ((snapshot: WorkflowLibraryBrowseSnapshot) => void),
   setWorkflowLibraryBrowseFilter: vi.fn(),
 }));
 
-vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
+vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
+  const { selectWorkflowLibraryEntry } = await original<typeof libraryBrowseStoreModule>();
   const { createExternalStore } = await import('@platform/state/externalStore');
   const store = createExternalStore<WorkflowLibraryBrowseSnapshot>({
     entries: [],
     error: null,
-    filter: { category: 'user', search: '', tag: null },
+    filter: { category: 'user', search: '', sort: 'updated', tag: null },
     page: 0,
     pages: 0,
     status: 'idle',
@@ -137,9 +154,13 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
   browse.setSnapshot = store.setSnapshot;
 
   return {
+    selectWorkflowLibraryEntry,
     ensureWorkflowLibraryBrowseLoaded: browse.ensureWorkflowLibraryBrowseLoaded,
     getWorkflowLibraryBrowseSnapshot: store.getSnapshot,
-    loadNextWorkflowLibraryPage: browse.loadNextWorkflowLibraryPage,
+    loadWorkflowLibraryRange: browse.loadWorkflowLibraryRange,
+    rememberWorkflowLibraryScroll: vi.fn(),
+    setWorkflowLibraryVisibleDemand: vi.fn(),
+    setWorkflowLibrarySelectedDemand: vi.fn(),
     setWorkflowLibraryBrowseFilter: browse.setWorkflowLibraryBrowseFilter,
     useWorkflowLibraryBrowseSelector: store.useSelector,
   };
@@ -180,6 +201,18 @@ vi.mock('@features/models', async (importOriginal) => ({
 
 // Provide English/plural strings without booting the HTTP-backed i18n client.
 const TRANSLATIONS: Record<string, string> = {
+  'workflowLibrary.openProjectWorkflowHint': 'Makes it the active workflow',
+  'workflowLibrary.renameProjectWorkflowHint': 'Changes its name in this project; a linked template keeps its own',
+  'workflowLibrary.duplicateProjectWorkflowHint': 'A copy beside it in this project',
+  'workflowLibrary.saveToLibraryHint': 'Creates a new template from this workflow',
+  'workflowLibrary.updateTemplateHint': 'Writes this workflow over its library template',
+  'workflowLibrary.removeHint': 'Removes it from this project only',
+  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
+  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
+  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
+  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
+  'workflowLibrary.deleteHint': 'Removes it from your library',
+
   'common.close': 'Close',
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
@@ -198,7 +231,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.loading': 'Loading workflows…',
-  'workflowLibrary.loadingMore': 'Loading more…',
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.newWorkflow': 'New workflow',
   'workflowLibrary.nodeCount_one': '{{count}} node',
@@ -208,6 +240,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.openHint': 'Adds a copy to this project',
   'workflowLibrary.openWithEllipsis': 'Open…',
   'workflowLibrary.previewGraph': 'Preview graph',
+  'workflowLibrary.private': 'Private',
+  'workflowLibrary.public': 'Public',
+  'workflowLibrary.publicWorkflow': 'Public workflow',
+  'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
   'workflowLibrary.projectWorkflowCount_one': '{{count}} workflow in this project',
   'workflowLibrary.projectWorkflowCount_other': '{{count}} workflows in this project',
   'workflowLibrary.remove': 'Remove',
@@ -223,10 +259,19 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.sampleOutput': 'Sample output',
   'workflowLibrary.saveToLibraryWithEllipsis': 'Save to library…',
   'workflowLibrary.searchPlaceholder': 'Search names, tags, or descriptions',
+  'workflowLibrary.sortCreated': 'Date created',
+  'workflowLibrary.sortLabel': 'Sort by',
+  'workflowLibrary.sortName': 'Name',
+  'workflowLibrary.sortOpened': 'Last opened',
+  'workflowLibrary.sortUpdated': 'Last updated',
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
+  'workflowLibrary.shared': 'Shared',
   'workflowLibrary.thisProject': 'This project',
+  'workflowLibrary.thumbnailFit': 'Thumbnail display',
+  'workflowLibrary.thumbnailFitContain': 'Fit',
+  'workflowLibrary.thumbnailFitCover': 'Fill',
   'workflowLibrary.thisProjectHint':
     'Workflows saved with this project. Edits autosave here; the library changes only when you save to it.',
   'workflowLibrary.title': 'Workflows',
@@ -293,6 +338,9 @@ const PORTRAIT = entry('wf-portrait', 'Portrait Studio', readyEnrichment(12, 'sd
   tags: ['portrait'],
   thumbnailUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
 });
+const NON_OWNER_SHARED = { ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-b' } };
+const OWNER_PRIVATE = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: false, user_id: 'user-a' } };
+const OWNER_PUBLIC = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: true, user_id: 'user-a' } };
 // One absent requirement with a matching starter should show one model to install.
 const LANDSCAPE = entry(
   'wf-landscape',
@@ -322,7 +370,7 @@ const LONG_NAMED = entry('wf-long-name', LONG_NAME, readyEnrichment(3, 'sdxl'));
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: [PORTRAIT, LANDSCAPE, SKETCH, UPSCALE],
   error: null,
-  filter: { category: 'user', search: '', tag: null },
+  filter: { category: 'user', search: '', sort: 'updated', tag: null },
   page: 0,
   pages: 2,
   status: 'loaded',
@@ -370,7 +418,7 @@ const BUNDLED_COPY: ProjectWorkflowEntry = {
 };
 const USER_COPY: ProjectWorkflowEntry = {
   document: { ...PREVIEW_DOCUMENT, id: 'wf-user', name: 'User copy' },
-  source: { libraryWorkflowId: 'wf-portrait', revision: 4 },
+  source: { libraryWorkflowId: 'wf-portrait', ownerUserId: 'user-a', revision: 4 },
 };
 const PROJECT_WORKFLOWS: readonly ProjectWorkflowEntry[] = [ALPHA, BUNDLED_COPY, USER_COPY];
 
@@ -402,8 +450,16 @@ const COMMANDS = {
   setWorkflowSource: vi.fn(),
   undo: vi.fn(),
 };
+/** Only the library's own preferences matter here; saving one republishes it, as the account store does. */
+const LIBRARY_PREFERENCES = { workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' } as const;
+const preferences = createMutablePort<WorkflowPreferences>(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+const setLibraryPreferences = vi.fn((patch: Partial<WorkflowPreferences>) =>
+  preferences.setSnapshot({ ...preferences.port.getSnapshot(), ...patch })
+);
 const UI_ADAPTER = {
   commands: COMMANDS,
+  preferences: preferences.port,
+  setLibraryPreferences,
   getProjectGraph: () => project.port.getSnapshot().projectGraph,
   notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
   openAddModels: vi.fn(),
@@ -508,39 +564,51 @@ describe('WorkflowLibraryDialog', () => {
     });
   };
 
+  /** The dialog sizes itself to the window, so layout tests set it; the runner's own size returns afterwards. */
+  const resizeViewport = async (width: number, height: number) => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
+
+    await page.viewport(width, height);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
+  };
+
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
 
-  /**
-   * Real layout in a `Dialog` portal gives no deterministic scroll geometry,
-   * so the viewport's metrics are defined directly — the assertion is about
-   * the dialog's near-bottom threshold, not the browser's layout engine.
-   */
-  const scrollTo = async (scrollTop: number) => {
-    const viewport = gridViewport();
-    expect(viewport).not.toBeNull();
+  const expectContained = (element: HTMLElement | Range, container: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    const bounds = container.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(bounds.left - 1);
+    expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
+    expect(box.top).toBeGreaterThanOrEqual(bounds.top - 1);
+    expect(
+      box.bottom,
+      element instanceof HTMLElement ? element.outerHTML.slice(0, 180) : 'metadata ending'
+    ).toBeLessThanOrEqual(bounds.bottom + 1);
+  };
 
-    for (const [property, value] of [
-      ['clientHeight', 400],
-      ['scrollHeight', 4000],
-      ['scrollTop', scrollTop],
-    ] as const) {
-      Object.defineProperty(viewport, property, { configurable: true, value, writable: true });
-    }
-
-    await act(async () => {
-      viewport?.dispatchEvent(new Event('scroll'));
-      // Settle deferred ScrollArea reactions within the same act scope.
-      await settleFrame();
+  const expectWrappedRenameHint = async (menu: HTMLElement, dialog: HTMLElement) => {
+    await act(() => userEvent.keyboard('{Home}{ArrowDown}'));
+    const rename = menu.querySelector<HTMLElement>('[data-menu-item="rename"]')!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(rename.id);
+      const hint = rename.querySelector('p')!;
+      expect(hint.textContent).toBe(TRANSLATIONS['workflowLibrary.renameProjectWorkflowHint']);
+      const text = document.createRange();
+      text.selectNodeContents(hint);
+      expect(text.getClientRects().length).toBeGreaterThan(1);
+      expectContained(text, menu);
+      expectContained(text, dialog);
     });
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resizeViewport(1280, 800);
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
-    browse.loadNextWorkflowLibraryPage.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
     loader.open.mockClear();
     loader.resume.mockClear();
@@ -549,6 +617,8 @@ describe('WorkflowLibraryDialog', () => {
       command.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
+    preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+    setLibraryPreferences.mockClear();
     // The dialog's tab and selection live in the session store; start every test from the account's clean slate.
     accountLifecycle.invalidate();
     // These are the template tabs' behaviours; the project view has its own suite below.
@@ -611,6 +681,53 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
+  it('opens in the account’s stored sort, offered on Yours only, and refetches in the order chosen', async () => {
+    preferences.setSnapshot({
+      ...LIBRARY_PREFERENCES,
+      workflowLibrarySort: 'opened',
+    } as unknown as WorkflowPreferences);
+    await openWith(LOADED_SNAPSHOT);
+    const sortTrigger = () => document.querySelector<HTMLElement>('[role="combobox"][aria-labelledby]');
+    const sortLabel = () => document.getElementById(sortTrigger()?.getAttribute('aria-labelledby') ?? '')?.textContent;
+
+    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith('opened');
+    expect(sortLabel()).toBe('Sort by');
+    expect(sortTrigger()?.textContent).toContain('Last opened');
+
+    await act(() => userEvent.click(sortTrigger()!));
+    const nameOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Name'
+    );
+    await act(() => userEvent.click(nameOption!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibrarySort: 'name' });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ sort: 'name' });
+
+    // Bundled templates always list by name, and the project's own workflows have no library order.
+    await act(() => browse.setSnapshot?.(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, category: 'default' } })));
+    expect(sortTrigger()).toBeNull();
+    await clickSegment('project');
+    expect(sortTrigger()).toBeNull();
+  });
+
+  it('fills thumbnails by default and letterboxes them once Fit is chosen', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    const thumbnail = () => card('wf-portrait')!.querySelector('img')!;
+    const fitOption = () =>
+      document.querySelector<HTMLInputElement>(
+        '[role="radiogroup"][aria-label="Thumbnail display"] input[value="contain"]'
+      );
+
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('cover');
+    expect(fitOption()?.checked).toBe(false);
+
+    await act(() => userEvent.click(fitOption()!.closest('label')!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryThumbnailFit: 'contain' });
+    expect(fitOption()?.checked).toBe(true);
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('contain');
+  });
+
   it('switches to the bundled defaults once when the account has no workflows of its own', async () => {
     await openWith(withSnapshot({ userTotal: 0 }));
     await wait(0);
@@ -618,6 +735,21 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
     // The segment follows the store's category, so the tab moves with it.
     expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
+  });
+
+  it('keeps Shared selected when the owner has no workflows of their own', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
+        userTotal: 0,
+      })
+    );
+    await wait(0);
+
+    expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
   });
 
   it('leaves the category alone when the account already has workflows', async () => {
@@ -628,13 +760,158 @@ describe('WorkflowLibraryDialog', () => {
   });
 
   it('resets the tag when the category segment changes', async () => {
-    await openWith(withSnapshot({ filter: { category: 'user', search: '', tag: 'portrait' } }));
+    await openWith(withSnapshot({ filter: { category: 'user', search: '', sort: 'updated', tag: 'portrait' } }));
 
     await clickSegment('default');
 
     // The store applies filter patches literally, so clearing the tag on a
     // category switch is the dialog's job.
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
+  });
+
+  it('opens the Shared tab with the public user-workflow filter', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await openWith(LOADED_SNAPSHOT);
+
+    await clickSegment('shared');
+
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
+    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({
+      category: 'user',
+      isPublic: true,
+      tag: null,
+    });
+  });
+
+  it('hides the Shared tab when multiuser mode is disabled', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    await openWith(LOADED_SNAPSHOT);
+
+    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')).toBeNull();
+  });
+
+  it('hides template editing controls for another user’s Shared workflow', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [NON_OWNER_SHARED],
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
+    expect(document.querySelector('[data-thumbnail-remove]')).toBeNull();
+  });
+
+  it('keeps an owner’s Shared workflow editable but hides its visibility switch', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [{ ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-a' } }],
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+  });
+
+  it('shows the visibility state on saved user cards and offers the switch only to the owner in Yours', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('user');
+    await openWith(
+      withSnapshot({
+        entries: [OWNER_PRIVATE],
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    expect(card('wf-portrait')?.textContent).toContain('Private');
+    const ownerSwitch = document.querySelector<HTMLInputElement>('[data-workflow-detail] input[type="checkbox"]');
+    expect(ownerSwitch).not.toBeNull();
+    expect(ownerSwitch?.checked).toBe(false);
+    expect(ownerSwitch?.labels?.[0]?.textContent).toBe('Public workflow');
+
+    await renderDialog();
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    await openWith(
+      withSnapshot({
+        entries: [{ ...OWNER_PRIVATE, item: { ...OWNER_PRIVATE.item, user_id: 'user-a' } }],
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
+  });
+
+  it('shows public state on Shared cards without visibility controls', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [OWNER_PUBLIC],
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    expect(card('wf-portrait')?.textContent).toContain('Public');
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+  });
+
+  it('keeps Yours template editing available in single-user mode', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    setWorkflowLibraryTab('user');
+    await openWith(
+      withSnapshot({
+        entries: [PORTRAIT],
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
   });
 
   it('selects and clears a tag from the chip row', async () => {
@@ -675,16 +952,384 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ search: 'photo' });
   });
 
-  it('requests the next page only once the grid is scrolled near the bottom', async () => {
+  it('bounds mounted cards and requests server positions while scrolling 1,000 workflows', async () => {
+    await resizeViewport(1280, 800);
+    const entries = Array.from({ length: 1000 }, (_, index) => ({
+      ...LOADED_SNAPSHOT.entries[0]!,
+      item: { ...LOADED_SNAPSHOT.entries[0]!.item, workflow_id: `large-${index}`, name: `Large ${index}` },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 1000, pages: 50 });
+    expect(cards().length).toBeGreaterThan(0);
+    expect(cards().length).toBeLessThan(40);
+    const viewport = gridViewport()!;
+    await act(async () => {
+      viewport.scrollTop = 3200;
+      viewport.dispatchEvent(new Event('scroll'));
+      await settleFrame();
+    });
+    expect(cards().length).toBeLessThan(40);
+    expect(browse.loadWorkflowLibraryRange.mock.calls.some(([start]) => Number(start) > 0)).toBe(true);
+    await act(async () => {
+      viewport.scrollTop = 0;
+      viewport.dispatchEvent(new Event('scroll'));
+      await settleFrame();
+    });
+    expect(card('large-0')).not.toBeNull();
+  });
+
+  it('keeps measured rows separated after viewport resize, zoom and text reflow', async () => {
+    const entries = Array.from({ length: 90 }, (_, index) => ({
+      ...PORTRAIT,
+      item: { ...PORTRAIT.item, workflow_id: `reflow-${index}`, name: LONG_NAME },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 90, pages: 5 });
+    const rootStyle = document.documentElement.style;
+    const previousZoom = rootStyle.zoom;
+    const previousFontSize = rootStyle.fontSize;
+    onTestFinished(() => {
+      rootStyle.zoom = previousZoom;
+      rootStyle.fontSize = previousFontSize;
+    });
+
+    const expectRowGaps = async (zoom = 1, gap = 12) => {
+      await vi.waitFor(() => {
+        const rows = [...new Set(cards().map((element) => element.closest<HTMLElement>('[data-index]')!))].sort(
+          (a, b) => Number(a.dataset.index) - Number(b.dataset.index)
+        );
+        expect(rows.length).toBeGreaterThanOrEqual(3);
+        expect(cards().length).toBeLessThan(40);
+        for (let index = 1; index < rows.length; index += 1) {
+          const previous = rows[index - 1]!;
+          const current = rows[index]!;
+          const previousRect = previous.getBoundingClientRect();
+          const currentRect = current.getBoundingClientRect();
+          // Row padding owns the 12px gap; the row boxes themselves must meet without overlap.
+          expect(Math.abs((currentRect.top - previousRect.bottom) / zoom)).toBeLessThanOrEqual(1);
+          const cardBottom = Math.max(
+            ...[...previous.querySelectorAll<HTMLElement>('[data-workflow-card]')].map(
+              (element) => element.getBoundingClientRect().bottom
+            )
+          );
+          expect(Math.abs((currentRect.top - cardBottom) / zoom - gap)).toBeLessThanOrEqual(1);
+        }
+      });
+    };
+
+    await expectRowGaps();
+    await page.viewport(700, 800);
+    await expectRowGaps();
+    await page.viewport(1280, 800);
+    await expectRowGaps();
+    await act(() => {
+      rootStyle.zoom = '2';
+    });
+    await expectRowGaps(2);
+    await act(() => {
+      rootStyle.zoom = previousZoom;
+      rootStyle.fontSize = '20px';
+    });
+    // Text scaling also scales the rem-based gap.
+    await expectRowGaps(1, 15);
+    await act(() => {
+      const viewport = gridViewport()!;
+      viewport.scrollTop = 1000;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await page.viewport(900, 800);
+    await expectRowGaps(1, 15);
+  });
+
+  it.each(
+    (['library', 'project'] as const).flatMap((view) =>
+      [
+        [640, 400],
+        [512, 384],
+        [320, 400],
+        [1280, 320],
+        [700, 320],
+        [640, 320],
+        [512, 320],
+        [320, 320],
+      ].map(([width, height]) => ({ view, width: width!, height: height! }))
+    )
+  )(
+    'keeps the $view grid, selected metadata and actions usable at $width×$height layout viewport',
+    async ({ view, width: targetWidth, height: targetHeight }) => {
+      const description = `${'Required workflow metadata. '.repeat(200)}End of required metadata.`;
+      const entries = [
+        { ...PREVIEW_FIXTURE, item: { ...PREVIEW_FIXTURE.item, description } },
+        ...Array.from({ length: 1000 }, (_, index) => ({
+          ...PORTRAIT,
+          item: { ...PORTRAIT.item, workflow_id: `layout-${index}` },
+        })),
+      ];
+      project.setSnapshot(
+        projectSnapshot([
+          ...PROJECT_WORKFLOWS.map((entry) =>
+            entry === USER_COPY ? { ...entry, document: { ...entry.document, description } } : entry
+          ),
+          ...Array.from({ length: 1000 }, (_, index) => ({
+            ...USER_COPY,
+            document: { ...USER_COPY.document, id: `project-layout-${index}` },
+          })),
+        ])
+      );
+      await openWith(withSnapshot({ entries, total: entries.length, pages: 51 }));
+      if (view === 'project') {
+        await clickSegment('project');
+        await vi.waitFor(() => expect(card('wf-user')).not.toBeNull());
+        await act(() => card('wf-user')!.click());
+        expect(document.querySelector('[data-project-workflow-detail="wf-user"]')).not.toBeNull();
+      }
+
+      const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+      const detail = dialog.querySelector<HTMLElement>('[data-workflow-detail], [data-project-workflow-detail]')!;
+      const metadata = detail.querySelector<HTMLElement>('[role="region"]')!;
+      const grid = gridViewport()!;
+      const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+      const open = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Open'
+      )!;
+      const preview = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Preview graph'
+      )!;
+      const menu = detail.querySelector<HTMLButtonElement>('button[aria-label="More actions"]')!;
+
+      for (const [width, height] of [
+        [1280, 800],
+        [700, 800],
+        [targetWidth, targetHeight],
+      ] as const) {
+        // Real layout-viewport reduction, as at 200% browser zoom on a 1280×800 display. CSS zoom misses this.
+        await page.viewport(width, height);
+        expect(window.innerWidth).toBe(width);
+        expect(window.innerHeight).toBe(height);
+        await vi.waitFor(() => {
+          // Enough for readable metadata and a substantial part of a card, rather than merely nonzero boxes.
+          expect(metadata.clientHeight, 'selected metadata scroll viewport').toBeGreaterThanOrEqual(80);
+          expect(grid.clientHeight, 'workflow grid scroll viewport').toBeGreaterThanOrEqual(120);
+          expect(grid.clientHeight, 'finite virtual grid viewport').toBeLessThanOrEqual(640);
+          expect(detail.clientHeight, 'finite detail pane').toBeLessThanOrEqual(640);
+          if (width <= 512 || height === 320) {
+            expect(grid.clientHeight, 'flow grid has a finite viewport').toBe(256);
+            expect(detail.getBoundingClientRect().height, 'flow detail does not grow with metadata').toBe(320);
+          }
+          expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth + 1);
+          expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width);
+          expect(dialog.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+          expect(dialog.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
+          if ((width >= 640 && height >= 400) || height >= 640) {
+            for (const action of [open, preview, menu, close]) {
+              expectContained(action, dialog);
+            }
+          }
+          for (const control of dialog.querySelectorAll<HTMLElement>(
+            'input[type="search"], [role="combobox"], [role="tab"], [aria-label="Thumbnail display"]'
+          )) {
+            expectContained(control, dialog);
+          }
+          if ((width === 700 && height >= 640) || width <= 512) {
+            expect(grid.getBoundingClientRect().bottom).toBeLessThanOrEqual(detail.getBoundingClientRect().top);
+          } else {
+            expect(grid.getBoundingClientRect().right).toBeLessThanOrEqual(detail.getBoundingClientRect().left);
+          }
+          expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth + 1);
+          expect(cards().length).toBeGreaterThan(0);
+          expect(cards().length).toBeLessThan(40);
+          for (const element of cards()) {
+            const box = element.getBoundingClientRect();
+            const bounds = grid.getBoundingClientRect();
+            expect(box.left).toBeGreaterThanOrEqual(bounds.left);
+            expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
+            expect(box.width).toBeGreaterThanOrEqual(180);
+            const row = element.closest<HTMLElement>('[data-index]')!;
+            expectContained(element, row);
+            const nextRow = row.nextElementSibling;
+            if (nextRow) {
+              expect(box.bottom).toBeLessThanOrEqual(nextRow.getBoundingClientRect().top);
+            }
+          }
+        });
+      }
+
+      const expectUnclipped = (element: HTMLElement) => {
+        expectContained(element, dialog);
+        for (let parent = element.parentElement; parent && parent !== dialog; parent = parent.parentElement) {
+          const style = getComputedStyle(parent);
+          if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+            expectContained(element, parent);
+          }
+        }
+      };
+      await act(() => cards()[0]!.focus());
+      const focusedCard = cards()[0]!.getBoundingClientRect();
+      const gridBounds = grid.getBoundingClientRect();
+      const modalBounds = dialog.getBoundingClientRect();
+      expect(
+        Math.min(focusedCard.bottom, gridBounds.bottom, modalBounds.bottom) -
+          Math.max(focusedCard.top, gridBounds.top, modalBounds.top)
+      ).toBeGreaterThanOrEqual(120);
+      await act(() => grid.focus());
+      await act(() => userEvent.keyboard('{PageDown}'));
+      await vi.waitFor(() => {
+        expect(grid.scrollTop).toBeGreaterThan(0);
+        expect(cards().length).toBeLessThan(40);
+        expect(grid.clientHeight).toBeLessThanOrEqual(640);
+      });
+      await act(() => metadata.focus());
+      expect(document.activeElement).toBe(metadata);
+      expectUnclipped(metadata);
+      await act(() => userEvent.keyboard('{End}'));
+      await vi.waitFor(() => {
+        expect(metadata.scrollTop).toBeGreaterThan(0);
+        const lastMetadata =
+          metadata.querySelector<HTMLElement>('[data-workflow-source]') ?? [...metadata.querySelectorAll('p')].at(-1)!;
+        const ending = document.createRange();
+        ending.selectNodeContents(lastMetadata);
+        const text = lastMetadata.firstChild!;
+        ending.setStart(text, Math.max(0, text.textContent!.length - 24));
+        expectContained(ending, metadata);
+        expectContained(ending, dialog);
+      });
+
+      // Native focus scrolling must bring each action into the modal's clipped viewport, including flow layouts.
+      const reached = new Set<Element>();
+      for (let index = 0; index < 40 && reached.size < 4; index += 1) {
+        await act(() => userEvent.keyboard('{Tab}'));
+        if ([open, preview, menu, close].includes(document.activeElement as HTMLButtonElement)) {
+          expectUnclipped(document.activeElement as HTMLElement);
+          reached.add(document.activeElement!);
+        }
+      }
+      expect(reached.size).toBe(4);
+      const toolbarTargets = [
+        dialog.querySelector<HTMLElement>('input[type="search"]'),
+        dialog.querySelector<HTMLElement>('[role="combobox"]'),
+        dialog.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'),
+        [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(
+          (button) => button.textContent === 'New workflow'
+        ),
+      ].filter((element): element is HTMLElement => Boolean(element));
+      const toolbarReached = new Set<Element>();
+      for (const key of ['{Shift>}{Tab}{/Shift}', '{Tab}']) {
+        await act(() => close.focus());
+        for (let index = 0; index < 30; index += 1) {
+          await act(() => userEvent.keyboard(key));
+          const focused = document.activeElement as HTMLElement;
+          if (focused.hasAttribute('data-workflow-card')) {
+            break;
+          }
+          if (toolbarTargets.includes(focused)) {
+            expectUnclipped(focused);
+            toolbarReached.add(focused);
+          }
+        }
+      }
+      expect(toolbarReached.size).toBe(toolbarTargets.length);
+      if (dialog.scrollHeight > dialog.clientHeight + 1) {
+        await act(() => close.focus());
+        await act(() => userEvent.keyboard('{End}'));
+        await vi.waitFor(() => {
+          expect(dialog.scrollTop).toBeGreaterThan(0);
+          expectUnclipped(preview);
+        });
+      }
+      // Focus first, as a keyboard user would, so offscreen controls scroll into view before activation.
+      await act(() => menu.focus());
+      expectUnclipped(menu);
+      await act(() => userEvent.keyboard('{Enter}'));
+      await vi.waitFor(() => expect(menu.getAttribute('aria-expanded')).toBe('true'));
+      const menuContent = document.querySelector<HTMLElement>('[role="menu"]')!;
+      // Open state precedes the entry slide's final geometry.
+      await act(() => settleAnimations(menuContent));
+      expectContained(menuContent, dialog);
+      if (view === 'project' && targetWidth === 320) {
+        await expectWrappedRenameHint(menuContent, dialog);
+      }
+      await act(() => userEvent.keyboard('{End}'));
+      const lastAction = [...menuContent.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+      await vi.waitFor(() => {
+        expect(menuContent.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+        expectContained(lastAction, menuContent);
+        expectContained(lastAction, dialog);
+      });
+      await act(() => userEvent.keyboard('{Escape}'));
+      await act(() => preview.focus());
+      expectUnclipped(preview);
+      await act(() => userEvent.keyboard('{Enter}'));
+      await waitForPreviewDialog();
+      expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+      // The preview renderer is stubbed; close it through its existing harness controls before using the rail.
+      await clickText('Close preview');
+      await clickText('Finish preview exit');
+      await act(() => open.focus());
+      expectUnclipped(open);
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(view === 'project' ? COMMANDS.selectWorkflow : loader.open).toHaveBeenCalled();
+      await act(() => close.focus());
+      expectUnclipped(close);
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    }
+  );
+
+  it('keeps keyboard focus mounted across virtual row boundaries', async () => {
+    await resizeViewport(1280, 800);
+    const entries = Array.from({ length: 90 }, (_, index) => ({
+      ...PORTRAIT,
+      item: { ...PORTRAIT.item, workflow_id: `key-${index}` },
+    }));
+    await openWith({ ...LOADED_SNAPSHOT, entries, total: 90, pages: 5 });
+    await act(() => document.querySelector<HTMLElement>('[data-workflow-card-menu="key-0"]')?.focus());
+    for (let index = 1; index <= 18; index += 1) {
+      await act(async () => {
+        await userEvent.keyboard('{Tab}');
+        await settleFrame();
+        await settleFrame();
+      });
+      await vi.waitFor(() => expect(document.activeElement?.getAttribute('data-workflow-card')).toBe(`key-${index}`));
+      await act(() => userEvent.keyboard('{Tab}'));
+      expect(document.activeElement?.getAttribute('data-workflow-card-menu')).toBe(`key-${index}`);
+    }
+    expect(cards().length).toBeLessThan(40);
+  });
+
+  it.each(['library', 'project'] as const)('keeps the %s card menu inside its dialog while resizing', async (view) => {
+    await resizeViewport(320, 320);
     await openWith(LOADED_SNAPSHOT);
-
-    await scrollTo(100);
-
-    expect(browse.loadNextWorkflowLibraryPage).not.toHaveBeenCalled();
-
-    await scrollTo(3200);
-
-    expect(browse.loadNextWorkflowLibraryPage).toHaveBeenCalled();
+    if (view === 'project') {
+      await clickSegment('project');
+    }
+    await vi.waitFor(() => expect(card(view === 'project' ? 'wf-alpha' : 'wf-landscape')).not.toBeNull());
+    const source = card(view === 'project' ? 'wf-alpha' : 'wf-landscape')!;
+    await act(() => source.focus());
+    // Keyboard context-menu events have no pointer coordinates.
+    await act(() => source.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+    );
+    const menu = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]')!;
+    const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+    await act(() => settleAnimations(menu));
+    expectContained(menu, dialog);
+    if (view === 'project') {
+      await expectWrappedRenameHint(menu, dialog);
+    }
+    await act(() => userEvent.keyboard('{End}'));
+    const lastAction = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+      expectContained(lastAction, menu);
+      expectContained(lastAction, dialog);
+    });
+    await resizeViewport(700, 320);
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('data-state')).toBe('open');
+      expectContained(menu, dialog);
+    });
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(source));
+    expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull();
   });
 
   it('auto-selects the first entry and moves the selection when it disappears', async () => {
@@ -733,7 +1378,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith({
       entries: [],
       error: null,
-      filter: { category: 'user', search: '', tag: null },
+      filter: { category: 'user', search: '', sort: 'updated', tag: null },
       page: 0,
       pages: 0,
       status: 'idle',
@@ -1045,26 +1690,88 @@ describe('WorkflowLibraryDialog', () => {
     expect(document.querySelector('[data-preview-dialog]')).toBeNull();
   });
 
-  it('sits the close control on the header row, not floating over the tag chips', async () => {
+  it('sits the close control at the end of the tab row, not floating over the tag chips', async () => {
+    await resizeViewport(1280, 800);
     await openWith(LOADED_SNAPSHOT);
 
     const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
     const segments = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Workflows"]');
+    const search = document.querySelector<HTMLElement>('input[type="search"]');
     expect(close).not.toBeNull();
     expect(segments).not.toBeNull();
 
-    // Same row container as the title/search/tab cluster…
-    expect(segments?.parentElement?.parentElement?.contains(close as Node)).toBe(true);
-    // …and on its baseline rather than the dialog's absolute top corner.
-    const closeBox = close?.getBoundingClientRect();
-    const segmentBox = segments?.getBoundingClientRect();
-    const closeCenter = (closeBox?.top ?? 0) + (closeBox?.height ?? 0) / 2;
+    // On the tab row's baseline rather than the dialog's absolute top corner…
+    const closeBox = close!.getBoundingClientRect();
+    const segmentBox = segments!.getBoundingClientRect();
+    const closeCenter = closeBox.top + closeBox.height / 2;
 
-    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox?.top ?? 0);
-    expect(closeCenter).toBeLessThanOrEqual(segmentBox?.bottom ?? 0);
-    // And it comes after the segment control, at the end of the row.
-    expect(closeBox?.left ?? 0).toBeGreaterThanOrEqual(segmentBox?.right ?? 0);
+    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox.top);
+    expect(closeCenter).toBeLessThanOrEqual(segmentBox.bottom);
+    // …after the tabs, at the end of the row, with the search before them.
+    expect(closeBox.left).toBeGreaterThanOrEqual(segmentBox.right);
+    expect(search!.getBoundingClientRect().right).toBeLessThanOrEqual(segmentBox.left);
   });
+
+  it.each([
+    ['user', false, 'This project'],
+    ['project', false, 'Yours'],
+    ['shared', true, 'Shared'],
+  ] as const)(
+    'keeps the %s header inside a 320px-wide dialog, with Close on the title row and every tab label whole',
+    async (tab, isMultiuser, targetTab) => {
+      identity.session = isMultiuser
+        ? { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } }
+        : { multiuserEnabled: false, phase: 'ready', user: null };
+      await resizeViewport(320, 640);
+      await openWith(LOADED_SNAPSHOT);
+      if (tab === 'project') {
+        await clickSegment('project');
+      }
+
+      const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+      const contentBox = content.getBoundingClientRect();
+      expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth + 1);
+      const title = content.querySelector<HTMLElement>('[data-part="title"]')!;
+      const close = content.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+      const tabs = [...content.querySelectorAll<HTMLElement>('[role="tab"]')];
+      const find = (selector: string) => content.querySelector<HTMLElement>(selector);
+      // Search, sort and the tag strip belong to the template tabs; the project tab shows its hint instead.
+      const rowControls =
+        tab === 'user'
+          ? [
+              find('input[type="search"]'),
+              find('[role="combobox"][aria-labelledby]'),
+              // The tag strip, the header's only scroll region.
+              find('[role="region"]:not([role="tabpanel"] *)'),
+            ]
+          : [];
+      const header = [close, ...tabs, find('[aria-label="Thumbnail display"]'), ...rowControls];
+      expect(tabs.map((element) => element.textContent)).toEqual(
+        isMultiuser ? ['This project', 'Browse', 'Yours', 'Shared'] : ['This project', 'Browse', 'Yours']
+      );
+      expect(header).not.toContain(null);
+
+      for (const element of header as HTMLElement[]) {
+        const box = element.getBoundingClientRect();
+        expect(box.left, element.textContent ?? '').toBeGreaterThanOrEqual(contentBox.left);
+        expect(box.right, element.textContent ?? '').toBeLessThanOrEqual(contentBox.right);
+      }
+      for (const label of tabs.map((element) => element.firstElementChild as HTMLElement)) {
+        expect(label.scrollWidth, label.textContent ?? '').toBeLessThanOrEqual(label.clientWidth);
+      }
+
+      // Close shares the title's row, so it stays where a dialog's Close is expected.
+      const titleBox = title.getBoundingClientRect();
+      const closeCenter = close.getBoundingClientRect().top + close.getBoundingClientRect().height / 2;
+      expect(closeCenter).toBeGreaterThanOrEqual(titleBox.top);
+      expect(closeCenter).toBeLessThanOrEqual(titleBox.bottom);
+
+      // A real pointer click reaches the other tab on its own row.
+      const target = tabs.find((element) => element.textContent === targetTab)!;
+      await act(() => userEvent.click(target));
+      expect(target.getAttribute('aria-selected')).toBe('true');
+    }
+  );
 
   it('wraps a long workflow name in full instead of scrolling the rail sideways', async () => {
     await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));
@@ -1230,6 +1937,8 @@ describe('WorkflowLibraryDialog — This project', () => {
     // The project view is local; no library page is requested and no search is offered.
     expect(browse.ensureWorkflowLibraryBrowseLoaded).not.toHaveBeenCalled();
     expect(document.querySelector('input[type="search"]')).toBeNull();
+    expect(document.querySelector('[data-workflow-card] [data-workflow-visibility]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Public workflow');
   });
 
   it('starts a fresh workflow from the header', async () => {
@@ -1259,13 +1968,17 @@ describe('WorkflowLibraryDialog — This project', () => {
   });
 
   it("opens a project tile's actions from its menu button, including rename", async () => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
+    await page.viewport(1280, 800);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
     await renderDialog();
 
-    const button = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
-    await act(async () => {
-      button?.click();
-      await settleFrame();
+    const button = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
+      expect(element).not.toBeNull();
+      return element!;
     });
+    await act(() => userEvent.click(button));
 
     await vi.waitFor(() =>
       expect(document.querySelector('[data-workflow-context-menu] [data-menu-item="rename"]')).not.toBeNull()
@@ -1393,6 +2106,19 @@ describe('WorkflowLibraryDialog — This project', () => {
       kind: 'update-source',
       workflowId: 'wf-landscape',
     });
+  });
+
+  it('keeps a public workflow copy read-only for Update Template when another account opens the project', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS, 'wf-user'));
+    openWorkflowLibraryAtProjectWorkflow(PROJECT_ID, 'wf-user');
+    await renderDialog({ storeBound: true });
+
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
+    await openRailMenu();
+
+    expect(menuItem('update-template')).toBeNull();
+    expect(menuItem('save-to-library')).not.toBeNull();
   });
 
   it('previews a project workflow from its own document', async () => {

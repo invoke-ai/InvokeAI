@@ -2,6 +2,8 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+import { createKeyedTransientStore } from '@platform/state/externalStore';
 import {
   createFromBbox as runCreateFromBbox,
   getCreateFromBboxNotice,
@@ -12,12 +14,17 @@ import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
+import { describeAdjustmentRefusal } from './useStructuralCommit';
 
 type CreateFromBboxEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'layers' | 'lifecycle' | 'projectId'>;
+
+/** Projects with a create in flight: the context menu and the header's Use frame menu share the gate and busy state. */
+const creatingProjects = createKeyedTransientStore<string, true>();
+registerAccountOwnedResource({ clear: () => creatingProjects.clear(), name: 'canvas-create-from-bbox' });
 
 export const useCreateFromBbox = (
   engine: CreateFromBboxEngine | null
@@ -28,8 +35,7 @@ export const useCreateFromBbox = (
   const { canvas, generation, notifications } = useWorkbenchCommands();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const models = useModelsSelector((snapshot) => snapshot.models);
-  const isCreatingRef = useRef(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const isCreating = creatingProjects.useValue(engine?.projectId ?? '') === true;
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -37,15 +43,13 @@ export const useCreateFromBbox = (
 
   const createFromBbox = useCallback(
     async (destination: CreateFromBboxDestination): Promise<void> => {
-      if (isCreatingRef.current) {
+      const project = queries.getSnapshot().activeProject;
+      if (creatingProjects.get(project.id)) {
         return;
       }
 
-      const project = queries.getSnapshot().activeProject;
-
       await withMatchingCanvasProject(engine, project.id, async (matchedEngine) => {
-        isCreatingRef.current = true;
-        setIsCreating(true);
+        creatingProjects.set(project.id, true);
 
         try {
           const result = await runCreateFromBbox({
@@ -82,6 +86,10 @@ export const useCreateFromBbox = (
           }
 
           const notice = getCreateFromBboxNotice(result);
+          if ('refusal' in notice) {
+            notify.error(t('widgets.canvas.contextMenu.createError'), describeAdjustmentRefusal(notice.refusal, t));
+            return;
+          }
           const options =
             notice.options && 'destination' in notice.options
               ? { destination: t(notice.options.destination) }
@@ -97,8 +105,7 @@ export const useCreateFromBbox = (
             )
           );
         } finally {
-          isCreatingRef.current = false;
-          setIsCreating(false);
+          creatingProjects.delete(project.id);
         }
       });
     },

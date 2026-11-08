@@ -1,5 +1,6 @@
 import type { Project, ProjectLoadResult } from '@workbench/projectContracts';
 
+import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { createDraftProject, loadWorkbenchProject, withAuthoritativeProjectBoard } from '@workbench/workbenchState';
 
 import type { ProjectWithWorkspaceDTO } from './api';
@@ -12,6 +13,7 @@ import {
   type ProjectDocumentMigration,
 } from './projectDocument';
 import { findRepeatedWorkflowItem, joinProjectDocument, splitProjectDocument } from './projectHalves';
+import { rebuildProjectMediaUrls } from './projectMediaUrls';
 
 const toFutureProjectDocumentRefusal = (
   data: Record<string, unknown>,
@@ -66,6 +68,14 @@ export const deserializeProjectDocument = (data: Record<string, unknown>): Proje
     workflowHistories: {},
   } as unknown as Project);
 
+  if (result.status === 'loaded') {
+    // Every load path (server records, drafts, `.invk` import, duplicate) passes here, and the sync baseline is taken
+    // from what it returns, so rebuilding here never by itself causes a save.
+    return {
+      project: rebuildProjectMediaUrls(result.project, { image: galleryImageUrls, video: galleryVideoUrls }),
+      status: 'loaded',
+    };
+  }
   return result.status === 'refused' ? { refused: { ...result.refused, raw: data }, status: 'refused' } : result;
 };
 

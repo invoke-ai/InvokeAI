@@ -54,6 +54,8 @@ const createDispatch = () => {
   };
 
   const widgets: WorkbenchWidgetCommands = {
+    clearInstanceValues: (instanceId, keys, projectId) =>
+      dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
     dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
     float: (instanceId, region) =>
@@ -126,7 +128,9 @@ describe('createWidgetRuntime', () => {
   });
 
   it('returns an empty runtime state snapshot when the scoped project is missing', () => {
-    expect(getProjectWidgetRuntimeState([], 'missing-project', 'generate')).toEqual({});
+    expect(getProjectWidgetRuntimeState({ projects: [], scopedDefaults: {} }, 'missing-project', 'generate')).toEqual(
+      {}
+    );
   });
 
   it('exposes widget state reads and writes through the state namespace', () => {
@@ -364,7 +368,7 @@ describe('createWidgetRuntime', () => {
     disposeTwo();
   });
 
-  it('scopes palette, search, and toolbar registrations to the widget source', () => {
+  it('scopes palette and search registrations to the widget source', () => {
     const { widgets } = createDispatch();
     const extensions = createExtensionRegistry();
     const runtime = createWidgetRuntime({
@@ -380,11 +384,9 @@ describe('createWidgetRuntime', () => {
 
     runtime.palette.register({ commandId: 'test-widget.palette-command', title: 'Palette entry' });
     runtime.search.registerProvider({ id: 'test-widget.search', label: 'Search', search: () => [] });
-    runtime.toolbars.register({ id: 'test-widget.toolbar', items: [], location: 'status.left' });
 
     const expectedSource = expect.objectContaining({ instanceId: 'alpha', typeId: 'test-widget' });
     expect(extensions.stores.palette.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
     expect(extensions.stores.search.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
-    expect(extensions.stores.toolbars.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
   });
 });

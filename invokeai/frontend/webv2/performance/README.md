@@ -5,7 +5,13 @@ Paths relative to the webv2 package. `pnpm test:performance:architecture` runs t
 | Gate    | Command                         | Baseline                                 | Checks                                                                                                                                  |
 | ------- | ------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Build   | `pnpm test:performance:build`   | `performance/architecture-baseline.json` | Per-route bytes, request counts, source-owner sets; sources a route must not load eagerly; direct-importer budgets for barrels and hubs |
-| Browser | `pnpm test:performance:browser` | `performance/browser-baseline.json`      | Each route in Chromium against the mock backend: script requests, source-owner sets, required widgets, timing samples                   |
+| Browser | `pnpm test:performance:browser` | `performance/browser-baseline.json`      | Each route in Chromium against the mock backend: script requests, source-owner sets, required widgets, repeated resource observations   |
+
+## Resource checks and timing profiles
+
+The routine browser gate visits each fixture twice in fresh browser contexts. Both observations run the complete journey, required/inactive-widget checks, and semantic-ready waits. Resource budgets use the maximum of each metric; fixture counts and script source owners must agree between observations. Successful routine runs do not record traces or report timing statistics. On failure, the gate attempts one diagnostic trace for the failing fixture and retains the original failure.
+
+`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan, as does the routine command when the checked-in timing policy enables enforcement. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
 
 ## Byte budgets
 
@@ -17,7 +23,7 @@ Baseline byte budgets record measurements only. Each byte ceiling is the lower o
 
 Reference modes:
 
-- PRs into `main` and merge groups targeting `main`: CI restores `main`'s own measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). Logs and reports name the restored reference.
+- PRs into `main` and merge groups targeting `main`: CI restores the exact base commit's measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). On a cache miss it checks out that pinned base separately, installs its dependencies and Node version, builds once, and records both build and browser resources. Base budget failures still permit recording, but missing, malformed, incompatible, or incomplete measurements stop the job. Both reference files must come from that base; older cached or candidate measurements cannot substitute. Logs and reports name the exact base SHA. Candidate completion gates retain their normal strict checks.
 - Local runs, pushes to `main`, stacked PRs without a reference: compare against committed measurements directly.
 - Every mode pins source-owner sets exactly: a module entering a route's initial graph fails at zero bytes.
 - Request counts have no allowance; cap is the lower of reference and committed counts.
@@ -25,8 +31,9 @@ Reference modes:
 
 ## Running
 
+- CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
-- Browser gate measures timing and binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
+- Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
 - One failing sample on a busy machine can be noise, "did not request required widgets" included. Rerun once on a quiet machine. Fails again: regression.
 
 ## Fixing failures
@@ -51,11 +58,11 @@ A module shared by eager and lazy code got its own chunk, or one owner imports i
 
 ### Route bytes grew
 
-Locale strings count: `en.json` is part of each route's `otherAssetRawBytes`. New strings need a reviewed re-record.
+Locale strings count in the browser gate: `en.json` is part of each route's `otherRawBytes` (locale plus `index.html`). The build gate's `otherAssetRawBytes` does not include it. New strings need a reviewed browser re-record.
 
 ### Finding a new startup request
 
-Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. `dist/.vite/chunk-sources.json` maps chunks to sources; `vite build --minify false` keeps `//#region` module markers.
+Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. Run `pnpm test:performance:browser:profile` to collect traces for passing routes. `dist/.vite/chunk-sources.json` maps each chunk to its source modules and packages; diff it between the two builds to see which modules moved between chunks. Unminified builds no longer carry `//#region` module markers.
 
 ## Remediation tickets
 
@@ -69,3 +76,9 @@ Failures name an owner and a remediation ticket: structural work that would reti
 | `seal-canvas-engine-seam`        | Importers of `@workbench/canvas-engine/contracts`                             |
 | `finish-queue-ownership`         | Importers of `@features/queue`                                                |
 | `define-gallery-feature`         | Importers of `./GalleryWidgetView`                                            |
+
+## Workflow-library scaling fixture
+
+The mock backend accepts `POST /__workflow-library` with JSON `{"scenario":"large"}`. This opt-in workload replaces library records with 1,000 user workflows, each containing 40 integer nodes; normal route fixtures and resource budgets are unchanged. Scenarios `empty`, `failed-page`, `slow-detail`, and `changed-revision` respectively empty the library, fail page 2 once (retry succeeds), delay detail reads by 300 ms, and advance each record's revision on its first detail read. `POST /__reset` restores ordinary fixtures. `GET /__workflow-requests` records list/detail requests since seeding.
+
+For a comparison, seed the same scenario on base and candidate with identical viewport, zoom, browser and hardware. Open Yours, select a detail, traverse the library in both directions, switch search/tag views repeatedly, and return. Count `[data-workflow-card]` elements and workflow detail/list GETs at each position. Record long tasks and force-GC retained heap with the same browser profiling procedure on both builds; heap and wall time are observations, not deterministic counts. Run the normal timing profile only against its corresponding fresh performance build, with exclusive use of the machine. Owner resource observations and unit-fixture reads are not substitutes for this browser comparison.

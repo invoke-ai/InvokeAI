@@ -64,6 +64,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #   covers Windows through AMD's index.
 # - xpu is on both win32 and linux: PyTorch's XPU index publishes win_amd64 and
 #   linux-x86_64 wheels, which is exactly what the `xpu` extra's markers allow.
+# - Windows on ARM64 is deliberately absent: the launcher's legacy path predates
+#   every Invoke version that runs there, and its bootstrap path installs from
+#   the release lockfile, which carries the ARM64 torch index itself.
 REQUIRED_BACKENDS: dict[str, set[str]] = {
     "win32": {"cpu", "cuda", "xpu"},
     "linux": {"cpu", "cuda", "rocm", "xpu"},

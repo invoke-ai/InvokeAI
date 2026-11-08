@@ -1,10 +1,19 @@
 import type { GalleryImage } from '@features/gallery';
-import type { ModelConfig } from '@features/models';
-import type { CanvasDocumentCapability, CanvasLayerCapability, LayerStackKind } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentContractV3,
+  CanvasNodeContract,
+  CanvasNodeInsertion,
+  CanvasLayerStackKind,
+  CanvasDocumentCapability,
+  CanvasLayerCapability,
+  LayerStackKind,
+} from '@workbench/canvas-engine/api';
 import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CanvasRecallPlan, CanvasRecallTarget } from '@workbench/image-actions/canvasRecall';
 import type { Project } from '@workbench/projectContracts';
 
+import { galleryImageUrls } from '@features/gallery/utility';
 import { getArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import {
   calculateNewSize,
@@ -12,24 +21,28 @@ import {
   isArchitectureDescribed,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
-import { getModelsSnapshot } from '@features/models';
+import { createItemId } from '@platform/browser/randomUuid';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   registerAccountOwnedResource,
+  type AccountScope,
 } from '@platform/state/accountLifecycle';
-import { captureInsertionAnchor, getDocumentLeaves } from '@workbench/canvas-engine/api';
-import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import {
+  captureInsertionAnchor,
   createControlLayer,
+  getDocumentLeaves,
+  nextControlLayerName,
+} from '@workbench/canvas-engine/api';
+import { hasPendingCanvasResults } from '@workbench/canvasStagingView';
+import {
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
   createLayerId,
   createRegionalGuidanceFromImage,
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
-  nextControlLayerName,
   nextInpaintMaskName,
   nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
@@ -39,6 +52,14 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { nextLayerName } from '@workbench/workbenchState';
 
 import { uploadCanvasImage } from './backend/canvasImages';
+import { getCanvasEngine } from './engineRegistry';
+
+/** Keep the legacy raster renderer out of Canvas startup and current-record recall. */
+export const prepareLegacyCanvasMetadata = async (
+  metadata: Record<string, unknown>,
+  owner: AccountScope,
+  isCurrent?: () => boolean
+) => (await import('./legacyCanvasMetadata')).convertLegacyCanvasMetadata(metadata, owner, isCurrent);
 
 export type GalleryCanvasImportDestination =
   | 'raster'
@@ -54,7 +75,6 @@ export type ImportGalleryImagesResult =
 
 interface BuildLayerContext {
   bbox: Project['canvas']['document']['bbox'];
-  defaultControlModel: string | null;
   existingLayers: readonly CanvasLayerContract[];
   modelBase: string | null;
 }
@@ -101,10 +121,12 @@ const buildLayer = (
     case 'control':
     case 'control-resized':
       return withBboxOrigin(
-        {
-          ...createControlLayer(nextControlLayerName(names), id, context.modelBase, context.defaultControlModel),
+        createControlLayer({
+          base: context.modelBase,
+          id,
+          name: nextControlLayerName(names),
           source: { image: ref, type: 'image' },
-        },
+        }),
         context.bbox
       );
     case 'inpaint-mask':
@@ -151,17 +173,14 @@ const buildLayer = (
 const buildLayers = (
   images: readonly LayerImage[],
   destination: GalleryCanvasImportDestination,
-  project: Project,
-  models: readonly ModelConfig[]
+  project: Project
 ): CanvasLayerContract[] => {
   const layers: CanvasLayerContract[] = [];
   const modelBase = getSelectedModelBase(project);
-  const defaultControlModel = resolveDefaultControlModelForBase(models, modelBase);
   for (const image of images) {
     layers.push(
       buildLayer(image, destination, {
         bbox: project.canvas.document.bbox,
-        defaultControlModel,
         existingLayers: [...getDocumentLeaves(project.canvas.document), ...layers],
         modelBase,
       })
@@ -185,7 +204,8 @@ const resizeImages = async (
   const dimensions = getGenerationDimensions(generateValues?.model);
   const results = await mapWithConcurrency(images, 4, async (image): Promise<ResizeResult> => {
     try {
-      const response = await fetchImage(image.imageUrl, { signal });
+      // Derived from the name, never the caller's cached URL: a URL saved at another origin is a cross-origin fetch.
+      const response = await fetchImage(galleryImageUrls.full(image.imageName), { signal });
 
       signal.throwIfAborted();
       if (!response.ok) {
@@ -227,7 +247,7 @@ const resizeImages = async (
   };
 };
 
-type GalleryImportEngine = {
+export type GalleryImportEngine = {
   readonly projectId: string;
   readonly document: Pick<CanvasDocumentCapability, 'captureInsertionAnchor'>;
   readonly layers: CanvasLayerCapability;
@@ -242,8 +262,6 @@ export const importGalleryImagesToCanvas = async (options: {
   images: readonly GalleryImage[];
   project: Project;
   fetchImage?: typeof fetch;
-  /** Model list used to pick a default control model; defaults to the loaded models snapshot. */
-  models?: readonly ModelConfig[];
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<ImportGalleryImagesResult> => {
   const owner = captureAccountScope();
@@ -255,7 +273,6 @@ export const importGalleryImagesToCanvas = async (options: {
     getProject,
     images,
     isActiveProject,
-    models = getModelsSnapshot().models,
     project,
     uploadImage = uploadCanvasImage,
   } = options;
@@ -296,7 +313,7 @@ export const importGalleryImagesToCanvas = async (options: {
       failedImageNames = resized.failedImageNames;
     }
 
-    const layers = buildLayers(layerImages, destination, project, models);
+    const layers = buildLayers(layerImages, destination, project);
     const previousSelectedLayerId = capturedDocument.selectedLayerId;
     const anchorFor = (stack: LayerStackKind) =>
       matchingProjectEngine
@@ -346,4 +363,123 @@ export const importGalleryImagesToCanvas = async (options: {
   } finally {
     activeImports.delete(importKey);
   }
+};
+
+/** Commit synchronously only to the captured project/document. Preserve replaced work in the existing restore-point UI. */
+export const commitCanvasRecall = ({
+  plan,
+  target,
+  expectedDocument,
+  append = false,
+  restorePointName,
+}: {
+  plan: CanvasRecallPlan;
+  target: CanvasRecallTarget;
+  expectedDocument: CanvasDocumentContractV3;
+  append?: boolean;
+  restorePointName: string;
+}): boolean => {
+  const project = target.getProject();
+  if (!project || project.id !== target.projectId || project.canvas.document !== expectedDocument) {
+    plan.problems.push('canvas-changed');
+    return false;
+  }
+  const engine = getCanvasEngine(target.projectId);
+  if (engine?.interaction.get('documentEditingLocked')) {
+    plan.problems.push('canvas-busy');
+    return false;
+  }
+  let applied = false;
+  if (plan.document) {
+    const document = structuredClone(plan.document);
+    if (plan.fitControlsToFrame) {
+      const frame = project.canvas.document.bbox;
+      for (const control of document.stacks.control) {
+        if (control.type === 'control' && control.source.type === 'image') {
+          control.transform = {
+            x: frame.x,
+            y: frame.y,
+            rotation: 0,
+            scaleX: frame.width / control.source.image.width,
+            scaleY: frame.height / control.source.image.height,
+          };
+        }
+      }
+    }
+    // Fresh ids avoid collisions in partial/append recalls and old engine caches on wholesale replacement.
+    const remappedIds = new Map<string, string>();
+    const remap = (nodes: CanvasNodeContract[]): void => {
+      for (const node of nodes) {
+        const newId = createItemId('recalled-layer');
+        remappedIds.set(node.id, newId);
+        node.id = newId;
+        if (node.type === 'group') {
+          remap(node.children);
+        }
+      }
+    };
+    Object.values(document.stacks).forEach(remap);
+    document.selectedLayerId = remappedIds.get(document.selectedLayerId ?? '') ?? null;
+    if (hasPendingCanvasResults(project.canvas, project.queue.items)) {
+      plan.partial = true;
+      plan.problems.push('canvas-pending-results');
+    }
+    if (plan.controlsOnly && !append && !plan.partial) {
+      document.stacks = { ...project.canvas.document.stacks, control: document.stacks.control };
+      document.width = project.canvas.document.width;
+      document.height = project.canvas.document.height;
+      document.bbox = project.canvas.document.bbox;
+      document.background = project.canvas.document.background;
+      document.selectedLayerId = project.canvas.document.selectedLayerId;
+    }
+    if (append || plan.partial) {
+      const add: CanvasNodeInsertion[] = Object.entries(document.stacks).map(([stack, nodes]) => ({
+        nodes,
+        anchor: {
+          projectId: target.projectId,
+          stack: stack as CanvasLayerStackKind,
+          parentPath: [],
+          beforeId: null,
+          afterId: null,
+          capturedEditRevision: engine?.document.getEditRevision() ?? 0,
+        },
+      }));
+      const forward: CanvasProjectMutation = { type: 'applyCanvasLayerStackMutation', add, enabledUpdates: [] };
+      const inverse: CanvasProjectMutation = {
+        type: 'applyCanvasLayerStackMutation',
+        removeIds: add.flatMap((insertion) => insertion.nodes.map((node) => node.id)),
+        enabledUpdates: [],
+        selectedLayerId: expectedDocument.selectedLayerId,
+      };
+      const hasAdditions = add.some((insertion) => insertion.nodes.length > 0);
+      applied =
+        hasAdditions &&
+        (engine
+          ? engine.layers.commitStructural(restorePointName, forward, inverse).status === 'committed'
+          : target.commands.canvas.apply(target.projectId, forward));
+      if (hasAdditions && !applied) {
+        plan.problems.push('canvas-limit');
+      }
+    } else {
+      const snapshotId = createItemId('canvas-recall');
+      target.commands.canvas.apply(target.projectId, {
+        type: 'saveCanvasSnapshot',
+        id: snapshotId,
+        name: restorePointName,
+        createdAt: new Date().toISOString(),
+      });
+      applied = engine
+        ? engine.document.replaceDocument(document)
+        : target.commands.canvas.apply(target.projectId, { type: 'replaceCanvasDocument', document });
+      if (!applied) {
+        target.commands.canvas.apply(target.projectId, { type: 'deleteCanvasSnapshot', snapshotId });
+        plan.problems.push('canvas-busy');
+      }
+    }
+  }
+  if (Object.keys(plan.settings).length > 0) {
+    target.commands.widgets.patchValues('canvas', plan.settings, target.projectId);
+    applied = true;
+  }
+  return applied;
 };

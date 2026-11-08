@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 from invokeai.app.invocations.fields import VideoField
 from invokeai.app.invocations.video_frame_extract_range import ExtractVideoRangeInvocation
@@ -89,6 +90,7 @@ def _invoke_and_capture(invocation: ExtractVideoRangeInvocation, clip_path: Path
     return saved
 
 
+@pytest.mark.ffmpeg
 class TestRangeAudio:
     def test_trim_keeps_the_matching_audio_slice(self, tmp_path):
         # 2 s clip: first second 440 Hz, second second 880 Hz. Trimming the back half

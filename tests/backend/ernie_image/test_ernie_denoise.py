@@ -75,11 +75,46 @@ def test_heun_progress_does_not_overrun_total_steps() -> None:
     assert states[-1].step == states[-1].total_steps == len(states)
 
 
-def test_heun_rejects_a_partial_denoise_range() -> None:
-    # Heun's `set_timesteps` takes only a step count, so it cannot honor a custom sigma window.
-    # Silently running a full denoise instead would be worse than refusing.
-    with pytest.raises(ValueError, match="denoising_start/denoising_end"):
-        _run(FlowMatchHeunDiscreteScheduler(), steps=8, denoising_start=0.5)
+def test_heun_honours_a_partial_denoise_range() -> None:
+    """A partial window must open at the requested sigma instead of being refused.
+
+    Heun's `set_timesteps` takes only a step count, so the driver rebuilds the schedule from the
+    window; refusing the request made every img2img, inpaint and Canvas pass with strength < 1 fail
+    on a scheduler ERNIE-Image offers. Running a full denoise instead would be worse than failing,
+    so pin the sigma the first model evaluation actually sees.
+    """
+    scheduler = FlowMatchHeunDiscreteScheduler()
+    states, sigmas, _ = _run(scheduler, steps=8, denoising_start=0.5)
+
+    scheduler_sigmas = scheduler.sigmas
+    assert scheduler_sigmas is not None
+    # Raw window start 0.5 with shift 1.0 -> 0.5. A full denoise would open at 1.0.
+    assert float(scheduler_sigmas[0]) == pytest.approx(0.5, abs=1e-6)
+    # `denoising_end` defaulted to 1.0, so the pass still ends on clean latents.
+    assert float(scheduler_sigmas[-1]) == pytest.approx(0.0, abs=1e-6)
+    # Heun evaluates the first sigma once and every later one twice, then keeps one terminal sigma
+    # for `step()` to read, so the rebuilt layout matches what `set_timesteps` would have built.
+    assert len(scheduler.timesteps) == 2 * (len(sigmas) - 1) - 1
+    assert len(scheduler_sigmas) == len(scheduler.timesteps) + 1
+    assert states[-1].step == states[-1].total_steps == len(states)
+
+
+@pytest.mark.parametrize(("denoising_end", "expected_terminal"), [(1.0, 0.0), (0.75, 0.5)])
+def test_heun_keeps_the_schedulers_own_shift_on_a_partial_range(denoising_end: float, expected_terminal: float) -> None:
+    """The rebuilt window must carry the scheduler's `shift`, mapped the way `set_timesteps` maps it.
+
+    With `shift=3`, the flow shift `3 * s / (1 + 2 * s)` turns the raw start 0.5 into 0.75 and a raw
+    end of 0.25 into 0.5. Splicing raw window values into the schedule instead would start a
+    shifted scheduler's partial pass at the wrong noise level, so both ends have to be checked --
+    `denoising_end=1.0` alone cannot catch it, because the shift maps 0 to 0.
+    """
+    scheduler = FlowMatchHeunDiscreteScheduler(shift=3.0)
+    _run(scheduler, steps=8, denoising_start=0.5, denoising_end=denoising_end)
+
+    scheduler_sigmas = scheduler.sigmas
+    assert scheduler_sigmas is not None
+    assert float(scheduler_sigmas[0]) == pytest.approx(0.75, abs=1e-6)
+    assert float(scheduler_sigmas[-1]) == pytest.approx(expected_terminal, abs=1e-6)
 
 
 @pytest.mark.parametrize("denoising_end", [1.0, 0.75, 0.5])

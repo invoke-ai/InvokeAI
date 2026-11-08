@@ -1,4 +1,8 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -10,6 +14,14 @@ import { getDocumentLayer } from '@workbench/canvas-engine/document/documentInde
 import { getSourceContentRect, isEmptyPolygonShape } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
+import { hasSpatialAdjustments, isPositionDependentAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import {
+  type AdjustmentRefusal,
+  adjustExactly,
+  adjustmentRefusal,
+  imageDataOf,
+  type SpatialRunner,
+} from '@workbench/canvas-engine/render/exactAdjustments';
 import { rasterizeSource } from '@workbench/canvas-engine/render/rasterizers';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
@@ -27,14 +39,17 @@ export type RasterizeLayerResult =
   | 'rasterized'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
   | LayerEditRefusal
-  | 'failed';
+  | 'failed'
+  | AdjustmentRefusal;
 
 export interface RasterizeLayerControllerOptions {
   readonly ctx: Pick<
     CanvasMutationContext,
-    'applyStep' | 'begin' | 'getDocument' | 'installPrepared' | 'preparePixels' | 'reserveRaster'
+    'applyStep' | 'begin' | 'getDocument' | 'getEditRevision' | 'installPrepared' | 'preparePixels' | 'reserveRaster'
   >;
   readonly backend: RasterBackend;
+  /** Evaluates spatial adjustment runs; without it a spatial stack refuses `error`. */
+  readonly runSpatial?: SpatialRunner;
   readonly rasterizeDeps: (document: CanvasDocumentContractV3) => RasterizeDeps;
 }
 
@@ -47,8 +62,14 @@ export class RasterizeLayerController {
   /**
    * Bakes the layer's source and transform into paint pixels as one undo step. Undo restores the parametric
    * contract, which rerasterizes from its source; redo reinstalls the baked pixels, never a rerender.
+   *
+   * A position-dependent stack (noise) or a spatial one (clarity, texture, dehaze) is baked too, all of it, on the
+   * layer-local render before the transform resamples it as the display does, and leaves the contract: kept, it would
+   * place its grain on, or measure its detail in, the baked pixel grid. A color-only stack stays on the contract and
+   * keeps applying to the baked pixels. A spatial bake runs in the worker; the result lands only if no edit landed
+   * meanwhile, and a stack that cannot run refuses.
    */
-  rasterize(layerId: string): RasterizeLayerResult {
+  async rasterize(layerId: string): Promise<RasterizeLayerResult> {
     const { ctx } = this.deps;
     if (this.disposed) {
       return 'not-ready';
@@ -72,6 +93,9 @@ export class RasterizeLayerController {
       return 'unsupported';
     }
     const contentRect = getSourceContentRect(layer, document);
+    const bakesAdjustments =
+      isPositionDependentAdjustments(layer.adjustments) || hasSpatialAdjustments(layer.adjustments);
+    const revision = ctx.getEditRevision();
     const matrix = bakeMatrix(layer.transform);
     const bakedRect = roundOut(transformBounds(matrix, contentRect));
     const txn = ctx.begin({ historyBytes: rgbaBytes(bakedRect) + HISTORY_ENTRY_OVERHEAD_BYTES });
@@ -85,6 +109,27 @@ export class RasterizeLayerController {
       }
       const scratch = this.deps.backend.createSurface(contentRect.width, contentRect.height);
       void rasterizeSource(source, this.deps.rasterizeDeps(document), scratch);
+      if (bakesAdjustments) {
+        // The render's own size: text resizes the scratch to its measured bounds. Its pixel (0,0) sits at the
+        // layer-local content origin, where the display's cache places it.
+        const { height, width } = scratch;
+        if (!txn.reserveRaster(width * height * 4)) {
+          return 'over-budget';
+        }
+        const imageData = scratch.ctx.getImageData(0, 0, width, height);
+        const adjusted = await adjustExactly(imageData, layer.adjustments, contentRect, { run: this.deps.runSpatial });
+        if (adjusted.status !== 'ok') {
+          return adjusted.status === 'aborted' ? 'not-ready' : adjustmentRefusal(document, layerId, adjusted.status);
+        }
+        if (this.disposed || !txn.isCurrent() || ctx.getEditRevision() !== revision) {
+          return 'not-ready';
+        }
+        scratch.ctx.putImageData(
+          adjusted.data === imageData.data ? imageData : imageDataOf(adjusted.data, width, height),
+          0,
+          0
+        );
+      }
       const baked = this.deps.backend.createSurface(bakedRect.width, bakedRect.height);
       baked.ctx.setTransform(1, 0, 0, 1, 0, 0);
       baked.ctx.clearRect(0, 0, bakedRect.width, bakedRect.height);
@@ -93,11 +138,14 @@ export class RasterizeLayerController {
       baked.ctx.drawImage(scratch.canvas, contentRect.x, contentRect.y);
       baked.ctx.setTransform(1, 0, 0, 1, 0, 0);
       const parametric = structuredClone(layer);
-      const paint: CanvasLayerContract = {
+      const paint: CanvasRasterLayerContractV2 = {
         ...parametric,
         source: { bitmap: null, offset: { x: bakedRect.x, y: bakedRect.y }, type: 'paint' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       };
+      if (bakesAdjustments) {
+        delete paint.adjustments;
+      }
       const status = layerOperationStatus(
         txn.publish('Rasterize layer', this.convertStep(layerId, paint, parametric, bakedRect, baked), {
           bytes: rgbaBytes(bakedRect) + HISTORY_ENTRY_OVERHEAD_BYTES,

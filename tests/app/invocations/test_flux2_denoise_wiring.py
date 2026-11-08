@@ -6,25 +6,31 @@ what those tests cannot see is the code that *calls* them. Each of these one-lin
 pass the whole suite:
 
 * dropping the ``time_shift_flux2`` call, so img2img runs the unshifted linear schedule again;
-* shifting unconditionally, which shifts txt2img twice (the scheduler already applies ``mu``);
+* leaving txt2img to a scheduler that shifts the schedule itself, after the clip: a txt2img pass
+  with ``denoising_end`` then stops at a different sigma than the img2img pass that continues it
+  starts at, and Heun ran a static shift of its own;
 * re-normalizing ``noise_packed`` before the inpaint extension is built, bringing back the half of
   the noise-scaling bug that lives in the unmasked region;
 * handing ``_prepare_normalized_start_latents`` a ``t_0`` from the unclipped schedule;
 * skipping the respacing of the clipped schedule, so img2img at low strength runs one or two steps
   instead of the requested number and the final Euler jump flattens the source image's detail.
 
-These tests drive the real ``_run_diffusion`` up to the transformer load and assert on what the
-wiring actually produced.
+These tests drive the real ``_run_diffusion`` up to the transformer load, or through the denoising loop
+with a stand-in transformer, and assert on what the wiring actually produced.
 """
 
+from contextlib import nullcontext
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from diffusers import FlowMatchHeunDiscreteScheduler
 
 import invokeai.app.invocations.flux2_denoise as flux2_denoise
 from invokeai.app.invocations.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
+from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_MAP, set_heun_timesteps_from_sigmas
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     get_schedule_flux2,
@@ -51,6 +57,19 @@ class _StopBeforeLoad(Exception):
     """Raised in place of entering the transformer's device context, to end _run_diffusion early."""
 
 
+class _RecordingTransformer(torch.nn.Module):
+    """Stands in for the FLUX.2 transformer: records the sigma of every evaluation, predicts zero."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sigmas: list[float] = []
+
+    def forward(self, hidden_states: torch.Tensor, timestep: torch.Tensor, **kwargs: Any) -> tuple[torch.Tensor]:
+        del kwargs
+        self.sigmas.append(float(timestep[0]))
+        return (torch.zeros_like(hidden_states),)
+
+
 def _bn_stats() -> tuple[torch.Tensor, torch.Tensor]:
     return (
         torch.full((PACKED_CHANNELS,), BN_MEAN_VALUE),
@@ -72,8 +91,13 @@ def _drive(
     with_mask: bool = False,
     scheduler: str = "euler",
     bn: bool = True,
+    transformer: torch.nn.Module | None = None,
 ):
-    """Run `_run_diffusion` far enough to build the schedule, start latents and inpaint extension."""
+    """Run `_run_diffusion` far enough to build the schedule, start latents and inpaint extension.
+
+    With a `transformer`, the run continues through the real denoising loop instead of stopping at the
+    transformer load.
+    """
     from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelFormat, ModelType
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
         ConditioningFieldData,
@@ -83,10 +107,21 @@ def _drive(
     noise = _latents(7)
     init_latents = _latents(8)
     mask = torch.full_like(noise, 0.5)
-    captured: dict = {"shift_calls": [], "start_kwargs": [], "inpaint": [], "redensify_calls": []}
+    captured: dict = {
+        "shift_calls": [],
+        "clip_calls": [],
+        "start_kwargs": [],
+        "inpaint": [],
+        "redensify_calls": [],
+        "denoise_kwargs": [],
+    }
 
     transformer_info = MagicMock()
-    transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+    if transformer is None:
+        transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+    else:
+        transformer_info.model = transformer
+        transformer_info.model_on_device = MagicMock(return_value=nullcontext((None, transformer)))
 
     context = MagicMock()
     context.models.load.return_value = transformer_info
@@ -128,12 +163,24 @@ def _drive(
         captured["shift_calls"].append((list(timesteps), mu))
         return real_shift(timesteps, mu)
 
+    real_clip = flux2_denoise.clip_timestep_schedule_fractional
+
+    def recording_clip(timesteps, denoising_start, denoising_end):
+        captured["clip_calls"].append(list(timesteps))
+        return real_clip(timesteps, denoising_start, denoising_end)
+
     real_redensify = flux2_denoise.redensify_schedule_flux2
 
     def recording_redensify(timesteps, num_steps, mu):
         result = real_redensify(timesteps, num_steps, mu)
         captured["redensify_calls"].append({"clipped": list(timesteps), "num_steps": num_steps, "result": result})
         return result
+
+    real_denoise = flux2_denoise.denoise
+
+    def recording_denoise(**kwargs):
+        captured["denoise_kwargs"].append(kwargs)
+        return real_denoise(**kwargs)
 
     real_prepare = Flux2DenoiseInvocation._prepare_normalized_start_latents
 
@@ -153,7 +200,9 @@ def _drive(
         patch.object(Flux2DenoiseInvocation, "_prepare_normalized_start_latents", recording_prepare),
         patch("invokeai.backend.util.devices.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
         patch.object(flux2_denoise, "time_shift_flux2", recording_shift),
+        patch.object(flux2_denoise, "clip_timestep_schedule_fractional", recording_clip),
         patch.object(flux2_denoise, "redensify_schedule_flux2", recording_redensify),
+        patch.object(flux2_denoise, "denoise", recording_denoise),
         patch.object(flux2_denoise, "RectifiedFlowInpaintExtension", _RecordingInpaintExtension),
     ):
         try:
@@ -168,42 +217,82 @@ def _drive(
     return captured
 
 
-def _expected_schedule(denoising_start: float, denoising_end: float = 1.0, shifted: bool = True) -> list[float]:
+def _expected_schedule(denoising_start: float, denoising_end: float = 1.0) -> list[float]:
     linear = get_schedule_flux2(num_steps=NUM_STEPS, image_seq_len=IMAGE_SEQ_LEN)
     mu = compute_empirical_mu(image_seq_len=IMAGE_SEQ_LEN, num_steps=NUM_STEPS)
-    timesteps = time_shift_flux2(linear, mu) if shifted else linear
-    clipped = clip_timestep_schedule_fractional(timesteps, denoising_start, denoising_end)
-    return redensify_schedule_flux2(clipped, NUM_STEPS, mu) if shifted else clipped
+    clipped = clip_timestep_schedule_fractional(time_shift_flux2(linear, mu), denoising_start, denoising_end)
+    return redensify_schedule_flux2(clipped, NUM_STEPS, mu)
 
 
-def test_txt2img_does_not_shift_the_schedule() -> None:
-    """The txt2img scheduler applies mu itself; shifting here too would shift twice."""
-    captured = _drive(denoising_start=0.0, with_init=False)
-
-    assert captured["shift_calls"] == []
-    assert captured["reached_transformer"]
-
-
-@pytest.mark.parametrize(("denoising_start", "with_mask"), [(0.5, False), (0.0, True)])
-def test_manual_euler_paths_shift_the_schedule_once(denoising_start: float, with_mask: bool) -> None:
-    """img2img and inpainting step the schedule themselves, so they must apply the shift."""
-    captured = _drive(denoising_start=denoising_start, with_mask=with_mask)
+@pytest.mark.parametrize(
+    ("denoising_start", "with_init", "with_mask", "scheduler"),
+    [
+        pytest.param(0.0, False, False, "euler", id="txt2img"),
+        pytest.param(0.0, False, False, "heun", id="txt2img-heun"),
+        pytest.param(0.5, True, False, "euler", id="img2img"),
+        pytest.param(0.0, True, True, "euler", id="inpaint"),
+        # Manual Euler also runs when the requested scheduler is unavailable (e.g. lcm without LCM
+        # support).
+        pytest.param(0.0, False, False, "not_a_real_scheduler", id="scheduler-fallback"),
+    ],
+)
+def test_every_path_shifts_the_full_schedule_once_before_clipping(
+    denoising_start: float, with_init: bool, with_mask: bool, scheduler: str
+) -> None:
+    captured = _drive(denoising_start=denoising_start, with_init=with_init, with_mask=with_mask, scheduler=scheduler)
 
     assert len(captured["shift_calls"]) == 1
-    shifted_timesteps, mu = captured["shift_calls"][0]
+    shifted_input, mu = captured["shift_calls"][0]
     assert mu == pytest.approx(compute_empirical_mu(image_seq_len=IMAGE_SEQ_LEN, num_steps=NUM_STEPS))
-    # Shifted before clipping, so the call still sees the full linear schedule.
-    assert shifted_timesteps == pytest.approx(get_schedule_flux2(num_steps=NUM_STEPS, image_seq_len=IMAGE_SEQ_LEN))
+    # Shifted before clipping, so the shift sees the full linear schedule and the clip its output.
+    assert shifted_input == pytest.approx(get_schedule_flux2(num_steps=NUM_STEPS, image_seq_len=IMAGE_SEQ_LEN))
+    assert captured["clip_calls"] == [time_shift_flux2(shifted_input, mu)]
 
 
-def test_a_scheduler_that_falls_back_to_manual_euler_still_shifts() -> None:
-    """Manual Euler also runs when the requested scheduler is unavailable (e.g. lcm without LCM support).
+@pytest.mark.parametrize(
+    "scheduler",
+    [
+        "euler",
+        "heun",
+        pytest.param(
+            "lcm", marks=pytest.mark.skipif("lcm" not in FLUX_SCHEDULER_MAP, reason="FlowMatchLCMScheduler unavailable")
+        ),
+    ],
+)
+def test_txt2img_schedulers_run_the_schedule_the_node_shifted(scheduler: str) -> None:
+    """The node shifts the schedule once. A scheduler that shifted it again, or built its own the way Heun
+    did with a static shift of 3, would evaluate the model elsewhere."""
+    transformer = _RecordingTransformer()
+    captured = _drive(with_init=False, scheduler=scheduler, transformer=transformer, bn=False)
 
-    Keying the shift on denoise_mask/denoising_start alone left that path on the unshifted schedule.
+    expected = _expected_schedule(denoising_start=0.0)
+    if scheduler == "heun":
+        reference = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+        set_heun_timesteps_from_sigmas(reference, expected[:-1], expected[-1], "cpu")
+        evaluated = (reference.timesteps / 1000).tolist()
+    else:
+        evaluated = expected[:-1]
+
+    (denoise_kwargs,) = captured["denoise_kwargs"]
+    assert (denoise_kwargs["scheduler"].timesteps / 1000).tolist() == pytest.approx(evaluated, abs=1e-6)
+    # The transformer runs in bfloat16, so the sigmas it saw are rounded to bfloat16.
+    assert transformer.sigmas == pytest.approx(evaluated, abs=4e-3)
+
+
+def test_a_pass_ending_at_denoising_end_stops_where_the_continuing_pass_starts() -> None:
+    """denoising_end and denoising_start meet at one sigma, so two chained passes split one schedule.
+
+    The txt2img pass used to clip the unshifted schedule and then append a terminal sigma of 0: it
+    finished the image instead of stopping, at a sigma the continuing img2img pass never assumed.
     """
-    captured = _drive(denoising_start=0.0, with_init=False, scheduler="not_a_real_scheduler")
+    split = 0.6
+    first = _drive(with_init=False, denoising_end=split, transformer=_RecordingTransformer(), bn=False)
+    second = _drive(denoising_start=split)
 
-    assert len(captured["shift_calls"]) == 1
+    (denoise_kwargs,) = first["denoise_kwargs"]
+    terminal_sigma = float(denoise_kwargs["scheduler"].sigmas[-1])
+    assert terminal_sigma == pytest.approx(1.0 - split)
+    assert terminal_sigma == pytest.approx(second["start_kwargs"][0]["t_0"])
 
 
 def test_start_latents_use_the_first_sigma_of_the_clipped_schedule() -> None:

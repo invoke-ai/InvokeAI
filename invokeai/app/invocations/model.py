@@ -118,6 +118,7 @@ class QwenVLEncoderField(BaseModel):
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: list[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class Qwen3EncoderField(BaseModel):
@@ -155,15 +156,19 @@ class PromptEnhancerField(BaseModel):
 
 
 class Qwen3VLEncoderField(BaseModel):
-    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+    """Field for the Qwen3-VL text encoder used by Krea-2 and Qwen-Image-2.1 models."""
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    vision_tower: ModelIdentifierField | None = Field(
+        default=None,
+        description="Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)",
+    )
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class Qwen35EncoderField(BaseModel):
-    """Field for the Qwen3.5 text encoder Anima-3.8B's semantic connector reads."""
+    """Field for a Qwen3.5 text encoder: the 4B Anima-3.8B's semantic connector reads, or MOSS-Image's 9B."""
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")

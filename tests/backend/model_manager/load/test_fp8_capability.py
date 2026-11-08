@@ -227,8 +227,10 @@ class TestEveryLoaderAnswersForItself:
         assert by_marker[Unimplemented] == [
             "flux/controlnet/checkpoint",
             "flux/controlnet/diffusers",
+            "flux2/controlnet/checkpoint",
             "minimax-h3/main/checkpoint",
             "minimax-h3/main/diffusers",
+            "qwen-image/controlnet/checkpoint",
             "z-image/controlnet/checkpoint",
         ]
 
@@ -279,7 +281,7 @@ class TestTheVerdict:
     def test_a_declared_loader_is_refused_with_its_own_reason(self) -> None:
         verdict = fp8_storage_verdict(BaseModelType.ZImage, ModelType.ControlNet, ModelFormat.Checkpoint)
         assert verdict.supported is False
-        assert verdict.reason is not None and "never cast" in verdict.reason
+        assert verdict.reason is not None and "Union and Tile 2.1" in verdict.reason
 
     def test_a_quantized_format_is_refused_although_its_loader_declares_nothing(self) -> None:
         """The rule the loaders do not have to repeat. `WanGGUFCheckpointModel` declares nothing and

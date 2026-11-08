@@ -99,15 +99,66 @@ _QWEN3_5_KEYS = {
     "layers.3.self_attn.q_proj.weight": [4, 4],
     "layers.3.self_attn.q_norm.weight": [4],
 }
+_PREFIXES = ["", "model.", "model.language_model.", "language_model."]
+
+
+def _whole_9b() -> dict[str, list[int]]:
+    """A complete Qwen3.5 9B at token extents: a tensor in each of its 32 decoder layers, and the final norm."""
+    layers = {f"layers.{index}.input_layernorm.weight": [4] for index in range(32)}
+    return {**_QWEN3_5_KEYS, **layers, "embed_tokens.weight": [4, 4096], "norm.weight": [4]}
+
+
+def _layer(key: str) -> int:
+    return int(key.split(".")[1]) if key.startswith("layers.") else -1
 
 
 class TestQwen35Encoder:
-    @pytest.mark.parametrize("prefix", ["", "model.", "model.language_model."])
+    @pytest.mark.parametrize("prefix", _PREFIXES)
     def test_qwen3_5_4b_is_identified(self, tmp_path: Path, prefix: str) -> None:
+        # Anima-3.8B's file has no final norm and only some layers here; the 4B needs neither.
         mod = _write(tmp_path / "q35.safetensors", {f"{prefix}{k}": s for k, s in _QWEN3_5_KEYS.items()})
         config = _identify(mod)
         assert isinstance(config, Qwen35Encoder_Checkpoint_Config)
         assert config.variant is Qwen35VariantType.Qwen35_4B
+
+    @pytest.mark.parametrize("prefix", _PREFIXES)
+    def test_a_whole_qwen3_5_9b_is_identified(self, tmp_path: Path, prefix: str) -> None:
+        mod = _write(tmp_path / "q35.safetensors", {f"{prefix}{k}": s for k, s in _whole_9b().items()})
+        config = _identify(mod)
+        assert isinstance(config, Qwen35Encoder_Checkpoint_Config)
+        assert config.variant is Qwen35VariantType.Qwen35_9B
+
+    def test_a_multimodal_export_is_a_qwen3_5_encoder_and_nothing_else(self, tmp_path: Path) -> None:
+        # MOSS-Image's 9B as ComfyUI exports it: a transformers `Qwen3_5Model` save, vision tower and final
+        # norm included -- which also has everything a Qwen3-VL encoder is recognized by.
+        keys = {f"language_model.{k}": s for k, s in _whole_9b().items()} | {
+            "visual.patch_embed.proj.weight": [4, 3, 2, 2, 2],
+            "visual.blocks.0.attn.qkv.weight": [4, 4],
+            "visual.merger.linear_fc1.weight": [4, 4],
+        }
+        config = _identify(_write(tmp_path / "qwen35_9b.safetensors", keys))
+        assert isinstance(config, Qwen35Encoder_Checkpoint_Config)
+        assert config.variant is Qwen35VariantType.Qwen35_9B
+
+    @pytest.mark.parametrize(
+        ("dropped", "reason"),
+        [
+            # MOSS-Image's `text_encoder/model-00001-of-00004.safetensors`: the embedding, layers 0-7, nothing else.
+            (lambda key: key == "norm.weight" or _layer(key) >= 8, "24 of its 32 decoder layers"),
+            (lambda key: key == "norm.weight", "final norm 'language_model.norm.weight'"),
+            (lambda key: _layer(key) == 31, "1 of its 32 decoder layers (first missing: 31)"),
+        ],
+        ids=["first shard", "no final norm", "no last layer"],
+    )
+    def test_part_of_a_9b_is_refused_not_installed(self, tmp_path: Path, dropped, reason: str) -> None:
+        keys = {f"language_model.{k}": s for k, s in _whole_9b().items() if not dropped(k)}
+        result = ModelConfigFactory.from_model_on_disk(_write(tmp_path / "shard.safetensors", keys), allow_unknown=True)
+        # Final, not "unknown": nothing is written to the database.
+        assert result.config is None
+        refusal = result.details[Qwen35Encoder_Checkpoint_Config.__name__]
+        assert isinstance(refusal, InvalidMatchError)
+        assert "one shard of a sharded" in str(refusal)
+        assert reason in str(refusal)
 
     def test_an_unknown_width_is_not_a_match(self, tmp_path: Path) -> None:
         keys = {**_QWEN3_5_KEYS, "embed_tokens.weight": [4, 1024]}

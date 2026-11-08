@@ -2643,6 +2643,99 @@ class TestBulkDownloadAccessControl:
         )
         assert r.status_code == status.HTTP_202_ACCEPTED
 
+    @staticmethod
+    def _download_zip_names(
+        client: TestClient, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path, token: str, board_id: str
+    ) -> set[str]:
+        """Request a board download, run the queued job, fetch the ZIP as the caller and list its images."""
+        import io
+        import zipfile
+
+        from fastapi import BackgroundTasks
+
+        queued: list[tuple[Any, tuple[Any, ...], dict[str, Any]]] = []
+        monkeypatch.setattr(
+            BackgroundTasks, "add_task", lambda _self, fn, *args, **kwargs: queued.append((fn, args, kwargs))
+        )
+
+        def image_path(image_name: str, thumbnail: bool = False) -> str:
+            path = tmp_path / image_name
+            path.write_bytes(image_name.encode())
+            return str(path)
+
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", image_path)
+
+        r = client.post("/api/v1/images/download", json={"board_id": board_id}, headers=_auth(token))
+        assert r.status_code == status.HTTP_202_ACCEPTED
+        fn, args, kwargs = queued.pop()
+        fn(*args, **kwargs)
+
+        r = client.get(f"/api/v1/images/download/{r.json()['bulk_download_item_name']}", headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        with zipfile.ZipFile(io.BytesIO(r.content)) as archive:
+            return {Path(name).name for name in archive.namelist()}
+
+    def test_uncategorized_download_contains_only_callers_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """Downloading "none" must not bundle another account's uncategorized images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-uncategorized-dl", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-dl", user2.user_id)
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, user2_token, "none")
+
+        assert names == {"user2-uncategorized-dl"}
+
+    def test_admin_uncategorized_download_contains_every_users_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        admin_token: str,
+        user1_token: str,
+        user2_token: str,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-uncategorized-admin-dl", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-admin-dl", user2.user_id)
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, admin_token, "none")
+
+        assert names == {"user1-uncategorized-admin-dl", "user2-uncategorized-admin-dl"}
+
+    def test_shared_board_download_contains_owners_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """Scoping uncategorized downloads must not filter a shared board down to the caller's own images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "Shared Contents DL Board")
+        _share_board(client, user1_token, board_id)
+        _save_image(mock_invoker, "user1-shared-board-dl", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-shared-board-dl")
+
+        names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, user2_token, board_id)
+
+        assert names == {"user1-shared-board-dl"}
+
     def test_bulk_download_events_carry_user_id(self):
         """BulkDownloadEventBase must carry user_id so events can be routed privately."""
         from invokeai.app.services.events.events_common import (
@@ -2687,8 +2780,7 @@ class TestBulkDownloadAccessControl:
         asyncio.run(socketio._handle_bulk_image_download_event(("bulk_download_complete", event)))
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "default" not in rooms_emitted_to
-        assert "user:owner-xyz" in rooms_emitted_to
+        assert set(rooms_emitted_to) == {"user:owner-xyz", "admin"}
 
 
 # ===========================================================================
@@ -2970,7 +3062,7 @@ class TestWebSocketAuth:
             assert payload["destination"] == "canvas"
 
         # A sanitized companion event must go to the queue_id room with sensitive fields cleared
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3041,7 +3133,7 @@ class TestWebSocketAuth:
             assert payload["origin"] == "workflows"
 
         # Sanitized event to queue room: user/batch/origin redacted, owner+admin skipped
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3097,7 +3189,9 @@ class TestWebSocketAuth:
 
         # CRITICAL: nothing identifying may reach the queue room. The only emit there is the
         # sanitized companion, which must not name any owner or any retried item.
-        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_room_payloads = [
+            c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"
+        ]
         assert len(queue_room_payloads) == 1
         assert queue_room_payloads[0]["retried_item_ids"] == []
         assert queue_room_payloads[0]["user_ids"] == []
@@ -3132,7 +3226,7 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
 
-        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
         payload = queue_emits[0].kwargs["data"]
         skip_sid = queue_emits[0].kwargs["skip_sid"]
@@ -3196,7 +3290,7 @@ class TestWebSocketAuth:
         assert owner_123_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 10, "item_id": 30}]
         assert owner_456_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 20, "item_id": 31}]
         assert len(admin_calls[0].kwargs["data"]["retried_items"]) == 2
-        sanitized_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "default"]
+        sanitized_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "queue:default"]
         assert sanitized_calls[0].kwargs["data"]["retried_items"] == []
 
     def test_queue_items_canceled_routed_privately_per_owner(self, socketio: Any) -> None:
@@ -3239,7 +3333,9 @@ class TestWebSocketAuth:
 
         # Nothing identifying may reach the queue room: the only emit there is the sanitized
         # companion, which must not name any owner or any canceled item.
-        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_room_payloads = [
+            c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"
+        ]
         assert len(queue_room_payloads) == 1
         assert queue_room_payloads[0]["canceled_item_ids"] == []
         assert queue_room_payloads[0]["user_ids"] == []
@@ -3271,7 +3367,7 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
 
-        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
         payload = queue_emits[0].kwargs["data"]
         skip_sid = queue_emits[0].kwargs["skip_sid"]
@@ -3341,7 +3437,7 @@ class TestWebSocketAuth:
         asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
 
         assert len(mock_emit.call_args_list) == 1
-        assert mock_emit.call_args_list[0].kwargs.get("room") == "default"
+        assert mock_emit.call_args_list[0].kwargs.get("room") == "queue:default"
         assert mock_emit.call_args_list[0].kwargs.get("data")["user_id"] is None
 
     def test_user_scoped_queue_cleared_routed_privately(self, socketio: Any) -> None:
@@ -3377,7 +3473,7 @@ class TestWebSocketAuth:
         assert private_emits[0][0]["user_id"] == "owner-xyz"
 
         # Sanitized companion goes to the queue room, skipping the owner's and admins' sids
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3421,7 +3517,7 @@ class TestWebSocketAuth:
         assert isinstance(room, list)
         assert set(room) == {"user:owner-recall", "admin"}
         # And never to the shared queue room, which would leak to other users.
-        assert "default" not in room
+        assert "queue:default" not in room
 
     def test_video_recall_is_emitted_once_to_the_owner_only(self, socketio: Any) -> None:
         """A video recall names the owner's media and no admin UI consumes it, so it goes to the

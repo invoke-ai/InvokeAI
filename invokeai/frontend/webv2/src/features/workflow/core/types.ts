@@ -272,6 +272,8 @@ export interface ProjectWorkflowSource {
   libraryWorkflowId: string;
   /** The template content revision loaded or last written; null when unknown (documents migrated from older schemas). */
   revision: number | null;
+  /** Stable owner metadata lets each account check write access against its current session. */
+  ownerUserId?: string;
 }
 
 /** The newest successful run's final output, owned by the project workflow that submitted it. */

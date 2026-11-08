@@ -1,12 +1,22 @@
+import type {
+  GalleryMediaUsageCheck,
+  GalleryMediaUsageReport,
+  GalleryMediaUsageSettledCheck,
+} from '@features/gallery/core/mediaUsage';
 import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
-import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, Checkbox, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
-import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
+import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
+import { galleryBoardMediaUsageQueryOptions } from '@features/gallery/data/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -23,6 +33,8 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
+import { GalleryMediaUsagePanel } from './GalleryMediaUsagePanel';
+import { getBoardCounts, getGalleryIntendedDestinationId } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -130,26 +142,21 @@ export const GalleryBoardMenu = ({
 
   const handleCancelDelete = useCallback(() => setDeleteTarget(null), []);
 
-  const handleDeleteBoardOnly = useCallback(() => {
-    if (deleteTarget) {
-      void actions.deleteBoard(deleteTarget.id, false);
-    }
+  const handleDelete = useCallback(
+    (includeMedia: boolean) => {
+      if (deleteTarget) {
+        void actions.deleteBoard(deleteTarget.id, includeMedia);
+      }
 
-    setDeleteTarget(null);
-  }, [actions, deleteTarget]);
-
-  const handleDeleteBoardAndImages = useCallback(() => {
-    if (deleteTarget) {
-      void actions.deleteBoard(deleteTarget.id, true);
-    }
-
-    setDeleteTarget(null);
-  }, [actions, deleteTarget]);
+      setDeleteTarget(null);
+    },
+    [actions, deleteTarget]
+  );
 
   return (
     <>
       <Menu.Root
-        key={board ? board.id : 'closed'}
+        key={board ? `menu:${board.id}` : 'menu:closed'}
         lazyMount
         open={target !== null}
         positioning={positioning}
@@ -172,9 +179,13 @@ export const GalleryBoardMenu = ({
                     <Menu.Separator />
                   </>
                 )}
-                {board.id === gallery.settings.autoAddBoardId ? (
-                  <BoardAutoAddMenuItem boardId={GALLERY_AUTO_ADD_FOLLOW} label={t('widgets.gallery.stopAutoAdd')} />
-                ) : board.kind !== 'date' && !board.archived && canOnBoard(board, 'add_media') ? (
+                {!gallery.settings.followSelectedBoard && board.id === gallery.settings.autoAddBoardId ? (
+                  // Back to the default destination; the default itself has nothing to stop.
+                  <BoardAutoAddMenuItem boardId={null} label={t('widgets.gallery.stopAutoAdd')} />
+                ) : (gallery.settings.followSelectedBoard || board.id !== getGalleryIntendedDestinationId(gallery)) &&
+                  board.kind !== 'date' &&
+                  !board.archived &&
+                  canOnBoard(board, 'add_media') ? (
                   <BoardAutoAddMenuItem boardId={board.id} label={t('widgets.gallery.autoAddToBoard')} />
                 ) : null}
                 <BoardDownloadMenuItem board={board} />
@@ -234,46 +245,260 @@ export const GalleryBoardMenu = ({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-      <Dialog.Root open={deleteTarget !== null} role="alertdialog" onOpenChange={handleDeleteDialogOpenChange}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content>
-              <Dialog.Header>
-                <Dialog.Title>
-                  {t('widgets.gallery.deleteBoardQuestion', { name: deleteTarget?.name ?? '' })}
-                </Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Stack gap="2">
-                  <Text color="fg.subtle" fontSize="md">
-                    {t('widgets.gallery.deleteBoardDescription')}
-                  </Text>
-                  <Text color="fg.subtle" fontSize="xs">
-                    {t('widgets.gallery.boardItemCounts', {
-                      assets: t('widgets.gallery.assetCount', { count: deleteTarget?.assetCount ?? 0 }),
-                      images: t('widgets.gallery.imageCount', { count: deleteTarget?.imageCount ?? 0 }),
-                      videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
-                    })}
-                  </Text>
-                </Stack>
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Button variant="ghost" onClick={handleCancelDelete}>
-                  {t('common.cancel')}
-                </Button>
-                <Button colorPalette="red" variant="outline" onClick={handleDeleteBoardOnly}>
-                  {t('widgets.gallery.deleteBoardOnly')}
-                </Button>
-                <Button colorPalette="red" onClick={handleDeleteBoardAndImages}>
-                  {t('widgets.gallery.deleteBoardAndMedia')}
-                </Button>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+      <BoardDeleteDialog
+        board={deleteTarget}
+        getMediaUsage={actions.getBoardMediaUsage}
+        onCancel={handleCancelDelete}
+        onDelete={handleDelete}
+        onOpenChange={handleDeleteDialogOpenChange}
+      />
     </>
+  );
+};
+
+/** From this many items, also deleting them needs the board's name typed, not only a tick. */
+export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
+
+/**
+ * Deleting a board keeps its media by default: it moves to Uncategorized in the Library, where the server puts what a
+ * deleted board held. Deleting the media too is the opt-in, behind a checkbox and, for many items, the typed name.
+ */
+const BoardDeleteDialog = ({
+  board,
+  getMediaUsage,
+  onCancel,
+  onDelete,
+  onOpenChange,
+}: {
+  board: GalleryBoard | null;
+  /** Where the board's media is still used, checked once deleting it is ticked. */
+  getMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
+  onCancel: () => void;
+  onDelete: (includeMedia: boolean) => void;
+  onOpenChange: (event: { open: boolean }) => void;
+}) => {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  // The board and the choices stay shown while the dialog animates out; the choices belong to one opening and start
+  // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
+  const [shownBoard, setShownBoard] = useState(board);
+  const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
+  // `hasTyped`: the user has typed into the name field this opening, which then stays (see `needsTypedName`).
+  const [choices, setChoices] = useState({ hasTyped: false, includeMedia: false, typedName: '' });
+  // Each opening asks where the media is used afresh; ticking and unticking within one opening does not.
+  const [opening, setOpening] = useState(0);
+  if (board !== null && board !== shownBoard) {
+    setShownBoard(board);
+  }
+  if ((board?.id ?? null) !== openedBoardId) {
+    setOpenedBoardId(board?.id ?? null);
+    if (board !== null) {
+      setChoices({ hasTyped: false, includeMedia: false, typedName: '' });
+      setOpening((current) => current + 1);
+    }
+  }
+  const { hasTyped, includeMedia, typedName } = choices;
+  const isOpen = board !== null;
+  const checksUsage = includeMedia && shownBoard !== null;
+  const boardId = shownBoard?.id ?? '';
+  const owner = captureAccountScope();
+  // An opening's check lives under its own key while the dialog is open. However the dialog closes (Cancel, Escape,
+  // Delete, or the board revoked or deleted elsewhere), the observer leaves that key, and Query stops a check still
+  // running there (its server call and project reads) and drops it.
+  const usageOptions = useMemo(
+    () => galleryBoardMediaUsageQueryOptions({ boardId, load: getMediaUsage, opening: isOpen ? opening : null, owner }),
+    [boardId, getMediaUsage, isOpen, opening, owner]
+  );
+  const { queryKey: usageQueryKey } = usageOptions;
+  const usageQuery = useQuery({ ...usageOptions, enabled: isOpen && checksUsage });
+  const { data: usageReport, isFetching: isCheckingUsage, refetch: refetchUsage, status: usageStatus } = usageQuery;
+  // The opening's last answer, kept while the box is unticked and as the dialog closes, so neither the report nor the
+  // counts it gives come and go.
+  const [keptAnswer, setKeptAnswer] = useState<{ check: GalleryMediaUsageSettledCheck; opening: number } | null>(null);
+  const answer: GalleryMediaUsageSettledCheck | null =
+    usageStatus === 'success' && usageReport
+      ? { report: usageReport, status: 'ready' }
+      : usageStatus === 'error'
+        ? { status: 'failed' }
+        : null;
+  const keptCheck = keptAnswer?.opening === opening ? keptAnswer.check : null;
+  if (
+    isOpen &&
+    answer &&
+    (answer.status === 'ready'
+      ? keptCheck?.status !== 'ready' || keptCheck.report !== answer.report
+      : keptCheck?.status !== 'failed')
+  ) {
+    setKeptAnswer({ check: answer, opening });
+  }
+  // Unticking stops a check still running too; it reverts, so ticking again asks again. An answer stays for the opening.
+  const cancelUsageCheck = useCallback(
+    () => void queryClient.cancelQueries({ exact: true, queryKey: usageQueryKey }),
+    [queryClient, usageQueryKey]
+  );
+  const usageCheck = useMemo<GalleryMediaUsageCheck | null>(() => {
+    if (!checksUsage) {
+      return null;
+    }
+
+    // A retry keeps the last answer on screen while it runs.
+    return isCheckingUsage || !keptCheck ? { previous: keptCheck ?? undefined, status: 'checking' } : keptCheck;
+  }, [checksUsage, isCheckingUsage, keptCheck]);
+  // A closing dialog's Retry stays in place, disabled: running it would ask on the closed key, which nothing stops.
+  const handleRetryUsage = useCallback(() => {
+    if (isOpen) {
+      void refetchUsage();
+    }
+  }, [isOpen, refetchUsage]);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const mediaHintId = useId();
+  const nameInputId = useId();
+  const boardName = shownBoard ? getGalleryBoardLabel(shownBoard, t) : '';
+  const counts = shownBoard ? getBoardCounts(shownBoard) : null;
+  const itemCount = counts?.items ?? 0;
+  const media = formatGalleryMediaCounts(t, {
+    images: counts?.images ?? 0,
+    uploads: counts?.uploads ?? 0,
+    videos: counts?.videos ?? 0,
+  });
+  // Deleting the media takes what the check counted, once it has: on a shared board only the caller's own items, while
+  // the board's counts include everyone's; the rest moves to Uncategorized, as when the media is kept. An administrator
+  // overriding takes everything, so a lower count there is only a board count gone stale.
+  const keptReport = keptCheck?.status === 'ready' ? keptCheck.report : undefined;
+  const deletedCount = keptReport?.checkedCount ?? itemCount;
+  const deletesOwnMedia = deletedCount < itemCount && shownBoard?.access?.adminOverride !== true;
+  const deletesNoMedia = deletesOwnMedia && deletedCount === 0;
+  const deletedMedia =
+    deletedCount === itemCount || !keptReport
+      ? media
+      : t(keptReport.onlyImages ? 'widgets.gallery.imageCount' : 'widgets.gallery.deleteInUse.itemCount', {
+          count: deletedCount,
+        });
+  const includeMediaLabel = deletesNoMedia
+    ? t('widgets.gallery.deleteBoardIncludeOwnMediaNone')
+    : t(deletesOwnMedia ? 'widgets.gallery.deleteBoardIncludeOwnMedia' : 'widgets.gallery.deleteBoardIncludeMedia', {
+        count: deletedCount,
+      });
+  const withMediaDescription = deletesNoMedia
+    ? t('widgets.gallery.deleteBoardWithNoOwnMediaDescription')
+    : t(
+        deletesOwnMedia
+          ? 'widgets.gallery.deleteBoardWithOwnMediaDescription'
+          : 'widgets.gallery.deleteBoardWithMediaDescription',
+        { count: deletedCount, media: deletedMedia }
+      );
+  const deleteLabel =
+    !includeMedia || deletesNoMedia
+      ? t('widgets.gallery.deleteBoard')
+      : t(deletesOwnMedia ? 'widgets.gallery.deleteBoardAndOwnMedia' : 'widgets.gallery.deleteBoardAndMedia', {
+          count: deletedCount,
+        });
+  // The board's count until the check answers, then what deleting the media actually takes. Once the user has typed
+  // into the field this opening it stays, with its requirement: an answer arriving mid-typing never takes their text.
+  const needsTypedName = includeMedia && (hasTyped || deletedCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS);
+  const canDelete = !needsTypedName || typedName.trim() === boardName.trim();
+  const handleIncludeMediaChange = useCallback(
+    (details: { checked: boolean | 'indeterminate' }) => {
+      if (details.checked !== true) {
+        cancelUsageCheck();
+      }
+      setChoices((current) => ({ ...current, includeMedia: details.checked === true }));
+    },
+    [cancelUsageCheck]
+  );
+  const handleTypedNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const typed = event.currentTarget.value;
+
+    setChoices((current) => ({ ...current, hasTyped: current.hasTyped || typed !== '', typedName: typed }));
+  }, []);
+  const getInitialFocus = useCallback(() => cancelRef.current, []);
+  // With none of the media the caller's, nothing is asked to be deleted: the board goes, and its notices say only that.
+  const deletesMedia = includeMedia && !deletesNoMedia;
+  const handleConfirm = useCallback(() => onDelete(deletesMedia), [deletesMedia, onDelete]);
+
+  return (
+    // Cancel takes focus, not the checkbox that would delete the media.
+    // Top-anchored: the usage report arrives after the dialog opens, and grows it downward instead of moving it.
+    <Dialog.Root
+      initialFocusEl={getInitialFocus}
+      open={board !== null}
+      placement="top"
+      role="alertdialog"
+      onOpenChange={onOpenChange}
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>{t('widgets.gallery.deleteBoardQuestion', { name: boardName })}</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap="3">
+                <Dialog.Description color="fg" fontSize="md" lineHeight="inherit">
+                  {itemCount === 0
+                    ? t('widgets.gallery.deleteBoardEmptyDescription')
+                    : includeMedia
+                      ? withMediaDescription
+                      : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
+                </Dialog.Description>
+                {itemCount > 0 ? (
+                  <Stack gap="1">
+                    <Checkbox.Root
+                      checked={includeMedia}
+                      colorPalette="red"
+                      size="sm"
+                      onCheckedChange={handleIncludeMediaChange}
+                    >
+                      <Checkbox.HiddenInput aria-describedby={mediaHintId} />
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                      <Checkbox.Label fontSize="md">{includeMediaLabel}</Checkbox.Label>
+                    </Checkbox.Root>
+                    <Text color="fg.muted" fontSize="sm" id={mediaHintId} ps="5">
+                      {t('widgets.gallery.deleteBoardIncludeMediaHint')}
+                    </Text>
+                  </Stack>
+                ) : null}
+                {itemCount > 0 && usageCheck ? (
+                  <GalleryMediaUsagePanel
+                    // Once the answer says none of the media is the caller's, nothing goes and there is no use to
+                    // report: the panel only reads out the description that changed with it.
+                    announcement={deletesNoMedia ? withMediaDescription : undefined}
+                    check={usageCheck}
+                    isRetryDisabled={!isOpen}
+                    onRetry={handleRetryUsage}
+                  />
+                ) : null}
+                {needsTypedName ? (
+                  <Stack gap="1">
+                    <chakra.label fontSize="md" htmlFor={nameInputId}>
+                      {t('widgets.gallery.deleteBoardTypeName', { name: boardName })}
+                    </chakra.label>
+                    <Input
+                      autoComplete="off"
+                      id={nameInputId}
+                      spellCheck={false}
+                      value={typedName}
+                      onChange={handleTypedNameChange}
+                    />
+                  </Stack>
+                ) : null}
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button ref={cancelRef} variant="ghost" onClick={onCancel}>
+                {t('common.cancel')}
+              </Button>
+              <Button colorPalette="red" disabled={!canDelete} onClick={handleConfirm}>
+                {deleteLabel}
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 };
 
@@ -301,8 +526,8 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
 
 /**
- * Where a board can go: the Library, the open project, then the account's other projects by name — every tier
- * but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
+ * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects
+ * by name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
  */
 const BoardMoveSubMenu = ({
   board,
@@ -321,20 +546,17 @@ const BoardMoveSubMenu = ({
     },
     [actions, onBoardMoved]
   );
-  const destinations = useMemo(() => {
+  const projects = useMemo(() => {
     const others = [...projectNames]
       .filter(([id]) => id !== projectId && id !== board.projectId)
       .map(([id, name]) => ({ id, label: name }))
       .sort((left, right) => left.label.localeCompare(right.label));
 
-    return [
-      ...(board.projectId !== null ? [{ id: null, label: t('widgets.gallery.boardGroups.library') }] : []),
-      ...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []),
-      ...others,
-    ];
-  }, [board.projectId, projectId, projectName, projectNames, t]);
+    return [...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []), ...others];
+  }, [board.projectId, projectId, projectName, projectNames]);
+  const canMoveToLibrary = board.projectId !== null;
 
-  if (destinations.length === 0) {
+  if (!canMoveToLibrary && projects.length === 0) {
     return null;
   }
 
@@ -351,17 +573,31 @@ const BoardMoveSubMenu = ({
       </Menu.TriggerItem>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
-            {destinations.map((destination) => (
+          <ScrollableMenuContent minW="12rem">
+            {canMoveToLibrary ? (
               <BoardMoveMenuItem
-                key={destination.id ?? 'library'}
                 boardId={board.id}
-                destinationId={destination.id}
-                label={destination.label}
+                destinationId={null}
+                label={t('widgets.gallery.boardGroups.library')}
                 onMove={handleMove}
               />
-            ))}
-          </MenuContent>
+            ) : null}
+            {canMoveToLibrary && projects.length > 0 ? <Menu.Separator /> : null}
+            {projects.length > 0 ? (
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>{t('widgets.gallery.boardGroups.projects')}</Menu.ItemGroupLabel>
+                {projects.map((destination) => (
+                  <BoardMoveMenuItem
+                    key={destination.id}
+                    boardId={board.id}
+                    destinationId={destination.id}
+                    label={destination.label}
+                    onMove={handleMove}
+                  />
+                ))}
+              </Menu.ItemGroup>
+            ) : null}
+          </ScrollableMenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>
@@ -391,10 +627,13 @@ const BoardMoveMenuItem = ({
   );
 };
 
-/** Sets the auto-add board; `follow` hands results back to the selected board. */
-const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string; label: string }) => {
+/** Fixes where new results go, which stops following the selected board; null returns them to the default. */
+const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string | null; label: string }) => {
   const { actions } = useGalleryWidget();
-  const handleClick = useCallback(() => actions.updateSettings({ autoAddBoardId: boardId }), [actions, boardId]);
+  const handleClick = useCallback(
+    () => actions.updateSettings({ autoAddBoardId: boardId, followSelectedBoard: false }),
+    [actions, boardId]
+  );
 
   return <BoardMenuItem icon={SquareArrowDownIcon} label={label} value="auto-add-board" onClick={handleClick} />;
 };
@@ -407,7 +646,11 @@ const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })}
+      label={
+        board.videoCount > 0
+          ? t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })
+          : t('widgets.gallery.downloadBoard')
+      }
       value="download-board"
       onClick={handleClick}
     />

@@ -1,18 +1,32 @@
 import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
+import type { GroupSurfaceResult } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
+import { roundOut } from '@workbench/canvas-engine/math/rect';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
+import { applyAdjustments, toSpatialPlan } from '@workbench/canvas-engine/render/adjustments';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
+import { createDerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
-import { planBaseRasterComposite, renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
-import { describe, expect, it } from 'vitest';
+import {
+  getCompositeLayerBounds,
+  planBaseRasterComposite,
+  renderRasterComposite,
+} from '@workbench/canvas-engine/render/rasterComposite';
+import { evaluateSpatialSteps } from '@workbench/canvas-engine/render/spatial/evaluateSpatialSteps';
+import {
+  createSpatialAdjustmentService,
+  type SpatialAdjustmentService,
+} from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const WIDTH = 64;
 const HEIGHT = 64;
@@ -37,6 +51,30 @@ const gammaStack = (id: string): CanvasAdjustmentsContract => [
   { gamma: 2, id, inBlack: 0, inWhite: 255, isEnabled: true, outBlack: 0, outWhite: 255, type: 'levels' },
 ];
 const invertStack = (id: string): CanvasAdjustmentsContract => [{ id, isEnabled: true, type: 'invert' }];
+/** Color grain: position dependent, so any misplaced origin shows as a different pattern. */
+const noiseStack = (id: string): CanvasAdjustmentsContract => [
+  {
+    amount: 0.2,
+    distribution: 'gaussian',
+    id,
+    isEnabled: true,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
+    seed: 4242,
+    type: 'noise',
+  },
+];
+/** Members drawn from their raw caches, which are always final. */
+const RAW_MEMBERS = () => ({ state: 'exact' as const, surface: null });
+
+const worstDifference = (a: Uint8ClampedArray, b: Uint8ClampedArray): number => {
+  let worst = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    worst = Math.max(worst, Math.abs(a[i]! - b[i]!));
+  }
+  return worst;
+};
 
 const sceneFor = (fills: Record<string, string>) => {
   const backend = createDomRasterBackend();
@@ -119,7 +157,7 @@ describe('group adjustment composite', () => {
     const scene = sceneFor({ red: '#ff4040', under: '#2040c0', white: '#c0c0c0' });
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -145,6 +183,32 @@ describe('group adjustment composite', () => {
     expect(centerPixel(again)).toEqual(screenPx);
   });
 
+  it('places group noise in document pixels identically on screen and in export', async () => {
+    // The member's translation moves the group surface off the document origin, so its slot rect matters.
+    const document = docWith([
+      groupContract('g', [raster('gray', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 7, y: 5 } })], {
+        adjustments: noiseStack('gn'),
+      }),
+    ]);
+    const scene = sceneFor({ gray: '#808080' });
+    const groupSurfaces = createGroupSurfaceCache({
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      getAdjustedSurface: RAW_MEMBERS,
+      getCacheEntry: (id) => scene.caches.get(id),
+    });
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    compositeDocument(screen, document, scene.caches, identity(), {
+      backend: scene.backend,
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
+    });
+    const exported = await renderRasterComposite(planBaseRasterComposite(document, BBOX), scene);
+
+    const screenPixels = screen.ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+    expect(new Set(screenPixels.filter((_, i) => i % 4 === 0)).size).toBeGreaterThan(20);
+    expect(worstDifference(screenPixels, exported.ctx.getImageData(0, 0, WIDTH, HEIGHT).data)).toBeLessThanOrEqual(1);
+  });
+
   it('resolves sibling scopes nested inside a parent scope with correct member indexing', async () => {
     // Outer gamma-2 maps inverted `a` from 64 to about 221 and plain `b` to about 128; `d` does not cover center.
     const document = docWith([
@@ -165,7 +229,7 @@ describe('group adjustment composite', () => {
 
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -182,7 +246,7 @@ describe('group adjustment composite', () => {
     const scene = sceneFor({ gray: '#404040' });
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -213,7 +277,7 @@ describe('group adjustment composite', () => {
 
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -249,7 +313,7 @@ describe('group adjustment composite', () => {
 
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => nestedScene.backend.createSurface(w, h),
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => nestedScene.caches.damageSince(id, version),
       getCacheEntry: (id) => nestedScene.caches.get(id),
     });
@@ -273,7 +337,7 @@ describe('group adjustment composite', () => {
         builds += 1;
         return scene.backend.createSurface(w, h);
       },
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -304,7 +368,7 @@ describe('group adjustment composite', () => {
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       diagnostics,
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const docAt = (x: number) =>
@@ -391,7 +455,7 @@ describe('group-scoped previews and partial refresh', () => {
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       damageSince: (id, version) => scene.caches.damageSince(id, version),
       diagnostics,
-      getAdjustedSurface: () => null,
+      getAdjustedSurface: RAW_MEMBERS,
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const memberNode = raster('member', member);
@@ -474,6 +538,7 @@ describe('group-scoped previews and partial refresh', () => {
     ],
     ['an inverted group', { group: { adjustments: invertStack('ga'), opacity: 0.5 } }],
     ['a group with levels', { group: { adjustments: gammaStack('ga') } }],
+    ['a group with noise', { group: { adjustments: noiseStack('gn') } }],
     ['a member inside a nested group', { nested: true }],
   ])('refreshes a damaged region of %s to the same pixels as a full rebuild', (_, options) => {
     const refreshed = groupedScene(options);
@@ -577,7 +642,7 @@ describe('layer adjustments in export', () => {
     ]);
   });
 
-  it('adjusts a downscaled layer after resampling, so the work never exceeds the output', async () => {
+  it('adjusts a downscaled color-only layer after resampling, so the work never exceeds the output', async () => {
     const { scene } = adjustedScene();
     const shrunk = docWith([
       raster('graded', {
@@ -603,6 +668,43 @@ describe('layer adjustments in export', () => {
       [2, 2],
     ]);
   });
+
+  // Each output samples more layer pixels than it holds, where a color-only stack would adjust the output instead.
+  it.each<[string, CanvasRasterLayerContractV2['transform'], Rect | null]>([
+    ['downscaled', { rotation: 0, scaleX: 0.5, scaleY: 0.5, x: 4, y: 3 }, { height: 10, width: 12, x: 10, y: 8 }],
+    // Framed on the whole layer: a rotated draw of a cropped region antialiases its cut edges.
+    ['rotated and downscaled', { rotation: Math.PI / 7, scaleX: 0.5, scaleY: 0.6, x: 20, y: 4 }, null],
+  ])(
+    'exports a %s noisy layer as the display shows it: grain added layer-local, then resampled',
+    async (_, transform, frame) => {
+      const scene = sceneFor({});
+      scene.caches.growToRect('grain', { height: 48, width: 48, x: 0, y: 0 });
+      const ctx = scene.caches.get('grain')!.surface.ctx;
+      for (let x = 0; x < 48; x += 1) {
+        ctx.fillStyle = `rgb(${64 + x * 2}, 128, ${192 - x * 2})`;
+        ctx.fillRect(x, 0, 1, 48);
+      }
+      scene.caches.publishPixels('grain');
+      const layer = raster('grain', { adjustments: noiseStack('gn'), transform });
+      const document = docWith([layer]);
+      const adjusted = createAdjustedSurfaceCache(scene.backend);
+      const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+      compositeDocument(screen, document, scene.caches, identity(), {
+        adjustedSurface: (_layer, entry) => adjusted.get(layer.id, entry, layer.adjustments),
+        backend: scene.backend,
+      });
+      const bbox = frame ?? roundOut(getCompositeLayerBounds(planBaseRasterComposite(document, BBOX).layers)!);
+
+      const exported = await renderRasterComposite(planBaseRasterComposite(document, bbox), scene);
+
+      expect(
+        worstDifference(
+          exported.ctx.getImageData(0, 0, bbox.width, bbox.height).data,
+          screen.ctx.getImageData(bbox.x, bbox.y, bbox.width, bbox.height).data
+        )
+      ).toBeLessThanOrEqual(1);
+    }
+  );
 
   it("draws the display's adjusted copy instead of adjusting again", async () => {
     const { document, layer, scene } = adjustedScene();
@@ -636,5 +738,331 @@ describe('layer adjustments in export', () => {
     expect([...exported.ctx.getImageData(0, 0, WIDTH, HEIGHT).data]).toEqual([
       ...screen.ctx.getImageData(0, 0, WIDTH, HEIGHT).data,
     ]);
+  });
+});
+
+describe('spatial group display', () => {
+  const MEMBER: Rect = { height: 30, width: 40, x: 0, y: 0 };
+  const AT = { x: 9, y: 7 };
+  const translated = { rotation: 0, scaleX: 1, scaleY: 1, ...AT };
+  const services: SpatialAdjustmentService[] = [];
+  afterEach(() => {
+    for (const service of services.splice(0)) {
+      service.dispose();
+    }
+  });
+
+  /** A gradient member with a transparent border and a dark block, so the kernels have edges and a sub-domain. */
+  const spatialScene = () => {
+    const scene = sceneFor({});
+    scene.caches.growToRect('m', MEMBER);
+    const ctx = scene.caches.get('m')!.surface.ctx;
+    const gradient = ctx.createLinearGradient(0, 0, MEMBER.width, MEMBER.height);
+    gradient.addColorStop(0, '#1d4ed8');
+    gradient.addColorStop(0.5, '#e2e8f0');
+    gradient.addColorStop(1, '#f59e0b');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(3, 2, MEMBER.width - 7, MEMBER.height - 5);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(14, 9, 10, 8);
+    scene.caches.publishPixels('m');
+    const budget = new RasterMemoryBudgetController({ budgetBytes: 64 * 1024 * 1024 });
+    const service = createSpatialAdjustmentService({
+      reserve: (bytes) => budget.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
+    });
+    services.push(service);
+    return { scene, service };
+  };
+
+  const pixelsOf = (surface: RasterSurface): Uint8ClampedArray =>
+    surface.ctx.getImageData(0, 0, surface.width, surface.height).data;
+
+  /** Writes pixels through a canvas and reads them back, rounding like the display. */
+  const roundTrip = (
+    backend: ReturnType<typeof createDomRasterBackend>,
+    pixels: Uint8ClampedArray,
+    width: number,
+    height: number
+  ) => {
+    const scratch = backend.createSurface(width, height);
+    const image = scratch.ctx.createImageData(width, height);
+    image.data.set(pixels);
+    scratch.ctx.putImageData(image, 0, 0);
+    return scratch;
+  };
+
+  /** The whole stack on the main thread, per-pixel runs at `origin`. */
+  const evaluateStack = (
+    pixels: Uint8ClampedArray,
+    width: number,
+    height: number,
+    stack: CanvasAdjustmentsContract,
+    origin = { x: 0, y: 0 }
+  ): Uint8ClampedArray => {
+    const out = pixels.slice();
+    for (const run of toSpatialPlan(stack)) {
+      if (run.kind === 'per-pixel') {
+        applyAdjustments({ data: out, height, width }, run.adjustments, origin);
+      } else {
+        expect(evaluateSpatialSteps(out, width, height, run.steps)).toEqual({ status: 'ok' });
+      }
+    }
+    return out;
+  };
+
+  /** The member's raw pixels placed on a transparent document-sized buffer: a larger domain than the group's. */
+  const memberOnDocument = (
+    scene: ReturnType<typeof sceneFor>,
+    member: RasterSurface = scene.caches.get('m')!.surface
+  ) => {
+    const document = scene.backend.createSurface(WIDTH, HEIGHT);
+    document.ctx.drawImage(member.canvas, AT.x, AT.y);
+    return document;
+  };
+
+  /** Composites until `done` holds, as frames would while results land; the content debounce runs in real time. */
+  const settle = async (composite: () => void, done: () => boolean) => {
+    await vi.waitFor(
+      () => {
+        composite();
+        expect(done()).toBe(true);
+      },
+      { interval: 20, timeout: 10_000 }
+    );
+  };
+
+  it('settles to the stack evaluated on the raw composite, independent of the buffer holding it', async () => {
+    // Per-pixel runs on both sides of the spatial step; noise places its grain by document pixel.
+    const stack: CanvasAdjustmentsContract = [
+      { brightness: 0.1, contrast: 0.05, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
+      { amount: 70, id: 'clarity', isEnabled: true, size: 12, type: 'clarity' },
+      ...noiseStack('grain'),
+    ];
+    const { scene, service } = spatialScene();
+    const document = docWith([groupContract('g', [raster('m', { transform: translated })], { adjustments: stack })]);
+    const results = new Map<string, GroupSurfaceResult | null>();
+    const groupSurfaces = createGroupSurfaceCache({
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      getAdjustedSurface: RAW_MEMBERS,
+      getCacheEntry: (id) => scene.caches.get(id),
+      spatial: { run: (request) => service.run(request) },
+    });
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    const composite = () => {
+      screen.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      compositeDocument(screen, document, scene.caches, identity(), {
+        backend: scene.backend,
+        groupSurface: (scope, members, matrices, content) => {
+          const result = groupSurfaces.get(scope, members, matrices, content);
+          results.set(scope.id, result);
+          return result;
+        },
+      });
+    };
+
+    composite();
+    expect(results.get('g')).toMatchObject({ rect: { height: 30, width: 40, ...AT }, state: 'pending' });
+    await settle(composite, () => results.get('g')?.state === 'exact');
+
+    const raw = pixelsOf(memberOnDocument(scene));
+    const expected = pixelsOf(roundTrip(scene.backend, evaluateStack(raw, WIDTH, HEIGHT, stack), WIDTH, HEIGHT));
+    expect(worstDifference(pixelsOf(screen), expected)).toBe(0);
+    // The spatial step changed pixels, so the comparison above tells it apart from the per-pixel interim.
+    const perPixel = evaluateStack(
+      raw,
+      WIDTH,
+      HEIGHT,
+      stack.filter((entry) => entry.type !== 'clarity')
+    );
+    expect(worstDifference(expected, pixelsOf(roundTrip(scene.backend, perPixel, WIDTH, HEIGHT)))).toBeGreaterThan(0);
+  });
+
+  it("repaints a group when a member's spatial result lands", async () => {
+    const memberStack: CanvasAdjustmentsContract = [
+      { amount: 80, id: 'clarity', isEnabled: true, size: 12, type: 'clarity' },
+    ];
+    const member = raster('m', { adjustments: memberStack, transform: translated });
+    const document = docWith([groupContract('g', [member], { adjustments: invertStack('inv') })]);
+    const { scene, service } = spatialScene();
+    let landed = false;
+    // Wired as the engine does: a member's landing redraws the groups holding it.
+    const adjusted = createAdjustedSurfaceCache(scene.backend, createDerivedSurfaceCache(), {
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      spatial: {
+        onSettle: () => {
+          landed = true;
+          groupSurfaces.invalidate(['g']);
+        },
+        run: (request) => service.run(request),
+      },
+    });
+    const groupSurfaces = createGroupSurfaceCache({
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      getAdjustedSurface: (layer, entry) => {
+        const surface = adjusted.get(layer.id, entry, layer.adjustments);
+        return { state: surface ? adjusted.state(layer.id, entry, layer.adjustments) : 'exact', surface };
+      },
+      getCacheEntry: (id) => scene.caches.get(id),
+    });
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    let state: GroupSurfaceResult['state'] | undefined;
+    const composite = () => {
+      screen.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      compositeDocument(screen, document, scene.caches, identity(), {
+        backend: scene.backend,
+        groupSurface: (scope, members, matrices, content) => {
+          const result = groupSurfaces.get(scope, members, matrices, content);
+          state = result?.state;
+          return result;
+        },
+      });
+    };
+    const inverted = (pixels: Uint8ClampedArray) => {
+      const out = pixels.slice();
+      applyAdjustments({ data: out, height: HEIGHT, width: WIDTH }, invertStack('inv'), { x: 0, y: 0 });
+      return pixelsOf(roundTrip(scene.backend, out, WIDTH, HEIGHT));
+    };
+
+    composite();
+    expect(state).toBe('pending');
+    const interim = pixelsOf(screen);
+    expect(worstDifference(interim, inverted(pixelsOf(memberOnDocument(scene))))).toBe(0);
+    await vi.waitFor(() => expect(landed).toBe(true), { timeout: 10_000 });
+    composite();
+
+    expect(state).toBe('exact');
+    const source = scene.caches.get('m')!.surface;
+    const memberResult = roundTrip(
+      scene.backend,
+      evaluateStack(pixelsOf(source), source.width, source.height, memberStack),
+      source.width,
+      source.height
+    );
+    const expected = inverted(pixelsOf(memberOnDocument(scene, memberResult)));
+    expect(worstDifference(pixelsOf(screen), expected)).toBe(0);
+    expect(worstDifference(interim, expected)).toBeGreaterThan(0);
+  });
+
+  it('refreshes an edited and moved member in place to the pixels a fresh build settles to', async () => {
+    const { scene, service } = spatialScene();
+    scene.caches.growToRect('b', { height: 8, width: 8, x: 0, y: 0 });
+    const ctx = scene.caches.get('b')!.surface.ctx;
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(1, 1, 6, 6);
+    scene.caches.publishPixels('b');
+    const stack: CanvasAdjustmentsContract = [
+      { amount: 70, id: 'clarity', isEnabled: true, size: 12, type: 'clarity' },
+    ];
+    // `b` stays inside `m`'s bounds, so the group surface keeps its size and origin.
+    const documentFor = (opacity: number, x: number) =>
+      docWith([
+        groupContract(
+          'g',
+          [
+            raster('b', { opacity, transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 15 } }),
+            raster('m', { transform: translated }),
+          ],
+          { adjustments: stack }
+        ),
+      ]);
+    const display = () => {
+      const diagnostics = createCanvasDiagnostics(true);
+      const groupSurfaces = createGroupSurfaceCache({
+        createSurface: (w, h) => scene.backend.createSurface(w, h),
+        damageSince: (id, version) => scene.caches.damageSince(id, version),
+        diagnostics,
+        getAdjustedSurface: RAW_MEMBERS,
+        getCacheEntry: (id) => scene.caches.get(id),
+        spatial: { run: (request) => service.run(request) },
+      });
+      const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+      let state: GroupSurfaceResult['state'] | undefined;
+      const show = (document: ReturnType<typeof documentFor>) =>
+        settle(
+          () => {
+            screen.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            compositeDocument(screen, document, scene.caches, identity(), {
+              backend: scene.backend,
+              groupSurface: (scope, members, matrices, content) => {
+                const result = groupSurfaces.get(scope, members, matrices, content);
+                state = result?.state;
+                return result;
+              },
+            });
+          },
+          () => state === 'exact'
+        );
+      return { diagnostics, screen, show };
+    };
+
+    const edited = display();
+    await edited.show(documentFor(1, 20));
+    await edited.show(documentFor(0.5, 23));
+    expect(edited.diagnostics.snapshot()).toMatchObject({ groupSurfaceAllocations: 1 });
+    expect(edited.diagnostics.snapshot().groupSurfaceRefreshes).toBeGreaterThan(0);
+
+    const fresh = display();
+    await fresh.show(documentFor(0.5, 23));
+    expect(worstDifference(pixelsOf(edited.screen), pixelsOf(fresh.screen))).toBe(0);
+  });
+
+  it('converges nested spatial groups to the inner result evaluated again by the outer stack', async () => {
+    const innerStack: CanvasAdjustmentsContract = [
+      { amount: 90, id: 'texture', isEnabled: true, size: 4, type: 'texture' },
+    ];
+    const outerStack: CanvasAdjustmentsContract = [
+      { amount: 60, id: 'clarity', isEnabled: true, size: 12, type: 'clarity' },
+    ];
+    const document = docWith([
+      groupContract(
+        'outer',
+        [groupContract('inner', [raster('m', { transform: translated })], { adjustments: innerStack })],
+        { adjustments: outerStack }
+      ),
+    ]);
+    const { scene, service } = spatialScene();
+    const settled: string[] = [];
+    const groupSurfaces = createGroupSurfaceCache({
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      getAdjustedSurface: RAW_MEMBERS,
+      getCacheEntry: (id) => scene.caches.get(id),
+      spatial: {
+        // Wired as the engine does: a landing redraws the groups holding the owner, never the owner itself.
+        onSettle: (groupId) => {
+          settled.push(groupId);
+          if (groupId === 'inner') {
+            groupSurfaces.invalidate(['outer']);
+          }
+        },
+        run: (request) => service.run(request),
+      },
+    });
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    let outerState: GroupSurfaceResult['state'] | undefined;
+    const composite = () => {
+      screen.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      compositeDocument(screen, document, scene.caches, identity(), {
+        backend: scene.backend,
+        groupSurface: (scope, members, matrices, content) => {
+          const result = groupSurfaces.get(scope, members, matrices, content);
+          outerState = scope.id === 'outer' ? result?.state : outerState;
+          return result;
+        },
+      });
+    };
+
+    composite();
+    expect(outerState).toBe('pending');
+    await settle(composite, () => outerState === 'exact');
+    expect(settled).toEqual(['inner', 'outer']);
+
+    const raw = pixelsOf(memberOnDocument(scene));
+    const inner = pixelsOf(roundTrip(scene.backend, evaluateStack(raw, WIDTH, HEIGHT, innerStack), WIDTH, HEIGHT));
+    const expected = pixelsOf(roundTrip(scene.backend, evaluateStack(inner, WIDTH, HEIGHT, outerStack), WIDTH, HEIGHT));
+    expect(worstDifference(pixelsOf(screen), expected)).toBe(0);
+    expect(worstDifference(inner, expected)).toBeGreaterThan(0);
   });
 });

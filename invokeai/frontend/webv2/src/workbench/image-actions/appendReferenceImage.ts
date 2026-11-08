@@ -5,10 +5,10 @@ import type { ModelConfig } from '@features/models';
 import {
   createReferenceImageId,
   generatedImageToReferenceImage,
-  getDefaultReferenceImageConfig,
   getMaxReferenceImages,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
@@ -29,18 +29,17 @@ export const appendReferenceImage = ({
   const supportedModels = models.filter(isSupportedGenerateModel);
   const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
 
-  if (!currentValues || !isReferenceImageSupported(currentValues.model)) {
+  if (!currentValues || !isReferenceImageSupported(currentValues.model, currentValues)) {
     return { status: 'unsupported' };
   }
-  if (currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model)) {
+  if (currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model, currentValues)) {
     return { status: 'full' };
   }
 
-  const referenceImage = {
-    config: getDefaultReferenceImageConfig(currentValues.model, models, generatedImageToReferenceImage(image)),
-    id: createReferenceImageId(),
-    isEnabled: true,
+  return {
+    referenceImages: withAddedReferenceImages(currentValues.model, models, currentValues.referenceImages, [
+      { id: createReferenceImageId(), image: generatedImageToReferenceImage(image) },
+    ]),
+    status: 'appended',
   };
-
-  return { referenceImages: [...currentValues.referenceImages, referenceImage], status: 'appended' };
 };

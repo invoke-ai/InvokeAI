@@ -41,6 +41,11 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CALIBRATION_ORIGIN_PREFIX,
+    CalibrationStoreError,
+    is_reserved_origin,
+)
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
@@ -256,6 +261,10 @@ def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: Curre
     operation_id="enqueue_batch",
     responses={
         201: {"model": EnqueueBatchResult},
+        400: {
+            "description": f"The batch's origin starts with '{CALIBRATION_ORIGIN_PREFIX}' (in any case), which is "
+            "reserved for working-memory calibration runs"
+        },
     },
 )
 async def enqueue_batch(
@@ -265,6 +274,14 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    # Calibration items are measured and admitted as such by the session runner; only the calibration route may
+    # create them, for administrators.
+    if is_reserved_origin(batch.origin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Origins starting with '{CALIBRATION_ORIGIN_PREFIX}' are reserved for working-memory calibration "
+            "runs, which start through POST /api/v2/models/i/{key}/working_memory/calibrate.",
+        )
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:
@@ -606,14 +623,23 @@ def cancel_by_destination(
 @session_queue_router.put(
     "/{queue_id}/retry_items_by_id",
     operation_id="retry_items_by_id",
-    responses={200: {"model": RetryItemsResult}},
+    responses={
+        200: {"model": RetryItemsResult},
+        503: {
+            "description": "The items include a working-memory calibration's, and its store cannot be written now "
+            "(unwritable root, lock timeout): no item is retried, the request's other items included"
+        },
+    },
 )
 def retry_items_by_id(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
 ) -> RetryItemsResult:
-    """Retries the given queue items. Users can only retry their own items unless they are an admin."""
+    """Retries the given queue items. Users can only retry their own items unless they are an admin.
+
+    A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
+    the request retries nothing, also its items that are no calibration's (503); retry again once it can."""
     try:
         # Check queue membership for all items and ownership for non-admins.
         valid_item_ids: list[int] = []
@@ -643,6 +669,12 @@ def retry_items_by_id(
         )
     except HTTPException:
         raise
+    except CalibrationStoreError:
+        # The error names the store's path on the server.
+        raise HTTPException(
+            status_code=503,
+            detail="The working-memory calibration store cannot be written now, so no item was retried. Try again.",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while retrying queue items: {e}")
 

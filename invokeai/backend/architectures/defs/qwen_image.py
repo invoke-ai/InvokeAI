@@ -31,6 +31,7 @@ register(
         dimension_grid=16,
         guidance_label="CFG",
         scheduler_set="standard",
+        control_kinds=frozenset({"qwen_image_control"}),
         max_reference_images=5,
         reference_images_require_variant="edit",
     ),

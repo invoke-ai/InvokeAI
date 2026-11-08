@@ -13,7 +13,7 @@ import time
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
@@ -328,7 +328,7 @@ class TestRunnerStopsBetweenNodes:
         runner._run_session_loop(queue_item)
 
         assert executed == ["n1"]
-        services.session_queue.cancel_queue_item.assert_called_once_with(21)
+        services.session_queue.cancel_queue_item.assert_called_once_with(21, queue_item=ANY)
 
     def test_an_unreadable_owner_stops_later_nodes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A deactivation the database can no longer be asked about still stops the run."""
@@ -353,7 +353,7 @@ class TestRunnerStopsBetweenNodes:
         runner._run_session_loop(queue_item)
 
         assert executed == ["n1"]
-        services.session_queue.cancel_queue_item.assert_called_once_with(21)
+        services.session_queue.cancel_queue_item.assert_called_once_with(21, queue_item=ANY)
 
     def test_active_owner_runs_all_nodes(self) -> None:
         node1, node2 = SimpleNamespace(id="n1"), SimpleNamespace(id="n2")
@@ -445,7 +445,7 @@ class TestRunnerStopsAfterTheLastNode:
         runner._run_session_loop(self._one_node_queue_item(SimpleNamespace(id="n1")))
 
         assert executed == ["n1"], "the node was already running; only its aftermath can change"
-        services.session_queue.cancel_queue_item.assert_called_once_with(21)
+        services.session_queue.cancel_queue_item.assert_called_once_with(21, queue_item=ANY)
 
     def test_deactivation_during_the_only_node_cancels_the_item(self) -> None:
         answers = iter([_active("user-1"), _inactive("user-1")])
@@ -456,7 +456,7 @@ class TestRunnerStopsAfterTheLastNode:
 
         runner._run_session_loop(self._one_node_queue_item(SimpleNamespace(id="n1")))
 
-        services.session_queue.cancel_queue_item.assert_called_once_with(21)
+        services.session_queue.cancel_queue_item.assert_called_once_with(21, queue_item=ANY)
 
     def test_an_active_owners_one_node_item_is_not_canceled(self) -> None:
         services = _services(users_by_id={"user-1": _active("user-1")})
@@ -594,10 +594,10 @@ class TestRunningQueueItemOwners:
         worker.queue_item = _queue_item()  # type: ignore[assignment]
         processor._workers = [worker]
 
-        stop_event, poll_now_event, resume_event = ThreadEvent(), ThreadEvent(), ThreadEvent()
+        stop_event, resume_event = ThreadEvent(), ThreadEvent()
         # `resume_event` is left clear, so the worker parks exactly where a paused
         # processor parks it: at the top of the loop, before any dequeue.
-        thread = Thread(target=processor._process, args=(worker, stop_event, poll_now_event, resume_event), daemon=True)
+        thread = Thread(target=processor._process, args=(worker, stop_event, resume_event), daemon=True)
         thread.start()
         try:
             deadline = time.monotonic() + 5

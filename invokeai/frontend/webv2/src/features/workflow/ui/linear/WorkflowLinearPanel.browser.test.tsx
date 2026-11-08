@@ -250,7 +250,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const content = chrome?.lastElementChild;
 
     if (!(content instanceof HTMLElement)) {
-      throw new Error(`card content not found for "${title}"`);
+      throw new TypeError(`card content not found for "${title}"`);
     }
 
     return content;

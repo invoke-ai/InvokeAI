@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterable, Iterator, Optional
+from uuid import uuid4
 
 import numpy as np
 import torch
@@ -21,7 +22,12 @@ from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
     MediaKind,
 )
-from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
+from invokeai.app.services.image_index.projection import (
+    compute_umap,
+    projection_method_is_current,
+    projection_params,
+    scope_hash,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
@@ -58,6 +64,11 @@ def _is_cpu_override(override: Optional[str]) -> bool:
 # How long the worker sleeps between generation-idle checks and empty-queue polls.
 _POLL_SECONDS = 1.0
 
+# Soft budget for retained decoded matrices, not metadata, in-flight builds or caller-held arrays.
+# The two most recent scopes always stay, even over budget, so two alternating scopes never evict each other.
+# Roughly the previous two-entry envelope at 100k x 768 float32 values per entry.
+_SEARCH_CACHE_MAX_BYTES = 600 * 1024**2
+
 # An image is retried this many times before being marked permanently failed. This bounds
 # per-image badness only — a corrupt file, an unreadable image, an embedding that cannot be
 # normalized. Failures of the machinery (the encoder, the database) never consume this budget;
@@ -73,6 +84,14 @@ _MAX_BACKOFF_SECONDS = 60.0
 # labels request after the window; a permanently broken install still answers from memory for
 # everything in between, at one rebuild attempt per window rather than one per points refresh.
 _VOCAB_FAILURE_RETRY_SECONDS = 600.0
+
+# A refit nobody asked for (a /points staleness check) waits this long after the scope's last fit:
+# the floor, or the multiplier times that fit's duration. On a busy server something embeds during
+# almost every fit, so without it one scope refits back to back forever; the multiplier caps it at
+# about a third of the worker's time. The floor stays short because a small gallery's map waits
+# it out after every generation. /refresh is exempt.
+_PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS = 10.0
+_PROJECTION_REFIT_COOLDOWN_MULTIPLIER = 2.0
 
 
 def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
@@ -277,6 +296,12 @@ class ImageIndexService(ImageIndexServiceBase):
         # user_id -> the scope hash whose failed fit has already been retried
         # this process; see _failed_scope_retry_available.
         self._failed_projection_scopes: dict[str, str] = {}
+        # user_id -> time.monotonic() before which a queued request for that
+        # scope may not start a fit; set once a fit's result is cached.
+        self._projection_not_before: dict[str, float] = {}
+        # Users whose queued request came from a person (/refresh). Kept apart
+        # from _projection_requests so a later poll cannot downgrade it.
+        self._projection_user_initiated: set[str] = set()
         self._projection_lock = threading.Lock()
 
         self._invoker: Optional["Invoker"] = None
@@ -344,9 +369,10 @@ class ImageIndexService(ImageIndexServiceBase):
         # Guards the lazy _processor/_cpu_model init: embed_image runs on
         # request threads concurrently with the indexer worker.
         self._vision_init_lock = threading.Lock()
-        # scope_hash -> (items, matrix): the accessible embedding matrix for
-        # similarity search, so repeated queries skip re-reading BLOBs.
-        self._search_cache: dict[str, tuple[list[IndexedItem], np.ndarray]] = {}
+        # (user_id, model_id) -> (scope_hash, items, matrix): one version per owner,
+        # so gallery growth retires old matrices while small scopes can share the budget.
+        self._search_cache: dict[tuple[str | None, str], tuple[str, list[IndexedItem], np.ndarray]] = {}
+        self._search_cache_bytes = 0
         self._search_cache_lock = threading.Lock()
         # (vocabulary, embeddings) for cluster labeling; RAM + disk cached.
         self._vocab_cache: Optional[tuple[list[str], np.ndarray]] = None
@@ -432,7 +458,19 @@ class ImageIndexService(ImageIndexServiceBase):
         `/points` and image search included. The build is handed to the index
         worker instead and this raises until it lands.
         """
-        with self._vocab_lock:
+        # A ready cache is one atomic reference load and callers hold use_model(),
+        # which fences model swaps, so it is returned without the lock below.
+        cache = self._vocab_cache
+        if cache is not None and self.model_id is not None:
+            return cache
+        # The worker keeps this lock through embedding for single-build ownership
+        # and atomic cache/failure publication; the try-acquire only decides
+        # building vs not, so a not-ready reader 409s instead of waiting.
+        if not self._vocab_lock.acquire(blocking=False):
+            if self._invoker is None or self.model_id is None:
+                raise TextSearchUnavailableError("The image index is not running")
+            raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
+        try:
             if self._vocab_cache is not None and self.model_id is not None:
                 return self._vocab_cache
             if self._vocab_failure is not None:
@@ -463,6 +501,8 @@ class ImageIndexService(ImageIndexServiceBase):
                 raise TextSearchUnavailableError("The image index is not running")
 
             self._vocab_build_requested.set()
+        finally:
+            self._vocab_lock.release()
 
         raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
 
@@ -523,21 +563,16 @@ class ImageIndexService(ImageIndexServiceBase):
             bundled_keys = {phrase.casefold() for phrase in bundled}
             custom = [term for term in custom if term.casefold() not in bundled_keys]
 
-            # The model hash contains ':' (e.g. 'blake3:...'), illegal in
-            # Windows filenames.
-            model_tag = self._model_id.replace(":", "_")[:24]
-            cache_dir = self._invoker.services.configuration.db_path.parent
+            bundled_path, custom_path = self._vocab_cache_paths()
 
             # Two cache tiers: the bundled vocabulary (~1700 phrases, minutes
             # to embed, effectively immutable) and the custom terms (a few
             # hundred at most, seconds). Caching them separately means an edit
             # to the custom list never pays the bundled tier's build again.
             try:
-                bundled_matrix = self._load_or_embed_phrases(bundled, cache_dir / f"cluster_vocab_{model_tag}.npz")
+                bundled_matrix = self._load_or_embed_phrases(bundled, bundled_path)
                 if custom:
-                    custom_matrix = self._load_or_embed_phrases(
-                        custom, cache_dir / f"cluster_vocab_custom_{model_tag}.npz"
-                    )
+                    custom_matrix = self._load_or_embed_phrases(custom, custom_path)
                     self._vocab_cache = (bundled + custom, np.concatenate([bundled_matrix, custom_matrix]))
                 else:
                     self._vocab_cache = (bundled, bundled_matrix)
@@ -601,29 +636,26 @@ class ImageIndexService(ImageIndexServiceBase):
 
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            # Written aside and renamed: two processes sharing a db_dir can
-            # first-run at once, and a kill mid-write would otherwise leave
-            # a truncated archive that costs another full re-embed.
-            #
-            # The staging name has to end in `.npz` because np.savez appends
-            # that extension to any path that lacks it: written as `.tmp`,
-            # the archive landed at `.tmp.npz` and the rename below then
-            # failed on the `.tmp` that was never created. The failure was
-            # swallowed by the handler, so the cache never reached disk and
-            # every restart re-embedded the whole vocabulary (minutes,
-            # during which cluster labels are unavailable) while leaking one
-            # orphaned staging file per run.
-            staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
-            np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
-            os.replace(staging_path, cache_path)
+            # Each writer owns a separate file in the cache directory. Normal
+            # file creation preserves the umask and directory's default ACLs.
+            staging_path = cache_path.with_name(f"{cache_path.name}.{uuid4().hex}.tmp.npz")
+            staging_file = staging_path.open("xb")
+            # Only clean up after exclusive creation succeeds: a collision
+            # must never remove another writer's staging file.
+            try:
+                with staging_file:
+                    np.savez(staging_file, embeddings=embeddings, fingerprint=np.str_(fingerprint))
+                # Windows requires the staging handle to be closed first.
+                os.replace(staging_path, cache_path)
+            finally:
+                staging_path.unlink(missing_ok=True)
         except Exception:
             # With the exception, not just the path. The caller caches the
             # matrix in RAM either way, so a write failure costs
             # nothing until the next restart and is invisible until someone
-            # goes looking at startup times. The `.tmp` bug above survived
-            # because this line said only that something had gone wrong,
-            # never what — the FileNotFoundError it swallowed names the
-            # missing staging file outright.
+            # goes looking at startup times. A past bug left the cache never
+            # reaching disk, unnoticed because this warning said only that
+            # something had failed, never what.
             self._invoker.services.logger.warning(
                 f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
             )
@@ -698,31 +730,39 @@ class ImageIndexService(ImageIndexServiceBase):
             records = self._invoker.services.image_index_records
 
             items = records.list_accessible_embedded_items(user_id, self._model_id)
+            cache_key = (user_id, self._model_id)
+            fingerprint = scope_hash(self._model_id, items)
+            with self._search_cache_lock:
+                cached = self._search_cache.pop(cache_key, None)
+                if cached is not None:
+                    if cached[0] == fingerprint:
+                        self._search_cache[cache_key] = cached  # LRU touch.
+                        return cached[1], cached[2]
+                    self._search_cache_bytes -= cached[2].nbytes
             if not items:
                 return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
 
-            # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
-            # so the LRU holds two entries and evicts oldest-first rather than
-            # clearing wholesale. Keys self-invalidate: any change to the
-            # accessible set changes the scope hash.
-            cache_key = scope_hash(self._model_id, items)
+            # Build outside the lock: duplicate misses beat serializing searches behind BLOB reads.
+            found_items, matrix = records.get_embeddings(items, self._model_id)
+            matrix_bytes = matrix.nbytes
             with self._search_cache_lock:
-                cached = self._search_cache.get(cache_key)
-                if cached is not None:
-                    # LRU touch.
-                    del self._search_cache[cache_key]
-                    self._search_cache[cache_key] = cached
-            if cached is None:
-                # Built outside the lock: a concurrent miss for the same scope
-                # transiently builds a duplicate, which beats serializing every
-                # search behind a multi-second BLOB read.
-                cached = records.get_embeddings(items, self._model_id)
-                with self._search_cache_lock:
-                    while len(self._search_cache) >= 2:
-                        self._search_cache.pop(next(iter(self._search_cache)))
-                    self._search_cache[cache_key] = cached
+                # Last completion wins, possibly an older gallery snapshot. Keep its own fingerprint
+                # so a later request rechecks visibility and misses rather than serving stale rows.
+                previous = self._search_cache.pop(cache_key, None)
+                if previous is not None:
+                    self._search_cache_bytes -= previous[2].nbytes
+                # Empty results must not accumulate owners that cost nothing against the budget.
+                if matrix_bytes:
+                    while (
+                        len(self._search_cache) >= 2
+                        and self._search_cache_bytes + matrix_bytes > _SEARCH_CACHE_MAX_BYTES
+                    ):
+                        _, _, evicted_matrix = self._search_cache.pop(next(iter(self._search_cache)))
+                        self._search_cache_bytes -= evicted_matrix.nbytes
+                    self._search_cache[cache_key] = (fingerprint, found_items, matrix)
+                    self._search_cache_bytes += matrix_bytes
 
-            return cached
+            return found_items, matrix
 
     def search_similar(
         self,
@@ -784,6 +824,7 @@ class ImageIndexService(ImageIndexServiceBase):
                 # and is driven by polling, so clearing there would hand a
                 # poller the unlimited retries the budget exists to deny.
                 self._failed_projection_scopes.pop(user_id, None)
+                self._projection_user_initiated.add(user_id)
             # Last writer wins: the scope reflects the requester's most recent
             # admin status, so a promotion/demotion between requests cannot
             # pin a stale scope.
@@ -808,6 +849,8 @@ class ImageIndexService(ImageIndexServiceBase):
         with self._projection_lock:
             self._failed_projection_scopes.clear()
             self._projection_requests.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
 
         device_override = config.image_index_device
         if device_override and not _is_cpu_override(device_override):
@@ -971,20 +1014,17 @@ class ImageIndexService(ImageIndexServiceBase):
 
         The shared cache is keyed by model key alone, so an encoder that keeps its key across a
         reinstall would be served from the retired weights while its embeddings are stored under
-        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
-        load from re-registering the old shared CPU weights around the drop. It is taken under
-        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
-        in flight; that cannot deadlock, because the worker and request users have drained and
-        nothing takes _activation_lock while holding the load lock.
+        the replacement's hash, and those survive a restart. The drop takes MODEL_LOAD_LOCK's write
+        lock, so a concurrent load cannot re-register the old shared CPU weights around it. It is
+        taken under _activation_lock, so map polls, searches and stop() wait out any model load or
+        VRAM move in flight; that cannot deadlock, because the worker and request users have drained
+        and nothing takes _activation_lock while holding the load lock.
         """
         keys = {config.key for config in configs if config is not None}
         if not keys:
             # Still missing: this runs on every throttled recheck, and must not queue behind a load.
             return
-        with MODEL_LOAD_LOCK.write_lock():
-            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
-                for key in keys:
-                    cache.drop_model(key)
+        invoker.services.model_manager.load.drop_cached_models(keys)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.
@@ -1008,9 +1048,12 @@ class ImageIndexService(ImageIndexServiceBase):
         self._vocab_invalidate_requested.clear()
         with self._search_cache_lock:
             self._search_cache.clear()
+            self._search_cache_bytes = 0
         with self._projection_lock:
             self._projection_requests.clear()
             self._failed_projection_scopes.clear()
+            self._projection_not_before.clear()
+            self._projection_user_initiated.clear()
         self._attempts.clear()
         self._failed.clear()
         self._pending_pokes.clear()
@@ -1021,6 +1064,7 @@ class ImageIndexService(ImageIndexServiceBase):
         discarded = invoker.services.image_index_records.delete_embeddings_for_other_models(self._model_id)
         if discarded:
             invoker.services.logger.info(f"Discarded {discarded} embeddings computed by a previously-configured model")
+        self._prune_vocab_caches()
 
         if not self._callbacks_registered:
             invoker.services.images.on_changed(self._on_image_changed)
@@ -1035,6 +1079,37 @@ class ImageIndexService(ImageIndexServiceBase):
         self._stop_event.clear()
         self._worker = threading.Thread(target=self._worker_loop, name="image_index_worker", daemon=True)
         self._worker.start()
+
+    def _vocab_cache_paths(self) -> tuple[Path, Path]:
+        """The current model's bundled and custom vocabulary archives, as written and as kept by pruning."""
+        assert self._invoker is not None and self._model_id is not None
+        cache_dir = self._invoker.services.configuration.db_path.parent
+        # The model hash contains ':' (e.g. 'blake3:...'), illegal in Windows filenames.
+        model_tag = self._model_id.replace(":", "_")[:24]
+        return cache_dir / f"cluster_vocab_{model_tag}.npz", cache_dir / f"cluster_vocab_custom_{model_tag}.npz"
+
+    def _prune_vocab_caches(self) -> None:
+        """Retire obsolete vocabulary archives under the index's one-current-model policy."""
+        assert self._invoker is not None
+        current = set(self._vocab_cache_paths())
+        cache_dir = self._invoker.services.configuration.db_path.parent
+        try:
+            for cache_path in cache_dir.glob("cluster_vocab_*.npz"):
+                # Both writer generations use .tmp.npz; these may still be open
+                # in another instance and are not obsolete published archives.
+                if cache_path in current or cache_path.name.lower().endswith(".tmp.npz"):
+                    continue
+                try:
+                    if cache_path.is_symlink() or not cache_path.is_file():
+                        continue
+                    cache_path.unlink(missing_ok=True)
+                except OSError:
+                    self._invoker.services.logger.warning(
+                        f"Could not remove stale cluster vocabulary cache at {cache_path}", exc_info=True
+                    )
+        except OSError:
+            # Cache maintenance must not prevent startup or a late encoder swap.
+            self._invoker.services.logger.warning("Could not prune obsolete cluster vocabulary caches", exc_info=True)
 
     def stop(self, invoker: Optional["Invoker"] = None) -> None:
         # Under the lock so a map request cannot be midway through starting a
@@ -1561,11 +1636,17 @@ class ImageIndexService(ImageIndexServiceBase):
             return self._failed_projection_scopes.get(user_id) != current_hash
 
     def _next_projection_job(self) -> Optional[tuple[str, bool]]:
+        """Take the first queued job that is not cooling down; jobs that are stay queued (/points still reports them
+        stale) and are taken once due."""
+        now = time.monotonic()
         with self._projection_lock:
-            if not self._projection_requests:
-                return None
-            user_id = next(iter(self._projection_requests))
-            return user_id, self._projection_requests.pop(user_id)
+            for user_id in self._projection_requests:
+                if user_id in self._projection_user_initiated or now >= self._projection_not_before.get(user_id, now):
+                    # The cooldown stays: a taken job that short-circuits on an
+                    # unchanged scope must not free the next poll to refit.
+                    self._projection_user_initiated.discard(user_id)
+                    return user_id, self._projection_requests.pop(user_id)
+            return None
 
     def _process_projection(self, user_id: str, all_images: bool) -> None:
         assert self._invoker is not None
@@ -1606,7 +1687,11 @@ class ImageIndexService(ImageIndexServiceBase):
             and bool(items)
             and self._failed_scope_retry_available(user_id, current_hash)
         )
-        if cached is not None and cached.scope_hash == current_hash and not retrying_failed_scope:
+        # A map projected by the fallback PCA is stale once the projector it fell back from is
+        # installed: same scope, but not the map a fit would give now. Failed (empty) rows are left
+        # to the retry budget above, so a doomed fit is not re-run on every request.
+        method_is_current = cached is None or projection_method_is_current(cached.params, cached.point_count)
+        if cached is not None and cached.scope_hash == current_hash and method_is_current and not retrying_failed_scope:
             # Nothing the projection depends on has changed, and the fit is
             # seeded, so recomputing would burn minutes of single-threaded CPU
             # to arrive at identical coordinates. Still emit, so a client that
@@ -1616,6 +1701,7 @@ class ImageIndexService(ImageIndexServiceBase):
             )
             return
 
+        fit_started = time.monotonic()
         try:
             # Read after the short-circuit, not before: this materializes every
             # accessible embedding (hundreds of MB on a large gallery), which is
@@ -1653,6 +1739,7 @@ class ImageIndexService(ImageIndexServiceBase):
             # per process, and the next gallery change flips the hash anyway.
             found_items = []
             coords = np.empty((0, 2), dtype=EMBEDDING_DTYPE)
+        fit_finished = time.monotonic()
 
         # Hash the scope the projection was computed against (on failure the
         # empty cache still claims the current scope, so staleness detection —
@@ -1695,6 +1782,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._failed_projection_scopes.pop(user_id, None)
             elif retrying_failed_scope:
                 self._failed_projection_scopes[user_id] = current_hash
+            self._projection_not_before[user_id] = fit_finished + max(
+                _PROJECTION_REFIT_COOLDOWN_FLOOR_SECONDS,
+                _PROJECTION_REFIT_COOLDOWN_MULTIPLIER * (fit_finished - fit_started),
+            )
         try:
             self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_items))
         except Exception:
@@ -1717,9 +1808,13 @@ class ImageIndexService(ImageIndexServiceBase):
         self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=point_count)
 
     def _requeue_projection(self, user_id: str, all_images: bool) -> None:
-        """Put a popped job back, without clobbering a newer request for that user."""
+        """Put a popped job back, without clobbering a newer request for that user.
+
+        The cooldown is dropped so the retry is immediate: every caller's fit either never ran or its result was not
+        cached, and a user-initiated job lost its exemption when it was taken."""
         with self._projection_lock:
             self._projection_requests.setdefault(user_id, all_images)
+            self._projection_not_before.pop(user_id, None)
 
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.

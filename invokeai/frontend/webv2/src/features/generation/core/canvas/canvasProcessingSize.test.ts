@@ -9,8 +9,37 @@ seedArchitectureCapabilities();
 
 const sd1 = { base: 'sd-1', type: 'main' } as GenerateModelConfig;
 const sdxl = { base: 'sdxl', type: 'main' } as GenerateModelConfig;
+const external = { base: 'external', type: 'external_image_generator' } as GenerateModelConfig;
 
 describe('resolveCanvasProcessingSize', () => {
+  it('asks a free-form hosted provider for the bbox itself, whatever the scaling method', () => {
+    const bbox = { height: 300, width: 500 };
+
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, undefined)).toEqual(bbox);
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, { height: null, method: 'auto', width: null })).toEqual(
+      bbox
+    );
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, { height: 2048, method: 'manual', width: 2048 })).toEqual(
+      bbox
+    );
+  });
+
+  it('asks a fixed-size hosted provider for one of its sizes, whatever the scaling method', () => {
+    const fixed = {
+      ...external,
+      capabilities: { aspect_ratio_sizes: { '1:1': { height: 1024, width: 1024 } }, modes: ['txt2img'] },
+    } as GenerateModelConfig;
+
+    expect(
+      resolveCanvasProcessingSize(
+        fixed,
+        'off',
+        { height: 300, width: 500 },
+        { height: 64, method: 'manual', width: 64 }
+      )
+    ).toEqual({ height: 1024, width: 1024 });
+  });
+
   it('keeps the bbox on the model grid when scaling is off or unset', () => {
     expect(resolveCanvasProcessingSize(sd1, 'off', { height: 300, width: 500 }, undefined)).toEqual({
       height: 304,

@@ -15,6 +15,7 @@ DENOISE_NODE = {
     BaseModelType.CogView4: "cogview4_denoise",
     BaseModelType.Flux: "flux_denoise",
     BaseModelType.Flux2: "flux2_denoise",
+    BaseModelType.Flux3: "flux3_denoise",
     BaseModelType.ZImage: "z_image_denoise",
     BaseModelType.ErnieImage: "ernie_image_denoise",
     BaseModelType.Ideogram4: "ideogram4_denoise",
@@ -24,6 +25,7 @@ DENOISE_NODE = {
     BaseModelType.QwenImage21: "qwen_image_2_1_denoise",
     BaseModelType.Wan: "wan_denoise",
     BaseModelType.MiniMaxH3: "minimax_h3_denoise",
+    BaseModelType.MossImage: "moss_image_denoise",
 }
 
 
@@ -70,6 +72,8 @@ def test_the_sd_family_grid_is_the_vae_compression() -> None:
         ("control_lora", {"flux"}),
         ("z_image_control", {"z-image"}),
         ("anima_lllite", {"anima"}),
+        ("qwen_image_control", {"qwen-image"}),
+        ("flux2_control", {"flux2"}),
     ],
 )
 def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: set[str]) -> None:
@@ -80,22 +84,33 @@ def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: se
     assert declared == expected
 
 
-def test_reference_images_and_the_one_variant_condition() -> None:
-    """Qwen-Image is the only base whose answer depends on the variant, so it is the only one with
-    `reference_images_require_variant` set."""
+def test_reference_images_and_the_conditions_on_them() -> None:
+    """Qwen-Image and Anima are the bases whose answer depends on the variant: Qwen-Image takes
+    reference images only as `edit`, Anima only on the Qwen3-conditioned releases the IP-Adapter was
+    trained on (not Anima-3.8B's Qwen3.5 variant). Qwen-Image-2.1 is the only one whose answer depends
+    on the encoder carrying a vision tower."""
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2"}
+    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2", "anima", "qwen-image-2-1"}
+
+    needs_tower = {
+        b.value
+        for b in generative_bases()
+        if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_vision_tower
+    }
+    assert needs_tower == {"qwen-image-2-1"}
 
     conditional = {
-        b.value
+        b.value: f.reference_images_require_variant
         for b in generative_bases()
         if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_variant is not None
     }
-    assert conditional == {"qwen-image"}
-    qwen = get(BaseModelType.QwenImage, FeaturesFacet)
-    assert qwen is not None and qwen.reference_images_require_variant == "edit"
+    assert conditional == {"qwen-image": "edit", "anima": "anima_qwen3"}
+
+    # Up to four images, attended together by `anima_denoise` (experimental: the adapter was trained on one).
+    anima = get(BaseModelType.Anima, FeaturesFacet)
+    assert anima is not None and anima.max_reference_images == 4
 
 
 def test_regional_guidance_and_its_negative_subset() -> None:
@@ -103,17 +118,29 @@ def test_regional_guidance_and_its_negative_subset() -> None:
     decides whether a region reaches the graph at all, `regional_negative` whether its negative
     prompt and auto-negative do. A wrong declaration here is a region silently applied globally.
 
-    Regional negative prompts are a strict subset: only the SD family's `compel` /
-    `sdxl_compel_prompt` path masks both prompt polarities. The FLUX / FLUX.2 / Krea-2 / Z-Image /
-    Anima denoisers mask positive conditioning only -- Z-Image and Anima accept a negative list but
-    discard its masks, so a "regional" negative there would act globally and webv2 rejects it.
+    Regional negative prompts are a strict subset: SD, Krea-2, Z-Image and Anima mask both
+    prompt polarities. FLUX / FLUX.2 mask positive conditioning only.
+    MOSS-Image, Ideogram 4 and FLUX.3 mask nothing: their regions become boxes in a JSON layout
+    prompt, structured caption or box table, which has no negative counterpart.
     """
     regional = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_regional_guidance
     }
     negative = {b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.regional_negative}
-    assert regional == {"sd-1", "sd-2", "sdxl", "flux", "flux2", "krea-2", "z-image", "anima"}
-    assert negative == {"sd-1", "sd-2", "sdxl"}
+    assert regional == {
+        "sd-1",
+        "sd-2",
+        "sdxl",
+        "flux",
+        "flux2",
+        "krea-2",
+        "z-image",
+        "anima",
+        "moss-image",
+        "ideogram-4",
+        "flux3",
+    }
+    assert negative == {"sd-1", "sd-2", "sdxl", "krea-2", "z-image", "anima"}
     assert negative < regional, "a regional negative prompt without regional guidance is meaningless"
 
 
@@ -129,12 +156,14 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
     assert by_usage["never"] == {"flux", "flux2", "ideogram-4", "minimax-h3"}
     assert by_usage["cfg-gated"] == {
         "anima",
+        "flux3",
         "krea-2",
         "qwen-image",
         "qwen-image-2-1",
         "z-image",
         "ernie-image",
         "ltx-2",
+        "moss-image",
     }
     # Nothing declares a visible box it never uses, or an invisible one it does.
     for base in generative_bases():

@@ -32,6 +32,7 @@ const createArgs = (state = createInitialWorkbenchState()) => {
   return {
     commands: {} as WorkbenchCommands,
     formatControlLayerError: ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`,
+    formatUpscaleMetadataFailure: (name: string) => name,
     getModels: () => undefined,
     queries: {
       getSnapshot: () => ({

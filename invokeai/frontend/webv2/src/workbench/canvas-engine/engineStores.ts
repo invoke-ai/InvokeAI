@@ -3,6 +3,7 @@
  * them to React without coupling the engine to UI.
  */
 
+import type { PsdExportStatus } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasLayerSourceContract,
   CanvasTextFontRef,
@@ -10,6 +11,7 @@ import type {
   CanvasTextFontVariations,
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -266,6 +268,12 @@ export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   size: 50,
 };
 
+/** The control layer displayed as its kept original, alone or under its map. */
+export interface ControlLayerView {
+  layerId: string;
+  view: 'original' | 'overlay';
+}
+
 /**
  * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
  * `transform` drives preview and numeric controls.
@@ -336,10 +344,13 @@ export interface KeyedVersionStore {
 
 export type LayerThumbnailStatus = 'loading' | 'ready' | 'error';
 
-/** A per-layer thumbnail request state; absence represents `idle`. */
-export interface KeyedThumbnailStatusStore {
-  get(key: string): LayerThumbnailStatus | undefined;
-  set(key: string, value: LayerThumbnailStatus): void;
+/** Why a layer's displayed spatial adjustments are not exact yet; absence means they are (or it has none). */
+export type LayerAdjustmentStatus = AdjustedSurfaceStatus;
+
+/** A per-layer status; absence represents `idle`. */
+export interface KeyedStatusStore<T extends string> {
+  get(key: string): T | undefined;
+  set(key: string, value: T): void;
   delete(key: string): void;
   clear(): void;
   subscribeKey(key: string, listener: () => void): () => void;
@@ -393,8 +404,8 @@ const createKeyedVersionStore = (): KeyedVersionStore => {
   };
 };
 
-const createKeyedThumbnailStatusStore = (): KeyedThumbnailStatusStore => {
-  const values = new Map<string, LayerThumbnailStatus>();
+const createKeyedStatusStore = <T extends string>(): KeyedStatusStore<T> => {
+  const values = new Map<string, T>();
   const keyedListeners = new Map<string, Set<() => void>>();
   const notify = (key: string): void => {
     for (const listener of keyedListeners.get(key) ?? []) {
@@ -444,7 +455,8 @@ export interface EngineStores {
   viewportReady: ScalarStore<boolean>;
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
-  thumbnailStatus: KeyedThumbnailStatusStore;
+  thumbnailStatus: KeyedStatusStore<LayerThumbnailStatus>;
+  adjustmentStatus: KeyedStatusStore<LayerAdjustmentStatus>;
   /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
   layerPixelEpoch: ScalarStore<number>;
   /** Monotonic version of the mirrored document, for consumers that read the engine's model during render. */
@@ -507,6 +519,8 @@ export interface EngineStores {
   bboxPreview: ScalarStore<Rect | null>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
+  /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
+  pendingTransformLayerId: ScalarStore<string | null>;
   /** Checkerboard defaults on; disabling reveals the widget surface through transparent document pixels. */
   checkerboard: ScalarStore<boolean>;
   /**
@@ -526,8 +540,11 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
+  psdExportStatus: ScalarStore<PsdExportStatus>;
   /** The layer targeted by that operation, or null when no operation is active. */
   documentEditingLayerId: ScalarStore<string | null>;
+  /** The control layer displayed as its original (or original under map); null displays every map. */
+  controlLayerView: ScalarStore<ControlLayerView | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -693,10 +710,12 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerboard: createScalarStore<boolean>(true),
   clipToBbox: createScalarStore<boolean>(false),
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
+  controlLayerView: createScalarStore<ControlLayerView | null>(null),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLayerId: createScalarStore<string | null>(null),
   documentEditingLocked: createScalarStore<boolean>(false),
+  psdExportStatus: createScalarStore<PsdExportStatus>('idle'),
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
@@ -725,8 +744,10 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),
-  thumbnailStatus: createKeyedThumbnailStatusStore(),
+  thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
+  adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
+  pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),
 });

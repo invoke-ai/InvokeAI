@@ -1,7 +1,7 @@
 /**
- * The plugin injects one {version, assets} manifest. Navigation is network-first, hashed assets cache-first,
- * locales stale-while-revalidate; API/socket traffic is untouched. Do not skipWaiting: old tabs may still need
- * lazy assets the new worker prunes.
+ * The plugin injects one {version, assets} manifest. Navigation is network-first, hashed assets and
+ * content-versioned locales cache-first; API/socket traffic is untouched. Do not skipWaiting: old tabs may still
+ * need lazy assets the new worker prunes.
  */
 
 const MANIFEST = self.__SW_MANIFEST__;
@@ -83,27 +83,27 @@ const respondCacheFirst = async (request) => {
   return response;
 };
 
-const respondStaleWhileRevalidate = async (request) => {
+const respondVersionedLocale = async (request) => {
   const cache = await caches.open(RUNTIME_CACHE);
   const cached = await cache.match(request);
-  const refresh = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        void cache.put(request, response.clone());
-      }
-
-      return response;
-    })
-    .catch(() => undefined);
 
   if (cached) {
     return cached;
   }
 
-  const response = await refresh;
+  const response = await fetch(request);
 
-  if (!response) {
-    throw new TypeError(`Offline and not cached: ${request.url}`);
+  const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
+
+  // Store JSON only: the backend's SPA fallback answers a missing file with a 200 index.html. Keep one entry per
+  // locale file: drop every other version of this path, unversioned ones included.
+  if (response.ok && contentType === 'application/json') {
+    const copy = response.clone();
+
+    void cache.keys(request, { ignoreSearch: true, ignoreVary: true }).then(async (entries) => {
+      await Promise.all(entries.filter((entry) => entry.url !== request.url).map((entry) => cache.delete(entry)));
+      await cache.put(request, copy);
+    });
   }
 
   return response;
@@ -126,7 +126,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (request.url.startsWith(LOCALES_PREFIX)) {
-    event.respondWith(respondStaleWhileRevalidate(request));
+  // `platform/i18n/client.ts` adds the locale content version as `v`. Unversioned requests go to the network, so
+  // none can be pinned in the cache.
+  if (request.url.startsWith(LOCALES_PREFIX) && new URL(request.url).searchParams.has('v')) {
+    event.respondWith(respondVersionedLocale(request));
   }
 });

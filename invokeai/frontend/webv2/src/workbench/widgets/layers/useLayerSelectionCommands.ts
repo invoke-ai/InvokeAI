@@ -55,7 +55,7 @@ export const useLayerSelectionCommands = (
       }
       if (result && result.status !== 'nothing') {
         reportLayerOperation(
-          result.status,
+          result.status === 'unreadable' ? result : result.status,
           (title, description) => toaster.create({ description, title, type: 'warning' }),
           t
         );

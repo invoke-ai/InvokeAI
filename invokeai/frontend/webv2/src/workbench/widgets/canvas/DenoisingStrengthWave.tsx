@@ -41,7 +41,7 @@ export const DenoisingStrengthWave = ({ value }: { value: number }) => {
       preserveAspectRatio="none"
       style={{ display: 'block', flexShrink: 0, pointerEvents: 'none' }}
       viewBox={`0 0 ${WAVE_WIDTH} ${WAVE_HEIGHT}`}
-      width={40}
+      width={30}
     >
       <path
         d={path}

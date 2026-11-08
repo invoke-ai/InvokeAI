@@ -8,6 +8,7 @@ import type {
 } from '@platform/logging/contracts';
 
 import { Badge, Box, createListCollection, HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { downloadText } from '@platform/browser/downloadBlob';
 import { LOG_LEVEL_ORDER, LOG_NAMESPACES, matchesLogScope } from '@platform/logging/contracts';
 import { createLogExport } from '@platform/logging/export';
@@ -247,17 +248,11 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
       ),
     [config, matched, scope, snapshot.retention]
   );
+  const canCopy = canCopyText();
   const copyFiltered = useCallback(() => {
     const count = matched.length;
-    const clipboard = navigator.clipboard;
 
-    if (!clipboard) {
-      toaster.create({ title: t('widgets.diagnostics.copyFailed'), type: 'error' });
-
-      return;
-    }
-
-    clipboard.writeText(buildExport()).then(
+    copyText(buildExport()).then(
       () => toaster.create({ duration: 2500, title: t('widgets.diagnostics.copied', { count }), type: 'success' }),
       () => toaster.create({ title: t('widgets.diagnostics.copyFailed'), type: 'error' })
     );
@@ -329,7 +324,13 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
       <RecordingStatus config={config} snapshot={snapshot} />
       <HStack flexWrap="wrap" gap="2" justify="space-between">
         <HStack flexWrap="wrap" gap="2">
-          <Button disabled={matched.length === 0} size="sm" variant="outline" onClick={copyFiltered}>
+          <Button
+            unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
+            disabled={matched.length === 0}
+            size="sm"
+            variant="outline"
+            onClick={copyFiltered}
+          >
             {t('widgets.diagnostics.copyFiltered', { count: matched.length })}
           </Button>
           <Button disabled={matched.length === 0} size="sm" variant="outline" onClick={downloadFiltered}>

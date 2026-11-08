@@ -1,12 +1,16 @@
 /**
  * None snaps the bbox to the model grid; auto grows undersized content toward optimal area at its aspect ratio;
- * manual uses the selected size. Restore final output to the exact bbox.
+ * manual uses the selected size. Restore final output to the exact bbox. Hosted providers ignore the scaling method:
+ * they are asked for one of their own sizes nearest the bbox (or the bbox itself when free-form), and the compiler
+ * restores their output to the bbox.
  */
 
 import type { GenerateModelConfig, PidMode } from '@features/generation/core/types';
 
 import { getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
-import { clampDimension, MAX_DIMENSION } from '@features/generation/core/settings';
+import { MAX_DIMENSION } from '@features/generation/core/dimensionLimits';
+import { resolveExternalCanvasRequestSize } from '@features/generation/core/externalProvider';
+import { clampDimension } from '@features/generation/core/settings';
 
 import type { CanvasScalingSettings } from './types';
 
@@ -74,12 +78,15 @@ const growToOptimalArea = (size: CanvasSize, optimal: number, grid: number): Can
 };
 
 export const resolveCanvasProcessingSize = (
-  // Keep the variant: Wan 5B and A14B use different grids.
-  model: Pick<GenerateModelConfig, 'base' | 'type'> & { variant?: unknown },
+  // Keep the variant (Wan 5B and A14B use different grids) and a provider's capabilities (its sizes).
+  model: GenerateModelConfig,
   pidMode: PidMode,
   bbox: CanvasSize,
   scaling: CanvasScalingSettings | undefined
 ): CanvasSize => {
+  if (model.type === 'external_image_generator') {
+    return resolveExternalCanvasRequestSize(model, bbox);
+  }
   const { grid, optimal } = getGenerationDimensions(model, pidMode);
   switch (scaling?.method) {
     case 'auto': {

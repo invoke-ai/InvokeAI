@@ -102,7 +102,7 @@ describe('getZoomedOutMountViewport', () => {
   const container = { height: 900, width: 450 };
 
   it('keeps the default viewport while the fit could still land at a readable zoom', () => {
-    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1000, 0)], container)).toBeNull();
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 900, 0)], container)).toBeNull();
     expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 0, 2000)], container)).toBeNull();
   });
 
@@ -115,11 +115,12 @@ describe('getZoomedOutMountViewport', () => {
   });
 
   it('counts the fit’s padding, which lowers the zoom it can land at', () => {
-    // 450 px less XYFlow's 10% padding leaves 410 px, which shows 1025 px of positions at the content zoom.
-    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1030, 0)], container)?.zoom).toBeLessThan(
+    // 450 px less the toolbar's 56 px and XYFlow's 20 px on the right leaves 374 px, which shows 935 px of positions
+    // at the content zoom.
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 940, 0)], container)?.zoom).toBeLessThan(
       CONTENT_VISIBILITY_ZOOM
     );
-    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1020, 0)], container)).toBeNull();
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 930, 0)], container)).toBeNull();
   });
 
   it('frames the positions in the container', () => {
@@ -132,7 +133,8 @@ describe('getZoomedOutMountViewport', () => {
       { x: -500, y: 100 },
       { x: 2500, y: 700 },
     ]) {
-      expect(position.x * zoom + x).toBeGreaterThanOrEqual(0);
+      // Clear of the toolbar floating over the left edge.
+      expect(position.x * zoom + x).toBeGreaterThanOrEqual(56);
       expect(position.x * zoom + x).toBeLessThanOrEqual(container.width);
       expect(position.y * zoom + y).toBeGreaterThanOrEqual(0);
       expect(position.y * zoom + y).toBeLessThanOrEqual(container.height);

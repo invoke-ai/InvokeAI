@@ -108,6 +108,7 @@ from invokeai.app.services.shared.graph_iterate_planner import (
     _prepare_direct_iterate_collect_fan_in_unchecked,
     _prepare_direct_iterate_collect_unchecked,
 )
+from invokeai.app.services.shared.graph_loop_topology import LoopTopology
 from invokeai.app.services.shared.graph_materializer import _ExecutionMaterializer
 from invokeai.app.services.shared.graph_models import (
     Edge,  # noqa: F401
@@ -163,8 +164,6 @@ from invokeai.app.services.shared.graph_validation import (
     _EdgeListMutationResult,  # noqa: F401
     _invalidates_edge_indexes,  # noqa: F401
     _LazyNetworkX,  # noqa: F401
-    _SupportedNestedForBody,  # noqa: F401
-    _SupportedNestedIterateBody,  # noqa: F401
     are_connection_types_compatible,  # noqa: F401
     are_connections_compatible,  # noqa: F401
     copydeep,
@@ -248,7 +247,7 @@ class _GraphExecutionStateRuntime:
         "execution_graph_flat",
         "completed_source_ids_cache",
         "unexecuted_prepared_counts",
-        "for_source_by_return_id",
+        "loop_topology",
         "apply_transaction",
         "generic_execution_runtime",
         "generic_graph_scheduler",
@@ -299,7 +298,7 @@ class _GraphExecutionStateRuntime:
         self.execution_graph_flat: Any | None = None
         self.completed_source_ids_cache: Optional[set[str]] = None
         self.unexecuted_prepared_counts: Optional[dict[str, int]] = None
-        self.for_source_by_return_id: Optional[dict[str, str]] = None
+        self.loop_topology: Optional[LoopTopology] = None
         self.apply_transaction: Optional[_ApplyTransaction] = None
         self.generic_execution_runtime: Optional[ExecutionEngineRuntime] = None
         self.generic_graph_scheduler: Optional[_GenericGraphSchedulerAdapter] = None
@@ -572,10 +571,10 @@ class GraphExecutionState(BaseModel):
         self._selected_if_frames_for_preparation = {}
         self._execution_runtime = None
         self._source_graph_flat = None
+        self.__pydantic_private__["_runtime_state"].loop_topology = None
         self._execution_graph_flat = None
         self._completed_source_ids_cache = None
         self._unexecuted_prepared_counts = None
-        self._for_source_by_return_id = None
         self._for_parent_iteration_paths_cache = {}
         self._all_for_contexts_finalized_cache = {}
         self._prepared_for_index = None
@@ -652,6 +651,16 @@ class GraphExecutionState(BaseModel):
         if runtime.source_graph_flat is None:
             runtime.source_graph_flat = self.graph.nx_graph_flat()
         return runtime.source_graph_flat
+
+    def _loop_topology(self) -> LoopTopology:
+        """Return the loop shapes of the source graph, classified once per flat source graph."""
+        runtime = self.__pydantic_private__["_runtime_state"]
+        source_graph = self._get_source_graph_flat()
+        topology = runtime.loop_topology
+        # Every site that drops the flat graph also drops the topology; the identity check covers any other rebuild.
+        if topology is None or topology.flat_graph is not source_graph:
+            topology = runtime.loop_topology = LoopTopology.classify(self.graph, source_graph)
+        return topology
 
     def _get_fresh_if_nodes(self) -> tuple[IfInvocation, ...]:
         return graph_if_dependencies._get_fresh_if_nodes(self)
@@ -836,25 +845,13 @@ class GraphExecutionState(BaseModel):
             }
         return runtime.completed_source_ids_cache
 
-    def _get_for_source_by_return_id(self) -> dict[str, str]:
-        if self._for_source_by_return_id is None:
-            source_graph = self._get_source_graph_flat()
-            self._for_source_by_return_id = {
-                body_path_to_return[1]: source_for_id
-                for source_for_id, source_for_node in self.graph.nodes.items()
-                if isinstance(source_for_node, ForInvocation)
-                and (body_path_to_return := self.graph._get_for_body_path_to_return(source_for_id, source_graph))
-                is not None
-            }
-        return self._for_source_by_return_id
-
     def _invalidate_source_graph_cache(self) -> None:
         runtime = self.__pydantic_private__["_runtime_state"]
         self._invalidate_selected_if_frames_for_preparation()
         runtime.source_graph_flat = None
+        runtime.loop_topology = None
         runtime.fresh_flat_if_activation = None
         runtime.if_iteration_axes_validated = False
-        runtime.for_source_by_return_id = None
         runtime.if_branch_sources_cache = {}
         runtime.if_activation_dependencies_by_source = {}
         runtime.if_activation_dependencies_by_exec = {}
@@ -893,7 +890,7 @@ class GraphExecutionState(BaseModel):
     def _get_for_parent(self, exec_node_id: str) -> Optional[str]:
         source_return_id = self._prepared_registry().get_source_node_id(exec_node_id)
         iteration_path = self._get_iteration_path(exec_node_id)
-        source_for_id = self._get_for_source_by_return_id().get(source_return_id)
+        source_for_id = self._loop_topology().for_id_by_return_id.get(source_return_id)
         if source_for_id is not None:
             prepared_for_id = self._get_prepared_for_index().get((source_for_id, iteration_path))
             if prepared_for_id is not None:
@@ -1051,7 +1048,7 @@ class GraphExecutionState(BaseModel):
         return self._apply_for_continuation(exec_node_id, output, self._materializer())
 
     def _can_use_generic_two_sibling_nested_for_scheduler(
-        self, for_nodes: list[ForInvocation], return_nodes: list[ForReturnInvocation], source_graph: Any
+        self, for_nodes: list[ForInvocation], return_nodes: list[ForReturnInvocation], loop_topology: LoopTopology
     ) -> bool:
         if len(for_nodes) != 3 or len(return_nodes) != 3 or len(self.graph.nodes) != 10 or len(self.graph.edges) != 13:
             return False
@@ -1059,7 +1056,7 @@ class GraphExecutionState(BaseModel):
         outer_candidates = []
         nested_bodies = {}
         for node in for_nodes:
-            nested_body = self.graph._get_supported_for_nested_for_body(node.id, source_graph)
+            nested_body = loop_topology.nested_for_body(node.id)
             if nested_body is not None:
                 nested_bodies[node.id] = nested_body
                 if len(nested_body.inner_for_ids) == 2 and len(nested_body.continuation_nodes) == 1:
@@ -1118,7 +1115,7 @@ class GraphExecutionState(BaseModel):
             child_return_id = self.graph._get_linked_for_return_id(child_id)
             if child_return_id is None:
                 return False
-            child_body_path = self.graph._get_for_body_path_to_return(child_id, source_graph)
+            child_body_path = loop_topology.for_body_paths.get(child_id)
             if child_body_path is None or len(child_body_path[0]) != 2 or child_body_path[1] != child_return_id:
                 return False
             child_body_ids = child_body_path[0] - {child_return_id}
@@ -1162,7 +1159,7 @@ class GraphExecutionState(BaseModel):
         self,
         for_nodes: list[ForInvocation],
         return_nodes: list[ForReturnInvocation],
-        source_graph: Any,
+        loop_topology: LoopTopology,
         *,
         nested_level: Literal[3, 4] = 3,
     ) -> bool:
@@ -1174,7 +1171,7 @@ class GraphExecutionState(BaseModel):
         outer_candidates: list[ForInvocation] = []
         for_node_bodies: dict[str, Any] = {}
         for node in for_nodes:
-            nested_body = self.graph._get_supported_for_nested_for_body(node.id, source_graph)
+            nested_body = loop_topology.nested_for_body(node.id)
             if nested_body is not None:
                 for_node_bodies[node.id] = nested_body
         nested_child_ids = {
@@ -1262,16 +1259,16 @@ class GraphExecutionState(BaseModel):
         return_nodes = [node for node in self.graph.nodes.values() if isinstance(node, ForReturnInvocation)]
         if any(isinstance(node, (IterateInvocation, CollectInvocation)) for node in self.graph.nodes.values()):
             return self._can_use_generic_nested_iterate_scheduler(for_nodes, return_nodes)
-        source_graph = self._get_source_graph_flat()
+        loop_topology = self._loop_topology()
         if len(for_nodes) == 3 and len(return_nodes) == 3:
-            if self._can_use_generic_two_sibling_nested_for_scheduler(for_nodes, return_nodes, source_graph):
+            if self._can_use_generic_two_sibling_nested_for_scheduler(for_nodes, return_nodes, loop_topology):
                 return True
-            return self._can_use_generic_serial_nested_for_scheduler(for_nodes, return_nodes, source_graph)
+            return self._can_use_generic_serial_nested_for_scheduler(for_nodes, return_nodes, loop_topology)
         if len(for_nodes) == 4 and len(return_nodes) == 4:
             return self._can_use_generic_serial_nested_for_scheduler(
                 for_nodes,
                 return_nodes,
-                source_graph,
+                loop_topology,
                 nested_level=4,
             )
         if len(for_nodes) == 2 and len(return_nodes) == 2:
@@ -1279,7 +1276,7 @@ class GraphExecutionState(BaseModel):
                 (
                     node
                     for node in for_nodes
-                    if (nested_body := self.graph._get_supported_for_nested_for_body(node.id, source_graph)) is not None
+                    if (nested_body := loop_topology.nested_for_body(node.id)) is not None
                     and len(nested_body.inner_for_ids) == 1
                     and not nested_body.continuation_nodes
                 ),
@@ -1289,7 +1286,7 @@ class GraphExecutionState(BaseModel):
                 not self.graph._get_input_edges(outer_for.id, COLLECTION_FIELD) and not outer_for.collection
             ):
                 return False
-            nested_body = self.graph._get_supported_for_nested_for_body(outer_for.id, source_graph)
+            nested_body = loop_topology.nested_for_body(outer_for.id)
             assert nested_body is not None
             outer_collection_edges = self.graph._get_input_edges(outer_for.id, COLLECTION_FIELD)
             if outer_collection_edges:
@@ -1347,7 +1344,7 @@ class GraphExecutionState(BaseModel):
                 and not collection_value
             ):
                 empty_collection_source = collection_source
-        body_path = self.graph._get_for_body_path_to_return(for_nodes[0].id, self._get_source_graph_flat())
+        body_path = loop_topology.for_body_paths.get(for_nodes[0].id)
         if body_path is None:
             return False
         body_node_ids, return_node_id = body_path
@@ -1417,9 +1414,9 @@ class GraphExecutionState(BaseModel):
 
         iterate_nodes = [node for node in self.graph.nodes.values() if isinstance(node, IterateInvocation)]
         collect_nodes = [node for node in self.graph.nodes.values() if isinstance(node, CollectInvocation)]
-        source_graph = self._get_source_graph_flat()
+        loop_topology = self._loop_topology()
         if len(iterate_nodes) == 2 and len(collect_nodes) == 1:
-            serial_chain = self.graph._get_supported_for_serial_nested_iterate_chain(outer_for.id, source_graph)
+            serial_chain = loop_topology.nested_iterate_chain(outer_for.id)
             if (
                 can_use_nested_iterate_planner(self)
                 and serial_chain is not None
@@ -1448,10 +1445,7 @@ class GraphExecutionState(BaseModel):
         collect_node = collect_nodes[0]
         return_node = return_nodes[0]
 
-        if (
-            not can_use_nested_iterate_planner(self)
-            or self.graph._get_supported_for_nested_iterate_body(outer_for.id, source_graph) is None
-        ):
+        if not can_use_nested_iterate_planner(self) or loop_topology.nested_iterate_body(outer_for.id) is None:
             return False
 
         iterate_collection_edges = self.graph._get_input_edges(iterate_node.id, COLLECTION_FIELD)
@@ -2049,9 +2043,7 @@ class GraphExecutionState(BaseModel):
                 and final_for_id == node.id
                 and self._is_loop_context_finalized(source_node_id, parent_iteration_path)
             ):
-                body_path_to_return = self.graph._get_for_body_path_to_return(
-                    source_node_id, self._get_source_graph_flat()
-                )
+                body_path_to_return = self._loop_topology().for_body_paths.get(source_node_id)
                 if body_path_to_return is not None:
                     _body_path_nodes, source_return_id = body_path_to_return
                     return_outputs = self._get_ordered_for_return_outputs(node.id, source_return_id)
@@ -3387,7 +3379,7 @@ class GraphExecutionState(BaseModel):
             return
 
         source_node_ids = {source_for_id}
-        body_path_to_return = self.graph._get_for_body_path_to_return(source_for_id, self._get_source_graph_flat())
+        body_path_to_return = self._loop_topology().for_body_paths.get(source_for_id)
         if body_path_to_return is not None:
             body_path_nodes, _return_node_id = body_path_to_return
             source_node_ids.update(body_path_nodes)
@@ -3601,6 +3593,7 @@ class GraphExecutionState(BaseModel):
         self._prepared_if_exec_indexed_sources = set()
         self._selected_if_frames_for_preparation = {}
         self._source_graph_flat = None
+        self.__pydantic_private__["_runtime_state"].loop_topology = None
         self._execution_graph_flat = None
         self._completed_source_ids_cache = None
         self._unexecuted_prepared_counts = None
@@ -4362,7 +4355,6 @@ _GRAPH_RUNTIME_ATTRIBUTE_NAMES = (
     "execution_graph_flat",
     "completed_source_ids_cache",
     "unexecuted_prepared_counts",
-    "for_source_by_return_id",
     "apply_transaction",
     "generic_execution_runtime",
     "generic_graph_scheduler",

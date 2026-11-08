@@ -43,6 +43,8 @@ register(
         guidance_max=20.0,
         scheduler_set="flow",
         scheduler_applies_to_graph=True,
+        # The Fun-ControlNet-Union is FLUX.2 [dev]'s; `flux2_denoise` refuses it on Klein.
+        control_kinds=frozenset({"flux2_control"}),
         max_reference_images=5,
         supports_regional_guidance=True,
     ),

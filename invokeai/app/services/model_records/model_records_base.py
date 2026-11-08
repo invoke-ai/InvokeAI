@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     FluxVariantType,
     Krea2VariantType,
     LTX2VariantType,
@@ -40,6 +41,7 @@ from invokeai.backend.model_manager.taxonomy import (
     QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
+    SD3VariantType,
     WanLoRAVariantType,
     WanVariantType,
     ZImageVariantType,
@@ -136,10 +138,12 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | ClipVariantType
         | FluxVariantType
         | Flux2VariantType
+        | Flux3VariantType
         | ZImageVariantType
         | QwenImageVariantType
         | WanVariantType
         | WanLoRAVariantType
+        | SD3VariantType
         | Qwen3VariantType
         | Qwen3VLVariantType
         | Qwen35VariantType
@@ -154,7 +158,6 @@ class ModelRecordChanges(BaseModelExcludeNull):
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )
-    upcast_attention: Optional[bool] = Field(description="Whether to upcast attention.", default=None)
     config_path: Optional[str] = Field(description="Path to config file for model", default=None)
 
 
@@ -189,9 +192,12 @@ class ModelRecordServiceBase(ABC):
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
-        :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param changes: A set of changes to apply to this model. Changes are validated before being written. A
+        model's key cannot change: `changes.key`, if set, must equal `key`, or ValueError is raised.
         :param allow_class_change: If True, allows changes that would change the model config class. For example,
         changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
+        A non-null change to a field that neither the current nor the resulting config class has raises ValueError
+        and nothing is written.
         """
         pass
 

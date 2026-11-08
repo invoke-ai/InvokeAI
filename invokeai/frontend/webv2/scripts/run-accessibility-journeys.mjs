@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
+import { startAssetFaultProxy } from './asset-fault-proxy.mjs';
 import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -138,6 +139,16 @@ const waitForWorkbench = async (page) => {
   await presetStrip(page).waitFor();
 };
 
+/** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
+const BUILT_IN_BOTTOM_WIDGETS = [
+  'Autosave',
+  'Gallery',
+  'Notifications',
+  'Queue status',
+  'Server Status',
+  'Shortcuts',
+  'Workflow',
+];
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
 /** Preset names need not match their center views; pass the expected view explicitly. */
@@ -232,6 +243,46 @@ const surfaces = [
     },
   },
   {
+    id: 'workbench-canvas-control-layer',
+    path: representativeProjectPath,
+    ready: async (page) => {
+      // Seed after the reset in openRepresentativePage, then reload so the model list includes the seed.
+      const seeded = await fetch(`${backendOrigin}/__models`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ set: 'control-sdxl' }),
+      });
+      assert.ok(seeded.ok, `Could not seed control models: ${String(seeded.status)}.`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForWorkbench(page);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
+      // (Fixture Model 006) through the Generate panel's model picker.
+      await page.getByText('Fixture Model 001', { exact: true }).click();
+      const search = page.getByRole('combobox', { name: /^Search / });
+      await search.fill('Fixture Model 006');
+      await page.getByRole('option', { name: /Fixture Model 006(?!\d)/ }).click();
+      // Once the picker has closed, the trigger is the only place naming the new model.
+      await search.waitFor({ state: 'hidden' });
+      await page.getByText('Fixture Model 006', { exact: true }).waitFor();
+      await page.getByRole('button', { exact: true, name: 'Add layer' }).click();
+      await page.getByRole('menuitem', { exact: true, name: 'Control layer' }).click();
+      // The new layer's Properties panel and the canvas hint over its empty source are both scanned.
+      const type = page.getByRole('combobox', { exact: true, name: 'Type' });
+      await type.waitFor();
+      await page.getByRole('note').filter({ hasText: 'Drop an image here' }).waitFor();
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, 'workbench-canvas-control-layer-untyped');
+      // Typed as Depth: the seed holds two depth models, so the panel asks for one; the runner scans this state.
+      await type.click();
+      await page.getByRole('option', { name: /^Depth/ }).click();
+      await page
+        .getByRole('combobox', { exact: true, name: 'Model' })
+        .filter({ hasText: 'Choose a depth model' })
+        .waitFor();
+    },
+  },
+  {
     id: 'workbench-gallery-representative',
     path: representativeProjectPath,
     ready: async (page) => {
@@ -248,7 +299,7 @@ const surfaces = [
     path: representativeProjectPath,
     ready: async (page) => {
       await waitForWorkbench(page);
-      await selectLayoutPreset(page, 'Automate', 'Workflow');
+      await selectLayoutPreset(page, 'Workflow', 'Workflow');
       await page.getByText('Fixture Node 001', { exact: true }).waitFor();
       // Pan the y=0 fixture clear of the floating toolbar before measuring targets.
       const pane = await page.locator('.react-flow__pane').boundingBox();
@@ -370,6 +421,97 @@ const runShortcutGuideJourney = async (browser) => {
   return { id: 'workbench-shortcuts', status: 'passed' };
 };
 
+/**
+ * A status-bar chip is named by its compact content, so every built-in chip must say which widget it is first. Enable
+ * every bottom widget the menu offers, then match each chip's name to one enabled label.
+ */
+const runStatusBarNamesJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-status-bar-names';
+
+  try {
+    await waitForWorkbench(page);
+    const footer = page.locator('footer');
+    await footer.getByRole('button', { exact: true, name: 'Bottom widget visibility' }).click();
+    const menu = page.getByRole('menu');
+    await menu.waitFor();
+    const items = menu.getByRole('menuitemcheckbox');
+
+    for (let index = 0; index < (await items.count()); index++) {
+      const item = items.nth(index);
+
+      if (
+        (await item.getAttribute('aria-checked')) === 'false' &&
+        (await item.getAttribute('aria-disabled')) !== 'true'
+      ) {
+        await item.click();
+        await page.waitForFunction(
+          (element) => element.getAttribute('aria-checked') === 'true',
+          await item.elementHandle()
+        );
+      }
+    }
+
+    // Read while the menu is open; its items leave the page with it.
+    const itemLabels = [];
+    const labels = [];
+
+    for (let index = 0; index < (await items.count()); index++) {
+      // Item text only: a failed widget's row also carries a "Failed" note.
+      const label = ((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim();
+      itemLabels.push(label);
+      if ((await items.nth(index).getAttribute('aria-checked')) === 'true') {
+        labels.push(label);
+      }
+    }
+
+    await page.keyboard.press('Escape');
+    await menu.waitFor({ state: 'hidden' });
+    // A chip still loading its view is named "Loading <label>" by its busy status fallback.
+    await page.waitForFunction(() => document.querySelector('footer [aria-busy="true"]') === null);
+    await waitForSettledDocument(page);
+    const chips = footer.locator('[data-status-bar-widget] > [role="button"]');
+    const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    assert.deepEqual(
+      itemLabels.toSorted(),
+      BUILT_IN_BOTTOM_WIDGETS.toSorted(),
+      'The bottom widget menu must list every built-in bottom widget.'
+    );
+    assert.equal(
+      labels.length,
+      itemLabels.length,
+      `Every bottom widget the menu lists must be enabled; got ${JSON.stringify(labels)}.`
+    );
+    assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
+
+    for (const label of labels) {
+      // Chromium's computed name; the label must lead as whole words ("Gallery: 102 items", "Queue status Queue idle").
+      const named = footer.getByRole('button', { name: new RegExp(`^${escapeRegExp(label)}(?:$|[\\s:])`) });
+      assert.equal(
+        await chips.and(named).count(),
+        1,
+        `Exactly one status-bar chip's name must start with "${label}"; chips: ${(await chips.allInnerTexts()).join(' | ')}.`
+      );
+    }
+
+    await assertNoAxeViolations(page, id, { include: ['footer'] });
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+  } catch (error) {
+    const directory = resolve(root, 'artifacts/accessibility');
+    await mkdir(directory, { recursive: true });
+    await page.screenshot({ path: resolve(directory, `${id}.png`) }).catch(() => undefined);
+    throw error;
+  } finally {
+    await context.close();
+  }
+
+  return { id: 'workbench-status-bar-names', status: 'passed' };
+};
+
 const runKeyboardJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, '/#/');
 
@@ -429,6 +571,13 @@ const runKeyboardJourney = async (browser) => {
     const previewTrigger = centerViewTrigger(page, 'Preview');
 
     await previewTrigger.focus();
+    await previewTrigger.press('ControlOrMeta+k');
+    await paletteDialog.waitFor();
+    await expectFocused(paletteInput, 'Opening the Workbench palette should focus its search field.');
+    await paletteInput.press('Escape');
+    await paletteDialog.waitFor({ state: 'hidden' });
+    await expectFocused(previewTrigger, 'Closing the Workbench palette should restore the keyboard origin.');
+
     await previewTrigger.press('Enter');
 
     // Compose keeps Preview and Gallery as its center views; Canvas lives under "Add to center".
@@ -466,7 +615,11 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    await page.getByRole('button', { exact: true, name: '0 images remaining. Open queue' }).waitFor();
+    // The representative queue is populated; measure the hydrated counter rather than its transient idle state.
+    await page
+      .locator('header')
+      .getByRole('button', { name: /^[1-9]\d* (images? remaining|items? waiting for the connection)\. Open queue$/ })
+      .waitFor();
 
     for (const width of [1_024, 900]) {
       await page.setViewportSize({ height: 900, width });
@@ -540,66 +693,92 @@ const runTopbarMenuJourney = async (browser) => {
     const activeLeftWidgetName = await activeLeftWidget.getAttribute('aria-label');
     assert.ok(activeLeftWidgetName);
 
-    const routingTrigger = page.getByRole('button', { name: /^Invoke from/ });
-    const routingLockIndicator = routingTrigger.locator('[data-routing-lock-indicator]');
-    const routingTriggerBoundsBeforeHover = await routingTrigger.boundingBox();
-    assert.ok(routingTriggerBoundsBeforeHover);
+    // Routing lives in the Invoke card: no separate routing button beside Invoke.
+    assert.equal(await page.locator('[data-routing-control]').count(), 0);
+    const invokeButton = page.getByRole('button', { name: /^Invoke(?: · \d+ issues?)?$/ });
+    const invokeCard = page.locator('[data-scope="popover"][data-part="content"][data-state="open"]');
+    const routingLockIndicator = invokeButton.locator('[data-routing-lock-indicator]');
+    const invokeBoundsBeforeLock = await invokeButton.boundingBox();
+    assert.ok(invokeBoundsBeforeLock);
+    // Activation opens the card only while issues block Invoke; when ready it queues, and announces no popup.
+    const invokeBlocked = (await invokeButton.getAttribute('data-blocked')) !== null;
+    const expectedInvokeExpanded = (expanded) => (invokeBlocked ? String(expanded) : null);
+    assert.equal(await invokeButton.getAttribute('aria-haspopup'), invokeBlocked ? 'dialog' : null);
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
     assert.ok(
-      routingTriggerBoundsBeforeHover.width <= 36 && routingTriggerBoundsBeforeHover.height <= 38,
-      'The routing trigger should remain narrow and align with its attached controls.'
+      ((await invokeButton.getAttribute('aria-keyshortcuts')) ?? '').split(' ').includes('ArrowDown'),
+      'Invoke must list ArrowDown, its keyboard way into the card, among its shortcuts.'
     );
+    // The route and its lock show only in the card and a decorative mark, so the description must carry them.
+    const invokeDescription = () =>
+      invokeButton.evaluate((button) =>
+        (button.getAttribute('aria-describedby') ?? '')
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((descriptionId) => document.getElementById(descriptionId)?.textContent?.trim() ?? '')
+          .join(' ')
+      );
+    const routeDescriptionPattern = (locked) =>
+      new RegExp(`^\\S+ to \\S+${locked ? ', route locked' : ''}\\. Down Arrow opens the route\\.`);
+    assert.match(await invokeDescription(), routeDescriptionPattern(false));
     assert.equal(await routingLockIndicator.count(), 0);
-    await routingTrigger.hover();
-    const routingTooltip = page.getByRole('tooltip', { exact: true, name: 'Change routing' });
-    await routingTooltip.waitFor({ timeout: 2_000 });
-    const [routingTriggerBounds, routingTooltipBounds] = await Promise.all([
-      routingTrigger.boundingBox(),
-      routingTooltip.boundingBox(),
-    ]);
-    assert.ok(routingTriggerBounds);
-    assert.ok(routingTooltipBounds);
-    assert.ok(
-      routingTooltipBounds.x < routingTriggerBounds.x + routingTriggerBounds.width &&
-        routingTooltipBounds.x + routingTooltipBounds.width > routingTriggerBounds.x,
-      'The routing tooltip should be anchored to and horizontally overlap its trigger.'
+
+    // Hover previews the card without expanding it or taking focus.
+    await invokeButton.hover();
+    await invokeCard.getByText('Source', { exact: true }).waitFor();
+    await invokeCard.getByText('Destination', { exact: true }).waitFor();
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
+    await page.mouse.move(0, 0);
+    await invokeCard.waitFor({ state: 'hidden' });
+
+    // ArrowDown pins it and moves focus into it, whether or not Invoke is ready to queue.
+    await invokeButton.focus();
+    await page.keyboard.press('ArrowDown');
+    await invokeCard.waitFor();
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(true));
+    assert.equal(await invokeButton.getAttribute('aria-controls'), await invokeCard.getAttribute('id'));
+    // The card the Down Arrow hint points to is named by its title.
+    assert.equal(
+      await page.getByRole('dialog', { name: /^(?:Add to queue|Unable to queue|Preparing generation…)$/ }).count(),
+      1,
+      'The open Invoke card must be named by its title.'
     );
-    await routingTrigger.click();
-    const routingMenu = page.getByRole('menu');
-    const sourceHeading = routingMenu.getByText('Source', { exact: true });
-    const destinationHeading = routingMenu.getByText('Destination', { exact: true });
-    const lockRouting = routingMenu.getByRole('menuitem', { exact: true, name: 'Lock routing' });
-    await sourceHeading.waitFor();
-    await destinationHeading.waitFor();
-    await lockRouting.waitFor();
-    assert.equal(await routingMenu.getByRole('button', { name: /^(?:Lock|Unlock)/ }).count(), 0);
-    assert.equal(await routingMenu.getByText('Opens', { exact: true }).count(), 0);
-    assert.equal(await routingMenu.getByText('Selected', { exact: true }).count(), 0);
-
-    await lockRouting.click();
-    const lockedRoutingTrigger = page.getByRole('button', {
-      exact: true,
-      name: 'Invoke from workflow, output to gallery, source locked, destination locked',
+    // Focus moves once the card's controls mount.
+    await invokeCard.locator(':focus').waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:invoke-card`, {
+      include: ['[data-scope="popover"][data-part="content"]'],
     });
-    await lockedRoutingTrigger.waitFor();
-    assert.equal(await lockedRoutingTrigger.locator('[data-routing-lock-indicator]').count(), 1);
-    await lockedRoutingTrigger.click();
-    const unlockRouting = page.getByRole('menu').getByRole('menuitem', { exact: true, name: 'Unlock routing' });
-    await unlockRouting.click();
-    await page
-      .getByRole('button', {
-        exact: true,
-        name: 'Invoke from workflow, output to gallery, following edits',
-      })
-      .waitFor();
-    assert.equal(await routingTrigger.locator('[data-routing-lock-indicator]').count(), 0);
 
-    await routingTrigger.click();
+    const lockRouting = invokeCard.getByRole('button', { exact: true, name: 'Lock routing' });
+    assert.equal(await lockRouting.getAttribute('aria-pressed'), 'false');
+    await lockRouting.click();
+    // One fixed name; the pressed state says whether the route is locked.
+    await invokeCard.locator('[data-routing-lock][aria-pressed="true"]').waitFor();
+    // The lock is marked on Invoke itself, without moving or resizing it.
+    await routingLockIndicator.waitFor();
+    const invokeBoundsLocked = await invokeButton.boundingBox();
+    assert.ok(invokeBoundsLocked);
+    assert.equal(invokeBoundsLocked.width, invokeBoundsBeforeLock.width);
+    assert.equal(invokeBoundsLocked.x, invokeBoundsBeforeLock.x);
+    assert.match(await invokeDescription(), routeDescriptionPattern(true));
+    await lockRouting.click();
+    await invokeCard.locator('[data-routing-lock][aria-pressed="false"]').waitFor();
+    assert.equal(await routingLockIndicator.count(), 0);
+    assert.ok(await invokeCard.isVisible(), 'Toggling the lock should keep the card open.');
 
-    await routingMenu.getByRole('menuitemradio', { name: /^Upscale/ }).click();
-    await page.getByRole('button', { name: /^No source widget open/ }).waitFor();
+    // Only sources this layout holds are offered; switching one keeps the layout and the card as they are.
+    const sourceGroup = invokeCard.getByRole('radiogroup', { exact: true, name: 'Source' });
+    assert.equal(await sourceGroup.getByText('Upscale', { exact: true }).count(), 0);
+    await sourceGroup.getByText('Generate', { exact: true }).click();
+    await sourceGroup.locator('input[value="generate"]:checked').waitFor({ state: 'attached' });
+    assert.ok(await invokeCard.isVisible(), 'Switching the source should keep the card open.');
     await centerViewTrigger(page, 'Preview').waitFor();
     assert.equal(await upscaleWidget.count(), 0);
     assert.equal(await activeLeftWidget.getAttribute('aria-label'), activeLeftWidgetName);
+    await page.keyboard.press('Escape');
+    await invokeCard.waitFor({ state: 'hidden' });
+    await expectFocused(invokeButton, 'Closing the Invoke card should return focus to Invoke.');
 
     await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
     const appMenu = page.getByRole('menu', { exact: true, name: 'Open menu' });
@@ -608,7 +787,7 @@ const runTopbarMenuJourney = async (browser) => {
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
-    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to InvokeAI' });
+    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to Invoke' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
     await whatsNewItem.waitFor();
@@ -645,11 +824,35 @@ const runTopbarMenuJourney = async (browser) => {
     });
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
+    // Donate is its own group right after Manage (ending with Queue and Widgets), above the footer icon row; this mock journey
+    // is single-user, so no account section sits between them.
+    const menuItemValues = await appMenu.evaluate((menu) =>
+      [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
+    );
+    assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
+      'queue',
+      'widgets',
+      'donate',
+      'command-palette',
+      'settings',
+      'whats-new',
+      'documentation',
+      'discord',
+    ]);
+    const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
+    const widgetsItem = appMenu.locator('[role="menuitem"][data-value="widgets"]');
+
     await appMenu.press('End');
-    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await donationItem.getAttribute('id'));
-    await appMenu.press('ArrowUp');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
+    for (const item of [
+      documentationItem,
+      whatsNewItem,
+      settingsItem,
+      commandPaletteItem,
+      donationItem,
+      widgetsItem,
+      queueItem,
+    ]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
@@ -769,7 +972,11 @@ const runVideoPreviewJourney = async (browser) => {
     assert.equal(await selectVideo.locator('xpath=..').locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
     await selectVideo.press('Enter');
 
-    const video = centerRegion(page).locator(`video[aria-label="Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}"]`);
+    const player = centerRegion(page).getByRole('group', {
+      exact: true,
+      name: `Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}`,
+    });
+    const video = player.locator('video');
 
     try {
       await video.waitFor();
@@ -779,10 +986,32 @@ const runVideoPreviewJourney = async (browser) => {
         `${error instanceof Error ? error.message : String(error)}\nPage errors: ${pageErrors.map(String).join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nBody:\n${bodyText}`
       );
     }
-    assert.equal(await video.getAttribute('controls'), '');
+    // The player's own controls replace the browser's.
+    assert.equal(await video.getAttribute('controls'), null);
     assert.equal(await video.getAttribute('playsinline'), '');
     assert.match((await video.getAttribute('poster')) ?? '', /fixture-video-001\.mp4\/thumbnail$/);
     assert.equal(await video.getAttribute('draggable'), null);
+
+    // The video can be operated from the keyboard: its controls are tab stops, and Space plays and pauses it.
+    const play = player.locator('button[aria-label="Play"]:not([disabled])');
+    await play.waitFor();
+    assert.notEqual(await play.getAttribute('tabindex'), '-1');
+    await play.focus();
+    await expectFocused(play, 'The video player Play control must be keyboard focusable.');
+    await page.keyboard.press('Space');
+    await page.waitForFunction((element) => !element.paused, await video.elementHandle());
+    const pause = player.getByRole('button', { exact: true, name: 'Pause' });
+    await expectFocused(pause, 'The video player must keep focus on its play control while playing.');
+    await page.keyboard.press('Space');
+    await page.waitForFunction((element) => element.paused, await video.elementHandle());
+    const seek = player.getByRole('slider', { exact: true, name: 'Seek' });
+    assert.notEqual(await seek.getAttribute('tabindex'), '-1');
+    assert.equal(await player.getByRole('button', { exact: true, name: 'Loop' }).isEnabled(), true);
+    // A wide bar shows the volume slider; a narrow one opens it from a volume button.
+    const volume = player
+      .getByRole('slider', { exact: true, name: 'Volume' })
+      .or(player.getByRole('button', { exact: true, name: 'Volume' }));
+    assert.equal(await volume.isEnabled(), true);
 
     // Media details live in the floating header chrome's Details popover; audit the surface with it open.
     const details = page
@@ -903,14 +1132,14 @@ const runKeepAliveStateJourney = async (browser) => {
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
 
-    const zoomTrigger = page.getByRole('button', { exact: true, name: 'Zoom level' });
+    const zoomTrigger = page.getByRole('button', { name: /^Zoom \d+%$/ });
     await zoomTrigger.click();
     await page.getByRole('menuitem', { exact: true, name: '200%' }).click();
     await waitForSettledDocument(page);
     assert.equal((await zoomTrigger.textContent())?.trim(), '200%', 'The zoom control must report the chosen zoom.');
 
     // Away and back, which is the whole point of keeping the widgets mounted.
-    await selectLayoutPreset(page, 'Automate', 'Workflow');
+    await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
     await waitForSettledDocument(page);
@@ -1269,6 +1498,321 @@ const runSettingsJourney = async (browser) => {
   }
 };
 
+/** Browser history can leave a modal section; authorized work must settle while its Activity is hidden. */
+const runHiddenMaintenanceJourney = async (browser) => {
+  const id = 'launchpad-hidden-maintenance';
+  for (const outcome of ['success', 'error']) {
+    const { context, page } = await openRepresentativePage(browser, '/#/');
+    let finish = () => {};
+    let started = () => {};
+    const executing = new Promise((resolveStarted) => {
+      started = resolveStarted;
+    });
+    const pending = new Promise((resolvePending) => {
+      finish = resolvePending;
+    });
+    let previews = 0;
+    let mutations = 0;
+    await page.route('**/api/v1/app/gallery/maintenance/preview', (route) => {
+      previews += 1;
+      return route.fulfill({
+        status: 200,
+        json: {
+          operation: 'archive_untracked',
+          fingerprint: 'a'.repeat(64),
+          examined_count: 12,
+          affected_count: 2,
+          skipped_count: 0,
+          error_count: 0,
+          errors: [],
+          archive_path: '/fixture/gallery-archive',
+        },
+      });
+    });
+    await page.route('**/api/v1/app/gallery/maintenance/archive-untracked', async (route) => {
+      mutations += 1;
+      started();
+      await pending;
+      await route.fulfill(
+        outcome === 'error'
+          ? { status: 500, json: { detail: 'Fixture maintenance failure' } }
+          : {
+              status: 200,
+              json: {
+                operation: 'archive_untracked',
+                status: 'completed',
+                examined_count: 12,
+                skipped_count: 0,
+                failed_count: 0,
+                records_removed: 0,
+                images_archived: 2,
+                thumbnails_archived: 0,
+                thumbnails_regenerated: 0,
+                archive_path: '/fixture/gallery-archive',
+                backup_path: '/fixture/gallery-backup.sqlite',
+                errors: [],
+              },
+            }
+      );
+    });
+    try {
+      await waitForHome(page);
+      await page.evaluate(() => {
+        location.hash = '/preferences/workspace';
+      });
+      const action = page.getByRole('button', { name: 'Archive untracked files', exact: true });
+      await action.click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Archive untracked files', exact: true }).click();
+      await executing;
+      await page.goBack();
+      await waitForHome(page);
+      const settled = page.waitForResponse((response) =>
+        response.url().endsWith('/api/v1/app/gallery/maintenance/archive-untracked')
+      );
+      finish();
+      await (await settled).finished();
+      await page.goForward();
+      await page
+        .getByText(outcome === 'success' ? 'Gallery maintenance completed.' : 'Fixture maintenance failure', {
+          exact: true,
+        })
+        .waitFor();
+      await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
+      assert.equal(await action.isEnabled(), true, 'Hidden completion must release the running state.');
+      assert.equal(previews, 1);
+      assert.equal(mutations, 1, 'History navigation must never repeat destructive execution.');
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:${outcome}`);
+    } finally {
+      finish();
+      await context.close();
+    }
+  }
+  return {
+    id,
+    status: 'passed',
+    hiddenOutcomes: ['success', 'error'],
+    navigation: 'browser Back/Forward while modal',
+    mutationsPerOperation: 1,
+  };
+};
+
+/** Fault the actual first-party production module request; Retry never silently reloads the editor. */
+const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = false) => {
+  const id = activeWorker
+    ? 'workbench-native-import-active-worker-recovery'
+    : failures === 1
+      ? 'workbench-native-import-recovery'
+      : 'workbench-native-import-repeated-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/workbench/widgets/preview/implementation.ts'].file;
+  const proxy = activeWorker ? await startAssetFaultProxy(origin, chunk, failures) : null;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    ...(activeWorker ? {} : { serviceWorkers: 'block' }),
+  });
+  const page = await context.newPage();
+  let remainingFailures = failures;
+  const requests = proxy?.requests ?? [];
+  const workerResponses = [];
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === `/${chunk}`) {
+      workerResponses.push({ status: response.status(), fromServiceWorker: response.fromServiceWorker() });
+    }
+  });
+  if (!activeWorker) {
+    await page.route(`**/${chunk}`, async (route) => {
+      const blocked = remainingFailures-- > 0;
+      requests.push(blocked ? 503 : 200);
+      if (blocked) {
+        await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+      } else {
+        await route.continue();
+      }
+    });
+  }
+  try {
+    if (activeWorker) {
+      await page.goto(proxy.origin);
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+          await new Promise((resolveController) => {
+            navigator.serviceWorker.addEventListener('controllerchange', resolveController, { once: true });
+          });
+        }
+      });
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      assert.equal(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).pathname), '/sw.js');
+      assert.deepEqual(requests, [], 'The lazy target must not already be cached before the fault.');
+    }
+    await page.goto(`${proxy?.origin ?? origin}${representativeProjectPath}`);
+    await waitForWorkbench(page);
+    let canvasUndoName;
+    if (failures > 1) {
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await page.getByRole('button', { name: 'Add layer', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Raster layer', exact: true }).click();
+      const undo = page.getByRole('button', { name: /^Undo: / });
+      await undo.waitFor();
+      canvasUndoName = await undo.getAttribute('aria-label');
+      assert.equal(await undo.isEnabled(), true);
+    }
+    await selectLayoutPreset(page, 'Compose', 'Preview');
+    const card = centerRegion(page).locator('[data-testid="widget-failure"]');
+    await card.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+    assert.deepEqual(requests, [503]);
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const output = resolve(root, 'artifacts/accessibility');
+    await mkdir(output, { recursive: true });
+    await page.screenshot({ path: resolve(output, `${id}-failed.png`) });
+    const before = await page.evaluate(() => performance.timeOrigin);
+    const draft = 'Native import recovery keeps this held prompt';
+    const prompt = page.getByLabel('Positive prompt', { exact: true });
+    await prompt.fill(draft);
+    const unsaved = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+      response.json()
+    );
+    assert.equal(JSON.stringify(unsaved).includes(draft), false, 'The field must not already be saved before Retry.');
+    const retry = card.getByRole('button', { name: 'Retry', exact: true });
+    await retry.focus();
+    await retry.press('Enter');
+    if (failures > 1) {
+      const reload = card.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.waitFor();
+      assert.equal(
+        await page.evaluate(() => performance.timeOrigin),
+        before,
+        'Ordinary Retry must keep the document and its undo histories.'
+      );
+      await reload.click();
+      const dialog = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+      await dialog.waitFor();
+      assert.match(await dialog.textContent(), /ALL open projects.*Canvas undo and per-workflow edit histories/);
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:confirmation`);
+      await page.screenshot({ path: resolve(output, `${id}-confirmation.png`) });
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(await page.evaluate(() => performance.timeOrigin), before);
+      assert.equal(await prompt.inputValue(), draft);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      const retainedUndo = page.getByRole('button', { name: canvasUndoName, exact: true });
+      assert.equal(await retainedUndo.isEnabled(), true, 'Cancel must retain real Canvas undo, across layout hiding.');
+      await selectLayoutPreset(page, 'Compose', 'Preview');
+      // A new held draft proves confirmation saves the current editor, not just the earlier Retry's checkpoint.
+      await prompt.fill(`${draft} after cancel`);
+      const beforeConfirm = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+        response.json()
+      );
+      assert.equal(JSON.stringify(beforeConfirm).includes(`${draft} after cancel`), false);
+      await reload.click();
+      await dialog.getByRole('button', { name: 'Reload editor', exact: true }).click();
+      await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    }
+    await waitForWorkbench(page);
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await page
+      .locator('[data-hotkey-widget-region="center"][data-hotkey-widget-type-id="preview"]')
+      .getByRole('button', { name: /^Auto-switch:/ })
+      .waitFor();
+    await centerRegion(page).locator('[data-widget-loading]').waitFor({ state: 'detached' });
+    await centerRegion(page).locator('[data-testid="widget-failure"]').waitFor({ state: 'detached' });
+    await page.getByLabel('Positive prompt', { exact: true }).waitFor();
+    assert.equal(
+      await page.getByLabel('Positive prompt', { exact: true }).inputValue(),
+      failures > 1 ? `${draft} after cancel` : draft
+    );
+    assert.deepEqual(requests, [...Array(failures).fill(503), 200]);
+    if (activeWorker) {
+      assert.deepEqual(
+        workerResponses,
+        requests.map((status) => ({ status, fromServiceWorker: true }))
+      );
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      await page.waitForFunction(
+        async (asset) => !!(await caches.match(new URL(asset, location.origin).href, { cacheName: 'invokeai-assets' })),
+        chunk
+      );
+    }
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    await page.screenshot({ path: resolve(output, `${id}-recovered.png`) });
+    return {
+      id,
+      status: 'passed',
+      requests,
+      chromiumVersion: browser.version(),
+      freshDocument: await page.evaluate((previous) => performance.timeOrigin > previous, before),
+      draftInitiallyUnsaved: true,
+      promptPreserved: true,
+      ...(failures > 1 ? { canvasUndoRetainedOnCancel: true } : {}),
+      ...(activeWorker ? { workerResponses, workerActiveBeforeFault: true, recoveredAssetCached: true } : {}),
+    };
+  } finally {
+    await context.close();
+    await proxy?.close();
+  }
+};
+
+const runNativeUsersRecoveryJourney = async (browser) => {
+  const id = 'launchpad-users-native-import-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  await fetch(`${backendOrigin}/__faults`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ intermediatesCaller: 'multiuser-admin' }),
+  });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/features/identity/ui/UsersPage.tsx'].file;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  let blocked = true;
+  const requests = [];
+  await page.route('**/api/v1/auth/users', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  await page.route(`**/${chunk}`, async (route) => {
+    requests.push(blocked ? 503 : 200);
+    if (blocked) {
+      await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+    } else {
+      await route.continue();
+    }
+  });
+  try {
+    await page.goto(origin);
+    await page.getByLabel('Email', { exact: true }).fill('fixture-admin@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('link', { name: 'Users', exact: true }).waitFor();
+    assert.deepEqual(requests, [], 'Home must not request user management.');
+    await page.getByRole('link', { name: 'Users', exact: true }).click();
+    await page.getByText('Unable to load users', { exact: true }).waitFor();
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const before = await page.evaluate(() => performance.timeOrigin);
+    blocked = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).press('Enter');
+    await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    await page.getByText('0 accounts in this workspace.', { exact: true }).waitFor();
+    assert.deepEqual(requests, [503, 200]);
+    await page.getByRole('button', { name: 'Add user', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    return { id, status: 'passed', requests, coldHomeManagementRequests: 0, freshDocument: true };
+  } finally {
+    await context.close();
+  }
+};
+
 const mockBackend = await startMockBackend(backendPort, { profile: 'representative' });
 const preview = spawnPreview({
   cwd: root,
@@ -1298,6 +1842,9 @@ try {
   if (!requestedJourney || requestedJourney === 'workbench-shortcuts') {
     reports.push(await runShortcutGuideJourney(browser));
   }
+  if (!requestedJourney || requestedJourney === 'workbench-status-bar-names') {
+    reports.push(await runStatusBarNamesJourney(browser));
+  }
   if (!requestedJourney || requestedJourney === 'workbench-topbar-responsive') {
     reports.push(await runResponsiveTopbarJourney(browser));
   }
@@ -1318,6 +1865,21 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 1));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-repeated-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-active-worker-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2, true));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-users-native-import-recovery') {
+    reports.push(await runNativeUsersRecoveryJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-hidden-maintenance') {
+    reports.push(await runHiddenMaintenanceJourney(browser));
   }
   if (reports.length === 0) {
     throw new Error(`Unknown accessibility journey ${JSON.stringify(requestedJourney)}.`);

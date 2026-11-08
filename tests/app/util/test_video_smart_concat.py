@@ -14,6 +14,13 @@ from invokeai.app.util.h264_splice import SpliceError
 from invokeai.app.util.video_smart_concat import _bridge_sample_entry, encode_rgb_frames
 
 
+@pytest.fixture
+def no_ffmpeg_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests that replace the ffmpeg process must not need a real binary to name in its command."""
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.imageio_ffmpeg.get_ffmpeg_exe", lambda: "ffmpeg")
+
+
+@pytest.mark.ffmpeg
 def test_bridge_encoder_cancellation_reaps_ffmpeg_and_discards_partial_output(tmp_path: Path) -> None:
     output = tmp_path / "canceled.mp4"
     canceled = [False]
@@ -30,6 +37,7 @@ def test_bridge_encoder_cancellation_reaps_ffmpeg_and_discards_partial_output(tm
     assert not output.exists()
 
 
+@pytest.mark.ffmpeg
 def test_bridge_encoder_timeout_stops_a_blocked_frame_source(tmp_path: Path) -> None:
     output = tmp_path / "timed-out.mp4"
     stop = threading.Event()
@@ -46,7 +54,7 @@ def test_bridge_encoder_timeout_stops_a_blocked_frame_source(tmp_path: Path) -> 
     assert not output.exists()
 
 
-def test_bridge_encoder_reports_process_start_failure(tmp_path: Path) -> None:
+def test_bridge_encoder_reports_process_start_failure(tmp_path: Path, no_ffmpeg_lookup: None) -> None:
     output = tmp_path / "no-ffmpeg.mp4"
     with patch("invokeai.app.util.video_smart_concat.subprocess.Popen", side_effect=OSError("not found")):
         with pytest.raises(SpliceError, match="could not start ffmpeg"):
@@ -55,6 +63,7 @@ def test_bridge_encoder_reports_process_start_failure(tmp_path: Path) -> None:
     assert not output.exists()
 
 
+@pytest.mark.ffmpeg
 def test_bridge_encoder_does_not_treat_internal_abort_as_user_cancellation(tmp_path: Path) -> None:
     output = tmp_path / "internal-abort.mp4"
     abort = threading.Event()
@@ -81,6 +90,7 @@ def test_bridge_encoder_does_not_treat_internal_abort_as_user_cancellation(tmp_p
     assert not output.exists()
 
 
+@pytest.mark.ffmpeg
 def test_bridge_source_value_error_is_a_fallback_eligible_splice_error(tmp_path: Path) -> None:
     output = tmp_path / "decoder-error.mp4"
     frame = np.zeros((64, 64, 3), dtype=np.uint8)
@@ -116,7 +126,9 @@ class _FakeProcess:
         return self.returncode
 
 
-def test_bridge_encoder_reaps_process_if_worker_thread_cannot_start(tmp_path: Path, monkeypatch) -> None:
+def test_bridge_encoder_reaps_process_if_worker_thread_cannot_start(
+    tmp_path: Path, monkeypatch, no_ffmpeg_lookup: None
+) -> None:
     output = tmp_path / "worker-start-failure.mp4"
     process = _FakeProcess()
     monkeypatch.setattr("invokeai.app.util.video_smart_concat.subprocess.Popen", lambda *args, **kwargs: process)
@@ -133,7 +145,9 @@ def test_bridge_encoder_reaps_process_if_worker_thread_cannot_start(tmp_path: Pa
     assert not output.exists()
 
 
-def test_bridge_encoder_reaps_process_and_feeder_if_cancel_callback_raises(tmp_path: Path, monkeypatch) -> None:
+def test_bridge_encoder_reaps_process_and_feeder_if_cancel_callback_raises(
+    tmp_path: Path, monkeypatch, no_ffmpeg_lookup: None
+) -> None:
     output = tmp_path / "callback-failure.mp4"
     process = _FakeProcess()
     monkeypatch.setattr("invokeai.app.util.video_smart_concat.subprocess.Popen", lambda *args, **kwargs: process)

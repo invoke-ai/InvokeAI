@@ -37,9 +37,14 @@ class ModelMetadataFetchBase(ABC):
         pass
 
     @abstractmethod
-    def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:
+    def from_url(
+        self, url: AnyHttpUrl, revision: Optional[str] = None, pin_to_commit: bool = False
+    ) -> AnyModelRepoMetadata:
         """
         Given a URL to a model repository, return a ModelMetadata object.
+
+        :param revision: Fetch this repository revision rather than the current default.
+        :param pin_to_commit: Without `revision`, name the current commit in file URLs rather than the branch.
 
         This method will raise a `UnknownMetadataException`
         in the event that the requested model metadata is not found at the provided location.
@@ -47,12 +52,20 @@ class ModelMetadataFetchBase(ABC):
         pass
 
     @abstractmethod
-    def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
+    def from_id(
+        self,
+        id: str,
+        variant: Optional[ModelRepoVariant] = None,
+        revision: Optional[str] = None,
+        pin_to_commit: bool = False,
+    ) -> AnyModelRepoMetadata:
         """
         Given an ID for a model, return a ModelMetadata object.
 
         :param id: An ID.
         :param variant: A model variant from the ModelRepoVariant enum.
+        :param revision: Fetch this repository revision rather than the current default.
+        :param pin_to_commit: Without `revision`, name the current commit in file URLs rather than the branch.
 
         This method will raise a `UnknownMetadataException`
         in the event that the requested model's metadata is not found at the provided id.

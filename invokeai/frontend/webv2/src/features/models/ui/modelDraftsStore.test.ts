@@ -1,5 +1,6 @@
 import type { ModelConfig } from '@features/models/core/types';
 
+import { toExternalModelValues } from '@features/models/core/externalModelFields';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -45,6 +46,21 @@ describe('model drafts store', () => {
     // Typing a field back to the server value stops it being an edit.
     recordModelDraftFields('m', 'identity', { description: '', name: 'Draft 2' }, server);
     expect(getModelDraft('m')?.identity?.fields).toEqual({ name: 'Draft 2' });
+  });
+
+  it('counts hosted-provider record edits as unsaved changes and discards them like defaults', () => {
+    recordModelDraftFields(
+      'm',
+      'external',
+      { modeInpaint: true, providerId: 'openai' },
+      { modeInpaint: false, providerId: 'openai' }
+    );
+
+    expect(getModelDraft('m')?.external?.fields).toEqual({ modeInpaint: true });
+    expect(hasUnsavedModelChanges(getModelDraft('m'))).toBe(true);
+
+    discardModelDraft('m', 'external');
+    expect(getModelDraft('m')).toBeUndefined();
   });
 
   it('treats unset and null default settings as the same value', () => {
@@ -195,6 +211,28 @@ describe('model drafts store', () => {
 
     expect(getModelDraft('m')?.defaults?.fields).toEqual({ cfg_scale: 6 });
     expect(getModelDraft('other')).toBeUndefined();
+  });
+
+  it('drops hosted-provider edits a refreshed record comes to agree with', () => {
+    const hosted = {
+      capabilities: { modes: ['txt2img'] },
+      key: 'hosted',
+      name: 'hosted',
+      provider_id: 'openai',
+      provider_model_id: 'gpt-image-1',
+      type: 'external_image_generator',
+    } as ModelConfig;
+    const saved = toExternalModelValues(hosted);
+
+    setModelsSnapshotForTests({ models: [hosted], status: 'loaded' });
+    recordModelDraftFields('hosted', 'external', { ...saved, maxReferenceImages: 4, modeImg2img: true }, saved);
+
+    setModelsSnapshotForTests({
+      models: [{ ...hosted, capabilities: { modes: ['txt2img', 'img2img'] } }],
+      status: 'loaded',
+    });
+
+    expect(getModelDraft('hosted')?.external?.fields).toEqual({ maxReferenceImages: 4 });
   });
 
   it('drops drafts of models that leave the loaded library and keeps the rest', () => {

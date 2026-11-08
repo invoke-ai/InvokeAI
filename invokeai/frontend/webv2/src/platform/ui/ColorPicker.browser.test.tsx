@@ -19,7 +19,7 @@ void i18n.use(initReactI18next).init({
       translation: {
         common: {
           colorPicker: {
-            format: 'Color format',
+            format: 'Color format: {{format}}',
             opacity: 'Opacity (%)',
             sampleFromCanvas: 'Pick a color from the canvas',
             sampleFromScreen: 'Pick a color from the screen',
@@ -148,9 +148,11 @@ describe('ColorPicker', () => {
     const { onChange, trigger } = await renderPicker({ initialValue: '#ff0000', swatches: false });
     await openPicker(trigger);
 
-    const formatTrigger = () => document.querySelector<HTMLButtonElement>('[aria-label="Color format"]')!;
+    const formatTrigger = () => document.querySelector<HTMLButtonElement>('[aria-label^="Color format"]')!;
 
     expect(formatTrigger().textContent).toBe('HEX');
+    // The name carries the visible format (WCAG 2.5.3).
+    await expect.element(formatTrigger()).toHaveAccessibleName('Color format: HEX');
     expect(queryChannelInputs()).toHaveLength(1);
 
     await interact(() => formatTrigger().click());

@@ -11,14 +11,16 @@ import {
   getCompatibleSelectedComponentKey,
   isAnimaQwen3Encoder,
   isErnieImageMistralEncoder,
-  isFlux2DiffusersSourceForModel,
+  isBundledFlux2Main,
+  isFlux2EncoderSourceForModel,
   isFlux2MistralEncoder,
+  isFlux2PipelineForModel,
   isFlux2Qwen3EncoderForModel,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentCandidate,
 } from './componentCompatibility';
 
@@ -96,14 +98,15 @@ describe('Generate component compatibility', () => {
     ).toBe(false);
   });
 
-  it('separates Anima Qwen3 0.6B encoders from other Qwen3 encoders', () => {
+  it('gives Anima the Qwen3 0.6B encoder and Z-Image only the 4B one', () => {
     const qwen06b = candidate({ variant: 'qwen3_06b' });
     const qwen4b = candidate({ variant: 'qwen3_4b' });
+    const qwen8b = candidate({ variant: 'qwen3_8b' });
 
-    expect(isAnimaQwen3Encoder(qwen06b)).toBe(true);
-    expect(isAnimaQwen3Encoder(qwen4b)).toBe(false);
-    expect(isNonAnimaQwen3Encoder(qwen06b)).toBe(false);
-    expect(isNonAnimaQwen3Encoder(qwen4b)).toBe(true);
+    expect([qwen06b, qwen4b, qwen8b].map(isAnimaQwen3Encoder)).toEqual([true, false, false]);
+    // The 8B encoder is 4096 wide; Z-Image's caption embedder takes 2560.
+    expect([qwen06b, qwen4b, qwen8b].map(isZImageQwen3Encoder)).toEqual([false, true, false]);
+    expect(isZImageQwen3Encoder(candidate({ type: 'qwen3_vl_encoder', variant: 'qwen3_4b' }))).toBe(false);
   });
 
   it('matches FLUX.2 Klein models to compatible Qwen3 encoder variants', () => {
@@ -114,8 +117,17 @@ describe('Generate component compatibility', () => {
     expect(filter(candidate({ variant: 'qwen3_06b' }))).toBe(false);
   });
 
+  it('lets a FLUX.2 Klein model of unknown size take either Klein encoder but never the Anima one', () => {
+    const filter = isFlux2Qwen3EncoderForModel(flux2Model('klein_unknown'));
+
+    expect(filter(candidate({ variant: 'qwen3_4b' }))).toBe(true);
+    expect(filter(candidate({ variant: 'qwen3_8b' }))).toBe(true);
+    expect(filter(candidate({ variant: 'qwen3_06b' }))).toBe(false);
+    expect(filter(candidate({ type: 'mistral_encoder', variant: 'qwen3_8b' }))).toBe(false);
+  });
+
   it('matches FLUX.2 component sources by shared Qwen3 encoder variant', () => {
-    const filter = isFlux2DiffusersSourceForModel(flux2Model('klein_9b'));
+    const filter = isFlux2EncoderSourceForModel(flux2Model('klein_9b'));
 
     expect(filter(candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'klein_9b_base' }))).toBe(
       true
@@ -132,15 +144,41 @@ describe('Generate component compatibility', () => {
     expect(isFlux2MistralEncoder(candidate({ type: 'qwen3_encoder' }))).toBe(false);
     expect(isFlux2Qwen3EncoderForModel(model)(candidate({ variant: 'qwen3_8b' }))).toBe(false);
     expect(
-      isFlux2DiffusersSourceForModel(model)(
+      isFlux2EncoderSourceForModel(model)(
         candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'dev' })
       )
     ).toBe(true);
     expect(
-      isFlux2DiffusersSourceForModel(model)(
+      isFlux2EncoderSourceForModel(model)(
         candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'klein_9b' })
       )
     ).toBe(false);
+  });
+
+  it('takes FLUX.2 [dev] components only from Diffusers pipelines and Klein ones from SDNQ pipelines too', () => {
+    const pipeline = (format: string, variant: string) =>
+      candidate({
+        base: 'flux2',
+        format,
+        type: 'main',
+        variant,
+        ...(format === 'sdnq_quantized'
+          ? { submodels: { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} } }
+          : {}),
+      });
+    const sdnqKlein = pipeline('sdnq_quantized', 'klein_9b');
+    const sdnqDev = pipeline('sdnq_quantized', 'dev');
+    const diffusersKlein = pipeline('diffusers', 'klein_9b');
+    const diffusersDev = pipeline('diffusers', 'dev');
+    const pipelines = [sdnqKlein, sdnqDev, diffusersKlein, diffusersDev];
+
+    // Any Diffusers pipeline gives [dev] its VAE; only a [dev] one its Mistral encoder.
+    expect(pipelines.map(isFlux2PipelineForModel(flux2Model('dev')))).toEqual([false, false, true, true]);
+    expect(pipelines.map(isFlux2EncoderSourceForModel(flux2Model('dev')))).toEqual([false, false, false, true]);
+    expect(pipelines.map(isFlux2PipelineForModel(flux2Model('klein_9b')))).toEqual([true, true, true, true]);
+    expect(pipelines.map(isFlux2EncoderSourceForModel(flux2Model('klein_9b')))).toEqual([true, false, true, false]);
+    // The selected install counts as bundled by the same rule.
+    expect(pipelines.map(isBundledFlux2Main)).toEqual([true, false, true, true]);
   });
 
   it('keeps each Mistral-family encoder out of the other family slot', () => {

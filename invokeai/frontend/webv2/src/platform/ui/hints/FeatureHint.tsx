@@ -1,7 +1,6 @@
 import type { HTMLAttributes, PointerEvent, ReactElement, ReactNode } from 'react';
 
 import {
-  Heading,
   HoverCard,
   HStack,
   Icon,
@@ -52,15 +51,18 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
   // Padding belongs to the `hoverCard` content recipe, not here.
   return (
     <Stack gap="1.5">
-      <Heading fontSize="md" fontWeight="600">
-        {heading}
-      </Heading>
-      <Separator />
-      {paragraphs.map((paragraph) => (
-        <Text key={paragraph} color="fg.muted" fontSize="md" lineHeight="1.45">
-          {paragraph}
+      <Stack gap="1">
+        <Text fontSize="md" fontWeight="800" lineHeight="1rem">
+          {heading}
         </Text>
-      ))}
+        <Stack gap="1.5">
+          {paragraphs.map((paragraph) => (
+            <Text key={paragraph} color="fg.muted" fontSize="md" lineHeight="1.45">
+              {paragraph}
+            </Text>
+          ))}
+        </Stack>
+      </Stack>
       {(onDisable || href) && (
         <>
           <Separator />

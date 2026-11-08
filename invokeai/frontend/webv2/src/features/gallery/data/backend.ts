@@ -8,6 +8,12 @@ import type {
   GalleryItemsPage,
   GalleryVideoItem,
 } from '@features/gallery/core/items';
+import type {
+  GalleryMediaUsage,
+  GalleryMediaUsageDocumentKind,
+  GalleryMediaUsageNames,
+  GalleryMediaUsageRequest,
+} from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
@@ -22,7 +28,13 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { DATE_BOARD_ID_PREFIX, isDateBoardId, parseGalleryItemKey } from '@features/gallery/core/items';
+import {
+  ALL_READABLE_BOARDS_ID,
+  DATE_BOARD_ID_PREFIX,
+  getGalleryViewCategories,
+  isDateBoardId,
+  parseGalleryItemKey,
+} from '@features/gallery/core/items';
 import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
@@ -44,14 +56,7 @@ import { getGalleryVideoThumbnailUrl } from './videoUrls';
 
 type BackendBoardDTO = components['schemas']['BoardDTO'];
 
-/**
- * 'board' is a real backend board; 'uncategorized' is the pseudo-board for
- * unassigned images (board_id 'none'); 'date' is a read-only virtual board
- * grouping images by creation date (id 'by_date:YYYY-MM-DD').
- */
-export const ALL_READABLE_BOARDS_ID = 'all';
-
-export { isDateBoardId };
+export { ALL_READABLE_BOARDS_ID, isDateBoardId };
 
 const getDateFromBoardId = (boardId: string): string => boardId.slice(DATE_BOARD_ID_PREFIX.length);
 
@@ -113,9 +118,8 @@ interface ListImagesResponse {
   total: number;
 }
 
-/** Mirror backend gallery categories; canvas-owned `other` pixels belong to neither Images nor Assets. */
-const imageCategories = ['general'];
-const assetCategories = ['control', 'mask', 'user'];
+const imageCategories = getGalleryViewCategories('images');
+const assetCategories = getGalleryViewCategories('assets');
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -347,9 +351,9 @@ export const listGalleryBoards = async ({
     boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
-    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is
-    // assembled here, so its video totals need their own requests.
-    getGalleryVideoTotal({ boardId: 'none', signal }),
+    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is assembled here, so its
+    // video totals need their own requests. Like a board's, they count only what the Media and Uploads views list.
+    getGalleryVideoTotal({ boardId: 'none', categories: [...imageCategories, ...assetCategories], signal }),
     getGalleryVideoTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
@@ -484,6 +488,8 @@ export const getGalleryVideoMetadata = async (
 /** The workflow and graph a piece of media embeds, each as stringified JSON, when it has them. */
 export interface GalleryMediaWorkflow {
   graph: string | null;
+  /** Image inputs resolved for this output; the full source graph remains available for workflow loading. */
+  resolved_inputs?: string | null;
   workflow: string | null;
 }
 
@@ -1171,6 +1177,110 @@ export const deleteGalleryBoard = async (
     failedImageNames: body.failed_images ?? [],
     failedVideoNames: body.failed_videos ?? [],
   };
+};
+
+type GalleryMediaUsageWire = components['schemas']['GalleryMediaUsage'];
+type GalleryMediaUsageNamesWire = Pick<
+  components['schemas']['GalleryMediaUsageQueue'],
+  'image_count' | 'image_names' | 'video_count' | 'video_names'
+>;
+type GalleryMediaUsageRequestWire = components['schemas']['GalleryMediaUsageRequest'];
+
+const GALLERY_MEDIA_USAGE_DOCUMENT_KINDS: Readonly<Record<string, GalleryMediaUsageDocumentKind>> = {
+  legacy_editor: 'legacyEditor',
+  project: 'project',
+  quarantined_project: 'quarantinedProject',
+  workflow: 'workflow',
+};
+
+/** A malformed answer must fail the check, never read as "nothing uses it". */
+const readUsageCount = (value: unknown, field: string): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`Gallery media usage field "${field}" must be a non-negative integer.`);
+  }
+
+  return value;
+};
+
+const readUsageNames = (value: unknown, field: string): string[] => {
+  if (!Array.isArray(value) || !value.every((name): name is string => typeof name === 'string')) {
+    throw new TypeError(`Gallery media usage field "${field}" must be an array of strings.`);
+  }
+
+  return value;
+};
+
+/** A revision is only a hint for narrowing: one that is not a non-negative integer reads as unknown. */
+const readUsageRevision = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+
+const mapGalleryMediaUsageNames = (wire: GalleryMediaUsageNamesWire, field: string): GalleryMediaUsageNames => ({
+  imageCount: readUsageCount(wire.image_count, `${field}.image_count`),
+  imageNames: readUsageNames(wire.image_names, `${field}.image_names`),
+  videoCount: readUsageCount(wire.video_count, `${field}.video_count`),
+  videoNames: readUsageNames(wire.video_names, `${field}.video_names`),
+});
+
+const mapGalleryMediaUsage = (body: GalleryMediaUsageWire): GalleryMediaUsage => {
+  if (!Array.isArray(body.documents) || typeof body.queue !== 'object' || typeof body.other_accounts !== 'object') {
+    throw new TypeError('Gallery media usage response is malformed.');
+  }
+
+  return {
+    checkedImageCount: readUsageCount(body.checked_image_count, 'checked_image_count'),
+    checkedVideoCount: readUsageCount(body.checked_video_count, 'checked_video_count'),
+    documents: body.documents.map((document, index) => ({
+      ...mapGalleryMediaUsageNames(document, `documents[${index}]`),
+      id: String(document.id),
+      // A kind added after this build still uses the media: it is listed, not dropped.
+      kind: GALLERY_MEDIA_USAGE_DOCUMENT_KINDS[document.kind] ?? 'other',
+      name: typeof document.name === 'string' && document.name.trim() !== '' ? document.name : null,
+      revision: readUsageRevision(document.revision),
+      workspaceRevision: readUsageRevision(document.workspace_revision),
+    })),
+    documentsTotal: readUsageCount(body.documents_total, 'documents_total'),
+    inUseImageCount: readUsageCount(body.in_use_image_count, 'in_use_image_count'),
+    inUseVideoCount: readUsageCount(body.in_use_video_count, 'in_use_video_count'),
+    otherAccounts: {
+      documentCount: readUsageCount(body.other_accounts.document_count, 'other_accounts.document_count'),
+      imageCount: readUsageCount(body.other_accounts.image_count, 'other_accounts.image_count'),
+      queueItemCount: readUsageCount(body.other_accounts.queue_item_count, 'other_accounts.queue_item_count'),
+      videoCount: readUsageCount(body.other_accounts.video_count, 'other_accounts.video_count'),
+    },
+    queue: {
+      ...mapGalleryMediaUsageNames(body.queue, 'queue'),
+      itemCount: readUsageCount(body.queue.item_count, 'queue.item_count'),
+    },
+  };
+};
+
+/**
+ * What still uses these items, or a board's items, per the server: the caller's projects, workflows and legacy editor
+ * state, their waiting or running queue work, and other accounts' use without identities. Names the caller may not
+ * delete are left out, as the delete endpoints skip them.
+ */
+export const checkGalleryMediaUsage = async (
+  request: GalleryMediaUsageRequest,
+  signal?: AbortSignal
+): Promise<GalleryMediaUsage> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  const payload: GalleryMediaUsageRequestWire =
+    request.kind === 'board'
+      ? { board_id: request.boardId }
+      : {
+          image_names: request.refs.filter((ref) => ref.kind === 'image').map((ref) => ref.name),
+          video_names: request.refs.filter((ref) => ref.kind === 'video').map((ref) => ref.name),
+        };
+  const body = await apiFetchJson<GalleryMediaUsageWire>('/api/v1/gallery/usage', {
+    body: JSON.stringify(payload),
+    method: 'POST',
+    signal: requestSignal,
+  });
+
+  assertAccountScopeCurrent(owner);
+
+  return mapGalleryMediaUsage(body);
 };
 
 export interface GalleryItemOrganizationTransportResult {

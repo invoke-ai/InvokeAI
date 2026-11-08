@@ -1,10 +1,13 @@
 import torch
 
+from invokeai.backend.quantization.bnb_import import record_bnb_import_failure
+
 try:
     from bitsandbytes.nn.modules import Params4bit
 
     bnb_available: bool = True
-except ImportError:
+except (ImportError, OSError, RuntimeError) as e:  # bnb may import and then fail loading its native library
+    record_bnb_import_failure(e)
     bnb_available: bool = False
 
 

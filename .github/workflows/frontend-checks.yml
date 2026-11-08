@@ -60,6 +60,7 @@ jobs:
           files_yaml: |
             webv2:
               - '.github/workflows/frontend-checks.yml'
+              - '.github/workflows/frontend-tests.yml'
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
@@ -72,10 +73,5 @@ jobs:
 
       - name: lint
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm run lint'
-        shell: bash
-
-      - name: build
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm run build'
+        run: 'pnpm run lint:code'
         shell: bash

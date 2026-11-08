@@ -3,6 +3,21 @@ export type BrowserLockResult =
   | { kind: 'contended' }
   | { kind: 'unavailable' };
 
+/** The injected manager, else the browser's; none outside a secure context (plain HTTP), where the API is absent. */
+const getLockManager = (lockManager?: LockManager): LockManager | undefined => {
+  if (lockManager) {
+    return lockManager;
+  }
+  try {
+    return typeof navigator === 'undefined' ? undefined : navigator.locks;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Whether tabs of this origin can coordinate through Web Locks; false on a plain-HTTP origin. */
+export const hasWebLocks = (lockManager?: LockManager): boolean => getLockManager(lockManager) !== undefined;
+
 const acquireLock = (
   name: string,
   mode: 'exclusive' | 'shared',
@@ -10,14 +25,7 @@ const acquireLock = (
   /** Wait for the lock until it is granted or this aborts, instead of taking it only when free. */
   waitSignal?: AbortSignal
 ): Promise<BrowserLockResult> => {
-  let manager = lockManager;
-  if (!manager) {
-    try {
-      manager = typeof navigator === 'undefined' ? undefined : navigator.locks;
-    } catch {
-      manager = undefined;
-    }
-  }
+  const manager = getLockManager(lockManager);
   if (!manager) {
     return Promise.resolve({ kind: 'unavailable' });
   }
@@ -85,14 +93,7 @@ export const waitForSharedLock = (
  * the name is never turned away. `null` when the Web Locks API or its query is unavailable.
  */
 export const isLockHeld = async (name: string, lockManager?: LockManager): Promise<boolean | null> => {
-  let manager = lockManager;
-  if (!manager) {
-    try {
-      manager = typeof navigator === 'undefined' ? undefined : navigator.locks;
-    } catch {
-      manager = undefined;
-    }
-  }
+  const manager = getLockManager(lockManager);
   if (!manager || typeof manager.query !== 'function') {
     return null;
   }

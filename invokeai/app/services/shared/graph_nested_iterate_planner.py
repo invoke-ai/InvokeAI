@@ -10,12 +10,9 @@ from invokeai.app.services.shared.graph_iterate_planner import (
     _create_direct_execution_node_copy,
     _initialize_direct_execution_node,
 )
+from invokeai.app.services.shared.graph_loop_topology import NestedIterateChain
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
-from invokeai.app.services.shared.graph_validation import (
-    COLLECTION_FIELD,
-    ITEM_FIELD,
-    _SupportedNestedIterateChain,
-)
+from invokeai.app.services.shared.graph_validation import COLLECTION_FIELD, ITEM_FIELD
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
@@ -32,10 +29,9 @@ def _get_exact_nested_iterate_body(state: "GraphExecutionState"):
     input_driven_outer = bool(outer_collection_edges)
     expected_node_count = 8 if input_driven_outer else 7
     expected_edge_count = 8 if input_driven_outer else 7
+    loop_topology = state._loop_topology()
     if not input_driven_outer:
-        serial_chain = state.graph._get_supported_for_serial_nested_iterate_chain(
-            for_node.id, state._get_source_graph_flat()
-        )
+        serial_chain = loop_topology.nested_iterate_chain(for_node.id)
         if serial_chain is not None and len(state.graph.nodes) == 9 and len(state.graph.edges) == 9:
             return for_node.id, serial_chain
     if len(state.graph.nodes) != expected_node_count or len(state.graph.edges) != expected_edge_count:
@@ -59,7 +55,7 @@ def _get_exact_nested_iterate_body(state: "GraphExecutionState"):
             or state.graph._get_output_edges(producer.id) != [outer_collection_edge]
         ):
             return None
-    nested_body = state.graph._get_supported_for_nested_iterate_body(for_node.id, state._get_source_graph_flat())
+    nested_body = loop_topology.nested_iterate_body(for_node.id)
     if nested_body is None or len(nested_body.body_path_nodes) != 5:
         return None
     return for_node.id, nested_body
@@ -77,11 +73,10 @@ def get_nested_iterate_sequence_depth(state: "GraphExecutionState") -> int | Non
     """Return the exact supported fresh Iterate-only chain depth, if any."""
     if state._legacy_snapshot_loaded:
         return None
-    source_graph = state._get_source_graph_flat()
-    for depth in _SUPPORTED_NESTED_ITERATE_SEQUENCE_DEPTHS:
-        if state.graph._get_supported_nested_iterate_sequence(source_graph, iterate_count=depth) is not None:
-            return depth
-    return None
+    sequence = state._loop_topology().nested_iterate_sequence
+    if sequence is None or len(sequence.iterate_node_ids) not in _SUPPORTED_NESTED_ITERATE_SEQUENCE_DEPTHS:
+        return None
+    return len(sequence.iterate_node_ids)
 
 
 def _outer_iteration_path(state: "GraphExecutionState", prepared_for_id: str) -> tuple[int, ...]:
@@ -103,7 +98,7 @@ def _prepare_nested_iterate_body_for_outer(
     if exact is None or exact[0] != source_for_id:
         return
     _, nested_body = exact
-    if isinstance(nested_body, _SupportedNestedIterateChain):
+    if isinstance(nested_body, NestedIterateChain):
         _prepare_serial_nested_iterate_chain_for_outer(state, source_for_id, prepared_for_id, nested_body)
         return
     outer_path = _outer_iteration_path(state, prepared_for_id)
@@ -213,7 +208,7 @@ def _prepare_serial_nested_iterate_chain_for_outer(
     state: "GraphExecutionState",
     source_for_id: str,
     prepared_for_id: str,
-    nested_body: _SupportedNestedIterateChain,
+    nested_body: NestedIterateChain,
 ) -> None:
     """Prepare one exact serial two-level nested iterator body incrementally."""
     outer_path = _outer_iteration_path(state, prepared_for_id)
@@ -396,11 +391,10 @@ def prepare_nested_iterate_bodies(state: "GraphExecutionState") -> None:
             _prepare_nested_iterate_body_for_outer(state, source_for_id, prepared_for_id)
 
 
-def _prepare_nested_iterate_sequence(state: "GraphExecutionState", *, iterate_count: int) -> None:
-    nested = state.graph._get_supported_nested_iterate_sequence(
-        state._get_source_graph_flat(), iterate_count=iterate_count
-    )
+def _prepare_nested_iterate_sequence(state: "GraphExecutionState") -> None:
+    nested = state._loop_topology().nested_iterate_sequence
     assert nested is not None
+    iterate_count = len(nested.iterate_node_ids)
 
     def prepared_at_path(source_node_id: str, path: tuple[int, ...]) -> str | None:
         return state._prepared_registry().get_prepared_id_at_path(source_node_id, path)
@@ -517,4 +511,4 @@ def prepare_nested_iterate_sequence(state: "GraphExecutionState", *, depth: int 
     if depth is None:
         depth = get_nested_iterate_sequence_depth(state)
     if depth is not None:
-        _prepare_nested_iterate_sequence(state, iterate_count=depth)
+        _prepare_nested_iterate_sequence(state)

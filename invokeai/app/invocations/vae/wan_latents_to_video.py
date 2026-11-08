@@ -149,7 +149,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             # left rather than what this decode is about to ask for. The sentinel resolves to
             # 256/192, which is also this VAE class's own default.
             tile_size = resolve_qwen_image_vae_tile_size(0)
-            estimated_working_memory = estimate_vae_working_memory_wan(
+            tiled_working_memory = estimate_vae_working_memory_wan(
                 operation="decode",
                 vae=vae_info.model,
                 pixel_height=h_pixel,
@@ -158,6 +158,18 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 tile_size=tile_size,
                 streaming=False,
             )
+            # Tiling holds six copies of the clip, so a long enough clip (480p from ~440 frames, against
+            # streaming) needs more tiled than untiled. Neither fits then, and the lighter decode is the better bet.
+            if tiled_working_memory < estimated_working_memory:
+                estimated_working_memory = tiled_working_memory
+            else:
+                context.logger.info(
+                    f"Not tiling the Wan VAE decode: tiled it would need ~{tiled_working_memory / 2**30:.1f} GiB, "
+                    f"more than the ~{estimated_working_memory / 2**30:.1f} GiB untiled, which is already more than "
+                    "the GPU keeps resident."
+                )
+                use_tiling = False
+                tile_size = None
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_wan_video_", suffix=".mp4", delete=False)
         tmp.close()

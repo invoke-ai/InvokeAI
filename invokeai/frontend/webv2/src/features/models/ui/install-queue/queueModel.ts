@@ -1,4 +1,4 @@
-import type { ModelInstallJob } from '@features/models/core/types';
+import type { ModelInstallDownloadPart, ModelInstallJob } from '@features/models/core/types';
 
 import { getInstallSourceLabel, type InstallDownloadProgress } from '@features/models/data/installsStore';
 
@@ -122,27 +122,45 @@ export interface ProblemDownloadPart {
   /** The part's download URL, which `restart_file` matches against; null for parts without one. */
   url: string | null;
   resumeRequired: boolean;
+  /** Why the part failed or cannot resume, when the backend says. */
   message: string | null;
 }
 
-/** Parts the backend could not resume or that errored; each needs a manual restart. */
+const nonEmptyLines = (text: string | null | undefined): string[] =>
+  (text ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/** `error_type` names the exception and its message; `error` is a traceback whose last line does the same. */
+const describePartError = (part: ModelInstallDownloadPart): string | null =>
+  nonEmptyLines(part.error_type)[0] ?? nonEmptyLines(part.error).at(-1) ?? null;
+
+/** Parts the backend could not resume or that errored. */
 export const getProblemDownloadParts = (job: ModelInstallJob): ProblemDownloadPart[] =>
   (job.download_parts ?? [])
     .filter((part) => part.resume_required === true || part.status === 'error')
     .map((part) => ({
       fileName: partFileName(part),
       key: part.source ?? part.local_path ?? partFileName(part),
-      message: part.resume_message ?? null,
+      message: (part.resume_required === true ? null : describePartError(part)) ?? part.resume_message ?? null,
       resumeRequired: part.resume_required === true,
       url: typeof part.source === 'string' ? part.source : null,
     }));
 
 /**
  * `restart_failed` only acts on errored or paused jobs with restartable parts; a cancelled job's temp dir is gone,
- * so it and anything else must be resubmitted.
+ * so it and anything else must be resubmitted. Restarting discards every incomplete part's partial file.
  */
 export const canRestartFailedParts = (job: ModelInstallJob): boolean =>
   job.status !== 'cancelled' && getProblemDownloadParts(job).length > 0;
+
+/**
+ * Resume keeps partial files and re-requests the rest by range, which also recovers parts that failed transiently.
+ * Only a part whose server refused the range needs a restart instead.
+ */
+export const canResumeInstall = (job: ModelInstallJob): boolean =>
+  job.status === 'paused' && !(job.download_parts ?? []).some((part) => part.resume_required === true);
 
 /** A one-off token saved with the source wins over the stored provider key. */
 export const getInstallJobAccessToken = (job: ModelInstallJob): string | undefined =>
@@ -225,16 +243,17 @@ export const summarizeInstallQueue = (rows: readonly InstallQueueRow[]): Install
     settled: 0,
   };
 
-  for (const { status } of rows) {
+  for (const { job, status } of rows) {
     if (status === 'downloading') {
       summary.downloading += 1;
     } else if (status === 'installing') {
       summary.installing += 1;
     } else if (status === 'queued') {
       summary.queued += 1;
-    } else if (status === 'paused') {
+    } else if (status === 'paused' && getProblemDownloadParts(job).length === 0) {
       summary.paused += 1;
-    } else if (status === 'failed' || status === 'unauthorized') {
+    } else if (status === 'paused' || status === 'failed' || status === 'unauthorized') {
+      // A paused job with a failed or unresumable file was stopped by the backend and needs a decision.
       summary.attention += 1;
     } else if (status === 'installed') {
       summary.installed += 1;

@@ -2,7 +2,6 @@
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
-import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
@@ -19,7 +18,7 @@ import {
 } from '@tanstack/react-router';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
-import { act } from 'react';
+import { type ReactNode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -37,6 +36,7 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useCapabilities: () => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }),
   UsersPage: () => null,
 }));
+vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
 vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
 vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
 vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
@@ -64,10 +64,11 @@ vi.mock('./pages/ProjectsPage', () => ({ ProjectsPage: () => null }));
 vi.mock('./projects/ProjectActionsMenuHost', () => ({
   ProjectActionsMenuProvider: ({ children }: { children: ReactNode }) => children,
 }));
+const projects = vi.hoisted(() => ({ open: ['one', 'two'] }));
 vi.mock('@workbench/projects/openProjects', () => ({
   refreshOpenProjects: () => Promise.resolve(),
   useOpenProjectsSelector: <T,>(select: (value: openProjects.OpenProjectsSnapshot) => T) =>
-    select({ activeId: 'one', ids: ['one', 'two'], status: 'ready' } as openProjects.OpenProjectsSnapshot),
+    select({ activeId: 'one', ids: projects.open, status: 'ready' } as openProjects.OpenProjectsSnapshot),
 }));
 vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: <T,>(select: (value: { summaries: { id: string; name: string }[] }) => T) =>
@@ -158,6 +159,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  projects.open = ['one', 'two'];
   await act(() => root.unmount());
   queryClient.clear();
   host.remove();
@@ -166,6 +168,16 @@ afterEach(async () => {
 });
 
 describe('Launchpad shell', () => {
+  it('retains selected model details across section deactivation', async () => {
+    await render();
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    await page.getByRole('link', { name: 'launchpad.sections.models' }).click();
+    await expect.element(page.getByRole('button', { name: 'common.edit', exact: true })).toBeVisible();
+    expect(host.textContent).toContain('Lora b');
+  });
+
   it('keeps the model manager usable at 720×450 (a 1440×900 window at 200%) beside an icon rail', async () => {
     await page.viewport(720, 450);
     await render();
@@ -218,6 +230,33 @@ describe('Launchpad shell', () => {
     expect(await auditAccessibility(document.querySelector('[role="menu"]')!)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toHaveFocus();
+  });
+
+  it('squeezes the open projects list to one entry before the rail scrolls', async () => {
+    projects.open = ['one', 'two', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+    const viewportOf = (element: Element) => element.closest('[data-scope="scroll-area"][data-part="viewport"]')!;
+    const isScrollable = (viewport: Element) => viewport.scrollHeight > viewport.clientHeight;
+    const current = () => page.getByRole('link', { name: 'First · launchpad.openProjects.current' }).element();
+    const help = () => page.getByRole('button', { name: 'launchpad.help.label' }).element();
+
+    await page.viewport(1280, 900);
+    await render();
+    const fullList = viewportOf(page.getByRole('link', { name: /^First/ }).element());
+    // Twelve rem of entries plus the focus-ring inset.
+    await expect.poll(() => rect(fullList).height).toBe(200);
+    expect(isScrollable(fullList)).toBe(true);
+
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(viewportOf(current())).height).toBeLessThan(200);
+    expect(isScrollable(viewportOf(current()))).toBe(true);
+    expect(isScrollable(viewportOf(help()))).toBe(false);
+    expect(isInView(current())).toBe(true);
+
+    await page.viewport(720, 360);
+    await expect.poll(() => isScrollable(viewportOf(help()))).toBe(true);
+    expect(isInView(current())).toBe(true);
+    help().focus();
+    expect(isInView(help())).toBe(true);
   });
 
   it('shows the labelled rail and both panes when the window widens', async () => {

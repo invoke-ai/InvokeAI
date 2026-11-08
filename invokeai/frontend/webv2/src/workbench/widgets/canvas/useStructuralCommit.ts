@@ -1,4 +1,6 @@
 import type {
+  AdjustmentRefusal,
+  AdjustmentRefusalReason,
   CanvasDocumentCapability,
   CanvasLayerBasePatch,
   CanvasLayerCapability,
@@ -6,6 +8,7 @@ import type {
   CanvasLayerPreviewMutation,
   CanvasDocumentModel,
   DocumentRefusal,
+  LayerUnreadable,
   MaskEditResult,
   PrepareEditResult,
   StructuralCommitResult,
@@ -41,12 +44,32 @@ const LAYER_OPERATION_KEYS: Record<LayerOperationRefusal, string> = {
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
+const ADJUSTMENT_REFUSAL_KEYS: Record<AdjustmentRefusalReason, string> = {
+  error: 'widgets.layers.adjustments.refusal.error',
+  'over-budget': 'widgets.layers.adjustments.refusal.overBudget',
+  'too-large': 'widgets.layers.adjustments.refusal.tooLarge',
+};
+
+/** Names the layer or group whose Clarity, Texture or Dehaze could not run, and why. */
+export const describeAdjustmentRefusal = (refusal: AdjustmentRefusal, t: TFunction): string =>
+  t(ADJUSTMENT_REFUSAL_KEYS[refusal.reason], { name: refusal.ownerName });
+
+/** Words a refusal that names its layer: an image that could not be read, or adjustments that could not run. */
+export const describeNamedRefusal = (refusal: AdjustmentRefusal | LayerUnreadable, t: TFunction): string =>
+  refusal.status === 'unreadable'
+    ? t('widgets.layers.actions.unreadable', { name: refusal.layerName })
+    : describeAdjustmentRefusal(refusal, t);
+
 /** Explains a refused layer pixel operation; nothing changed in the document, pixels or history. */
 export const reportLayerOperation = (
-  refusal: LayerOperationRefusal,
+  refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable,
   reportError: (title: string, message: string) => void,
   t: TFunction
-): void => reportError(t('widgets.layers.actions.actionFailed'), t(LAYER_OPERATION_KEYS[refusal]));
+): void =>
+  reportError(
+    t('widgets.layers.actions.actionFailed'),
+    typeof refusal === 'string' ? t(LAYER_OPERATION_KEYS[refusal]) : describeNamedRefusal(refusal, t)
+  );
 
 /** Explains a refused mask clear or invert; `busy` and a mask with nothing to change stay silent. */
 export const reportMaskEdit = (

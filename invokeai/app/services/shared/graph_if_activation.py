@@ -51,7 +51,7 @@ class _IfActivationController:
         for_by_return_id: dict[str, str] = {}
         if any(isinstance(self._state.graph.nodes.get(node_id), ForInvocation) for node_id in branch_sources):
             return_id_by_for = {
-                for_id: return_id for return_id, for_id in self._state._get_for_source_by_return_id().items()
+                for_id: return_id for return_id, for_id in self._state._loop_topology().for_id_by_return_id.items()
             }
             body_ids_by_for = {
                 for_id: nx.ancestors(source_graph, return_id) & nx.descendants(source_graph, for_id)

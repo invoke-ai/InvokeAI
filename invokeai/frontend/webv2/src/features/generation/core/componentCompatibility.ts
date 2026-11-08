@@ -81,8 +81,13 @@ export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
 
-export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
+/** MOSS-Image conditions on the Qwen3.5 9B; the 4B's hidden size does not fit its text embedder. */
+export const isMossImageQwen35Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_9b';
+
+/** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
+export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';
 
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
@@ -96,12 +101,20 @@ export const isFlux2MistralEncoder: GenerateComponentFilter = (model) =>
 export const isErnieImageMistralEncoder: GenerateComponentFilter = (model) =>
   model.type === 'mistral_encoder' && model.variant === MINISTRAL_3B_VARIANT;
 
-/** Krea-2 conditions on the 4B encoder; Ideogram 4 and Qwen-Image-2.1 on the 8B one. The two are not interchangeable. */
-export const isKrea2Qwen3VlEncoder: GenerateComponentFilter = (model) =>
+/** Krea-2 and FLUX.3 condition on the 4B encoder; Ideogram 4 and Qwen-Image-2.1 on the 8B one. The two are not interchangeable. */
+export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_4b';
 
 export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
+
+/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the 8B one only. */
+export const isQwen3Vl8bVisionTower: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_8b';
+
+/** A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file), so references need the tower model. */
+export const isGgufQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
+  isQwen3Vl8bEncoder(model) && model.format === 'gguf_quantized';
 
 /** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
@@ -119,7 +132,7 @@ export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig):
     typeof selectedModel.variant === 'string' ? KLEIN_TO_QWEN3_VARIANT[selectedModel.variant] : null;
 
   return (model) => {
-    if (!isNonAnimaQwen3Encoder(model)) {
+    if (model.type !== 'qwen3_encoder' || model.variant === 'qwen3_06b') {
       return false;
     }
 
@@ -127,12 +140,25 @@ export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig):
   };
 };
 
-export const isFlux2DiffusersSourceForModel = (selectedModel: GenerateModelConfig): GenerateComponentFilter => {
+/**
+ * The FLUX.2 pipelines whose VAE the selected model's loader takes, the selected install included.
+ * `flux2_klein_model_loader` reads a Diffusers install or a self-contained SDNQ pipeline. `flux2_dev_model_loader`
+ * reads only a Diffusers install: the SDNQ FLUX.2 loader builds a Qwen3 encoder, never the Mistral one [dev] runs.
+ */
+export const isFlux2PipelineForModel = (selectedModel: GenerateComponentCandidate): GenerateComponentFilter =>
+  selectedModel.variant === 'dev' ? isDiffusersMainForBase('flux2') : isBundledMainForBase('flux2');
+
+/** Whether a FLUX.2 main brings its own encoder and VAE to its loader. */
+export const isBundledFlux2Main = (model: GenerateComponentCandidate): boolean => isFlux2PipelineForModel(model)(model);
+
+/** The FLUX.2 pipelines that also supply the selected model's encoder: [dev] ones for [dev], same-size Klein ones for Klein. */
+export const isFlux2EncoderSourceForModel = (selectedModel: GenerateModelConfig): GenerateComponentFilter => {
+  const isPipeline = isFlux2PipelineForModel(selectedModel);
   const selectedVariant = typeof selectedModel.variant === 'string' ? selectedModel.variant : null;
   const requiredVariant = selectedVariant ? KLEIN_TO_QWEN3_VARIANT[selectedVariant] : null;
 
   return (model) => {
-    if (!isBundledMainForBase('flux2')(model)) {
+    if (!isPipeline(model)) {
       return false;
     }
 
@@ -159,7 +185,7 @@ export const isCompatibleDiffusersComponentSourceForModel = (
   }
 
   if (selectedModel.base === 'flux2') {
-    return isFlux2DiffusersSourceForModel(selectedModel)(source);
+    return isFlux2EncoderSourceForModel(selectedModel)(source);
   }
 
   return isBundledMainForBase(selectedModel.base)(source);

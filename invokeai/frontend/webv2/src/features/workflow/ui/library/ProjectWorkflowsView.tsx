@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -23,7 +24,7 @@ import {
   Trash2Icon,
   WorkflowIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -31,7 +32,7 @@ import {
   isUpdatableSource,
   toProjectWorkflowLibraryEntries,
 } from './projectWorkflowEntries';
-import { formatRelativeTime } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import {
   getWorkflowLibraryCardId,
   getWorkflowLibraryCardMenuContentId,
@@ -46,6 +47,7 @@ import {
   useWorkflowLibraryMissingCounts,
   WorkflowRequirementsList,
 } from './WorkflowRequirementsList';
+import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 /**
  * The project's own workflows, presented through the library's card contract. Everything here is a local
@@ -53,7 +55,26 @@ import {
  */
 
 const DETAIL_RAIL_WIDTH = '18rem';
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
+const COLUMNS_CSS = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    flexDirection: 'column',
+  },
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+  },
+} as const;
+const DETAIL_RAIL_CSS = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    width: '100%',
+  },
+  '@container workflow-library-content (width < 42rem) and (height >= 32rem)': {
+    flexBasis: '45%',
+  },
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+    height: '20rem',
+  },
+} as const;
 
 export interface ProjectWorkflowsViewProps {
   contextMenuPoint: WorkflowCardMenuAnchor | null;
@@ -154,7 +175,7 @@ export const ProjectWorkflowsView = ({
             </Button>
           </HStack>
         </HStack>
-        <HStack align="stretch" flex="1" gap="3" minH="0" minW="0">
+        <HStack css={COLUMNS_CSS} align="stretch" flex="1" gap="3" minH="0" minW="0">
           <WorkflowLibraryGrid
             activeWorkflowId={activeWorkflowId}
             entries={entries}
@@ -234,11 +255,21 @@ const ProjectWorkflowDetailPanel = ({
   onRemove,
   onRename,
 }: ProjectWorkflowDetailPanelProps) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Portaled action menus belong to this dialog's visible bounds, rather than the whole viewport.
+  const menuPositioning = useMemo(
+    () => ({
+      boundary: () => panelRef.current?.closest<HTMLElement>('[data-scope="dialog"][data-part="content"]') ?? [],
+    }),
+    []
+  );
   const { t } = useTranslation();
+  const session = useAuthSession();
   const deps = useModelRequirementDeps();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const openAddModels = useOpenAddModels();
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
+  const dataTime = useDataTimeSnapshot(entry);
 
   const libraryEntry = useMemo(
     () =>
@@ -261,11 +292,12 @@ const ProjectWorkflowDetailPanel = ({
     () =>
       contextMenuPoint?.kind === 'point'
         ? {
+            ...menuPositioning,
             getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
             placement: 'bottom-start' as const,
           }
-        : { placement: 'bottom-end' as const },
-    [contextMenuPoint]
+        : { ...menuPositioning, placement: 'bottom-end' as const },
+    [contextMenuPoint, menuPositioning]
   );
   const handleContextMenuOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -312,7 +344,15 @@ const ProjectWorkflowDetailPanel = ({
 
   if (!entry || !libraryEntry) {
     return (
-      <Box borderColor="border.subtle" borderWidth="1px" flexShrink={0} minH="0" rounded="md" w={DETAIL_RAIL_WIDTH} />
+      <Box
+        css={DETAIL_RAIL_CSS}
+        borderColor="border.subtle"
+        borderWidth="1px"
+        flexShrink={0}
+        minH="0"
+        rounded="md"
+        w={DETAIL_RAIL_WIDTH}
+      />
     );
   }
 
@@ -320,9 +360,9 @@ const ProjectWorkflowDetailPanel = ({
   const name = entryName;
   const thumbnailUrl = libraryEntry.item.thumbnail_url;
   const showThumbnail = Boolean(thumbnailUrl) && thumbnailUrl !== failedThumbnailUrl;
-  const lastRun = entry.lastRun ? formatRelativeTime(entry.lastRun.completedAt, new Date()) : '';
+  const lastRun = entry.lastRun ? formatTimeSince(entry.lastRun.completedAt, dataTime) : '';
   const source = entry.source;
-  const canUpdateSource = isUpdatableSource(source);
+  const canUpdateSource = isUpdatableSource(source, session);
 
   const actionItems = (
     <>
@@ -378,6 +418,8 @@ const ProjectWorkflowDetailPanel = ({
     <Stack
       borderColor="border.subtle"
       borderWidth="1px"
+      css={DETAIL_RAIL_CSS}
+      ref={panelRef}
       data-project-workflow-detail={workflowId}
       flexShrink={0}
       gap="0"
@@ -388,16 +430,9 @@ const ProjectWorkflowDetailPanel = ({
       <Scrollable flex="1" label={name} minH="0">
         <Stack gap="2" minW="0" p="2.5">
           <Stack gap="1" minW="0">
-            <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
+            <Box aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
               {showThumbnail ? (
-                <Image
-                  alt=""
-                  h="full"
-                  objectFit="cover"
-                  src={thumbnailUrl ?? undefined}
-                  w="full"
-                  onError={handleThumbnailError}
-                />
+                <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
               ) : (
                 <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
                   <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
@@ -426,7 +461,7 @@ const ProjectWorkflowDetailPanel = ({
           </HStack>
 
           {entry.document.description ? (
-            <Text color="fg.muted" fontSize="xs" lineClamp={4}>
+            <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
               {entry.document.description}
             </Text>
           ) : null}
@@ -460,7 +495,7 @@ const ProjectWorkflowDetailPanel = ({
           <Button disabled={isActive} flex="1" minW="0" size="lg" onClick={handleOpen}>
             {isActive ? t('workflowLibrary.activeWorkflow') : t('workflowLibrary.open')}
           </Button>
-          <Menu.Root ids={moreActionsIds}>
+          <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
             {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
                 menu never takes focus and the first pointer move onto it closes it. */}
             <Menu.Trigger asChild>
@@ -472,7 +507,9 @@ const ProjectWorkflowDetailPanel = ({
             </Menu.Trigger>
             <Portal>
               <Menu.Positioner>
-                <MenuContent minW="16rem">{actionItems}</MenuContent>
+                <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                  {actionItems}
+                </MenuContent>
               </Menu.Positioner>
             </Portal>
           </Menu.Root>
@@ -503,7 +540,11 @@ const ProjectWorkflowDetailPanel = ({
       >
         <Portal>
           <Menu.Positioner>
-            <MenuContent data-workflow-context-menu minW="16rem">
+            <MenuContent
+              data-workflow-context-menu
+              minW="min(16rem, var(--available-width))"
+              maxW="var(--available-width)"
+            >
               {actionItems}
             </MenuContent>
           </Menu.Positioner>

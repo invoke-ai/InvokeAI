@@ -79,5 +79,15 @@ describe('BundleChips overflow', () => {
     expect(horizontalScrollbar!.getAttribute('data-orientation')).toBe('horizontal');
 
     expect(viewport!.contains(trailing)).toBe(false);
+
+    // (b) the scrollbar sits in its own gutter: it overlaps no chip and no count badge.
+    const scrollbarRect = horizontalScrollbar!.getBoundingClientRect();
+    const chipParts = [...viewport!.querySelectorAll<HTMLElement>('button, .chakra-badge')];
+    expect(chipParts.length).toBeGreaterThan(bundles.length);
+    expect(scrollbarRect.height).toBeGreaterThan(0);
+    for (const part of chipParts) {
+      const rect = part.getBoundingClientRect();
+      expect(rect.bottom, part.textContent ?? '').toBeLessThanOrEqual(scrollbarRect.top);
+    }
   });
 });

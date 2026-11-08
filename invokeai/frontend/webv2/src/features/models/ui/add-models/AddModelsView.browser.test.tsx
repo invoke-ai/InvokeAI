@@ -1,12 +1,16 @@
 import type { FoundModel, ModelConfig } from '@features/models/core/types';
+import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { getModelsUiSnapshotForTests, setAddModelsQuery, updateModelsUi } from '@features/models/ui/uiStore';
+import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -14,8 +18,8 @@ import { userEvent } from 'vitest/browser';
 import { AddModelsView } from './AddModelsView';
 
 /**
- * Verify one-shot external search handover into local input state; the seed must not become account-lived
- * filtering.
+ * The search box lives in the Model Manager's session store; "Install in place" is an account preference, stood in for
+ * here by a store that outlives each mount as the account settings do.
  */
 
 vi.mock('react-i18next', () => ({
@@ -47,11 +51,14 @@ const INSTALLED_STARTERS = [
   },
 ];
 
+const DEFAULT_STARTER_RESPONSE = { starter_bundles: {}, starter_models: INSTALLED_STARTERS };
+let starterResponse: object = DEFAULT_STARTER_RESPONSE;
+
 vi.mock('@features/models/data/startersStore', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureStartersLoaded: vi.fn(),
   useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ error: null, response: { starter_bundles: {}, starter_models: INSTALLED_STARTERS }, status: 'loaded' }),
+    selector({ error: null, response: starterResponse, status: 'loaded' }),
 }));
 
 vi.mock('@features/models/data/externalProvidersStore', async (importOriginal) => ({
@@ -83,7 +90,33 @@ vi.mock('@features/models/ui/useModelsNotify', () => ({ useNotify: () => notify 
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('AddModelsView search seed', () => {
+const accountPreferences = createExternalStore({ installInPlace: true });
+const setInstallInPlace = (installInPlace: boolean) => accountPreferences.setSnapshot({ installInPlace });
+
+const WithAccountPreferences = ({ children }: { children: ReactNode }) => {
+  const { installInPlace } = accountPreferences.useSnapshot();
+  const adapter = useMemo<ModelsUiAdapter>(
+    () => ({
+      canManageModels: true,
+      enableModelDescriptions: true,
+      installInPlace,
+      isProjectActive: () => true,
+      managerProjectId: null,
+      schedulerPolicy: NO_SCHEDULER_POLICY,
+      setInstallInPlace,
+    }),
+    [installInPlace]
+  );
+
+  return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
+};
+
+const resetSessionAndPreferences = () => {
+  setAddModelsQuery('');
+  setInstallInPlace(true);
+};
+
+describe('AddModelsView search box', () => {
   let host: HTMLDivElement;
   let root: Root;
 
@@ -96,7 +129,9 @@ describe('AddModelsView search seed', () => {
       root.render(
         <StrictMode>
           <ChakraProvider value={system}>
-            <AddModelsView />
+            <WithAccountPreferences>
+              <AddModelsView />
+            </WithAccountPreferences>
           </ChakraProvider>
         </StrictMode>
       );
@@ -112,34 +147,49 @@ describe('AddModelsView search seed', () => {
     await act(() => root.unmount());
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
 
-    const store = await import('@features/models/ui/uiStore');
-    store.clearAddModelsSeeds();
+    resetSessionAndPreferences();
   });
 
   afterEach(() => {
     host.remove();
+    resetSessionAndPreferences();
   });
 
-  it('opens searching for a seeded model, then forgets it on the next open', async () => {
+  it('opens searching for a requested model, replacing what the box held', async () => {
     const { requestAddModelsSearch } = await import('@features/models/ui/uiStore');
 
+    setAddModelsQuery('something typed earlier');
     requestAddModelsSearch('Wan 2.2 I2V A14B');
     await mount();
 
-    // StrictMode double-invokes the `useState` initializer, so the read has to
-    // survive being run twice — this is the case that catches a take-and-clear
-    // initializer.
     expect(searchBox()?.value).toBe('Wan 2.2 I2V A14B');
 
     await unmount();
+  });
+
+  it('keeps the typed text and the Install in place choice when the view is reopened', async () => {
+    await mount();
+    const outside = '/home/user/downloads/outside.safetensors';
+    const inplaceInput = () =>
+      [...document.querySelectorAll('label')]
+        .find((label) => label.textContent === 'models.installInPlace')
+        ?.querySelector('input');
+
+    await act(() => userEvent.fill(searchBox()!, outside));
+    expect(inplaceInput()?.checked).toBe(true);
+    await act(() => userEvent.click(inplaceInput()!.closest('label')!));
+    expect(inplaceInput()?.checked).toBe(false);
+
+    // Switching tabs or closing the manager unmounts the view.
+    await unmount();
     await mount();
 
-    // Unmount resets local search; consumed seeds must not reappear on later visits.
-    expect(searchBox()?.value).toBe('');
+    expect(searchBox()?.value).toBe(outside);
+    expect(inplaceInput()?.checked).toBe(false);
 
     await unmount();
   });
@@ -227,6 +277,36 @@ describe('AddModelsView search seed', () => {
     await unmount();
   });
 
+  it('offers the starter sorts it implements, with the catalog order named for what it is', async () => {
+    await mount();
+
+    await act(() =>
+      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
+    );
+    const sortBy = await vi.waitFor(() => {
+      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) =>
+        element.textContent?.startsWith('models.sortBy')
+      );
+      expect(item).toBeDefined();
+      return item!;
+    });
+    // The summary names the default sort.
+    expect(sortBy.textContent).toContain('models.sort.name');
+    await act(() => userEvent.click(sortBy));
+
+    await expect
+      .poll(() =>
+        [...document.querySelectorAll('[role="menuitemradio"], [role="menuitemcheckbox"]')]
+          .map((item) => item.textContent ?? '')
+          .filter((text) => text.startsWith('models.sort.'))
+          // The selected sort also shows its direction.
+          .map((text) => text.replace(/common\.(asc|desc)$/u, ''))
+      )
+      .toEqual(['models.sort.catalog', 'models.sort.name', 'models.sort.base', 'models.sort.format']);
+
+    await unmount();
+  });
+
   it('links each installed starter to the library model it became', async () => {
     setModelsSnapshotForTests({
       models: [
@@ -255,7 +335,8 @@ describe('AddModelsView search seed', () => {
       (button) => button.textContent === 'models.viewModel'
     );
     expect(links).toHaveLength(2);
-    for (const [index, key] of ['by-source', 'by-name'].entries()) {
+    // The list sorts by name: Dreamshaper XL, then Juggernaut XL.
+    for (const [index, key] of ['by-name', 'by-source'].entries()) {
       updateModelsUi({ activeModelKey: null, activeTab: 'add' });
       await act(() => links[index]!.click());
       expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: key, activeTab: 'details' });
@@ -276,7 +357,9 @@ describe('AddModelsView models folder scan', () => {
     await act(async () => {
       root.render(
         <ChakraProvider value={system}>
-          <AddModelsView />
+          <WithAccountPreferences>
+            <AddModelsView />
+          </WithAccountPreferences>
         </ChakraProvider>
       );
       await new Promise<void>((resolve) => {
@@ -317,6 +400,7 @@ describe('AddModelsView models folder scan', () => {
     host.remove();
     updateModelsUi({ hfLookup: null, scan: null });
     setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loaded' });
+    resetSessionAndPreferences();
   });
 
   it.each(['/opt/invokeai/models', '/mnt/fast disk/Invoke Models'])(
@@ -381,7 +465,8 @@ describe('AddModelsView models folder scan', () => {
     await act(() => userEvent.click(buttonNamed('models.pull')!));
     expect(installActions.install).toHaveBeenLastCalledWith(expect.objectContaining({ inplace: true, source: inside }));
 
-    // Leaving the folder restores the user's own choice.
+    // Leaving the folder restores the user's own choice, which the forced state never overwrote.
+    expect(accountPreferences.getSnapshot().installInPlace).toBe(false);
     await act(() => userEvent.fill(searchBox, outside));
     expect(inplaceInput().checked).toBe(false);
     expect(inplaceInput().disabled).toBe(false);
@@ -522,5 +607,188 @@ describe('AddModelsView models folder scan', () => {
 
     expect(scanModelsFolder()).toBeDisabled();
     expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+describe('AddModelsView bundle preview decoder', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const TAEF1 = {
+    base: 'flux',
+    compatible_bases: ['z-image'],
+    description: 'Preview decoder.',
+    is_installed: false,
+    name: 'TAEF1 (FLUX.1 preview decoder)',
+    source: 'https://example/taef1.safetensors',
+    type: 'tiny_autoencoder',
+  };
+  // Decoders the reveal must leave out: another family's, and one filed under TAEF1's base that Z-Image cannot use.
+  const TAESDXL = { ...TAEF1, base: 'sdxl', compatible_bases: [], name: 'TAESDXL', source: 'https://example/taesdxl' };
+  const FLUX_ONLY_DECODER = { ...TAEF1, compatible_bases: [], name: 'FLUX-only decoder', source: 'https://example/fo' };
+  const Z_IMAGE = {
+    base: 'z-image',
+    description: 'Z-Image main model.',
+    is_installed: false,
+    name: 'Z-Image Turbo',
+    source: 'https://example/z-image-turbo',
+    type: 'main',
+  };
+  const Z_IMAGE_ENCODER = {
+    ...Z_IMAGE,
+    name: 'Z-Image encoder',
+    source: 'https://example/qwen3',
+    type: 'qwen3_encoder',
+  };
+
+  const useCatalog = (decoderInstalled: boolean) => {
+    const decoder = { ...TAEF1, is_installed: decoderInstalled };
+    starterResponse = {
+      starter_bundles: { 'z-image': { models: [Z_IMAGE, Z_IMAGE_ENCODER], name: 'Z-Image' } },
+      starter_models: [...INSTALLED_STARTERS, Z_IMAGE, Z_IMAGE_ENCODER, decoder, TAESDXL, FLUX_ONLY_DECODER],
+    };
+  };
+
+  const mount = async () => {
+    root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WithAccountPreferences>
+            <AddModelsView />
+          </WithAccountPreferences>
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  };
+  const selectBundle = () =>
+    act(() =>
+      userEvent.click(
+        [...document.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Z-Image'))!
+      )
+    );
+  const hint = () => document.querySelector<HTMLButtonElement>('button[aria-label="models.showStarterModel"]');
+  const listedNames = () => [...document.querySelectorAll('[title]')].map((element) => element.getAttribute('title'));
+  const pickFilter = async (submenu: string, item: string) => {
+    const menuItem = (startsWith: string) =>
+      vi.waitFor(() => {
+        const item = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((element) =>
+          element.textContent?.startsWith(startsWith)
+        );
+        expect(item).toBeDefined();
+        return item!;
+      });
+    await act(() =>
+      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
+    );
+    await act(async () => userEvent.click(await menuItem(submenu)));
+    await act(async () => userEvent.click(await menuItem(item)));
+    await act(() => userEvent.keyboard('{Escape}'));
+  };
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    starterResponse = DEFAULT_STARTER_RESPONSE;
+    updateModelsUi({ selectedBundleName: null });
+    resetSessionAndPreferences();
+  });
+
+  it('points a bundle at its missing decoder, and reveals it in the starters filtered to the family', async () => {
+    useCatalog(false);
+    // A type filter and search text that would each hide the decoder; revealing it replaces both.
+    updateModelsUi({ addModelsTypeSeed: 'main' });
+    setAddModelsQuery('turbo');
+    await mount();
+    await selectBundle();
+
+    // The decoder is a hint in the bundle's summary, not one of its rows.
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(listedNames()).not.toContain(TAEF1.name);
+    expect(hint()?.textContent).toBe(TAEF1.name);
+
+    hint()!.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBeNull();
+    expect(hint()).toBeNull();
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    // Only the decoder: the family's other starters and the rest of the catalog stay out.
+    expect(listedNames()).not.toContain(Z_IMAGE.name);
+    expect(listedNames()).not.toContain(Z_IMAGE_ENCODER.name);
+    expect(listedNames()).not.toContain(INSTALLED_STARTERS[0]!.name);
+    expect(listedNames()).not.toContain(TAESDXL.name);
+    expect(listedNames()).not.toContain(FLUX_ONLY_DECODER.name);
+    expect(getModelsUiSnapshotForTests().addModelsQuery).toBe('');
+    // The hint left with the bar; focus moves on to the revealed decoder's own install button.
+    await expect
+      .poll(() => document.activeElement?.closest('[data-list-row]')?.getAttribute('data-list-row'))
+      .toBe(TAEF1.source);
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+    expect(installActions.installMany).not.toHaveBeenCalled();
+  });
+
+  it('drops the revealed decoder filter when a bundle is picked again', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+
+    // The Launchpad selects a bundle through the store, not the chip.
+    act(() => updateModelsUi({ selectedBundleName: 'Z-Image' }));
+
+    // No bundle holds a decoder, so keeping the reveal's type filter would empty every bundle.
+    await expect.poll(listedNames).toContain(Z_IMAGE.name);
+    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
+  });
+
+  it('drops the revealed type even when the user changed only the base', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    act(() => updateModelsUi({ selectedBundleName: null }));
+    await pickFilter('models.baseArchitecture', 'models.allBases');
+
+    await selectBundle();
+
+    // The reveal's type filter alone would still hide every member of the bundle.
+    await expect.poll(listedNames).toContain(Z_IMAGE.name);
+    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
+  });
+
+  it('keeps a filter the user picked after the reveal', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    // The user's own choice replaces the reveal's type, then they come back to the bundle.
+    act(() => updateModelsUi({ selectedBundleName: null }));
+    await pickFilter('models.modelType', getModelTypeLabel('qwen3_encoder'));
+
+    await selectBundle();
+
+    await expect.poll(listedNames).toContain(Z_IMAGE_ENCODER.name);
+    expect(listedNames()).not.toContain(Z_IMAGE.name);
+  });
+
+  it('gives no hint when the decoder is already installed', async () => {
+    useCatalog(true);
+    await mount();
+    await selectBundle();
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(hint()).toBeNull();
   });
 });

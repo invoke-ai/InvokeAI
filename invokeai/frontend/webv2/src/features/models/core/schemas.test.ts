@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isAbsoluteModelPath,
+  canonicalLocalPath,
   isInModelsDir,
   mainDefaultSettingsSchema,
   modelPathSchema,
@@ -88,6 +89,19 @@ describe('mainDefaultSettingsSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('canonicalLocalPath', () => {
+  it.each([
+    ['C:\\Users\\Me\\x.safetensors', 'c:/users/me/x.safetensors'],
+    ['  C:/Users/Me/loras/  ', 'c:/users/me/loras'],
+    ['C:\\', 'c:'],
+    ['\\\\NAS\\Models\\', '//nas/models'],
+    ['/home/Me/Models//', '/home/Me/Models'],
+    ['loras/X.safetensors', 'loras/X.safetensors'],
+  ])('spells %j as %j', (path, canonical) => {
+    expect(canonicalLocalPath(path)).toBe(canonical);
   });
 });
 

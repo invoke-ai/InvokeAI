@@ -13,7 +13,8 @@ import {
   createBrowserReference,
   isBudgetFailure,
   loadPerformanceReference,
-  createBrowserSamplePlan,
+  createBrowserRunPlan,
+  summarizeBrowserSamples,
   PERFORMANCE_GUIDE,
   summarizeBrowserResources,
   validateBrowserBaseline,
@@ -32,12 +33,11 @@ const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.js
 const chunkSourceManifest = validateChunkSourceManifest(
   JSON.parse(await readFile(resolve(root, 'dist/.vite/chunk-sources.json'), 'utf8'))
 );
-const sampleConfig = {
+const fullSampleConfig = {
   scoredSamples: fixtures.scoredSamples,
   traceSamples: fixtures.traceSamples,
   warmups: fixtures.warmups,
 };
-const samplePlan = createBrowserSamplePlan(sampleConfig);
 const getScriptLabel = (source, chunk) => {
   const widgetId = getWidgetId(source);
 
@@ -65,32 +65,27 @@ const origin = `http://127.0.0.1:${String(port)}`;
 const backendPort = Number(process.env.INVOKEAI_PERFORMANCE_BACKEND_PORT ?? 4177);
 const backendOrigin = `http://127.0.0.1:${String(backendPort)}`;
 const updateBaseline = process.argv.includes('--update-baseline');
+const baseline = JSON.parse(await readFile(baselinePath, 'utf8'));
+if (!updateBaseline) {
+  validateBrowserBaseline(baseline, fixtures);
+}
+if (!updateBaseline && JSON.stringify(baseline.sampling) !== JSON.stringify(fullSampleConfig)) {
+  throw new Error(
+    `Browser sampling configuration changed. Expected ${JSON.stringify(baseline.sampling)}, received ${JSON.stringify(fullSampleConfig)}.`
+  );
+}
+const {
+  mode,
+  sampling: sampleConfig,
+  samples: samplePlan,
+} = createBrowserRunPlan({
+  sampling: fullSampleConfig,
+  timingPolicy: baseline.timingPolicy,
+  profile: process.argv.includes('--profile'),
+  updateBaseline,
+});
 const referenceDir = process.env[PERFORMANCE_REFERENCE_DIR_VARIABLE] || null;
 const referenceLabel = process.env[PERFORMANCE_REFERENCE_LABEL_VARIABLE] || null;
-
-const median = (values) => {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-
-  if (sorted.length % 2 === 0) {
-    return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-  }
-  return sorted[middle] ?? 0;
-};
-
-const summarizeVariance = (values) => {
-  const mean = values.reduce((total, value) => total + value, 0) / values.length;
-  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / Math.max(1, values.length - 1);
-  const standardDeviation = Math.sqrt(variance);
-
-  return {
-    coefficientOfVariation: mean === 0 ? 0 : standardDeviation / mean,
-    maximum: Math.max(...values),
-    mean,
-    minimum: Math.min(...values),
-    standardDeviation,
-  };
-};
 
 const getRequestedScriptLabels = (scripts) =>
   new Set([...scripts].map((request) => scriptLabelByPath.get(request) ?? request));
@@ -210,8 +205,6 @@ const getScriptSourceOwners = (scripts) => {
   return [...owners].sort();
 };
 
-const getZeroResourceSummary = () => Object.fromEntries(BROWSER_RESOURCE_METRIC_KEYS.map((key) => [key, 0]));
-
 const createSourceOwnerSets = (routes) => {
   const sets = {};
   const setIdByFingerprint = new Map();
@@ -238,11 +231,6 @@ const createSourceOwnerSets = (routes) => {
 
   return { routeSetIds, sets };
 };
-
-const getMaximumResourceSummary = (samples, key) =>
-  Object.fromEntries(
-    BROWSER_RESOURCE_METRIC_KEYS.map((metric) => [metric, Math.max(...samples.map((sample) => sample[key][metric]))])
-  );
 
 /** Wait for main-thread idle between switches so the next sample excludes the previous switch's work. */
 const settleMainThread = (page) =>
@@ -618,96 +606,58 @@ preview.stderr.on('data', (chunk) => {
 });
 
 let browser;
+const captureFailureTrace = async (fixture) => {
+  if (mode !== 'resources') {
+    return;
+  }
+  try {
+    await runSample(browser, fixture, { index: 0, kind: 'trace' });
+  } catch (error) {
+    // Diagnostics must never replace the original gate failure.
+    process.stderr.write(`Diagnostic trace for ${fixture.id}/${fixture.stateProfile} failed: ${String(error)}\n`);
+  }
+};
 try {
   await waitForPreview();
   browser = await chromium.launch({ headless: true });
   const routeReports = [];
 
   for (const fixture of fixtures.routes) {
-    const scoredSamples = [];
+    const observedSamples = [];
     let traceSample = null;
-    let stableProfileCounts = null;
-    let stableScriptSourceOwners = null;
 
-    for (const sample of samplePlan) {
-      let result;
-      try {
-        result = await runSample(browser, fixture, sample);
-      } catch (error) {
-        throw new Error(
-          `${fixture.id}/${fixture.stateProfile} ${sample.kind} sample ${String(sample.index)} failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      }
-
-      if (sample.kind === 'trace') {
-        traceSample = result;
-      }
-      if (sample.kind !== 'scored') {
-        continue;
-      }
-
-      stableProfileCounts ??= result.profileCounts;
-      stableScriptSourceOwners ??= result.scriptSourceOwners;
-      const stableValues = [
-        ['profile counts', stableProfileCounts, result.profileCounts],
-        ['script source owners', stableScriptSourceOwners, result.scriptSourceOwners],
-      ];
-      for (const [label, expected, received] of stableValues) {
-        if (JSON.stringify(expected) !== JSON.stringify(received)) {
+    try {
+      for (const sample of samplePlan) {
+        let result;
+        try {
+          result = await runSample(browser, fixture, sample);
+        } catch (error) {
           throw new Error(
-            `${fixture.id}/${fixture.stateProfile} ${label} were unstable between scored samples.\nExpected ${JSON.stringify(
-              expected
-            )}\nReceived ${JSON.stringify(received)}`
+            `${sample.kind} sample ${String(sample.index)} failed: ${error instanceof Error ? error.message : String(error)}`
           );
         }
+        if (sample.kind === 'trace') {
+          traceSample = result;
+        }
+        if (sample.kind === 'scored' || sample.kind === 'resource') {
+          observedSamples.push(result);
+        }
       }
-
-      scoredSamples.push({
-        activatedResources: result.activatedResources,
-        resources: result.resources,
-        timing: result.timing,
+      routeReports.push({
+        ...summarizeBrowserSamples(observedSamples, mode),
+        id: fixture.id,
+        owner: fixture.owner,
+        readyMark: fixture.readyMark,
+        remediationTicket: fixture.remediationTicket,
+        stateProfile: fixture.stateProfile,
+        traceSample,
       });
+    } catch (error) {
+      await captureFailureTrace(fixture);
+      throw new Error(
+        `${fixture.id}/${fixture.stateProfile} ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-
-    const timingKeys = [
-      'domContentLoadedMs',
-      'layoutAckMs',
-      'layoutReturnSwitchMs',
-      'layoutSwitchMs',
-      'loadMs',
-      'longestTaskMs',
-      'projectSwitchMs',
-      'routeReadyMs',
-    ];
-    const timingValues = (key) => scoredSamples.map((sample) => sample.timing[key]);
-    routeReports.push({
-      activatedResources:
-        scoredSamples.length > 0
-          ? getMaximumResourceSummary(scoredSamples, 'activatedResources')
-          : getZeroResourceSummary(),
-      domContentLoadedMedianMs: median(timingValues('domContentLoadedMs')),
-      id: fixture.id,
-      layoutAckMedianMs: median(timingValues('layoutAckMs')),
-      layoutReturnSwitchMedianMs: median(timingValues('layoutReturnSwitchMs')),
-      layoutSwitchMedianMs: median(timingValues('layoutSwitchMs')),
-      loadMedianMs: median(timingValues('loadMs')),
-      longestTaskMaxMs: Math.max(...timingValues('longestTaskMs')),
-      owner: fixture.owner,
-      profileCounts: stableProfileCounts,
-      projectSwitchMedianMs: median(timingValues('projectSwitchMs')),
-      rawSamples: scoredSamples,
-      readyMark: fixture.readyMark,
-      remediationTicket: fixture.remediationTicket,
-      resources:
-        scoredSamples.length > 0 ? getMaximumResourceSummary(scoredSamples, 'resources') : getZeroResourceSummary(),
-      routeReadyMedianMs: median(timingValues('routeReadyMs')),
-      scriptSourceOwners: stableScriptSourceOwners ?? [],
-      stateProfile: fixture.stateProfile,
-      traceSample,
-      variance: Object.fromEntries(timingKeys.map((key) => [key, summarizeVariance(timingValues(key))])),
-    });
   }
 
   // Written before any check so a failing main still records what it measured for the next PR.
@@ -744,6 +694,7 @@ try {
           uncoveredRoutes: [],
         }
       : null,
+    mode,
     routes: routeReports,
     sampling: sampleConfig,
     schemaVersion: 2,
@@ -794,7 +745,6 @@ try {
     await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
     await writeFile(artifactPath, `${JSON.stringify(report, null, 2)}\n`);
   } else {
-    const baseline = validateBrowserBaseline(JSON.parse(await readFile(baselinePath, 'utf8')), fixtures);
     const { routes: expectedRoutes, uncovered: uncoveredRoutes } = applyBrowserReference(baseline.routes, reference);
     if (report.reference) {
       report.reference.uncoveredRoutes = uncoveredRoutes;
@@ -813,13 +763,6 @@ try {
       );
     }
     const failures = [];
-    if (JSON.stringify(baseline.sampling) !== JSON.stringify(sampleConfig)) {
-      failures.push(
-        `Browser sampling configuration changed. Expected ${JSON.stringify(baseline.sampling)}, received ${JSON.stringify(
-          sampleConfig
-        )}.`
-      );
-    }
     for (const route of routeReports) {
       const expected = expectedRoutes.find(
         (candidate) => candidate.id === route.id && candidate.stateProfile === route.stateProfile
@@ -833,14 +776,18 @@ try {
           `${route.id}/${route.stateProfile} semantic-ready mark changed from ${expected.readyMark} to ${route.readyMark}.`
         );
       }
-      failures.push(
-        ...checkBrowserRouteBudget(
-          route,
-          expected,
-          baseline.timingPolicy,
-          baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet]
-        )
+      const routeFailures = checkBrowserRouteBudget(
+        route,
+        expected,
+        baseline.timingPolicy,
+        baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet]
       );
+      failures.push(...routeFailures);
+      if (routeFailures.length > 0) {
+        await captureFailureTrace(
+          fixtures.routes.find((fixture) => fixture.id === route.id && fixture.stateProfile === route.stateProfile)
+        );
+      }
     }
     for (const expected of baseline.routes) {
       if (!routeReports.some((route) => route.id === expected.id && route.stateProfile === expected.stateProfile)) {
@@ -856,6 +803,7 @@ try {
     `${JSON.stringify(
       {
         artifactPath,
+        mode,
         routes: routeReports.map((route) => ({
           activatedResources: route.activatedResources,
           id: route.id,

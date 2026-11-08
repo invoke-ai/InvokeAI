@@ -8,6 +8,7 @@ import {
   type GalleryImage,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
+import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
 import { recordLogEvent } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { createExternalStore } from '@platform/state/externalStore';
@@ -23,6 +24,7 @@ import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPr
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
+import { createWidgetRecovery, type WidgetRecoveryStore } from './widget-frame/widgetRecoveryStore';
 import { areWidgetsLoaded } from './widgetRegistry';
 import { getProjectWidgetValues } from './widgetState';
 import {
@@ -93,9 +95,13 @@ const createCommands = (
 
   return {
     account: {
+      /** Patches the active project's settings, or those of `projectId` while it is open. */
       updateProjectPreferences: command(
         'setActiveProjectSettings',
-        (settings: ActionPayload<'setActiveProjectSettings'>['settings']) => ({ settings })
+        (settings: ActionPayload<'setActiveProjectSettings'>['settings'], projectId?: string) => ({
+          settings,
+          ...(projectId ? { projectId } : {}),
+        })
       ),
     },
     canvas: {
@@ -147,6 +153,15 @@ const createCommands = (
           preserveNavigationQuery,
           projectId,
           selectionPage,
+        })
+      ),
+      /** Select an image or video picked outside the Gallery's listing; Preview navigates within the item's own board. */
+      selectItemInItsBoard: command(
+        'selectGalleryItem',
+        (item: ActionPayload<'selectGalleryItem'>['item'], projectId?: string) => ({
+          item,
+          navigateItemBoard: true,
+          projectId,
         })
       ),
       setCompareItem: command(
@@ -273,6 +288,10 @@ const createCommands = (
         'removePromptFromHistory',
         (prompt: ActionPayload<'removePromptFromHistory'>['prompt'], projectId?: string) => ({ projectId, prompt })
       ),
+      restorePromptHistory: command(
+        'restorePromptHistory',
+        (items: ActionPayload<'restorePromptHistory'>['items'], projectId: string) => ({ items, projectId })
+      ),
       setBatchCount: command('setGenerateBatchCount', (batchCount: number, projectId?: string) => ({
         batchCount,
         projectId,
@@ -292,7 +311,18 @@ const createCommands = (
       setSource: command('setInvocationSource', (sourceId: ActionPayload<'setInvocationSource'>['sourceId']) => ({
         sourceId,
       })),
-      submitCanvas: command('submitCanvasInvocationSnapshot'),
+      submitCanvas: (payload: Omit<ActionPayload<'submitCanvasInvocationSnapshot'>, 'runtime'>) =>
+        dispatch({
+          ...payload,
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
+          type: 'submitCanvasInvocationSnapshot',
+        }),
+      submitModelOnlyUpscale: (payload: Omit<ActionPayload<'submitModelOnlyUpscale'>, 'runtime'>) =>
+        dispatch({
+          ...payload,
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
+          type: 'submitModelOnlyUpscale',
+        }),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),
@@ -345,9 +375,19 @@ const createCommands = (
       recover: command('recoverShellLayout'),
       renamePreset: command(
         'renameLayoutPreset',
-        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
+        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string, localizedDefaultLabel?: string) => ({
+          label,
+          presetId,
+          ...(localizedDefaultLabel === undefined ? {} : { localizedDefaultLabel }),
+        })
       ),
       reset: command('resetActiveLayout'),
+      /** Steps the project's layout back (the active project by default), or back to before one step's change. */
+      undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
+        ...(projectId === undefined ? {} : { projectId }),
+        ...(throughEntryId === undefined ? {} : { throughEntryId }),
+      })),
+      redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
       /** Discards the named preset's unsaved arrangement in the active project. */
       revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
         presetId,
@@ -379,7 +419,14 @@ const createCommands = (
     notifications: {
       add: command('recordNotice'),
       clear: command('clearNotifications'),
+      dismiss: command('dismissNotification', (notificationId: string) => ({ notificationId })),
+      withdrawRetry: command('withdrawNotificationRetry', (itemIds: readonly number[]) => ({ itemIds })),
       markAllRead: command('markAllNotificationsRead'),
+      markRead: command('markNotificationsRead', (notificationIds: readonly string[]) => ({ notificationIds })),
+      restore: command(
+        'restoreNotifications',
+        (notifications: ActionPayload<'restoreNotifications'>['notifications']) => ({ notifications })
+      ),
       recordWidgetFailure: command(
         'recordWidgetFailure',
         (failure: ActionPayload<'recordWidgetFailure'>['failure']) => ({ failure })
@@ -449,17 +496,16 @@ const createCommands = (
         (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
           projectId,
           queueItemId,
-          ...(notice ? { notice } : {}),
+          ...(notice !== undefined ? { notice } : {}),
         })
       ),
-      cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
-      cancelAllExceptCurrent: command(
-        'cancelAllQueueItemsExceptCurrent',
-        (projectId?: string, currentQueueItemId?: string | null) => ({ currentQueueItemId, projectId })
+      cancelUnsubmitted: command('cancelUnsubmittedQueueItems', (projectId?: string) =>
+        projectId === undefined ? {} : { projectId }
       ),
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
       markBackendSubmitted: command('markQueueItemBackendSubmitted'),
+      recordSubmissionRetry: command('recordQueueItemSubmissionRetry'),
       setCancellationPending: command('setQueueItemCancellationPending'),
       setLocalRecoveryState: command('setQueueItemLocalRecoveryState'),
       routePartialResults: command('routeQueueItemPartialResults'),
@@ -484,6 +530,11 @@ const createCommands = (
       raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
+      /** Deletes these pins from the instance, so it follows the user's defaults for them. */
+      clearInstanceValues: command(
+        'clearWidgetInstanceValues',
+        (instanceId: string, keys: readonly string[], projectId?: string) => ({ instanceId, keys, projectId })
+      ),
       patchInstanceValues: command(
         'patchWidgetInstanceValues',
         (instanceId: string, values: Record<string, unknown>, projectId?: string) => ({
@@ -677,6 +728,8 @@ export type WorkbenchPersistenceCommands = ReturnType<typeof createPersistenceAd
 
 export interface WorkbenchInternalAdapters {
   persistence: WorkbenchPersistenceCommands;
+  /** Mirrors the settings store's `scopedDefaults` into the aggregate; only the workbench runtime calls it. */
+  setScopedDefaults: (scopedDefaults: WorkbenchState['scopedDefaults']) => void;
 }
 
 export interface WorkbenchSnapshot {
@@ -687,6 +740,7 @@ export interface WorkbenchSnapshot {
   hasHydrated: boolean;
   notifications: WorkbenchState['notifications'];
   projects: WorkbenchState['projects'];
+  scopedDefaults: WorkbenchState['scopedDefaults'];
 }
 
 /** Imperative, read-only views for event handlers that must observe post-flush state. */
@@ -697,6 +751,7 @@ export interface WorkbenchQueries {
 }
 
 export interface WorkbenchInternalStore {
+  widgetRecovery: Map<string, WidgetRecoveryStore>;
   commands: WorkbenchCommands;
   getPersistedRevision: () => number;
   getSnapshot: () => WorkbenchSnapshot;
@@ -724,6 +779,7 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
   hasHydrated,
   notifications: state.notifications,
   projects: state.projects,
+  scopedDefaults: state.scopedDefaults,
 });
 
 const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState): boolean =>
@@ -905,7 +961,12 @@ export const createWorkbenchStore = (
   initialState = createInitialWorkbenchState(),
   options: WorkbenchStoreOptions = {}
 ): WorkbenchInternalStore => {
-  let state = initialState;
+  // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
+  // settings subscription keeps the mirror current from then on.
+  let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
+  const widgetRecovery = new Map(
+    Object.keys(getActiveProject(state).widgetInstances).map((id) => [id, createWidgetRecovery()])
+  );
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -921,6 +982,23 @@ export const createWorkbenchStore = (
       persistedRevision += 1;
     }
 
+    const project = getActiveProject(nextState);
+    const previousProject = getActiveProject(state);
+    if (project.id !== previousProject.id || project.widgetInstances !== previousProject.widgetInstances) {
+      if (project.id !== previousProject.id) {
+        widgetRecovery.clear();
+      }
+      for (const id of widgetRecovery.keys()) {
+        if (!project.widgetInstances[id]) {
+          widgetRecovery.delete(id);
+        }
+      }
+      for (const id of Object.keys(project.widgetInstances)) {
+        if (!widgetRecovery.has(id)) {
+          widgetRecovery.set(id, createWidgetRecovery());
+        }
+      }
+    }
     state = nextState;
     hasHydrated = nextHasHydrated;
     snapshotStore.setSnapshot(createSnapshot(state, hasHydrated));
@@ -985,11 +1063,13 @@ export const createWorkbenchStore = (
 
   return {
     commands,
+    widgetRecovery,
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,
     getState,
     internal: {
       persistence: createPersistenceAdapter(dispatch, getState),
+      setScopedDefaults: (scopedDefaults) => dispatch({ scopedDefaults, type: 'setScopedDefaults' }),
     },
     queries: {
       getProject: (projectId) => state.projects.find((project) => project.id === projectId) ?? null,

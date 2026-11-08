@@ -12,10 +12,12 @@ import type {
 
 import { ChakraProvider, HStack } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createDeferredResource } from '@workbench/deferredResource';
 import { createExtensionRegistry, type ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider, type WorkbenchFocusController } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { closeWorkbenchSettings, settingsDialogStore } from '@workbench/settings/settingsDialogStore';
+import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import i18next from 'i18next';
 import { MapIcon, TagsIcon } from 'lucide-react';
 import { act, useState } from 'react';
@@ -31,6 +33,7 @@ import { page, userEvent } from 'vitest/browser';
 
 const windowMocks = vi.hoisted(() => ({
   actionsRegion: null as string | null,
+  closeFloating: vi.fn(),
   extensions: null as unknown as ExtensionRegistry,
   dockFloating: vi.fn(),
   flushWorkbenchDrafts: vi.fn(),
@@ -60,11 +63,20 @@ const project = {
   },
 };
 
+const recoveryOwner = vi.hoisted(() => ({
+  widgetRecovery: new Map(),
+  getSnapshot: () => ({ activeProject: project }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchInternalStore: () => recoveryOwner,
+  useWorkbenchReload: () => async () => {},
   useActiveProjectSelector: (selector: (project: unknown) => unknown) => selector(project),
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
     getProject: (projectId: string) => (projectId === project.id ? project : null),
+    getSnapshot: () => ({
+      activeProject: { ...project, layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } } },
+    }),
     isActiveProject: (projectId: string) => projectId === project.id,
   }),
   useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
@@ -157,19 +169,16 @@ const implementation: WidgetImplementation = {
   view: () => <MapBody />,
 };
 
-const implementationPromise = Promise.resolve(implementation);
+const implementationResource = createDeferredResource(() => Promise.resolve(implementation));
+const implementationPromise = implementationResource.load();
 const registeredWidget = {
-  implementation: { load: () => implementationPromise, retry: () => {} },
+  implementation: implementationResource,
   manifest,
   status: 'enabled',
 } as unknown as RegisteredWidget;
 
-const failedLoad = Promise.reject(new Error('chunk unavailable'));
-// Nothing awaits this before the render that consumes it; an unhandled
-// rejection would fail the run on its own.
-failedLoad.catch(() => undefined);
 const failingWidget = {
-  implementation: { load: () => failedLoad, retry: () => {} },
+  implementation: createDeferredResource<WidgetImplementation>(() => Promise.reject(new Error('chunk unavailable'))),
   // The body isolates its own failure, so only the title bar's containment is
   // under test here.
   manifest: { ...manifest, failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' } },
@@ -195,6 +204,8 @@ await i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           floating: {
+            close: 'Close window',
+            closeNamed: 'Close {{label}} window',
             destinations: { right: 'right panel' },
             dockTo: 'Dock to {{destination}}',
             maximize: 'Maximize',
@@ -222,7 +233,8 @@ let testController = createTestFocusController();
 const renderWindow = async (
   floatingState: FloatingWidgetState = state,
   controller: WorkbenchFocusController = testController,
-  showUnavailablePanel = false
+  showUnavailablePanel = false,
+  showWindow = true
 ) => {
   await act(async () => {
     root?.render(
@@ -233,7 +245,9 @@ const renderWindow = async (
             {showUnavailablePanel ? (
               <MissingWidgetFrame instanceId="image-map-instance" label="Image Map" region="right" typeId="image-map" />
             ) : null}
-            <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+            {showWindow ? (
+              <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+            ) : null}
           </FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -260,14 +274,17 @@ beforeEach(async () => {
   windowMocks.flushWorkbenchDrafts.mockClear();
   windowMocks.setFloatingMode.mockClear();
   windowMocks.dockFloating.mockClear();
+  windowMocks.closeFloating.mockClear();
   windowMocks.raiseFloating.mockClear();
   windowMocks.setFloatingGeometry.mockClear();
+  recoveryOwner.widgetRecovery.set('image-map-instance', createWidgetRecovery());
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 });
 
 afterEach(async () => {
+  recoveryOwner.widgetRecovery.clear();
   await act(() => root?.unmount());
   host?.remove();
   host = null;
@@ -514,7 +531,7 @@ describe('FloatingWidgetWindow chrome', () => {
     const controls = host!.querySelector('[data-floating-controls]')!.getBoundingClientRect();
 
     expect(frame.width).toBe(280);
-    for (const name of ['Shade', 'Maximize', 'Dock to right panel']) {
+    for (const name of ['Shade', 'Maximize', 'Dock to right panel', 'Close Image Map window']) {
       const button = host!.querySelector(`button[aria-label="${name}"]`)!.getBoundingClientRect();
 
       expect(button.width).toBeGreaterThan(0);
@@ -635,7 +652,7 @@ describe('FloatingWidgetWindow focus', () => {
       floatingWindow().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     });
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 
@@ -647,7 +664,7 @@ describe('FloatingWidgetWindow focus', () => {
     await act(() => floatingWindow().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
     await act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!.focus());
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 
@@ -685,6 +702,32 @@ describe('FloatingWidgetWindow focus', () => {
     });
 
     expect(focusRegion).toHaveBeenCalledWith('right', 'image-map');
+  });
+
+  // Close takes the window out of the layout; focus goes to the panel its rail shows, saving drafts first.
+  // Close takes the window out of the layout, its drafts saved first, and focus lands in the panel it returns to.
+  it('closes from the title bar and leaves focus in the panel the window returns to', async () => {
+    windowMocks.useMissingWidget = true;
+    const controller = createTestFocusController();
+    await renderWindow(state, controller, true);
+    const close = host!.querySelector<HTMLButtonElement>(
+      '[data-floating-window="image-map-instance"] button[aria-label^="Close "][aria-label$=" window"]'
+    )!;
+
+    await act(() => close.click());
+    expect(windowMocks.closeFloating).toHaveBeenCalledWith('image-map-instance');
+    // The layout as the store leaves it: the window gone, its panel in place.
+    await renderWindow(state, controller, true, false);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+    expect(windowMocks.flushWorkbenchDrafts).toHaveBeenCalled();
+    expect(host!.querySelector('[data-floating-window="image-map-instance"]')).toBeNull();
+    expect(document.activeElement).toBe(host!.querySelector('[data-focus-region="right"]'));
   });
 
   it('moves focus to the unavailable-widget panel when its floating window docks', async () => {
@@ -1022,11 +1065,42 @@ describe('FloatingWidgetWindow gestures', () => {
     await act(() =>
       titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown', shiftKey: true }))
     );
+    // A vertical step leaves x alone: the clamped 552px on screen is the viewport's, not the user's.
     expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
       heightPx: 300,
       widthPx: 900,
-      x: 552,
+      x: 5000,
       y: 72,
+    });
+
+    // A step right, into the edge that holds the window at 552px, moves nothing on screen and commits nothing.
+    await act(() => titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the stored position of the axis a pointer move leaves alone, without jumping to it', async () => {
+    await page.viewport(500, 260);
+    // Stored far off the bottom-right; shown at (452, 212).
+    await renderWindow({ ...state, heightPx: 300, widthPx: 400, x: 1000, y: 800 });
+
+    await drag(titleBar(), 0, -40, { release: false });
+    // The preview carries the stored x, which the viewport still clamps: no jump towards it.
+    expect(rect()).toMatchObject({ left: 452, top: 172 });
+    await release(0, -40);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 400,
+      x: 1000,
+      y: 172,
+    });
+
+    await nextFrame();
+    await drag(titleBar(), -50, 0);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 400,
+      x: 402,
+      y: 800,
     });
   });
 
@@ -1173,6 +1247,51 @@ describe('FloatingWidgetWindow gestures', () => {
     await act(() => corner().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
 
     expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+  });
+
+  it('clamps against the viewport CSS uses at a fractional zoom, so a push into an edge stores nothing', async () => {
+    // At 80% zoom a 598x498 frame is 478x398 device pixels: a 597.5x497.5 viewport. CSS holds a wide window
+    // between -549.5px and 549.5px from the left and at most 449.5px from the top. `innerWidth` and `innerHeight`
+    // are whole pixels; an engine that rounds half up reports 598x498, half a pixel past those edges.
+    await page.viewport(598, 498);
+    const frame = window.frameElement as HTMLElement;
+    frame.style.setProperty('zoom', '0.8');
+    const innerWidth = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(598);
+    const innerHeight = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(498);
+
+    try {
+      const key = (target: HTMLElement, name: string) =>
+        act(() => target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: name })));
+
+      // Stored for a larger display: wider than this viewport and past its bottom-right corner.
+      await renderWindow({ ...state, heightPx: 300, widthPx: 900, x: 1400, y: 1400 });
+      expect(rect().left).toBeCloseTo(549.5, 1);
+      expect(rect().top).toBeCloseTo(449.5, 1);
+      expect(rect().width).toBeCloseTo(597.5, 1);
+
+      // Steps into the right and bottom edges, a drag into that corner, and a grow against the width cap.
+      await key(titleBar(), 'ArrowRight');
+      await key(titleBar(), 'ArrowDown');
+      await drag(titleBar(), 40, 40);
+      await key(corner(), 'ArrowRight');
+      // Past the left edge instead, where the sliver bound is the viewport's width too.
+      await renderWindow({ ...state, heightPx: 300, widthPx: 900, x: -1400, y: 40 });
+      expect(rect().left).toBeCloseTo(-549.5, 1);
+      await key(titleBar(), 'ArrowLeft');
+      expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+
+      // A step away from the edge still moves the window, and only on its own axis: 16px right of -549.5px, in
+      // whole pixels.
+      await key(titleBar(), 'ArrowRight');
+      expect(windowMocks.setFloatingGeometry).toHaveBeenCalledOnce();
+      const [, moved] = windowMocks.setFloatingGeometry.mock.calls[0]!;
+      expect(moved).toMatchObject({ heightPx: 300, widthPx: 900, y: 40 });
+      expect(Math.abs(moved.x - -533.5)).toBeLessThanOrEqual(0.5);
+    } finally {
+      innerWidth.mockRestore();
+      innerHeight.mockRestore();
+      frame.style.removeProperty('zoom');
+    }
   });
 
   it('moves a collapsed window by its title bar and keeps its stored height', async () => {

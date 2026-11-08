@@ -20,7 +20,17 @@ from invokeai.backend.model_manager.taxonomy import AnyVariant
 NegativePromptUsage = Literal["always", "cfg-gated", "never"]
 """`cfg-gated` means the field exists but only does anything above CFG 1 — the distilled models."""
 
-ControlKind = Literal["controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite"]
+ControlKind = Literal[
+    "controlnet",
+    "t2i_adapter",
+    "control_lora",
+    "z_image_control",
+    "anima_lllite",
+    "qwen_image_control",
+    "flux2_control",
+]
+"""A kind names the graph node webv2 compiles a control layer to, so an architecture with its own control node
+is its own kind -- the Z-Image, Qwen-Image and FLUX.2 Fun branches are the same design and still three kinds."""
 
 SchedulerSet = Literal["standard", "flow", "flow-no-lcm", "anima"]
 """Which family of schedulers to offer. `None` means the architecture drives its own and offers no
@@ -111,12 +121,18 @@ class FeaturesFacet(Facet):
     control_kinds: frozenset[ControlKind] = frozenset()
     max_reference_images: int = 0
     reference_images_require_variant: str | None = None
-    """Qwen-Image accepts reference images only as the `edit` variant — the one feature in this
-    table that a base alone cannot answer."""
+    """The one variant that accepts reference images, where a base alone cannot answer: Qwen-Image
+    takes them only as `edit`, Anima only on its Qwen3-conditioned releases."""
+    reference_images_require_vision_tower: bool = False
+    """Reference images are read by the Qwen3-VL vision tower: the effective encoder must carry one. Qwen-Image-2.1
+    gets it from a Diffusers pipeline's own encoder or a safetensors Qwen3-VL encoder; a GGUF encoder has none of its
+    own and takes the llama.cpp mmproj file as a separate vision tower model.
+    The frontend's encoder filter for this flag is Qwen3-VL 8B, Qwen-Image-2.1's; another base that sets it with a
+    different encoder needs its own filter there."""
 
     supports_regional_guidance: bool = False
     regional_negative: bool = False
-    """Regional *negative* prompts, which only the SD family has."""
+    """Whether regional negative conditionings retain their spatial masks."""
 
     clip_skip_max: int | None = None
     supports_seamless: bool = False

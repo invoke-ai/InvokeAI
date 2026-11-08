@@ -150,14 +150,12 @@ def test_worker_stops_while_gallery_maintenance_holds_the_mutation_lock(tmp_path
     stop_event = threading.Event()
     resume_event = threading.Event()
     resume_event.set()
-    poll_now_event = threading.Event()
     worker = _SessionWorker(device=None, runner=object())
     processor._invoker.services.logger = InvokeAILogger.get_logger()
     processor._polling_interval = 5
     processor._thread_semaphore = threading.BoundedSemaphore(1)
     processor._stop_event = stop_event
     processor._resume_event = resume_event
-    processor._poll_now_event = poll_now_event
     processor._workers = [worker]
 
     claim_attempted = threading.Event()
@@ -173,7 +171,6 @@ def test_worker_stops_while_gallery_maintenance_holds_the_mutation_lock(tmp_path
         kwargs={
             "worker": worker,
             "stop_event": stop_event,
-            "poll_now_event": poll_now_event,
             "resume_event": resume_event,
         },
         daemon=True,

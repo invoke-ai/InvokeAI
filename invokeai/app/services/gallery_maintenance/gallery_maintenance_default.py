@@ -24,6 +24,7 @@ from invokeai.app.services.gallery_maintenance.gallery_maintenance_common import
     GalleryMaintenanceResult,
 )
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveJobAlreadyRunning, ImageMoveQueueActive
+from invokeai.app.util.no_replace import publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -863,8 +864,8 @@ class GalleryMaintenanceService:
                 after = os.fstat(source_file.fileno())
                 if GalleryMaintenanceService._signature(after)[:5] != expected[:5]:
                     raise OSError("Source changed while archiving")
-            os.link(temporary, destination)
-            temporary.unlink()
+            publish_noreplace(temporary, destination)
+            temporary.unlink(missing_ok=True)
             GalleryMaintenanceService.__fsync_directory(destination.parent)
             if GalleryMaintenanceService._path_signature(source) != expected:
                 raise OSError("Source changed before archive completion")
@@ -888,11 +889,11 @@ class GalleryMaintenanceService:
         except Exception:
             if source_quarantined and quarantined_source is not None:
                 try:
-                    # Link is atomic and refuses to replace a source created by another writer.
+                    # Publishing is atomic and refuses to replace a source created by another writer.
                     # If restoration cannot safely claim the original name, leave the quarantined
                     # file in its hidden directory for recovery instead of deleting user data.
-                    os.link(quarantined_source, source)
-                    quarantined_source.unlink()
+                    publish_noreplace(quarantined_source, source)
+                    quarantined_source.unlink(missing_ok=True)
                     source_quarantined = False
                     GalleryMaintenanceService.__fsync_directory(quarantine_directory)
                     GalleryMaintenanceService.__fsync_directory(source.parent)
@@ -943,8 +944,8 @@ class GalleryMaintenanceService:
 
     def _restore_quarantined_thumbnail(self, quarantined: Path, thumbnail: Path) -> None:
         try:
-            os.link(quarantined, thumbnail)
-            quarantined.unlink()
+            publish_noreplace(quarantined, thumbnail)
+            quarantined.unlink(missing_ok=True)
             self.__fsync_directory(quarantined.parent)
             self.__fsync_directory(thumbnail.parent)
         except OSError:

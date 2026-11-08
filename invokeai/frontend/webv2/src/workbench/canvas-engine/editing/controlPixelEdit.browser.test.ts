@@ -113,8 +113,11 @@ const setup = (
     getActiveProjectId: () => 'project',
     getAdjustedSurface: (candidate, candidateEntry) =>
       candidate.type === 'raster' ? adjusted.get(candidate.id, candidateEntry, candidate.adjustments) : null,
+    getAdjustmentStatus: () => undefined,
     getDocument: () => document,
     getTransformSession: () => null,
+    peekAdjustedSurface: (candidate, candidateEntry) =>
+      candidate.type === 'raster' ? adjusted.peek(candidate.id, candidateEntry, candidate.adjustments) : null,
     installPrepared: (prepared) => {
       layers.installReplacement(prepared);
     },

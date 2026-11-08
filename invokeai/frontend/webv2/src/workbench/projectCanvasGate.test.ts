@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createEmptyCanvasState } from './canvasMigration';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
 import { gateProjectCanvases } from './projectCanvasGate';
 
 const canvas = createEmptyCanvasState();
@@ -13,14 +14,14 @@ describe('gateProjectCanvases', () => {
   });
 
   it('refuses a project whose live canvas is unsupported or invalid, keeping the raw document', () => {
-    const future = { canvas: { ...canvas, version: 5 }, id: 'p', name: 'P' };
+    const future = { canvas: { ...canvas, version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 }, id: 'p', name: 'P' };
     const broken = { canvas: { ...canvas, version: '2' }, id: 'p', name: 'P' };
 
     expect(gateProjectCanvases(future)).toMatchObject({
       projectId: 'p',
       projectName: 'P',
       raw: future,
-      refusal: { scope: 'state', status: 'unsupported-version', version: 5 },
+      refusal: { scope: 'state', status: 'unsupported-version', version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 },
       source: 'canvas',
     });
     expect(gateProjectCanvases(broken)).toMatchObject({

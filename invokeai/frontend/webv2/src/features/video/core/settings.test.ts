@@ -21,7 +21,6 @@ import {
   formatReferencePromptLabels,
   getDefaultReferenceClip,
   getDefaultReferenceConditioning,
-  getDefaultReferenceImageDetail,
   getInitialVideoPatch,
   getReferencesPatch,
   isVideoSettings,
@@ -129,6 +128,34 @@ describe('normalizeVideoSettings', () => {
     // A record whose mode normalize has to invent is not canonical, so nothing may reuse it raw.
     expect(isVideoSettings({ ...legacy, shouldRandomizeSeed: true })).toBe(false);
     expect(isVideoSettings(legacy)).toBe(false);
+  });
+
+  it("reads dynamic prompt settings saved before Video had them as off, with Video's prompt cap", () => {
+    const legacy: Record<string, unknown> = { ...createSettings() };
+
+    for (const key of Object.keys(legacy).filter((name) => name.startsWith('dynamicPrompts'))) {
+      delete legacy[key];
+    }
+
+    expect(normalizeVideoSettings(legacy)).toMatchObject({
+      dynamicPromptsCombinatorial: true,
+      dynamicPromptsEnabled: false,
+      dynamicPromptsMaxPrompts: 10,
+      dynamicPromptsResample: true,
+      dynamicPromptsSampleSeed: 0,
+      dynamicPromptsSeedBehaviour: 'per-iteration',
+    });
+    expect(isVideoSettings(legacy)).toBe(false);
+  });
+
+  it('starts a new Video panel, seeded or not yet, with dynamic prompts on and capped at 10', () => {
+    const newPanel = { dynamicPromptsEnabled: true, dynamicPromptsMaxPrompts: 10 };
+
+    expect(getDefaultVideoSettings()).toMatchObject(newPanel);
+    expect(normalizeVideoSettings({})).toMatchObject(newPanel);
+    expect(normalizeVideoSettings({ firstFrameImage: FIRST_FRAME, positivePrompt: 'a {red|green} fox' })).toMatchObject(
+      newPanel
+    );
   });
 
   it('round-trips canonical settings', () => {
@@ -488,26 +515,12 @@ describe('getDefaultReferenceClip', () => {
   });
 });
 
-describe('getDefaultReferenceImageDetail', () => {
-  const imageReference = {
-    detail: 'max',
-    image: { height: 1080, image_name: 'ref.png', width: 1920 },
-    kind: 'image',
-  } as const;
-  const videoReference = {
-    clip: SOURCE_VIDEO,
-    conditioning: 'video_audio',
-    kind: 'video',
-  } as const;
+describe('stored image reference detail', () => {
+  it.each(['max', 'match'] as const)('keeps a stored %s reference through normalization', (detail) => {
+    // New references default to match; references saved before that keep the detail they were stored with.
+    const reference = { detail, image: { height: 1080, image_name: 'ref.png', width: 1920 }, kind: 'image' } as const;
 
-  it('starts the first image reference at maximum detail', () => {
-    expect(getDefaultReferenceImageDetail([])).toBe('max');
-    expect(getDefaultReferenceImageDetail([videoReference])).toBe('max');
-  });
-
-  it('matches the generation size once an image reference is placed', () => {
-    expect(getDefaultReferenceImageDetail([imageReference])).toBe('match');
-    expect(getDefaultReferenceImageDetail([videoReference, imageReference])).toBe('match');
+    expect(normalizeVideoSettings(createSettings({ references: [reference] }))?.references).toEqual([reference]);
   });
 });
 

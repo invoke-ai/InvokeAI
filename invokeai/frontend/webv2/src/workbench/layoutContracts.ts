@@ -92,6 +92,11 @@ export interface LayoutPresetRoute {
 export interface LayoutPreset {
   id: LayoutPresetId;
   label: string;
+  /**
+   * The i18n key a built-in preset is shown by while the account has not renamed it; `label` is then its English
+   * default. Never on a custom preset, and never persisted.
+   */
+  labelKey?: string;
   isBuiltIn?: boolean;
   /** Missing only on legacy or source-less custom presets. */
   defaultRoute?: LayoutPresetRoute;

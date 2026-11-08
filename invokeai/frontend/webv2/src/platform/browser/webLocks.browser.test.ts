@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { acquireExclusiveLock, isLockHeld, waitForSharedLock } from './webLocks';
+import { acquireExclusiveLock, hasWebLocks, isLockHeld, waitForSharedLock } from './webLocks';
 
 describe('Web Locks adapter', () => {
+  it('reports whether Web Locks are available, from the browser or an injected manager', () => {
+    // The browser test page is a secure context (localhost), where the API exists.
+    expect(hasWebLocks()).toBe(true);
+    expect(hasWebLocks({} as LockManager)).toBe(true);
+
+    const descriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, 'locks');
+    Object.defineProperty(Navigator.prototype, 'locks', { configurable: true, get: () => undefined });
+    try {
+      // As on a plain-HTTP origin, where the browser leaves `navigator.locks` undefined.
+      expect(hasWebLocks()).toBe(false);
+    } finally {
+      Object.defineProperty(Navigator.prototype, 'locks', descriptor!);
+    }
+  });
+
   it('holds one exclusive owner and releases it idempotently', async () => {
     const name = `invokeai:web-lock-test:${crypto.randomUUID()}`;
     const first = await acquireExclusiveLock(name);

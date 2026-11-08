@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import pytest
-from sqlalchemy import URL, delete
+from sqlalchemy import URL, create_engine, delete, insert, select
 
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig, InvokeAIAppConfig
 from invokeai.app.services.shared.database import database as database_module
@@ -22,7 +22,17 @@ from invokeai.app.services.shared.database.startup import (
     open_migrated_database,
     redacted_database_url,
 )
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import NoImageFiles
+from invokeai.app.services.shared.sqlite_migrator.migration_loader import (
+    PORTABLE_CUTOVER,
+    MigrationBuildContext,
+    build_migrations,
+)
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
+    MigrationBase,
+    MigrationError,
+    PortableMigration,
+)
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import UPGRADE_DOCS_URL, NoImageFiles
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database import external_test_db_url
 
@@ -51,6 +61,35 @@ def test_a_url_is_shown_without_its_password() -> None:
     )
     assert redacted_database_url(None) is None
     assert redacted_database_url("no url at all") == "***"
+
+
+@pytest.mark.parametrize(
+    ("url", "shown"),
+    [
+        (
+            "mariadb+pymysql://invokeai@db/invokeai?password=s3cret",
+            "mariadb+pymysql://invokeai@db/invokeai?password=***",
+        ),
+        (
+            "mysql+pymysql://invokeai:s3cret@db/invokeai?charset=utf8mb4&passwd=0ther",
+            "mysql+pymysql://invokeai:***@db/invokeai?charset=utf8mb4&passwd=***",
+        ),
+    ],
+)
+def test_a_password_in_the_query_is_masked_too(
+    url: str, shown: str, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # PyMySQL takes `password` and `passwd` from the query as the password.
+    assert redacted_database_url(url) == shown
+
+    logger = logging.getLogger("test_startup_redaction")
+    # Exercise the real URL parsing and logging without requiring the optional MySQL driver.
+    monkeypatch.setattr(database_module, "create_mysql_engine", lambda _url: create_engine("sqlite:///:memory:"))
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        Database.open_url(url, logger).dispose()
+    [message] = [record.getMessage() for record in caplog.records if record.name == logger.name]
+    assert message == f"Connecting to database {shown}"
+    assert "s3cret" not in caplog.text and "0ther" not in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -210,6 +249,73 @@ def test_a_lock_the_server_released_is_taken_again(
         lock.close()
         database.dispose()
         other.dispose()
+
+
+@server_only
+def test_updating_an_existing_server_database_warns_that_no_backup_was_made(
+    empty_database: Database,
+    _external_test_schema: Optional[URL],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assert _external_test_schema is not None
+    # The test servers keep their own defaults; what is checked here is the warning.
+    monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
+    config = _config(tmp_path, db_url=_external_test_schema.render_as_string(hide_password=False))
+
+    with caplog.at_level(logging.WARNING):
+        init_database(config, LOGGER, NoImageFiles()).dispose()
+    assert [record for record in caplog.records if record.levelno == logging.WARNING] == []
+
+    # A newer version, with a migration this database has not had.
+    def with_one_more(context: MigrationBuildContext) -> list[MigrationBase]:
+        probe = PortableMigration(id="2099_01_01_probe", depends_on=PORTABLE_CUTOVER, callback=lambda context: None)
+        return [*build_migrations(context), probe]
+
+    monkeypatch.setattr(startup, "build_migrations", with_one_more)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        init_database(config, LOGGER, NoImageFiles()).dispose()
+
+    [warning] = [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
+    assert _external_test_schema.render_as_string(hide_password=True) in warning
+    if _external_test_schema.password:
+        # The password may also spell the database name (CI uses "invokeai" for both), so look for it where the URL
+        # writes it, after the user name.
+        credentials = _external_test_schema.render_as_string(hide_password=False).split("://", 1)[1].rpartition("@")[0]
+        assert credentials not in warning
+    assert "makes no backup of a server database" in warning
+    assert UPGRADE_DOCS_URL in warning
+
+
+@server_only
+def test_a_server_database_a_newer_version_updated_is_refused_with_how_to_go_back(
+    empty_database: Database,
+    _external_test_schema: Optional[URL],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _external_test_schema is not None
+    monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
+    config = _config(tmp_path, db_url=_external_test_schema.render_as_string(hide_password=False))
+    init_database(config, LOGGER, NoImageFiles()).dispose()
+    with empty_database.begin(write=True) as conn:
+        conn.execute(insert(applied_migrations).values(migration_id="2999_01_01_from_a_newer_version"))
+    with empty_database.begin(write=False) as conn:
+        applied_before = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
+
+    with pytest.raises(
+        MigrationError, match="unknown applied migration IDs: 2999_01_01_from_a_newer_version"
+    ) as refused:
+        init_database(config, LOGGER, NoImageFiles())
+
+    message = str(refused.value)
+    assert "restore the backup you made before upgrading" in message
+    assert "InvokeAI does not back up server databases" in message
+    assert UPGRADE_DOCS_URL in message
+    with empty_database.begin(write=False) as conn:
+        assert set(conn.execute(select(applied_migrations.c.migration_id)).scalars()) == applied_before
 
 
 def _take_when_free(database: Database) -> InstanceLock:

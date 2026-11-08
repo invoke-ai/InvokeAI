@@ -1,21 +1,14 @@
-import type {
-  CanvasControlLayerContract,
-  CanvasEngine,
-  CanvasRasterLayerContractV2,
-} from '@workbench/canvas-engine/api';
+import type { CanvasEngine, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 
-import { ChakraProvider } from '@chakra-ui/react';
-import { system } from '@theme/system';
-import { createControlLayer, createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ControlLayerSettings } from './ControlLayerSettings';
 import { RasterLayerFilterSection } from './RasterLayerFilterSection';
 
 interface SharedLaunchProps {
   engine: CanvasEngine | null;
-  layer: CanvasControlLayerContract | CanvasRasterLayerContractV2;
+  layer: CanvasRasterLayerContractV2;
   onOperationStarted(): void;
   operations: unknown;
 }
@@ -39,18 +32,6 @@ vi.mock('./LayerFilterOperationButton', () => ({
 vi.mock('@workbench/canvas-operations/api', () => ({
   getCanvasOperations: () => operations,
 }));
-vi.mock('@features/models', () => ({
-  useModelsSelector: (selector: (snapshot: { models: never[] }) => unknown) => selector({ models: [] }),
-}));
-vi.mock('@workbench/WorkbenchContext', () => ({
-  useActiveProjectId: () => 'project',
-  useActiveProjectSelector: () => null,
-  useOptionalWorkbenchCommands: () => null,
-  useWorkbenchCommands: () => ({ canvas: { apply: vi.fn() } }),
-}));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
 
 beforeEach(() => {
   renderSharedLaunch.mockClear();
@@ -63,22 +44,6 @@ describe('layer filter launch delegation', () => {
 
     renderToStaticMarkup(
       <RasterLayerFilterSection engine={ENGINE} layer={layer} onOperationStarted={onOperationStarted} />
-    );
-
-    expect(renderSharedLaunch).toHaveBeenCalledOnce();
-    expect(renderSharedLaunch).toHaveBeenCalledWith(
-      expect.objectContaining({ engine: ENGINE, layer, onOperationStarted, operations: expect.any(Object) })
-    );
-  });
-
-  it('delegates control-layer launch rendering to the shared control with the original props', () => {
-    const layer = createControlLayer('Control', 'control');
-    const onOperationStarted = vi.fn();
-
-    renderToStaticMarkup(
-      <ChakraProvider value={system}>
-        <ControlLayerSettings engine={ENGINE} layer={layer} onOperationStarted={onOperationStarted} />
-      </ChakraProvider>
     );
 
     expect(renderSharedLaunch).toHaveBeenCalledOnce();

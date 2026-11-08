@@ -9,7 +9,7 @@ from page to page.
 import functools
 import itertools
 import operator
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any, Literal, NamedTuple, Optional
 
 from sqlalchemy import (
@@ -18,6 +18,7 @@ from sqlalchemy import (
     FromClause,
     Row,
     Select,
+    String,
     Subquery,
     Table,
     and_,
@@ -41,13 +42,16 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
+    InBoundSet,
     JsonString,
     OrderedJoin,
+    bound_set,
     fixed_limit,
     like_contains,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, read
-from invokeai.app.services.shared.database.schema.boards import board_images, board_videos
+from invokeai.app.services.shared.database.queries.board_access import listed_board
+from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.videos import videos
 
@@ -65,6 +69,13 @@ _HALVES = {
     "video": _Half(videos, board_videos, "video_name", "video_category", "video_origin"),
 }
 
+_ITEM_OWNERS = {
+    kind: select(half.media.c[half.name], half.media.c.user_id).where(
+        InBoundSet(half.media.c[half.name], bindparam("names", type_=String()))
+    )
+    for kind, half in _HALVES.items()
+}
+
 
 class _Shape(NamedTuple):
     """Which filters a listing has: never their values, which are bound, so that the shapes are few."""
@@ -76,7 +87,7 @@ class _Shape(NamedTuple):
     categories: Optional[tuple[str, ...]]
     intermediate: bool
     starred: bool
-    # "any" (no board filter), "none" (on no board) or "one".
+    # "any" (no board filter), "none" (on no board), "all" (on no board or a readable, active one) or "one".
     board: str
     # Whether the listing is limited to one account's items; else everything, as for an administrator.
     scoped: bool
@@ -112,7 +123,7 @@ class Filters(NamedTuple):
             else tuple(sorted({ImageCategory(c).value for c in self.categories})),
             intermediate=self.is_intermediate is not None,
             starred=self.starred is not None,
-            board="any" if self.board_id is None else "none" if self.board_id == "none" else "one",
+            board="any" if self.board_id is None else self.board_id if self.board_id in ("none", "all") else "one",
             scoped=self.user_id is not None and not self.is_admin,
             search=bool(self.search_term),
             created_date=self.created_date is not None,
@@ -144,12 +155,14 @@ def _from(kind: str, shape: _Shape, with_board: bool) -> tuple[FromClause, Colum
     on = membership.c[half.name] == media.c[half.name]
     if shape.board == "one":
         return OrderedJoin(membership, media, on), membership.c.board_id
-    if shape.board == "any" and with_board:
+    if shape.board in ("any", "all") and with_board:
         return media.outerjoin(membership, on), membership.c.board_id
     return media, null()
 
 
-def _conditions(kind: str, shape: _Shape) -> list[ColumnElement[bool]]:
+def _conditions(kind: str, shape: _Shape, joined: bool) -> list[ColumnElement[bool]]:
+    """The listing's conditions. `joined`: the half lists through a LEFT JOIN of its memberships (`_from` with the
+    board id), so a membership is read from the join rather than checked per item."""
     half = _HALVES[kind]
     media, membership = half.media, half.membership
     conditions: list[ColumnElement[bool]] = []
@@ -173,6 +186,22 @@ def _conditions(kind: str, shape: _Shape) -> list[ColumnElement[bool]]:
         conditions.append(~exists(select(literal(1)).where(membership.c[half.name] == media.c[half.name])))
         if shape.scoped:
             conditions.append(own)
+    elif shape.board == "all":
+        # As the images listing's "all": the account's own items on no board (every one when not scoped), and the
+        # items on any active board it may read.
+        if joined:
+            on_no_board = membership.c.board_id.is_(None)
+            on_listed_board = exists(
+                select(literal(1)).where(boards.c.board_id == membership.c.board_id, *listed_board(shape.scoped))
+            )
+        else:
+            on_no_board = ~exists(select(literal(1)).where(membership.c[half.name] == media.c[half.name]))
+            on_listed_board = exists(
+                select(literal(1))
+                .select_from(membership.join(boards, boards.c.board_id == membership.c.board_id))
+                .where(membership.c[half.name] == media.c[half.name], *listed_board(shape.scoped))
+            )
+        conditions.append(or_(and_(on_no_board, own) if shape.scoped else on_no_board, on_listed_board))
     elif shape.board == "one":
         conditions.append(membership.c.board_id == bindparam("board_id"))
     elif shape.scoped:
@@ -190,6 +219,7 @@ def _half(kind: str, shape: _Shape, names_only: bool) -> Select[Any]:
     half = _HALVES[kind]
     media = half.media
     source, board_id = _from(kind, shape, with_board=not names_only)
+    joined = shape.board == "all" and not names_only
     if names_only:
         columns: list[ColumnElement[Any]] = [
             literal(kind).label("kind"),
@@ -211,7 +241,7 @@ def _half(kind: str, shape: _Shape, names_only: bool) -> Select[Any]:
             (media.c.duration if kind == "video" else null()).label("duration"),
             (media.c.fps if kind == "video" else null()).label("fps"),
         ]
-    return select(*columns).select_from(source).where(*_conditions(kind, shape))
+    return select(*columns).select_from(source).where(*_conditions(kind, shape, joined))
 
 
 def _items(shape: _Shape, names_only: bool) -> Subquery:
@@ -253,7 +283,9 @@ def _count(shape: _Shape) -> Select[Any]:
         # Without the board id a listing shows: a membership join cannot change the count, and MySQL does not
         # eliminate it.
         source, _ = _from(kind, shape, with_board=False)
-        counts.append(select(func.count()).select_from(source).where(*_conditions(kind, shape)).scalar_subquery())
+        counts.append(
+            select(func.count()).select_from(source).where(*_conditions(kind, shape, False)).scalar_subquery()
+        )
     return select(functools.reduce(operator.add, counts))
 
 
@@ -267,26 +299,28 @@ def _in(column: ColumnElement[Any], categories: Sequence[ImageCategory]) -> Colu
     return column.in_([literal(category.value) for category in categories])
 
 
+# What the gallery's two views list: Media (`IMAGE_CATEGORIES`) and Uploads (`ASSETS_CATEGORIES`).
+_LISTED_CATEGORIES = [*IMAGE_CATEGORIES, *ASSETS_CATEGORIES]
+
+
 def _counted(items: Subquery) -> list[ColumnElement[int]]:
-    """Image and asset counts as the gallery's views list them (`IMAGE_CATEGORIES`, `ASSETS_CATEGORIES`), so that a
-    count never includes canvas-owned images (OTHER), which neither view shows; and every video, and those of a
-    category other than general, as a board counts its videos."""
+    """Counts as the gallery's views list items, so that a count never includes what neither view shows (OTHER, such as
+    canvas-owned images): images in Media, images in Uploads, videos in either view, and videos in Uploads."""
     is_image, is_video = items.c.kind == literal("image"), items.c.kind == literal("video")
     return [
         func.sum(case((and_(is_image, _in(items.c.category, IMAGE_CATEGORIES)), 1), else_=0)),
         func.sum(case((and_(is_image, _in(items.c.category, ASSETS_CATEGORIES)), 1), else_=0)),
-        func.sum(case((is_video, 1), else_=0)),
-        func.sum(case((and_(is_video, items.c.category != literal(ImageCategory.GENERAL.value)), 1), else_=0)),
+        func.sum(case((and_(is_video, _in(items.c.category, _LISTED_CATEGORIES)), 1), else_=0)),
+        func.sum(case((and_(is_video, _in(items.c.category, ASSETS_CATEGORIES)), 1), else_=0)),
     ]
 
 
 def _dated(kind: str, scoped: bool) -> Select[Any]:
     half = _HALVES[kind]
     media = half.media
-    conditions = [media.c.is_intermediate == false()]
-    if kind == "image":
-        # Only what the gallery's views show: canvas-owned images (OTHER) neither make a day nor cover one.
-        conditions.append(_in(media.c[half.category], [*IMAGE_CATEGORIES, *ASSETS_CATEGORIES]))
+    # Only what the gallery's views show: an OTHER item (such as a canvas-owned image) neither makes a day nor covers
+    # one.
+    conditions = [media.c.is_intermediate == false(), _in(media.c[half.category], _LISTED_CATEGORIES)]
     if scoped:
         conditions.append(media.c.user_id == bindparam("user_id"))
     return select(
@@ -439,3 +473,10 @@ class GalleryQueries(QueryModule):
                     BoardSummary(str(r[0]), int(r[1] or 0), int(r[2] or 0), int(r[3] or 0), int(r[4] or 0), r[5], r[6])
                 )
         return summaries
+
+    @read
+    def item_owners(
+        self, conn: Connection, kind: Literal["image", "video"], names: Collection[str]
+    ) -> list[tuple[str, str]]:
+        """(name, owner) of each named item of `kind` that exists."""
+        return [(str(r[0]), str(r[1])) for r in conn.execute(_ITEM_OWNERS[kind], {"names": bound_set(names)}).all()]

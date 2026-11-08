@@ -32,6 +32,7 @@ import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 
 /** Practical track ranges; typed values may exceed them up to the legacy input limits. */
 const STEPS_SLIDER_MAX = 100;
@@ -116,6 +117,7 @@ export const GenerateRefinerSection = ({
     step: number;
   }) => (
     <GenerateFieldContextMenu
+      fieldLabel={label}
       copyValue={() => String(settings[key])}
       isAtDefault={(key === 'refinerStart' ? !refiner : !isActive) || settings[key] === defaultValue}
       onReset={() => onCommit({ [key]: defaultValue })}
@@ -143,6 +145,7 @@ export const GenerateRefinerSection = ({
       sectionId="refiner"
     >
       <Stack gap="2" p="2">
+        <GenerateIssueNotes section="refiner" />
         <Field hint="refinerModel" label={t('widgets.generate.refinerModel')}>
           {/* The picker owns the loading and empty states, so no refiner installed reads as one message. */}
           <ModelSelect
@@ -176,6 +179,7 @@ export const GenerateRefinerSection = ({
           step: 0.5,
         })}
         <GenerateFieldContextMenu
+          fieldLabel={t('widgets.generate.refinerScheduler')}
           copyValue={() => settings.refinerScheduler}
           isAtDefault={!isActive || settings.refinerScheduler === DEFAULT_REFINER_SCHEDULER}
           onReset={() => onCommitImmediate({ refinerScheduler: DEFAULT_REFINER_SCHEDULER })}

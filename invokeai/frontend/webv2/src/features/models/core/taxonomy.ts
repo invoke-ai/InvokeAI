@@ -1,4 +1,4 @@
-import type { ModelFileFormat, ModelTaxonomyType } from './types';
+import type { ModelConfig, ModelFileFormat, ModelTaxonomyType } from './types';
 
 import { toTitleCase } from './baseIdentity';
 
@@ -25,11 +25,13 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
   { label: 'Qwen3 Encoder', pluralLabel: 'Qwen3 Encoders', type: 'qwen3_encoder' },
   { label: 'Qwen VL Encoder', pluralLabel: 'Qwen VL Encoders', type: 'qwen_vl_encoder' },
   { label: 'Qwen3 VL Encoder', pluralLabel: 'Qwen3 VL Encoders', type: 'qwen3_vl_encoder' },
+  { label: 'Qwen3 VL Vision Tower', pluralLabel: 'Qwen3 VL Vision Towers', type: 'qwen3_vl_vision_tower' },
   { label: 'Qwen3.5 Encoder', pluralLabel: 'Qwen3.5 Encoders', type: 'qwen3_5_encoder' },
   { label: 'Mistral Encoder', pluralLabel: 'Mistral Encoders', type: 'mistral_encoder' },
   { label: 'Gemma 2 Encoder', pluralLabel: 'Gemma 2 Encoders', type: 'gemma2_encoder' },
   { label: 'Gemma 4 Encoder', pluralLabel: 'Gemma 4 Encoders', type: 'gemma4_encoder' },
   { label: 'PiD Decoder', pluralLabel: 'PiD Decoders', type: 'pid_decoder' },
+  { label: 'Tiny AutoEncoder', pluralLabel: 'Tiny AutoEncoders', type: 'tiny_autoencoder' },
   { label: 'LTX-2 Duration Head', pluralLabel: 'LTX-2 Duration Heads', type: 'ltx2_duration_head' },
   { label: 'CLIP Embed', pluralLabel: 'CLIP Embeds', type: 'clip_embed' },
   { label: 'CLIP Vision', pluralLabel: 'CLIP Visions', type: 'clip_vision' },
@@ -121,6 +123,8 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   gigantic: 'CLIP G',
   i2v_a14b: 'Wan 2.2 I2V A14B',
   inpaint: 'Inpaint',
+  flux3_klein: 'FLUX.3 Klein',
+  flux3_klein_base: 'FLUX.3 Klein Base',
   klein_4b: 'FLUX.2 Klein 4B',
   klein_4b_base: 'FLUX.2 Klein 4B Base',
   klein_9b: 'FLUX.2 Klein 9B',
@@ -135,7 +139,8 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_5_4b: 'Qwen3.5 4B (Anima-3.8B)',
-  qwen3_vl_4b: 'Qwen3-VL 4B (Krea-2)',
+  qwen3_5_9b: 'Qwen3.5 9B (MOSS-Image)',
+  qwen3_vl_4b: 'Qwen3-VL 4B (Krea-2, FLUX.3)',
   qwen3_vl_8b: 'Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)',
   qwen_image_21_base: 'Qwen-Image-2.1 Base',
   qwen_image_21_turbo: 'Qwen-Image-2.1 Turbo',
@@ -143,6 +148,8 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   res2k_sr4x: 'PiD 2K (4x SR)',
   res2kto4k_sr4x: 'PiD 4K (4x SR Upscale)',
   schnell: 'FLUX Schnell',
+  sd3_large: 'SD 3.5 Large',
+  sd3_medium: 'SD 3 / 3.5 Medium',
   ltx2_dev: 'LTX-2 Dev',
   ltx2_distilled: 'LTX-2 Distilled',
   t2v_a14b: 'Wan 2.2 T2V A14B',
@@ -159,6 +166,7 @@ const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
   anima: ['anima_qwen3', 'anima_qwen35'],
   flux: ['schnell', 'dev', 'dev_fill'],
   flux2: ['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base', 'dev'],
+  flux3: ['flux3_klein', 'flux3_klein_base'],
   'krea-2': ['krea2_turbo', 'krea2_base'],
   'ltx-2': ['ltx2_dev', 'ltx2_distilled'],
   'minimax-h3': ['fl2va', 'ref2va'],
@@ -166,6 +174,7 @@ const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
   'qwen-image-2-1': ['qwen_image_21_base', 'qwen_image_21_turbo'],
   'sd-1': ['normal', 'inpaint'],
   'sd-2': ['normal', 'inpaint', 'depth'],
+  'sd-3': ['sd3_medium', 'sd3_large'],
   sdxl: ['normal', 'inpaint'],
   'sdxl-refiner': ['normal'],
   wan: ['t2v_a14b', 'i2v_a14b', 'ti2v_5b'],
@@ -177,14 +186,16 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   mistral_encoder: ['cow_mistral3_small', 'mistral3_24b', 'ministral3_3b'],
   pid_decoder: ['res2k_sr4x', 'res2kto4k_sr4x'],
   qwen3_encoder: ['qwen3_4b', 'qwen3_8b', 'qwen3_06b'],
-  qwen3_5_encoder: ['qwen3_5_4b'],
+  qwen3_5_encoder: ['qwen3_5_4b', 'qwen3_5_9b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
+  qwen3_vl_vision_tower: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };
 
 /**
- * Constrained variant choices for a base/type pair; empty means the pair has
- * no variant concept and the edit form falls back to free text.
+ * Constrained variant choices for a base/type pair; empty means the pair has no
+ * variant concept, so the edit form hides the field unless the model already
+ * stores a variant, which it then edits as free text.
  */
 export const getVariantOptionsFor = (base: string, type: string): readonly string[] => {
   if (type === 'main') {
@@ -192,7 +203,10 @@ export const getVariantOptionsFor = (base: string, type: string): readonly strin
   }
 
   if (type === 'lora') {
-    return base === 'wan' ? ['a14b', '5b'] : [];
+    if (base === 'wan') {
+      return ['a14b', '5b'];
+    }
+    return base === 'sd-3' ? ['sd3_medium', 'sd3_large'] : [];
   }
 
   if (type === 'qwen3_vl_encoder') {
@@ -201,4 +215,26 @@ export const getVariantOptionsFor = (base: string, type: string): readonly strin
   }
 
   return VARIANTS_BY_TYPE[type] ?? [];
+};
+
+/** A fact the probe records that this model's record predates; re-identifying fills it in. */
+export type UnrecordedModelFact = 'adapter_type' | 'native_scale';
+
+/**
+ * What re-identifying would record for a model installed before the probe recorded it, or null. No migration fills
+ * these fields.
+ * - `adapter_type`: an Anima ControlNet-LLLite without `cond_in_channels`. Control layers cannot tell a control
+ *   adapter from an inpaint one, so it stays unusable there.
+ * - `native_scale`: a Spandrel upscaler without `scale`. Upscale cannot show how it will run it.
+ */
+export const getUnrecordedModelFact = (
+  model: Pick<ModelConfig, 'base' | 'cond_in_channels' | 'scale' | 'type'>
+): UnrecordedModelFact | null => {
+  if (model.type === 'controlnet' && model.base === 'anima' && (model.cond_in_channels ?? null) === null) {
+    return 'adapter_type';
+  }
+  if (model.type === 'spandrel_image_to_image' && (model.scale ?? null) === null) {
+    return 'native_scale';
+  }
+  return null;
 };

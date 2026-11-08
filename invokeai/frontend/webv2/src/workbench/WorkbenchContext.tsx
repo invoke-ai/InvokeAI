@@ -1,6 +1,6 @@
 import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { ProjectSettings } from '@workbench/settings/contracts';
+import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
@@ -8,7 +8,7 @@ import { createLogger } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
+import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ import type { ProjectPushOutcome } from './projects/projectFlush';
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
+import { StayOnLaunchpadButton } from './launchpad/StayOnLaunchpadButton';
 import { clearLayerPanelStates } from './layerPanelState';
 import { browserPageLifecycle, createWorkbenchPersistenceRuntime, type PersistenceExit } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
@@ -27,14 +28,18 @@ import {
   type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
+import { reloadWorkbench, WorkbenchReloadError } from './projects/reloadWorkbench';
 import {
   createSyncedWorkbenchPersistence,
   type SyncedWorkbenchPersistence,
   type WorkbenchLoadOptions,
 } from './projects/syncedPersistence';
 import { consumeWorkspaceClearFailure } from './settings/clearWorkspaceData';
-import { getProjectWidgetValues } from './widgetState';
+import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
+import { getResolvedProjectWidgetValues, resolveWidgetValues } from './widgetState';
 import { createWorkbenchStore, type WorkbenchSnapshot, type WorkbenchInternalStore } from './workbenchStore';
+
+const STAY_ON_LAUNCHPAD = <StayOnLaunchpadButton />;
 
 interface WorkbenchContextValue {
   activeProject: Project;
@@ -89,8 +94,10 @@ export const WorkbenchProvider = ({
         notifyProjectNotFound: () =>
           store.commands.notifications.add({
             kind: 'info',
-            message: 'The linked project does not exist on this account — it may have been deleted.',
+            message: 'The linked project does not exist on this account. It may have been deleted.',
+            messageKey: 'projects.notFoundDescription',
             title: 'Project not found',
+            titleKey: 'projects.notFound',
           }),
         reportLoadAvailable: () => {
           setLoadUnavailable(null);
@@ -226,7 +233,7 @@ export const WorkbenchProvider = ({
             ) : hasHydrated ? (
               children
             ) : (
-              <WorkbenchSplashScreen messageKey="splash.openingProject" />
+              <WorkbenchSplashScreen action={STAY_ON_LAUNCHPAD} messageKey="splash.openingProject" />
             )}
           </WorkbenchStoreContext>
         </WorkbenchExtensionsContext>
@@ -285,23 +292,40 @@ export const useActiveProjectLayoutSelector = <Selected,>(
   isEqual?: EqualityFn<Selected>
 ): Selected => useActiveProjectSelector((project) => selector(project.layout), isEqual);
 
+/** The active project's settings with every layered flag resolved (pin, then the user's default, then built-in). */
 export const useActiveProjectSettingsSelector = <Selected,>(
-  selector: (settings: ProjectSettings) => Selected,
+  selector: (settings: EffectiveProjectSettings) => Selected,
   isEqual?: EqualityFn<Selected>
-): Selected => useActiveProjectSelector((project) => selector(project.settings), isEqual);
+): Selected =>
+  useWorkbenchSelector(
+    (snapshot) =>
+      selector(
+        getEffectiveProjectSettings(snapshot.activeProject.settings, snapshot.scopedDefaults[PROJECT_SETTINGS_OWNER])
+      ),
+    isEqual
+  );
 
+/** A widget's values as it reads them: the active project's pins over the user's defaults for the widget's type. */
 export const useWidgetValuesSelector = <Selected,>(
   widgetId: WidgetTypeId,
   selector: (values: Record<string, unknown>) => Selected,
   isEqual?: EqualityFn<Selected>
-): Selected => useActiveProjectSelector((project) => selector(getProjectWidgetValues(project, widgetId)), isEqual);
+): Selected =>
+  useWorkbenchSelector(
+    (snapshot) => selector(getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults)),
+    isEqual
+  );
 
 export const useWidgetInstanceValuesSelector = <Selected,>(
   instanceId: WidgetInstanceId,
   selector: (values: Record<string, unknown>) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
-  useActiveProjectSelector((project) => selector(project.widgetInstances[instanceId]?.state.values ?? {}), isEqual);
+  useWorkbenchSelector(
+    (snapshot) =>
+      selector(resolveWidgetValues(snapshot.activeProject.widgetInstances[instanceId], snapshot.scopedDefaults)),
+    isEqual
+  );
 
 export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   projectId: string,
@@ -312,7 +336,7 @@ export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   useWorkbenchSelector((snapshot) => {
     const project = snapshot.projects.find((candidate) => candidate.id === projectId);
 
-    return selector(project?.widgetInstances[instanceId]?.state.values ?? {});
+    return selector(resolveWidgetValues(project?.widgetInstances[instanceId], snapshot.scopedDefaults));
   }, isEqual);
 
 export const useWorkbenchHasHydrated = (): boolean => useWorkbenchSelector((snapshot) => snapshot.hasHydrated);
@@ -393,4 +417,35 @@ export const useOptionalWorkbench = (): WorkbenchContextValue | null => {
   );
 
   return store && snapshot ? snapshot : null;
+};
+
+/** Recovery is an explicit action, independent of the editor's terminal exit checkpoint. */
+export const useWorkbenchReload = () => {
+  const store = use(WorkbenchStoreContext);
+  const persistence = use(WorkbenchPersistenceContext);
+  const engines = use(WorkbenchLiveCanvasEnginesContext);
+  const owner = captureAccountScope();
+  return async (isCurrent: () => boolean) => {
+    if (!store || !persistence || !engines) {
+      throw new WorkbenchReloadError('unavailable');
+    }
+    const current = () => isAccountScopeCurrent(owner) && isCurrent();
+    if (!current()) {
+      return;
+    }
+    try {
+      await reloadWorkbench({
+        owner,
+        isCurrent: current,
+        store,
+        persistence,
+        engines,
+        reload: () => window.location.reload(),
+      });
+    } catch (error) {
+      if (current()) {
+        throw error;
+      }
+    }
+  };
 };

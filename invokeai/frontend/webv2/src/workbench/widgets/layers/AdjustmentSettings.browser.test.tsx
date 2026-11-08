@@ -1,4 +1,9 @@
-import type { CanvasAdjustmentEntry, CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type {
+  CanvasAdjustmentEntry,
+  CanvasGroupContract,
+  CanvasNodeContract,
+  PreparedDocumentEdit,
+} from '@workbench/canvas-engine/api';
 import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 
@@ -10,14 +15,16 @@ import { groupContract, layerContract } from '@workbench/canvas-engine/document-
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { commitPreparedEdit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { createInstance } from 'i18next';
-import { act, useSyncExternalStore } from 'react';
+import { act, type ReactElement, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { type AdjustmentOwner, type AdjustmentsEngine, AdjustmentSettings } from './AdjustmentSettings';
+import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { CURVE_SIZE } from './curveEditorMath';
+import { LayerGroupContextMenu, type LayerGroupContextMenuEngine } from './LayerGroupContextMenu';
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
@@ -28,6 +35,12 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
 }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
+// The group menu reads the active project's document; here that is the stub engine's.
+vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'project-1',
+  useActiveProjectSelector: <T,>(select: (project: { canvas: { document: unknown } }) => T): T =>
+    select({ canvas: { document: stub.document() } }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -39,6 +52,17 @@ const initialEntries = (): CanvasAdjustmentEntry[] => [
   { curves: {}, id: 'cv1', isEnabled: true, type: 'curves' },
   { id: 'hue1', isEnabled: true, rotation: 0, type: 'hue' },
   { gamma: 1, id: 'lv1', inBlack: 0, inWhite: 255, isEnabled: true, outBlack: 0, outWhite: 255, type: 'levels' },
+  {
+    amount: 0.1,
+    distribution: 'gaussian',
+    grain: 'monochrome',
+    id: 'nz1',
+    isEnabled: true,
+    response: 'midtones',
+    seed: 42,
+    size: 1,
+    type: 'noise',
+  },
 ];
 
 type Owner = 'raster' | 'group';
@@ -51,6 +75,7 @@ const ownerNode = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): CanvasNo
 
 /** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
 let stub: StructuralEngineStub;
+let adjustmentStatus = createFakeAdjustmentStatus();
 let ownerId = OWNER_ID.raster;
 const documentOwner = (): AdjustmentOwner =>
   getDocumentIndex(stub.document()).byId.get(ownerId)!.node as unknown as AdjustmentOwner;
@@ -70,9 +95,15 @@ const landConcurrentEdit = (update: (adjustments: readonly CanvasAdjustmentEntry
     expect(outcome).toEqual({ status: 'committed' });
   });
 
-const Harness = ({ entryId }: { entryId: string }) => {
+const Harness = ({ entryId, withEngine }: { entryId: string; withEngine: boolean }) => {
   const layer = useSyncExternalStore(stub.subscribe, documentOwner);
-  return <AdjustmentSettings engine={stub.engine as unknown as AdjustmentsEngine} entryId={entryId} layer={layer} />;
+  return (
+    <AdjustmentSettings
+      engine={withEngine ? (stub.engine as unknown as AdjustmentsEngine) : null}
+      entryId={entryId}
+      layer={layer}
+    />
+  );
 };
 
 const settle = (action: () => void): Promise<void> =>
@@ -83,12 +114,8 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries()) => {
-  applyThemeToRoot('classic');
-  host = document.createElement('div');
-  host.style.width = '260px';
-  document.body.append(host);
-  root = createRoot(host);
+/** A fresh stub engine over one owner, reporting spatial status from a fake store the test drives. */
+const setUp = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): void => {
   ownerId = OWNER_ID[owner];
   stub = createStructuralEngineStub({
     layers: [ownerNode(owner, adjustments)],
@@ -97,18 +124,29 @@ const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = in
       return () => undefined;
     },
   });
+  adjustmentStatus = createFakeAdjustmentStatus();
+  Object.assign(stub.engine, { interaction: adjustmentStatus.interaction });
+};
 
+const mount = async (element: ReactElement): Promise<void> => {
+  applyThemeToRoot('classic');
+  host = document.createElement('div');
+  host.style.width = '260px';
+  document.body.append(host);
+  root = createRoot(host);
   await settle(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <Harness entryId={entryId} />
-        </ChakraProvider>
+        <ChakraProvider value={system}>{element}</ChakraProvider>
       </I18nextProvider>
     );
   });
+};
 
-  return host.querySelector<SVGSVGElement>(`svg[viewBox="0 0 ${CURVE_SIZE} ${CURVE_SIZE}"]`)!;
+const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries(), withEngine = true) => {
+  setUp(owner, adjustments);
+  await mount(<Harness entryId={entryId} withEngine={withEngine} />);
+  return host!.querySelector<SVGSVGElement>(`svg[viewBox="0 0 ${CURVE_SIZE} ${CURVE_SIZE}"]`)!;
 };
 
 const handles = (svg: SVGSVGElement): SVGCircleElement[] => Array.from(svg.querySelectorAll('circle'));
@@ -291,7 +329,7 @@ describe('scalar and levels editors', () => {
 
     expect(latestAdjustments().some((entry) => entry.id === 'hue1')).toBe(false);
     expect(host!.querySelector('[data-scope="scrubber"]')).toBeNull();
-    expect(stub.history.entries()).toEqual({ future: ['Edit'], past: [] });
+    expect(stub.history.entries()).toEqual({ evicted: 0, future: ['Edit'], past: [] });
     expect(notify.error).not.toHaveBeenCalled();
   });
 
@@ -332,6 +370,157 @@ describe('scalar and levels editors', () => {
     expect(entry).toMatchObject({ gamma: 1, id: 'lv1', inWhite: 255, outBlack: 0, outWhite: 255 });
     expect(entry.inBlack).toBeGreaterThan(50);
     expect(entry.inBlack).toBeLessThan(80);
+  });
+});
+
+type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
+const NOISE_INDEX = 4;
+
+/** The segmented-control item whose label reads `label`. */
+const segment = (label: string): HTMLElement => {
+  const item = [...host!.querySelectorAll<HTMLElement>('[data-scope="segment-group"][data-part="item"]')].find(
+    (candidate) => candidate.textContent?.trim() === label
+  );
+  if (!item) {
+    throw new Error(`No segment labelled ${label}`);
+  }
+  return item;
+};
+const newPatternButton = (): HTMLButtonElement =>
+  host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.layers.adjustments.newNoisePattern"]')!;
+
+describe('noise editor', () => {
+  it("shows the entry's choices and commits a distribution change as one undoable patch", async () => {
+    await render('nz1');
+    expect(host!.querySelector('[aria-label="widgets.layers.adjustments.noiseDistribution"]')).not.toBeNull();
+    expect(segment('widgets.layers.adjustments.noiseDistributions.gaussian').dataset.state).toBe('checked');
+    expect(segment('widgets.layers.adjustments.noiseGrains.monochrome').dataset.state).toBe('checked');
+    expect(segment('widgets.layers.adjustments.noiseResponses.midtones').dataset.state).toBe('checked');
+    expect(host!.querySelector('[aria-label="widgets.layers.adjustments.noiseResponse"]')).not.toBeNull();
+
+    await settle(() => segment('widgets.layers.adjustments.noiseDistributions.uniform').click());
+
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({
+      ...initialEntries()[NOISE_INDEX],
+      distribution: 'uniform',
+    });
+    expect(inverseEntries(commits()[0]!)).toEqual(initialEntries());
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('commits the grain, and nothing when the current choice is picked again', async () => {
+    await render('nz1');
+    await settle(() => segment('widgets.layers.adjustments.noiseGrains.monochrome').click());
+    expect(commits()).toHaveLength(0);
+
+    await settle(() => segment('widgets.layers.adjustments.noiseGrains.chroma').click());
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({ ...initialEntries()[NOISE_INDEX], grain: 'chroma' });
+    expect(segment('widgets.layers.adjustments.noiseGrains.chroma').dataset.state).toBe('checked');
+  });
+
+  it('commits the tonal response as one undoable patch', async () => {
+    await render('nz1');
+    await settle(() => segment('widgets.layers.adjustments.noiseResponses.flat').click());
+
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({ ...initialEntries()[NOISE_INDEX], response: 'flat' });
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('edits the grain size in tenths of a pixel from the keyboard as one step, Shift stepping whole pixels', async () => {
+    await render('nz1');
+    const slider = scrubber('widgets.layers.adjustments.noiseSize').querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuetext')).toBe('1.0 px');
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+    expect(commits()).toHaveLength(1);
+    expect((forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry).size).toBe(1.3);
+
+    await act(async () => {
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
+    });
+    expect(commits()).toHaveLength(2);
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(2.3);
+
+    await act(async () => {
+      await userEvent.keyboard('{End}');
+    });
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    await act(async () => {
+      await userEvent.keyboard('{ArrowRight}');
+    });
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    expect(latestAdjustments()[NOISE_INDEX]).toMatchObject({ amount: 0.1, grain: 'monochrome', seed: 42 });
+  });
+
+  it('rounds a typed grain size to tenths of a pixel and clamps it to 8 px', async () => {
+    await render('nz1');
+    const frame = scrubber('widgets.layers.adjustments.noiseSize');
+    const type = async (text: string) => {
+      await act(async () => {
+        frame.querySelector<HTMLElement>('[role="slider"]')!.focus();
+        await userEvent.keyboard(`${text}{Enter}`);
+      });
+    };
+
+    await type('2.37');
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(2.4);
+    await type('20');
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    expect(commits()).toHaveLength(2);
+  });
+
+  it('edits the amount in percent from the keyboard as one step', async () => {
+    await render('nz1');
+    const slider = scrubber('widgets.layers.adjustments.noiseAmount').querySelector<HTMLElement>('[role="slider"]')!;
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+
+    expect(commits()).toHaveLength(1);
+    const entry = forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry;
+    expect(entry.amount).toBeCloseTo(0.13, 10);
+    expect(entry).toMatchObject({ distribution: 'gaussian', grain: 'monochrome', seed: 42, size: 1 });
+  });
+
+  it('re-rolls the seed from the keyboard-reachable new-pattern button as one undoable step', async () => {
+    await render('nz1');
+    const button = newPatternButton();
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button.focus();
+      await userEvent.keyboard('{Enter}');
+    });
+
+    expect(commits()).toHaveLength(1);
+    const entry = forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry;
+    expect(entry).toMatchObject({ amount: 0.1, distribution: 'gaussian', grain: 'monochrome', id: 'nz1' });
+    expect(Number.isInteger(entry.seed) && entry.seed >= 0 && entry.seed <= 0xffffffff).toBe(true);
+    expect(entry.seed).not.toBe(42);
+    expect(latestAdjustments()[NOISE_INDEX]).toMatchObject({ seed: entry.seed });
+
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('disables every control without an engine', async () => {
+    await render('nz1', 'raster', initialEntries(), false);
+    expect(newPatternButton().disabled).toBe(true);
+    const radios = [...host!.querySelectorAll<HTMLInputElement>('[data-scope="segment-group"] input')];
+    expect(radios).toHaveLength(7);
+    expect(radios.every((radio) => radio.disabled)).toBe(true);
+    expect(scrubber('widgets.layers.adjustments.noiseAmount').dataset.disabled).toBeDefined();
+    expect(scrubber('widgets.layers.adjustments.noiseSize').dataset.disabled).toBeDefined();
   });
 });
 
@@ -407,5 +596,109 @@ describe('curves entry editor', () => {
     expect(handles(svg)).toHaveLength(3);
     const added = centreOf(handles(svg)[1]!);
     expect(added.x).toBeCloseTo(targetX, 0);
+  });
+});
+
+const MENU_ANCHOR = { height: 1, width: 1, x: 300, y: 10 };
+const closeMenu = (): void => undefined;
+
+describe('spatial adjustment editors', () => {
+  type SpatialEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
+
+  /** The group's menu over the editor of whichever entry the group's stack ends with. */
+  const MenuHarness = () => {
+    const owner = useSyncExternalStore(stub.subscribe, documentOwner);
+    const last = owner.adjustments?.at(-1);
+    return (
+      <>
+        <LayerGroupContextMenu
+          anchor={MENU_ANCHOR}
+          editingLocked={false}
+          engine={stub.engine as unknown as LayerGroupContextMenuEngine}
+          group={owner as unknown as CanvasGroupContract}
+          stack="raster"
+          onClose={closeMenu}
+        />
+        {last ? (
+          <AdjustmentSettings engine={stub.engine as unknown as AdjustmentsEngine} entryId={last.id} layer={owner} />
+        ) : null}
+      </>
+    );
+  };
+
+  const sliderOf = (label: string): HTMLElement => scrubber(label).querySelector<HTMLElement>('[role="slider"]')!;
+
+  it('adds Clarity from the menu at identity, then scrubs and resets its amount as undoable steps', async () => {
+    setUp('group', []);
+    await mount(<MenuHarness />);
+
+    const trigger = document.querySelector<HTMLElement>('[aria-label="widgets.layers.menu.addAdjustment"]')!;
+    await act(() => userEvent.click(trigger));
+    const clarityItem = () => document.querySelector<HTMLElement>('[role="menuitem"][data-value="add-clarity"]');
+    await expect.poll(clarityItem).not.toBeNull();
+    const clarity = clarityItem()!;
+    expect(clarity.textContent).toBe('widgets.layers.adjustments.clarity');
+    await act(() => userEvent.click(clarity));
+    await settle(() => undefined);
+
+    expect(commits()).toHaveLength(1);
+    const [added] = latestAdjustments() as SpatialEntry[];
+    expect(added).toEqual({ amount: 0, id: expect.any(String), isEnabled: true, size: 40, type: 'clarity' });
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('0');
+    expect(sliderOf('widgets.layers.adjustments.size').getAttribute('aria-valuetext')).toBe('40 px');
+
+    await scrub(scrubber('widgets.layers.adjustments.amount'), [0.1, 0.25]);
+    expect(commits()).toHaveLength(2);
+    expect(latestAdjustments()).toEqual([{ ...added, amount: 100 }]);
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('+100');
+
+    // Backspace restores the default, recorded like any other edit.
+    await act(async () => {
+      sliderOf('widgets.layers.adjustments.amount').focus();
+      await userEvent.keyboard('{Backspace}');
+    });
+    expect(commits()).toHaveLength(3);
+    expect(latestAdjustments()).toEqual([added]);
+
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual([{ ...added, amount: 100 }]);
+  });
+
+  it("sizes Texture in the layer's whole pixels on a log track, keeping the amount", async () => {
+    await render('tx1', 'raster', [{ amount: -30, id: 'tx1', isEnabled: true, size: 8, type: 'texture' }]);
+    expect(host!.textContent).toContain('widgets.layers.adjustments.sizeHintLayer');
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('-30');
+
+    await act(async () => {
+      sliderOf('widgets.layers.adjustments.size').focus();
+      await userEvent.keyboard('2.6{Enter}');
+    });
+    expect(latestAdjustments()).toEqual([{ amount: -30, id: 'tx1', isEnabled: true, size: 3, type: 'texture' }]);
+
+    await act(async () => {
+      await userEvent.keyboard('{End}');
+    });
+    expect((latestAdjustments()[0] as SpatialEntry & { size: number }).size).toBe(100);
+    expect(commits()).toHaveLength(2);
+  });
+
+  it('gives Dehaze only an amount, says it approximates, and explains when the canvas cannot apply it', async () => {
+    await render('dh1', 'group', [{ amount: 50, id: 'dh1', isEnabled: true, type: 'dehaze' }]);
+    expect(() => scrubber('widgets.layers.adjustments.size')).toThrow();
+    expect(host!.textContent).toContain('widgets.layers.adjustments.dehazeHint');
+    // One live region stays mounted, so a warning that appears in it is announced.
+    const region = host!.querySelector('[role="status"]')!;
+    expect(region.textContent).toBe('');
+
+    await settle(() => adjustmentStatus.set('group-1', 'computing'));
+    expect(region.textContent).toBe('');
+
+    await settle(() => adjustmentStatus.set('group-1', 'too-large'));
+    expect(host!.querySelector('[role="status"]')).toBe(region);
+    expect(region.textContent).toBe('widgets.layers.adjustments.status.tooLarge');
+
+    await settle(() => adjustmentStatus.set('group-1', 'idle'));
+    expect([...host!.querySelectorAll('[role="status"]')]).toEqual([region]);
+    expect(region.textContent).toBe('');
   });
 });

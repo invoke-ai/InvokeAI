@@ -1,4 +1,8 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+  CanvasLayerStackKind,
+} from '@workbench/canvas-engine/contracts';
 import type {
   PreviewStateController,
   SamPreviewState,
@@ -13,8 +17,13 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
+import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { isLeafDrawableForScreen } from '@workbench/canvas-engine/document-model/screenComposition';
+import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { isLayerContributing } from '@workbench/canvas-engine/document/layerEligibility';
+import { isOverlayStack } from '@workbench/canvas-engine/document/layerStacks';
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { intersect } from '@workbench/canvas-engine/math/rect';
 import {
   compositeDocument,
   reusePreparation,
@@ -42,9 +51,45 @@ export interface CreateCompositeFrameDeps {
   readonly getGroupSurface: NonNullable<CompositeOptions['groupSurface']>;
   readonly getMaskPatternTile: (style: string, color: string) => RasterSurface | null;
   readonly getCheckerboardTile: () => RasterSurface;
+  /** The control layer shown as its kept original, if any. */
+  readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
+  /**
+   * Whether a pointer gesture in progress edits a mask or a region. Its stacks and the regenerate tint then draw
+   * above a shown preview, so the user never paints a mask blind; the frame after the gesture hides them again.
+   */
+  readonly isEditingStagingHiddenStack: () => boolean;
 }
+
+/**
+ * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
+ * would be accepted; control layers stay.
+ */
+const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
+
+const isStagingHiddenStack = (stack: CanvasLayerStackKind): boolean =>
+  isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
+
+/**
+ * Whether the selection sits in a stack the staging view hides: a mask or a region, or a group in those stacks. A
+ * gesture that edits it shows those stacks again ({@link CreateCompositeFrameDeps.isEditingStagingHiddenStack}).
+ */
+export const isStagingHiddenStackSelected = (doc: CanvasDocumentContractV3): boolean => {
+  const stack = doc.selectedLayerId ? getDocumentIndex(doc).byId.get(doc.selectedLayerId)?.stack : undefined;
+  return stack !== undefined && isStagingHiddenStack(stack);
+};
+
+/**
+ * The selected mask or region a shown preview hides, when the screen would draw it with the stack shown. A gesture
+ * on it reveals the stack (and a brush refuses a mask whose pixels are not loaded yet), so the frame keeps it
+ * resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new layer,
+ * move drags whatever caches exist.
+ */
+const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
+  const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+  return leaf && isStagingHiddenStack(leaf.stack) && isLeafDrawableForScreen(leaf, false) ? leaf : null;
+};
 
 export interface CompositeFrame {
   /** Composites the document onto the screen surface and enforces the surface budget. */
@@ -74,8 +119,8 @@ const sameOptionalRect = (a: Rect | undefined, b: Rect | undefined): boolean =>
 
 /**
  * Composite only for pixel/order/view changes. Rasterize demanded visible layers and protect them during post-draw
- * eviction. SAM isolation restricts drawing and clipping to its layer/rect, suppressing unrelated previews, floats
- * and transform overrides.
+ * eviction. SAM isolation restricts drawing and clipping to its layer/rect, suppressing unrelated previews, floats,
+ * control views and transform overrides.
  */
 export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeFrame => {
   const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
@@ -90,16 +135,19 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     activeFrameLayerIds: ReadonlySet<string>
   ): void => {
     for (const { layer } of frame.leaves) {
-      if (!activeFrameLayerIds.has(layer.id) || !isLayerContributing(layer) || !renderableSourceOf(layer)) {
-        continue;
+      if (activeFrameLayerIds.has(layer.id)) {
+        ensureLayerCache(doc, layer);
       }
-      if (!isRenderableLayer(layer)) {
-        continue;
-      }
-      const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
-      if (entry.stale) {
-        deps.rasterizeLayer(layer, doc);
-      }
+    }
+  };
+
+  const ensureLayerCache = (doc: CanvasDocumentContractV3, layer: CanvasLayerContract): void => {
+    if (!isLayerContributing(layer) || !renderableSourceOf(layer) || !isRenderableLayer(layer)) {
+      return;
+    }
+    const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
+    if (entry.stale) {
+      deps.rasterizeLayer(layer, doc);
     }
   };
 
@@ -130,12 +178,14 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   const describeFrame = (
     doc: CanvasDocumentContractV3,
     isolationLayerId: string | null,
-    overrides: CompositeOptions['transformOverrides']
+    overrides: CompositeOptions['transformOverrides'],
+    showOverlayStacks: CompositeOptions['showOverlayStacks']
   ): CompositePreparation => {
     const plan = reusePreparation(preparation, doc, {
       backend: deps.backend,
       groupSurface: deps.getGroupSurface,
       isolationLayerId,
+      showOverlayStacks,
       transformOverrides: overrides,
     });
     preparation = plan;
@@ -182,22 +232,40 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   return {
     draw: (screen, doc, view, floatFrame, samPreview, damage) => {
       const stagedPreview = previews.getStaged();
-      const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides);
+      // A shown preview hides masks, regions and the regenerate tint, unless a gesture is editing one of them.
+      const staging = stagedPreview !== null && !deps.isEditingStagingHiddenStack();
+      const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
+      const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
       const layerPreviews = !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null;
+      const visibleRect = visibleDocumentRect(screen);
       const activeFrameLayerIds = calculateActiveFrameLayerIds({
         document: doc,
         preparation: frame,
-        viewport: visibleDocumentRect(screen),
+        viewport: visibleRect,
       });
       // A previewed layer draws through its cache entry even when only the preview is on screen.
       for (const layerId of layerPreviews?.keys() ?? []) {
         activeFrameLayerIds.add(layerId);
       }
       ensureLayerCaches(doc, frame, activeFrameLayerIds);
+      // The selected mask or region stays loaded and unevicted while hidden, ready for a gesture to reveal and edit,
+      // under the same on-screen rule as the leaves the frame draws. No transform override moves a hidden leaf.
+      const hiddenSelected = staging && !isolatedGuard ? stagingHiddenSelectedLeaf(doc) : null;
+      const hiddenBounds = hiddenSelected
+        ? committedLeafBounds(
+            hiddenSelected,
+            hiddenSelected.worldTransform,
+            doc,
+            layerCache.peek(hiddenSelected.id)?.rect
+          )
+        : null;
+      if (hiddenSelected && hiddenBounds && intersect(hiddenBounds, visibleRect)) {
+        activeFrameLayerIds.add(hiddenSelected.id);
+        ensureLayerCache(doc, hiddenSelected.layer);
+      }
       const frameDamage = isolatedGuard ? FULL_DAMAGE : (damage ?? FULL_DAMAGE);
       const usage = raster.beginFrame();
       if (frameDamage.kind === 'full' || !fullFrameUsage) {
@@ -211,6 +279,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         backend: deps.backend,
         checkerboardTile: stores.checkerboard.get() ? deps.getCheckerboardTile() : null,
         clipRect: isolatedGuard && samPreview ? samPreview.rect : null,
+        controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
         // Pixels in flight, drawn directly above the layer they were cut from.
@@ -220,22 +289,20 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         layerPreviews,
         maskPatternTile: deps.getMaskPatternTile,
         preparation: frame,
-        // Screen frames are display-time: the region tint may draw.
-        regionOverlays: true,
-        // Candidate-specific placement wins for final images. Progress frames
-        // and legacy image inputs continue to follow the CURRENT bbox origin.
+        // Screen frames are display-time: the region tint may draw, except over a staged result.
+        regionOverlays: !staging,
+        showOverlayStacks,
+        // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:
           !isolatedGuard && stagedPreview
             ? {
-                opacity: stagedPlacement?.opacity ?? 1,
-                rect: stagedPlacement
-                  ? {
-                      height: stagedPlacement.height,
-                      width: stagedPlacement.width,
-                      x: stagedPlacement.x,
-                      y: stagedPlacement.y,
-                    }
-                  : { height: stagedPreview.height, width: stagedPreview.width, x: doc.bbox.x, y: doc.bbox.y },
+                opacity: stagedPreview.placement.opacity,
+                rect: {
+                  height: stagedPreview.placement.height,
+                  width: stagedPreview.placement.width,
+                  x: stagedPreview.placement.x,
+                  y: stagedPreview.placement.y,
+                },
                 surface: stagedPreview.surface,
               }
             : null,

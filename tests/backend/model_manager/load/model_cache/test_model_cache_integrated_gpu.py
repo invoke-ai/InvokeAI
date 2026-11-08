@@ -7,6 +7,7 @@ integrated-GPU probe stubbed, so no Intel hardware is required.
 """
 
 import logging
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -56,12 +57,17 @@ def _make_cache(
         )
 
 
+@contextmanager
 def _patch_integrated(is_integrated: bool | None):
     """Stub the Level Zero probe. None models a device whose type cannot be determined."""
-    return patch(
-        "invokeai.backend.model_manager.load.model_cache.model_cache.xpu_device_is_integrated",
-        return_value=is_integrated,
-    )
+    with (
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=is_integrated),
+        patch(
+            "invokeai.backend.model_manager.load.model_cache.model_cache.xpu_device_is_integrated",
+            return_value=is_integrated,
+        ),
+    ):
+        yield
 
 
 def _logged_messages(logger: MagicMock) -> list[str]:

@@ -48,8 +48,12 @@ from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH
 from invokeai.app.services.shared.pagination import SQLiteDirection
-from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
+from invokeai.backend.model_manager.configs.factory import (
+    SINGLE_FILE_MODEL_SUFFIXES,
+    AnyModelConfig,
+    ModelConfigFactory,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
@@ -59,12 +63,27 @@ def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModel
     Used when changing a model's type via the update endpoint: the existing record's `format`/`variant`
     fields belong to the old class and may not have a discriminator match in the new type space, so we
     fall back to constructing each candidate class directly with whatever fields it accepts.
+
+    More than one class of a type can validate from the same stripped fields -- TextLLM has a folder and a
+    single-file class -- so the candidates are tried in a fixed order rather than in the iteration order of
+    `CONFIG_CLASSES`, a set. The single-file classes (`Checkpoint_Config_Base`) come first when the record's path
+    is a model file and last otherwise; ties go by class name.
     """
+    is_file = Path(str(fields.get("path", ""))).suffix.lower() in SINGLE_FILE_MODEL_SUFFIXES
+    candidates = sorted(
+        (
+            candidate_class
+            for candidate_class in Config_Base.CONFIG_CLASSES
+            if (type_field := candidate_class.model_fields.get("type")) is not None
+            and type_field.default == target_type
+        ),
+        key=lambda candidate_class: (
+            issubclass(candidate_class, Checkpoint_Config_Base) != is_file,
+            candidate_class.__name__,
+        ),
+    )
     last_error: Exception | None = None
-    for candidate_class in Config_Base.CONFIG_CLASSES:
-        type_field = candidate_class.model_fields.get("type")
-        if type_field is None or type_field.default != target_type:
-            continue
+    for candidate_class in candidates:
         try:
             return candidate_class(**fields)  # type: ignore[return-value]
         except ValidationError as e:
@@ -127,6 +146,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             raise UnknownModelException("model not found")
 
     def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
+        # Every set field is copied into the stored config, so a different key would be written into the blob while
+        # the row keeps the old one: a record nothing can look up by the key it reports.
+        if "key" in changes.model_fields_set and changes.key != key:
+            raise ValueError("A model's key cannot be changed")
+
         def apply(q: Queries) -> str:
             # Locked, so that a concurrent update applies its changes to this one's result, not beside it.
             stored = q.models.lock(key)
@@ -141,6 +165,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # 1. Convert the existing record to a dict
                 # 2. Apply the changes to the dict
                 # 3. Attempt to create a new model config from the updated dict
+
+                original = record
 
                 # 1. Convert the existing record to a dict
                 record_as_dict = record.model_dump()
@@ -167,6 +193,19 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                         if stale_field not in changes.model_fields_set:
                             fallback_dict.pop(stale_field, None)
                     record = _construct_config_for_type(fallback_dict, changes.type)
+
+                # Validation ignores keys the resulting class has no field for, so without this check a change it
+                # cannot store would be dropped while the update reports success. None clears a value, and a field
+                # of the original class may be dropped by a class change; neither is refused.
+                unstorable = sorted(
+                    field_name
+                    for field_name in changes.model_fields_set
+                    if getattr(changes, field_name) is not None
+                    and field_name not in type(original).model_fields
+                    and field_name not in type(record).model_fields
+                )
+                if unstorable:
+                    raise ValueError(f"Model '{original.name}' does not support {', '.join(unstorable)}")
             else:
                 # We are not allowing the model config class to change, so we can just update the existing instance in
                 # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.

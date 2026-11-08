@@ -14,17 +14,10 @@ Converting back and forth around the guidance combine, as the reference pipeline
 add two divisions by a sigma that is already the step's own ratio.
 """
 
-import math
-
 import torch
 
-from invokeai.backend.ltx2.constants import (
-    LTX2_BASE_SEQ_LEN,
-    LTX2_BASE_SHIFT,
-    LTX2_DISTILLED_SIGMAS,
-    LTX2_MAX_SEQ_LEN,
-    LTX2_MAX_SHIFT,
-)
+from invokeai.backend.ltx2.constants import LTX2_DISTILLED_SIGMAS, LTX2_SHIFT_FIT
+from invokeai.backend.rectified_flow.schedule_shift import time_shift
 
 # The last sampled noise level every shifted schedule is stretched onto. Not cosmetic: at the
 # max-shift anchor the raw schedule's final sigma is 0.21, and without the stretch the run would
@@ -36,22 +29,6 @@ LTX2_SHIFT_TERMINAL = 0.1
 
 # How close to the level it asked for a refine pass has to start for the pass to mean anything.
 _MIN_REFINE_ENTRY_FRACTION = 0.5
-
-
-def calculate_shift(video_seq_len: int) -> float:
-    """The schedule's ``mu``, interpolated from the token count and held at the anchors outside them.
-
-    The clamp is the whole point. The line is fitted between 1024 and 4096 tokens, and every canvas
-    this architecture offers is past its top: a 1248x704x121 clip is 13728 tokens, where the
-    unclamped line gives mu 5.5 and the resulting schedule spends 29 of 30 steps above sigma 0.54
-    before covering 0.54 -> 0.1 in one. Held at 2.05, the schedule is the released pipeline's
-    exactly -- ltx-core's ``LTX2Scheduler`` is called with no latent, so it always takes the
-    max-shift anchor, and the diffusers port's own default operating point is inside the range.
-    """
-    slope = (LTX2_MAX_SHIFT - LTX2_BASE_SHIFT) / (LTX2_MAX_SEQ_LEN - LTX2_BASE_SEQ_LEN)
-    shift = video_seq_len * slope + LTX2_BASE_SHIFT - slope * LTX2_BASE_SEQ_LEN
-
-    return min(max(shift, LTX2_BASE_SHIFT), LTX2_MAX_SHIFT)
 
 
 def build_sigmas(
@@ -81,11 +58,10 @@ def build_sigmas(
     if num_steps < 1:
         raise ValueError(f"LTX-2 needs at least one step; got {num_steps}.")
 
-    # Built in float64 and narrowed once at the end. The shift divides mu by itself at sigma 1,
-    # which in float32 is the exact mu over a rounded one -- the schedule would not start at 1.
+    # Built in float64 and narrowed once at the end. The shift divides e^mu by itself at sigma 1,
+    # which in float32 is the exact value over a rounded one -- the schedule would not start at 1.
     sigmas = torch.linspace(1.0, 1.0 / num_steps, num_steps, dtype=torch.float64)
-    mu = math.exp(calculate_shift(video_seq_len))
-    sigmas = mu / (mu + (1.0 / sigmas - 1.0))
+    sigmas = time_shift(LTX2_SHIFT_FIT.shift(video_seq_len), sigmas)
 
     # A single step is already the terminal one, and its `1 - sigma` is 0: there is nothing to
     # stretch onto and the scale factor would be a division by zero.

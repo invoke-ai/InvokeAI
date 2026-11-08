@@ -1,3 +1,4 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
@@ -92,6 +93,9 @@ interface Harness {
   lifts: string[];
   commitFloat: ReturnType<typeof vi.fn>;
   transforms: LayerTransform[];
+  refusals: CanvasEditRefusal[];
+  /** Calls to `beginSelectedLayerEdit`: the gesture started moving the selected layer in place. */
+  selectedLayerEdits: ReturnType<typeof vi.fn>;
 }
 
 interface HarnessOptions {
@@ -125,6 +129,8 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     current: options.existingFloat ? fakeFloat(doc.selectedLayerId ?? 'a') : null,
   };
   const commitFloat = vi.fn();
+  const refusals: CanvasEditRefusal[] = [];
+  const selectedLayerEdits = vi.fn();
   const stores = createEngineStores();
   stores.snapToGrid.set(options.snapToGrid ?? false);
   if (options.bboxGrid !== undefined) {
@@ -142,6 +148,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
+    beginSelectedLayerEdit: selectedLayerEdits,
     beginStrokeEdit: () => null,
     getDocument: () => doc,
     getSelectedLayerIds: () => options.selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
@@ -158,6 +165,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
       return result;
     },
     notifyLayerPainted: vi.fn(),
+    reportEditRefusal: (refusal) => refusals.push(refusal),
     setFloatingTransform: (transform) => {
       transforms.push(transform);
       if (float.current) {
@@ -170,7 +178,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     updateCursor: vi.fn(),
     viewport: null as never,
   };
-  return { commitFloat, commits, ctx, dispatched, float, lifts, overrides, transforms };
+  return { commitFloat, commits, ctx, dispatched, float, lifts, overrides, refusals, selectedLayerEdits, transforms };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -282,6 +290,7 @@ describe('move tool: drag', () => {
 
     expect(h.overrides).toEqual([]);
     expect(h.commits).toEqual([]);
+    expect(h.refusals).toEqual([{ layerId: 'b', layerName: 'b', status: 'layer-locked' }]);
   });
 
   it('previews via override on move then commits one structural transform on up', () => {
@@ -378,6 +387,7 @@ describe('move tool: drag', () => {
     expect(h.commits).toHaveLength(0);
     expect(h.overrides).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
+    expect(h.refusals).toEqual([{ layerId: 'locked', layerName: 'locked', status: 'layer-locked' }]);
   });
 
   it('constrains to the dominant axis under shift', () => {
@@ -421,6 +431,42 @@ describe('move tool: drag', () => {
     expect(h.commits).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
     expect(h.overrides.at(-1)).toEqual({ layerId: 'a', override: null });
+  });
+});
+
+describe('move tool: editing the selected layer in place', () => {
+  /** Presses at x 10 and moves through `path`, returning how many times each move reported the edit. */
+  const press = (h: Harness, tool: Tool, path: readonly number[]): number[] => {
+    h.selectedLayerEdits.mockClear();
+    down(tool, h.ctx, pointer(10, 10));
+    const reported = path.map((x) => {
+      const before = h.selectedLayerEdits.mock.calls.length;
+      move(tool, h.ctx, pointer(x, 10));
+      return h.selectedLayerEdits.mock.calls.length - before;
+    });
+    up(tool, h.ctx, pointer(path.at(-1)!, 10));
+    return reported;
+  };
+
+  it('reports a layer drag once, as it crosses the threshold, and never a click', () => {
+    const h = createHarness(makeDoc([imageLayer('a')], 'a'));
+    const tool = createMoveTool();
+    expect(press(h, tool, [11, 12])).toEqual([0, 0]);
+    expect(press(h, tool, [11, 30, 35])).toEqual([0, 1, 0]);
+  });
+
+  it('reports the layer drag a lift falls back to', () => {
+    const h = createHarness(makeDoc([imageLayer('a')], 'a'), { lift: 'unavailable', selectionContainsPoint: true });
+    expect(press(h, createMoveTool(), [30, 35])).toEqual([1, 0]);
+  });
+
+  it.each([
+    ['a refused drag on a locked layer', makeDoc([imageLayer('a', { isLocked: true })], 'a'), {}],
+    ['a float already in flight', makeDoc([imageLayer('a')], 'a'), { existingFloat: true }],
+    ['a lifted float', makeDoc([imageLayer('a')], 'a'), { selectionContainsPoint: true }],
+    ['a refused lift', makeDoc([imageLayer('a')], 'a'), { lift: 'refused' as const, selectionContainsPoint: true }],
+  ])('reports nothing for %s, which moves no layer', (_, doc, options) => {
+    expect(press(createHarness(doc, options), createMoveTool(), [30, 35])).toEqual([0, 0]);
   });
 });
 

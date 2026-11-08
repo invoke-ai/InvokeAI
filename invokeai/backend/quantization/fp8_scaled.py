@@ -416,19 +416,30 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
 _MX_SCALE_DTYPES = tuple(dtype for dtype in (torch.uint8, getattr(torch, "float8_e8m0fnu", None)) if dtype is not None)
 
 
+def unparsed_fp8_scale_keys(sd: Mapping[str, Any]) -> list[str]:
+    """The scale keys beside an fp8 weight in a spelling this module does not parse, such as ``.weight_scale_inv``.
+
+    Read off the key names beside each ``<module>.weight``, so it is only right in the namespace the scale was
+    written in: a loader that renames keys has to ask before renaming, or a scale its converter does not carry is
+    left behind under the old name, sits beside no weight any more, and its weight loads unscaled.
+    """
+    return sorted(
+        key
+        for key in sd
+        if isinstance(key, str)
+        and "scale" in key.rsplit(".", 1)[-1]
+        and not key.endswith(WEIGHT_SCALE_SUFFIXES + INPUT_SCALE_SUFFIXES)
+        and getattr(sd.get(f"{key.rsplit('.', 1)[0]}.weight"), "dtype", None) in FP8_WEIGHT_DTYPES
+    )
+
+
 def _reject_unparsed_scales(sd: Mapping[str, Any]) -> None:
     """Refuse a scale spelling this module does not parse when it sits beside an fp8 weight.
 
     Loaders ignore unexpected keys (logged at DEBUG), so a leftover ``.weight_scale_inv``-style
     key would otherwise let its weight load unscaled and generate noise instead of failing here.
     """
-    unparsed = sorted(
-        key
-        for key in sd
-        if isinstance(key, str)
-        and "scale" in key.rsplit(".", 1)[-1]
-        and getattr(sd.get(f"{key.rsplit('.', 1)[0]}.weight"), "dtype", None) in FP8_WEIGHT_DTYPES
-    )
+    unparsed = unparsed_fp8_scale_keys(sd)
     if unparsed:
         raise NotImplementedError(
             f"Unsupported fp8 scale layout: {unparsed[:8]}{' ...' if len(unparsed) > 8 else ''}. InvokeAI reads "
@@ -651,9 +662,51 @@ def dequantize_fp8_scaled(
         weight = sd.get(key)
         if weight is None:
             continue
-        weight = weight.float()
-        sd[key] = (weight * expand_weight_scale(weight, layer.weight_scale, path)).to(dtype)
+        sd[key] = _fold_scale(weight, layer.weight_scale, dtype, path)
     return sd
+
+
+# The most elements a fold widens to float32 at once. The multiply holds two float32 copies of what it works
+# on, so folding a tensor whole peaks at 10 bytes per element in RAM: 5.8 GiB for the 151936x4096 token
+# table of Comfy's nvfp4 Qwen3-VL 8B, against a 1.2 GiB result and a reservation sized for that result.
+_FOLD_SLAB_ELEMENTS = 1 << 24
+
+
+def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype, path: str) -> torch.Tensor:
+    """``(weight.float() * expand_weight_scale(weight, scale)).to(dtype)``, element for element, a slab of rows
+    at a time.
+
+    ``scale`` is the compact one :func:`extract_fp8_scaled_layers` keeps, and it is expanded a slab at a time as
+    well: a block-wise or MXFP8 scale widened whole is itself a float32 copy of the weight, 2.3 GiB for that
+    token table, before the first slab is folded. So beyond the result, nothing the size of the weight is ever
+    held in float32, whatever the layout. Each slab rounds exactly as the whole would, since every element is
+    computed alone.
+    """
+    rows = weight.shape[0] if weight.dim() else 1
+    block_wise = scale.numel() > 1 and scale.dim() > 1
+    if block_wise and rows % scale.shape[0]:
+        # Expanded, such a scale never lines up with the rows; the multiply would refuse it without naming the layer.
+        raise ValueError(
+            f"{path}: a {tuple(scale.shape)} block-wise weight_scale does not tile the {rows} rows of its "
+            f"{tuple(weight.shape)} weight; the checkpoint's quantization metadata appears to be malformed."
+        )
+    if weight.numel() <= _FOLD_SLAB_ELEMENTS:
+        return (weight.float() * expand_weight_scale(weight, scale, path)).to(dtype)
+    step = max(1, _FOLD_SLAB_ELEMENTS // (weight.numel() // rows))
+    # A scalar or one entry per row: expanding it is a view, sliced per slab below.
+    expanded = None if block_wise else expand_weight_scale(weight, scale, path)
+    rows_per_scale_row = rows // scale.shape[0] if block_wise else 1
+    out = torch.empty(weight.shape, dtype=dtype, device=weight.device)
+    for start in range(0, rows, step):
+        slab = slice(start, start + step)
+        if expanded is None:
+            # The scale rows this slab's rows read, one per weight row, widened along the other axes.
+            index = torch.arange(start, min(start + step, rows), device=scale.device) // rows_per_scale_row
+            slab_scale = expand_weight_scale(weight[slab], scale.index_select(0, index), path)
+        else:
+            slab_scale = expanded[slab] if expanded.dim() else expanded
+        out[slab] = weight[slab].float() * slab_scale
+    return out
 
 
 def attach_fp8_scales(

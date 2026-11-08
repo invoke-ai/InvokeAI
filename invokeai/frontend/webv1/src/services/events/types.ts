@@ -30,6 +30,7 @@ export type ServerToClientEvents = {
   model_install_download_started: (payload: S['ModelInstallDownloadStartedEvent']) => void;
   model_install_download_progress: (payload: S['ModelInstallDownloadProgressEvent']) => void;
   model_install_downloads_complete: (payload: S['ModelInstallDownloadsCompleteEvent']) => void;
+  model_install_paused: (payload: S['ModelInstallPausedEvent']) => void;
   model_install_complete: (payload: S['ModelInstallCompleteEvent']) => void;
   model_install_error: (payload: S['ModelInstallErrorEvent']) => void;
   model_install_cancelled: (payload: S['ModelInstallCancelledEvent']) => void;

@@ -18,6 +18,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.gallery.gallery_default import GalleryService
+from invokeai.app.services.image_index import projection
 from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
 from invokeai.app.services.image_index.image_index_common import (
     ImageIndexStatus,
@@ -27,6 +28,7 @@ from invokeai.app.services.image_index.image_index_records_default import ImageI
 from invokeai.app.services.image_index.projection import (
     DEFAULT_CLUSTER_MIN_SAMPLES,
     cluster_with_diagnostics,
+    projection_params,
     scope_hash,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -353,7 +355,9 @@ def _seed_projection(mock_invoker: Invoker, user_id: str, items: list[IndexedIte
     accessible = _records(mock_invoker).list_accessible_embedded_items(
         None if user_id == SYSTEM_USER_ID else user_id, MODEL_ID
     )
-    _records(mock_invoker).set_projection(user_id, MODEL_ID, scope_hash(MODEL_ID, accessible), "{}", items, coords)
+    _records(mock_invoker).set_projection(
+        user_id, MODEL_ID, scope_hash(MODEL_ID, accessible), projection_params(n_points=len(items)), items, coords
+    )
 
 
 # --- Single-user mode (system admin) ---
@@ -449,6 +453,25 @@ def test_stale_projection_filters_now_inaccessible_names_and_requests_refresh(
 
     assert body["stale"] is True
     assert [p["image_name"] for p in body["points"]] == ["keep.png"]
+    assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
+
+
+def test_a_pca_map_is_stale_once_umap_is_installed(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient, monkeypatch
+) -> None:
+    """Over an unchanged scope too: otherwise the PCA map outlives the missing umap until the gallery changes."""
+    names = [f"img-{i}.png" for i in range(4)]
+    for name in names:
+        _seed_embedded_image(mock_invoker, name)
+    monkeypatch.setattr(projection, "is_windows_arm64", lambda: True)
+    monkeypatch.setattr(projection, "_umap_class", lambda: None)
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, imgs(*names), np.zeros((4, 2), dtype=np.float32))
+
+    assert client.get("/api/v1/image_map/points").json()["stale"] is False
+    assert image_index_service.projection_requests == []
+
+    monkeypatch.setattr(projection, "_umap_class", lambda: object)
+    assert client.get("/api/v1/image_map/points").json()["stale"] is True
     assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
 
 

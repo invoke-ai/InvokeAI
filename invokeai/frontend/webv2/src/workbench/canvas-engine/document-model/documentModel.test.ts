@@ -335,6 +335,27 @@ describe('createDocumentModel', () => {
       expect(after.canvas.document.stacks.raster[1]).toMatchObject({ name: 'G copy', type: 'group' });
     });
 
+    it('keeps adjustment entries on a duplicated layer, noise seeds included, so the copy looks identical', () => {
+      const adjustments = [
+        {
+          amount: 0.1,
+          distribution: 'gaussian',
+          id: 'n',
+          isEnabled: true,
+          grain: 'monochrome',
+          response: 'flat',
+          size: 1,
+          seed: 1234,
+          type: 'noise',
+        },
+      ] as const;
+      const project = projectWith([layer('r1', 'raster', { adjustments: [...adjustments] })], 'r1');
+      const { after } = roundTrip(project, { createId: () => 'd0', ids: ['r1'], type: 'duplicate' });
+
+      const copy = after.canvas.document.stacks.raster.find((node) => node.id === 'd0');
+      expect(copy).toMatchObject({ adjustments });
+    });
+
     it('moves within sibling lists, keeping a selected group and its descendants together', () => {
       const project = projectWith(tree(), 'r3');
       const moved = roundTrip(project, { ids: ['G', 'r3'], kind: 'front', type: 'move' });
@@ -863,6 +884,44 @@ describe('createDocumentModel', () => {
       });
       const mask = getDocumentLeaves(removed.after.canvas.document).find((leaf) => leaf.id === 'i1')!;
       expect(Object.hasOwn(mask, 'noise')).toBe(false);
+    });
+
+    it("round-trips a region's layout role from the live layer, and clearing it leaves no field behind", () => {
+      const project = projectWith([layer('g1', 'regional_guidance'), layer('r1')], 'g1');
+      const regionOf = (after: Project) => getDocumentLeaves(after.canvas.document).find((leaf) => leaf.id === 'g1')!;
+      // The settings panel commits without a baseline, so each inverse is read from the live layer.
+      const added = roundTrip(project, {
+        config: { layerType: 'regional_guidance', layout: { kind: 'text' } },
+        id: 'g1',
+        type: 'patch-config',
+      });
+      expect(added.edit.inverse).toEqual({
+        config: { layerType: 'regional_guidance', layout: undefined },
+        id: 'g1',
+        type: 'updateCanvasLayerConfig',
+      });
+      const texted = roundTrip(added.after, {
+        config: { layerType: 'regional_guidance', layout: { kind: 'text', text: 'OPEN' } },
+        id: 'g1',
+        type: 'patch-config',
+      });
+      expect(regionOf(texted.after)).toMatchObject({ layout: { kind: 'text', text: 'OPEN' } });
+      const cleared = roundTrip(texted.after, {
+        config: { layerType: 'regional_guidance', layout: null },
+        id: 'g1',
+        type: 'patch-config',
+      });
+
+      expect(Object.hasOwn(regionOf(cleared.after), 'layout')).toBe(false);
+      const undoneAdd = applyCanvasProjectMutation(added.after, added.edit.inverse);
+      expect(Object.hasOwn(regionOf(undoneAdd), 'layout')).toBe(false);
+      expect(
+        modelOf(cleared.after).prepare({
+          config: { layerType: 'regional_guidance', layout: null },
+          id: 'g1',
+          type: 'patch-config',
+        })
+      ).toEqual({ status: 'unchanged' });
     });
 
     it('round-trips setting and clearing a regional prompt, which the layer stores as null', () => {

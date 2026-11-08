@@ -7,7 +7,10 @@ import type {
   VaeModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
@@ -17,6 +20,7 @@ import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
 import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
 
+import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
@@ -36,6 +40,14 @@ const flux2DevModel: MainModelConfig = {
   key: 'flux2-dev-model',
   name: 'FLUX.2 [dev]',
   variant: 'dev',
+};
+const flux3Model: MainModelConfig = {
+  base: 'flux3',
+  format: 'diffusers',
+  key: 'flux3-model',
+  name: 'FLUX.3 Klein',
+  type: 'main',
+  variant: 'flux3_klein',
 };
 const cogView4Model: MainModelConfig = { base: 'cogview4', key: 'cog-model', name: 'CogView4', type: 'main' };
 const qwenImageModel: MainModelConfig = {
@@ -65,6 +77,20 @@ const qwenImage21Model: MainModelConfig = {
   format: 'diffusers',
   key: 'qwen-image-2-1-model',
   name: 'Qwen-Image-2.1',
+  type: 'main',
+};
+const mossImageModel: MainModelConfig = {
+  base: 'moss-image',
+  format: 'diffusers',
+  key: 'moss-image-model',
+  name: 'MOSS-Image',
+  type: 'main',
+};
+const ideogram4Model: MainModelConfig = {
+  base: 'ideogram-4',
+  format: 'diffusers',
+  key: 'ideogram4-model',
+  name: 'Ideogram 4',
   type: 'main',
 };
 const externalModel: GenerateModelConfig = {
@@ -182,7 +208,7 @@ interface BaseCase {
   denoiseType: string;
   txt2imgMode: string;
   img2imgMode: string;
-  /** sd-3 / flux / flux2 rescale strength with an exponent of 0.2 (legacy parity). */
+  /** sd-3 / flux / flux2 / moss-image rescale strength with an exponent of 0.2 (legacy parity for the first three). */
   optimizedDenoising: boolean;
 }
 
@@ -246,6 +272,15 @@ const BASE_CASES: BaseCase[] = [
     optimizedDenoising: true,
   },
   {
+    model: flux3Model,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'flux3_denoise',
+    txt2imgMode: 'flux3_txt2img',
+    img2imgMode: 'flux3_img2img',
+    optimizedDenoising: true,
+  },
+  {
     model: cogView4Model,
     encodeType: 'cogview4_i2l',
     outputType: 'cogview4_l2i',
@@ -289,6 +324,15 @@ const BASE_CASES: BaseCase[] = [
     txt2imgMode: 'qwen_image_2_1_txt2img',
     img2imgMode: 'qwen_image_2_1_img2img',
     optimizedDenoising: false,
+  },
+  {
+    model: mossImageModel,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'moss_image_denoise',
+    txt2imgMode: 'moss_image_txt2img',
+    img2imgMode: 'moss_image_img2img',
+    optimizedDenoising: true,
   },
 ];
 
@@ -347,6 +391,18 @@ describe('compileCanvasGraph', () => {
     });
   });
 
+  describe.each(['img2img', 'inpaint', 'outpaint'] as const)('SDXL %s color compensation', (mode) => {
+    it.each([
+      { colorCompensation: true, expected: 'SDXL' },
+      { colorCompensation: false, expected: 'None' },
+    ])('sets $expected on the encoder when enabled=$colorCompensation', ({ colorCompensation, expected }) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: { colorCompensation } });
+
+      expect(getNodeByType(backendGraph, 'i2l')).toMatchObject({ color_compensation: expected, fp32: true });
+      expect(getNodeByType(backendGraph, 'l2i')).not.toHaveProperty('color_compensation');
+    });
+  });
+
   describe('img2img per base', () => {
     it.each(BASE_CASES)(
       'grafts a $model.base image-to-latents encode node',
@@ -402,11 +458,16 @@ describe('compileCanvasGraph', () => {
       expect(getNodeByType(fp32.backendGraph, 'i2l')?.fp32).toBe(true);
     });
 
-    it('does not attach fp32 to non-SD encode nodes', () => {
-      const { backendGraph } = compile(fluxModel, 'img2img');
+    it.each(BASE_CASES.filter(({ encodeType }) => encodeType !== 'i2l'))(
+      'does not attach SD-only VAE settings to $model.base encode nodes',
+      ({ model, encodeType }) => {
+        const { backendGraph } = compile(model, 'img2img', { settings: { colorCompensation: true } });
+        const encode = getNodeByType(backendGraph, encodeType);
 
-      expect(getNodeByType(backendGraph, 'flux_vae_encode')?.fp32).toBeUndefined();
-    });
+        expect(encode).not.toHaveProperty('fp32');
+        expect(encode).not.toHaveProperty('color_compensation');
+      }
+    );
 
     it('threads the composite image name into the encode node', () => {
       const { backendGraph } = compile(sdxlModel, 'img2img', { compositeImageName: 'my-upload.png' });
@@ -431,13 +492,319 @@ describe('compileCanvasGraph', () => {
     );
   });
 
-  describe('unsupported models', () => {
-    it('rejects external image generators for txt2img', () => {
-      expect(() => compile(externalModel, 'txt2img')).toThrow('does not support canvas generation');
+  describe('external image generators', () => {
+    const editModel: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'img2img', 'inpaint'], supports_seed: true },
+    };
+    const smallBbox: Rect = { height: 512, width: 640, x: 10, y: 20 };
+    // The starter catalog's GPT Image size table.
+    const gptImage: GenerateModelConfig = {
+      ...editModel,
+      capabilities: {
+        allowed_aspect_ratios: ['1:1', '3:2', '2:3'],
+        aspect_ratio_sizes: {
+          '1:1': { height: 1024, width: 1024 },
+          '3:2': { height: 1024, width: 1536 },
+          '2:3': { height: 1536, width: 1024 },
+        },
+        modes: ['txt2img', 'img2img'],
+        supports_seed: true,
+      },
+      provider_model_id: 'gpt-image-1',
+    };
+
+    it('writes hosted canvas graphs for backend invocation contract validation', async () => {
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const graphs: Record<string, BackendGraphContract> = {};
+      try {
+        for (const mode of ['txt2img', 'img2img'] as const) {
+          graphs[mode] = compile({ ...gptImage, hash: 'blake3:external' }, mode, { bbox: smallBbox }).backendGraph;
+        }
+      } finally {
+        clock.mockRestore();
+        random.mockRestore();
+      }
+      const fixture = {
+        _comment:
+          'Generated by compileCanvasGraph.test.ts; regenerate with vitest -u. Validated by tests/app/invocations/test_frontend_external_canvas_graphs.py.',
+        ...graphs,
+      };
+      await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+        '../__snapshots__/externalCanvasGraphs.json'
+      );
     });
 
-    it('rejects external image generators for img2img', () => {
-      expect(() => compile(externalModel, 'img2img')).toThrow('does not support canvas generation');
+    it.each(['canvas', 'gallery'] as const)('restores provider output to the exact bbox for %s', (destination) => {
+      const { backendGraph, mode } = compile(externalModel, 'txt2img', {
+        bbox: smallBbox,
+        compositeImageName: null,
+        destination,
+        scaling: { height: null, method: 'auto', width: null },
+      });
+      const output = backendGraph.nodes.canvas_processing_output;
+
+      expect(mode).toBe('txt2img');
+      expect(output).toMatchObject({
+        height: 512,
+        is_intermediate: true,
+        mode: 'txt2img',
+        type: 'openai_image_generation',
+        width: 640,
+      });
+      expect(output).not.toHaveProperty('init_image');
+      expect(output).not.toHaveProperty('mask_image');
+      expect(getEdge(backendGraph, 'canvas_processing_output', 'prompt')?.source.node_id).toBe('positive_prompt');
+      expect(getEdge(backendGraph, 'canvas_processing_output', 'seed')?.source.node_id).toBe('seed');
+      expect(backendGraph.nodes.canvas_i2l).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        type: 'img_resize',
+        height: 512,
+        width: 640,
+        is_intermediate: destination === 'canvas',
+      });
+      expect(backendGraph.nodes.canvas_provider_image.type).toBe('iterate');
+      expect(getEdge(backendGraph, 'canvas_provider_image', 'collection')?.source).toEqual({
+        node_id: 'canvas_processing_output',
+        field: 'collection',
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source).toEqual({
+        node_id: 'canvas_provider_image',
+        field: 'item',
+      });
+      expect(backendGraph.nodes.canvas_provider_metadata.type).toBe('metadata_from_image');
+      expect(getEdge(backendGraph, 'canvas_provider_metadata', 'image')?.source).toEqual({
+        node_id: 'canvas_provider_image',
+        field: 'item',
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe('canvas_provider_metadata');
+      expect(getEdge(backendGraph, 'canvas_processing_output', 'metadata')).toBeDefined();
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 512, width: 640 });
+    });
+
+    it('asks a fixed-size provider for its nearest-ratio size and center-crops a text-to-image result to the bbox', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', { bbox: smallBbox, compositeImageName: null });
+
+      // 640×512 is nearest 3:2 among the table's ratios; the provider receives that exact entry.
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1536 });
+      // 1536×1024 scaled to cover 640×512 is 768×512, then 64 px come off each side.
+      expect(backendGraph.nodes.canvas_provider_cover).toMatchObject({
+        height: 512,
+        is_intermediate: true,
+        type: 'img_resize',
+        width: 768,
+      });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        height: 512,
+        type: 'img_crop',
+        width: 640,
+        x: 64,
+        y: 0,
+      });
+      expect(getEdge(backendGraph, 'canvas_provider_cover', 'image')?.source).toEqual({
+        node_id: 'canvas_provider_image',
+        field: 'item',
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_provider_cover');
+      // Each image keeps the metadata of the provider image it was cropped from.
+      expect(getEdge(backendGraph, 'canvas_provider_metadata', 'image')?.source.node_id).toBe('canvas_provider_image');
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe('canvas_provider_metadata');
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 512, width: 640 });
+    });
+
+    it('crops a portrait frame vertically', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', {
+        bbox: { height: 1000, width: 700, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      // 1024×1536 scaled to cover 700×1000 is 700×1050, then 25 px come off the top and bottom.
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1536, width: 1024 });
+      expect(backendGraph.nodes.canvas_provider_cover).toMatchObject({ height: 1050, width: 700 });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        height: 1000,
+        type: 'img_crop',
+        width: 700,
+        x: 0,
+        y: 25,
+      });
+    });
+
+    it('resizes without cropping when the provider size has the bbox’s shape', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', {
+        bbox: { height: 512, width: 512, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1024 });
+      expect(backendGraph.nodes.canvas_provider_cover).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 512, type: 'img_resize', width: 512 });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_provider_image');
+    });
+
+    it('resizes an image-to-image init to the provider size and its result plainly back, without cropping', () => {
+      const { backendGraph } = compile(gptImage, 'img2img', { bbox: smallBbox, compositeImageName: 'bbox.png' });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1536 });
+      expect(backendGraph.nodes.canvas_processing_output).not.toHaveProperty('init_image');
+      expect(backendGraph.nodes.canvas_resize_image_to_request).toMatchObject({
+        height: 1024,
+        image: { image_name: 'bbox.png' },
+        type: 'img_resize',
+        width: 1536,
+      });
+      expect(getEdge(backendGraph, 'canvas_processing_output', 'init_image')?.source.node_id).toBe(
+        'canvas_resize_image_to_request'
+      );
+      expect(backendGraph.nodes.canvas_provider_cover).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 512, type: 'img_resize', width: 640 });
+    });
+
+    it('sends the smallest named size covering the frame, so a 2000 px square gets 2K', () => {
+      const gemini: GenerateModelConfig = {
+        ...externalModel,
+        capabilities: {
+          allowed_aspect_ratios: ['1:1', '16:9'],
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '1:1', height: 4096, image_size: '4K', label: '1:1 (4K)', width: 4096 },
+          ],
+        },
+        provider_id: 'gemini',
+      };
+      const { backendGraph } = compile(gemini, 'txt2img', {
+        bbox: { height: 2000, width: 2000, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({
+        height: 2048,
+        image_size: '2K',
+        type: 'gemini_image_generation',
+        width: 2048,
+      });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 2000, type: 'img_resize', width: 2000 });
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({
+        height: 2000,
+        image_size: '2K',
+        width: 2000,
+      });
+    });
+
+    it('sends the composited bbox as the init image for img2img when the model advertises it', () => {
+      const { backendGraph } = compile({ ...editModel, capabilities: { modes: ['img2img'] } }, 'img2img', {
+        compositeImageName: 'bbox.png',
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({
+        height: 1024,
+        init_image: { image_name: 'bbox.png' },
+        is_intermediate: true,
+        mode: 'img2img',
+        width: 768,
+      });
+      expect(backendGraph.nodes.canvas_processing_output).not.toHaveProperty('mask_image');
+      // The edited whole image is restored to the bbox like a txt2img result.
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 1024, type: 'img_resize', width: 768 });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source).toEqual({
+        node_id: 'canvas_provider_image',
+        field: 'item',
+      });
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 1024, width: 768 });
+      // No local denoise path is grafted: the provider edits the whole image.
+      expect(backendGraph.nodes.denoise_latents).toBeUndefined();
+      expect(backendGraph.nodes.create_gradient_mask).toBeUndefined();
+    });
+
+    it('rejects provider inpaint until Canvas mask semantics and compositing are supported', () => {
+      expect(() =>
+        compile(editModel, 'inpaint', {
+          compositeImageName: 'bbox.png',
+          maskImageName: 'mask.png',
+        })
+      ).toThrow('OpenAI Image does not support inpainting on the canvas yet. Remove or disable the inpaint mask.');
+    });
+
+    it('requires the composite for img2img', () => {
+      expect(() => compile(editModel, 'img2img', { compositeImageName: null })).toThrow(
+        'Canvas generation requires a composited source image.'
+      );
+    });
+
+    it('names raster content in the frame as the cause for a text-only model, in every edit mode', () => {
+      for (const mode of ['img2img', 'outpaint', 'inpaint'] as const) {
+        expect(() => compile(externalModel, mode, { maskImageName: mode === 'inpaint' ? 'mask.png' : null })).toThrow(
+          'OpenAI Image cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.'
+        );
+      }
+    });
+
+    it('rejects text-to-image for a model that does not advertise it, naming the mode', () => {
+      expect(() =>
+        compile({ ...externalModel, capabilities: { modes: ['img2img'] } }, 'txt2img', { compositeImageName: null })
+      ).toThrow('OpenAI Image does not support text-to-image generation.');
+    });
+
+    it('rejects outpaint even for a model that advertises every provider mode', () => {
+      expect(() => compile(editModel, 'outpaint', { maskImageName: null })).toThrow(
+        'OpenAI Image does not support outpainting on the canvas.'
+      );
+    });
+
+    it('rejects control layers and regional guidance by name instead of failing inside a graft', () => {
+      const layer: ControlLayerGraphInput = {
+        beginEndStepPct: [0, 1],
+        controlMode: 'balanced',
+        id: 'control',
+        imageName: 'control.png',
+        kind: 'controlnet',
+        model: { base: 'sd-1', key: 'canny', name: 'Canny', type: 'controlnet' },
+        weight: 1,
+      };
+
+      expect(() => compile(editModel, 'txt2img', { compositeImageName: null, controlLayers: [layer] })).toThrow(
+        'OpenAI Image does not support control layers.'
+      );
+      expect(() =>
+        compile(editModel, 'txt2img', {
+          compositeImageName: null,
+          regionalGuidance: [
+            {
+              autoNegative: false,
+              id: 'r1',
+              maskBounds: { height: 64, width: 64, x: 0, y: 0 },
+              maskImageName: 'r1-mask.png',
+              negativePrompt: null,
+              positivePrompt: 'a cat',
+              referenceImages: [],
+            },
+          ],
+        })
+      ).toThrow('OpenAI Image does not support regional guidance.');
+    });
+
+    it('ignores the denoising strength: the provider edits at its own, so none is validated, sent or recorded', () => {
+      const { backendGraph } = compile(editModel, 'img2img', { compositeImageName: 'bbox.png', strength: 0 });
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+
+      expect(backendGraph.nodes.canvas_output).not.toHaveProperty('strength');
+      expect(backendGraph.nodes.canvas_output).not.toHaveProperty('denoising_start');
+      expect(metadata).not.toHaveProperty('strength');
+      expect(metadata).not.toHaveProperty('generation_mode');
+    });
+
+    it('asks a free-form provider for the bbox itself even when the render size is set to auto or a custom size', () => {
+      const custom = compile(editModel, 'img2img', {
+        bbox: smallBbox,
+        compositeImageName: 'bbox.png',
+        scaling: { height: 2048, method: 'manual', width: 2048 },
+      });
+
+      expect(custom.backendGraph.nodes.canvas_output).toMatchObject({ height: 512, width: 640 });
+      expect(custom.backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 512, width: 640 });
     });
   });
 
@@ -468,13 +835,13 @@ describe('compileCanvasGraph', () => {
 
     it('rejects a zero-area bbox', () => {
       expect(() => compile(sd1Model, 'txt2img', { bbox: { height: 0, width: 512, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box must have a positive area.'
+        'Canvas frame must have a positive area.'
       );
     });
 
     it('rejects fractional bbox dimensions before emitting backend resize fields', () => {
       expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024.5, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box dimensions must be whole pixels.'
+        'Canvas frame dimensions must be whole pixels.'
       );
     });
 
@@ -712,6 +1079,22 @@ describe('compileCanvasGraph — inpaint per base', () => {
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
   });
 
+  // Qwen-Image-2.1's denoise adds its cache mode to the record, so the record still passes through it once the blend
+  // takes over the output.
+  it('routes Qwen-Image-2.1 inpaint metadata through the denoise onto the final blend output', () => {
+    const { backendGraph } = compile(qwenImage21Model, 'inpaint');
+    const metadata = getNodeByType(backendGraph, 'core_metadata');
+    const metadataEdges = backendGraph.edges.filter(
+      (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+    );
+
+    expect(backendGraph.nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+      [metadata?.id, 'denoise_latents'],
+      ['denoise_latents', 'canvas_output'],
+    ]);
+  });
+
   it('outputs only the generated mask region with transparency when requested', () => {
     const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: true });
 
@@ -854,12 +1237,6 @@ describe('compileCanvasGraph — outpaint per base', () => {
     expect(backendGraph.nodes.create_gradient_mask?.minimum_denoise).toBe(0.3);
     expect(backendGraph.nodes.expand_mask?.fade_size_px).toBe(24);
   });
-
-  it('rejects an external model for every image mode', () => {
-    expect(() => compile(externalModel, 'outpaint', { maskImageName: null })).toThrow(
-      'does not support canvas generation'
-    );
-  });
 });
 
 // Exercise control grafting through the real compiler entry point.
@@ -873,6 +1250,27 @@ describe('compileCanvasGraph — control layers (integration)', () => {
     model: { base: 'sd-1', key: 'canny-controlnet', name: 'Canny ControlNet', type: 'controlnet' },
     weight: 0.65,
   };
+
+  it('carries the InstantX mode of a FLUX union layer onto its flux_controlnet node, and none onto other bases', () => {
+    const unionLayer: ControlLayerGraphInput = {
+      ...controlNetLayer,
+      controlMode: null,
+      instantxControlMode: 4,
+      model: { base: 'flux', key: 'flux-union', name: 'FLUX ControlNet Union Pro', type: 'controlnet' },
+    };
+    const flux = compile(fluxModel, 'txt2img', { controlLayers: [unionLayer] }).backendGraph;
+    const sd1 = compile(sd1Model, 'img2img', {
+      controlLayers: [{ ...controlNetLayer, instantxControlMode: 4 }],
+    }).backendGraph;
+
+    expect(flux.nodes['control_net_control-layer-1']).toMatchObject({
+      instantx_control_mode: 4,
+      type: 'flux_controlnet',
+    });
+    expect(flux.nodes['control_net_control-layer-1']).not.toHaveProperty('control_mode');
+    expect(sd1.nodes['control_net_control-layer-1']?.type).toBe('controlnet');
+    expect(sd1.nodes['control_net_control-layer-1']).not.toHaveProperty('instantx_control_mode');
+  });
 
   it('grafts an enabled control layer through a real compiled canvas graph: control node args, collector → denoise.control wiring, base graph intact', () => {
     const { backendGraph, graph, mode } = compile(sd1Model, 'img2img', { controlLayers: [controlNetLayer] });
@@ -927,6 +1325,294 @@ describe('compileCanvasGraph — control layers (integration)', () => {
       field: 'control',
       node_id: 'z_image_control_z-control',
     });
+  });
+});
+
+describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
+  const layer: ControlLayerGraphInput = {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    id: 'q-control',
+    imageName: 'q-control.png',
+    kind: 'qwen_image_control',
+    model: { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    weight: 0.85,
+  };
+  const instantxLayer: ControlLayerGraphInput = {
+    ...layer,
+    model: {
+      base: 'qwen-image',
+      key: 'qwen-instantx',
+      name: 'Qwen Image InstantX ControlNet Union',
+      type: 'controlnet',
+    },
+    modelControlArchitecture: 'instantx_union',
+  };
+  const CONTROL = 'qwen_image_control_q-control';
+  const MASK = 'qwen_image_control_mask_q-control';
+  const edgesInto = (graph: BackendGraphContract, nodeId: string) =>
+    graph.edges
+      .filter((edge) => edge.destination.node_id === nodeId)
+      .map((edge) => [edge.destination.field, edge.source]);
+
+  it('grafts the control into the Qwen-Image base graph, whose denoise holds the VAE that encodes its images', () => {
+    const { backendGraph } = compile(qwenImageModel, 'txt2img', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes.denoise_latents?.type).toBe('qwen_image_denoise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      begin_step_percent: 0,
+      control_context_scale: 0.85,
+      control_model: layer.model,
+      end_step_percent: 1,
+      image: { image_name: 'q-control.png' },
+      type: 'qwen_image_control',
+    });
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+    expect(getEdge(backendGraph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+  });
+
+  it.each(['txt2img', 'img2img'] as const)('sends only the control image in %s', (mode) => {
+    const { backendGraph } = compile(qwenImageModel, mode, { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([]);
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+  });
+
+  it('inpaint: the control also reads the composite and the inverted canvas mask the denoise is limited to', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+    // The canvas mask is white = keep; img_lerp 255 → 0 makes it white = regenerate for the control.
+    expect(backendGraph.nodes[MASK]).toEqual({
+      id: MASK,
+      image: { image_name: 'canvas-mask.png' },
+      is_intermediate: true,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+      use_cache: true,
+    });
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([['inpaint_mask', { field: 'image', node_id: MASK }]]);
+    // The denoise mask is untouched: the gradient mask still reads the uploaded canvas mask as is.
+    expect(backendGraph.nodes.create_gradient_mask?.mask).toEqual({ image_name: 'canvas-mask.png' });
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+  });
+
+  it('inpaint with Scale Before Processing: the control reads the resized composite and mask', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+    });
+
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(backendGraph.nodes[MASK]).not.toHaveProperty('image');
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('canvas_resize_mask_to_processing');
+  });
+
+  it('inpaint with a noise mask: the control reads the image before noise is added', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', {
+      controlLayers: [layer],
+      noiseMaskImageName: 'noise.png',
+    });
+
+    expect(getEdge(backendGraph, 'canvas_i2l', 'image')?.source.node_id).toBe('add_inpaint_noise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+  });
+
+  it('outpaint: the control reads the infilled image and the alpha-derived or combined mask', () => {
+    const alphaOnly = compile(qwenImageModel, 'outpaint', { controlLayers: [layer], maskImageName: null }).backendGraph;
+    expect(getEdge(alphaOnly, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+    expect(getEdge(alphaOnly, MASK, 'image')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(getEdge(alphaOnly, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+
+    const combined = compile(qwenImageModel, 'outpaint', {
+      controlLayers: [layer],
+      maskImageName: 'canvas-mask.png',
+    }).backendGraph;
+    expect(getEdge(combined, MASK, 'image')?.source.node_id).toBe('mask_combine');
+
+    const scaled = compile(qwenImageModel, 'outpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+      maskImageName: null,
+    }).backendGraph;
+    expect(getEdge(scaled, MASK, 'image')?.source.node_id).toBe('canvas_resize_outpaint_mask_to_processing');
+    expect(getEdge(scaled, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+  });
+
+  it.each(['inpaint', 'outpaint'] as const)('%s: an InstantX union reads the control image alone', (mode) => {
+    const { backendGraph } = compile(qwenImageModel, mode, { controlLayers: [instantxLayer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      control_model: instantxLayer.model,
+      image: { image_name: 'q-control.png' },
+    });
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([]);
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+    // The region is still inpainted: the denoise keeps its mask.
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+  });
+
+  it('rejects the control on a Qwen Image Edit model, as the denoise does', () => {
+    expect(() => compile({ ...qwenImageModel, variant: 'edit' }, 'inpaint', { controlLayers: [layer] })).toThrow(
+      /qwen_image_edit_control/
+    );
+  });
+
+  it('leaves inpainting without a control layer as it was', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint');
+
+    expect(Object.values(backendGraph.nodes).map((node) => node.type)).not.toContain('img_lerp');
+    expect(Object.values(backendGraph.nodes).map((node) => node.type)).not.toContain('qwen_image_control');
+  });
+
+  it('writes the graphs the backend validates against its invocations', async () => {
+    // Ids minted from the clock and Math.random are pinned so the fixture changes only when the graph does.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
+    const model = hashed(qwenImageModel, 'blake3:qwen');
+    const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:union') }];
+    const instantxLayers = [{ ...instantxLayer, model: hashed(instantxLayer.model, 'blake3:instantx') }];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let outpaint: BackendGraphContract;
+    let instantxInpaint: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
+      // Without Scale Before Processing the control reads the canvas uploads as fixed image fields.
+      inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
+      // The infilled image and the combined mask reach the control through edges.
+      outpaint = compile(model, 'outpaint', { controlLayers, maskImageName: 'canvas-mask.png' }).backendGraph;
+      // An InstantX union inpaints with the control image alone.
+      instantxInpaint = compile(model, 'inpaint', { controlLayers: instantxLayers }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_fun_control_graphs.py, which validates the graphs against the backend invocations.',
+      inpaint_control_layer: { ...inpaint, id: 'qwen_image_control_canvas_inpaint' },
+      inpaint_instantx_control_layer: { ...instantxInpaint, id: 'qwen_image_control_canvas_inpaint_instantx' },
+      outpaint_control_layer: { ...outpaint, id: 'qwen_image_control_canvas_outpaint' },
+      txt2img_control_layer: { ...txt2img, id: 'qwen_image_control_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/qwenImageControlCanvasGraphs.json'
+    );
+  });
+});
+
+describe('compileCanvasGraph — FLUX.2 [dev] ControlNet (integration)', () => {
+  const layer: ControlLayerGraphInput = {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    id: 'f-control',
+    imageName: 'f-control.png',
+    kind: 'flux2_control',
+    model: { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
+    weight: 0.75,
+  };
+  const CONTROL = 'flux2_control_f-control';
+  const MASK = 'flux2_control_mask_f-control';
+
+  it('grafts the control into the FLUX.2 [dev] base graph, whose denoise holds the VAE that encodes its images', () => {
+    const { backendGraph } = compile(flux2DevModel, 'txt2img', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes.denoise_latents?.type).toBe('flux2_denoise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      begin_step_percent: 0,
+      control_context_scale: 0.75,
+      control_model: layer.model,
+      end_step_percent: 1,
+      image: { image_name: 'f-control.png' },
+      type: 'flux2_control',
+    });
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+    expect(getEdge(backendGraph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+  });
+
+  it('inpaint: the control also reads the composite and the inverted canvas mask the denoise is limited to', () => {
+    const { backendGraph } = compile(flux2DevModel, 'inpaint', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+    expect(backendGraph.nodes[MASK]).toMatchObject({ image: { image_name: 'canvas-mask.png' }, max: 0, min: 255 });
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+    // The denoise mask is untouched: the gradient mask still reads the uploaded canvas mask as is.
+    expect(backendGraph.nodes.create_gradient_mask?.mask).toEqual({ image_name: 'canvas-mask.png' });
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+  });
+
+  it('inpaint with Scale Before Processing: the control reads the resized composite and mask', () => {
+    const { backendGraph } = compile(flux2DevModel, 'inpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+    });
+
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('canvas_resize_mask_to_processing');
+  });
+
+  it('outpaint: the control reads the infilled image and the combined mask', () => {
+    const { backendGraph } = compile(flux2DevModel, 'outpaint', {
+      controlLayers: [layer],
+      maskImageName: 'canvas-mask.png',
+    });
+
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('mask_combine');
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+  });
+
+  it('rejects the control on a FLUX.2 Klein 9B model, as the denoise does', () => {
+    expect(() => compile({ ...flux2Model, variant: 'klein_9b' }, 'inpaint', { controlLayers: [layer] })).toThrow(
+      /flux2_klein_control/
+    );
+  });
+
+  it('rejects the control on a FLUX.2 model whose variant is unknown, as the denoise does', () => {
+    expect(flux2Model.variant).toBeUndefined();
+    expect(() => compile(flux2Model, 'inpaint', { controlLayers: [layer] })).toThrow(/flux2_klein_control/);
+  });
+
+  it('writes the graphs the backend validates against its invocations', async () => {
+    // Ids minted from the clock and Math.random are pinned so the fixture changes only when the graph does.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
+    const model = hashed(flux2DevModel, 'blake3:flux2-dev');
+    const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:union') }];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let outpaint: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
+      // Without Scale Before Processing the control reads the canvas uploads as fixed image fields.
+      inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
+      // The infilled image and the combined mask reach the control through edges.
+      outpaint = compile(model, 'outpaint', { controlLayers, maskImageName: 'canvas-mask.png' }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_fun_control_graphs.py, which validates the graphs against the backend invocations.',
+      inpaint_control_layer: { ...inpaint, id: 'flux2_control_canvas_inpaint' },
+      outpaint_control_layer: { ...outpaint, id: 'flux2_control_canvas_outpaint' },
+      txt2img_control_layer: { ...txt2img, id: 'flux2_control_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}
+`).toMatchFileSnapshot('../__snapshots__/flux2ControlCanvasGraphs.json');
   });
 });
 
@@ -1080,19 +1766,21 @@ describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
     );
   });
 
-  it.each(['inpaint', 'outpaint'] as const)(
-    'adds no adapter nodes, edges or metadata to the %s graph without one',
-    (mode) => {
-      const { backendGraph } = compile(animaModel, mode, { settings: { animaInpaintAdapterModel: null } });
+  it.each([
+    ['inpaint', 'without one', { animaInpaintAdapterModel: null }],
+    ['outpaint', 'without one', { animaInpaintAdapterModel: null }],
+    ['inpaint', 'switched off', { ...withAdapter(0.8), animaInpaintAdapterEnabled: false }],
+    ['outpaint', 'switched off', { ...withAdapter(0.8), animaInpaintAdapterEnabled: false }],
+  ] as const)('adds no adapter nodes, edges or metadata to the %s graph %s', (mode, _case, settings) => {
+    const { backendGraph } = compile(animaModel, mode, { settings });
 
-      expect(backendGraph.nodes.anima_inpaint_adapter).toBeUndefined();
-      expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask).toBeUndefined();
-      expect(backendGraph.nodes.control_lllite_collector).toBeUndefined();
-      expect(getEdge(backendGraph, 'denoise_latents', 'control_lllite')).toBeUndefined();
-      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter');
-      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter_weight');
-    }
-  );
+    expect(backendGraph.nodes.anima_inpaint_adapter).toBeUndefined();
+    expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask).toBeUndefined();
+    expect(backendGraph.nodes.control_lllite_collector).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'control_lllite')).toBeUndefined();
+    expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter');
+    expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter_weight');
+  });
 
   it('outpaint with Scale Before Processing: the adapter reads the resized combined mask (legacy addOutpaint.ts:182)', () => {
     const { backendGraph } = compile(animaModel, 'outpaint', {
@@ -1151,6 +1839,16 @@ describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
     expect(() => compile(animaModel, 'outpaint', { settings: withAdapter(10.5) })).toThrow(
       'Anima inpaint adapter weight must be between -10 and 10.'
     );
+    // A switched-off adapter is not validated: the kept selection must not block inpainting.
+    expect(() =>
+      compile(animaModel, 'inpaint', {
+        settings: {
+          animaInpaintAdapterEnabled: false,
+          animaInpaintAdapterModel: { ...inpaintAdapter, cond_in_channels: 3 },
+          animaInpaintAdapterWeight: 10.5,
+        },
+      })
+    ).not.toThrow();
     // Installs that predate `cond_in_channels` are inpaint adapters (legacy isAnimaInpaintControlNetModelConfig).
     expect(() =>
       compile(animaModel, 'inpaint', {
@@ -1241,7 +1939,33 @@ describe('compileCanvasGraph — PiD decode', () => {
         .filter((edge) => edge.destination.node_id === targetNodeId)
         .map((edge) => [edge.destination.field, [graph.nodes[edge.source.node_id]?.type, edge.source.field]])
     );
-  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, qwenImageModel, zImageModel];
+  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, flux3Model, qwenImageModel, zImageModel];
+  const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
+
+  it('lays MOSS-Image regions out at the PiD generation size, which is smaller than the canvas', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        {
+          autoNegative: false,
+          id: 'r1',
+          maskBounds: { height: 256, width: 192, x: 64, y: 128 },
+          maskImageName: 'r1-mask.png',
+          negativePrompt: null,
+          positivePrompt: 'a cat',
+          referenceImages: [],
+        },
+      ],
+      settings: { ...pidSettings(mossImageModel, 'native'), positivePrompt: 'a market street' },
+    });
+
+    // Native PiD generates a quarter of the 768×1024 bbox and decodes it back up.
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 256, width: 192 });
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({
+      height: 256,
+      regions: [{ bbox: [16, 32, 64, 96], caption: 'a cat', kind: 'object' }],
+      width: 192,
+    });
+  });
 
   it('txt2img fit: the PiD chain replaces the VAE decode and a resize back to the bbox owns canvas_output', () => {
     const { backendGraph } = compile(sdxlModel, 'txt2img', { settings: pidSettings(sdxlModel, 'fit') });
@@ -1304,7 +2028,7 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(getNodeByType(backendGraph, 'core_metadata')?.width).toBe(bbox.width);
   });
 
-  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode reads', () => {
+  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode records', () => {
     const { backendGraph } = compile(sdxlModel, 'img2img', { settings: pidSettings(sdxlModel, 'fit'), strength: 0.5 });
 
     const encode = backendGraph.nodes.canvas_i2l;
@@ -1352,6 +2076,26 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(backendGraph.nodes.canvas_processing_output).toBeUndefined();
   });
 
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes and PiD decodes with the VAE override', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), vae: sdxlVae },
+    });
+
+    expect(backendGraph.nodes.vae_loader?.vae_model).toEqual(sdxlVae);
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'vae_loader' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('vae_loader');
+  });
+
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes through the seamless VAE when tiling', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), seamlessXAxis: true, seamlessYAxis: true },
+    });
+
+    expect(backendGraph.nodes.seamless).toMatchObject({ seamless_x: true, seamless_y: true });
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'seamless' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('seamless');
+  });
+
   it.each(PID_BASES)('resolves the encode VAE for a $base native img2img', (model) => {
     const { backendGraph } = compile(model, 'img2img', {
       settings: { ...COMPONENT_OVERRIDES[model.base], ...pidSettings(model, 'native') },
@@ -1395,9 +2139,10 @@ describe('compileCanvasGraph — PiD decode', () => {
 });
 
 describe('compileCanvasGraph — regional guidance', () => {
-  const region = (id: string, overrides: Partial<RegionalGuidanceInput> = {}) => ({
+  const region = (id: string, overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanceInput => ({
     autoNegative: false,
     id,
+    maskBounds: { height: 256, width: 192, x: 64, y: 128 },
     maskImageName: `${id}-mask.png`,
     negativePrompt: null,
     positivePrompt: 'a cat',
@@ -1452,6 +2197,113 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(getEdge(backendGraph, 'neg_cond_collect', 'item')?.source.node_id).toBe('neg_cond');
   });
 
+  describe.each([
+    ['Z-Image', zImageModel, 'z_image_text_encoder', 'qwen3_encoder'],
+    ['Anima', animaModel, 'anima_text_encoder', 'qwen3_encoder'],
+    ['Krea-2', krea2Model, 'krea2_text_encoder', 'qwen3_vl_encoder'],
+  ] as const)('%s regional negatives', (_label, model, encoderType, encoderField) => {
+    it('collects masked negatives and inverted positives alongside the global negative', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [
+          region('r1', { autoNegative: true, negativePrompt: 'blurry' }),
+          region('r2', { negativePrompt: 'text', positivePrompt: null }),
+        ],
+        settings: { cfgScale: 4 },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r2).toMatchObject({ prompt: 'text', type: encoderType });
+      expect(graph.nodes.rg_pos_cond_r2).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(getEdge(graph, 'rg_neg_cond_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_neg_cond_r2', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r2');
+      expect(getEdge(graph, 'rg_invert_mask_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_pos_cond_inverted_r1', 'mask')?.source.node_id).toBe('rg_invert_mask_r1');
+      for (const nodeId of ['rg_neg_cond_r1', 'rg_neg_cond_r2', 'rg_pos_cond_inverted_r1']) {
+        expect(getEdge(graph, nodeId, encoderField)?.source.node_id).toBe('model_loader');
+      }
+      expect(
+        graph.edges.filter((edge) => edge.destination.node_id === 'neg_cond_collect').map((edge) => edge.source.node_id)
+      ).toEqual(['neg_cond', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1', 'rg_neg_cond_r2']);
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+        field: 'collection',
+        node_id: 'neg_cond_collect',
+      });
+    });
+
+    it('does not encode regional negatives or auto-negatives while CFG is off', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+        settings: { cfgScale: 1 },
+      });
+
+      expect(graph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r1).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
+      expect(graph.nodes.rg_invert_mask_r1).toBeUndefined();
+      expect(graph.nodes.neg_cond_collect).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    });
+  });
+
+  // The canvas settings and the region collector decide from the support row which regional negatives a graph keeps,
+  // so the row has to agree with where each base graph actually has a negative collector.
+  const modelsByBase: Record<string, MainModelConfig> = Object.fromEntries(
+    [sd1Model, sd2Model, sdxlModel, zImageModel, animaModel, krea2Model].map((model) => [model.base, model])
+  );
+  // Collected before capabilities are seeded, so straight from the fixture the tests run against.
+  const negativeMaskBases = [
+    ...new Set(
+      architectureCapabilitiesFixture
+        .filter((row) => row.features.supports_regional_guidance && row.features.regional_negative)
+        .map((row) => row.base)
+    ),
+  ];
+
+  it('covers every mask base that reads regional negatives', () => {
+    expect(negativeMaskBases.length).toBeGreaterThan(0);
+    for (const base of negativeMaskBases) {
+      expect(modelsByBase[base], base).toBeDefined();
+    }
+  });
+
+  it.each(negativeMaskBases)('reads regional negatives on %s exactly at the CFG Scales its support names', (base) => {
+    const support = getRegionalGuidanceSupport(base);
+    expect(support).toMatchObject({ mode: 'masks', negativePrompt: true });
+    for (const cfgScale of [1, 1.5, 4]) {
+      const { backendGraph: graph } = compile(modelsByBase[base]!, 'txt2img', {
+        regionalGuidance: [region('r1', { negativePrompt: 'blurry' })],
+        settings: { cfgScale },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1 !== undefined, `cfg ${cfgScale}`).toBe(
+        areRegionalNegativesActive(support!, cfgScale)
+      );
+    }
+  });
+
+  it('copies both Anima-3.8B encoders to regional negatives and auto-negatives', () => {
+    const { backendGraph: graph } = compile({ ...animaModel, variant: 'anima_qwen35' }, 'txt2img', {
+      regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+      settings: {
+        cfgScale: 4,
+        qwen35EncoderModel: {
+          base: 'any',
+          key: 'qwen35',
+          name: 'Qwen3.5 4B',
+          type: 'qwen3_5_encoder',
+          variant: 'qwen3_5_4b',
+        },
+      },
+    });
+
+    for (const nodeId of ['rg_pos_cond_r1', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1']) {
+      for (const field of ['qwen3_encoder', 'qwen3_5_encoder']) {
+        expect(getEdge(graph, nodeId, field)?.source).toEqual({ field, node_id: 'model_loader' });
+      }
+    }
+  });
+
   it('coexists with control layers in one graph', () => {
     const control: ControlLayerGraphInput = {
       beginEndStepPct: [0, 0.75],
@@ -1476,6 +2328,56 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('joins regional FLUX Redux references to the collector the builder feeds from the global ones', () => {
+    const reduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' } as const;
+    const { backendGraph } = compile(fluxModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', {
+          referenceImages: [
+            {
+              id: 'regional',
+              imageName: 'regional-redux.png',
+              model: reduxModel,
+              settings: { downsampling_factor: 1, weight: 1 },
+              type: 'flux_redux',
+            },
+          ],
+        }),
+      ],
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'global-redux.png', width: 512 } } },
+              imageInfluence: 'medium',
+              model: reduxModel,
+              type: 'flux_redux',
+            },
+            id: 'global',
+            isEnabled: true,
+          },
+        ],
+      },
+    });
+    const reduxInputs = backendGraph.edges.filter(
+      (edge) => edge.destination.node_id === 'denoise_latents' && edge.destination.field === 'redux_conditioning'
+    );
+
+    expect(reduxInputs).toHaveLength(1);
+    const builderCollector = reduxInputs[0]!.source.node_id;
+    expect(builderCollector).toMatch(/^flux_redux_collector_/);
+    expect(backendGraph.nodes.regional_flux_redux_collector).toBeUndefined();
+    expect(getEdge(backendGraph, builderCollector, 'item')).toBeDefined();
+    expect(
+      backendGraph.edges.some(
+        (edge) =>
+          edge.source.node_id === 'flux_redux_regional' &&
+          edge.source.field === 'redux_cond' &&
+          edge.destination.node_id === builderCollector
+      )
+    ).toBe(true);
   });
 
   it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {
@@ -1510,6 +2412,385 @@ describe('compileCanvasGraph — regional guidance', () => {
       .filter((edge) => edge.destination.node_id === 'pos_cond_collect' && edge.destination.field === 'item')
       .map((edge) => edge.source.node_id);
     expect(collectedSources).toEqual(['krea2_seed_variance', 'rg_krea2_r1_seed_variance', 'rg_krea2_r2_seed_variance']);
+  });
+
+  it('places MOSS-Image regions as layout boxes at the denoise size instead of masking conditioning', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', { layout: { kind: 'text', text: 'SALE' }, positivePrompt: 'a red banner' }),
+        region('r2', { layout: { kind: 'character' }, maskBounds: { height: 64, width: 32, x: 0, y: 0 } }),
+      ],
+      // The bbox is 768×1024, so x doubles and y stays.
+      scaling: { height: 1024, method: 'manual', width: 1536 },
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 1024, width: 1536 });
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({
+      height: 1024,
+      regions: [
+        { bbox: [128, 128, 512, 384], caption: 'a red banner', kind: 'text', text: 'SALE' },
+        { bbox: [0, 0, 64, 64], caption: 'a cat', kind: 'character' },
+      ],
+      type: 'moss_image_layout_prompt',
+      width: 1536,
+    });
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('clamps MOSS-Image boxes to the image, sends text only for text regions, and leaves out what it cannot place', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+        region('stale-text', { layout: { kind: 'character', text: 'kept for a switch back' } }),
+        // alphaBounds reports a mask that misses the bbox as an empty rect.
+        region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+        region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+        region('blank-text', { layout: { kind: 'text', text: ' ' } }),
+        region('no-caption', { positivePrompt: null }),
+      ],
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([
+      { bbox: [700, 0, 768, 80], caption: 'a cat', kind: 'object' },
+      { bbox: [64, 128, 256, 384], caption: 'a cat', kind: 'character' },
+    ]);
+  });
+
+  it('places no region, even on a blank prompt, when no region can be placed', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } })],
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([]);
+  });
+
+  it('blocks MOSS-Image regions on a blank prompt unless a prompt template supplies one', () => {
+    expect(() =>
+      compile(mossImageModel, 'txt2img', { regionalGuidance: [region('r1')], settings: { positivePrompt: ' ' } })
+    ).toThrow(
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [region('r1')],
+      settings: {
+        positivePrompt: '',
+        promptTemplate: { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' },
+      },
+    });
+    expect(backendGraph.nodes.layout_prompt).toBeDefined();
+  });
+
+  it('keeps fractional MOSS-Image boxes when the processing grid rounds the bbox', () => {
+    // A 1000×1000 bbox denoises at 1008×1008 on the 16 px grid, so every edge scales by 1.008.
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      bbox: { height: 1000, width: 1000, x: 0, y: 0 },
+      regionalGuidance: [region('r1', { maskBounds: { height: 250, width: 500, x: 100, y: 250 } })],
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1008, width: 1008 });
+    const [element] = backendGraph.nodes.layout_prompt!.regions as { bbox: number[] }[];
+    expect(element?.bbox).toEqual([
+      expect.closeTo(100.8, 9),
+      expect.closeTo(252, 9),
+      expect.closeTo(604.8, 9),
+      expect.closeTo(504, 9),
+    ]);
+  });
+
+  it('leaves a mask base unchanged by a layout role stored for MOSS-Image', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const plain = compile(zImageModel, 'txt2img', { regionalGuidance: [region('r1')] }).backendGraph;
+      const withRole = compile(zImageModel, 'txt2img', {
+        regionalGuidance: [region('r1', { layout: { kind: 'text' } })],
+      }).backendGraph;
+
+      expect(withRole.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'z_image_text_encoder' });
+      expect(withRole).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('writes the MOSS-Image layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...mossImageModel, hash: 'blake3:moss' };
+    // Every kind, a box that starts on the bbox edge and one that ends on it, and multi-line visible text.
+    const regions = [
+      region('sign', {
+        layout: { kind: 'text', text: '一杯温暖\n一刻从容' },
+        maskBounds: { height: 256, width: 512, x: 0, y: 0 },
+        positivePrompt: 'a hand-lettered cafe sign',
+      }),
+      region('barista', { layout: { kind: 'character' }, positivePrompt: 'a barista pouring latte art' }),
+      region('cup', {
+        layout: { kind: 'object', text: 'kept for a switch back' },
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a steaming ceramic cup',
+      }),
+    ];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a cozy cafe interior, morning light' };
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the MOSS-Image layout graph tests.',
+      inpaint: { ...inpaint, id: 'moss_image_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'moss_image_layout_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/mossImageLayoutCanvasGraphs.json'
+    );
+  });
+
+  it('routes a MOSS-Image canvas prompt without regions through the layout node at the denoise size', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img');
+
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1024, regions: [], width: 768 });
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
+  });
+
+  it('places Ideogram 4 regions on the caption builder as boxes normalized to the 768×1024 bbox', () => {
+    const { backendGraph } = compile(ideogram4Model, 'txt2img', {
+      regionalGuidance: [
+        // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+        region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+        // Starts above the bbox and ends past its right edge.
+        region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+        // Ideogram has no text elements: the stored role stays on the layer, the region is placed as an object.
+        region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+        region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+        region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+        region('no-prompt', { positivePrompt: null }),
+        region('blank-prompt', { positivePrompt: ' ' }),
+      ],
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.caption_builder?.regions).toEqual([
+      { bbox: [10, 130, 498, 521], prompt: 'a red kite' },
+      { bbox: [0, 911, 78, 1000], prompt: 'a cat' },
+      { bbox: [125, 83, 375, 333], prompt: 'a shop sign' },
+    ]);
+    // The global prompt still reaches the caption through the batchable prompt node; no mask is encoded.
+    expect(getEdge(backendGraph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'ideogram4_caption')?.source.node_id).toBe('caption_builder');
+  });
+
+  it('leaves the Ideogram 4 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(ideogram4Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(ideogram4Model, 'txt2img', {
+        regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.caption_builder).not.toHaveProperty('regions');
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('blocks Ideogram 4 regions on a blank prompt', () => {
+    expect(() =>
+      compile(ideogram4Model, 'txt2img', { regionalGuidance: [region('r1')], settings: { positivePrompt: '' } })
+    ).toThrow(
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('writes the Ideogram 4 regional canvas graph the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...ideogram4Model, hash: 'blake3:ideogram4' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges.
+    const regions = [
+      region('kite', { maskBounds: { height: 256, width: 384, x: 192, y: 64 }, positivePrompt: 'a red kite' }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    let txt2img: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { positivePrompt: 'a beach at noon' },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the Ideogram 4 regional graph tests.',
+      txt2img: { ...txt2img, id: 'ideogram4_regional_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/ideogram4RegionalCanvasGraphs.json'
+    );
+  });
+
+  /** FLUX.3 regions on the 768×1024 bbox; `FLUX3_ROWS` are the rows the first three become. */
+  const flux3Regions = () => [
+    // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+    region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+    // Starts above the bbox and ends past its right edge.
+    region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+    // FLUX.3 places objects only: the stored role stays on the layer, the region is placed as an object.
+    region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+    // One pixel in the corner rounds to [0, 0, 1, 1], which FLUX.3 reads as 0–1 fractions.
+    region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+    region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+    region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+    region('no-prompt', { positivePrompt: null }),
+    region('blank-prompt', { positivePrompt: ' ' }),
+  ];
+  const FLUX3_ROWS = [
+    { bbox: [10, 130, 498, 521], desc: 'a red kite' },
+    { bbox: [0, 911, 78, 1000], desc: 'a cat' },
+    { bbox: [125, 83, 375, 333], desc: 'a shop sign' },
+  ];
+
+  it('fills the FLUX.3 layout prompt with boxes normalized to the 768×1024 bbox and records the caption', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+    // Without reference images FLUX.3 does not edit, so the boxes stay object rows; no mask is encoded.
+    expect(backendGraph.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    // Recall restores the prompt the user typed.
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('places FLUX.3 boxes on the bbox when the canvas generates at a scaled size', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      scaling: { height: 768, method: 'manual', width: 576 },
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 576 });
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('leaves the FLUX.3 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(flux3Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(flux3Model, 'txt2img', {
+        regionalGuidance: [
+          region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+          region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+        ],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+      expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...flux3Model, hash: 'blake3:flux3' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges; quotes and non-ASCII text
+    // travel inside the JSON the node writes.
+    const regions = [
+      region('kite', {
+        maskBounds: { height: 256, width: 384, x: 192, y: 64 },
+        positivePrompt: 'a red kite reading "Éole"',
+      }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    // With a reference image FLUX.3 edits, and the boxes say where new content goes in the output.
+    const reference = {
+      config: {
+        image: { original: { image: { height: 768, image_name: 'beach.png', width: 512 } } },
+        type: 'flux2_reference_image' as const,
+      },
+      id: 'beach',
+      isEnabled: true,
+    };
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let edit: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+      edit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...settings, referenceImages: [reference] },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the FLUX.3 layout graph tests.',
+      edit: { ...edit, id: 'flux3_layout_canvas_edit' },
+      inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/flux3LayoutCanvasGraphs.json'
+    );
   });
 });
 
@@ -1592,6 +2873,7 @@ describe('compileCanvasGraph — SDXL Refiner', () => {
         {
           autoNegative: false,
           id: 'r1',
+          maskBounds: { height: 64, width: 64, x: 0, y: 0 },
           maskImageName: 'r1-mask.png',
           negativePrompt: null,
           positivePrompt: 'a cat',
@@ -1741,5 +3023,67 @@ describe('compileCanvasGraph — Krea-2 style reference', () => {
     expect(backendGraph.edges.find((edge) => edge.destination.field === 'style_reference')?.source.node_id).toBe(
       styleReference?.id
     );
+  });
+});
+
+describe('compileCanvasGraph — Krea-2 edit references', () => {
+  const editReference = (imageName: string, isEnabled = true) => ({
+    config: {
+      image: { original: { image: { height: 768, image_name: imageName, width: 512 } } },
+      type: 'krea2_edit_reference_image' as const,
+    },
+    id: imageName,
+    isEnabled,
+  });
+  const region: RegionalGuidanceInput = {
+    autoNegative: false,
+    id: 'r1',
+    maskBounds: { height: 256, width: 192, x: 64, y: 128 },
+    maskImageName: 'r1-mask.png',
+    negativePrompt: null,
+    positivePrompt: 'a cat',
+    referenceImages: [],
+  };
+
+  it('inpaints with the edit references alongside the encoded canvas image', () => {
+    const { backendGraph } = compile(krea2Model, 'inpaint', {
+      settings: { referenceImages: [editReference('pose.png'), editReference('depth.png')] },
+    });
+    const referenceEncoders = Object.values(backendGraph.nodes).filter(
+      (node) => node.type === 'qwen_image_i2l' && node.reference === true
+    );
+
+    // The canvas image is still what gets denoised under the mask; the references only join as clean tokens.
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')?.source.node_id).toBe('canvas_i2l');
+    expect(backendGraph.nodes.canvas_i2l).not.toHaveProperty('reference');
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')).toBeDefined();
+    expect(referenceEncoders.map((node) => node.image)).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    expect(backendGraph.nodes.pos_cond?.reference_images).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+  });
+
+  it('refuses edit references together with regional guidance, which the denoise cannot place them in', () => {
+    expect(() =>
+      compile(krea2Model, 'txt2img', {
+        regionalGuidance: [region],
+        settings: { referenceImages: [editReference('pose.png')] },
+      })
+    ).toThrow(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
+
+    const { backendGraph } = compile(krea2Model, 'txt2img', {
+      regionalGuidance: [region],
+      settings: { referenceImages: [editReference('pose.png', false)] },
+    });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toBeDefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeUndefined();
   });
 });

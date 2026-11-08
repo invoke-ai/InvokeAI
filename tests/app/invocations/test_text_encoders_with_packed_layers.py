@@ -21,8 +21,10 @@ from invokeai.app.invocations.text_encoder.flux2_dev_text_encoder import Flux2De
 from invokeai.app.invocations.text_encoder.flux2_klein_text_encoder import Flux2KleinTextEncoderInvocation
 from invokeai.app.invocations.text_encoder.flux_text_encoder import FluxTextEncoderInvocation
 from invokeai.app.invocations.text_encoder.ideogram4_text_encoder import Ideogram4TextEncoderInvocation
+from invokeai.app.invocations.text_encoder.ltx2_text_encoder import LTX2TextEncoderInvocation
 from invokeai.app.invocations.text_encoder.sd3_text_encoder import Sd3TextEncoderInvocation
 from invokeai.app.invocations.text_encoder.z_image_text_encoder import ZImageTextEncoderInvocation
+from invokeai.backend.ltx2.text_conditioning import estimate_tower_working_memory
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -247,3 +249,75 @@ def test_a_gguf_encoder_reserves_its_dequant_transient(node_name: str, kind: str
         assert encoder.working_mem_bytes is not None and encoder.working_mem_bytes > 128 * 64 * 2
     else:
         assert not encoder.working_mem_bytes
+
+
+@pytest.mark.parametrize("kind", ["gguf", "dense"])
+def test_the_wan_node_reserves_a_gguf_encoders_dequant_transient(kind: str) -> None:
+    """Wan's UMT5 encoder became loadable from GGUF. Kept out of the table above because this node
+    tokenizes before it loads the encoder."""
+    from invokeai.app.invocations.text_encoder.wan_text_encoder import WanTextEncoderInvocation
+
+    model_format = ModelFormat.GGUFQuantized if kind == "gguf" else ModelFormat.WanT5Encoder
+    encoder = _LoadedModel(_encoder(kind), model_format)
+    encoder.stop_on_device = True
+    context = MagicMock()
+    context.models.load.side_effect = [_LoadedModel(MagicMock()), encoder]
+    node = WanTextEncoderInvocation.model_construct(
+        prompt="a prompt", wan_t5_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace())
+    )
+
+    with pytest.raises(_StopOnDevice):
+        node._encode(context)
+
+    if kind == "gguf":
+        assert encoder.working_mem_bytes is not None and encoder.working_mem_bytes > 128 * 64 * 2
+    else:
+        assert not encoder.working_mem_bytes
+
+
+@pytest.mark.parametrize("kind", ["gguf", "nvfp4", "dense"])
+def test_the_ltx2_tower_reserves_a_gguf_transient_on_top_of_its_estimate(kind: str) -> None:
+    """LTX-2 reserves its measured tower estimate for every build. It was measured on the int8 tower, so a
+    module-quantized tower's dequant transient is already in it (nvfp4 stands in here); only a GGUF tower,
+    which dequantizes through its weights instead, adds one on top."""
+    model_format = ModelFormat.GGUFQuantized if kind == "gguf" else ModelFormat.Checkpoint
+    tower = _LoadedModel(_encoder(kind), model_format)
+    tower.stop_on_device = True
+    context = MagicMock()
+    context.models.load.side_effect = [tower, _LoadedModel(object())]
+    node = LTX2TextEncoderInvocation.model_construct(
+        prompt="a prompt",
+        max_sequence_length=1024,
+        text_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace()),
+    )
+
+    with pytest.raises(_StopOnDevice):
+        node._encode_with_tower(context, ["a prompt"])
+
+    estimate = estimate_tower_working_memory(tower.model, 1024)
+    if kind == "gguf":
+        # At least the bfloat16 copy of the one packed 128x64 weight.
+        assert tower.working_mem_bytes is not None and tower.working_mem_bytes - estimate > 128 * 64 * 2
+    else:
+        assert tower.working_mem_bytes == estimate
+
+
+@pytest.mark.parametrize("node_name", ["flux_t5", "sd3_t5"])
+def test_a_t5_that_keeps_fp8_weights_reserves_the_per_layer_cast_transient(node_name: str) -> None:
+    """A single-file fp8 T5 keeps float8 Linear weights resident and widens each per forward, a transient
+    the resident size does not cover."""
+    invocation_class, fields, encode = GGUF_ONLY_NODES[node_name]
+    t5 = torch.nn.Module()
+    t5.proj = torch.nn.Linear(64, 128, bias=False)
+    t5.proj.weight = torch.nn.Parameter(t5.proj.weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    encoder = _LoadedModel(t5)
+    encoder.stop_on_device = True
+    context = MagicMock()
+    context.models.load.side_effect = [encoder, _LoadedModel(object())]
+    node = invocation_class.model_construct(prompt="a prompt", t5_max_seq_len=512, **fields)
+
+    with pytest.raises(_StopOnDevice):
+        encode(node, context)
+
+    # At least the 2-byte widened copy of the one 128x64 weight.
+    assert encoder.working_mem_bytes is not None and encoder.working_mem_bytes >= 128 * 64 * 2

@@ -141,6 +141,19 @@ describe('joining a project for a member', () => {
     expect(loaded.workflows.activeWorkflowId).toBe(project.workflows.entries[0]!.document.id);
     expect(loaded.workflows.entries.some((entry) => entry.lastRun)).toBe(false);
     expect(loaded.name).toBe(project.name);
+    // A member's first open is a new workspace: Auto-switch starts In progress, not a stored project's Off.
+    expect(loaded.settings.viewerAutoSwitch).toBe('progress');
+  });
+
+  it('keeps the Auto-switch mode a workspace saved, across a split and a join', () => {
+    const project = workedOnProject();
+    const { content, workspace } = splitProjectDocument(
+      serializeProjectDocumentV3({ ...project, settings: { ...project.settings, viewerAutoSwitch: 'latest' } })
+    );
+
+    const joined = join({ content, workspace });
+
+    expect(load((joined as { document: Record<string, unknown> }).document).settings.viewerAutoSwitch).toBe('latest');
   });
 
   it('falls back to the first workflow when the open one was deleted meanwhile', () => {
