@@ -1,0 +1,478 @@
+---
+/*
+ * The Model Manager (`invokeai/frontend/webv2/src/features/models/ui/ModelManagerView.tsx`) as an annotated app
+ * sketch, on its Add Models tab with one starter bundle chosen. Text is drawn as skeleton bars, so the sketch needs no
+ * translation; the callouts passed as children name the controls.
+ *
+ * Layout follows the app at roughly 1 stage unit per pixel of a narrow window: the library column
+ * (`manager/LibraryColumn.tsx`) with its header and maintenance menu, search and filter bar, select-all bar and model
+ * rows (cover, name, base and format badges, size); the detail pane (`manager/DetailPane.tsx`) with its three tabs;
+ * the Add Models view (`add-models/AddModelsView.tsx`): the search-or-add field, the models-folder scan row, the
+ * bundle chips with the starter filter menu, the selected bundle's Install bundle bar and starter rows with Install
+ * buttons or an Installed badge; and the collapsed install queue (`install-queue/InstallQueueBar.tsx`) under the
+ * detail pane.
+ */
+import Box from '@lucide/astro/icons/box';
+import Check from '@lucide/astro/icons/check';
+import ChevronUp from '@lucide/astro/icons/chevron-up';
+import Download from '@lucide/astro/icons/download';
+import Ellipsis from '@lucide/astro/icons/ellipsis';
+import Folder from '@lucide/astro/icons/folder';
+import FolderSearch from '@lucide/astro/icons/folder-search';
+import KeyRound from '@lucide/astro/icons/key-round';
+import Pause from '@lucide/astro/icons/pause';
+import Plus from '@lucide/astro/icons/plus';
+import Search from '@lucide/astro/icons/search';
+import SlidersHorizontal from '@lucide/astro/icons/sliders-horizontal';
+import X from '@lucide/astro/icons/x';
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from '../whats-new/box';
+import Annotated from './Annotated.astro';
+
+type Props = {
+  /** Names the sketch for screen readers. */
+  label: string;
+};
+
+const { label } = Astro.props;
+
+const WIDTH = 640;
+const HEIGHT = 400;
+const sk = (width: number) => `--sk: ${width}`;
+
+// Library column.
+const LIBRARY = 224;
+const libraryRows = [
+  { name: 84, hue: 265, crop: 'object-position: 20% 50%; scale: 1.8' },
+  { name: 70, hue: 42, crop: 'object-position: 70% 50%; scale: 2.4' },
+  { name: 96, hue: 180 },
+  { name: 62, hue: 265, crop: 'object-position: 45% 50%' },
+  { name: 78, hue: 317 },
+  { name: 88, hue: 42, crop: 'object-position: 85% 40%; scale: 2' },
+];
+const libraryRowTop = (index: number) => 98 + index * 46;
+
+// Detail pane: 12 units of padding inside it.
+const left = LIBRARY + 12;
+const right = WIDTH - 12;
+const chips = [
+  { w: 18, count: 14 },
+  { w: 30, count: 10 },
+  { w: 24, count: 10 },
+  { w: 30, count: 12, selected: true },
+  { w: 34, count: 8 },
+];
+const starterRows = [
+  { name: 112, description: 220, installed: false },
+  { name: 86, description: 196, installed: true },
+  { name: 128, description: 236, installed: false },
+  { name: 74, description: 180, installed: false },
+];
+const starterRowTop = (index: number) => 166 + index * 46;
+const QUEUE_TOP = 356;
+---
+
+<Annotated label={label} width={WIDTH} height={HEIGHT}>
+  <Fragment slot="sketch">
+    <div class="window wn-abs" style={box(0, 0, WIDTH, HEIGHT)}>
+      <!-- Library column -->
+      <div class="wn-abs rule" style={`${box(0, 0, LIBRARY, HEIGHT)}; border-right-width: 1px`}></div>
+      <div class="wn-abs rule" style={`${box(0, 0, LIBRARY, 34)}; border-bottom-width: 1px`}></div>
+      <div class="wn-abs row" style={box(12, 0, 120, 34)}>
+        <i class="sk sk--title" style={sk(44)}></i><i class="sk" style={sk(12)}></i>
+      </div>
+      <div class="wn-abs icon-button icon-button--ghost" style={box(196, 7, 20, 20)}><Ellipsis /></div>
+
+      <div class="wn-abs field" style={box(12, 42, 174, 22)}><Search /><i class="sk" style={sk(64)}></i></div>
+      <div class="wn-abs icon-button" style={box(192, 42, 22, 22)}><SlidersHorizontal /></div>
+
+      <div class="wn-abs row select-bar" style={box(12, 70, LIBRARY - 24, 22)}>
+        <span class="checkbox"></span><i class="sk" style={sk(34)}></i>
+      </div>
+
+      {
+        libraryRows.map(({ name, hue, crop }, index) => (
+          <div
+            class:list={['wn-abs row list-row', { 'list-row--active': index === 0 }]}
+            style={box(8, libraryRowTop(index), LIBRARY - 16, 44)}
+          >
+            <span class="cover">{crop ? <Image src={landscape} alt="" width={96} class="fill" style={crop} /> : <Box />}</span>
+            <span class="body">
+              <i class="sk sk--strong" style={sk(name)} />
+              <span class="row badges">
+                <span class="badge" style={`--hue: ${hue}`}>
+                  <i class="sk" style={sk(22)} />
+                </span>
+                <span class="badge">
+                  <i class="sk" style={sk(18)} />
+                </span>
+              </span>
+            </span>
+            <i class="sk" style={sk(24)} />
+          </div>
+        ))
+      }
+
+      <!-- Detail pane tabs -->
+      <div class="wn-abs rule" style={`${box(LIBRARY, 0, WIDTH - LIBRARY, 34)}; border-bottom-width: 1px`}></div>
+      <div class="wn-abs row tab" style={box(left, 0, 64, 34)}><Box /><i class="sk" style={sk(44)}></i></div>
+      <div class="wn-abs row tab tab--active" style={box(312, 0, 68, 34)}>
+        <Plus /><i class="sk sk--strong" style={sk(48)}></i>
+      </div>
+      <div class="wn-abs row tab" style={box(416, 0, 52, 34)}><KeyRound /><i class="sk" style={sk(34)}></i></div>
+
+      <!-- Search or add -->
+      <div class="wn-abs field field--large" style={box(left, 46, 364, 26)}>
+        <Search /><i class="sk" style={sk(220)}></i>
+      </div>
+
+      <!-- Models folder scan -->
+      <div class="wn-abs row outline-button" style={box(left, 80, 98, 20)}>
+        <FolderSearch /><i class="sk" style={sk(62)}></i>
+      </div>
+      <i class="wn-abs sk sk--mono" style={box(left + 106, 88, 120, 3.5)}></i>
+
+      <!-- Bundle chips and the starter filter menu -->
+      <div class="wn-abs row chips" style={box(left, 108, 320, 22)}>
+        {
+          chips.map(({ w, count, selected }) => (
+            <span class:list={['row chip', { 'chip--selected': selected }]}>
+              <Folder />
+              <i class="sk" style={sk(w)} />
+              <span class="count">{count}</span>
+            </span>
+          ))
+        }
+      </div>
+      <div class="wn-abs icon-button" style={box(right - 22, 108, 22, 22)}><SlidersHorizontal /></div>
+
+      <!-- Selected bundle bar -->
+      <i class="wn-abs sk" style={box(left, 146, 150, 3.5)}></i>
+      <div class="wn-abs row outline-button" style={box(right - 80, 138, 80, 20)}>
+        <Download /><i class="sk sk--strong" style={sk(48)}></i>
+      </div>
+
+      <!-- Starter rows -->
+      {
+        starterRows.map(({ name, description, installed }, index) => (
+          <div class="wn-abs row starter-row" style={box(left, starterRowTop(index), right - left, 46)}>
+            <span class="body">
+              <span class="row">
+                <i class="sk sk--strong" style={sk(name)} />
+                <span class="badge" style="--hue: 265">
+                  <i class="sk" style={sk(22)} />
+                </span>
+                <span class="badge">
+                  <i class="sk" style={sk(26)} />
+                </span>
+              </span>
+              <i class="sk" style={sk(description)} />
+            </span>
+            {installed ? (
+              <span class="row installed">
+                <Check />
+                <i class="sk" style={sk(30)} />
+              </span>
+            ) : (
+              <span class="row outline-button">
+                <Download />
+                <i class="sk sk--strong" style={sk(26)} />
+              </span>
+            )}
+          </div>
+        ))
+      }
+
+      <!-- Install queue, collapsed -->
+      <div class="wn-abs rule queue" style={`${box(LIBRARY, QUEUE_TOP, WIDTH - LIBRARY, HEIGHT - QUEUE_TOP)}; border-top-width: 1px`}></div>
+      <div class="wn-abs row queue-row" style={box(left, QUEUE_TOP, right - left, HEIGHT - QUEUE_TOP)}>
+        <ChevronUp /><i class="sk sk--title" style={sk(62)}></i>
+        <i class="sk" style={sk(70)}></i>
+        <span class="progress"><span></span></span>
+        <i class="spacer"></i>
+        <Pause /><X />
+      </div>
+    </div>
+  </Fragment>
+  <slot />
+</Annotated>
+
+<style>
+  .window {
+    overflow: hidden;
+    border-radius: inherit;
+    background-color: var(--wn-panel);
+    color: var(--wn-ink);
+    font-size: calc(var(--u) * 8);
+  }
+
+  /* Lucide icons size from `--i`, in stage units, set by the context that holds them. */
+  .window :global(.lucide) {
+    flex: none;
+    width: calc(var(--u) * var(--i, 9));
+    height: calc(var(--u) * var(--i, 9));
+    stroke-width: 2;
+  }
+
+  .rule {
+    border: 0 solid var(--wn-line);
+  }
+
+  .row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    white-space: nowrap;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  /* Skeleton text, `--sk` units wide. */
+  .sk {
+    flex: none;
+    width: calc(var(--u) * var(--sk));
+    height: calc(var(--u) * 3.5);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-faint);
+  }
+
+  .wn-abs.sk {
+    width: calc(var(--u) * var(--w));
+    height: calc(var(--u) * var(--h));
+  }
+
+  .sk--strong {
+    background-color: color-mix(in oklab, var(--wn-strong) 45%, transparent);
+  }
+
+  .sk--title {
+    background-color: color-mix(in oklab, var(--wn-strong) 55%, transparent);
+  }
+
+  .sk--mono {
+    border-radius: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--wn-faint) 0 calc(var(--u) * 5),
+      transparent 0 calc(var(--u) * 6)
+    );
+    background-color: transparent;
+  }
+
+  .field {
+    --i: 8;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    padding-inline: calc(var(--u) * 8);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .field--large {
+    --i: 9;
+    padding-inline: calc(var(--u) * 10);
+  }
+
+  .icon-button {
+    --i: 9;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    color: var(--wn-strong);
+  }
+
+  .icon-button--ghost {
+    border-color: transparent;
+  }
+
+  .outline-button {
+    --i: 8;
+    gap: calc(var(--u) * 5);
+    justify-content: center;
+    padding-inline: calc(var(--u) * 7);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    color: var(--wn-strong);
+  }
+
+  .select-bar {
+    gap: calc(var(--u) * 8);
+    padding-inline: calc(var(--u) * 8);
+    border-bottom: 1px solid var(--docs-border-subtle);
+  }
+
+  .checkbox {
+    flex: none;
+    width: calc(var(--u) * 12);
+    height: calc(var(--u) * 12);
+    border: 1px solid var(--docs-border-strong);
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .list-row {
+    gap: calc(var(--u) * 8);
+    padding-inline: calc(var(--u) * 6) calc(var(--u) * 8);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .list-row--active {
+    background-color: var(--wn-shown);
+  }
+
+  .cover {
+    --i: 13;
+    display: grid;
+    flex: none;
+    overflow: hidden;
+    place-items: center;
+    width: calc(var(--u) * 30);
+    height: calc(var(--u) * 30);
+    border: 1px solid var(--docs-border-subtle);
+    border-radius: calc(var(--u) * 5);
+    background-color: var(--wn-raised);
+  }
+
+  .fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--u) * 7);
+    min-width: 0;
+  }
+
+  .badges {
+    gap: calc(var(--u) * 3);
+  }
+
+  /* A base badge takes its family's hue; a format or type badge stays grey. */
+  .badge {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: calc(var(--u) * 11);
+    padding-inline: calc(var(--u) * 4);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 3);
+    background-color: var(--wn-raised);
+  }
+
+  .badge[style] {
+    border-color: oklch(65% 0.12 var(--hue) / 0.45);
+    background-color: oklch(65% 0.12 var(--hue) / 0.18);
+
+    .sk {
+      background-color: oklch(65% 0.12 var(--hue) / 0.7);
+    }
+  }
+
+  .tab {
+    --i: 8;
+    gap: calc(var(--u) * 5);
+    justify-content: center;
+  }
+
+  .tab--active {
+    box-shadow: inset 0 calc(var(--u) * -2) 0 var(--docs-accent);
+    color: var(--wn-strong);
+  }
+
+  .chips {
+    gap: calc(var(--u) * 5);
+    overflow: hidden;
+  }
+
+  .chip {
+    --i: 7;
+    gap: calc(var(--u) * 4);
+    height: calc(var(--u) * 22);
+    padding-inline: calc(var(--u) * 7) calc(var(--u) * 4);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-raised);
+  }
+
+  .chip--selected {
+    background-color: var(--wn-strong);
+    color: var(--wn-panel);
+
+    .sk {
+      background-color: color-mix(in oklab, var(--wn-panel) 70%, transparent);
+    }
+  }
+
+  .count {
+    display: grid;
+    place-items: center;
+    height: calc(var(--u) * 13);
+    padding-inline: calc(var(--u) * 3);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 3);
+    background-color: var(--wn-panel);
+    color: var(--wn-ink);
+    font-size: calc(var(--u) * 7);
+    font-weight: 600;
+  }
+
+  .starter-row {
+    gap: calc(var(--u) * 10);
+    border-bottom: 1px solid var(--docs-border-subtle);
+
+    .body .row {
+      gap: calc(var(--u) * 4);
+    }
+
+    .outline-button {
+      height: calc(var(--u) * 20);
+    }
+  }
+
+  .installed {
+    --i: 7;
+    gap: calc(var(--u) * 3);
+    height: calc(var(--u) * 14);
+    padding-inline: calc(var(--u) * 4);
+    border-radius: calc(var(--u) * 3);
+    background-color: oklch(65% 0.14 150 / 0.18);
+    color: oklch(65% 0.14 150);
+
+    .sk {
+      background-color: oklch(65% 0.14 150 / 0.7);
+    }
+  }
+
+  .queue-row {
+    --i: 9;
+    gap: calc(var(--u) * 8);
+    color: var(--wn-strong);
+  }
+
+  .progress {
+    display: block;
+    flex: none;
+    overflow: hidden;
+    width: calc(var(--u) * 100);
+    height: calc(var(--u) * 4);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-raised);
+
+    span {
+      display: block;
+      width: 62%;
+      height: 100%;
+      background-color: var(--docs-accent);
+    }
+  }
+</style>

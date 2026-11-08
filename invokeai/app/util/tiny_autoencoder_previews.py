@@ -9,19 +9,20 @@ from typing import TYPE_CHECKING
 import torch
 from PIL import Image
 
-from invokeai.app.util.step_callback import render_linear_preview
-from invokeai.backend.architectures import LatentSpace, resolve_latent_space
+from invokeai.app.util.step_callback import preview_frame, render_linear_preview
+from invokeai.backend.architectures import LatentSpace, latent_space_with_channels, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.tiny_autoencoder import is_tiny_autoencoder_supported
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 from invokeai.backend.tiny_autoencoder.preview import (
     decode_preview,
     decode_working_memory_bytes,
     select_tiny_autoencoder,
 )
-from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
 from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
@@ -49,6 +50,18 @@ RENDER_COST_INTERVAL_FACTOR = 20
 RENDER_COST_SMOOTHING = 0.5
 
 
+def tiny_autoencoder_starters(space: LatentSpace) -> list[StarterModel]:
+    """The starter models that install a TAE for `space`, read from the catalog by the TAE each one installs."""
+    starters = []
+    for starter in STARTER_MODELS:
+        if starter.type is not ModelType.TinyAutoencoder:
+            continue
+        named = named_tiny_autoencoder((starter.source,))
+        if named is not None and latent_space_with_channels(starter.base, named[2]) is space:
+            starters.append(starter)
+    return starters
+
+
 def _first_report(key: Hashable) -> bool:
     with _reported_lock:
         first = key not in _reported
@@ -58,7 +71,7 @@ def _first_report(key: Hashable) -> bool:
 
 @dataclass(frozen=True)
 class _HeldDecoder:
-    decoder: TaesdDecoder
+    decoder: TinyAutoencoderDecoder
     device: torch.device
 
 
@@ -126,7 +139,7 @@ class TinyAutoencoderPreviews:
             self._render_cost_s += RENDER_COST_SMOOTHING * (cost - self._render_cost_s)
 
     def render(self, base_model: BaseModelType, sample: torch.Tensor) -> tuple[Image.Image, tuple[int, int]]:
-        space = resolve_latent_space(base_model, sample)
+        space = resolve_latent_space(base_model, preview_frame(sample))
         if not self._disabled:
             try:
                 held = self._decoder_for(base_model, space, sample)
@@ -186,8 +199,8 @@ class TinyAutoencoderPreviews:
             return None
 
         decoder = loaded.model  # the very module the lock moves and yields
-        if not isinstance(decoder, TaesdDecoder):
-            raise TypeError(f"expected a TaesdDecoder, the loader returned {type(decoder).__name__}")
+        if not isinstance(decoder, TinyAutoencoderDecoder):
+            raise TypeError(f"expected a TinyAutoencoderDecoder, the loader returned {type(decoder).__name__}")
         # Reserved once, with the lock: a denoise keeps its size, so every later frame decodes the same.
         working_mem_bytes = decode_working_memory_bytes(decoder, sample)
         if not self._fits_in_vram(loaded, working_mem_bytes):
@@ -230,10 +243,12 @@ class TinyAutoencoderPreviews:
         return available >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
-        if is_tiny_autoencoder_supported(space):
+        starters = tiny_autoencoder_starters(space)
+        if starters:
+            install = " or ".join(f"the {s.name} starter model (listed under {s.base.value})" for s in starters)
             message = (
                 f"No installed Tiny AutoEncoder decodes {base_model.value} latents; using linear previews. "
-                "Install the matching Tiny AutoEncoder starter model."
+                f"Install {install}."
             )
         else:
             message = f"{base_model.value} has no Tiny AutoEncoder; using linear previews."

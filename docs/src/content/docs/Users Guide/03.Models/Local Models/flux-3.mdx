@@ -276,13 +276,13 @@ system prompts, captions of 237–305 tokens, the model already loaded, the defa
 The first expansion after a start also loads the model: it took 21.3 s instead of 13.0 s for the same caption with the
 bf16 model, and 45 s instead of 34 s with the int8 file. After int8 Compute was turned on, the first prompt with an
 image took about 8 s longer while the kernels were
-[tuned](/configuration/optimization/int8-compute/#the-first-generation-pauses) for its longer prompt; the tuning is kept
+[tuned](/configuration/optimization/int8-compute/#turning-it-on) for its longer prompt; the tuning is kept
 on disk.
 
 The bf16 model is fast only while all of it is on the GPU: what does not fit is streamed in for every token. On the same
 card with 5 GB of working memory and the same 1 GB reserve, only 89 % of it fit, and it generated 4.2 tokens/s instead
 of 21.3. To keep the model entirely on the GPU, lower
-[`device_working_mem_gb`](/configuration/optimization/low-vram-mode/#working-memory) (on the 4090, the default 3 GB
+[`device_working_mem_gb`](/configuration/optimization/low-vram-mode/#settings) (on the 4090, the default 3 GB
 left room for the bf16 model) or use the int8 file, which fit entirely in both runs.
 
 ComfyUI's w4a8 build and single files in fp8 scaled, nvfp4 or mxfp8 are refused at install, and a GGUF of the
