@@ -23,7 +23,7 @@ Baseline byte budgets record measurements only. Each byte ceiling is the lower o
 
 Reference modes:
 
-- PRs into `main` and merge groups targeting `main`: CI restores `main`'s own measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). Logs and reports name the restored reference.
+- PRs into `main` and merge groups targeting `main`: CI restores the exact base commit's measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). On a cache miss it checks out that pinned base separately, installs its dependencies and Node version, builds once, and records both build and browser resources. Base budget failures still permit recording, but missing, malformed, incompatible, or incomplete measurements stop the job. Both reference files must come from that base; older cached or candidate measurements cannot substitute. Logs and reports name the exact base SHA. Candidate completion gates retain their normal strict checks.
 - Local runs, pushes to `main`, stacked PRs without a reference: compare against committed measurements directly.
 - Every mode pins source-owner sets exactly: a module entering a route's initial graph fails at zero bytes.
 - Request counts have no allowance; cap is the lower of reference and committed counts.

@@ -9798,9 +9798,22 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(getActiveProject(state).queue.items[0]?.status).toBe('completed');
   });
 
-  it('submitCanvasInvocationSnapshot enqueues a pre-compiled graph bound for the canvas', () => {
+  it('enqueues a Canvas expansion with detached authored metadata and the actual sample seed for recall', () => {
+    const initial = createInitialWorkbenchState();
+    const canvas = structuredClone(getCanvas(initial));
+    canvas.document.bbox = { height: 48, width: 32, x: 17, y: 23 };
+    const recordedCanvas = {
+      controlModels: {},
+      document: canvas.document,
+      settings: { strength: 0.75 },
+      version: 1,
+    };
     const graph: GraphContract = {
-      backendGraph: { edges: [], id: 'canvas-backend-graph', nodes: {} },
+      backendGraph: {
+        edges: [],
+        id: 'canvas-backend-graph',
+        nodes: { metadata: { canvas_v3_metadata: recordedCanvas, id: 'metadata', type: 'core_metadata' } },
+      },
       edges: [],
       id: 'canvas-graph',
       label: 'Canvas',
@@ -9809,23 +9822,27 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       version: 1,
     };
 
-    const initial = createInitialWorkbenchState();
+    const values = createGenerateValues({
+      dynamicPromptsCombinatorial: false,
+      dynamicPromptsSampleSeed: 99,
+      negativePrompt: 'avoid blur',
+      positivePrompt: 'inpaint {red|green} cat',
+      seed: 42,
+      seedMode: 'fixed',
+    });
     const state = workbenchReducer(initial, {
       backendSupportsCancellation: true,
-      canvas: structuredClone(getCanvas(initial)),
+      canvas,
       destination: 'canvas',
       generate: {
         negativePromptNodeId: 'negative_prompt',
         positivePromptNodeId: 'positive_prompt',
         seedNodeId: 'seed',
-        values: createGenerateValues({
-          negativePrompt: 'avoid blur',
-          positivePrompt: 'inpaint prompt',
-          seed: 42,
-          seedMode: 'fixed',
-        }),
+        values,
       },
       graph,
+      positivePrompts: ['inpaint green cat'],
+      positivePromptsSampleSeed: 7,
       projectId: initial.activeProjectId,
       type: 'submitCanvasInvocationSnapshot',
     });
@@ -9835,9 +9852,12 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(queueItem?.snapshot.sourceId).toBe('canvas');
     expect(queueItem?.snapshot.destination).toBe('canvas');
     expect(queueItem?.snapshot.graph).toEqual({ id: 'canvas-graph', label: 'Canvas' });
+    expect(queueItem?.snapshot.recall?.canvasMetadata).toEqual({ canvas_v3_metadata: recordedCanvas });
+    expect(queueItem?.snapshot.recall?.canvasMetadata?.canvas_v3_metadata).not.toBe(recordedCanvas);
     expect(queueItem?.snapshot.recall?.generateValues).toMatchObject({
+      dynamicPromptsSampleSeed: 7,
       negativePrompt: 'avoid blur',
-      positivePrompt: 'inpaint prompt',
+      positivePrompt: 'inpaint {red|green} cat',
       seed: 42,
       seedMode: 'fixed',
     });
@@ -9849,14 +9869,30 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       kind: 'generate',
       negativePrompt: 'avoid blur',
       negativePromptNodeId: 'negative_prompt',
-      positivePrompt: 'inpaint prompt',
+      positivePrompt: 'inpaint {red|green} cat',
       positivePromptNodeId: 'positive_prompt',
+      positivePrompts: ['inpaint green cat'],
       seed: 42,
       seedNodeId: 'seed',
       seedStep: 0,
     });
     expect(queueItem?.snapshot.resultNodeIds).toEqual(['canvas_output']);
     expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
+
+    canvas.document.bbox.x = 999;
+    recordedCanvas.settings.strength = 0.1;
+    values.positivePrompt = 'later prompt';
+    values.dynamicPromptsSampleSeed = 101;
+
+    expect(queueItem?.snapshot.recall?.canvasMetadata?.canvas_v3_metadata).toMatchObject({
+      document: { bbox: { height: 48, width: 32, x: 17, y: 23 } },
+      settings: { strength: 0.75 },
+      version: 1,
+    });
+    expect(queueItem?.snapshot.recall?.generateValues).toMatchObject({
+      dynamicPromptsSampleSeed: 7,
+      positivePrompt: 'inpaint {red|green} cat',
+    });
   });
 
   it('queues the frozen canvas supplied by an immutable canvas invocation instead of cloning live state', () => {
