@@ -22,6 +22,7 @@ import { ApiError } from '@platform/transport/http';
 import {
   ALL_READABLE_BOARDS_ID,
   addImagesToGalleryBoard,
+  checkGalleryMediaUsage,
   createGalleryBoard,
   galleryBoardExists,
   deleteGalleryBoard,
@@ -102,6 +103,152 @@ describe('deleteGalleryBoard outcomes', () => {
       method: 'DELETE',
       signal: undefined,
     });
+  });
+});
+
+describe('checkGalleryMediaUsage', () => {
+  const usageBody = (overrides: Record<string, unknown> = {}) => ({
+    checked_image_count: 2,
+    checked_video_count: 1,
+    documents: [
+      {
+        id: 'legacy_editor',
+        image_count: 1,
+        image_names: ['a.png'],
+        kind: 'legacy_editor',
+        name: null,
+        revision: null,
+        video_count: 0,
+        video_names: [],
+        workspace_revision: null,
+      },
+      {
+        id: 'project-1',
+        image_count: 1200,
+        image_names: ['a.png', 'b.png'],
+        kind: 'project',
+        name: 'Harbor Tower',
+        revision: 7,
+        video_count: 1,
+        video_names: ['c.mp4'],
+        workspace_revision: 3,
+      },
+      {
+        id: 'later-kind',
+        image_count: 1,
+        image_names: ['b.png'],
+        kind: 'storyboard',
+        name: '  ',
+        // Revisions are only a hint: a malformed one reads as unknown rather than failing the check.
+        revision: '2',
+        video_count: 0,
+        video_names: [],
+        workspace_revision: -1,
+      },
+    ],
+    documents_total: 140,
+    in_use_image_count: 2,
+    in_use_video_count: 1,
+    other_accounts: { document_count: 3, image_count: 1, queue_item_count: 2, video_count: 0 },
+    queue: { image_count: 1, image_names: ['a.png'], item_count: 2, video_count: 0, video_names: [] },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('asks about the items by kind, or about a whole board, and maps the answer', async () => {
+    mocks.apiFetchJson.mockResolvedValue(usageBody());
+
+    const usage = await checkGalleryMediaUsage({
+      kind: 'items',
+      refs: [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'video', name: 'c.mp4' },
+        { kind: 'image', name: 'b.png' },
+      ],
+    });
+    await checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
+
+    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[0]?.[1]?.body))).toEqual({
+      image_names: ['a.png', 'b.png'],
+      video_names: ['c.mp4'],
+    });
+    expect(mocks.apiFetchJson.mock.calls[0]?.[0]).toBe('/api/v1/gallery/usage');
+    expect(mocks.apiFetchJson.mock.calls[0]?.[1]?.method).toBe('POST');
+    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[1]?.[1]?.body))).toEqual({ board_id: 'board-1' });
+    expect(usage).toEqual({
+      checkedImageCount: 2,
+      checkedVideoCount: 1,
+      documents: [
+        {
+          id: 'legacy_editor',
+          imageCount: 1,
+          imageNames: ['a.png'],
+          kind: 'legacyEditor',
+          name: null,
+          revision: null,
+          videoCount: 0,
+          videoNames: [],
+          workspaceRevision: null,
+        },
+        {
+          id: 'project-1',
+          imageCount: 1200,
+          imageNames: ['a.png', 'b.png'],
+          kind: 'project',
+          name: 'Harbor Tower',
+          revision: 7,
+          videoCount: 1,
+          videoNames: ['c.mp4'],
+          workspaceRevision: 3,
+        },
+        // A kind this build does not know still uses the media; a blank name reads as none.
+        {
+          id: 'later-kind',
+          imageCount: 1,
+          imageNames: ['b.png'],
+          kind: 'other',
+          name: null,
+          revision: null,
+          videoCount: 0,
+          videoNames: [],
+          workspaceRevision: null,
+        },
+      ],
+      documentsTotal: 140,
+      inUseImageCount: 2,
+      inUseVideoCount: 1,
+      otherAccounts: { documentCount: 3, imageCount: 1, queueItemCount: 2, videoCount: 0 },
+      queue: { imageCount: 1, imageNames: ['a.png'], itemCount: 2, videoCount: 0, videoNames: [] },
+    });
+  });
+
+  it('fails on a malformed answer rather than reading it as nothing in use', async () => {
+    mocks.apiFetchJson.mockResolvedValue(usageBody({ in_use_image_count: undefined }));
+
+    await expect(checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' })).rejects.toThrow(TypeError);
+  });
+
+  it('drops an answer that arrives after the account changed', async () => {
+    let answer: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+    );
+
+    const check = checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
+    const signal = mocks.apiFetchJson.mock.calls[0]?.[1]?.signal as AbortSignal;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    answer(usageBody());
+
+    await expect(check).rejects.toThrow('no longer active');
+    expect(signal.aborted).toBe(true);
   });
 });
 

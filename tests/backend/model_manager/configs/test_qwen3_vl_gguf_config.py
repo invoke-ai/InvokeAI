@@ -57,7 +57,7 @@ def _write_gguf(
     """Write a minimal but structurally honest GGUF.
 
     `hidden_size=None` omits the embedding entirely; `last_layer=None` omits the final block, which
-    is what a multi-part quant's later shard or an interrupted download looks like.
+    is a file that carries all the metadata but not all of its tensors.
     """
     import gguf
 
@@ -143,13 +143,13 @@ def test_variant_comes_from_the_embedding_tensor(
 
 
 def test_a_partial_quant_is_rejected_at_install_time(tmp_path: Path) -> None:
-    """A multi-part quant's later shard carries a complete KV block and only some tensors. Matching
-    on metadata alone would install it, offer it in the picker, and fail at the first generation.
+    """A file with a complete KV block and only some tensors. Matching on metadata alone would install
+    it, offer it in the picker, and fail at the first generation.
 
     Asserted through the factory at the default `allow_unknown`: once the architecture metadata has
     identified the file, the rejection has to be final (`InvalidMatchError`), or the file still
     installs -- as an Unknown model, with the reason nowhere the user looks."""
-    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0-00002-of-00003.gguf", last_layer=None)
+    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0.gguf", last_layer=None)
 
     result = _identify(path, allow_unknown=True)
 
@@ -160,7 +160,7 @@ def test_a_partial_quant_is_rejected_at_install_time(tmp_path: Path) -> None:
 def test_a_variant_override_does_not_skip_the_completeness_check(tmp_path: Path) -> None:
     """`variant` is an install-API override. It says which Qwen3-VL the file is, not that all of its
     tensors are present, so it must not buy the file past the one check that looks."""
-    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0-00002-of-00003.gguf", last_layer=None)
+    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0.gguf", last_layer=None)
 
     with pytest.raises(InvalidMatchError, match="incomplete"):
         Qwen3VLEncoder_GGUF_Config.from_model_on_disk(

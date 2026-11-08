@@ -1,0 +1,43 @@
+---
+// One board row of the Gallery demo, after the app's `GalleryBoardRowShell.tsx` and `GalleryBoardRow.tsx`: a cover,
+// the name and the `media | uploads` count badge in one button, and the board menu's trigger shown on hover. The
+// selected row takes the solid accent fill.
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+import EllipsisVertical from '@lucide/astro/icons/ellipsis-vertical';
+import ImageIcon from '@lucide/astro/icons/image';
+import Inbox from '@lucide/astro/icons/inbox';
+
+import type { GalleryDemoBoard } from './gallery-demo.mjs';
+
+interface Props {
+  board: GalleryDemoBoard;
+  cover?: ImageMetadata;
+  counts: { media: number; uploads: number };
+  selected?: boolean;
+}
+
+const { board, cover, counts, selected = false } = Astro.props;
+---
+
+<div class="gd-row" data-board-row={board.id} data-selected={selected ? '' : undefined}>
+  <button type="button" class="gd-row-button" aria-current={selected ? 'true' : undefined}>
+    <span class="gd-cover">
+      {
+        cover ? (
+          <Image src={cover} alt="" width={40} height={40} loading="lazy" decoding="async" />
+        ) : board.isInbox ? (
+          <Inbox size={12} aria-hidden="true" />
+        ) : (
+          <ImageIcon size={12} aria-hidden="true" />
+        )
+      }
+    </span>
+    <span class="gd-row-label" data-board-label>{board.name}</span>
+    <span class="gd-badge gd-count" aria-hidden="true" data-board-count>{counts.media} | {counts.uploads}</span>
+    <span class="gd-sr-only" data-board-count-text>, {counts.media} media, {counts.uploads} uploads</span>
+  </button>
+  <span class="gd-icon-button gd-icon-button--sm gd-row-actions" aria-hidden="true">
+    <EllipsisVertical size={16} />
+  </span>
+</div>

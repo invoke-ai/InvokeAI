@@ -12,10 +12,22 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
-import { compileGenerateGraph, resolveGenerateSeed } from './graph';
-import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
+import {
+  getDefaultGenerateSettings,
+  getGenerationValidationIssues,
+  isSupportedGenerateModel,
+  type SupportedGenerateBase,
+} from './baseGenerationPolicies';
+import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
+import {
+  fullyFilledSettingsFor,
+  generateGraphCases,
+  satisfiedSettingsFor,
+  tunedSettingsFor,
+} from './graphCoverage.testing';
+import { isPidDecodeNodeType } from './pidGraph';
 import { getReferenceImagePromptTags } from './referenceImage';
+import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -208,7 +220,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'unet')?.source.node_id).toBe('model_loader');
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('records the accelerator supplied by the orchestration boundary in metadata', () => {
@@ -223,10 +235,11 @@ describe('compileGenerateGraph', () => {
     expect(getNodeByType(graph, 'core_metadata')?.rand_device).toBe('xpu');
   });
 
-  it('passes SDXL color compensation to the VAE decode node when enabled', () => {
-    const graph = compile(sdxlModel, { colorCompensation: true });
+  it.each([true, false])('omits encoder-only color compensation from SDXL txt2img when enabled=%s', (enabled) => {
+    const graph = compile(sdxlModel, { colorCompensation: enabled });
 
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('SDXL');
+    expect(getNodeByType(graph, 'i2l')).toBeUndefined();
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('coerces invalid SD schedulers before graph submission', () => {
@@ -268,6 +281,39 @@ describe('compileGenerateGraph', () => {
       hidiffusion_t2_ratio: 0.15,
       hidiffusion_window_attn: true,
     });
+  });
+
+  it.each([sd1Model, sdxlModel])('preserves automatic ratios and explicit zero for $base', (model) => {
+    const automatic = compile(model, { hiDiffusionEnabled: true, hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 } });
+    expect(getNodeByType(automatic, 'denoise_latents')).toMatchObject({
+      hidiffusion_auto_ratios: true,
+      hidiffusion_t1_ratio: 0,
+      hidiffusion_t2_ratio: 0,
+    });
+    expect(getNodeByType(automatic, 'core_metadata')).toMatchObject({
+      hidiffusion_t1_ratio: null,
+      hidiffusion_t2_ratio: null,
+    });
+    const zero = compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0, hiDiffusionT2Ratio: 0 });
+    expect(getNodeByType(zero, 'denoise_latents')).toMatchObject({ hidiffusion_t1_ratio: 0, hidiffusion_t2_ratio: 0 });
+    expect(() =>
+      compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0.2, hiDiffusionT2Ratio: 0.4 })
+    ).toThrow('HiDiffusion T1');
+    expect(
+      getGenerationValidationIssues(model, {
+        ...getDefaultGenerateSettings(model),
+        hiDiffusionEnabled: true,
+        hiDiffusionT1Ratio: 0.2,
+        hiDiffusionT2Ratio: 0.4,
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'HiDiffusion T1 ratio must be greater than or equal to T2.',
+          target: { section: 'advanced' },
+        }),
+      ])
+    );
   });
 
   it('omits HiDiffusion ratios from denoise while disabled but records all metadata settings', () => {
@@ -440,6 +486,34 @@ describe('compileGenerateGraph', () => {
 
   it('fails early when required FLUX components are missing', () => {
     expect(() => compile(fluxModel)).toThrow('Generate needs a T5 Encoder for FLUX models.');
+  });
+
+  it('routes the SD3 transformer and both CLIP encoders through SD3 LoRAs, and T5 around them', () => {
+    const sd3Lora: LoraModelConfig = { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' };
+    // Same diffusers attention names, different family: it must not reach the SD3 loader.
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'Qwen LoRA', type: 'lora' };
+
+    const graph = compile(sd3Model, {
+      loras: [
+        { isEnabled: true, model: sd3Lora, weight: 0.6 },
+        { isEnabled: true, model: qwenLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'sd3_lora_collection_loader');
+
+    expect(loraLoader).toBeDefined();
+    for (const field of ['transformer', 'clip_l', 'clip_g']) {
+      expect(getEdge(graph, loraLoader?.id ?? '', field)?.source.node_id).toBe('model_loader');
+    }
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    for (const cond of ['pos_cond', 'neg_cond']) {
+      expect(getEdge(graph, cond, 'clip_l')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 'clip_g')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 't5_encoder')?.source.node_id).toBe('model_loader');
+    }
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
   });
 
   it('builds modern Diffusers-family graphs without separate component overrides', () => {
@@ -1175,6 +1249,158 @@ describe('compileGenerateGraph', () => {
         ['denoise_latents', 'canvas_output'],
       ]);
     });
+  });
+});
+
+describe('getFamilyGraphBuilder', () => {
+  it('returns builders for supported bases only, never Object.prototype members', () => {
+    expect(getFamilyGraphBuilder('sdxl')).toBeTypeOf('function');
+    expect(getFamilyGraphBuilder('constructor')).toBeNull();
+    expect(getFamilyGraphBuilder('toString')).toBeNull();
+    expect(getFamilyGraphBuilder('__proto__')).toBeNull();
+  });
+});
+
+describe('family graph facts', () => {
+  const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
+  const build = (model: MainModelConfig, settings: GenerateSettings) =>
+    GRAPH_BUILDERS[model.base as SupportedGenerateBase](settings, model, false, projectSettings);
+  const buildWith = (model: MainModelConfig, overrides: Partial<GenerateSettings> = {}) =>
+    build(model, createSettings(model, overrides));
+
+  it('names the SD decode VAE, override and seamless wrapping included, and the UNet after LoRAs', () => {
+    expect(buildWith(sd1Model).latents?.vae).toMatchObject({ field: 'vae', node: { id: 'model_loader' } });
+    expect(buildWith(sd1Model, { vae }).latents?.vae.node.id).toBe('vae_loader');
+    expect(buildWith(sd1Model, { seamlessXAxis: true, vae }).latents).toMatchObject({
+      encodeType: 'i2l',
+      unet: { field: 'unet', node: { id: 'seamless' } },
+      vae: { field: 'vae', node: { id: 'seamless' } },
+    });
+
+    const withLora = buildWith(sd1Model, { loras: [{ isEnabled: true, model: sd1Lora, weight: 0.5 }] });
+    expect(withLora.latents?.unet).toMatchObject({ field: 'unet', node: { type: 'lora_collection_loader' } });
+    expect(buildWith(sd1Model, { vaePrecision: 'fp32' }).latents?.fp32).toBe(true);
+    expect(buildWith(sd1Model, { vaePrecision: 'fp16' }).latents?.fp32).toBe(false);
+  });
+
+  it('reports a quarter of the requested size as the native PiD denoise size', () => {
+    const family = buildWith(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' },
+      height: 2048,
+      pidDecoderModel: { base: 'flux', key: 'pid-flux', name: 'PiD flux', type: 'pid_decoder' },
+      pidMode: 'native',
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      width: 2048,
+    });
+
+    expect(family.denoiseSize).toEqual({ height: 512, width: 512 });
+    // The FLUX PiD decode takes no VAE, so the record names the loader the graph decodes with.
+    expect(family.latents?.vae).toMatchObject({ field: 'vae', node: { id: 'model_loader' } });
+  });
+
+  const recipes = { filled: fullyFilledSettingsFor, required: satisfiedSettingsFor, tuned: tunedSettingsFor };
+  const familyCases = generateGraphCases.flatMap((testCase) =>
+    (Object.keys(recipes) as (keyof typeof recipes)[]).map((recipe) => ({
+      ...testCase,
+      label: `${testCase.label} / ${recipe}`,
+      recipe,
+    }))
+  );
+
+  it.each(familyCases)('$label hands out the facts its emitted graph carries', ({ base, recipe, shape }) => {
+    const { model, settings } = recipes[recipe](base, shape);
+    const { conditioning, denoise, denoiseSize, graph, latents, layoutPrompt } = build(model, settings);
+    const sourceOf = (nodeId: string, field: string) => {
+      const edge = getEdge(graph, nodeId, field);
+      return edge ? { field: edge.source.field, nodeId: edge.source.node_id } : undefined;
+    };
+    const named = (output: { node: { id: string }; field: string } | undefined) =>
+      output ? { field: output.field, nodeId: output.node.id } : undefined;
+    const reaches = (fromId: string, toId: string): boolean => {
+      const seen = new Set([fromId]);
+      const queue = [fromId];
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        if (id === toId) {
+          return true;
+        }
+        for (const edge of graph.edges) {
+          if (edge.source.node_id === id && !seen.has(edge.destination.node_id)) {
+            seen.add(edge.destination.node_id);
+            queue.push(edge.destination.node_id);
+          }
+        }
+      }
+      return false;
+    };
+    const decode =
+      Object.values(graph.nodes).find((node) => isPidDecodeNodeType(node.type)) ?? graph.nodes.canvas_output!;
+
+    // The decode reads the base denoise, or the refiner stage that finishes it.
+    const decodeLatents = sourceOf(decode.id, 'latents');
+    expect(
+      decodeLatents?.nodeId === REFINER_DENOISE_NODE_ID
+        ? sourceOf(REFINER_DENOISE_NODE_ID, 'latents')?.nodeId
+        : decodeLatents?.nodeId
+    ).toBe(denoise.id);
+    expect(denoise).toBe(graph.nodes[denoise.id]);
+
+    const { height, width } = graph.nodes.noise ?? denoise;
+    expect(denoiseSize).toEqual({ height, width });
+
+    expect(latents === null).toBe(['ernie-image', 'ideogram-4'].includes(base));
+    if (latents) {
+      // The FLUX and SD-3 PiD decodes take no VAE; those graphs decode with the loader's.
+      expect(named(latents.vae)).toEqual(sourceOf(decode.id, 'vae') ?? { field: 'vae', nodeId: 'model_loader' });
+      expect(named(latents.unet)).toEqual(sourceOf(denoise.id, 'unet'));
+    }
+
+    expect(conditioning === null).toBe(
+      !['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima'].includes(base)
+    );
+    if (conditioning) {
+      expect(reaches(conditioning.positive.id, conditioning.positiveCollector.id)).toBe(true);
+      expect(
+        graph.edges.some(
+          (edge) => edge.source.node_id === conditioning.positiveCollector.id && edge.destination.node_id === denoise.id
+        )
+      ).toBe(true);
+      if (conditioning.negative) {
+        expect(reaches(conditioning.negative.node.id, conditioning.negative.collector.id)).toBe(true);
+        expect(sourceOf(denoise.id, 'negative_conditioning')?.nodeId).toBe(conditioning.negative.collector.id);
+      }
+    }
+
+    expect(layoutPrompt === null).toBe(!['flux3', 'ideogram-4', 'moss-image'].includes(base));
+    if (layoutPrompt) {
+      expect(sourceOf(layoutPrompt.id, 'prompt')?.nodeId).toBe('positive_prompt');
+    }
+  });
+
+  it('hands out the reference-image collectors the builder feeds the denoise from', () => {
+    const sd = buildWith(sd1Model, {
+      referenceImages: [
+        {
+          config: {
+            beginEndStepPct: [0, 1] as [number, number],
+            clipVisionModel: 'ViT-H' as const,
+            image: refImage,
+            method: 'full' as const,
+            model: sd1IpAdapter,
+            type: 'ip_adapter' as const,
+            weight: 1,
+          },
+          id: 'ip',
+          isEnabled: true,
+        },
+      ],
+    });
+    const collector = sd.conditioning?.ipAdapterCollector;
+
+    expect(collector?.type).toBe('collect');
+    expect(getEdge(sd.graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toBe(collector?.id);
+    expect(buildWith(sd1Model).conditioning?.ipAdapterCollector).toBeNull();
   });
 });
 
@@ -2193,7 +2419,7 @@ describe('SDXL Refiner', () => {
     expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
   });
 
-  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+  it('keeps HiDiffusion off the refiner pass and coerces its scheduler', () => {
     const graph = compile(sdxlModel, {
       ...refinerSettings,
       hiDiffusionEnabled: true,
@@ -2202,10 +2428,9 @@ describe('SDXL Refiner', () => {
     });
 
     expect(graph.nodes.refiner_denoise_latents).toMatchObject({
-      hidiffusion: true,
-      hidiffusion_t1_ratio: 0.3,
       scheduler: 'euler_a',
     });
+    expect(graph.nodes.refiner_denoise_latents).not.toHaveProperty('hidiffusion');
     expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
   });
 
