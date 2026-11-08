@@ -104,19 +104,35 @@ test('invalid locale JSON fails the production build with the failing filename',
   await assert.rejects(buildFixture(projectRoot), /Invalid locale JSON: broken\.json/);
 });
 
-test('font namespace loads separately in production and development, preserving fallback locales', async (context) => {
+test('cold namespaces load separately in production and development, preserving fallback locales', async (context) => {
   const projectRoot = await createFixture(context);
-  const translations = { common: { retry: 'Retry' }, fonts: { title: 'Fonts 🎨' } };
+  const translations = {
+    common: { retry: 'Retry' },
+    fonts: { title: 'Fonts 🎨' },
+    widgets: { preview: { details: 'Details', metadataLabels: { control_layers: 'Control layers 🎨' } } },
+  };
   await writeFile(resolve(projectRoot, 'public/locales/en.json'), JSON.stringify(translations));
   await writeFile(resolve(projectRoot, 'public/locales/fr.json'), JSON.stringify({ common: { retry: 'Réessayer' } }));
   await buildFixture(projectRoot);
   assert.deepEqual(JSON.parse(await readFile(resolve(projectRoot, 'dist/locales/en.json'), 'utf8')), {
     common: translations.common,
+    widgets: { preview: { details: 'Details' } },
   });
   assert.deepEqual(JSON.parse(await readFile(resolve(projectRoot, 'dist/locales/en.fonts.json'), 'utf8')), {
     fonts: translations.fonts,
   });
   assert.deepEqual(JSON.parse(await readFile(resolve(projectRoot, 'dist/locales/fr.fonts.json'), 'utf8')), {});
+  assert.deepEqual(JSON.parse(await readFile(resolve(projectRoot, 'dist/locales/en.metadata.json'), 'utf8')), {
+    widgets: { preview: { metadataLabels: translations.widgets.preview.metadataLabels } },
+  });
+  assert.deepEqual(JSON.parse(await readFile(resolve(projectRoot, 'dist/locales/fr.metadata.json'), 'utf8')), {});
+  const originalVersion = await readBuiltLocaleVersion(projectRoot);
+  const originalRoot = await readFile(resolve(projectRoot, 'dist/locales/en.json'), 'utf8');
+  translations.widgets.preview.metadataLabels.control_layers = 'Control adapters';
+  await writeFile(resolve(projectRoot, 'public/locales/en.json'), JSON.stringify(translations));
+  await buildFixture(projectRoot);
+  assert.equal(await readFile(resolve(projectRoot, 'dist/locales/en.json'), 'utf8'), originalRoot);
+  assert.notEqual(await readBuiltLocaleVersion(projectRoot), originalVersion);
   const server = await createServer({
     root: projectRoot,
     configFile: false,
@@ -129,7 +145,7 @@ test('font namespace loads separately in production and development, preserving 
   try {
     await server.listen();
     const origin = server.resolvedUrls.local[0];
-    for (const filename of ['en.json', 'en.fonts.json', 'fr.fonts.json']) {
+    for (const filename of ['en.json', 'en.fonts.json', 'fr.fonts.json', 'en.metadata.json', 'fr.metadata.json']) {
       // Versioned like the client's requests.
       const response = await fetch(new URL(`locales/${filename}?v=0123456789ab`, origin));
       assert.equal(response.status, 200);
@@ -138,6 +154,12 @@ test('font namespace loads separately in production and development, preserving 
         JSON.parse(await readFile(resolve(projectRoot, `dist/locales/${filename}`), 'utf8'))
       );
     }
+    translations.widgets.preview.metadataLabels.control_layers = 'Updated controls';
+    await writeFile(resolve(projectRoot, 'public/locales/en.json'), JSON.stringify(translations));
+    const updated = await fetch(new URL('locales/en.metadata.json?v=0123456789ab', origin));
+    assert.deepEqual(await updated.json(), {
+      widgets: { preview: { metadataLabels: { control_layers: 'Updated controls' } } },
+    });
   } finally {
     await server.close();
   }

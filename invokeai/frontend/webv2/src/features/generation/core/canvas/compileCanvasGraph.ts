@@ -379,6 +379,61 @@ const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileC
   }
 };
 
+/** Record only the resolved inputs handed to the graph, beside the independently versioned authored document. */
+const recordCanvasInputs = (graph: BackendGraphContract, input: CompileCanvasGraphInput): void => {
+  const metadata = findMetadataNode(graph);
+  if (!metadata) {
+    return;
+  }
+  if (input.canvasMetadata) {
+    metadata.canvas_v3_metadata = input.canvasMetadata;
+  }
+  const controls = input.controlLayers ?? [];
+  const recordedControls = controls.map((control) => ({
+    begin_step_percent: control.beginEndStepPct[0],
+    end_step_percent: control.beginEndStepPct[1],
+    control_mode: control.controlMode,
+    image: { image_name: control.imageName, width: input.bbox.width, height: input.bbox.height },
+    position: { x: input.bbox.x, y: input.bbox.y },
+    layer_id: control.id,
+    model: control.model,
+    type: control.kind,
+    weight: control.weight,
+    ...(control.instantxControlMode === null || control.instantxControlMode === undefined
+      ? {}
+      : { instantx_control_mode: control.instantxControlMode }),
+  }));
+  metadata.control_layers = recordedControls;
+  metadata.controlnets = recordedControls
+    .filter((control) => control.type === 'controlnet')
+    .map((control) => ({
+      image: control.image,
+      control_model: control.model,
+      control_weight: control.weight,
+      begin_step_percent: control.begin_step_percent,
+      end_step_percent: control.end_step_percent,
+      control_mode: control.control_mode ?? 'balanced',
+    }));
+  metadata.t2iAdapters = recordedControls
+    .filter((control) => control.type === 't2i_adapter')
+    .map((control) => ({
+      image: control.image,
+      t2i_adapter_model: control.model,
+      weight: control.weight,
+      begin_step_percent: control.begin_step_percent,
+      end_step_percent: control.end_step_percent,
+    }));
+  const layoutRegions = graph.nodes.layout_prompt?.regions ?? graph.nodes.caption_builder?.regions;
+  if (Array.isArray(layoutRegions) && layoutRegions.length > 0) {
+    metadata.regions = layoutRegions;
+  } else if (!['moss-image', 'ideogram-4', 'flux3'].includes(input.model.base)) {
+    const regions = (input.regionalGuidance ?? []).filter((region) => graph.nodes[`rg_mask_to_tensor_${region.id}`]);
+    if (regions.length) {
+      metadata.regions = regions.map(({ layout: _layout, ...region }) => region);
+    }
+  }
+};
+
 /** Sets the metadata `generation_mode` variant + strength (legacy parity). */
 const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: number): void => {
   const metadata = findMetadataNode(graph);
@@ -1082,6 +1137,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     }
     restoreExternalCanvasOutputToBbox(backendGraph, { bbox, destination, mode }, processingSize);
     setCanvasMetadataDimensions(backendGraph, bbox);
+    recordCanvasInputs(backendGraph, input);
 
     return {
       backendGraph,
@@ -1169,6 +1225,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // After every mode has settled its final image node, so the filters see the composited/resized result.
   addOutputPostprocessors(backendGraph, runtimeProjectSettings, outputIsIntermediate);
   setCanvasMetadataDimensions(backendGraph, bbox);
+  recordCanvasInputs(backendGraph, input);
 
   return {
     backendGraph,
