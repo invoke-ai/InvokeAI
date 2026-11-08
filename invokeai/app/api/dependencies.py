@@ -136,7 +136,11 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
-        files = DiskFileService(output_folder / "files", max_file_size=config.max_file_upload_size_bytes)
+        files = DiskFileService(
+            output_folder / "files",
+            max_file_size=config.max_file_upload_size_bytes,
+            max_storage_size=config.max_file_library_bytes,
+        )
         video_files = DiskVideoFileStorage(f"{output_folder}/videos")
 
         model_images_folder = config.models_path

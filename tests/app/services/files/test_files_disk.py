@@ -7,6 +7,7 @@ from invokeai.app.services.files.files_common import (
     FileAccessDeniedException,
     FileMetadataException,
     FileNotFoundException,
+    FileQuotaExceededException,
     FileTooLargeException,
     UnsupportedFileTypeException,
 )
@@ -134,6 +135,22 @@ def test_allows_octet_stream_for_allowed_extensions(tmp_path: Path, content_type
     assert dto.content_type == "application/octet-stream"
 
 
+@pytest.mark.parametrize(
+    ("file_name", "content_type"),
+    [
+        ("data.csv", "application/vnd.ms-excel"),
+        ("data.csv", "text/x-csv"),
+        ("data.json", "text/json"),
+    ],
+)
+def test_allows_common_vendor_content_type_aliases(tmp_path: Path, file_name: str, content_type: str) -> None:
+    service = DiskFileService(tmp_path)
+
+    dto = service.save(file_name=file_name, content_type=content_type, file=BytesIO(b"data"), user_id=None)
+
+    assert dto.content_type == content_type
+
+
 def test_rejects_files_over_size_limit_and_cleans_up(tmp_path: Path) -> None:
     service = DiskFileService(tmp_path, max_file_size=4)
 
@@ -141,6 +158,31 @@ def test_rejects_files_over_size_limit_and_cleans_up(tmp_path: Path) -> None:
         service.save(file_name="large.txt", content_type="text/plain", file=BytesIO(b"12345"), user_id=None)
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_rejects_files_over_storage_quota_and_cleans_up(tmp_path: Path) -> None:
+    service = DiskFileService(tmp_path, max_storage_size=4)
+
+    with pytest.raises(FileQuotaExceededException):
+        service.save(file_name="large.txt", content_type="text/plain", file=BytesIO(b"12345"), user_id=None)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_storage_quota_counts_existing_files_and_delete_frees_space(tmp_path: Path) -> None:
+    service = DiskFileService(tmp_path, max_storage_size=10)
+    first = service.save(file_name="first.txt", content_type="text/plain", file=BytesIO(b"123456"), user_id=None)
+
+    with pytest.raises(FileQuotaExceededException):
+        service.save(file_name="second.txt", content_type="text/plain", file=BytesIO(b"123456"), user_id=None)
+
+    # A fresh service recounts the directory instead of assuming an empty library.
+    restarted = DiskFileService(tmp_path, max_storage_size=10)
+    with pytest.raises(FileQuotaExceededException):
+        restarted.save(file_name="second.txt", content_type="text/plain", file=BytesIO(b"12345"), user_id=None)
+
+    restarted.delete(first.file_id)
+    restarted.save(file_name="second.txt", content_type="text/plain", file=BytesIO(b"1234567890"), user_id=None)
 
 
 def test_user_scoped_access(tmp_path: Path) -> None:

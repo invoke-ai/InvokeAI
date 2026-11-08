@@ -751,7 +751,6 @@ app.add_middleware(
     identify_user=_identify_video_upload_user_async,
     idle_timeout_seconds=files.FILE_UPLOAD_IDLE_TIMEOUT_SECONDS,
     max_upload_duration_seconds=files.FILE_UPLOAD_MAX_DURATION_SECONDS,
-    retry_after_seconds=1,
 )
 app.add_middleware(
     RequestBodyLimitASGIMiddleware,

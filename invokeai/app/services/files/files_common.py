@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 DEFAULT_FILE_UPLOAD_MAX_BYTES = 50 * 1024 * 1024
+DEFAULT_FILE_LIBRARY_MAX_BYTES = 5 * 1024 * 1024 * 1024
 
 SUPPORTED_FILE_EXTENSIONS = frozenset(
     {
@@ -19,13 +20,18 @@ SUPPORTED_FILE_EXTENSIONS = frozenset(
 
 SUPPORTED_FILE_MIME_TYPES = frozenset(
     {
+        "application/csv",
         "application/json",
         "application/pdf",
+        "application/vnd.ms-excel",
+        "application/x-json",
         "application/x-yaml",
         "application/yaml",
         "text/csv",
+        "text/json",
         "text/markdown",
         "text/plain",
+        "text/x-csv",
         "text/x-markdown",
         "text/x-yaml",
         "text/yaml",
@@ -55,6 +61,10 @@ class UnsupportedFileTypeException(FileStorageException):
 
 class FileTooLargeException(FileStorageException):
     """Raised when a managed file upload exceeds the size limit."""
+
+
+class FileQuotaExceededException(FileStorageException):
+    """Raised when a managed file upload would exceed the total storage limit."""
 
 
 class FileAccessDeniedException(FileStorageException):

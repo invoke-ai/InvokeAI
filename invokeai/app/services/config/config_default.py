@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 import invokeai.configs as model_configs
+from invokeai.app.services.files.files_common import DEFAULT_FILE_LIBRARY_MAX_BYTES, DEFAULT_FILE_UPLOAD_MAX_BYTES
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -219,6 +220,8 @@ class InvokeAIAppConfig(BaseSettings):
     fonts_storage_dir:             Path = Field(default=Path("fonts-uploaded"), description="Path to application-managed uploaded fonts.")
     max_font_upload_bytes:          int = Field(default=32 * 1024 * 1024, gt=0, le=128 * 1024 * 1024, description="Maximum size of one uploaded custom font in bytes.")
     max_font_library_bytes:         int = Field(default=1024 * 1024 * 1024, gt=0, le=16 * 1024 * 1024 * 1024, description="Maximum total size of uploaded custom fonts in bytes per account or shared library.")
+    max_file_upload_size_bytes:     int = Field(default=DEFAULT_FILE_UPLOAD_MAX_BYTES, gt=0, le=1024 * 1024 * 1024, description="Maximum size in bytes of one managed file upload.")
+    max_file_library_bytes:         int = Field(default=DEFAULT_FILE_LIBRARY_MAX_BYTES, gt=0, le=16 * 1024 * 1024 * 1024, description="Maximum total size in bytes of all managed files.")
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
@@ -285,7 +288,6 @@ class InvokeAIAppConfig(BaseSettings):
     session_queue_mode: SESSION_QUEUE_MODE = Field(default="round_robin",   description="Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way — except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.")
     clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup. If true, disables `max_queue_history`.")
     max_queue_history:      Optional[int] = Field(default=None, ge=0,        description="Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.")
-    max_file_upload_size_bytes:     int = Field(default=50 * 1024 * 1024, gt=0, description="Maximum size in bytes for managed file uploads.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")

@@ -1,4 +1,5 @@
 import json
+import threading
 from datetime import datetime, timezone
 from json import JSONDecodeError
 from pathlib import Path
@@ -8,6 +9,7 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from invokeai.app.services.files.files_base import FileServiceBase
 from invokeai.app.services.files.files_common import (
+    DEFAULT_FILE_LIBRARY_MAX_BYTES,
     DEFAULT_FILE_UPLOAD_MAX_BYTES,
     SUPPORTED_FILE_EXTENSIONS,
     SUPPORTED_FILE_MIME_TYPES,
@@ -15,6 +17,7 @@ from invokeai.app.services.files.files_common import (
     FileDTO,
     FileMetadataException,
     FileNotFoundException,
+    FileQuotaExceededException,
     FileTooLargeException,
     UnsupportedFileTypeException,
 )
@@ -31,11 +34,20 @@ FileRecordAdapter = TypeAdapter(FileRecord)
 
 
 class DiskFileService(FileServiceBase):
-    def __init__(self, storage_path: Path, max_file_size: int = DEFAULT_FILE_UPLOAD_MAX_BYTES) -> None:
+    def __init__(
+        self,
+        storage_path: Path,
+        max_file_size: int = DEFAULT_FILE_UPLOAD_MAX_BYTES,
+        max_storage_size: int = DEFAULT_FILE_LIBRARY_MAX_BYTES,
+    ) -> None:
         self._storage_path = storage_path
         self._max_file_size = max_file_size
+        self._max_storage_size = max_storage_size
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._validate_storage_folder()
+        self._storage_lock = threading.Lock()
+        # Recount on every construction so restarts (and files removed outside the service) are reflected.
+        self._used_bytes = self._calculate_used_bytes()
 
     def save(
         self,
@@ -53,8 +65,10 @@ class DiskFileService(FileServiceBase):
         stored_file_name = f"{file_id}{extension}"
         file_path = self._get_file_path(stored_file_name)
         metadata_path = self._get_metadata_path(file_id)
+        metadata_tmp_path = metadata_path.with_name(f"{metadata_path.name}.tmp")
 
         size_bytes = 0
+        reserved_bytes = 0
         try:
             with open(file_path, "wb") as out_file:
                 while True:
@@ -64,6 +78,8 @@ class DiskFileService(FileServiceBase):
                     size_bytes += len(chunk)
                     if size_bytes > self._max_file_size:
                         raise FileTooLargeException(f"File exceeds the maximum size of {self._max_file_size} bytes.")
+                    self._reserve_storage(len(chunk))
+                    reserved_bytes += len(chunk)
                     out_file.write(chunk)
 
             record = FileRecord(
@@ -75,11 +91,16 @@ class DiskFileService(FileServiceBase):
                 created_at=datetime.now(timezone.utc),
                 user_id=user_id,
             )
-            metadata_path.write_text(record.model_dump_json(), encoding="utf-8")
+            # Write the metadata beside its final path and swap it in, so a crash mid-write cannot leave an
+            # unreadable record for a file that was saved completely.
+            metadata_tmp_path.write_text(record.model_dump_json(), encoding="utf-8")
+            metadata_tmp_path.replace(metadata_path)
             return self._record_to_dto(record)
         except Exception:
             file_path.unlink(missing_ok=True)
             metadata_path.unlink(missing_ok=True)
+            metadata_tmp_path.unlink(missing_ok=True)
+            self._release_storage(reserved_bytes)
             raise
 
     def get_dto(self, file_id: str, user_id: str | None = None) -> FileDTO:
@@ -101,8 +122,14 @@ class DiskFileService(FileServiceBase):
 
     def delete(self, file_id: str, user_id: str | None = None) -> None:
         record = self._get_record(file_id, user_id=user_id)
-        self._get_file_path(record.stored_file_name).unlink(missing_ok=True)
+        file_path = self._get_file_path(record.stored_file_name)
+        try:
+            size_bytes = file_path.stat().st_size
+        except FileNotFoundError:
+            size_bytes = 0
+        file_path.unlink(missing_ok=True)
         self._get_metadata_path(file_id).unlink(missing_ok=True)
+        self._release_storage(size_bytes)
 
     def _get_record(self, file_id: str, user_id: str | None = None) -> FileRecord:
         metadata_path = self._get_metadata_path(file_id)
@@ -144,6 +171,32 @@ class DiskFileService(FileServiceBase):
     def _validate_storage_folder(self) -> None:
         self._storage_path.mkdir(parents=True, exist_ok=True)
 
+    def _calculate_used_bytes(self) -> int:
+        used_bytes = 0
+        for entry in self._storage_path.iterdir():
+            # Metadata is part of the record, not the stored document; counting only data files keeps the limit
+            # meaningful and matches what `save` reserves.
+            if entry.is_file() and not entry.name.endswith((".meta.json", ".tmp")):
+                try:
+                    used_bytes += entry.stat().st_size
+                except FileNotFoundError:
+                    continue
+        return used_bytes
+
+    def _reserve_storage(self, size_bytes: int) -> None:
+        with self._storage_lock:
+            if self._used_bytes + size_bytes > self._max_storage_size:
+                raise FileQuotaExceededException(
+                    f"Managed file storage is full (limit {self._max_storage_size} bytes)."
+                )
+            self._used_bytes += size_bytes
+
+    def _release_storage(self, size_bytes: int) -> None:
+        if size_bytes == 0:
+            return
+        with self._storage_lock:
+            self._used_bytes = max(0, self._used_bytes - size_bytes)
+
     @staticmethod
     def _record_to_dto(record: FileRecord) -> FileDTO:
         return FileDTO(**record.model_dump(exclude={"stored_file_name", "user_id"}))
@@ -170,8 +223,9 @@ class DiskFileService(FileServiceBase):
 
     @staticmethod
     def _validate_content_type(content_type: str) -> None:
-        # Some browsers or reverse proxies send application/octet-stream for document files. The extension
-        # allowlist remains authoritative in that case.
+        # Some browsers or reverse proxies send application/octet-stream for document files, and some report
+        # vendor aliases such as application/vnd.ms-excel for CSV. The extension allowlist remains the primary
+        # check; the MIME allowlist only rejects clearly unrelated types.
         if content_type in {"application/octet-stream", ""}:
             return
         if content_type not in SUPPORTED_FILE_MIME_TYPES:

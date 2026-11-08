@@ -93,3 +93,18 @@ def test_oversized_file_is_rejected(client: TestClient, user1_token: str, file_s
     response = _upload(client, user1_token, content=b"x" * (MAX_FILE_SIZE_BYTES + 1))
 
     assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
+
+
+def test_exhausted_storage_quota_is_rejected(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, tmp_path: Path
+) -> None:
+    storage_path = tmp_path / "quota-files"
+    mock_invoker.services.files = DiskFileService(storage_path, max_storage_size=8)
+
+    assert _upload(client, user1_token, content=b"x" * 6).status_code == status.HTTP_201_CREATED
+
+    response = _upload(client, user1_token, content=b"x" * 6)
+
+    assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
+    # The rejected upload's partial file and metadata are cleaned up.
+    assert len(list(storage_path.iterdir())) == 2

@@ -45,6 +45,7 @@ from invokeai.backend.util.devices import TorchDevice
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
     from invokeai.app.services.shared.execution_engine.child import ChildExecutionCapability
 
@@ -290,7 +291,7 @@ class FilesInterface(InvocationContextInterface):
         """
         return self._get_files_service().open(file_id, mode=mode, user_id=self._data.queue_item.user_id)
 
-    def _get_files_service(self):
+    def _get_files_service(self) -> "FileServiceBase":
         if self._services.files is None:
             raise RuntimeError("The managed files service is not available.")
         return self._services.files

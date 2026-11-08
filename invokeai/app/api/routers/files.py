@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Path, Response, UploadFile
+from fastapi import HTTPException, Path, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.routing import APIRouter
 
@@ -10,6 +10,7 @@ from invokeai.app.services.files.files_common import (
     FileDTO,
     FileMetadataException,
     FileNotFoundException,
+    FileQuotaExceededException,
     FileTooLargeException,
     UnsupportedFileTypeException,
 )
@@ -21,8 +22,9 @@ files_router = APIRouter(prefix="/v1/files", tags=["files"])
 FILE_UPLOAD_MULTIPART_OVERHEAD = 1024 * 1024
 MAX_CONCURRENT_FILE_UPLOADS = 2
 MAX_CONCURRENT_FILE_UPLOADS_PER_USER = 1
-FILE_UPLOAD_IDLE_TIMEOUT_SECONDS = 30.0
-FILE_UPLOAD_MAX_DURATION_SECONDS = 120.0
+# Match the video-upload ingress: allow long transfers on slow links instead of dropping them after two minutes.
+FILE_UPLOAD_IDLE_TIMEOUT_SECONDS = 120.0
+FILE_UPLOAD_MAX_DURATION_SECONDS = 30 * 60
 
 
 def _get_file_service() -> FileServiceBase:
@@ -37,7 +39,7 @@ def _get_file_service() -> FileServiceBase:
     operation_id="upload_file",
     responses={
         201: {"description": "The file was uploaded successfully"},
-        413: {"description": "The file is too large"},
+        413: {"description": "The file is too large or managed file storage is full"},
         415: {"description": "The file type is not supported"},
     },
     status_code=201,
@@ -46,22 +48,19 @@ def _get_file_service() -> FileServiceBase:
 async def upload_file(
     current_user: CurrentUserOrDefault,
     file: UploadFile,
-    response: Response,
 ) -> FileDTO:
     """Uploads a managed file for node inputs."""
     try:
-        file_dto = await run_in_threadpool(
+        return await run_in_threadpool(
             _get_file_service().save,
             file_name=file.filename or "",
             content_type=file.content_type,
             file=file.file,
             user_id=current_user.user_id,
         )
-        response.status_code = 201
-        return file_dto
     except UnsupportedFileTypeException as e:
         raise HTTPException(status_code=415, detail=str(e))
-    except FileTooLargeException as e:
+    except (FileTooLargeException, FileQuotaExceededException) as e:
         raise HTTPException(status_code=413, detail=str(e))
     except FileMetadataException as e:
         raise HTTPException(status_code=500, detail=str(e))

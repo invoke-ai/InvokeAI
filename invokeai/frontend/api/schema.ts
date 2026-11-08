@@ -25238,6 +25238,18 @@ export type components = {
              */
             max_font_library_bytes?: number;
             /**
+             * Max File Upload Size Bytes
+             * @description Maximum size in bytes of one managed file upload.
+             * @default 52428800
+             */
+            max_file_upload_size_bytes?: number;
+            /**
+             * Max File Library Bytes
+             * @description Maximum total size in bytes of all managed files.
+             * @default 5368709120
+             */
+            max_file_library_bytes?: number;
+            /**
              * Image Subfolder Strategy
              * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.
              * @default flat
@@ -25560,12 +25572,6 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
              */
             max_queue_history?: number | null;
-            /**
-             * Max File Upload Size Bytes
-             * @description Maximum size in bytes for managed file uploads.
-             * @default 52428800
-             */
-            max_file_upload_size_bytes?: number;
             /**
              * Allow Nodes
              * @description List of nodes to allow. Omit to allow all.
@@ -62400,7 +62406,7 @@ export interface operations {
                     "application/json": components["schemas"]["FileDTO"];
                 };
             };
-            /** @description The file is too large */
+            /** @description The file is too large or managed file storage is full */
             413: {
                 headers: {
                     [name: string]: unknown;
