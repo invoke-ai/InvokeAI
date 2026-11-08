@@ -1,0 +1,9 @@
+title: Mask Operations
+author: VeyDlin
+repo: https://github.com/VeyDlin/mask-operations-node
+summary: Combine masks with the logical operations OR, SUB and AND.
+categories: [masks]
+thumbnail: ./mask-operations.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/mask-operations-node/master/.readme/node.png
+    alt: The Mask Operations node
