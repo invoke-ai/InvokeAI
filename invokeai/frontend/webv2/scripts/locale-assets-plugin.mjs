@@ -4,7 +4,15 @@ import { resolve } from 'node:path';
 
 const splitLocale = (translations) => {
   const { fonts, ...translation } = translations;
-  return { translation, fonts: fonts ? { fonts } : {} };
+  const { metadataLabels, ...preview } = translation.widgets?.preview ?? {};
+  if (metadataLabels !== undefined) {
+    translation.widgets = { ...translation.widgets, preview };
+  }
+  return {
+    translation,
+    fonts: fonts ? { fonts } : {},
+    metadata: metadataLabels === undefined ? {} : { widgets: { preview: { metadataLabels } } },
+  };
 };
 
 /** The files a build emits for `public/locales`, sorted by name so the version does not depend on readdir order. */
@@ -27,13 +35,14 @@ const buildLocaleAssets = async (projectRoot) => {
     return [
       { fileName: `locales/${name}`, source: JSON.stringify(parts.translation) },
       { fileName: `locales/${name.replace('.json', '.fonts.json')}`, source: JSON.stringify(parts.fonts) },
+      { fileName: `locales/${name.replace('.json', '.metadata.json')}`, source: JSON.stringify(parts.metadata) },
     ];
   });
 };
 
 /**
- * Keep source locales readable; load font-library copy only when that UI opens. Locale URLs stay the same across
- * releases, so the injected content version tells the client and service worker which files a build carries.
+ * Keep source locales readable; load font-library and metadata labels only when their UI opens. Locale URLs stay
+ * the same across releases, so the injected content version tells the client and service worker which files a build carries.
  */
 export const localeAssetsPlugin = ({ projectRoot }) => {
   let assets;
@@ -52,7 +61,7 @@ export const localeAssetsPlugin = ({ projectRoot }) => {
       // Read per request so edits show without a restart. The version stays at its startup value, which only the
       // production service worker relies on.
       server.middlewares.use(async (request, response, next) => {
-        const match = request.url?.match(/\/locales\/([a-zA-Z0-9_-]+)(\.fonts)?\.json(?:\?.*)?$/);
+        const match = request.url?.match(/\/locales\/([a-zA-Z0-9_-]+)(?:\.(fonts|metadata))?\.json(?:\?.*)?$/);
         if (!match) {
           next();
           return;
@@ -61,7 +70,7 @@ export const localeAssetsPlugin = ({ projectRoot }) => {
           const source = await readFile(resolve(projectRoot, `public/locales/${match[1]}.json`), 'utf8');
           const parts = splitLocale(JSON.parse(source));
           response.setHeader('Content-Type', 'application/json');
-          response.end(JSON.stringify(match[2] ? parts.fonts : parts.translation));
+          response.end(JSON.stringify(parts[match[2] ?? 'translation']));
         } catch (error) {
           if (error.code === 'ENOENT') {
             next();
