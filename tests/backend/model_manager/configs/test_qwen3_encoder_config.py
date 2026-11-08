@@ -152,6 +152,58 @@ def test_gguf_config_rejects_gemma_state_dict() -> None:
         Qwen3Encoder_GGUF_Config._validate_looks_like_qwen3_model(mod)
 
 
+def _write_decoder_gguf(path: Path, *, architecture: str, hidden_size: int, llamacpp_names: bool = True) -> Path:
+    """A real, token-sized decoder GGUF: the embedding at the real width, which is what the variant is read from."""
+    import gguf
+    import numpy as np
+
+    embed, block = (
+        ("token_embd.weight", "blk.0.") if llamacpp_names else ("model.embed_tokens.weight", "model.layers.0.")
+    )
+    writer = gguf.GGUFWriter(str(path), architecture)
+    writer.add_tensor(embed, np.zeros((8, hidden_size), dtype=np.float32))
+    for name in ("attn_q.weight", "attn_q_norm.weight") if llamacpp_names else ("self_attn.q_norm.weight",):
+        writer.add_tensor(block + name, np.zeros((4,), dtype=np.float32))
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    return path
+
+
+class TestGGUFArchitecture:
+    """llama.cpp names tensors by role, so a Llama or Mistral GGUF of a Qwen3 width carries every key the Qwen3 GGUF
+    config looks for; only the architecture metadata tells them apart. Without it a real 4096-wide Llama-architecture
+    merge (`Dark-Oddity-12B-v1.0-Q8_0.gguf`) identifies as a Qwen3 8B encoder."""
+
+    @pytest.mark.parametrize("architecture", ["llama", "qwen2", "qwen3moe", "qwen2vl"])
+    def test_a_llamacpp_decoder_of_another_architecture_is_not_a_qwen3_encoder(
+        self, tmp_path: Path, architecture: str
+    ) -> None:
+        path = _write_decoder_gguf(tmp_path / "decoder.gguf", architecture=architecture, hidden_size=4096)
+
+        with pytest.raises(NotAMatchError, match=f"architecture is '{architecture}'"):
+            Qwen3Encoder_GGUF_Config.from_model_on_disk(ModelOnDisk(path), dict(_OVERRIDE_FIELDS))
+
+    def test_a_qwen3_gguf_is_still_a_qwen3_encoder(self, tmp_path: Path) -> None:
+        path = _write_decoder_gguf(tmp_path / "Qwen3-8B-Q4_K_M.gguf", architecture="qwen3", hidden_size=4096)
+
+        config = Qwen3Encoder_GGUF_Config.from_model_on_disk(ModelOnDisk(path), dict(_OVERRIDE_FIELDS))
+
+        assert config.variant.value == "qwen3_8b"
+
+    def test_a_gguf_keeping_the_transformers_names_is_matched_by_its_keys(self, tmp_path: Path) -> None:
+        """The architecture rule covers llama.cpp's role names only. Transformers names say what they are (Qwen3's
+        q/k norms among them), so such a file is judged by its keys whatever its converter wrote as the architecture."""
+        path = _write_decoder_gguf(
+            tmp_path / "qwen3-4b.gguf", architecture="qwen3-hf", hidden_size=2560, llamacpp_names=False
+        )
+
+        config = Qwen3Encoder_GGUF_Config.from_model_on_disk(ModelOnDisk(path), dict(_OVERRIDE_FIELDS))
+
+        assert config.variant.value == "qwen3_4b"
+
+
 class TestShardedQwen3EncoderFolder:
     """A sharded text_encoder folder must still identify as a Qwen3 encoder.
 

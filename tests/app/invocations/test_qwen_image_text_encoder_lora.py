@@ -36,30 +36,41 @@ _PROJ_PATH = "model.language_model.layers.0.mlp.down_proj"
 SEQ_LEN = _GENERATE_DROP_IDX + 3
 
 
+class _InnerModel(torch.nn.Module):
+    """The encoder's inner model, which the node runs: its forward returns the Linear's output as the last hidden state."""
+
+    def __init__(self, fail: bool) -> None:
+        super().__init__()
+        self.language_model = torch.nn.Module()
+        self.language_model.layers = torch.nn.ModuleList([torch.nn.Module()])
+        self.language_model.layers[0].mlp = torch.nn.Module()
+        self.language_model.layers[0].mlp.down_proj = torch.nn.Linear(HIDDEN, HIDDEN, bias=False)
+        self.fail = fail
+        self.patches_during_forward: int | None = None
+
+    def forward(self, input_ids, attention_mask, **_):
+        proj = self.language_model.layers[0].mlp.down_proj
+        self.patches_during_forward = proj.get_num_patches() if hasattr(proj, "get_num_patches") else None
+        if self.fail:
+            raise RuntimeError("forward failed (simulated)")
+        x = torch.linspace(-1, 1, input_ids.numel() * HIDDEN).reshape(*input_ids.shape, HIDDEN)
+        return SimpleNamespace(last_hidden_state=proj(x))
+
+
 class _Encoder(torch.nn.Module):
-    """One Linear the LoRA targets; the forward returns its output as the last hidden state."""
+    """One Linear the LoRA targets, at the path of a real Qwen2.5-VL Linear, which is what a converted LoRA can address."""
 
     def __init__(self, fail: bool = False) -> None:
         super().__init__()
-        # The path of a real Qwen2.5-VL Linear, which is what a converted LoRA can address.
-        self.model = torch.nn.Module()
-        self.model.language_model = torch.nn.Module()
-        self.model.language_model.layers = torch.nn.ModuleList([torch.nn.Module()])
-        self.model.language_model.layers[0].mlp = torch.nn.Module()
-        self.model.language_model.layers[0].mlp.down_proj = torch.nn.Linear(HIDDEN, HIDDEN, bias=False)
-        self.fail = fail
-        self.patches_during_forward: int | None = None
+        self.model = _InnerModel(fail)
 
     @property
     def proj(self) -> torch.nn.Module:
         return self.model.language_model.layers[0].mlp.down_proj
 
-    def forward(self, input_ids, attention_mask, **_):
-        self.patches_during_forward = self.proj.get_num_patches() if hasattr(self.proj, "get_num_patches") else None
-        if self.fail:
-            raise RuntimeError("forward failed (simulated)")
-        x = torch.linspace(-1, 1, input_ids.numel() * HIDDEN).reshape(*input_ids.shape, HIDDEN)
-        return MagicMock(hidden_states=[self.proj(x)])
+    @property
+    def patches_during_forward(self) -> int | None:
+        return self.model.patches_during_forward
 
 
 def _encoder_module(fail: bool = False) -> _Encoder:
