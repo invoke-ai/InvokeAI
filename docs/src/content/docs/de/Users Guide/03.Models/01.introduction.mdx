@@ -1,0 +1,226 @@
+---
+title: Managing media generation models
+description: Install, add API keys for, edit and maintain image and video models in the Model Manager.
+lastUpdated: 2026-10-26
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import Callout from '@components/annotated/Callout.astro';
+import ModelManagerSketch from '@components/annotated/ModelManagerSketch.astro';
+
+Invoke generates with models: local models that run on your own hardware, and external models that run on a provider's servers. The **Model Manager** installs, configures and removes both.
+
+## Types of models
+
+<CardGrid>
+  <Card title="Image generation" icon="pencil">
+    Main models that turn a prompt into an image, change a starting image, or edit images by instruction.
+  </Card>
+  <Card title="Video generation" icon="window">
+    Models that make a video from a prompt, a starting image or another video.
+  </Card>
+  <Card title="Concepts" icon="puzzle">
+    Small add-ons, mostly **LoRAs** and **embeddings**, that teach a main model a style, theme or character.
+  </Card>
+  <Card title="Control and reference" icon="random">
+    **ControlNets**, **T2I Adapters** and **Control LoRAs** guide where things go, for example by copying a pose. **IP Adapters** and **FLUX Redux** take a reference image.
+  </Card>
+  <Card title="Upscalers" icon="up-arrow">
+    Enlarge images. The Model Manager lists them as **Image-to-Image** models.
+  </Card>
+  <Card title="Support models" icon="setting">
+    **VAEs** and text encoders, usually installed together with the main model that needs them. **LLaVA OneVision** describes images, and **Text LLMs** expand short prompts.
+  </Card>
+</CardGrid>
+
+Segmentation models (Segment Anything) are not installed here: they download the first time a tool uses them.
+
+## Local or external
+
+|          | Local model                                                                             | External model                                                      |
+| -------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Runs on  | Your GPU (or CPU)                                                                       | The provider's servers                                              |
+| Cost     | Free after the hardware and electricity                                                 | Billed by the provider for each request                             |
+| Hardware | Enough VRAM and disk space; see [System Requirements](/start-here/system-requirements/) | None beyond Invoke itself                                           |
+| Privacy  | Prompts and images stay on your machine                                                 | Prompts and input images are sent to the provider                   |
+| Internet | Only to download the model                                                              | Needed for every generation                                         |
+| Setup    | Install from the Model Manager                                                          | Add the provider's API key                                          |
+| Models   | Open-weights families such as FLUX, SDXL, Z-Image and Wan                               | Closed models such as GPT Image, Gemini and Seedream                |
+| Features | Everything in Invoke                                                                    | What the provider supports; see [External models](#external-models) |
+
+:::note[Model licensing]
+Some models carry license terms that limit commercial use or use on public servers, and following them is your responsibility. The [Model Families](/users-guide/models/model-families/#model-families) table lists each family's license, and each model's page has a **License** section.
+:::
+
+## Install your first model
+
+The Model Manager is for administrators: in [multi-user mode](/configuration/multi-user-mode/admin-guide/) other accounts don't see it. Open it from the Invoke menu at the top left (**Manage › Model Manager**) or from **Models** in the Launchpad. While no models are installed, the Launchpad's home page also shows the starter bundles.
+
+<ModelManagerSketch label="Sketch of the Model Manager: the installed model library on the left, and on the right the Add Models tab with a search field, a Scan models folder button, starter bundle chips, an Install button named after the bundle and starter models with Install buttons, above the install queue. Numbered callouts mark the controls described below.">
+  <Callout x={24.2} y={40} labelSide="right" label="Library">Your installed models, with their base and format. Search, filter and sort them above the list; click one to open it in the model's tab.</Callout>
+  <Callout x={28.4} y={4.25} labelSide="bottom" label="Library menu">**Refresh model list**, **Clean up orphaned models…** and **Empty model cache**, which unloads every model from RAM and VRAM.</Callout>
+  <Callout x={61.9} y={4.25} labelSide="bottom" label="Add Models">Starter models and every other way to install. It opens here while the library is empty.</Callout>
+  <Callout x={75.6} y={4.25} labelSide="bottom" label="API Keys">Keys for external providers, a HuggingFace token and a Civitai key.</Callout>
+  <Callout x={83} y={14.75} labelSide="top" label="Search or add">Type to search the starter models, or paste a URL, a HuggingFace repo ID or a path on the server. See [Other ways to install](#other-ways-to-install).</Callout>
+  <Callout x={74} y={22.5} labelSide="bottom" label="Scan models folder">Lists the model files in the server's models folder, whose path is shown beside the button, so you can register files copied there. The button turns into **Stop** while the scan runs. If the server can't report the folder, a message says so with **Retry**.</Callout>
+  <Callout x={90} y={29.75} labelSide="top" label="Bundles">**All** lists every starter model; each bundle chip lists the recommended models for one family. A check mark means the whole bundle is installed. The menu at the end filters and sorts the list.</Callout>
+  <Callout x={81.25} y={37} labelSide="left" label="Install bundle">**Install** followed by the bundle's name, such as **Install SDXL**. Queues every model of the chosen bundle that isn't installed yet.</Callout>
+  <Callout x={87.2} y={47.25} labelSide="left" label="Install">Installs one starter model and any models it depends on, such as its VAE or text encoder.</Callout>
+  <Callout x={82.5} y={94.5} labelSide="left" label="Install queue">Download and install progress. Expand it to pause, resume, retry or cancel installs and to clear finished ones.</Callout>
+</ModelManagerSketch>
+
+<Steps>
+
+1. Open the Model Manager. It shows **Add Models** when nothing is installed; otherwise open that tab.
+
+2. Choose the bundle chip for the model family you want, such as **FLUX.2**, **SDXL** or **Z-Image**. The [model family pages](/users-guide/models/model-families/#model-families) list what each family needs.
+
+3. Press **Install** followed by the bundle's name, such as **Install SDXL**, or **Install** on single models. Dependencies are queued with them.
+
+4. Follow the downloads in the **Install queue**. Large models take a while. A finished model appears in the library and in every model picker. Each row's stop button cancels its install; the **X** on a finished row only removes it from the list. Cancelling a download that has already fetched data asks first, since that data is discarded, and **Cancel all…** confirms how many installs it stops.
+
+</Steps>
+
+Until a model that can generate is installed, the Launchpad's **Home** page says so. Administrators can install the recommended starter bundle there in one click (it says what the bundle suits and links the hardware requirements) or open another bundle in the Model Manager; other users see a notice to ask an administrator. Home also counts installs that failed or need attention, with **Review** to open the install queue.
+
+## Other ways to install
+
+Paste a source into **Search or add**. The field recognizes what you typed and offers the matching button:
+
+| You enter                                | Example                                     | Button   | Result                                                                                                                                                 |
+| ---------------------------------------- | ------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A search term                            | `flux`                                      | None     | Filters the starter models.                                                                                                                            |
+| A download URL                           | `https://civitai.com/api/download/models/…` | **Pull** | Downloads and installs the file. A key button beside the field attaches a one-off access token to this download.                                       |
+| A HuggingFace repo ID                    | `stabilityai/sdxl-turbo`                    | **Pull** | A diffusers repo installs whole and a repo with one model file installs that file. A repo with several files lists them so you can install one or all. |
+| A file on the server, by absolute path   | `/data/loras/style.safetensors`             | **Pull** | Installs the file.                                                                                                                                     |
+| A folder on the server, by absolute path | `/data/loras/`                              | **Scan** | Lists the model files in the folder and which are installed, to install one or all. **Stop** cancels a slow scan.                                      |
+
+Text starting with `./` or `../`, or ending in a model file extension such as `.safetensors`, is treated as a search term unless it is an absolute path or URL. Other text shaped like `owner/name` is taken as a HuggingFace repo ID, so use absolute paths for local files. Two options appear before an install:
+
+* **Install in place** (local files): registers the file where it is. It is on by default and always on inside the models folder. Turned off, Invoke moves the file into its models folder.
+* **FP8 storage**: stores the weights in FP8 to roughly halve VRAM use, where the model's loader supports it.
+
+:::tip[A model in a repo subfolder]
+Add `::` and the subfolder to the repo ID. For the model in the `v2` folder of `monster-labs/control_v1p_sd15_qrcode_monster`, enter `monster-labs/control_v1p_sd15_qrcode_monster::v2`.
+:::
+
+:::note[Gated and login-only downloads]
+Some HuggingFace repos are gated and some Civitai models need a login. Add a **HuggingFace** token (stored on the server and checked with HuggingFace) or a **Civitai** key (stored in this browser only, attached to civitai.com downloads) under **API Keys**, and accept the model's license on its download page if asked. An install that is missing a token offers **Add token** in the install queue.
+:::
+
+## External models
+
+An external model has no weights to download. Saving a provider's API key adds that provider's models:
+
+<Steps>
+
+1. Get an API key from the provider's account page.
+
+2. In the Model Manager, open **API Keys** and find the provider: Alibaba Cloud (Qwen), Atlas Cloud, Google Gemini, OpenAI or Seedream. In **Add Models**, **Configure** on an external starter model opens the same card.
+
+3. Paste the key and press **Save**. **Override base URL** is optional, for a proxy or regional endpoint.
+
+4. Invoke queues the provider's starter models right away. Once added, they show as **Installed** in Add Models and appear in the model pickers.
+
+</Steps>
+
+Keys are stored on the server and used for every request to that provider. **Clear** removes the key and every model of that provider from the library. [Using external models](/users-guide/models/external-models/introduction/) covers the `api_keys.yaml` file, costs and each provider.
+
+<details>
+<summary>The External Provider settings of a model</summary>
+
+Opening an external model shows an **External Provider** section:
+
+* **Provider** and **Provider Model ID** route the requests. **Supported modes** (Text to image, Image to image, Inpaint), whether it accepts a seed, reference images or a negative prompt, and the limits (images per request, max reference images, max width and height) describe what the provider accepts. **Default width**, **Default height** and **Default image count** are what it is asked for by default. **Save Provider Settings** stores them.
+* The Generate panel and the Canvas offer only what the record advertises, so keep it in step with the provider's documentation.
+* The Canvas uses text to image and image to image only: its mask does not match any provider's edit mask. An advertised Inpaint mode serves workflows.
+* Models from the starter catalog are read-only, provider and model ID included, because Invoke applies the catalog entry to them on every load. Models added any other way can be edited.
+
+</details>
+
+## Edit, delete and bulk actions
+
+Click a model in the library to open it. Its **⋯** menu, and right-clicking its row in the library, hold the actions that change the whole record.
+
+| Action                       | How                                                                                                               | What happens                                                                                                                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rename, describe, reclassify | **Edit**                                                                                                          | Change the name, description, base, type, variant, format and **Source URL**. Changing the format reclassifies the model; invalid combinations are rejected.                                                           |
+| Default settings             | **Default Settings**, then **Save Defaults** (main models, LoRAs, control adapters)                               | Applied when the model is selected; a setting left off uses the app default.                                                                                                                                           |
+| Trigger phrases              | **Trigger Phrases** (main models, LoRAs, embeddings)                                                              | Offered in the prompt editor.                                                                                                                                                                                          |
+| Cover image                  | Click the model's image                                                                                           | Shown in the library and pickers. PNG, JPEG or WebP.                                                                                                                                                                   |
+| Related models               | **Related Models**                                                                                                | Linked models are suggested together elsewhere in the app.                                                                                                                                                             |
+| Run on CPU                   | **Run on CPU** (text encoders, VAEs, CLIP Vision, SigLIP, LLaVA OneVision, Text LLMs)                             | Saves VRAM; may be slower.                                                                                                                                                                                             |
+| Moved file                   | **Update path** beside the path (models installed in place outside the models folder, or whose files are missing) | Points Invoke at the file's new location. Nothing is moved or copied.                                                                                                                                                  |
+| Convert to diffusers         | **Convert to diffusers** (checkpoint main models of supported families)                                           | Replaces the checkpoint file with a diffusers folder.                                                                                                                                                                  |
+| Re-identify                  | **Re-identify model** in the menu                                                                                 | Re-reads the files to detect base, type, format and variant again.                                                                                                                                                     |
+| Delete                       | **Delete model** in the menu, then confirm                                                                        | Removes the model from Invoke. Its files are deleted only if they are inside Invoke's models folder, where everything the Model Manager downloads or moves goes; a model installed in place elsewhere keeps its files. |
+| Act on several models        | Tick their rows or **Select all**, then **Re-identify** or **Delete**                                             | Asks once for all of them. Models that fail stay selected, and a notice gives the counts and the first error.                                                                                                          |
+
+**Source URL** records where a model came from, such as its Civitai or HuggingFace page, and shows as a link in the model's details. It doesn't affect loading or updates.
+
+:::caution[Re-identify resets settings]
+Re-identify keeps the name, description, cover image, trigger phrases, install source and the CPU and FP8 storage choices. It resets the custom variant and the other default settings, and clears the **Source URL**: note it first. Re-identifying several models asks for confirmation first; the single-model action runs at once.
+:::
+
+## Maintenance
+
+<details>
+<summary>Recovering a failed installation</summary>
+
+Invoke retries temporary file permission errors during installation. If moving a model fails, it tries to restore the files to their source folder.
+
+* **The error says installation recovery is required.** Keep both the source and destination folders named in the error: some files may have moved while others remain at the source. Restore one complete model folder without overwriting files you need, then use **Scan** on it to register it. Files kept for recovery are not resumed or removed when Invoke restarts.
+* **All files moved but registering the model failed.** The complete model remains in the destination folder. Resolve the reported error, then use **Scan** on that folder.
+
+</details>
+
+<details>
+<summary>Finding orphaned models</summary>
+
+Model folders can stay in the models folder after their database entry is gone, for example after a failed install, a database reset, or files copied there by hand.
+
+<Steps>
+
+1. In the library's **⋯** menu, choose **Clean up orphaned models…**.
+
+2. The dialog lists every folder in the models folder without a database record, with its file count and size, or says the library is clean.
+
+3. Tick the folders to remove and press **Delete Selected**.
+
+</Steps>
+
+Without the web UI, an administrator can use the API: `GET /api/v2/models/sync/orphaned` lists the folders and `DELETE /api/v2/models/sync/orphaned` deletes the paths it is given.
+
+The opposite case, a model whose files are missing from disk, is marked **Missing file** in the library. The type filter's **Missing files** entry shows only those models.
+
+</details>
+
+<details>
+<summary>How models are identified</summary>
+
+Invoke identifies a model from its files, and falls back to its name only where the contents are the same:
+
+* **Standalone 16-channel VAEs.** FLUX.1 and SD3 use the same VAE network with different settings. A diffusers `vae/` folder is identified by its `config.json`, so FLUX.1-dev's folder is filed as FLUX.1 and SD3.5's as SD3. A single file such as `sd3_vae.safetensors` is identified by its name, folder or download source; if none of them names a model family, it is filed as FLUX.1. If a VAE lands under the wrong base, change **Base** with **Edit**. A `vae/` folder installed before this detection existed can be fixed with **Re-identify model**.
+* **FLUX.2 Klein 9B vs. Klein 9B Base.** The two are identical in structure, so the file or repo name decides, and they ship different default step counts (4 against 28). Names that say "distilled" are read as Klein 9B even when they also contain "base". If you installed `Winnougan/Klein9b-Distilled-Base-INT8-Convrot` by repo ID before this was fixed, it was filed as Klein 9B Base; remove and reinstall it.
+
+</details>
+
+### Exporting and importing model settings
+
+**Export settings…** and **Import settings…** in a model's **⋯** menu save its configuration to a `.json` file and apply one to the open model: to back up a tuned model before reinstalling it, copy settings to another install, or share a setup. The file holds settings, not weights:
+
+| Field                               | Contents                                                                                            |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `name`, `description`, `source_url` | The model's name, description and Source URL.                                                       |
+| `default_settings`                  | Default steps, CFG or guidance, scheduler, size, FP8 storage, VAE precision and the other defaults. |
+| `trigger_phrases`                   | Trigger phrases.                                                                                    |
+| `cpu_only`                          | The **Run on CPU** choice.                                                                          |
+| `cover_image`                       | The cover image, embedded as a data URL.                                                            |
+
+Fields you haven't set are left out. On import, top-level fields Invoke doesn't recognize are skipped, a field the model doesn't have is skipped and named in a notice, and the rest is applied. A default setting the receiving version doesn't know makes that model's import fail. A file is rejected if `source_url` is not an `http://` or `https://` URL or `cover_image` is not an image data URL.
+
+## Formats and families
+
+<LinkCard title="Model Formats and Families" description="Checkpoint and diffusers formats, quantized builds, the parts a model is made of, and every supported family with its license." href="/users-guide/models/model-families/" />
+
+<LinkCard title="Model Format Support" description="Which file formats each family's main models, text encoders, VAEs and LoRAs install from." href="/users-guide/models/model-format-support/" />
