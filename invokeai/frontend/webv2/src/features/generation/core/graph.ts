@@ -1062,6 +1062,7 @@ const buildQwenImageGraph = (
   const loraSource = activeLoras.length
     ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_lora_collection_loader', modelLoader, [
         'transformer',
+        'qwen_vl_encoder',
       ])
     : modelLoader;
   // The encoders default to `none`, so only an actual quantization choice reaches the graph.
@@ -1097,12 +1098,12 @@ const buildQwenImageGraph = (
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
-  addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
+  addEdge(graph, loraSource, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
-    addEdge(graph, modelLoader, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
+    addEdge(graph, loraSource, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
     addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
     addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
   }
@@ -1484,6 +1485,7 @@ const buildKrea2Graph = (
   const posCond = addNode(graph, { id: 'pos_cond', type: 'krea2_text_encoder' });
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'krea2_text_encoder' }) : null;
+  const negCondCollect = useCfg ? addNode(graph, { id: 'neg_cond_collect', type: 'collect' }) : null;
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
     height: settings.height,
@@ -1510,10 +1512,11 @@ const buildKrea2Graph = (
   addEdge(graph, positiveConditioningSource, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
-  if (negCond) {
+  if (negCond && negCondCollect) {
     addEdge(graph, loraSource, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
     addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
-    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+    addEdge(graph, negCond, 'conditioning', negCondCollect, 'item');
+    addEdge(graph, negCondCollect, 'collection', denoise, 'negative_conditioning');
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
@@ -1576,8 +1579,7 @@ const buildKrea2Graph = (
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
-      // Krea-2's negative conditioning feeds the denoise directly, so regional negatives have nothing to join.
-      negative: null,
+      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
       positive: posCond,
       positiveCollector: posCondCollect,
     },

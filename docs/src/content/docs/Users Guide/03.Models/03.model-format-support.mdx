@@ -40,7 +40,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | – | ✓ | – | – |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✓ | ✓ | ✗ |
-| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | R | – | ✓ | ✗ | ✗ |
 | [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✗ | ✗ |
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
@@ -61,7 +61,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
   builds, are refused at install. FLUX.3 and Ideogram 4 refuse every torchao export at install. MOSS-Image loads
   Comfy-Org's int8 build and GGUFs; its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao builds, are refused at
   install, unscaled fp8 included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported; Krea-2
-  refuses them at install.
+  and Qwen-Image refuse them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
@@ -80,7 +80,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | R | – | R | ✗ | ✗ |
 | Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | R | ✓ | R | ✗ | ✗ |
-| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✓ (text only) | ✗ |
+| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (text only) | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
@@ -227,6 +227,8 @@ factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and 
 Plain Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
 (`base_model.model.`) when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
+
+Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.

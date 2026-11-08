@@ -3,3 +3,6 @@
 
 # Prefix for Qwen Image Edit transformer LoRA layers
 QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
+
+# Prefix for Qwen2.5-VL text encoder LoRA layers
+QWEN_IMAGE_LORA_QWEN_VL_PREFIX = "lora_qwen_vl-"
