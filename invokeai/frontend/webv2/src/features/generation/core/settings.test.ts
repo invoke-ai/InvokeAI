@@ -730,6 +730,31 @@ describe('LoRA settings helpers', () => {
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);
   });
+
+  it('keeps SD 3 Large LoRAs off Medium models, and lets records without a variant through', () => {
+    const medium: MainModelConfig = {
+      base: 'sd-3',
+      key: 'sd35m',
+      name: 'SD 3.5 Medium',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, medium)).toBe(false);
+    // Installed before the variant existed: the denoise node checks those at run time.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3' }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
+      true
+    );
+    // The API sends null, not undefined, for a record without one.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
+    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
+  });
 });
 
 describe('model defaults', () => {
