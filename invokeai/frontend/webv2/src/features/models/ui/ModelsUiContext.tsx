@@ -1,4 +1,4 @@
-import type { ModelConfig } from '@features/models/core/types';
+import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { CalibrationGraphCompiler } from '@features/models/core/workingMemory';
 import type { ReactNode } from 'react';
 
@@ -11,7 +11,20 @@ export interface SchedulerChoice {
   value: string;
 }
 
-/** Generate's scheduler rules for one main model, so its defaults offer exactly what Generate runs. */
+/** One text encoder Generate takes for a main model, such as FLUX.1's T5 or a Klein's Qwen3 8B. */
+export interface TextEncoderSlotChoice {
+  /** Whether Generate puts `candidate` into this slot. */
+  accepts: (candidate: ModelConfig) => boolean;
+  /** Generate's settings key, unique among one model's slots. */
+  key: string;
+  label: string;
+  modelTypes: readonly ModelTaxonomyType[];
+}
+
+/**
+ * Generate's rules for one main model, so its defaults offer exactly what Generate runs: its scheduler choices and the
+ * text encoders its default encoders can fill.
+ */
 export interface ModelSchedulerPolicy {
   /** False where the base's graph ignores the scheduler; Generate hides the control there. */
   appliesToGraph: boolean;
@@ -19,9 +32,11 @@ export interface ModelSchedulerPolicy {
   defaultValue: string;
   /** Generate's choices for the base, led by `currentValue` when it is outside them. */
   options: readonly SchedulerChoice[];
+  /** Empty where Generate takes no standalone text encoder for the model. */
+  textEncoderSlots: readonly TextEncoderSlotChoice[];
 }
 
-/** The main model's architecture; Generate's scheduler rules key on these alone. */
+/** The main model's architecture; Generate's rules here key on these alone. */
 export type SchedulerPolicyModel = Pick<ModelConfig, 'base' | 'format' | 'variant'>;
 
 export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: string | null) => ModelSchedulerPolicy;

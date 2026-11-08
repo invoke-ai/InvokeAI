@@ -17,6 +17,7 @@ const ANIMA_POLICY: ModelSchedulerPolicy = {
     { label: 'Euler', value: 'euler' },
     { label: 'ER-SDE', value: 'er_sde' },
   ],
+  textEncoderSlots: [],
 };
 const IGNORED_POLICY: ModelSchedulerPolicy = { ...ANIMA_POLICY, appliesToGraph: false };
 
@@ -109,6 +110,31 @@ describe('getFieldsForModel scheduler row', () => {
   it('keeps the row second, after the VAE', () => {
     expect(fieldKeys(model('sdxl', 'main'), false).slice(0, 3)).toEqual(['vae', 'scheduler', 'steps']);
   });
+});
+
+describe('getFieldsForModel text encoders row', () => {
+  const qwen3Slot = {
+    accepts: () => true,
+    key: 'qwen3EncoderModel',
+    label: 'Qwen3 Encoder',
+    modelTypes: ['qwen3_encoder'],
+  };
+  const KLEIN_POLICY: ModelSchedulerPolicy = { ...IGNORED_POLICY, textEncoderSlots: [qwen3Slot] };
+
+  it("offers Generate's encoder slots after the VAE, turning on with nothing picked", () => {
+    const fields = getFieldsForModel(model('flux2', 'main'), false, KLEIN_POLICY);
+
+    expect(fields.map((field) => field.key).slice(0, 3)).toEqual(['vae', 'text_encoders', 'steps']);
+    expect(fields[1]).toMatchObject({ control: { kind: 'textEncoders', slots: [qwen3Slot] }, defaultValue: [] });
+  });
+
+  it.each(['loading', 'unavailable'] as const)(
+    'has no row while the rules are %s, or for a base without slots',
+    (rules) => {
+      expect(fieldKeys(model('flux2', 'main'), false, rules)).not.toContain('text_encoders');
+      expect(fieldKeys(model('sdxl', 'main'))).not.toContain('text_encoders');
+    }
+  );
 });
 
 describe('validateDefaults', () => {

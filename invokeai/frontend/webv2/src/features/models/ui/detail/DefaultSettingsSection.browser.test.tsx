@@ -1,7 +1,11 @@
+import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
+import type { ModelSchedulerPolicy, ModelsUiAdapter, SchedulerPolicyState } from '@features/models/ui/ModelsUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getFp8StorageSupportSnapshot } from '@features/models/data/fp8StorageSupportStore';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { ModelsUiProvider } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -219,5 +223,97 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
     });
 
     expect(api.getFp8StorageSupport).toHaveBeenCalledTimes(1);
+  });
+});
+
+const TEXT_ENCODERS_LABEL = 'models.defaultFields.textEncoders';
+const qwen3_8b = { base: 'any', key: 'qwen3-8b', name: 'Qwen3 8B', type: 'qwen3_encoder', variant: 'qwen3_8b' };
+const qwen3_4b = { ...qwen3_8b, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+/** A Klein 9B's rules: one Qwen3 slot that takes only the 8B encoder. */
+const KLEIN_POLICY: ModelSchedulerPolicy = {
+  appliesToGraph: false,
+  defaultValue: 'euler',
+  options: [],
+  textEncoderSlots: [
+    {
+      accepts: (candidate) => candidate.variant === 'qwen3_8b',
+      key: 'qwen3EncoderModel',
+      label: 'Qwen3 Encoder',
+      modelTypes: ['qwen3_encoder'],
+    },
+  ],
+};
+const KLEIN_POLICY_STATE: SchedulerPolicyState = { read: () => KLEIN_POLICY, status: 'ready' };
+const KLEIN_RULES_ADAPTER: ModelsUiAdapter = {
+  canManageModels: true,
+  enableModelDescriptions: true,
+  installInPlace: true,
+  isProjectActive: () => true,
+  managerProjectId: null,
+  schedulerPolicy: { getSnapshot: () => KLEIN_POLICY_STATE, load: () => undefined, subscribe: () => () => undefined },
+  setInstallInPlace: () => undefined,
+};
+
+describe('DefaultSettingsSection text encoders row', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    api.getFp8StorageSupport.mockResolvedValue([]);
+    api.updateModel.mockReset();
+    accountLifecycle.activate('text-encoders-test', ':user:text-encoders-test');
+    setModelsSnapshotForTests({ error: null, models: [qwen3_4b, qwen3_8b] as ModelConfig[], status: 'loaded' });
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    accountLifecycle.invalidate();
+  });
+
+  it('saves the encoder picked for a slot, offering only those Generate accepts there', async () => {
+    const model = settingsModel({ base: 'flux2', format: 'gguf_quantized', variant: 'klein_9b' });
+    api.updateModel.mockResolvedValue({ ...model, default_settings: { text_encoders: [qwen3_8b.key] } });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={KLEIN_RULES_ADAPTER}>
+            <DefaultSettingsSection model={model} onError={vi.fn()} onSaved={vi.fn()} />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const panel = [...host.querySelectorAll<HTMLElement>('div')].find(
+      (node) => node.firstElementChild?.textContent?.startsWith(TEXT_ENCODERS_LABEL) && node.querySelector('input')
+    );
+    expect(panel, 'the text encoders row is missing').toBeDefined();
+
+    await act(async () => {
+      panel!.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+      await Promise.resolve();
+    });
+    await act(() => panel!.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!.click());
+    await expect
+      .poll(() => [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? ''))
+      .toEqual([expect.stringContaining('Qwen3 8B')]);
+
+    await act(() => document.querySelector<HTMLElement>('[role="option"]')!.click());
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === 'models.saveDefaults');
+    await act(async () => {
+      save!.click();
+      await Promise.resolve();
+    });
+
+    expect(api.updateModel).toHaveBeenCalledWith(
+      'model-key',
+      expect.objectContaining({ default_settings: expect.objectContaining({ text_encoders: [qwen3_8b.key] }) }),
+      expect.anything()
+    );
   });
 });

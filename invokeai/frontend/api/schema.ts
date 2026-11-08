@@ -31516,6 +31516,11 @@ export type components = {
              */
             vae?: string | null;
             /**
+             * Text Encoders
+             * @description Default text encoders for this model (model keys). Generate fills each encoder slot the model uses with the first of these it accepts.
+             */
+            text_encoders?: string[] | null;
+            /**
              * Vae Precision
              * @description Default VAE precision for this model
              */

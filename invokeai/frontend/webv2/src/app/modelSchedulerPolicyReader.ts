@@ -6,7 +6,12 @@ import {
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
 } from '@features/generation/runtime';
-import { getDefaultGenerateSettings, getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/settings';
+import {
+  getDefaultGenerateSettings,
+  getDefaultTextEncoderSlots,
+  getGenerationUiPolicy,
+  getSchedulerOptions,
+} from '@features/generation/settings';
 
 type GenerateMainModel = Parameters<typeof getDefaultGenerateSettings>[0] & { type: 'main' };
 
@@ -18,6 +23,7 @@ const readSchedulerPolicy: SchedulerPolicyReader = (model, currentValue) => {
     appliesToGraph: getGenerationUiPolicy(mainModel).schedulerVisible,
     defaultValue: getDefaultGenerateSettings(mainModel).scheduler,
     options: getSchedulerOptions(mainModel, currentValue ?? undefined),
+    textEncoderSlots: getDefaultTextEncoderSlots(mainModel),
   };
 };
 

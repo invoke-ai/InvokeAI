@@ -299,9 +299,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [findImage, getUploadBoardId, queryClient, selectedGalleryImage]
   );
   const openInModelManager = useOpenModelInManager();
+  const applyModelDefaultsOnSwitch = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.applyModelDefaultsOnSwitch
+  );
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(
     () => ({
       ModelSelect,
+      applyDefaultsOnSwitch: applyModelDefaultsOnSwitch,
       catalog: modelsCatalog,
       ensureLoaded: ensureModelsLoaded,
       refresh: () => refreshModels(),
@@ -313,7 +317,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       openManager: (options) => openModelManager({ modelType: options?.modelType, projectId: project.activeProjectId }),
       status: modelsStatus,
     }),
-    [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
+    [applyModelDefaultsOnSwitch, modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
     () => ({

@@ -112,6 +112,8 @@ export interface GenerationUiAdapter {
   };
   models: {
     ModelSelect: ComponentType<GenerationModelSelectProps>;
+    /** Picking another model applies its defaults, as "Reset all to model defaults" does; an account preference. */
+    applyDefaultsOnSwitch: boolean;
     catalog: readonly GenerationModelCatalogItem[];
     ensureLoaded(): void;
     error: string | null;

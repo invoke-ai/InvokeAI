@@ -42,6 +42,7 @@ describe('selectProjectGenerateModel', () => {
     };
 
     const selection = selectProjectGenerateModel({
+      applyModelDefaults: false,
       isCanvasFrame: false,
       currentValues,
       generation: { setSettings },
@@ -62,11 +63,125 @@ describe('selectProjectGenerateModel', () => {
     expect(selection.status === 'switched' && selection.revertPatch).not.toHaveProperty('positivePrompt');
   });
 
+  it("applies the new model's defaults when asked, and its revert patch restores the values they replaced", () => {
+    const currentModel = createModel('sdxl');
+    const model: GenerateModelConfig = {
+      base: 'flux',
+      default_settings: { guidance: 3.5, scheduler: 'heun', steps: 20 },
+      key: 'flux-model',
+      name: 'flux-model',
+      type: 'main',
+    };
+    const setSettings = vi.fn();
+
+    const selection = selectProjectGenerateModel({
+      applyModelDefaults: true,
+      isCanvasFrame: false,
+      currentValues: { ...createSettings(currentModel, { scheduler: 'euler', steps: 42 }), model: currentModel },
+      generation: { setSettings },
+      model,
+      models: [currentModel, model],
+      projectId: 'project-1',
+    });
+
+    expect(setSettings).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ cfgScale: 3.5, modelKey: model.key, scheduler: 'heun', steps: 20 }),
+      'project-1'
+    );
+    expect(selection.status === 'switched' && selection.revertPatch).toMatchObject({ scheduler: 'euler', steps: 42 });
+  });
+
+  it('fills the only fitting encoder and VAE on a switch, and its revert patch empties them again', () => {
+    const currentModel = createModel('sdxl');
+    const model: GenerateModelConfig = {
+      base: 'flux2',
+      format: 'gguf_quantized',
+      key: 'klein-9b',
+      name: 'Klein 9B',
+      type: 'main',
+      variant: 'klein_9b',
+    };
+    const encoder = { base: 'any', key: 'qwen3-8b', name: 'Qwen3 8B', type: 'qwen3_encoder', variant: 'qwen3_8b' };
+    const vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
+    const setSettings = vi.fn();
+
+    const selection = selectProjectGenerateModel({
+      applyModelDefaults: false,
+      isCanvasFrame: false,
+      currentValues: { ...createSettings(currentModel), model: currentModel },
+      generation: { setSettings },
+      model,
+      models: [currentModel, model, encoder, vae],
+      projectId: 'project-1',
+    });
+
+    expect(setSettings).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ qwen3EncoderModel: encoder, vae }),
+      'project-1'
+    );
+    expect(selection.status === 'switched' && selection.revertPatch).toMatchObject({
+      qwen3EncoderModel: null,
+      vae: null,
+    });
+  });
+
+  it("fills required components on a project's first pick too", () => {
+    const model: GenerateModelConfig = {
+      base: 'flux2',
+      format: 'gguf_quantized',
+      key: 'klein-9b',
+      name: 'Klein 9B',
+      type: 'main',
+      variant: 'klein_9b',
+    };
+    const encoder = { base: 'any', key: 'qwen3-8b', name: 'Qwen3 8B', type: 'qwen3_encoder', variant: 'qwen3_8b' };
+
+    const selection = selectProjectGenerateModel({
+      applyModelDefaults: false,
+      isCanvasFrame: false,
+      currentValues: {},
+      generation: { setSettings: vi.fn() },
+      model,
+      models: [model, encoder],
+      projectId: 'project-empty',
+    });
+
+    expect(selection).toMatchObject({ result: { settings: { qwen3EncoderModel: encoder } }, status: 'switched' });
+  });
+
+  it("keeps a Canvas frame's size when it applies the new model's defaults", () => {
+    const currentModel = createModel('sdxl');
+    const model: GenerateModelConfig = {
+      base: 'sd-1',
+      default_settings: { height: 512, steps: 25, width: 512 },
+      key: 'sd1-model',
+      name: 'sd1-model',
+      type: 'main',
+    };
+    const setSettings = vi.fn();
+
+    selectProjectGenerateModel({
+      applyModelDefaults: true,
+      isCanvasFrame: true,
+      currentValues: { ...createSettings(currentModel, { height: 768, width: 1344 }), model: currentModel },
+      generation: { setSettings },
+      model,
+      models: [currentModel, model],
+      projectId: 'project-1',
+    });
+
+    expect(setSettings).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ height: 768, steps: 25, width: 1344 }),
+      'project-1'
+    );
+  });
+
   it('leaves a switch that removes something to the model card to confirm', () => {
     const currentModel = createModel('sdxl');
     const setSettings = vi.fn();
 
     const selection = selectProjectGenerateModel({
+      applyModelDefaults: false,
       isCanvasFrame: false,
       currentValues: { ...createSettings(currentModel, { vae: sdxlVae }), model: currentModel },
       generation: { setSettings },
@@ -89,6 +204,7 @@ describe('selectProjectGenerateModel', () => {
 
     expect(
       selectProjectGenerateModel({
+        applyModelDefaults: false,
         isCanvasFrame: false,
         currentValues: { ...createSettings(model), model },
         generation: { setSettings },
@@ -105,6 +221,7 @@ describe('selectProjectGenerateModel', () => {
     const setSettings = vi.fn();
 
     const selection = selectProjectGenerateModel({
+      applyModelDefaults: false,
       isCanvasFrame: false,
       currentValues: {},
       generation: { setSettings },

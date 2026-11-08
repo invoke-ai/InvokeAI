@@ -103,6 +103,8 @@ import {
   DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
   deriveAspectRatioId,
+  getModelDefaultVae,
+  hasModelDefaultVae,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
   IDEOGRAM4_MU_MAX,
@@ -115,6 +117,7 @@ import {
   isLoraCompatibleWithModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
+  isVaeModelConfig,
   KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
@@ -616,14 +619,20 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
   };
 };
 
+/**
+ * What "Reset all to model defaults" sets. With `models`, the installed models, it also sets the model's default VAE
+ * and text encoders (`getModelDefaultComponents`), which only resolve against them.
+ */
 export const getSettingsWithModelDefaults = (
   settings: GenerateSettings,
-  model: GenerateModelConfig
+  model: GenerateModelConfig,
+  models?: readonly ModelConfig[]
 ): GenerateSettings => {
   const modelDefaults = getDefaultGenerateSettings(model);
 
   return {
     ...settings,
+    ...(models ? getModelDefaultComponents(model, settings, models) : {}),
     aspectRatioId: modelDefaults.aspectRatioId,
     aspectRatioIsLocked: false,
     aspectRatioValue: modelDefaults.aspectRatioValue,
@@ -1461,6 +1470,125 @@ export const isComponentCompatibleWithModel = (
   return isSelectedComponentCompatible(slotPolicy, model, nextSettings, key);
 };
 
+/** The encoders a model conditions on. PiD's Gemma-2 belongs to that optional decoder and is left to its own slot. */
+const TEXT_ENCODER_TYPES: ReadonlySet<ModelTaxonomyType> = new Set([
+  ...TYPE_CLIP_EMBED,
+  ...TYPE_MISTRAL,
+  ...TYPE_QWEN3,
+  ...TYPE_QWEN35,
+  ...TYPE_QWEN3_VL,
+  ...TYPE_QWEN_VL,
+  ...TYPE_T5,
+  ...TYPE_WAN_T5,
+]);
+
+const isTextEncoderSlot = (slotPolicy: ComponentSlotPolicy): boolean =>
+  slotPolicy.valueKind === 'component' && slotPolicy.modelTypes.some((type) => TEXT_ENCODER_TYPES.has(type));
+
+/** The text encoder slots a model's `default_settings.text_encoders` can fill, for the Model Manager to offer. */
+export const getDefaultTextEncoderSlots = (
+  model: GenerateModelConfig
+): { accepts: (candidate: ModelConfig) => boolean; key: string; label: string; modelTypes: readonly string[] }[] => {
+  const settings = getDefaultGenerateSettings(model);
+
+  return getComponentSectionPolicy(model, settings)
+    .slots.filter(isTextEncoderSlot)
+    .map((slotPolicy) => ({
+      accepts: (candidate) =>
+        slotPolicy.modelTypes.includes(candidate.type) &&
+        isComponentCompatibleWithModel(model, settings, slotPolicy.key, candidate),
+      key: slotPolicy.key,
+      label: slotPolicy.label,
+      modelTypes: slotPolicy.modelTypes,
+    }));
+};
+
+/** The installed models `slotPolicy` offers for `model`, by the rule its picker and the switch apply. */
+const getSlotCandidates = (
+  slotPolicy: ComponentSlotPolicy,
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): ModelConfig[] =>
+  models.filter(
+    (candidate) =>
+      slotPolicy.modelTypes.includes(candidate.type) &&
+      isComponentCompatibleWithModel(model, settings, slotPolicy.key, candidate)
+  );
+
+/**
+ * The model's default VAE and text encoders by the setting each fills. Each encoder slot takes the first listed default
+ * it offers; a default that is not installed or fits no slot is left out. A default VAE that is not installed or not
+ * compatible clears the VAE, as it always has.
+ */
+export const getModelDefaultComponents = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): Partial<Pick<GenerateSettings, GenerateComponentValueKey>> => {
+  const components: Partial<Pick<GenerateSettings, GenerateComponentValueKey>> = hasModelDefaultVae(model)
+    ? { vae: getModelDefaultVae(model, models.filter(isVaeModelConfig)) }
+    : {};
+  const encoderKeys = model.type === 'external_image_generator' ? [] : (model.default_settings?.text_encoders ?? []);
+
+  if (encoderKeys.length === 0) {
+    return components;
+  }
+
+  for (const slotPolicy of getComponentSectionPolicy(model, settings).slots) {
+    if (!isTextEncoderSlot(slotPolicy)) {
+      continue;
+    }
+
+    const candidates = getSlotCandidates(slotPolicy, model, settings, models);
+    const encoder = encoderKeys
+      .map((key) => candidates.find((candidate) => candidate.key === key))
+      .find((candidate) => candidate !== undefined);
+
+    if (encoder) {
+      (components as Record<string, unknown>)[slotPolicy.key] = encoder;
+    }
+  }
+
+  return components;
+};
+
+/**
+ * Fills each text encoder and VAE slot the model requires but leaves empty: with the model's default when the slot
+ * offers it, else with the one installed model the slot offers. A filled slot is never replaced, and an optional one
+ * stays empty, since there an empty slot means the component the main model brings.
+ */
+const getSettingsWithRequiredComponentsFilled = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): GenerateSettings => {
+  const defaults = model.type === 'external_image_generator' ? undefined : model.default_settings;
+  const defaultKeys = [defaults?.vae, ...(defaults?.text_encoders ?? [])];
+  let filled = settings;
+
+  for (const slotPolicy of getComponentSectionPolicy(model, settings).slots) {
+    if (
+      (slotPolicy.valueKind !== 'vae' && !isTextEncoderSlot(slotPolicy)) ||
+      filled[slotPolicy.key] ||
+      !slotPolicy.required?.(getComponentPolicyContext(model, filled))
+    ) {
+      continue;
+    }
+
+    const candidates = getSlotCandidates(slotPolicy, model, filled, models);
+    const pick =
+      defaultKeys.map((key) => candidates.find((candidate) => candidate.key === key)).find(Boolean) ??
+      (candidates.length === 1 ? candidates[0] : undefined);
+
+    if (pick) {
+      filled = { ...filled, [slotPolicy.key]: pick };
+    }
+  }
+
+  return filled;
+};
+
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
 const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
@@ -2093,32 +2221,59 @@ const getSettingsWithCompatibleModelSelections = (
   };
 };
 
-/** Normalize, reconcile, and apply component policy before persisting model selection. */
+/**
+ * Normalize, reconcile, and apply component policy before persisting model selection. A switch to another model then
+ * fills the text encoders and VAE it requires and lacks (`getSettingsWithRequiredComponentsFilled`).
+ */
 export const getGenerateModelSelectionResult = ({
+  applyModelDefaults = false,
   currentValues,
   isCanvasFrame = false,
   model,
   models,
 }: {
+  /** A switch to another model starts from that model's defaults, as "Reset all to model defaults" sets them. */
+  applyModelDefaults?: boolean;
   currentValues: unknown;
   /** The width and height are the Canvas frame (a Canvas source), which the Canvas sync resizes to follow them. */
   isCanvasFrame?: boolean;
   model: GenerateModelConfig;
   models: readonly ModelConfig[];
 }): GenerateModelSelectionResult => {
-  const currentSettings = isGenerateSettings(currentValues)
+  const normalizedSettings = isGenerateSettings(currentValues)
     ? currentValues
-    : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
+    : normalizeGenerateSettings(currentValues);
+  const storedSettings = normalizedSettings ?? getDefaultGenerateSettings(model);
+  // A project without Generate values picks its first model, which is a switch too.
+  const isSwitch = normalizedSettings?.modelKey !== model.key;
+  // The previous model's key stays, so the transition still reports what the switch sets aside. A Canvas frame keeps
+  // its size: the user drew it, and it is not the model's to change.
+  const currentSettings =
+    applyModelDefaults && isSwitch
+      ? {
+          ...getSettingsWithModelDefaults(storedSettings, model, models),
+          modelKey: storedSettings.modelKey,
+          ...(isCanvasFrame
+            ? {
+                aspectRatioId: storedSettings.aspectRatioId,
+                aspectRatioIsLocked: storedSettings.aspectRatioIsLocked,
+                aspectRatioValue: storedSettings.aspectRatioValue,
+                height: storedSettings.height,
+                width: storedSettings.width,
+              }
+            : {}),
+        }
+      : storedSettings;
   const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models, isCanvasFrame);
   const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
-
-  if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {
-    return result;
-  }
+  const settings =
+    componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key
+      ? result.settings
+      : { ...result.settings, componentSourceModel };
 
   return {
     ...result,
-    settings: { ...result.settings, componentSourceModel },
+    settings: isSwitch ? getSettingsWithRequiredComponentsFilled(model, settings, models) : settings,
   };
 };
 

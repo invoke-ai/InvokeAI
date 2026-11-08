@@ -1492,6 +1492,7 @@
       "preprocessor": "Chosen automatically per image",
       "scheduler": "Uses the generator default for its base",
       "steps": "App default: 30",
+      "textEncoders": "A required encoder is picked when only one installed encoder fits",
       "vae": "Uses the compatible default VAE",
       "vaePrecision": "App default: fp16",
       "weight": "App default: 0.75",
@@ -1508,6 +1509,7 @@
       "preprocessor": "Preprocessor",
       "scheduler": "Scheduler",
       "steps": "Steps",
+      "textEncoders": "Text Encoders",
       "vae": "VAE",
       "vaePrecision": "VAE Precision",
       "weight": "Weight",
@@ -1516,6 +1518,7 @@
       "width": "Width"
     },
     "defaultSettings": "Default Settings",
+    "defaultTextEncoder": "No default encoder",
     "defaultVae": "Default VAE",
     "defaultSettingsHelp": "Applied automatically when this model is selected. Off = use the app default.",
     "defaultSettingsSaved": "Default settings saved",
@@ -2552,6 +2555,10 @@
       "showFocusRegionHighlight": {
         "label": "Highlight focused regions",
         "description": "Highlight the region receiving keyboard shortcuts."
+      },
+      "applyModelDefaultsOnSwitch": {
+        "label": "Apply model defaults when switching models",
+        "description": "Picking another model in Generate sets its default size, steps, CFG or guidance, scheduler, VAE and encoders, as Reset all to model defaults does. A Canvas frame keeps its size. Undo on the switch notice puts your values back."
       },
       "autoSwitchInvocationRoute": {
         "label": "Invoke follows what you edit",

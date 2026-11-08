@@ -76445,6 +76445,21 @@
             "title": "Vae",
             "description": "Default VAE for this model (model key)"
           },
+          "text_encoders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Encoders",
+            "description": "Default text encoders for this model (model keys). Generate fills each encoder slot the model uses with the first of these it accepts."
+          },
           "vae_precision": {
             "anyOf": [
               {

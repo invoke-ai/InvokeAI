@@ -24,6 +24,7 @@ export type ProjectGenerateModelSwitch =
 
 /** The palette's model switch, with the model picker's rule: a switch that loses nothing applies at once. */
 export const selectProjectGenerateModel = ({
+  applyModelDefaults,
   currentValues,
   generation,
   isCanvasFrame,
@@ -31,6 +32,7 @@ export const selectProjectGenerateModel = ({
   models,
   projectId,
 }: {
+  applyModelDefaults: boolean;
   currentValues: unknown;
   generation: Pick<WorkbenchGenerationCommands, 'setSettings'>;
   isCanvasFrame: boolean;
@@ -44,7 +46,7 @@ export const selectProjectGenerateModel = ({
     return { status: 'unchanged' };
   }
 
-  const result = getGenerateModelSelectionResult({ currentValues, isCanvasFrame, model, models });
+  const result = getGenerateModelSelectionResult({ applyModelDefaults, currentValues, isCanvasFrame, model, models });
 
   if (isLossyModelSwitch(result)) {
     return { result, status: 'needsConfirmation' };

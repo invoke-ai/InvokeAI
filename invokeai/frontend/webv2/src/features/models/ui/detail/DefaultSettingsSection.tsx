@@ -1,6 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { AnyModelDefaultSettings } from '@features/models/core/types';
-import type { SchedulerPolicyState } from '@features/models/ui/ModelsUiContext';
+import type { SchedulerPolicyState, TextEncoderSlotChoice } from '@features/models/ui/ModelsUiContext';
 
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
@@ -9,7 +9,7 @@ import {
   isFp8StorageSupported,
   useFp8StorageSupportSelector,
 } from '@features/models/data/fp8StorageSupportStore';
-import { replaceModelInStore } from '@features/models/data/modelsStore';
+import { replaceModelInStore, useModelsSelector } from '@features/models/data/modelsStore';
 import { ModelSelect } from '@features/models/ui/components/ModelSelect';
 import {
   applyModelDraftFields,
@@ -27,7 +27,7 @@ import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
+import { Button, Combobox, Field, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -136,6 +136,10 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
     );
   }
 
+  if (control.kind === 'textEncoders') {
+    return <TextEncoderPickers disabled={disabled} setValue={setValue} slots={control.slots} value={value} />;
+  }
+
   if (control.kind === 'model') {
     return (
       <ModelSelect
@@ -155,6 +159,53 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
   }
 
   return null;
+};
+
+/**
+ * One picker per encoder slot over a list of model keys. Each slot shows the first listed key it accepts, which is the
+ * one Generate puts there; picking replaces it and clearing removes it.
+ */
+const TextEncoderPickers = ({
+  disabled,
+  setValue,
+  slots,
+  value,
+}: {
+  disabled: boolean;
+  setValue: (value: unknown) => void;
+  slots: readonly TextEncoderSlotChoice[];
+  value: unknown;
+}) => {
+  const { t } = useTranslation();
+  const modelsByKey = useModelsSelector((snapshot) => snapshot.modelsByKey);
+  const keys = Array.isArray(value) ? value.filter((key): key is string => typeof key === 'string') : [];
+
+  return (
+    <Stack gap="2">
+      {slots.map((slot) => {
+        const selected =
+          keys.find((key) => {
+            const candidate = modelsByKey.get(key);
+            return candidate !== undefined && slot.accepts(candidate);
+          }) ?? null;
+
+        return (
+          <Field key={slot.key} disabled={disabled} label={slot.label}>
+            <ModelSelect
+              filter={slot.accepts}
+              isClearable
+              modelTypes={slot.modelTypes}
+              placeholder={t('models.defaultTextEncoder')}
+              showManagerButton={false}
+              size="lg"
+              value={selected}
+              onChange={(model) => setValue([...keys.filter((key) => key !== selected), ...(model ? [model.key] : [])])}
+            />
+          </Field>
+        );
+      })}
+    </Stack>
+  );
 };
 
 export const DefaultSettingsSection = ({
