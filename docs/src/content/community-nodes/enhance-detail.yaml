@@ -1,0 +1,16 @@
+title: Enhance Detail
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/enhance-detail-node
+summary: Increase or decrease the detail in an image with a guided filter.
+description: >-
+  Uses a guided filter, as opposed to the Gaussian blur most sharpening filters use. Based on the Enhance Detail node
+  of ComfyUI-Image-Filters.
+categories: [image-effects]
+dependencies: true
+links:
+  - label: ComfyUI-Image-Filters, the original node
+    url: https://github.com/spacepxl/ComfyUI-Image-Filters
+thumbnail: ./enhance-detail.webp
+images:
+  - src: https://raw.githubusercontent.com/skunkworxdark/enhance-detail-node/refs/heads/main/images/Comparison.png
+    alt: The same image with less and with more detail, side by side
