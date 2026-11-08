@@ -18,8 +18,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderGGUFLoader
-from invokeai.backend.model_manager.load.quantized_embedding import _PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from tests.backend.model_manager.load.qwen3vl_gguf_fixture import (
     FILL_VALUE,

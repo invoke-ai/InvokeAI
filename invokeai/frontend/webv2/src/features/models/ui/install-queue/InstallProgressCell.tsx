@@ -1,5 +1,5 @@
-import { Progress, Stack, Text } from '@chakra-ui/react';
 import { formatBytes } from '@platform/i18n/languages';
+import { ManagerQueueProgressBar } from '@platform/ui/ManagerQueue';
 import { useTranslation } from 'react-i18next';
 
 import type { InstallByteProgress, InstallRowStatus } from './queueModel';
@@ -8,11 +8,15 @@ import { describeEta } from './queueModel';
 
 const BAR_STATUSES: ReadonlySet<InstallRowStatus> = new Set(['downloading', 'installing', 'queued', 'paused']);
 
-export const formatEta = (t: (key: string, options?: Record<string, unknown>) => string, etaSeconds: number) => {
+const formatEta = (t: (key: string, options?: Record<string, unknown>) => string, etaSeconds: number) => {
   const eta = describeEta(etaSeconds);
 
   return t(`models.eta.${eta.unit}`, { count: eta.count });
 };
+
+/** Installing has no byte budget: sweep until the backend reports completion. */
+export const getInstallProgressValue = (progress: InstallByteProgress, status: InstallRowStatus): number | null =>
+  status === 'installing' ? null : status === 'queued' ? 0 : (progress.ratio ?? 0);
 
 export const InstallProgressBar = ({
   label,
@@ -22,25 +26,13 @@ export const InstallProgressBar = ({
   label: string;
   progress: InstallByteProgress;
   status: InstallRowStatus;
-}) => {
-  // Installing has no byte budget: sweep until the backend reports completion.
-  const value = status === 'installing' ? null : status === 'queued' ? 0 : (progress.ratio ?? 0);
-
-  return (
-    <Progress.Root
-      aria-label={label}
-      colorPalette={status === 'paused' ? 'gray' : 'accent'}
-      max={1}
-      minW="0"
-      value={value}
-      w="full"
-    >
-      <Progress.Track rounded="full">
-        <Progress.Range rounded="full" transition="width var(--wb-motion-duration-fast) ease" />
-      </Progress.Track>
-    </Progress.Root>
-  );
-};
+}) => (
+  <ManagerQueueProgressBar
+    label={label}
+    muted={status === 'paused'}
+    value={getInstallProgressValue(progress, status)}
+  />
+);
 
 /** One caption per row status, joined with middle dots so the column reads as a single line. */
 export const useInstallProgressCaption = ({
@@ -107,28 +99,5 @@ export const useInstallProgressCaption = ({
   return parts.filter((part): part is string => part !== null && part !== '').join(' · ');
 };
 
-export const InstallProgressCell = ({
-  progress,
-  queuePosition,
-  status,
-  typeLabel,
-}: {
-  progress: InstallByteProgress;
-  queuePosition: number | null;
-  status: InstallRowStatus;
-  typeLabel: string | null;
-}) => {
-  const { t } = useTranslation();
-  const caption = useInstallProgressCaption({ progress, queuePosition, status, typeLabel });
-
-  return (
-    <Stack gap="1" minW="0">
-      {BAR_STATUSES.has(status) ? (
-        <InstallProgressBar label={t('models.downloadProgress')} progress={progress} status={status} />
-      ) : null}
-      <Text color="fg.muted" fontFamily="mono" fontSize="xs" lineHeight="short" overflowWrap="anywhere">
-        {caption}
-      </Text>
-    </Stack>
-  );
-};
+/** Live, waiting, and paused rows carry a bar; settled rows only their caption. */
+export const hasInstallProgressBar = (status: InstallRowStatus): boolean => BAR_STATUSES.has(status);

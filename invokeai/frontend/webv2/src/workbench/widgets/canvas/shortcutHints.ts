@@ -2,6 +2,7 @@ import type { CanvasEngine, CanvasInteractionState, ToolId } from '@workbench/ca
 import type { ShortcutHint, ShortcutHintSnapshot, ShortcutHintSource } from '@workbench/hotkeys/hintSources';
 
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
 
 const gesture = (label: string, parts: readonly string[] = [], pointerKey?: string): ShortcutHint => ({
   labelKey: `workbench.shortcuts.actions.${label}`,
@@ -13,6 +14,10 @@ const ZOOM = gesture('zoom', [], 'scroll');
 const SAMPLE = gesture('sample', ['alt'], 'click');
 const CANCEL = gesture('cancel', ['esc']);
 const POLYGON_HINTS = [gesture('placePoint', [], 'click'), gesture('closePolygon', ['enter']), CANCEL];
+/** Alt held before or during a drag skips snapping to the grid (bbox, move, transform). */
+const FREE_OF_GRID = gesture('ignoreGrid', ['alt'], 'drag');
+/** C: hold for the Frame tool until release; a quick tap keeps it selected. */
+const FRAME_KEY = gesture('frameKey', ['c']);
 
 /** Fixed gestures follow engine tools; configurable commands are resolved by the Workbench host. */
 export const getCanvasShortcutHints = ({
@@ -22,7 +27,6 @@ export const getCanvasShortcutHints = ({
   hasTransform,
   hasSelection,
   canUndo,
-  isLocked,
   operation,
   samVisual,
 }: {
@@ -32,12 +36,11 @@ export const getCanvasShortcutHints = ({
   hasTransform: boolean;
   hasSelection: boolean;
   canUndo: boolean;
-  isLocked: boolean;
   operation: 'filter' | 'select-object' | null;
   samVisual: boolean;
 }): ShortcutHintSnapshot => {
   const hints: ShortcutHint[] = [];
-  if (isLocked || operation === 'filter' || (operation === 'select-object' && !samVisual)) {
+  if (operation === 'filter' || (operation === 'select-object' && !samVisual)) {
     return { hints: [PAN, ZOOM], titleKey: 'widgets.canvas.tools.view' };
   }
   const tool = operation === 'select-object' ? 'sam' : activeTool;
@@ -71,15 +74,27 @@ export const getCanvasShortcutHints = ({
       gesture('subtractSelection', ['alt'])
     );
   } else if (tool === 'shape') {
+    const isBox = shapeKind !== 'polygon' && shapeKind !== 'freehand';
     hints.push(
-      ...(shapeKind === 'polygon'
-        ? POLYGON_HINTS
-        : [
-            gesture('draw', [], 'drag'),
-            ...(shapeKind === 'freehand' ? [] : [gesture('constrain', ['shift'], 'drag')]),
-            CANCEL,
-          ])
+      ...(shapeKind === 'polygon' ? POLYGON_HINTS : [gesture('draw', [], 'drag'), CANCEL]),
+      ...(isBox ? [gesture('constrain', ['shift'], 'drag'), gesture('drawFromCenter', ['alt'], 'drag')] : []),
+      // The platform's mod key cuts out: ⌘ on macOS, Ctrl elsewhere.
+      gesture('cutOutShape', [MOD_KEY_LABEL])
     );
+  } else if (tool === 'bbox') {
+    hints.push(
+      gesture('moveFrame', [], 'drag'),
+      gesture('resizeFrame', [], 'handleDrag'),
+      gesture('constrainFrame', ['shift'], 'drag'),
+      gesture('resizeFromCenter', ['ctrl'], 'handleDrag'),
+      FREE_OF_GRID,
+      FRAME_KEY
+    );
+  } else if (tool === 'move') {
+    hints.push(gesture('moveLayer', [], 'drag'), gesture('constrainMove', ['shift'], 'drag'), FREE_OF_GRID, {
+      commandId: 'canvas.nudgeRight',
+      labelKey: 'workbench.shortcuts.actions.nudge',
+    });
   } else if (tool === 'view') {
     hints.push(gesture('pan', [], 'drag'), ZOOM);
   } else if (tool === 'colorPicker') {
@@ -88,6 +103,7 @@ export const getCanvasShortcutHints = ({
     hints.push(
       { commandId: 'canvas.brushSizeDown', labelKey: 'workbench.shortcuts.actions.smaller' },
       { commandId: 'canvas.brushSizeUp', labelKey: 'workbench.shortcuts.actions.larger' },
+      gesture('straightLine', ['shift'], 'click'),
       SAMPLE
     );
   }
@@ -117,8 +133,7 @@ const HINT_STATE_KEYS: readonly (keyof CanvasInteractionState)[] = [
 export const createCanvasShortcutHintSource = (
   engine: CanvasEngine,
   projectId: string,
-  instanceId: string,
-  lock: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
+  instanceId: string
 ): ShortcutHintSource => {
   const operations = getCanvasOperations(engine);
   let snapshot: ShortcutHintSnapshot | null = null;
@@ -135,7 +150,6 @@ export const createCanvasShortcutHintSource = (
         hasSelection: engine.interaction.get('hasSelection'),
         hasTransform:
           engine.interaction.get('transformSession') !== null || engine.interaction.get('hasFloatingSelection'),
-        isLocked: lock.getSnapshot(),
         lassoShape: engine.interaction.get('lassoOptions').shape,
         operation: operation.status === 'active' ? operation.identity.kind : null,
         samVisual: sam?.input.type === 'visual' && sam.status !== 'committing',
@@ -156,7 +170,6 @@ export const createCanvasShortcutHintSource = (
         ...HINT_STATE_KEYS.map((key) => engine.interaction.subscribe(key, listener)),
         operations.subscribeOperation(listener),
         operations.subscribeSamSession(listener),
-        lock.subscribe(listener),
       ];
       return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     },

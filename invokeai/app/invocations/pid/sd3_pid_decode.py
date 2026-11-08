@@ -3,6 +3,10 @@
 Replaces SD3's AutoencoderKL decode with the PiD pixel-diffusion super-res
 decoder (``PiD_res2k_sr4x_official_sd3_distill_4step``). Produces a 4x
 super-resolved image from an SD3 latent in a 4-step distill pass.
+
+The stored latent goes to PiD unchanged: PiD was trained on the SD3-normalized latent
+(``scale * (raw - shift)``, what the upstream tokenizer encodes to), not the raw latent the
+VAE's conv decoder consumes.
 """
 
 from contextlib import ExitStack
@@ -34,7 +38,6 @@ from invokeai.backend.pid.decode import (
     encode_caption_for_pid,
     estimate_pid_decode_working_memory,
 )
-from invokeai.backend.sd3.vae import SD3_VAE_SCALING_FACTOR, SD3_VAE_SHIFT_FACTOR
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -43,7 +46,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Latents to Image - SD3 + PiD (4x SR)",
     tags=["latents", "image", "pid", "sd3", "upscale"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -137,13 +140,13 @@ class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            denorm_latent = latents.to(device=device, dtype=dtype) / SD3_VAE_SCALING_FACTOR + SD3_VAE_SHIFT_FACTOR
+            latent = latents.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")
             decoder = PiDDecoder(pid_net, backbone=BaseModelType.StableDiffusion3)
             x0 = decoder.decode(
-                latent=denorm_latent,
+                latent=latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(

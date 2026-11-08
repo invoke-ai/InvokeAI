@@ -1,0 +1,9 @@
+title: Image Resize Plus
+author: VeyDlin
+repo: https://github.com/VeyDlin/image-resize-plus-node
+summary: Resize images to fill, stretch, fit, center or crop.
+categories: [sizing]
+thumbnail: ./image-resize-plus.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/image-resize-plus-node/master/.readme/node.png
+    alt: The Image Resize Plus node

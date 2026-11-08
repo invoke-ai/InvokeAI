@@ -4,6 +4,8 @@ import type {
   BboxToolOptions,
   BrushOptions,
   CanvasCoreStoreCapability,
+  CanvasHistoryCapability,
+  CanvasHistoryEntries,
   CanvasInteractionState,
   EraserOptions,
   GradientToolOptions,
@@ -170,6 +172,34 @@ export const useCanvasCanUndo = (engine: CanvasCoreStoreCapability): boolean =>
 export const useCanvasCanRedo = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'canRedo');
 
+type CanvasHistoryLabelEngine = CanvasCoreStoreCapability & {
+  readonly history: Pick<CanvasHistoryCapability, 'getEntries'>;
+};
+
+const readUndoLabel = (entries: CanvasHistoryEntries): string | undefined => entries.past.at(-1);
+const readRedoLabel = (entries: CanvasHistoryEntries): string | undefined => entries.future[0];
+
+/** One history entry's label, re-read on every history-stack mutation; null when there is none. */
+const useCanvasHistoryLabel = (
+  engine: CanvasHistoryLabelEngine,
+  read: (entries: CanvasHistoryEntries) => string | undefined
+): string | null => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine.interaction.subscribe('historyEpoch', listener),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => read(engine.history.getEntries()) ?? null, [engine, read]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
+
+/** The label of the step `undo()` would revert, or null with nothing to undo. */
+export const useCanvasUndoLabel = (engine: CanvasHistoryLabelEngine): string | null =>
+  useCanvasHistoryLabel(engine, readUndoLabel);
+
+/** The label of the step `redo()` would replay, or null with nothing to redo. */
+export const useCanvasRedoLabel = (engine: CanvasHistoryLabelEngine): string | null =>
+  useCanvasHistoryLabel(engine, readRedoLabel);
+
 /** Bumped on every history-stack mutation; a history list re-reads the entries on change. */
 export const useCanvasHistoryEpoch = (engine: CanvasCoreStoreCapability): number =>
   useCanvasInteractionState(engine, 'historyEpoch');
@@ -251,3 +281,15 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+/** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
+export const usePsdExportStatus = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['psdExportStatus'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('psdExportStatus', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};

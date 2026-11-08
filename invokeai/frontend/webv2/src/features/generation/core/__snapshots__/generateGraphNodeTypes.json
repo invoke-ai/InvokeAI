@@ -46,12 +46,15 @@
       "componentsFilled": {
         "diffusers": [],
         "standalone-components": [],
-        "diffusers-with-refiner": []
+        "diffusers-with-refiner": [],
+        "canvas-img2img-uncompensated": [],
+        "canvas-img2img-compensated": []
       },
       "nodeTypes": [
         "collect",
         "core_metadata",
         "denoise_latents",
+        "i2l",
         "img_nsfw",
         "img_watermark",
         "integer",
@@ -130,6 +133,30 @@
         "flux2_klein_model_loader",
         "flux2_klein_text_encoder",
         "flux2_vae_decode",
+        "flux_kontext",
+        "img_nsfw",
+        "img_watermark",
+        "integer",
+        "string"
+      ]
+    },
+    "flux3": {
+      "componentsFilled": {
+        "klein-diffusers": [],
+        "klein-standalone": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
+        "klein-base-diffusers": []
+      },
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "flux2_vae_decode",
+        "flux3_denoise",
+        "flux3_layout_prompt",
+        "flux3_model_loader",
+        "flux3_text_encoder",
         "flux_kontext",
         "img_nsfw",
         "img_watermark",
@@ -313,6 +340,10 @@
           "qwen3EncoderModel",
           "vae"
         ],
+        "qwen3-gguf": [
+          "qwen3EncoderModel",
+          "vae"
+        ],
         "qwen35": [
           "qwen35EncoderModel",
           "qwen3EncoderModel",
@@ -348,6 +379,7 @@
         "img_watermark",
         "integer",
         "moss_image_denoise",
+        "moss_image_layout_prompt",
         "moss_image_model_loader",
         "moss_image_text_encoder",
         "string"
@@ -620,6 +652,8 @@
     },
     "core_metadata": {
       "inputs": [
+        "ideogram4_caption",
+        "moss_image_layout_prompt",
         "negative_prompt",
         "positive_prompt",
         "seed"
@@ -641,6 +675,8 @@
         "clip_skip": [
           0
         ],
+        "control_layers": [],
+        "controlnets": [],
         "dype_exponent": [
           1
         ],
@@ -657,12 +693,14 @@
           "ernie_image_txt2img",
           "flux_txt2img",
           "flux2_txt2img",
+          "flux3_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
           "moss_image_txt2img",
           "qwen_image_2_1_txt2img",
           "qwen_image_txt2img",
           "sd3_txt2img",
+          "sdxl_img2img",
           "sdxl_txt2img",
           "txt2img",
           "wan_txt2img",
@@ -677,23 +715,39 @@
           768
         ],
         "hidiffusion": [
-          false
+          false,
+          true
+        ],
+        "hidiffusion_auto_ratios": [
+          false,
+          true
         ],
         "hidiffusion_raunet": [
           true
         ],
         "hidiffusion_t1_ratio": [
-          0.4
+          0,
+          null
         ],
         "hidiffusion_t2_ratio": [
-          0
+          0,
+          null
         ],
         "hidiffusion_window_attn": [
           true
         ],
         "ideogram4_color_palette": [],
+        "ideogram4_guidance_scale": [
+          null
+        ],
+        "ideogram4_mu": [
+          null
+        ],
         "ideogram4_sampler_preset": [
           "V4_QUALITY_48"
+        ],
+        "ideogram4_steps": [
+          null
         ],
         "ideogram4_unconditional_model": [],
         "is_intermediate": [
@@ -775,6 +829,7 @@
           false
         ],
         "steps": [
+          16,
           28,
           30,
           35,
@@ -785,12 +840,19 @@
           8,
           9
         ],
+        "strength": [
+          0.6
+        ],
+        "t2iAdapters": [],
         "t5_encoder": [],
         "use_cache": [
           true
         ],
         "vae": [],
         "wan_component_source": [],
+        "wan_guidance_scale_low_noise": [
+          null
+        ],
         "wan_t5_encoder_model": [],
         "width": [
           1024,
@@ -840,13 +902,24 @@
         ],
         "denoising_start": [
           0,
+          0.4,
           0.8
         ],
         "hidiffusion": [
+          false,
+          true
+        ],
+        "hidiffusion_auto_ratios": [
           false
         ],
         "hidiffusion_raunet": [
           true
+        ],
+        "hidiffusion_t1_ratio": [
+          0
+        ],
+        "hidiffusion_t2_ratio": [
+          0
         ],
         "hidiffusion_window_attn": [
           true
@@ -1265,6 +1338,126 @@
         "image"
       ]
     },
+    "flux3_denoise": {
+      "inputs": [
+        "kontext_conditioning",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          3.5
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          16,
+          50
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "flux3_layout_prompt": {
+      "inputs": [
+        "prompt"
+      ],
+      "literalInputs": {
+        "edit_targets": [
+          true
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "flux3_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "flux3_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "i2l": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "color_compensation": [
+          "None",
+          "SDXL"
+        ],
+        "fp32": [
+          true
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
     "ideogram4_caption_builder": {
       "inputs": [
         "prompt"
@@ -1584,9 +1777,6 @@
         "vae"
       ],
       "literalInputs": {
-        "color_compensation": [
-          "None"
-        ],
         "fp32": [
           true
         ],
@@ -1674,6 +1864,29 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "moss_image_layout_prompt": {
+      "inputs": [
+        "prompt"
+      ],
+      "literalInputs": {
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "regions": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "value"
       ]
     },
     "moss_image_model_loader": {

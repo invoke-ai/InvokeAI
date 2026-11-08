@@ -9,29 +9,38 @@
     "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
     "check-deploy-output": "node ./scripts/verify-deploy-output.mjs",
     "check-redirects": "node ./scripts/validate-redirect-targets.mjs",
-    "test": "node --test \"src/**/*.test.mjs\"",
+    "refresh-launcher-release": "node ./scripts/refresh-launcher-release.mjs",
+    "sync-app-search-index": "node ./scripts/sync-app-search-index.mjs",
+    "check-app-search-index": "node ./scripts/sync-app-search-index.mjs --check",
+    "test": "node --test \"src/**/*.test.mjs\" \"plugins/**/*.test.mjs\"",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "^7.3.2",
-    "@astrojs/starlight": "^0.42.6",
-    "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource-variable/roboto-mono": "^5.2.9",
-    "astro": "^7.3.8",
+    "@astrojs/markdown-remark": "^7.3.4",
+    "@astrojs/starlight": "^0.42.7",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
+    "@lucide/astro": "^1.61.0",
+    "astro": "^7.4.2",
     "github-slugger": "^2.0.0",
-    "mermaid": "^11.15.0",
+    "mermaid": "^12.2.0",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.35.5",
-    "starlight-changelogs": "^0.5.0",
-    "starlight-contextual-menu": "^0.1.5",
+    "starlight-changelogs": "^0.7.1",
     "starlight-links-validator": "^0.27.0",
-    "starlight-llms-txt": "^0.12.0"
+    "starlight-llms-txt": "^0.12.0",
+    "starlight-markdown": "^0.1.5",
+    "starlight-sidebar-topics": "^0.9.0"
   },
   "devDependencies": {
-    "node-addon-api": "^8.8.0",
-    "node-gyp": "^12.3.0"
+    "@mdx-js/mdx": "3.1.1",
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^13.1.0"
+  },
+  "engines": {
+    "node": ">=22.23.4"
   },
   "packageManager": "pnpm@10.12.4"
 }

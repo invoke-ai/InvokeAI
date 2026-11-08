@@ -26,6 +26,7 @@ from invokeai.backend.ltx2.text_conditioning import (
     estimate_connector_working_memory,
     estimate_tower_working_memory,
 )
+from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -128,6 +129,9 @@ class LTX2TextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.text_encoder.tokenizer)
         # Read off the unlocked model, before the VRAM lock the reservation applies to.
         tower_memory = estimate_tower_working_memory(text_encoder_info.model, self.max_sequence_length)
+        # A GGUF tower dequantizes each packed Linear inside the forward. The estimate above was measured on
+        # the int8 tower and already holds its own transient, so only the GGUF one is added.
+        tower_memory += peak_ggml_linear_dequant_transient_bytes(text_encoder_info.model)
         hidden_states: list[tuple[torch.Tensor, torch.Tensor]] = []
         with (
             tokenizer_info.model_on_device() as (_, tokenizer),

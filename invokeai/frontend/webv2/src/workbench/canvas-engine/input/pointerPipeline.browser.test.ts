@@ -44,7 +44,7 @@ const createInputHarness = () => {
             deactivations.push(id);
           }
         },
-        onKeyCommand: (_ctx, command) => events.push(`${id}:${command}`),
+        onKeyCommand: (_ctx, command) => events.push(`${id}:${command}`) > 0,
         onPointerCancel: () => events.push(`${id}:cancel`),
         onPointerDown: () => events.push(`${id}:down`),
         onPointerMove: () => events.push(`${id}:move`),
@@ -59,7 +59,6 @@ const createInputHarness = () => {
     getToolContext: () => ctx,
     initialToolId: 'brush',
     invalidateOverlay: () => undefined,
-    isLocked: () => false,
     publishActiveTool: () => undefined,
     stepBrushSize: () => undefined,
     updateCursor: () => undefined,

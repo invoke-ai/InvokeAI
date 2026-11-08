@@ -3,6 +3,7 @@ instances of the model exactly when the change affects how it loads. The load fe
 themselves to is covered by `tests/app/services/model_load/test_stale_model_load_fence.py`."""
 
 import gc
+import re
 import threading
 import time
 from pathlib import Path
@@ -29,21 +30,46 @@ from invokeai.backend.model_manager.configs.default_settings import MainModelDef
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_InvokeAI_SD1_Config
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config, Main_Checkpoint_SDXL_Config
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
     ModelSourceType,
+    ModelType,
     ModelVariantType,
+    Qwen35VariantType,
     SubModelType,
 )
+from invokeai.backend.tiny_autoencoder.checkpoint import (
+    TAELTX2_3,
+    TAEW2_1,
+    TAEW2_2,
+    TaehvLayout,
+    TinyAutoencoderLayout,
+)
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager.load.state_dicts import clip_g_comfy_keys, clip_l_comfy_keys
+from tests.backend.model_manager.load.state_dicts import (
+    clip_g_comfy_keys,
+    clip_l_comfy_keys,
+    flux3_pup_int8_convrot_keys,
+)
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 from tests.fixtures.spandrel_models import write_compact_upscaler
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.fixtures.tiny_autoencoders import (
+    TAEF2,
+    TAEQI2_1,
+    TAESD,
+    TAESD3,
+    diffusers_weights,
+    native_weights,
+    taehv_weights,
+)
 
 KEY = "model-key"
 MODEL_PATH = "sd-1/main/model.safetensors"
@@ -307,6 +333,21 @@ def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
     assert (later_install.default_settings.cpu_only, later_install.default_settings.fp8_storage) == (None, None)
 
 
+def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(harness: _Harness) -> None:
+    """A CLIP-G without the projection SD 3 needs is recognised and refused as unusable; the record is not touched."""
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    (harness.models_path / MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(harness.models_path / MODEL_PATH, keys)
+    record = _sd1_record()
+    harness.store.add_model(record)
+
+    with pytest.raises(InvalidModelException, match="Unable to identify model format: .*text_projection"):
+        harness.manager.reidentify_model(KEY)
+
+    assert harness.store.get_model(KEY) == record
+
+
 def test_reidentify_while_a_load_of_the_old_record_is_queued_rebuilds_it_from_the_new_record(
     harness: _Harness,
 ) -> None:
@@ -381,6 +422,50 @@ def test_reidentify_keeps_a_cpu_only_choice_held_on_the_config_itself(harness: _
     assert updated.cpu_only is cpu_only
 
 
+_COMFY_MOSS_INT8_URL = (
+    "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_int8_convrot.safetensors"
+)
+
+
+def _write_moss_int8_encoder(path: Path) -> Path:
+    """Comfy-Org's int8 MOSS-Image encoder: the key set of the FLUX.3 prompt upsampler, a Text LLM by its weights."""
+    return write_header_only_safetensors(
+        path, flux3_pup_int8_convrot_keys.state_dict_keys, flux3_pup_int8_convrot_keys.markers
+    )
+
+
+def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) -> None:
+    """A local copy has no source to tell the encoder from the upsampler, so the type it was installed with stays."""
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    installed = _identify(
+        path,
+        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        key=KEY,
+        path="encoder.safetensors",
+        name="Qwen3.5 9B (int8)",
+    )
+    assert isinstance(installed, Qwen35Encoder_Checkpoint_Config)
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert updated.variant is Qwen35VariantType.Qwen35_9B
+
+
+def test_reidentify_repairs_a_text_llm_record_installed_from_comfy_orgs_encoder_url(harness: _Harness) -> None:
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    installed = _identify(path, key=KEY, path="encoder.safetensors", name="encoder")
+    assert isinstance(installed, TextLLM_Checkpoint_Config)
+    installed.source, installed.source_type = _COMFY_MOSS_INT8_URL, ModelSourceType.Url
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert updated.source == _COMFY_MOSS_INT8_URL
+
+
 def test_reidentify_keeps_an_ip_adapter_encoder_override_its_files_leave_blank(harness: _Harness) -> None:
     model_path = harness.models_path / "ip-adapter"
     model_path.mkdir()
@@ -435,6 +520,93 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(harness: _Har
     harness.store.add_model(installed)
 
     assert harness.manager.reidentify_model(KEY).base is BaseModelType.StableDiffusion3
+
+
+def _write_tae(path: Path, layout: TinyAutoencoderLayout, combined: bool = True) -> None:
+    """A TAESD file in the combined or native layout, or a TAEHV file (which has only one)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(layout, TaehvLayout):
+        save_file(taehv_weights(layout, dtype=torch.float16), path)
+        return
+    native = native_weights(layout, dtype=torch.float16)
+    save_file(diffusers_weights(native) if combined else native, path)
+
+
+# The Tiny AutoEncoders whose weights do not say which they are, so only a name can: the four that share their latent
+# space with another base, and the two whose network is also published as an unsupported twin.
+_NAME_AMBIGUOUS_TAES = [
+    pytest.param("taesd", TAESD, False, BaseModelType.StableDiffusion1, id="taesd"),
+    pytest.param("taesdxl", TAESD, False, BaseModelType.StableDiffusionXL, id="taesdxl"),
+    pytest.param("taesd3", TAESD3, True, BaseModelType.StableDiffusion3, id="taesd3"),
+    pytest.param("taef1", TAESD3, True, BaseModelType.Flux, id="taef1"),
+    pytest.param("taew2_1", TAEW2_1, True, BaseModelType.Wan, id="taew2_1"),
+    pytest.param("taeltx2_3", TAELTX2_3, True, BaseModelType.LTX2, id="taeltx2_3"),
+]
+
+
+@pytest.mark.parametrize(("folder", "layout", "combined", "base"), _NAME_AMBIGUOUS_TAES)
+def test_reidentify_keeps_the_base_a_local_install_read_off_the_folder_it_came_from(
+    harness: _Harness, folder: str, layout: TinyAutoencoderLayout, combined: bool, base: BaseModelType
+) -> None:
+    """The install moves the file into a folder named for its key and keeps its generic name. The folder that named the
+    TAE survives only in the recorded source path."""
+    source = harness.models_path.parent / "downloads" / folder / "diffusion_pytorch_model.safetensors"
+    _write_tae(source, layout, combined)
+
+    key = harness.manager.install.install_path(source)
+
+    installed = harness.store.get_model(key)
+    assert installed.base is base
+    assert Path(installed.path) == Path(key) / "diffusion_pytorch_model.safetensors"
+    assert harness.manager.reidentify_model(key).base is base
+
+
+_TAE_STARTERS = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+
+# What each published TAE's file holds, by the TAE's name.
+_PUBLISHED_TAE_LAYOUTS: dict[str, tuple[TinyAutoencoderLayout, bool]] = {
+    "taesd": (TAESD, False),
+    "taesdxl": (TAESD, False),
+    "taesd3": (TAESD3, True),
+    "taef1": (TAESD3, True),
+    "taef2": (TAEF2, True),
+    "taeqi2_1": (TAEQI2_1, True),
+    "taew2_1": (TAEW2_1, True),
+    "taew2_2": (TAEW2_2, True),
+    "taeltx2_3": (TAELTX2_3, True),
+}
+
+
+def _tae_name(starter: StarterModel) -> str:
+    """The TAE's name: its Hugging Face repo, or its file in the TAEHV GitHub repo."""
+    match = re.search(r"madebyollin/(?:taehv/raw/[0-9a-f]+/safetensors/)?(?P<name>\w+)", starter.source)
+    assert match is not None, starter.source
+    return match["name"]
+
+
+@pytest.mark.parametrize("starter", _TAE_STARTERS, ids=_tae_name)
+def test_reidentify_keeps_the_base_of_a_tiny_autoencoder_starter(harness: _Harness, starter: StarterModel) -> None:
+    """A starter downloads to a file named like its URL, filed under the base the starter sets, then moved into a folder
+    named for its key. TAESD3 and TAEF1 publish the same generic file name; their URLs name them."""
+    path = harness.models_path / KEY / starter.source.rsplit("/", 1)[-1]
+    _write_tae(path, *_PUBLISHED_TAE_LAYOUTS[_tae_name(starter)])
+    installed = ModelConfigFactory.from_model_on_disk(
+        path,
+        {
+            "key": KEY,
+            "base": starter.base,
+            "type": starter.type,
+            "format": starter.format,
+            "name": starter.name,
+            "source": starter.source,
+            "source_type": ModelSourceType.Url,
+        },
+        allow_unknown=False,
+    ).config
+    assert installed is not None and installed.base is starter.base
+    harness.store.add_model(installed)
+
+    assert harness.manager.reidentify_model(KEY).base is starter.base
 
 
 def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harness: _Harness) -> None:

@@ -182,7 +182,7 @@ class LoadedModelWithoutConfig:
                 # invariant turning this loop into a spin.
                 assert settled, "uncapped continue_lock pass did not settle"
 
-    def _lock_on_device(self, working_mem_bytes: Optional[int]) -> None:
+    def _lock_on_device(self, working_mem_bytes: Optional[int], *, offload_others: bool = False) -> None:
         """Lock the model onto its compute device and repair its required tensors there. Nothing stays locked if this
         raises.
 
@@ -191,6 +191,11 @@ class LoadedModelWithoutConfig:
         a co-lock, which moves weights and is kept out of the window's peak; on another thread it voids the window.
         The lock is in `probe.locking` from before `armed` is read until it has settled or failed, so a window that
         opens on this cache meanwhile is void even if this read missed the scope arming.
+
+        `offload_others`: first move every other unlocked model on the device to RAM whole, within that interval. A
+        calibration lock asks for it (`model_on_device`): the lock itself offloads only the shortfall it predicts and
+        splits the last model it moves, and a split can free a little less than predicted, so the measured model would
+        run partly resident and its window fit no line. Locked models, a window's co-locks among them, stay.
         """
         observed = locked = False
         probe.locking.append(self._cache)
@@ -198,6 +203,11 @@ class LoadedModelWithoutConfig:
             observed = probe.armed
             if observed:
                 probe.lock_started(self._cache, self._cache_record)
+            if offload_others:
+                # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
+                # dicts, which must not overlap a model construction.
+                with MODEL_LOAD_LOCK.read_lock():
+                    self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
             self._lock_paced(working_mem_bytes)
             locked = True
             self._end_first_use_window()
@@ -234,8 +244,9 @@ class LoadedModelWithoutConfig:
             model.
         :param working_memory: A working-memory estimate whose `reservation_bytes` is kept available instead; see
             `invokeai.backend.working_memory`. Pass this or `working_mem_bytes`, not both. Inside a calibration scope
-            (`working_memory.probe`) on a GPU, the lock reserves calibration headroom on top and the probe measures the
-            operation from the settled lock until the unlock.
+            (`working_memory.probe`) on a GPU, the lock first moves every other unlocked model on the device to RAM,
+            reserves calibration headroom on top, and the probe measures the operation from the settled lock until the
+            unlock.
         """
         if isinstance(working_mem_bytes, WorkingMemoryEstimate):
             raise TypeError(
@@ -250,13 +261,11 @@ class LoadedModelWithoutConfig:
                 f"Working memory for {self._cache_record.key}: {working_memory.estimator} reserves "
                 f"{working_mem_bytes / 2**20:.0f} MB ({working_memory.source})"
             )
-            scope = probe.current_scope()
-            if scope is not None and self.compute_device.type != "cpu":
-                calibration = scope
-                working_mem_bytes = probe.calibration_reservation(working_mem_bytes)
+            calibration, working_mem_bytes = probe.lock_reservation(working_mem_bytes, self.compute_device)
+            if calibration is not None:
                 message += f"; the calibration lock reserves {working_mem_bytes / 2**20:.0f} MB"
             InvokeAILogger.get_logger(__name__).debug(message)
-        self._lock_on_device(working_mem_bytes)
+        self._lock_on_device(working_mem_bytes, offload_others=calibration is not None)
         window = None
         try:
             if calibration is not None:

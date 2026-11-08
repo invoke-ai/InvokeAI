@@ -13,6 +13,7 @@ export type ModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
@@ -55,6 +56,7 @@ export type ModelTaxonomyType =
   | 'gemma4_encoder'
   | 'pid_decoder'
   | 'ltx2_duration_head'
+  | 'tiny_autoencoder'
   | 'siglip'
   | 'spandrel_image_to_image'
   | 'flux_redux'
@@ -177,7 +179,6 @@ export interface ModelConfig {
   format: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -189,6 +190,8 @@ export interface ModelConfig {
   image_encoder_model_id?: string;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
+  /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */
+  control_architecture?: 'fun_union' | 'instantx_union';
   /** Spandrel upscalers: native scale (1 = same size); null when installed before it was recorded. */
   scale?: number | null;
   /** External API models. */
@@ -209,7 +212,6 @@ export interface ModelRecordChanges {
   format?: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -302,6 +304,7 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  previous_sources?: string[];
 }
 
 export interface StarterModelBundle {

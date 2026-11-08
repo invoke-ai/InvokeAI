@@ -117,7 +117,7 @@ describe('tool strip family slots', () => {
     root = null;
   });
 
-  const renderStrip = async (props: Partial<ComponentProps<typeof ToolStrip>> = {}) => {
+  const renderStrip = async () => {
     const fake = createFakeEngine();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -125,7 +125,7 @@ describe('tool strip family slots', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <ToolStrip engine={fake.engine} {...props} />
+          <ToolStrip engine={fake.engine} />
         </ChakraProvider>
       );
     });
@@ -326,7 +326,7 @@ describe('tool strip family slots', () => {
     const extensions = createExtensionRegistry();
     const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
     for (const [id, key] of [
-      ['canvas.tool.marquee', 'u'],
+      ['canvas.tool.marquee', 'm'],
       ['canvas.tool.lasso', 'l'],
     ] as const) {
       extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
@@ -374,7 +374,7 @@ describe('tool strip family slots', () => {
     const extensions = createExtensionRegistry();
     const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
     for (const [id, key] of [
-      ['canvas.tool.marquee', 'u'],
+      ['canvas.tool.marquee', 'm'],
       ['canvas.tool.lasso', 'l'],
     ] as const) {
       extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
@@ -385,7 +385,7 @@ describe('tool strip family slots', () => {
       await renderStrip();
       const marquee = (await button('Marquee select').element()) as HTMLElement;
       await hoverSlot(marquee);
-      await expect.poll(tooltipText).toBe(`Marquee select (U)${MARQUEE_HELP}`);
+      await expect.poll(tooltipText).toBe(`Marquee select (M)${MARQUEE_HELP}`);
 
       await openByContextMenu(marquee);
       await act(() => userEvent.click(page.getByRole('menuitemradio', { name: /^Lasso select/ })));
@@ -420,35 +420,35 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('lasso');
   });
 
-  it('disables the open menu entries when an interaction lock engages', async () => {
-    const fake = await renderStrip();
-    const shape = (await button('Shape').element()) as HTMLElement;
-    await openByContextMenu(shape);
-    await act(() => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <ToolStrip isInteractionLocked engine={fake.engine} />
-        </ChakraProvider>
-      );
-    });
-    await expect.element(entry('Star')).toHaveAttribute('aria-disabled', 'true');
-    await act(() => userEvent.click(entry('Star'), { force: true }));
-    expect(fake.shapeKind).toBe('rect');
-  });
+  it('names the key that selects each tool in its tooltip, remaps included', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.eraser': ['q'] } });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.brush', 'b'],
+      ['canvas.tool.eraser', 'e'],
+      ['canvas.transformSelected', 'shift+t'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
 
-  it('disables the family slots under an interaction lock, hold included', async () => {
-    await renderStrip({ isInteractionLocked: true });
-    const shape = (await button('Shape').element()) as HTMLElement;
-    expect((shape as HTMLButtonElement).disabled).toBe(true);
-    const at = centre(shape);
-    await act(() => {
-      shape.dispatchEvent(pointerAt('pointerdown', at.x, at.y));
-    });
-    await act(() => wait(450));
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    expect(document.querySelector('[role="menu"]')).toBeNull();
+    try {
+      await renderStrip();
+      await hoverSlot((await button('Brush').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Brush (B)');
+      await hoverSlot((await button('Eraser').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Eraser (Q)');
+      await hoverSlot((await button('Transform').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Transform (Shift+T)');
+      // The frame tool's key is C, held or tapped, which its help line explains.
+      await hoverSlot((await button('Generation frame').element()) as HTMLElement);
+      await expect
+        .poll(tooltipText)
+        .toBe('Generation frame (C)Hold C to use it until you let go; tap C to stay on it.');
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
   });
 });

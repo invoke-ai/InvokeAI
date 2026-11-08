@@ -120,6 +120,7 @@ const createHarness = (
     activeToolId = id;
   });
   const ctx = {} as ToolContext;
+  const gestureChanges: boolean[] = [];
 
   const deps: PointerPipelineDeps = {
     getActiveTool: () => tool,
@@ -132,12 +133,13 @@ const createHarness = (
     hasTool: (id) => registered.has(id),
     isReplaying: () => opts.replaying?.() ?? false,
     maybeCommitModalSession: opts.maybeCommitModalSession,
+    onGestureChange: (active) => gestureChanges.push(active),
     setTool,
     updateCursor: vi.fn(),
     viewport: createViewport(),
   };
 
-  return { captures, deps, pipeline: createPointerPipeline(deps), releases, setTool, tool };
+  return { captures, deps, gestureChanges, pipeline: createPointerPipeline(deps), releases, setTool, tool };
 };
 
 // ---- Tests -----------------------------------------------------------------
@@ -342,36 +344,44 @@ describe('pointer pipeline: multi-pointer isolation during an active gesture', (
 });
 
 describe('pointer pipeline: gesture-active state', () => {
-  it('reports the primary-button gesture from down to up', () => {
+  it('reports the primary-button gesture from down to up, announcing it before the tool sees the press', () => {
     const h = createHarness();
+    const announcedAtToolDown: boolean[][] = [];
+    h.tool.onPointerDown = () => announcedAtToolDown.push([...h.gestureChanges]);
     expect(h.pipeline.isGestureActive()).toBe(false);
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
     expect(h.pipeline.isGestureActive()).toBe(true);
+    expect(announcedAtToolDown).toEqual([[true]]);
     h.pipeline.onPointerMove(makePointerEvent({ pointerId: 1, clientX: 10 }));
     expect(h.pipeline.isGestureActive()).toBe(true);
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 1 }));
     expect(h.pipeline.isGestureActive()).toBe(false);
+    expect(h.gestureChanges).toEqual([true, false]);
   });
 
-  it('clears on pointercancel, Escape, and reset', () => {
+  it.each([
+    ['pointercancel', (h: ReturnType<typeof createHarness>) => h.pipeline.onPointerCancel(makePointerEvent())],
+    ['Escape', (h: ReturnType<typeof createHarness>) => h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape' }))],
+    ['reset', (h: ReturnType<typeof createHarness>) => h.pipeline.reset()],
+    ['cancelActiveGesture', (h: ReturnType<typeof createHarness>) => h.pipeline.cancelActiveGesture()],
+    ['a tool switch', (h: ReturnType<typeof createHarness>) => h.pipeline.endForToolSwitch()],
+  ])('clears once on %s; repeats and the later release announce nothing more', (_, end) => {
     const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    h.pipeline.onPointerCancel(makePointerEvent({ pointerId: 1 }));
+    h.pipeline.onPointerDown(makePointerEvent());
+    end(h);
+    end(h);
     expect(h.pipeline.isGestureActive()).toBe(false);
-
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 2 }));
-    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape' }));
-    expect(h.pipeline.isGestureActive()).toBe(false);
-
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
-    h.pipeline.reset();
-    expect(h.pipeline.isGestureActive()).toBe(false);
+    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0 }));
+    expect(h.gestureChanges).toEqual([true, false]);
   });
 
   it('does not report a middle-mouse pan as a gesture', () => {
     const h = createHarness();
     h.pipeline.onPointerDown(makePointerEvent({ button: 1, buttons: 4 }));
     expect(h.pipeline.isGestureActive()).toBe(false);
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 4, clientX: 10 }));
+    h.pipeline.onPointerUp(makePointerEvent({ button: 1, buttons: 0 }));
+    expect(h.gestureChanges).toEqual([]);
   });
 });
 
@@ -653,7 +663,7 @@ describe('pointer pipeline: injected key owner', () => {
     const resolveKeyOwner = vi.fn((_event: KeyboardEvent) => owner);
     const h = createHarness({ handleEscape, resolveKeyOwner, tools: ['view', 'brush', 'bbox', 'colorPicker'] });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands, handleEscape, resolveKeyOwner };
   };
   const BODY = { tagName: 'BODY' };
@@ -738,7 +748,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
   const applyHarness = () => {
     const h = createHarness();
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands };
   };
 
@@ -761,7 +771,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     const handleEscape = vi.fn();
     const h = createHarness({ handleEscape });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     h.pipeline.onPointerEnter();
     const body = { tagName: 'BODY' };
     const release = registerModalPresence();
@@ -816,6 +826,7 @@ describe('pointer pipeline: history replay', () => {
 
     replaying = false;
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 2 }));
+    expect(h.gestureChanges).toEqual([]);
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
     expect(h.tool.downs).toHaveLength(1);
   });

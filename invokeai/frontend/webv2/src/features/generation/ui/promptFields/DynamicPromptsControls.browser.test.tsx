@@ -1,8 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
+import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -35,11 +37,38 @@ const pageErrors: string[] = [];
 
 const BASE_CONFIG: DynamicPromptsConfig = {
   combinatorial: true,
+  enabled: true,
   maxPrompts: 100,
   resample: true,
   sampleSeed: 0,
   seedBehaviour: 'per-iteration',
 };
+
+const PROMPT = 'a {red|green} cat';
+
+const NO_PROMPT_ELEMENT = { element: () => null };
+
+/** The button with the expansion its prompt field would hand it. */
+const ExpandingButton = ({ config }: { config: DynamicPromptsFieldConfig }) => (
+  <DynamicPromptsButton
+    batchCount={2}
+    config={config}
+    expansion={useDynamicPrompts(PROMPT, config)}
+    highlightExpandedPrompts
+    syntaxProfile="compel"
+    promptEditor={NO_PROMPT_ELEMENT}
+    showSyntaxHighlighting
+    onInsertText={vi.fn()}
+    onUsePrompt={vi.fn()}
+  />
+);
+
+/** The switch whose label reads `label` (the i18n key: no instance is bootstrapped here). */
+const switchRoot = (label: string) =>
+  [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="root"]')].find(
+    (root) => root.querySelector('[data-part="label"]')?.textContent === label
+  )!;
+const SEED_SWITCH = 'widgets.generate.dynamicPrompts.newSeedPerImage';
 
 /** Use stateful controlled values so toggles can round-trip. */
 const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void = vi.fn(), isSeedFixed = false) => {
@@ -53,8 +82,7 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
     root?.render(
       <QueryClientProvider client={client}>
         <ChakraProvider value={system}>
-          <DynamicPromptsButton
-            batchCount={2}
+          <ExpandingButton
             config={{
               ...config,
               isSeedFixed,
@@ -64,12 +92,6 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
                 void act(() => draw());
               },
             }}
-            highlightExpandedPrompts
-            syntaxProfile="compel"
-            positivePrompt="a {red|green} cat"
-            showSyntaxHighlighting
-            onInsertText={vi.fn()}
-            onUsePrompt={vi.fn()}
           />
         </ChakraProvider>
       </QueryClientProvider>
@@ -111,13 +133,32 @@ afterEach(async () => {
 });
 
 describe('dynamic prompts popover controls', () => {
+  it('turns dynamic prompts off, leaving only the switch and no expansion', async () => {
+    const onChange = vi.fn();
+
+    await render(onChange);
+    await vi.waitFor(() => expect(parseDynamicPrompts).toHaveBeenCalledOnce());
+    await openPopover();
+
+    await act(async () => {
+      await userEvent.click(switchRoot('widgets.generate.dynamicPrompts.enabled'));
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ enabled: false });
+    expect(switchRoot(SEED_SWITCH), 'the expansion settings go with it').toBeUndefined();
+    expect(document.body.textContent).toContain('widgets.generate.dynamicPrompts.disabledHelp');
+    expect(document.body.textContent).not.toContain('a green cat');
+    expect([...host!.querySelectorAll('button')].at(-1)!.textContent).toContain('widgets.generate.dynamicPrompts.off');
+    expect(parseDynamicPrompts).toHaveBeenCalledOnce();
+  });
+
   it('retires the seed sharing switch while the seed is held fixed', async () => {
     const onChange = vi.fn();
 
     await render(onChange, true);
     await openPopover();
 
-    const seedSwitch = document.querySelector<HTMLElement>('[data-scope="switch"][data-part="root"]')!;
+    const seedSwitch = switchRoot(SEED_SWITCH);
     const hiddenInput = seedSwitch.querySelector<HTMLInputElement>('input')!;
     const explanation = document.getElementById(hiddenInput.getAttribute('aria-describedby') ?? '');
 
@@ -139,7 +180,7 @@ describe('dynamic prompts popover controls', () => {
     await render(onChange);
     await openPopover();
 
-    const seedSwitch = document.querySelector<HTMLElement>('[data-scope="switch"][data-part="root"]')!;
+    const seedSwitch = switchRoot(SEED_SWITCH);
 
     expect(seedSwitch, 'seed switch should be rendered').toBeTruthy();
 
@@ -161,9 +202,9 @@ describe('dynamic prompts popover controls', () => {
     await render(onChange);
     await openPopover();
 
-    const label = document.querySelector<HTMLElement>('[data-scope="switch"][data-part="label"]')!;
-    const switchRoot = document.querySelector('[data-scope="switch"][data-part="root"]')!;
-    const hiddenInput = switchRoot.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const seedSwitch = switchRoot(SEED_SWITCH);
+    const label = seedSwitch.querySelector<HTMLElement>('[data-part="label"]')!;
+    const hiddenInput = seedSwitch.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
     const numberInput = document.querySelector<HTMLInputElement>('[data-scope="number-input"][data-part="input"]')!;
 
     // Assert ID uniqueness directly, independently of prior render order.

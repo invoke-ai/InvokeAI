@@ -390,7 +390,11 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
     await prepareCanvasInvocation({
       commands: harness.deps.commands,
       destination: harness.deps.destination,
-      expansion: { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 },
+      expansion: {
+        expandedFrom: { combinatorial: false, maxPrompts: 100, positivePrompt: 'a {red|green} cat' },
+        positivePrompts: ['a green cat'],
+        positivePromptsSampleSeed: 7,
+      },
       formatControlLayerError: harness.deps.formatControlLayerError,
       generateValues: harness.deps.generateValues,
       models: harness.deps.models,
@@ -712,6 +716,10 @@ describe('runCanvasInvocation', () => {
       '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
     ],
     [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+    [
+      { status: 'over-budget' } as const,
+      'Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.',
+    ],
   ])('explains a %o capture and dispatches nothing', async (result, message) => {
     const harness = makeHarness();
     harness.deps.composeForGeneration = () => Promise.resolve(result);
@@ -929,9 +937,7 @@ describe('runCanvasInvocation', () => {
     const harness = makeHarness({ model });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices().map((notice) => notice.message)).toEqual([
-      'OpenAI Image supports a maximum size of 32×64.',
-    ]);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['OpenAI Image supports at most 32×64.']);
   });
 
   it('counts the captured init image against the Seedream budget before enqueue', async () => {
@@ -1089,6 +1095,17 @@ describe('runCanvasInvocation', () => {
       expect(
         remembered.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']?.control_model
       ).toMatchObject({ key: 'depth-b' });
+      const outputMetadata = Object.values(remembered.submittedGraphs()[0]!.graph.backendGraph!.nodes).find(
+        (node) => node.type === 'core_metadata'
+      );
+      expect(outputMetadata?.canvas_v3_metadata).toMatchObject({
+        controlModels: { 'depth-layer': { key: 'depth-b', name: 'depth b', hash: 'depth-b-hash' } },
+        document: { stacks: { control: [{ id: 'depth-layer', adapter: { model: 'depth-b', kind: 'controlnet' } }] } },
+        settings: { strength: 0.75 },
+      });
+      expect(outputMetadata?.control_layers).toMatchObject([
+        { layer_id: 'depth-layer', model: { key: 'depth-b' }, type: 'controlnet' },
+      ]);
     });
 
     it('gives a FLUX union model the InstantX mode of the layer type', async () => {
@@ -1363,6 +1380,34 @@ describe('runCanvasInvocation', () => {
         min: 255,
         type: 'img_lerp',
       });
+    });
+
+    it('hands an InstantX union, as its record says it is, the control image alone when the canvas inpaints', async () => {
+      const instantx = {
+        ...union,
+        control_architecture: 'instantx_union' as const,
+        hash: 'qwen-instantx-hash',
+        key: 'qwen-instantx',
+        name: 'Qwen Image InstantX ControlNet Union',
+      };
+      const harness = makeHarness({
+        document: docWithLayers([
+          rasterLayer('base'),
+          qwenLayer('q-layer', { model: instantx.key }),
+          inpaintMaskLayer('mask'),
+        ]),
+        model: qwenImage,
+        models: [union, instantx],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+      expect(nodes['qwen_image_control_q-layer']).toMatchObject({ control_model: { key: 'qwen-instantx' } });
+      expect(nodes['qwen_image_control_q-layer']).not.toHaveProperty('inpaint_image');
+      expect(nodes['qwen_image_control_mask_q-layer']).toBeUndefined();
+      expect(nodes.create_gradient_mask).toBeDefined();
     });
 
     it('blocks a second enabled nonempty control', async () => {

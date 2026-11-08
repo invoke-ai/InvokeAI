@@ -213,6 +213,8 @@ export const createTransformTool = (): Tool => {
       return hoverCursor ?? 'default';
     },
     id: 'transform',
+    // Alt scales about the centre on a handle and bypasses the grid on a move, held before the drag or during it.
+    usesAltKey: true,
     onActivate: (ctx, opts) => {
       if (opts?.temporary) {
         // Temporary reactivation preserves existing edits and does not reopen from committed transforms. If
@@ -248,7 +250,7 @@ export const createTransformTool = (): Tool => {
     onKeyCommand: (ctx, command) => {
       if (gesture) {
         // Ignore apply/cancel during captured drags to avoid tearing down the still-active pointer session.
-        return;
+        return false;
       }
       if (ctx.getFloatingSelection?.()) {
         if (command === 'apply') {
@@ -256,13 +258,15 @@ export const createTransformTool = (): Tool => {
         } else {
           ctx.cancelFloatingSelection?.();
         }
-        return;
+        return true;
       }
+      const open = ctx.stores.transformSession.get() !== null;
       if (command === 'apply') {
         ctx.applyTransform?.();
-      } else {
+      } else if (open) {
         ctx.cancelTransform?.();
       }
+      return open;
     },
     onPointerCancel: (ctx) => {
       // Revert just this drag (keep the session / the float); Escape's own

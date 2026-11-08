@@ -43,6 +43,7 @@ from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CALIBRATION_ORIGIN_PREFIX,
+    CalibrationStoreError,
     is_reserved_origin,
 )
 
@@ -622,14 +623,23 @@ def cancel_by_destination(
 @session_queue_router.put(
     "/{queue_id}/retry_items_by_id",
     operation_id="retry_items_by_id",
-    responses={200: {"model": RetryItemsResult}},
+    responses={
+        200: {"model": RetryItemsResult},
+        503: {
+            "description": "The items include a working-memory calibration's, and its store cannot be written now "
+            "(unwritable root, lock timeout): no item is retried, the request's other items included"
+        },
+    },
 )
 def retry_items_by_id(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
 ) -> RetryItemsResult:
-    """Retries the given queue items. Users can only retry their own items unless they are an admin."""
+    """Retries the given queue items. Users can only retry their own items unless they are an admin.
+
+    A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
+    the request retries nothing, also its items that are no calibration's (503); retry again once it can."""
     try:
         # Check queue membership for all items and ownership for non-admins.
         valid_item_ids: list[int] = []
@@ -659,6 +669,12 @@ def retry_items_by_id(
         )
     except HTTPException:
         raise
+    except CalibrationStoreError:
+        # The error names the store's path on the server.
+        raise HTTPException(
+            status_code=503,
+            detail="The working-memory calibration store cannot be written now, so no item was retried. Try again.",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while retrying queue items: {e}")
 

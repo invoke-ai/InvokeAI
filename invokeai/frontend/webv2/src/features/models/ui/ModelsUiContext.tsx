@@ -1,4 +1,5 @@
 import type { ModelConfig } from '@features/models/core/types';
+import type { CalibrationGraphCompiler } from '@features/models/core/workingMemory';
 import type { ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -80,6 +81,20 @@ export const ModelsUiProvider = ({ adapter, children }: { adapter: ModelsUiAdapt
 );
 
 export const useModelsUi = (): ModelsUiAdapter => use(ModelsUiContext);
+
+const CalibrationGraphCompilerContext = createContext<CalibrationGraphCompiler | null>(null);
+
+/** Supplies working-memory calibration with Generate's graph compiler, which App composes: Models cannot import it. */
+export const CalibrationGraphCompilerProvider = ({
+  children,
+  compile,
+}: {
+  children: ReactNode;
+  compile: CalibrationGraphCompiler;
+}) => <CalibrationGraphCompilerContext value={compile}>{children}</CalibrationGraphCompilerContext>;
+
+/** Null outside a provider; calibration is then unavailable. */
+export const useCalibrationGraphCompiler = (): CalibrationGraphCompiler | null => use(CalibrationGraphCompilerContext);
 
 /**
  * Opens the Model Manager on a model's details, returning to the manager's project like its other entry points; null

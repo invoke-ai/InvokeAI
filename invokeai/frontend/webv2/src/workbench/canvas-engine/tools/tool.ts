@@ -4,7 +4,11 @@
  * StrokeCommittedEvent} for downstream history/persistence.
  */
 
-import type { ColorSamplePhase, StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasEditRefusal,
+  ColorSamplePhase,
+  StructuralCommitResult,
+} from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
@@ -33,8 +37,11 @@ export interface StrokeCommittedEvent {
   beforeImageData: ImageData;
   /** Cache pixels within `dirtyRect` after the stroke. */
   afterImageData: ImageData;
-  /** Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer. */
-  tool: 'brush' | 'eraser' | 'shape';
+  /**
+   * Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer or mask, a `shape-cutout` one
+   * whose footprint was erased from it.
+   */
+  tool: 'brush' | 'eraser' | 'shape' | 'shape-cutout';
   /** Optional auto-created layer and insertion placement let stroke history remove/recreate both layer and pixels. */
   createdLayer?: { layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor };
 }
@@ -163,6 +170,8 @@ export interface ToolContext {
   updateCursor(): void;
   /** Admits a live pixel edit on a paint layer; null when refused (the engine reports why). */
   beginStrokeEdit(initialBytes?: number): StrokeEdit | null;
+  /** Reports a press the tool refused itself (a locked or hidden layer) through `tools.onEditRefused`. */
+  reportEditRefusal?(refusal: CanvasEditRefusal): void;
   /** Bumps a layer's cache version (without marking it stale) after a direct paint, and recomposites. */
   notifyLayerPainted(layerId: string): void;
   commitSelection?(commit: SelectionCommit): void;
@@ -192,6 +201,13 @@ export interface ToolContext {
   documentDeltaToLayerLocal?(layerId: string, delta: Vec2): Vec2;
   /** True if `point` (document space) falls inside the live selection. */
   isPointInSelection?(point: Vec2): boolean;
+  /**
+   * The gesture in progress has started editing the selected layer in place: once its press reaches the tool (a
+   * shape whose modifiers make it a cutout), or later (a move crossing its drag threshold). Answers what
+   * {@link Tool.editsSelectedLayer} would have, for a tool that only knows after it was asked; outside a pointer
+   * gesture it does nothing.
+   */
+  beginSelectedLayerEdit?(): void;
 }
 
 /** Temporary modifier switches/restores preserve sessions; real switches or disposal tear them down. */
@@ -218,17 +234,27 @@ export interface Tool {
   /** The active gesture was cancelled (Esc, pointercancel, focus loss). */
   onPointerCancel?(ctx: ToolContext): void;
   /**
-   * Optional session commands from the pipeline; tools may apply/cancel while gesture cancellation remains
-   * separate.
+   * Session commands: `apply` from Enter on the surface, `cancel` from the engine's Escape ladder once no
+   * engine-owned session (text edit, transform, float) took it. Returns whether the tool had an open session the
+   * command applied or dropped: a handled cancel ends the ladder, so that Escape never also clears the selection.
+   * Gesture cancellation stays separate (`onPointerCancel`) and runs first when Escape lands mid-press.
    */
-  onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): void;
+  onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): boolean;
   /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
   onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   /** The CSS cursor to show while this tool is active. */
   cursor?(ctx: ToolContext): string;
   /**
-   * Alt is one of this tool's gesture modifiers (selection ops), so the pointer
-   * pipeline must not turn an alt-hold into the temporary color picker.
+   * Alt is one of this tool's gesture modifiers (selection ops, grid bypass, scaling or drawing about the centre), so
+   * the pointer pipeline must not turn an alt-hold into the temporary color picker.
    */
   readonly usesAltKey?: boolean;
+  /**
+   * Whether a primary gesture starting now edits the selected layer in place, writing its pixels or its placement:
+   * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture
+   * starts, before the press reaches the tool; absent means not known then (a tool that decides from the press's
+   * modifiers or later calls {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a mask or a region, the screen shows
+   * their stacks above a staged preview that otherwise hides them.
+   */
+  editsSelectedLayer?(ctx: ToolContext): boolean;
 }

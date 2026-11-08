@@ -14,6 +14,8 @@ import numpy as np
 import torch
 from gguf.quants import dequantize, quantize
 
+from tests.fixtures.quantized_payloads import random_q4_k
+
 # Every Linear input a multiple of 32, the Q8_0 block size. head_dim is 32 and the RoPE axes sum to it,
 # as the released (32, 48, 48) sums to 4096/32.
 TINY_CONFIG = {
@@ -40,20 +42,6 @@ K_QUANT_CONFIG = {
     "text_in_dim": 512,
     "rope_axes_dim": (32, 48, 48),
 }
-
-# gguf-py can read K-quants but not write them. A super-block's bytes are all valid codes, so random ones with sane
-# fp16 super-scales make a real Q4_K tensor; what it means comes from gguf-py's reference reader, not from us.
-_Q4_K_BLOCK_BYTES = 144  # d (fp16), dmin (fp16), 12 bytes of 6-bit scales and mins, 128 bytes of 4-bit codes
-_Q4_K_SUPER_SCALE = np.float16(1e-3).tobytes()
-
-
-def _random_q4_k(shape: tuple[int, ...], rng: np.random.Generator) -> np.ndarray:
-    rows, cols = shape
-    blocks = rng.integers(0, 256, size=(rows, cols // 256, _Q4_K_BLOCK_BYTES), dtype=np.uint8)
-    blocks[..., 0:2] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
-    blocks[..., 2:4] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
-    return blocks.reshape(rows, -1)
-
 
 # The six weights every unsloth release keeps in BF16 (read from the Q2_K to Q8_0 headers).
 _BF16 = (
@@ -102,7 +90,7 @@ def write_ernie_image_gguf(
             meant[name] = torch.from_numpy(data.copy())
         else:
             raw = (
-                _random_q4_k(data.shape, rng)
+                random_q4_k(data.shape, rng)
                 if stored_as is gguf.GGMLQuantizationType.Q4_K
                 else quantize(data, stored_as)
             )

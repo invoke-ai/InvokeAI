@@ -43,7 +43,7 @@ const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerCont
     hasEngine: true,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
-    interactionLocked: false,
+    operationLocked: false,
     selectedIds: [layer.id],
     canGroupSelection: true,
     canDeleteSelection: true,

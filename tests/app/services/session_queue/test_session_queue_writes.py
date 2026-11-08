@@ -62,7 +62,11 @@ def events() -> TestEventService:
 def _service(database: Database, events: TestEventService, **config: Any) -> SessionQueue:
     configuration = InvokeAIAppConfig(use_memory_db=True, **config)
     services = SimpleNamespace(
-        configuration=configuration, events=events, logger=logging.getLogger("queue"), model_manager=None
+        configuration=configuration,
+        events=events,
+        logger=logging.getLogger("queue"),
+        model_manager=None,
+        working_memory_calibration=None,
     )
     queue = SessionQueue(database)
     queue.start(cast(Invoker, SimpleNamespace(services=services)))

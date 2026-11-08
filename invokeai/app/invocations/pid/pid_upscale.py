@@ -4,7 +4,7 @@ Stand-alone 4x super-resolution path that does **not** require a Generator
 latent. Pipeline::
 
     image
-      -> FLUX VAE encode (denormalised back to raw)
+      -> FLUX VAE encode (FLUX-normalized latent, the form PiD was trained on)
       -> Gemma-2 caption encode
       -> PiD decoder (4x SR)
       -> image (4x linear)
@@ -12,7 +12,7 @@ latent. Pipeline::
 This is the PiD analogue of ESRGAN / SUPIR: a one-shot, end-to-end pixel
 upscaler. The FLUX VAE is also valid for Z-Image inputs (they share the
 same 16-channel encoder). SD3 / FLUX.2 upscale paths would each need their
-own invocation with the matching VAE encode and latent denormalisation;
+own invocation with the matching VAE encode and latent normalisation;
 they are deferred until we have the matching PiD checkpoints to validate
 against.
 """
@@ -37,7 +37,7 @@ from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, 
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.util import get_flux_ae_params, is_flux_family_vae
+from invokeai.backend.flux.util import is_flux_family_vae
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
@@ -56,7 +56,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="PiD Upscale (4x) - FLUX VAE",
     tags=["upscale", "image", "pid", "super-resolution", "flux"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -71,8 +71,8 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="Image to upscale.")
     vae: VAEField = InputField(
-        description="The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone "
-        "and undoes FLUX VAE scaling, so a VAE of another family is not accepted.",
+        description="The FLUX.1 VAE, which Z-Image also uses. PiD's FLUX decoder was trained on latents "
+        "normalized with its constants, so a VAE of another family is not accepted.",
         input=Input.Connection,
     )
     gemma2_encoder: Gemma2EncoderField = InputField(
@@ -109,7 +109,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             node_title="PiD Upscale",
         )
 
-        # 1) Encode the source image into a FLUX raw latent.
+        # 1) Encode the source image into a FLUX-normalized latent.
         pil_image = context.images.get_pil(self.image.image_name).convert("RGB")
         image_tensor = image_resized_to_grid_as_tensor(pil_image)
         if image_tensor.dim() == 3:
@@ -119,7 +119,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Reject a foreign VAE up front with a clear error rather than failing on a stripped assert
         # inside `vae_encode` under `python -O`. The check is on the latent normalisation rather than
         # on the class: the FLUX.1 autoencoder is an `AutoencoderKL` now, and so are SD, SD 3.5 and
-        # CogView 4 -- and the scaling this node undoes below is precisely what differs between them.
+        # CogView 4 -- and the normalisation PiD's FLUX decoder was trained on is precisely what differs.
         if not is_flux_family_vae(vae_info.model):
             raise ValueError(
                 "PiD Upscale requires the FLUX.1 autoencoder (Z-Image uses the same one). The VAE "
@@ -127,12 +127,9 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "so its latents do not mean what the PiD decoder expects."
             )
         context.util.signal_progress("Running VAE encode")
-        normalised_latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
-        # The FLUX VAE encode emits `scale * (raw - shift)`. PiD expects raw, so undo it.
-        ae = get_flux_ae_params()
-        raw_latent = normalised_latent / ae.scale_factor + ae.shift_factor
-        raw_latent = raw_latent.to("cpu")  # park while we swap to Gemma
-        del normalised_latent
+        # The FLUX VAE encode emits `scale * (raw - shift)`, the latent PiD's FLUX decoder was trained on.
+        latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+        latent = latent.to("cpu")  # park while we swap to Gemma
         TorchDevice.empty_cache()
 
         # 2) Encode the caption with Gemma-2.
@@ -177,7 +174,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
         # peak that will not happen (or too little for one that will).
         pid_memory_optimization = context.config.get().pid_memory_optimization
         estimated_working_memory = estimate_pid_decode_working_memory(
-            raw_latent,
+            latent,
             BaseModelType.Flux,
             pid_memory_optimization,
             pid_net=pid_info.model,
@@ -188,7 +185,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            latent_on_device = raw_latent.to(device=device, dtype=dtype)
+            latent_on_device = latent.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")

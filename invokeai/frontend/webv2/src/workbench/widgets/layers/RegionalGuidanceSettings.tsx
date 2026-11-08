@@ -20,7 +20,12 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
-import { getLayoutRegionIssue, getPromptSyntaxProfile, getRegionalGuidanceSupport } from '@features/generation/graph';
+import {
+  getEffectiveLayoutKind,
+  getLayoutRegionIssue,
+  getPromptSyntaxProfile,
+  getRegionalGuidanceSupport,
+} from '@features/generation/graph';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -164,14 +169,19 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     [commitConfig, t]
   );
 
-  // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches.
+  // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches, and a
+  // base without it places the region as an object. A base with only one role offers no choice.
   const isLayout = support?.mode === 'layout';
+  const layoutKinds = isLayout ? support.layoutKinds : [];
+  const showLayoutKinds = layoutKinds.length > 1;
   const layoutKind = layer.layout?.kind ?? 'object';
+  const effectiveLayoutKind = getEffectiveLayoutKind(layoutKinds, layer.layout);
   const storedVisibleText = layer.layout?.text;
   // Null while not editing, so undo and edits from elsewhere show through.
   const [visibleTextDraft, setVisibleTextDraft] = useState<string | null>(null);
   const visibleText = visibleTextDraft ?? storedVisibleText ?? '';
   const layoutKindFieldId = useId();
+  const promptFieldId = useId();
   const promptIssueId = useId();
   const visibleTextIssueId = useId();
 
@@ -232,10 +242,17 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   // Generation skips a region the layout cannot place. The warning sits under the missing value and describes its
   // control; a status region that exists before any warning announces each change.
-  const layoutIssue =
-    isLayout && support
-      ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt })
-      : null;
+  const layoutIssue = isLayout
+    ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt }, layoutKinds)
+    : null;
+  // The prompt field explains the box on every layout base; the region type's help explains only the roles.
+  const promptHelp = isLayout
+    ? t('widgets.layers.regionalGuidance.layoutBoxHelp', { model: support.label })
+    : undefined;
+  const promptDescription =
+    [promptHelp ? `${promptFieldId}-help` : null, layoutIssue === 'missing_prompt' ? promptIssueId : null]
+      .filter(Boolean)
+      .join(' ') || undefined;
   const layoutIssueMessage = layoutIssue
     ? t(
         layoutIssue === 'missing_prompt'
@@ -301,9 +318,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {t('widgets.layers.regionalGuidance.unsupportedModel')}
         </Text>
       ) : null}
-      {isLayout && support ? (
+      {isLayout && showLayoutKinds ? (
         <Field
-          helpText={t('widgets.layers.regionalGuidance.layoutKindHelp', { model: support.label })}
+          helpText={t('widgets.layers.regionalGuidance.layoutKindHelp')}
           id={layoutKindFieldId}
           label={t('widgets.layers.regionalGuidance.layoutKind')}
         >
@@ -316,9 +333,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           />
         </Field>
       ) : null}
-      <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
+      <Field helpText={promptHelp} id={promptFieldId} label={t('widgets.layers.regionalGuidance.positivePrompt')}>
         <PromptTextarea
-          aria-describedby={layoutIssue === 'missing_prompt' ? promptIssueId : undefined}
+          aria-describedby={promptDescription}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
           attentionSyntax={attentionSyntax}
           syntaxProfile={syntaxProfile}
@@ -338,7 +355,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {layoutIssueMessage}
         </Text>
       ) : null}
-      {isLayout && layoutKind === 'text' ? (
+      {isLayout && effectiveLayoutKind === 'text' ? (
         <Field label={t('widgets.layers.regionalGuidance.visibleText')}>
           <Textarea
             aria-describedby={layoutIssue === 'missing_text' ? visibleTextIssueId : undefined}

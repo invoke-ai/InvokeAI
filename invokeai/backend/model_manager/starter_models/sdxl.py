@@ -1,6 +1,10 @@
 """SDXL starter models."""
 
-from invokeai.backend.model_manager.starter_models.common import gemma2_2b_encoder, ip_adapter_sdxl_image_encoder
+from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
+    gemma2_2b_encoder,
+    ip_adapter_sdxl_image_encoder,
+)
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -16,6 +20,15 @@ sdxl_fp16_vae_fix = StarterModel(
     source="madebyollin/sdxl-vae-fp16-fix",
     description="SDXL VAE that works with FP16.",
     type=ModelType.VAE,
+)
+
+taesdxl = StarterModel(
+    name="TAESDXL (SDXL preview decoder)",
+    base=BaseModelType.StableDiffusionXL,
+    source="https://huggingface.co/madebyollin/taesdxl/resolve/b20258aaef75ef61e659c1e0f14f251cf0ad153e/taesdxl_decoder.safetensors",
+    description=f"Sharp live previews for SDXL and the SDXL Refiner. {TINY_AUTOENCODER_NOTE} ~5MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 # SDXL uses a 4-channel latent, which is unambiguous (no FLUX/SD3-style directory-name disambiguation needed).

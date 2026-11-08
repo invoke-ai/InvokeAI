@@ -112,6 +112,20 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
     dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
+qwen_image_edit_fp8_mixed = StarterModel(
+    name="Qwen Image Edit 2511 (fp8 mixed)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-Edit/resolve/f68ace85e60b4a02a323e394253731947657b7d2/split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors",
+    description="Qwen Image Edit 2511 transformer in Comfy-Org's scaled fp8 mixed build. FP8 Storage is switched on "
+    "when it is installed, so its fp8 layers stay fp8, about 20.5GB once loaded, which fills most of a 24GB card; "
+    "with the working memory a generation needs, partial loading may keep part of it in RAM. Ships only the "
+    "transformer, so the Qwen Image VAE and the Qwen2.5-VL encoder are installed as dependencies. (~20.5GB)",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
+)
+
 qwen_image_edit_lightning_4step = StarterModel(
     name="Qwen Image Edit Lightning (4-step, bf16)",
     base=BaseModelType.QwenImage,
@@ -179,6 +193,21 @@ qwen_image_gguf_q8_0 = StarterModel(
     dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
+qwen_image_fp8 = StarterModel(
+    name="Qwen Image 2512 (fp8)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image/resolve/1f12b17be14c89b026c51a91d67c32f84bb047bc/split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
+    description="Qwen Image 2512 transformer in Comfy-Org's fp8 build (plain e4m3, no scales). FP8 Storage is "
+    "switched on when it is installed, so its weights are held in fp8, about 20.5GB once loaded, which fills most "
+    "of a 24GB card; with the working memory a generation needs, partial loading may keep part of it in RAM. "
+    "Loading briefly needs about 41GB of free system RAM, because the file is widened to bf16 before FP8 Storage "
+    "casts it back. Ships only the transformer, so the Qwen Image VAE and the Qwen2.5-VL encoder are installed as "
+    "dependencies. (~20.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
+)
+
 qwen_image_lightning_4step = StarterModel(
     name="Qwen Image Lightning (4-step, V2.0, bf16)",
     base=BaseModelType.QwenImage,
@@ -204,5 +233,14 @@ qwen_image_fun_controlnet_union = StarterModel(
     source="https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union/resolve/main/Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors",
     description="Unified ControlNet for Qwen Image 2512 supporting Canny, HED, Depth, Pose, MLSD, Scribble and Gray "
     "control images, plus inpainting. Works best at weights 0.70-0.95. Apache-2.0. ~3.5GB",
+    type=ModelType.ControlNet,
+)
+qwen_image_instantx_controlnet_union = StarterModel(
+    name="Qwen Image InstantX ControlNet Union",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets/resolve/main/split_files/controlnet/Qwen-Image-InstantX-ControlNet-Union.safetensors",
+    description="InstantX's ControlNet for Qwen Image supporting Canny, Soft Edge, Depth and Pose control images; "
+    "no inpainting. Trained on the original Qwen Image: on Qwen Image 2512 use weights of about 1.5-2.0. Apache-2.0. "
+    "~3.5GB",
     type=ModelType.ControlNet,
 )

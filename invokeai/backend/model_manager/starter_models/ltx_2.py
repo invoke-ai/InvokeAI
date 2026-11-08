@@ -12,8 +12,14 @@ and the nvfp4 distilled transformer. The mirror's nvfp4 repack names no quantize
 or header, which the nvfp4 reader requires to know the block-scale layout, so it is refused at load
 time; the official file lists its layers in ``_quantization_metadata``. Both are optional, so the
 cost of the exception falls only on users who choose them.
+
+The two GGUF transformers come from a community conversion, ``vantagewithai/LTX-2.5-GGUF``, and
+the GGUF text encoder from ``Rootport/Nz-Gemma4-12B-LTX25``; both are ungated as well.
+
+The preview decoder is madebyollin's (MIT, from GitHub), not part of the LTX-2.5 release.
 """
 
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -83,6 +89,19 @@ ltx2_5_text_encoder_bf16 = StarterModel(
     format=ModelFormat.Gemma4Encoder,
 )
 
+# A community conversion of the release's encoder (ungated, like the mirror), with the tokenizer and config packed in.
+# Its text projection and vision stubs are left unread.
+ltx2_5_text_encoder_gguf_q4_k_m = StarterModel(
+    name="LTX-2.5 Text Encoder (Gemma-4 12B, GGUF Q4_K_M)",
+    base=BaseModelType.LTX2,
+    source="Rootport/Nz-Gemma4-12B-LTX25::TextEncoder/LTX-2.5-gemma4-12b-text-encoder-Q4_K_M.gguf",
+    description="Lightricks' LTX-tuned Gemma-4-12B text encoder as a community GGUF Q4_K_M build with its tokenizer "
+    "(~9.2 GB; ~7.6 GiB on the card against ~12 GiB for int8). It drifts further from the unquantized encoder than "
+    f"int8 does: the same scene, framed a little differently at the same seed. {_LICENSE_NOTE}",
+    type=ModelType.Gemma4Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 ltx2_5_dev_transformer_int8 = StarterModel(
     name="LTX-2.5 Dev Transformer (int8)",
     base=BaseModelType.LTX2,
@@ -137,6 +156,35 @@ ltx2_5_distilled_lora = StarterModel(
     format=ModelFormat.LyCORIS,
 )
 
+# The connectors these builds bundle beside the transformer are left unread; the components entry supplies them.
+_GGUF_REPO = "vantagewithai/LTX-2.5-GGUF"
+
+ltx2_5_dev_transformer_gguf_q4_k_m = StarterModel(
+    name="LTX-2.5 Dev Transformer (GGUF Q4_K_M)",
+    base=BaseModelType.LTX2,
+    source=f"{_GGUF_REPO}::dev/ltx-2.5-22b-dev-transformer-Q4_K_M.gguf",
+    description="LTX-2.5 22B guided ('dev') video+audio transformer, community GGUF Q4_K_M build (~15.7 GB; "
+    "~12.5 GiB on the card against ~18 GiB for int8). Runs with the LTX-2.5 Components and the Gemma-4 text "
+    f"encoder. Total size with dependencies: ~38 GB. {_LICENSE_NOTE}",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=LTX2VariantType.Dev,
+    dependencies=[ltx2_5_components, ltx2_5_text_encoder_int8],
+)
+
+ltx2_5_distilled_transformer_gguf_q4_k_m = StarterModel(
+    name="LTX-2.5 Distilled Transformer (GGUF Q4_K_M)",
+    base=BaseModelType.LTX2,
+    source=f"{_GGUF_REPO}::distilled/ltx-2.5-22b-distilled-transformer-Q4_K_M.gguf",
+    description="LTX-2.5 22B step-distilled video+audio transformer (8 steps, no guidance), community GGUF Q4_K_M "
+    "build (~15.7 GB; ~12.5 GiB on the card against ~18 GiB for int8). Runs with the LTX-2.5 Components and the "
+    f"Gemma-4 text encoder. Total size with dependencies: ~38 GB. {_LICENSE_NOTE}",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=LTX2VariantType.Distilled,
+    dependencies=[ltx2_5_components, ltx2_5_text_encoder_int8],
+)
+
 ltx2_5_dev_transformer_bf16 = StarterModel(
     name="LTX-2.5 Dev Transformer (bf16)",
     base=BaseModelType.LTX2,
@@ -161,5 +209,17 @@ ltx2_5_duration_head = StarterModel(
     "length (~3.6 MB). Optional. Unlike the other LTX-2.5 starter models this one is fetched from Lightricks' "
     f"gated repo, so it needs a Hugging Face login whose account has accepted the licence. {_LICENSE_NOTE}",
     type=ModelType.LTX2DurationHead,
+    format=ModelFormat.Checkpoint,
+)
+
+
+# taeltx2_3 is upstream's decoder for LTX-2.3 and later. taeltx_2 (LTX-2) has the same network but
+# scored 11.0 dB against the VAE on LTX-2.5 latents, below the linear preview's 26.6 (taeltx2_3: 37.8).
+taeltx2_3 = StarterModel(
+    name="TAELTX2.3 (LTX-2.5 preview decoder)",
+    base=BaseModelType.LTX2,
+    source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taeltx2_3.safetensors",
+    description=f"Sharp live previews for LTX-2.5. {TINY_AUTOENCODER_NOTE} ~24MB",
+    type=ModelType.TinyAutoencoder,
     format=ModelFormat.Checkpoint,
 )
