@@ -3,6 +3,7 @@ import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { RasterCompositeExportResult } from '@workbench/canvas-engine/exportRasterComposite';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { describe, expect, it, vi } from 'vitest';
 
 import { exportCanvasComposite } from './exportCanvasComposite';
@@ -10,7 +11,7 @@ import { exportCanvasComposite } from './exportCanvasComposite';
 const defaultRect: Rect = { height: 456, width: 123, x: -4, y: 8 };
 const defaultBlob = new Blob(['pixels'], { type: 'image/png' });
 
-const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ bbox }) as unknown as CanvasDocumentContractV3;
+const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ ...createEmptyCanvasDocument(), bbox });
 
 const createHarness = (
   options: {
@@ -56,12 +57,13 @@ describe('exportCanvasComposite', () => {
     const harness = createHarness();
 
     await expect(exportCanvasComposite(harness.engine, 'canvas')).resolves.toEqual({
+      document: createDocument(defaultRect),
       blob: defaultBlob,
       rect: defaultRect,
       status: 'ok',
     });
 
-    expect(harness.order).toEqual(['flush', 'document', 'export']);
+    expect(harness.order).toEqual(['flush', 'document', 'export', 'document']);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'content' });
   });
 

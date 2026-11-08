@@ -352,7 +352,7 @@ export const isValidMossImageSkipLayers = (layers: readonly number[]): boolean =
 export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
   Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
-const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
+export const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
 
 export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>

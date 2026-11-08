@@ -432,15 +432,22 @@ export interface CanvasLayerEditRefusal {
   readonly canPaintNewLayer?: boolean;
 }
 
+/** A shape cut out with the mod key found no selected paint layer or mask to erase its footprint from. */
+export interface CanvasShapeCutoutRefusal {
+  readonly status: 'cutout-no-target';
+}
+
 /**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
  * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
- * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit.
+ * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasShapeCutoutRefusal` has no layer to
+ * name.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
   | AdjustmentRefusal
-  | CanvasLayerEditRefusal;
+  | CanvasLayerEditRefusal
+  | CanvasShapeCutoutRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'

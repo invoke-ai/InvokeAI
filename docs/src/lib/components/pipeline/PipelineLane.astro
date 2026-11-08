@@ -1,0 +1,60 @@
+---
+/*
+ * One alternative of a `PipelineBranch`: a label above the lane's `PipelineStep`s. A lane without steps goes straight
+ * on to the step after the branch, drawn as a dashed line. See `Pipeline.astro`.
+ */
+type Props = {
+  /** Names the alternative, such as a mode. */
+  label: string;
+};
+
+const { label } = Astro.props;
+const hasSteps = Astro.slots.has('default');
+---
+
+<li class="lane">
+  <span class="lane__label">{label}</span>
+  {
+    hasSteps ? (
+      <ol class="pipeline__lane-steps" role="list">
+        <slot />
+      </ol>
+    ) : (
+      <span class="lane__through" aria-hidden="true" />
+    )
+  }
+</li>
+
+<style>
+  /* The label sits above the lane's steps, so the steps get the lane's full width. */
+  .lane {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .lane__label {
+    align-self: flex-start;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-tab-shown);
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .lane__through {
+    min-height: 1.5rem;
+    background: linear-gradient(var(--docs-border-strong), var(--docs-border-strong)) center / 100% 1px no-repeat;
+    mask: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 10px);
+  }
+
+  @container (width < 36rem) {
+    .lane__through {
+      background-size: 1px 100%;
+      mask: repeating-linear-gradient(180deg, #000 0 6px, transparent 6px 10px);
+    }
+  }
+</style>
