@@ -17,8 +17,9 @@ Nested, sibling, fan-out, loop, saved-workflow, and other valid shapes keep eage
 combinations rejected by validation still fail before invocation. Legacy snapshots retain their generic compatibility
 projection and skipped-state metadata. Both scheduler adapters consume frame-local activation dependencies without
 pruning execution edges or calling a type-specific branch scheduler. `executed_history` records source-level completion
-and retirement, not an invocation trace. This is backend-only and changes no
-invocation, frontend, generated-schema, image, or external-interface contract. The token-authoritative topology is used
+and retirement, not an invocation trace. The persisted `GraphExecutionState` adds optional `prepared_iteration_axes`,
+which is exposed as an additive field in the queue-session schema. This changes no invocation or image contract. The
+token-authoritative topology is used
 for fresh ordinary-node If graphs. The compatibility controller remains for legacy snapshots and mixed control-flow
 graphs outside the bounded Iterate/If/Collect case. The execution ledgers (`execution_refs`, `execution_tokens`, `execution_effects`, and
 `execution_child_dependencies`) are internal persistence data. They are not part of public API schemas or client
@@ -114,8 +115,8 @@ continuations, and authorized child-dependency records are stored in `invokeai.a
 legacy graph and queue behavior is retained behind adapters while those records provide the generic runtime projection
 for admitted shapes.
 
-The graph runtime is backend-only. It does not add author-time fields or frontend/backend external fields; the existing
-frontend/backend interface remains stable.
+The graph runtime adds no author-time graph or invocation fields and does not change web UI interactions. Queue-session
+serialization exposes the additive optional `prepared_iteration_axes` runtime metadata field described above.
 
 ## 2) Major Data Types
 
@@ -387,7 +388,13 @@ the producing invocation's declared activation fields and persists it without cr
 every activation token is bound to a currently prepared owner and its derived execution reference; its declared port,
 value, canonical token id, mapping key, and known frame fields must match. Unknown extra frame metadata remains
 forward-compatible. `GraphExecutionState` compiles opaque, frame-local activation dependencies for fresh acyclic
-ordinary-node `If` graphs without a nested or sibling count limit. Fresh `If` execution is eager except for the two
+ordinary-node `If` graphs without a nested or sibling count limit. The compiled dependencies keep only the gate
+frontier: a nested `If`'s own admission prerequisites imply its outer gates, while incomparable owners and branch
+labels remain explicit. With `V` source nodes, `E` edges, `I` If owners and machine word width `w`, the packed masks
+use `O(VI/w)` words and analysis takes `O((V+E)I/w)` word operations; a nested chain with `I = Θ(V)` is therefore
+quadratic in graph size. The materializer's prepared-context path/axis prefix index has worst-case `O(P D_path D_axes)`
+work and entries for `P` prepared contexts, path depth `D_path` and axis depth `D_axes`; its near-linear frame-count
+scaling holds at fixed depths. Fresh `If` execution is eager except for the two
 private-branch candidates described above. Loop and saved-workflow graphs outside the exact connected per-item
 `Iterate`/`If`/`Collect` candidate use the compatibility scheduler and `_IfActivationController`; legacy snapshots
 retain their generic compatibility projection and skipped-state metadata. The controller remains the fallback runtime
@@ -492,8 +499,8 @@ graphs admit and evaluate both branch paths by default, then attach only the sel
 `If`; only the two bounded candidates run just the selected path. Legacy snapshots retain their recorded selected-only
 projection and skipped metadata. This is not token-built successor topology. Loop and
 workflow-call adapters still own materialization for unsupported shapes
-and durable queue lifecycle. The frontend boundary remains frozen: the graph runtime does not modify
-`invokeai/frontend/...` or existing web/webv2 interactions.
+and durable queue lifecycle. Web UI interactions remain unchanged; the generated queue-session API contracts add the
+optional `prepared_iteration_axes` runtime metadata field described above.
 
 The test-only differential harness at `tests/app/services/shared/test_execution_engine_differential.py` compares
 generic and forced-compatibility scheduling for static DAGs, a constructed mixed/nested `If` graph, the supported
@@ -822,8 +829,10 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
     not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. Unrelated
     sibling `Iterate` streams that reach one `Collect` directly or through literal `If` nodes close into their own
-    sibling group, with values kept in stream order; they are not paired by numeric iteration index. A downstream
-    `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
+    sibling group, with values kept in stream order; they are not paired by numeric iteration index. An `Iterate`
+    directly fed by `Collect.collection` consumes each prepared Collect run independently and preserves its parent
+    frames. A downstream `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more
+    literal-`True` `If`
     nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
     own axis. When a wired Boolean condition resolves per parent frame to select a `For.output_collection`, its `If`
     output retains those parent-frame groups through `Collect`, including through an outer literal-`True` `If`. Root

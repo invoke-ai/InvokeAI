@@ -6098,6 +6098,75 @@ def test_computed_condition_selecting_empty_iterate_branch_produces_no_values() 
     assert state.results[collect_id].collection == []
 
 
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("checkpoint", [False, True], ids=["fresh", "checkpoint"])
+def test_empty_iterate_for_output_to_computed_if_closes_collect(
+    force_compatibility_scheduler: bool, checkpoint: bool
+) -> None:
+    graph = Graph()
+    for node in (
+        CollectionConcatInvocation(id="source", first=[]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="return"),
+        AnyTypeTestInvocation(id="passthrough"),
+        FixedCollectionTestInvocation(id="condition", value=True),
+        BooleanInvocation(id="fallback", value=False),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ):
+        graph.add_node(node)
+    for source, source_field, destination, destination_field in (
+        ("source", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "return", "output"),
+        ("for", "output_collection", "passthrough", "value"),
+        ("passthrough", "value", "if", "true_input"),
+        ("condition", "condition", "if", "condition"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+    graph.add_edge(create_loop_linkage("for", "return"))
+
+    fresh_trace, fresh_state = _run_graph_with_effects(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+    if checkpoint:
+        partial_trace, partial_state = _run_graph_with_effects(
+            GraphExecutionState(graph=graph),
+            force_compatibility_scheduler=force_compatibility_scheduler,
+            stop_after_source="condition",
+        )
+        assert not partial_state.is_complete()
+        resumed_trace, state = _run_graph_with_effects(
+            load_execution_state(dump_execution_state(partial_state)),
+            force_compatibility_scheduler=force_compatibility_scheduler,
+        )
+        trace = partial_trace + resumed_trace
+        assert trace == fresh_trace
+    else:
+        state = fresh_state
+        trace = fresh_trace
+
+    assert state.is_complete(), (
+        f"execution stalled after {trace}; history={state.executed_history}; "
+        f"prepared={state.prepared_source_mapping}; pending_if={state._pending_if_exec_nodes}; "
+        f"indegree={state.indegree}"
+    )
+    assert not state.has_error(), state.errors
+    assert not {"for", "body", "passthrough", "if", "fallback"} & set(trace)
+    collect_results = {
+        state._get_iteration_path(exec_id): state.results[exec_id].collection
+        for exec_id in state.source_prepared_mapping["collect"]
+    }
+    assert collect_results == {(): []}
+    if checkpoint:
+        assert _state_projection(state) == _state_projection(fresh_state)
+
+
 @pytest.mark.parametrize(
     ("conditions", "expected_values"),
     [
@@ -10327,8 +10396,8 @@ def test_fresh_nested_if_records_graph_state_dependencies_without_controller_ana
     )
     assert dependencies_by_source == {
         "inner_condition": {("outer_if", "true_input", ())},
-        "inner_true": {("outer_if", "true_input", ()), ("inner_if", "true_input", ())},
-        "inner_false": {("outer_if", "true_input", ()), ("inner_if", "false_input", ())},
+        "inner_true": {("inner_if", "true_input", ())},
+        "inner_false": {("inner_if", "false_input", ())},
         "inner_if": {("outer_if", "true_input", ())},
     }
     assert state.is_complete()
@@ -11222,12 +11291,7 @@ def test_fresh_four_nested_ifs_support_all_direct_parent_branch_ports(
         assert {
             (dependency.owner_id, dependency.branch, dependency.frame)
             for dependency in state._get_source_activation_dependencies("inner_true")
-        } == {
-            ("inner_if", "true_input", ()),
-            ("middle_if", middle_branch, ()),
-            ("outer_if", outer_branch, ()),
-            ("root_if", root_branch, ()),
-        }
+        } == {("inner_if", "true_input", ())}
 
     _assert_generic_and_compatibility_schedulers(runs[0][1], runs[1][1])
     assert runs[0][0] == runs[1][0]

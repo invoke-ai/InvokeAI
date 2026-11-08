@@ -514,7 +514,8 @@ def _run(
                 executions.append(
                     (tuple(state._get_iteration_path(exec_id)), _canonical_result(graph, node_id, value), exec_id)
                 )
-        executions.sort(key=lambda item: item[0])
+        # Prepared IDs come from a set, so same-path tie order is unspecified.
+        executions.sort(key=lambda item: (item[0], repr(item[1])))
         outputs[node_id] = [(path, value) for path, value, _ in executions]
         output_execution_ids[node_id] = [exec_id for _, _, exec_id in executions]
     return _normalize_collect_fed_iterate_permutations(graph, state, outputs, output_execution_ids)

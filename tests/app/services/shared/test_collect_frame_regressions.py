@@ -4,6 +4,7 @@ Each Collect execution is read separately: several executions at one iteration p
 keyed by path would hide it. Order across different sources in one Collect is unspecified, so items are compared sorted.
 """
 
+import json
 import re
 from typing import Any as AnyValue
 from unittest.mock import Mock
@@ -16,6 +17,7 @@ from invokeai.app.invocations.logic import IfInvocation as If
 from invokeai.app.invocations.loops import ForInvocation as For
 from invokeai.app.invocations.loops import ForReturnInvocation as ForReturn
 from invokeai.app.invocations.primitives import BooleanInvocation
+from invokeai.app.services.shared.execution_state_migration import dump_execution_state, load_execution_state
 from invokeai.app.services.shared.graph import CollectInvocation as Collect
 from invokeai.app.services.shared.graph import (
     Graph,
@@ -748,3 +750,665 @@ def test_root_conditioned_if_waits_for_a_nested_for_final(compatibility_schedule
         "iif1": [((0,), "aT:[[['a']]]")],
         "if": [((0,), "aT:[[['a']]]")],
     }
+
+
+@pytest.mark.parametrize(
+    "true_branch_edges",
+    [
+        pytest.param(
+            """
+            it1.item -> t.value
+            t.value -> c1.item
+            c1.collection -> c2.item
+            c2.collection -> if.true_input
+            """,
+            id="collect-of-collect-fuzz-2037",
+        ),
+        pytest.param(
+            """
+            it0.item -> t.value
+            t.value -> c2.item
+            c2.collection -> if.true_input
+            """,
+            id="collect-closing-outer-axis-fuzz-460",
+        ),
+    ],
+)
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_root_condition_selecting_per_frame_collect_closes_downstream_collect(
+    true_branch_edges: str, computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    nodes: list[BaseInvocation] = [
+        Marked(id="x", marker="x"),
+        Collect(id="col"),
+        Marked(id="f", marker="F:"),
+        Marked(id="t", marker="x"),
+        Collect(id="c2"),
+        If(id="if", condition=False),
+        Collect(id="out"),
+    ]
+    if "c1" in true_branch_edges:
+        nodes.append(Collect(id="c1"))
+    edges = f"""
+        it1.item -> x.value
+        x.value -> col.item
+        col.collection -> f.value
+        f.value -> if.false_input
+        {true_branch_edges}
+        if.value -> out.item
+    """
+    if computed_condition:
+        nodes.append(BooleanInvocation(id="cond", value=False))
+        edges += "cond.value -> if.condition\n"
+    graph = _graph([["a", "b"], ["c"]], 2, nodes, edges)
+
+    assert _collect_runs(graph, compatibility_scheduler)["out"] == [((), ["F:['xa', 'xb']", "F:['xc']"])]
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+@pytest.mark.parametrize("resume", [False, True], ids=["fresh", "resume-after-parent-collect"])
+def test_reiterating_collect_keeps_root_if_value_in_parent_frames(
+    compatibility_scheduler: bool, computed_condition: bool, resume: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nodes: list[BaseInvocation] = [
+        Marked(id="m", marker="T:"),
+        Collect(id="out"),
+        Iterate(id="rit"),
+        Marked(id="rm", marker="r"),
+        If(id="rif") if computed_condition else If(id="rif", condition=False),
+        Value(id="rr", value="RR"),
+        Collect(id="out2"),
+    ]
+    edges = """
+        it1.item -> m.value
+        m.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> rif.true_input
+        rr.value -> rif.false_input
+        rif.value -> out2.item
+    """
+    if computed_condition:
+        nodes.append(BooleanInvocation(id="cond", value=False))
+        edges += "cond.value -> rif.condition\n"
+    graph = _graph([[], [["a"]], [["b"], ["c"]]], 2, nodes, edges)
+
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    checkpointed = not resume
+    for _ in range(5000):
+        out_exec_ids = state.source_prepared_mapping.get("out", set())
+        rit_exec_ids = state.source_prepared_mapping.get("rit", set())
+        if (
+            resume
+            and not checkpointed
+            and out_exec_ids
+            and all(exec_id in state.results for exec_id in out_exec_ids)
+            and not any(exec_id in state.results for exec_id in rit_exec_ids)
+        ):
+            state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
+            state._execution_scheduler = (
+                _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+            )
+            checkpointed = True
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert checkpointed
+    assert state.is_complete() and not state.has_error()
+    materializer = _ExecutionMaterializer(state)
+    registry = state._prepared_registry()
+    root_value_edge = graph._get_input_edges("out2", "item")[0]
+    from invokeai.app.services.shared.graph_if_runtime import _get_if_iteration_paths_with_ancestry
+
+    iterator_ancestry = materializer._get_iterator_ancestry(materializer.iterator_graph())
+    assert _get_if_iteration_paths_with_ancestry(
+        state,
+        "rif",
+        set(),
+        materializer._get_prepared_nodes_for_source,
+        materializer._get_prepared_edge_iteration_path,
+        iterator_ancestry,
+    ) == [(1, 0), (2, 0), (2, 1)]
+    static_axis_derivations = 0
+    get_static_collect_group_axes = materializer._get_static_collect_group_axes
+
+    def count_static_axis_derivations(edge: AnyValue) -> tuple[str, ...]:
+        nonlocal static_axis_derivations
+        static_axis_derivations += 1
+        return get_static_collect_group_axes(edge)
+
+    monkeypatch.setattr(materializer, "_get_static_collect_group_axes", count_static_axis_derivations)
+    rif_exec_ids = registry.get_prepared_ids("rif")
+    for exec_id in rif_exec_ids:
+        assert materializer._get_prepared_edge_iteration_axes(root_value_edge, exec_id) == ("it0", "rit")
+    parent_item_edges = graph._get_input_edges("out", "item")
+    assert static_axis_derivations == len(parent_item_edges)
+
+    empty_out_exec_id = registry.get_prepared_id_at_path("out", (0,))
+    assert empty_out_exec_id is not None
+    collection_edge = graph._get_input_edges("rit", "collection")[0]
+    assert materializer._get_prepared_edge_iteration_axes(collection_edge, empty_out_exec_id) == ("it0",)
+
+    execution_graph_reads = 0
+    get_execution_graph_flat = state._get_execution_graph_flat
+
+    def count_execution_graph_reads() -> AnyValue:
+        nonlocal execution_graph_reads
+        execution_graph_reads += 1
+        return get_execution_graph_flat()
+
+    monkeypatch.setattr(state, "_get_execution_graph_flat", count_execution_graph_reads)
+    for exec_id in rif_exec_ids:
+        assert materializer._get_prepared_edge_iteration_axes(root_value_edge, exec_id) == ("it0", "rit")
+    assert execution_graph_reads == 0
+
+    observed = _sorted_runs(
+        [
+            (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+            for exec_id in state.source_prepared_mapping.get("out2", ())
+            if exec_id in state.results
+        ]
+    )
+    assert observed == [((0,), []), ((1,), ["RR"]), ((2,), ["RR", "RR"])]
+
+    state.add_node(Marked(id="unrelated", marker="x"))
+    assert materializer._get_prepared_edge_iteration_axes(root_value_edge, next(iter(rif_exec_ids))) == (
+        "it0",
+        "rit",
+    )
+    assert static_axis_derivations == len(parent_item_edges) * 2
+
+
+def test_reiterated_collect_parent_path_index_is_stable_while_children_expand(
+    compatibility_scheduler: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    child_count = 24
+    nodes: list[BaseInvocation] = [
+        Marked(id="m", marker="T:"),
+        Collect(id="out"),
+        Iterate(id="rit"),
+        Marked(id="rm", marker="r"),
+        If(id="rif", condition=False),
+        Value(id="rr", value="RR"),
+        Collect(id="out2"),
+    ]
+    graph = _graph(
+        [[[f"v{i}"]] for i in range(child_count)],
+        2,
+        nodes,
+        """
+        it1.item -> m.value
+        m.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> rif.true_input
+        rr.value -> rif.false_input
+        rif.value -> out2.item
+        """,
+    )
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    registry = state._prepared_registry()
+    original_lookup = registry.get_prepared_id_at_path
+    original_get_iteration_path = registry.get_iteration_path
+    original_register = registry.register
+    out_index_builds = 0
+    out_index_source_visits = 0
+    out_lookups = 0
+    late_out_registrations = 0
+    building_out_index = False
+
+    def track_iteration_path(exec_id: str) -> tuple[int, ...] | None:
+        nonlocal out_index_source_visits
+        if building_out_index:
+            out_index_source_visits += 1
+        return original_get_iteration_path(exec_id)
+
+    def track_lookup(source_node_id: str, iteration_path: tuple[int, ...]) -> str | None:
+        nonlocal building_out_index, out_index_builds, out_lookups
+        if source_node_id != "out":
+            return original_lookup(source_node_id, iteration_path)
+        out_lookups += 1
+        building_out_index = source_node_id not in registry._prepared_ids_by_source_and_path
+        if building_out_index:
+            out_index_builds += 1
+        try:
+            return original_lookup(source_node_id, iteration_path)
+        finally:
+            building_out_index = False
+
+    def track_register(exec_id: str, source_node_id: str) -> None:
+        nonlocal late_out_registrations
+        if source_node_id == "out" and out_index_builds:
+            late_out_registrations += 1
+        original_register(exec_id, source_node_id)
+
+    monkeypatch.setattr(registry, "get_prepared_id_at_path", track_lookup)
+    monkeypatch.setattr(registry, "get_iteration_path", track_iteration_path)
+    monkeypatch.setattr(registry, "register", track_register)
+
+    for _ in range(10000):
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert state.is_complete() and not state.has_error()
+    assert len(registry.get_prepared_ids("out")) == child_count
+    assert len(registry.get_prepared_ids("rif")) == child_count
+    assert _sorted_runs(
+        [
+            (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+            for exec_id in registry.get_prepared_ids("out2")
+        ]
+    ) == _sorted_runs([((index,), ["RR"]) for index in range(child_count)])
+    assert out_index_builds == 1
+    assert out_index_source_visits == child_count
+    assert late_out_registrations == 0
+    assert out_lookups >= child_count
+
+
+@pytest.mark.parametrize("resume", [False, True], ids=["fresh", "checkpoint-after-parent-collect"])
+@pytest.mark.parametrize("empty_parent_run", [False, True], ids=["non-empty-parent-runs", "empty-parent-run"])
+def test_reiterating_collect_consumes_each_sibling_group_independently(
+    compatibility_scheduler: bool, resume: bool, empty_parent_run: bool
+) -> None:
+    graph = _graph(
+        ([[], ["a"], ["b", "c"]] if empty_parent_run else [["a"], ["b", "c"]]),
+        2,
+        [
+            Marked(id="m", marker="T:"),
+            Concat(id="sib_src", first=["q", "p", "r"]),
+            Iterate(id="itb"),
+            Marked(id="n", marker="n"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Marked(id="rm", marker="r"),
+            Collect(id="out2"),
+        ],
+        """
+        it1.item -> m.value
+        m.value -> out.item
+        sib_src.collection -> itb.collection
+        itb.item -> n.value
+        n.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> out2.item
+        """,
+    )
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    checkpointed = not resume
+    for _ in range(5000):
+        out_exec_ids = state.source_prepared_mapping.get("out", set())
+        rit_exec_ids = state.source_prepared_mapping.get("rit", set())
+        if (
+            resume
+            and not checkpointed
+            and out_exec_ids
+            and all(exec_id in state.results for exec_id in out_exec_ids)
+            and not any(exec_id in state.results for exec_id in rit_exec_ids)
+        ):
+            state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
+            state._execution_scheduler = (
+                _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+            )
+            checkpointed = True
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert checkpointed
+    assert state.is_complete() and not state.has_error()
+    root_sibling_runs = [
+        state.results[exec_id].collection
+        for exec_id in state.source_prepared_mapping.get("out2", ())
+        if exec_id in state.results and state._get_iteration_path(exec_id) == ()
+    ]
+    assert root_sibling_runs == [["rnq", "rnp", "rnr"]]
+    expected = (
+        [
+            ((), ["rnp", "rnq", "rnr"]),
+            ((0,), []),
+            ((1,), ["rT:a"]),
+            ((2,), ["rT:b", "rT:c"]),
+        ]
+        if empty_parent_run
+        else [
+            ((), ["rnp", "rnq", "rnr"]),
+            ((0,), ["rT:a"]),
+            ((1,), ["rT:b", "rT:c"]),
+        ]
+    )
+    assert (
+        _sorted_runs(
+            [
+                (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+                for exec_id in state.source_prepared_mapping.get("out2", ())
+                if exec_id in state.results
+            ]
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize("checkpoint_after_out", [False, True], ids=["fresh", "checkpoint-after-out"])
+def test_downstream_if_keeps_sibling_collect_parent_frames(
+    compatibility_scheduler: bool, checkpoint_after_out: bool
+) -> None:
+    graph = _graph(
+        [["a"], ["b", "c"]],
+        2,
+        [
+            Marked(id="m", marker="T:"),
+            Truthy(id="cond"),
+            If(id="if"),
+            Concat(id="sib_src", first=["p", "q", "r"]),
+            Iterate(id="itb"),
+            Marked(id="n", marker="n"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Marked(id="rm", marker="r"),
+            Truthy(id="rc"),
+            Value(id="rr", value="RR"),
+            If(id="rif"),
+            Collect(id="out2"),
+        ],
+        """
+        it1.item -> m.value
+        m.value -> if.true_input
+        it1.item -> cond.value
+        cond.condition -> if.condition
+        if.value -> out.item
+        sib_src.collection -> itb.collection
+        itb.item -> n.value
+        n.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> rif.true_input
+        rr.value -> rif.false_input
+        rit.item -> rc.value
+        rc.condition -> rif.condition
+        rif.value -> out2.item
+        """,
+    )
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    checkpointed = not checkpoint_after_out
+    for _ in range(5000):
+        out_ids = state._prepared_registry().get_prepared_ids("out")
+        rit_ids = state._prepared_registry().get_prepared_ids("rit")
+        if (
+            checkpoint_after_out
+            and not checkpointed
+            and len(out_ids) == 3
+            and all(exec_id in state.results for exec_id in out_ids)
+            and not any(exec_id in state.results for exec_id in rit_ids)
+        ):
+            state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
+            state._execution_scheduler = (
+                _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+            )
+            checkpointed = True
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert checkpointed
+    assert state.is_complete() and not state.has_error()
+    observed_out = _sorted_runs(
+        [
+            (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+            for exec_id in state._prepared_registry().get_prepared_ids("out")
+            if exec_id in state.results
+        ]
+    )
+    observed_out2 = _sorted_runs(
+        [
+            (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+            for exec_id in state._prepared_registry().get_prepared_ids("out2")
+            if exec_id in state.results
+        ]
+    )
+    assert observed_out == [((), ["np", "nq", "nr"]), ((0,), ["T:a"]), ((1,), ["T:b", "T:c"])]
+    assert observed_out2 == [
+        ((), ["rnp", "rnq", "rnr"]),
+        ((0,), ["rT:a"]),
+        ((1,), ["rT:b", "rT:c"]),
+    ]
+
+
+def test_sibling_collect_classification_is_cached_per_source_graph(
+    compatibility_scheduler: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downstream_count = 12
+    parent_sources = {"m", "n"}
+    graph = _graph(
+        ["a", "b"],
+        1,
+        [
+            Marked(id="m", marker="T:"),
+            Concat(id="sib_src", first=["p", "q"]),
+            Iterate(id="itb"),
+            Marked(id="n", marker="n"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            *[Marked(id=f"rm{index}", marker="r") for index in range(downstream_count)],
+            *[Collect(id=f"sink{index}") for index in range(downstream_count)],
+        ],
+        "\n".join(
+            [
+                "it0.item -> m.value",
+                "m.value -> out.item",
+                "sib_src.collection -> itb.collection",
+                "itb.item -> n.value",
+                "n.value -> out.item",
+                "out.collection -> rit.collection",
+                *[
+                    f"rit.item -> rm{index}.value\nrm{index}.value -> sink{index}.item"
+                    for index in range(downstream_count)
+                ],
+            ]
+        ),
+    )
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    materializer = _ExecutionMaterializer(state)
+    original_get_source_axes = materializer._get_collect_source_iterator_ids
+    classifications = dict.fromkeys(parent_sources, 0)
+
+    def count_parent_item_classification(source_node_id: str) -> tuple[str, ...]:
+        if source_node_id in parent_sources:
+            classifications[source_node_id] += 1
+        return original_get_source_axes(source_node_id)
+
+    monkeypatch.setattr(materializer, "_get_collect_source_iterator_ids", count_parent_item_classification)
+    for index in range(downstream_count):
+        assert materializer._is_sibling_collect_reiteration(f"rm{index}")
+
+    assert classifications == dict.fromkeys(parent_sources, 1)
+
+    state.add_node(Marked(id="unrelated", marker="x"))
+    assert materializer._is_sibling_collect_reiteration("rm0")
+    assert classifications == dict.fromkeys(parent_sources, 2)
+
+
+def _run_reiteration_graph(
+    graph: Graph, compatibility_scheduler: bool, checkpoint_after_out: bool
+) -> GraphExecutionState:
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+    if checkpoint_after_out:
+        for _ in range(5000):
+            out_ids = state._prepared_registry().get_prepared_ids("out")
+            if len(out_ids) == 2 and all(exec_id in state.results for exec_id in out_ids):
+                break
+            node = state.next()
+            assert node is not None, "graph stalled before upstream Collect completed"
+            state.complete(node.id, node.invoke(Mock()))
+        else:
+            pytest.fail("upstream Collect did not produce both executions")
+
+        assert not any(exec_id in state.results for exec_id in state._prepared_registry().get_prepared_ids("rit"))
+        state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
+        state._execution_scheduler = (
+            _ExecutionScheduler(state) if compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+        )
+
+    for _ in range(5000):
+        node = state.next()
+        if node is None:
+            break
+        state.complete(node.id, node.invoke(Mock()))
+    assert state.is_complete() and not state.has_error()
+    return state
+
+
+def _lstein_reiterate_graph(with_for: bool) -> Graph:
+    nodes: list[BaseInvocation] = [
+        Marked(id="cm", marker="C:"),
+        Truthy(id="condition"),
+        If(id="if"),
+        Collect(id="out"),
+        Iterate(id="rit"),
+        Marked(id="rm", marker="r"),
+        Value(id="RR", value="RR"),
+        Truthy(id="rcondition"),
+        If(id="rif"),
+        Collect(id="out2"),
+    ]
+    if with_for:
+        nodes.extend([For(id="for", collection=["u"]), Marked(id="fb", marker="F"), ForReturn(id="ret")])
+        true_branch = """
+        for.item -> fb.value
+        fb.value -> ret.output
+        for.loop_linkage -> ret.loop_linkage
+        for.output_collection -> if.true_input
+        """
+    else:
+        nodes.append(Value(id="for_value", value=["Fu"]))
+        true_branch = "for_value.value -> if.true_input"
+
+    return _graph(
+        [[["c"], ["c", ""]], []],
+        2,
+        nodes,
+        f"""
+        it1.item -> cm.value
+        cm.value -> if.false_input
+        it1.item -> condition.value
+        condition.condition -> if.condition
+        {true_branch}
+        if.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> rif.true_input
+        RR.value -> rif.false_input
+        rit.item -> rcondition.value
+        rcondition.condition -> rif.condition
+        rif.value -> out2.item
+        """,
+    )
+
+
+@pytest.mark.parametrize("with_for", [False, True], ids=["root-value", "for-final"])
+@pytest.mark.parametrize("checkpoint_after_out", [False, True], ids=["fresh", "checkpoint-after-out"])
+def test_reiterated_root_condition_keeps_lstein_empty_frames(
+    compatibility_scheduler: bool, with_for: bool, checkpoint_after_out: bool
+) -> None:
+    state = _run_reiteration_graph(_lstein_reiterate_graph(with_for), compatibility_scheduler, checkpoint_after_out)
+    out_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out")
+        if exec_id in state.results
+    ]
+    out2_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out2")
+        if exec_id in state.results
+    ]
+    assert _sorted_runs(out_runs) == [((0,), [["Fu"], ["Fu"]]), ((1,), [])]
+    assert _sorted_runs(out2_runs) == [((0,), ["r['Fu']", "r['Fu']"]), ((1,), [])]
+
+
+def _seed_1234_reiteration_graph() -> Graph:
+    return _graph(
+        [[], [[[], [], ["b"]], [], []]],
+        3,
+        [
+            Marked(id="m1", marker="T:"),
+            Marked(id="m2", marker="F:"),
+            If(id="if", condition=False),
+            Truthy(id="cond"),
+            Marked(id="cm3", marker="x"),
+            Collect(id="col4"),
+            Marked(id="p5", marker="O:"),
+            If(id="if2", condition=False),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Marked(id="rm", marker="r"),
+            Value(id="rr", value="RR"),
+            If(id="rif"),
+            Collect(id="out2"),
+            BooleanInvocation(id="rc", value=True),
+        ],
+        """
+        it0.item -> m1.value
+        it0.item -> m2.value
+        m1.value -> if.true_input
+        m2.value -> if.false_input
+        it1.item -> cond.value
+        cond.condition -> if.condition
+        it0.item -> cm3.value
+        cm3.value -> col4.item
+        col4.collection -> p5.value
+        if.value -> if2.true_input
+        p5.value -> if2.false_input
+        if2.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rm.value
+        rm.value -> rif.true_input
+        rr.value -> rif.false_input
+        rc.value -> rif.condition
+        rif.value -> out2.item
+        """,
+    )
+
+
+@pytest.mark.parametrize("checkpoint_after_out", [False, True], ids=["fresh", "checkpoint-after-out"])
+def test_seed_1234_reiteration_keeps_empty_outer_frame(
+    compatibility_scheduler: bool, checkpoint_after_out: bool
+) -> None:
+    state = _run_reiteration_graph(_seed_1234_reiteration_graph(), compatibility_scheduler, checkpoint_after_out)
+    collected_value = "O:['x[]', \"x[[[], [], ['b']], [], []]\"]"
+    reiterated_value = f"r{collected_value}"
+    out_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out")
+        if exec_id in state.results
+    ]
+    out2_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out2")
+        if exec_id in state.results
+    ]
+    assert _sorted_runs(out_runs) == [((0,), []), ((1,), [collected_value] * 3)]
+    assert _sorted_runs(out2_runs) == [((0,), []), ((1,), [reiterated_value] * 3)]

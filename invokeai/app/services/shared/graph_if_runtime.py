@@ -893,11 +893,15 @@ def _get_if_iteration_paths_with_ancestry(
             if iterator_edges
             else {state._get_iteration_path(prepared_id) for prepared_id in prepared_ids}
         )
+        branch_paths = paths
         paths = {
-            frame_path if frame_path[: len(branch_path)] == branch_path else branch_path
-            for branch_path in paths
+            frame_path
             for frame_path in frame_paths
-            if frame_path[: len(branch_path)] == branch_path or branch_path[: len(frame_path)] == frame_path
+            if any(frame_path[:prefix_length] in branch_paths for prefix_length in range(len(frame_path) + 1))
+        } | {
+            branch_path
+            for branch_path in branch_paths
+            if any(branch_path[:prefix_length] in frame_paths for prefix_length in range(len(branch_path) + 1))
         }
 
     if not paths:
@@ -907,7 +911,8 @@ def _get_if_iteration_paths_with_ancestry(
             if not iterator_ancestry.has_iterator_ancestor(node_id):
                 return [()]
         return []
-    return sorted(path for path in paths if not any(path != other and other[: len(path)] == path for other in paths))
+    proper_prefixes = {path[:prefix_length] for path in paths for prefix_length in range(len(path))}
+    return sorted(path for path in paths if path not in proper_prefixes)
 
 
 def _record_activation_dependencies(
@@ -1309,12 +1314,10 @@ def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency
     else:
         matching_gate_ids = tuple(
             exec_node_id
-            for exec_node_id in state.source_prepared_mapping.get(dependency.owner_id, ())
-            if isinstance(state.execution_graph.nodes.get(exec_node_id), IfInvocation)
-            if (
-                (frame := state._get_iteration_path(exec_node_id)) is not None
-                and (frame[: len(dependency.frame)] == dependency.frame or dependency.frame[: len(frame)] == frame)
+            for exec_node_id in state._prepared_registry().get_prepared_ids_with_overlapping_path(
+                dependency.owner_id, dependency.frame
             )
+            if isinstance(state.execution_graph.nodes.get(exec_node_id), IfInvocation)
         )
     if not matching_gate_ids:
         return False

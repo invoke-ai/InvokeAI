@@ -154,8 +154,35 @@ def _get_flat_activation_owner_masks_by_source(
         if bits:
             owned_bits[node_id] = bits
 
+    # A nested If cannot run until the dependencies gating its own execution are open. Those
+    # prerequisites are implied by either branch gate it owns, so retain only the gate frontier.
+    owner_prerequisites = {if_node_id: owned_bits.get(if_node_id, 0) for if_node_id in analysis.if_node_ids}
+    _reduce_activation_owner_masks_to_frontier(owned_bits, owners, owner_prerequisites)
+
     analysis.activation_owner_masks_by_source = owned_bits
     return owned_bits
+
+
+def _reduce_activation_owner_masks_to_frontier(
+    owner_masks_by_source: dict[str, int],
+    owners: tuple[tuple[str, str], ...],
+    owner_prerequisites: dict[str, int],
+) -> None:
+    """Drop only gates implied by a nested If's own admission dependencies."""
+    for source_id, source_mask in tuple(owner_masks_by_source.items()):
+        remaining_mask = source_mask
+        frontier_mask = 0
+        while remaining_mask:
+            # Owners follow graph topological order, so nested gates precede the outer gates they imply.
+            bit = remaining_mask & -remaining_mask
+            owner_id, _branch = owners[bit.bit_length() - 1]
+            frontier_mask |= bit
+            remaining_mask &= ~bit
+            remaining_mask &= ~owner_prerequisites.get(owner_id, 0)
+        if frontier_mask:
+            owner_masks_by_source[source_id] = frontier_mask
+        else:
+            del owner_masks_by_source[source_id]
 
 
 def _can_use_fresh_mixed_if_iterate_collect(state: "GraphExecutionState") -> bool:

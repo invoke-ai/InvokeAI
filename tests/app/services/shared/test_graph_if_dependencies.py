@@ -263,11 +263,36 @@ def test_flat_and_nested_dependencies_preserve_values_and_order() -> None:
     nested_state = GraphExecutionState(graph=_nested_if_graph())
     assert nested_state._get_source_activation_dependencies("inner_true") == (
         ActivationDependency(owner_id="inner_if", branch="true_input", frame=()),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=()),
     )
     assert nested_state._get_source_activation_dependencies("inner_false", (4,)) == (
         ActivationDependency(owner_id="inner_if", branch="false_input", frame=(4,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(4,)),
+    )
+
+
+def test_gate_frontier_keeps_incomparable_owner_and_branch() -> None:
+    owners = (
+        ("inner_if", "true_input"),
+        ("sibling_if", "false_input"),
+        ("outer_if", "true_input"),
+    )
+    outer_bit = 1 << 2
+    masks = {"source": (1 << 0) | (1 << 1) | outer_bit}
+
+    graph_if_dependencies._reduce_activation_owner_masks_to_frontier(
+        masks,
+        owners,
+        {"inner_if": outer_bit},
+    )
+
+    assert masks == {"source": (1 << 0) | (1 << 1)}
+    retained = tuple(
+        ActivationDependency(owner_id=owners[index][0], branch=owners[index][1], frame=())
+        for index in range(len(owners))
+        if masks["source"] & (1 << index)
+    )
+    assert retained == (
+        ActivationDependency(owner_id="inner_if", branch="true_input", frame=()),
+        ActivationDependency(owner_id="sibling_if", branch="false_input", frame=()),
     )
 
 
@@ -402,17 +427,12 @@ def test_three_nested_ifs_admit_owner_and_frame_dependencies(
     assert state._can_use_fresh_flat_if_activation()
     assert state._get_source_activation_dependencies("inner_true", (1,)) == (
         ActivationDependency(owner_id="inner_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="middle_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(1,)),
     )
     assert state._get_source_activation_dependencies("inner_false", (2,)) == (
         ActivationDependency(owner_id="inner_if", branch="false_input", frame=(2,)),
-        ActivationDependency(owner_id="middle_if", branch="true_input", frame=(2,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(2,)),
     )
     assert state._get_source_activation_dependencies("middle_false", (3,)) == (
         ActivationDependency(owner_id="middle_if", branch="false_input", frame=(3,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(3,)),
     )
     assert state._get_source_activation_dependencies("outer_false", (4,)) == (
         ActivationDependency(owner_id="outer_if", branch="false_input", frame=(4,)),
@@ -428,12 +448,9 @@ def test_three_nested_ifs_middle_leaf_fanout_keeps_only_outer_dependency() -> No
     assert state._can_use_fresh_flat_if_activation()
     assert state._get_source_activation_dependencies("inner_true", (1,)) == (
         ActivationDependency(owner_id="inner_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="middle_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(1,)),
     )
     assert state._get_source_activation_dependencies("middle_false", (2,)) == (
         ActivationDependency(owner_id="middle_if", branch="false_input", frame=(2,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(2,)),
     )
     assert state._get_source_activation_dependencies("outer_false", (3,)) == (
         ActivationDependency(owner_id="outer_if", branch="false_input", frame=(3,)),
@@ -449,13 +466,9 @@ def test_four_nested_ifs_admit_owner_and_frame_dependencies() -> None:
     assert state._can_use_fresh_flat_if_activation()
     assert state._get_source_activation_dependencies("inner_true", (1,)) == (
         ActivationDependency(owner_id="inner_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="middle_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="outer_if", branch="true_input", frame=(1,)),
-        ActivationDependency(owner_id="deepest_if", branch="true_input", frame=(1,)),
     )
     assert state._get_source_activation_dependencies("outer_false", (2,)) == (
         ActivationDependency(owner_id="outer_if", branch="false_input", frame=(2,)),
-        ActivationDependency(owner_id="deepest_if", branch="true_input", frame=(2,)),
     )
     assert state._get_source_activation_dependencies("deepest_false", (3,)) == (
         ActivationDependency(owner_id="deepest_if", branch="false_input", frame=(3,)),

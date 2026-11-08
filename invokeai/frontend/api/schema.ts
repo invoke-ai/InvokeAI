@@ -18451,6 +18451,13 @@ export type components = {
             prepared_iteration_paths?: {
                 [key: string]: number[];
             };
+            /**
+             * Prepared Iteration Axes
+             * @description The named iteration axes of each prepared execution node
+             */
+            prepared_iteration_axes?: {
+                [key: string]: string[];
+            };
             /** Ready Order */
             ready_order?: string[];
             /**

@@ -47139,6 +47139,17 @@
             "title": "Prepared Iteration Paths",
             "description": "The iteration coordinates of each prepared execution node"
           },
+          "prepared_iteration_axes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Prepared Iteration Axes",
+            "description": "The named iteration axes of each prepared execution node"
+          },
           "ready_order": {
             "items": {
               "type": "string"

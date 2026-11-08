@@ -392,6 +392,10 @@ class GraphExecutionState(BaseModel):
         description="The iteration coordinates of each prepared execution node",
         default_factory=dict,
     )
+    prepared_iteration_axes: dict[str, tuple[str, ...]] = Field(
+        description="The named iteration axes of each prepared execution node",
+        default_factory=dict,
+    )
     execution_refs: SkipJsonSchema[dict[str, ExecutionReference]] = Field(
         default_factory=dict,
         description="Stable frame-aware references for prepared execution nodes",
@@ -609,6 +613,7 @@ class GraphExecutionState(BaseModel):
                 source_prepared_mapping=self.source_prepared_mapping,
                 prepared_iteration_paths=self.prepared_iteration_paths,
                 metadata=runtime.prepared_exec_metadata,
+                prepared_iteration_axes=self.prepared_iteration_axes,
                 on_iteration_path_change=self._invalidate_loop_caches_for_exec_node,
                 state=self,
             )
@@ -3492,6 +3497,7 @@ class GraphExecutionState(BaseModel):
         attached_fields = {edge.destination.field for edge in self.execution_graph._get_input_edges(exec_node_id)}
         target_path = self._get_iteration_path(exec_node_id)
         materializer = self._materializer()
+        registry = self._prepared_registry()
         selected_field = self._resolved_if_exec_branches.get(exec_node_id)
         branches = (selected_field,) if selected_field is not None else ("true_input", "false_input")
         return all(
@@ -3505,9 +3511,9 @@ class GraphExecutionState(BaseModel):
                     and not self.source_prepared_mapping.get(edge.source.node_id)
                 )
                 and not any(
-                    target_path[: len(path)] == path or path[: len(target_path)] == target_path
-                    for prepared_id in materializer._get_ordered_prepared_nodes_for_edge(edge)
-                    if (path := materializer._get_prepared_edge_iteration_path(edge, prepared_id)) is not None
+                    registry.get_metadata(prepared_id).state != "skipped"
+                    and materializer._prepared_node_has_edge_output(edge, prepared_id)
+                    for prepared_id in registry.get_prepared_ids_with_overlapping_path(edge.source.node_id, target_path)
                 )
                 for edge in edges
             )

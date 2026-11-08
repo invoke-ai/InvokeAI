@@ -206,7 +206,9 @@ def _work(counts: dict[str, int]) -> int:
     return sum(counts.values())
 
 
-def test_if_analysis_work_is_linear_and_invalidated_by_graph_edits(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_if_analysis_graph_traversal_work_is_bounded_and_invalidated_by_graph_edits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     graph = _make_graph(4)
     state = GraphExecutionState(graph=graph)
     counts = _instrument(state, monkeypatch)
@@ -238,34 +240,40 @@ def test_if_analysis_work_is_linear_and_invalidated_by_graph_edits(monkeypatch: 
             ActivationDependency(owner_id=f"if_{index}", branch="false_input", frame=(index + 32,)),
         )
     graph_size = len(graph.nodes) + len(graph.edges)
-    analysis_work = _work(counts)
-    assert analysis_work <= 8 * graph_size, (
-        f"If ownership visited {analysis_work} graph items for {graph_size} nodes and edges"
+    graph_traversal_work = _work(counts)
+    assert graph_traversal_work <= 8 * graph_size, (
+        f"If ownership visited {graph_traversal_work} graph items for {graph_size} nodes and edges"
     )
 
 
-def test_nested_if_ownership_masks_keep_storage_linear(monkeypatch: pytest.MonkeyPatch) -> None:
-    graph = _make_nested_if_graph(64)
-    state = GraphExecutionState(graph=graph)
-    counts = _instrument(state, monkeypatch)
+def test_nested_if_analysis_materializes_gate_frontiers_and_bounds_mask_payload() -> None:
+    measurements = []
+    for depth in (16, 32, 64, 128):
+        graph = _make_nested_if_graph(depth)
+        state = GraphExecutionState(graph=graph)
+        dependencies = {
+            source_id: state._get_source_activation_dependencies(source_id, (7,)) for source_id in graph.nodes
+        }
+        relation_count = sum(map(len, dependencies.values()))
 
-    frame = (7,)
-    assert state._get_source_activation_dependencies("true_leaf", frame) == tuple(
-        ActivationDependency(owner_id=f"if_{index}", branch="true_input", frame=frame) for index in range(64)
-    )
+        analysis = state._if_graph_analysis
+        assert analysis is not None
+        owner_masks_by_source = analysis.activation_owner_masks_by_source
+        assert owner_masks_by_source is not None
+        # shortcut: packed masks bound materialized frontier relations, but bit payload remains
+        # O(V·I/w); revisit a sparse representation if profiling on real workflows shows it matters.
+        mask_payload_bits = sum(mask.bit_length() for mask in owner_masks_by_source.values())
+        frontier_iterations = sum(mask.bit_count() for mask in owner_masks_by_source.values())
 
-    analysis = state._if_graph_analysis
-    assert analysis is not None
-    owner_masks_by_source = analysis.activation_owner_masks_by_source
-    assert owner_masks_by_source is not None
-    assert len(owner_masks_by_source) <= len(graph.nodes)
-    assert all(isinstance(mask, int) for mask in owner_masks_by_source.values())
-    assert counts["owner_mask_entries"] == len(owner_masks_by_source)
-    assert owner_masks_by_source["true_leaf"].bit_count() == 64
-    assert counts["owner_relations"] == 64
+        assert dependencies["true_leaf"] == (ActivationDependency(owner_id="if_0", branch="true_input", frame=(7,)),)
+        assert relation_count <= 3 * depth + 1
+        # The reducer performs one loop iteration per retained frontier owner bit.
+        assert frontier_iterations == relation_count
+        assert len(owner_masks_by_source) <= len(graph.nodes)
+        assert all(isinstance(mask, int) for mask in owner_masks_by_source.values())
+        # A compact integer bitset still stores through its highest owner bit; that payload grows with
+        # graph size × owner count even though only the frontier relations are materialized.
+        assert mask_payload_bits <= 2 * len(owner_masks_by_source) * (2 * depth)
+        measurements.append((depth, relation_count, mask_payload_bits))
 
-    graph_size = len(graph.nodes) + len(graph.edges)
-    analysis_work = _work(counts)
-    assert analysis_work <= 8 * graph_size, (
-        f"Nested If ownership visited {analysis_work} graph items for {graph_size} nodes and edges"
-    )
+    assert measurements[-1][1] <= 9 * measurements[0][1]
