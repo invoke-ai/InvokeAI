@@ -39,7 +39,7 @@ def test_each_step_previews_the_flux2_space_latent_through_the_shared_callback(
     monkeypatch.setattr(ideogram4_denoise.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     # float64: CPU bf16 matmul can raise an illegal instruction on Windows runners.
     branches = (Ideogram4Transformer(TINY).double().eval(), Ideogram4Transformer(TINY).double().eval())
-    monkeypatch.setattr(Ideogram4DenoiseInvocation, "_load_branches", lambda self, context, stack, mem: branches)
+    monkeypatch.setattr(Ideogram4DenoiseInvocation, "_load_branches", lambda self, context, stack, mem, **_: branches)
 
     # Keep a copy of each packed latent the loop hands over, before the node's callback replaces it.
     packed: list[torch.Tensor] = []
