@@ -80426,7 +80426,7 @@
           "expert"
         ],
         "title": "Main_Checkpoint_Wan_Config",
-        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized. The loader normalises all of those.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
+        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized, or ComfyUI ``int8_tensorwise`` (convrot) quantized, which stays int8 in memory. The loader\nnormalises all of those. An int8 weight without a decodable ``int8_tensorwise`` marker (a bare\n``{\"convrot\": true}``, int4) is refused at install.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
       },
       "Main_Checkpoint_ZImage_Config": {
         "properties": {
