@@ -49,11 +49,11 @@ from safetensors.torch import save_file
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
 from invokeai.backend.ideogram4.quantized_loading import (
     FP8_TEXT_ENCODER_CONFIG_FLAG,
-    Fp8Linear,
     quantize_weight_to_fp8,
 )
 from invokeai.backend.model_manager.load.model_loaders import ideogram4
 from invokeai.backend.model_manager.load.model_loaders.ideogram4 import Ideogram4DiffusersModel
+from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot, quantize_scaled_fp8

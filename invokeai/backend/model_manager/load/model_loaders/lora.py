@@ -22,6 +22,9 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+    lora_model_from_ernie_image_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
 from invokeai.backend.patches.lora_conversions.flux3_lora_conversion_utils import lora_model_from_flux3_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
@@ -59,6 +62,9 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_conversion_utils import (
+    lora_model_from_ideogram4_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
     lora_model_from_krea2_state_dict,
 )
@@ -73,10 +79,30 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_ut
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.sd3_lora_conversion_utils import lora_model_from_sd3_state_dict
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
+
+_DORA_MAGNITUDE_SUFFIXES = (".dora_scale", ".dora_magnitude", ".lora_magnitude_vector.weight", ".magnitude")
+_FACTORIZED_LAYER_SUFFIXES = (".hada_w1_a", ".lokr_w1", ".lokr_w1_a")
+
+
+def _layer_prefixes_with_suffixes(state_dict: dict[str, torch.Tensor], suffixes: tuple[str, ...]) -> set[str]:
+    prefixes: set[str] = set()
+    for key in state_dict:
+        for suffix in suffixes:
+            if key.endswith(suffix):
+                prefixes.add(key[: -len(suffix)])
+                break
+    return prefixes
+
+
+def _count_factorized_layers_with_dora_magnitude(state_dict: dict[str, torch.Tensor]) -> int:
+    magnitude_layers = _layer_prefixes_with_suffixes(state_dict, _DORA_MAGNITUDE_SUFFIXES)
+    factorized_layers = _layer_prefixes_with_suffixes(state_dict, _FACTORIZED_LAYER_SUFFIXES)
+    return len(magnitude_layers & factorized_layers)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
@@ -129,6 +155,8 @@ class LoRALoader(ModelLoader):
             BaseModelType.Flux,
         ]:
             state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
+
+        factorized_dora_layers = _count_factorized_layers_with_dora_magnitude(state_dict)
 
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
@@ -224,8 +252,26 @@ class LoRALoader(ModelLoader):
             # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
             # is what the published distilled accelerator (no .alpha tensors) expects.
             model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.ErnieImage:
+            # ERNIE-Image LoRAs already name the transformer's own (diffusers) modules; only the container
+            # prefix is stripped. Without .alpha tensors (ai-toolkit) alpha = rank, i.e. the patch applies unscaled.
+            model = lora_model_from_ernie_image_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Ideogram4:
+            # Converted onto the vendored transformer every Ideogram 4 build loads into; diffusers' split q/k/v
+            # are fused into its single `attention.qkv`. Without .alpha tensors alpha = rank (unscaled).
+            model = lora_model_from_ideogram4_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.StableDiffusion3:
+            # diffusers, PEFT, SimpleTuner LyCORIS and kohya MMDiT names, all onto diffusers' SD3Transformer2DModel
+            # and the two CLIP encoders; T5 layers are dropped with a warning.
+            model = lora_model_from_sd3_state_dict(state_dict=state_dict)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
+
+        if factorized_dora_layers:
+            self._logger.warning(
+                f"LoRA '{config.name}' contains {factorized_dora_layers} LoKr/LoHa layers with unsupported DoRA "
+                "magnitudes; applying those layers as plain LoKr/LoHa."
+            )
 
         model.to(dtype=self._torch_dtype)
         return model

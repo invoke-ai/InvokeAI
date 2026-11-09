@@ -34,11 +34,13 @@ import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 export const WidgetPanelFrame = ({
   children,
   instanceId,
+  label,
   region,
   typeId,
 }: {
   children: ReactNode;
   instanceId?: WidgetInstanceId;
+  label?: string;
   region: Exclude<WidgetRegion, 'center'>;
   typeId?: WidgetTypeId;
 }) => {
@@ -122,6 +124,8 @@ export const WidgetPanelFrame = ({
   return (
     // Side widths shrink to protect center space and opposite rails; bottom height stays fixed.
     <Flex
+      role="group"
+      aria-label={label ?? t('widgets.panelLabel', { region })}
       direction={isBottom ? 'column' : 'row'}
       flexShrink={isBottom ? 0 : 1}
       h={isBottom ? `${displaySizePx}px` : 'full'}

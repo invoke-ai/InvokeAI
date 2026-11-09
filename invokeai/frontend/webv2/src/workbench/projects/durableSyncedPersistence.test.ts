@@ -4835,6 +4835,8 @@ describe('project content and the caller’s workspace', () => {
     expect(api.updateProject).not.toHaveBeenCalled();
     expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
     expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
+    // What the copy here builds on, as the media usage check compares it with the server's.
+    expect(getProjectSyncSnapshot().projects[project.id]).toMatchObject({ revision: 1, workspaceRevision: 2 });
   });
 
   it('saves a change to the shared project as the content alone', async () => {

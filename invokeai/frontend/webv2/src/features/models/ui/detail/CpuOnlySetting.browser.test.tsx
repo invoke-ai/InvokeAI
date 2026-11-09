@@ -3,12 +3,13 @@ import type { ModelConfig } from '@features/models/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsSnapshot, setModelsSnapshotForTests, useModelsSelector } from '@features/models/data/modelsStore';
 import { type AccountScope, accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
+import { CpuOnlySetting } from './CpuOnlySetting';
 
 const api = vi.hoisted(() => ({
   getModelsDir: vi.fn(),
@@ -85,32 +86,6 @@ describe('CpuOnlySetting', () => {
     accountLifecycle.invalidate();
   });
 
-  it('is available exactly for the types whose config carries cpu_only', () => {
-    const supported = [
-      'vae',
-      'clip_embed',
-      't5_encoder',
-      'qwen3_encoder',
-      'clip_vision',
-      'siglip',
-      'llava_onevision',
-      'text_llm',
-      'wan_t5_encoder',
-      'gemma2_encoder',
-      'mistral_encoder',
-      'qwen3_vl_encoder',
-    ];
-
-    for (const type of supported) {
-      expect(supportsCpuOnlySetting({ type }), type).toBe(true);
-    }
-
-    // These configs have no cpu_only field; the PATCH would silently drop it.
-    for (const type of ['main', 'lora', 'qwen_vl_encoder', 'pid_decoder']) {
-      expect(supportsCpuOnlySetting({ type }), type).toBe(false);
-    }
-  });
-
   it('saves immediately, disables while pending, and accepts the canonical response', async () => {
     const request = deferred<ModelConfig>();
     api.updateModel.mockReturnValue(request.promise);
@@ -137,7 +112,7 @@ describe('CpuOnlySetting', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('restores the previous value and reports a failed save', async () => {
+  it('restores the previous value and reports why the backend refused the save', async () => {
     const request = deferred<ModelConfig>();
     api.updateModel.mockReturnValue(request.promise);
     const input = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
@@ -149,15 +124,40 @@ describe('CpuOnlySetting', () => {
     expect(getModelsSnapshot().models[0]?.cpu_only).toBe(true);
 
     await act(async () => {
-      request.reject(new Error('save exploded'));
+      request.reject(new ApiError(JSON.stringify({ detail: "Model 'SDXL VAE' does not support cpu_only" }), 409));
       await request.promise.catch(() => undefined);
     });
 
     expect(getModelsSnapshot().models[0]?.cpu_only).toBeNull();
     expect(input.checked).toBe(false);
     expect(input.disabled).toBe(false);
-    expect(onError).toHaveBeenCalledWith('save exploded');
+    expect(onError).toHaveBeenCalledWith("Model 'SDXL VAE' does not support cpu_only");
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("reports a plain error's message, and the generic message when a failure carries none", async () => {
+    const input = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const toggle = () =>
+      act(async () => {
+        input.click();
+        await Promise.resolve();
+      });
+
+    api.updateModel.mockRejectedValueOnce(new Error('Network unreachable'));
+    await toggle();
+    expect(onError).toHaveBeenLastCalledWith('Network unreachable');
+
+    api.updateModel.mockRejectedValueOnce(undefined);
+    await toggle();
+    expect(onError).toHaveBeenLastCalledWith('models.failedToSaveCpuSetting');
+    expect(input.checked).toBe(false);
+  });
+
+  it('describes the switch with its help text', () => {
+    const input = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const help = document.getElementById(input.getAttribute('aria-describedby') ?? '');
+
+    expect(help?.textContent).toBe('models.runVaeOnCpuHelp');
   });
 
   it('does not commit a late response from account A into account B', async () => {

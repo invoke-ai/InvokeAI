@@ -1,3 +1,4 @@
+import type * as Languages from '@platform/i18n/languages';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 import type * as projectsApi from '@workbench/projects/api';
@@ -22,6 +23,18 @@ import { page, userEvent } from 'vitest/browser';
 
 import { PreferencesPage } from './PreferencesPage';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
+
+vi.mock('@platform/i18n/languages', async (importOriginal) => {
+  const original = await importOriginal<typeof Languages>();
+  const catalogs = { en: { translated: 10, ready: true }, fr: { translated: 2 } };
+  return {
+    ...original,
+    getWorkbenchLanguageAvailability: (language: Languages.WorkbenchLanguage) =>
+      original.getWorkbenchLanguageAvailability(language, catalogs),
+    getEffectiveWorkbenchLanguage: (language: Languages.WorkbenchLanguage) =>
+      original.getEffectiveWorkbenchLanguage(language, catalogs),
+  };
+});
 
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
@@ -106,6 +119,23 @@ afterEach(async () => {
 });
 
 describe('Launchpad preferences page', () => {
+  it('keeps an unavailable language selected and explains the English content', async () => {
+    await patchWorkbenchPreferences({ language: 'ar' });
+    await render('/preferences/appearance');
+    await expect
+      .element(
+        page.getByText(
+          'Unavailable and incomplete translations display English content. Your language choice is kept.',
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(page.getByRole('combobox', { name: 'Language', exact: true }))
+      .toHaveTextContent('العربية — Unavailable; English content');
+    expect(getWorkbenchPreferences().language).toBe('ar');
+  });
+
   it('lists every section, per-project ones as defaults, and follows the route', async () => {
     const router = await render('/preferences/behavior');
 

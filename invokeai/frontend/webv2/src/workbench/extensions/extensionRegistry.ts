@@ -6,12 +6,8 @@ import type {
   WidgetContributionSource,
   WidgetHotkeyApi,
   WidgetHotkeyContribution,
-  WidgetMenuApi,
-  WidgetMenuContribution,
   WidgetSearchApi,
   WidgetSearchProvider,
-  WidgetToolbarApi,
-  WidgetToolbarContribution,
 } from '@workbench/widgetContracts';
 
 import { createCollectionStore, type CollectionStore } from '@platform/state/externalStore';
@@ -21,21 +17,17 @@ import { areWidgetContributionSourcesEqual, getWidgetContributionRegistrationKey
 export interface ExtensionContributionStores {
   commands: CollectionStore<WidgetCommandContribution>;
   hotkeys: CollectionStore<WidgetHotkeyContribution>;
-  menus: CollectionStore<WidgetMenuContribution>;
   palette: CollectionStore<WidgetCommandPaletteContribution>;
   search: CollectionStore<WidgetSearchProvider>;
-  toolbars: CollectionStore<WidgetToolbarContribution>;
 }
 
 export interface ExtensionRegistry {
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
-  menus: WidgetMenuApi;
   palette: WidgetCommandPaletteApi;
   search: WidgetSearchApi;
-  /** Read side for shell surfaces (hotkey runtime, palette/search/toolbar UI). */
+  /** Read side for shell surfaces (hotkey runtime and palette/search UI). */
   stores: ExtensionContributionStores;
-  toolbars: WidgetToolbarApi;
 }
 
 /** Construct one registry per Workbench mount so contribution state shares its lifetime. */
@@ -43,10 +35,8 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
   const stores: ExtensionContributionStores = {
     commands: createCollectionStore<WidgetCommandContribution>(),
     hotkeys: createCollectionStore<WidgetHotkeyContribution>(),
-    menus: createCollectionStore<WidgetMenuContribution>(),
     palette: createCollectionStore<WidgetCommandPaletteContribution>(),
     search: createCollectionStore<WidgetSearchProvider>(),
-    toolbars: createCollectionStore<WidgetToolbarContribution>(),
   };
 
   const findCommand = (
@@ -80,11 +70,6 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
         return stores.hotkeys.register(hotkey, getWidgetContributionRegistrationKey(hotkey.id, hotkey.source));
       },
     },
-    menus: {
-      register(menu) {
-        return stores.menus.register(menu, getWidgetContributionRegistrationKey(menu.id, menu.source));
-      },
-    },
     palette: {
       register(entry) {
         return stores.palette.register(entry, getWidgetContributionRegistrationKey(entry.commandId, entry.source));
@@ -104,10 +89,5 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
       },
     },
     stores,
-    toolbars: {
-      register(toolbar) {
-        return stores.toolbars.register(toolbar, getWidgetContributionRegistrationKey(toolbar.id, toolbar.source));
-      },
-    },
   };
 };
