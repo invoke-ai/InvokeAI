@@ -996,15 +996,11 @@
     },
     "colorCompensation": {
       "heading": "Color Compensation",
-      "paragraphs": [
-        "Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."
-      ]
+      "paragraphs": ["Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."]
     },
     "concepts": {
       "heading": "LoRA",
-      "paragraphs": [
-        "Lightweight models that are used in conjunction with base models."
-      ]
+      "paragraphs": ["Lightweight models that are used in conjunction with base models."]
     },
     "conditioningRebalance": {
       "heading": "Conditioning rebalance",
@@ -1044,9 +1040,7 @@
     },
     "height": {
       "heading": "Height",
-      "paragraphs": [
-        "Height of the generated image. Must be a multiple of 8."
-      ]
+      "paragraphs": ["Height of the generated image. Must be a multiple of 8."]
     },
     "dypePreset": {
       "heading": "DyPE (High-Resolution)",
@@ -1191,9 +1185,7 @@
     },
     "loraWeight": {
       "heading": "LoRA Weight",
-      "paragraphs": [
-        "Weight of the LoRA. Higher weight will lead to larger impacts on the final image."
-      ]
+      "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
     },
     "mistralEncoder": {
       "heading": "Mistral Encoder",
@@ -1257,9 +1249,7 @@
     },
     "referenceImage": {
       "heading": "Global Reference Image",
-      "paragraphs": [
-        "Applies a reference image to influence the entire generation."
-      ]
+      "paragraphs": ["Applies a reference image to influence the entire generation."]
     },
     "referenceImageStrength": {
       "heading": "Reference Image Strength",
@@ -1363,9 +1353,7 @@
     },
     "vae": {
       "heading": "VAE",
-      "paragraphs": [
-        "Model used for translating AI output into the final image."
-      ]
+      "paragraphs": ["Model used for translating AI output into the final image."]
     },
     "vaePrecision": {
       "heading": "VAE Precision",
@@ -1376,9 +1364,7 @@
     },
     "width": {
       "heading": "Width",
-      "paragraphs": [
-        "Width of the generated image. Must be a multiple of 8."
-      ]
+      "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
     },
     "refinerModel": {
       "heading": "Refiner model",
@@ -1389,21 +1375,15 @@
     },
     "refinerSteps": {
       "heading": "Refiner steps",
-      "paragraphs": [
-        "Number of steps the refiner schedule is divided into. Only the part after Refiner start runs."
-      ]
+      "paragraphs": ["Number of steps the refiner schedule is divided into. Only the part after Refiner start runs."]
     },
     "refinerCfgScale": {
       "heading": "Refiner CFG",
-      "paragraphs": [
-        "How strictly the refiner follows the prompt during its pass, like the main CFG."
-      ]
+      "paragraphs": ["How strictly the refiner follows the prompt during its pass, like the main CFG."]
     },
     "refinerScheduler": {
       "heading": "Refiner scheduler",
-      "paragraphs": [
-        "Scheduler used for the refiner pass, independent of the base model's scheduler."
-      ]
+      "paragraphs": ["Scheduler used for the refiner pass, independent of the base model's scheduler."]
     },
     "refinerStart": {
       "heading": "Refiner start",
@@ -6743,35 +6723,23 @@
     }
   },
   "workflowLibrary": {
-    "activeRanWhen": "Active workflow · ran {{when}}",
     "activeWorkflow": "Active",
-    "activeWorkflowLine": "Active workflow",
     "applying": "Applying workflow…",
-    "callable": "Callable",
     "cardSize": "Card size",
     "cardSizeLarge": "Large cards",
     "cardSizeSmall": "Small cards",
     "clearTags": "Clear",
+    "layoutGrid": "Grid",
+    "layoutGroup": "View",
+    "layoutList": "List",
     "conflictStaleBody": "The library template behind \"{{name}}\" has changed since this copy was loaded or last saved.",
     "conflictTitle": "Template has changed",
     "conflictUnknownBody": "It is not known whether the library template behind \"{{name}}\" still matches this copy.",
-    "copyChoice": {
-      "addCopy": "Add new copy",
-      "body_one": "This project already has a copy of this workflow. Open it, add another copy, or replace the copy with the library version.",
-      "body_other": "This project already has {{count}} copies of this workflow. Open one, add another copy, or replace one with the library version.",
-      "copy": "Copy",
-      "open": "Open copy",
-      "openCopyLabel": "{{name}} (open now)",
-      "replace": "Replace copy",
-      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph. Until you reload, Undo in the workflow editor brings the previous graph back.",
-      "title": "“{{name}}” is already in this project"
-    },
     "delete": "Delete",
     "deleteConfirmBody": "Delete \"{{name}}\" from the workflow library? This cannot be undone.",
     "deleteConfirmTitle": "Delete workflow",
     "deleteFailed": "Failed to delete workflow",
     "deleteHint": "Removes it from your library",
-    "detailsAndRequirements": "Details and requirements",
     "downloadJson": "Download JSON",
     "downloadJsonHint": "For bug reports and sharing",
     "duplicate": "Duplicate",
@@ -6784,74 +6752,61 @@
     "emptyRecent": "Nothing opened yet. Workflows you open from My library or Templates appear here.",
     "emptyShared": "Nothing shared yet. Public workflows on this server appear here.",
     "emptyUser": "No saved workflows yet. Use Save to library… in the editor to keep one here.",
-    "factCreated": "Created",
-    "factEdited": "Edited",
-    "factInProject": "In this project",
-    "factLastRun": "Last run",
-    "factUpdated": "Updated",
     "fetching": "Fetching workflow…",
     "findModel": "Find {{name}} in the model manager",
     "forkIntoProject": "Fork into new project",
     "forkIntoProjectHint": "Copies it into a new project",
-    "hideDetails": "Hide details",
-    "inProject": "In project",
     "installModels_one": "Install 1 model",
     "installModels_other": "Install {{count}} models",
     "installQueued": "Model installs queued",
     "lastRun": "Your last run · {{when}}",
-    "layoutGrid": "Grid",
-    "layoutGroup": "View",
-    "layoutList": "List",
-    "linkedTemplate": "Linked template",
     "loadFailed": "Failed to load workflow",
     "loadFailedBody": "Could not load \"{{name}}\".",
     "loadWarning": "Workflow load warning",
     "loadedLabel": "Loaded \"{{name}}\" from library",
+    "placeDefault": "Templates",
+    "placeProject": "In this project",
+    "placeRecent": "Recent",
+    "places": "Places",
+    "placeShared": "Shared with me",
+    "placeUser": "My library",
+    "replacedLabel": "Replaced with \"{{name}}\" from library",
     "loading": "Loading workflows…",
     "loadingMore": "Loading more…",
-    "missingNodePackNames_one": "Missing node pack: {{packs}}",
-    "missingNodePackNames_other": "Missing node packs: {{packs}}",
-    "modelsToInstall_one": "{{count, number}} model to install",
-    "modelsToInstall_other": "{{count, number}} models to install",
     "moreActions": "More actions",
     "multipleWorkflowReturnNodes": "The workflow must contain exactly one workflow return node before it can be saved.",
     "multipleWorkflowReturnNodesForTransfer": "The workflow must contain exactly one workflow return node before it can be exported or copied.",
     "newWorkflow": "New workflow",
     "nodeCount_one": "{{count}} node",
     "nodeCount_other": "{{count}} nodes",
-    "nodePacksMissing_one": "{{count, number}} node pack missing",
-    "nodePacksMissing_other": "{{count, number}} node packs missing",
     "notRunYet": "Not run yet",
+    "copyChoice": {
+      "addCopy": "Add new copy",
+      "body_one": "This project already has a copy of this workflow. Open it, add another copy, or replace the copy with the library version.",
+      "body_other": "This project already has {{count}} copies of this workflow. Open one, add another copy, or replace one with the library version.",
+      "copy": "Copy",
+      "open": "Open copy",
+      "openCopyLabel": "{{name}} (open now)",
+      "replace": "Replace copy",
+      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph. Until you reload, Undo in the workflow editor brings the previous graph back.",
+      "title": "“{{name}}” is already in this project"
+    },
     "open": "Open",
     "openExistingCopiesHint": "This project already has a copy; choose to open it, add another, or replace it",
     "openHint": "Adds a copy to this project",
+    "openWithEllipsis": "Open…",
     "openProjectChanged": "The project changed while \"{{name}}\" was loading; nothing was added.",
     "openProjectWorkflowHint": "Makes it the active workflow",
-    "openWithEllipsis": "Open…",
-    "openedWhen": "Opened {{when}}",
-    "placeDefault": "Templates",
-    "placeProject": "In this project",
-    "placeRecent": "Recent",
-    "placeShared": "Shared with me",
-    "placeUser": "My library",
-    "places": "Places",
     "previewGraph": "Preview graph",
     "private": "Private",
-    "projectCopiesNone": "None",
-    "projectCopies_one": "{{count, number}} copy",
-    "projectCopies_other": "{{count, number}} copies",
-    "projectCopyRevision": "1 copy · revision {{revision}}",
     "public": "Public",
     "publicVisibilityHelp": "Visible to users of this Invoke instance.",
     "publicVisibilityPartial": "The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.",
     "publicWorkflow": "Public workflow",
-    "ranWhen": "Ran {{when}}",
-    "readyToRun": "Ready to run",
     "remove": "Remove",
     "removeConfirmBody": "Remove \"{{name}}\" from this project? Its library template, if any, is not affected.",
     "removeConfirmTitle": "Remove workflow",
     "removeHint": "Removes it from this project only",
-    "removeTag": "Remove tag {{tag}}",
     "removeWithEllipsis": "Remove…",
     "rename": "Rename",
     "renameFailed": "Rename failed",
@@ -6859,19 +6814,18 @@
     "renameTemplateHint": "Changes the template's name in the library",
     "renameTemplateTitle": "Rename template",
     "renameTitle": "Rename workflow",
-    "renameWithEllipsis": "Rename…",
     "renamed": "Template renamed",
+    "renameWithEllipsis": "Rename…",
     "replaceTemplate": "Replace template",
-    "replacedLabel": "Replaced with \"{{name}}\" from library",
     "requirementInstallable": "Not installed",
     "requirementInstalled": "Installed",
     "requirementInstalling": "Installing…",
     "requirementMissing": "Not available to install",
     "requires": "Requires",
-    "resultCountWithTags_one": "{{count, number}} workflow · {{tags}}",
-    "resultCountWithTags_other": "{{count, number}} workflows · {{tags}}",
     "resultCount_one": "{{count, number}} workflow",
     "resultCount_other": "{{count, number}} workflows",
+    "resultCountWithTags_one": "{{count, number}} workflow · {{tags}}",
+    "resultCountWithTags_other": "{{count, number}} workflows · {{tags}}",
     "retry": "Retry",
     "retryBody": "Saving \"{{name}}\" did not get an answer from the library ({{message}}). Retry the same save, or discard it. If the library did receive it, that template already exists.",
     "retryDiscard": "Discard",
@@ -6888,9 +6842,9 @@
     "saveFailed": "Failed to save workflow",
     "saveToLibraryConfirm": "Save",
     "saveToLibraryExplanation": "Creates a new library template from this workflow; its current input values become the template's defaults. This workflow then links to the new template and takes its name.",
-    "saveToLibraryHint": "Creates a new template from this workflow",
     "saveToLibraryRelink": "Update library template will then write to the new template instead of \"{{template}}\".",
     "saveToLibraryRelinkUnnamed": "Update library template will then write to the new template instead of the one this workflow is linked to now.",
+    "saveToLibraryHint": "Creates a new template from this workflow",
     "saveToLibraryTitle": "Save to library",
     "saveToLibraryWithEllipsis": "Save to library…",
     "saved": "Workflow saved",
@@ -6898,37 +6852,24 @@
     "savedUpdatedBody": "Updated \"{{name}}\" in the library.",
     "searchPlaceholder": "Search names, tags, or descriptions",
     "sortAToZ": "A to Z",
-    "sortAndViewOptions": "Sort and view options",
     "sortControl": "Sort: {{sort}}, {{direction}}",
-    "sortCreated": "Date created",
-    "sortDirectionGroup": "Direction",
     "sortFirstToLast": "First to last",
-    "sortLabel": "Sort by",
     "sortLastRun": "Last run",
     "sortLastToFirst": "Last to first",
-    "sortName": "Name",
     "sortNewestFirst": "Newest first",
     "sortOldestFirst": "Oldest first",
-    "sortOpened": "Last opened",
     "sortProjectOrder": "Project order",
-    "sortUpdated": "Last updated",
     "sortZToA": "Z to A",
     "sourceBundled": "From a bundled template (read-only)",
-    "sourceNamedRevision": "Linked to {{name}}, revision {{revision}}",
     "sourceNone": "Not linked to a library template",
     "sourceRevision": "Linked to library template at revision {{revision}}",
     "sourceUnknownRevision": "Linked to a library template (revision unknown)",
     "tags": "Tags",
     "tagsAnyHint": "Showing workflows with any checked tag",
     "templateName": "Template name",
-    "templateNewer": "Template is newer",
-    "templateRevision": "Library template is at revision {{revision}}",
     "thisProjectHint": "Workflows saved with this project. Edits autosave here; the library changes only when you save to it.",
     "thumbnail": "Thumbnail",
     "thumbnailChoose": "Choose thumbnail",
-    "thumbnailFit": "Thumbnail display",
-    "thumbnailFitContain": "Fit",
-    "thumbnailFitCover": "Fill",
     "thumbnailRemove": "Remove thumbnail",
     "thumbnailRemoveFailed": "Failed to remove thumbnail",
     "thumbnailRemoved": "Thumbnail removed",
@@ -6936,6 +6877,10 @@
     "thumbnailUpdateFailed": "Failed to update thumbnail",
     "thumbnailUpdated": "Thumbnail updated",
     "thumbnailUpdating": "Updating thumbnail…",
+    "viewOptions": "View options",
+    "visibility": "Visibility",
+    "visibilityUpdateFailed": "Failed to update workflow visibility",
+    "visibilityUnknown": "Visibility unknown",
     "title": "Workflows",
     "unavailableBundledBody": "\"{{name}}\" came from a bundled template, which cannot be changed. Save it as a new template instead.",
     "unavailableForbiddenBody": "The library template behind \"{{name}}\" belongs to someone else. Save it as a new template instead.",
@@ -6947,22 +6892,56 @@
     "updateConfirmCallers": "Workflows that call this template will use the new version.",
     "updateConfirmIrreversible": "This cannot be undone: the template's current version is replaced.",
     "updateConfirmNamedBody": "Replace the library template \"{{template}}\" with this workflow's current graph, form, and input values?",
-    "updateFromTemplate": "Update from template",
-    "updateFromTemplateBody": "Replace \"{{name}}\" with the library template's current version? Your edits to this copy are replaced; Undo restores them.",
-    "updateFromTemplateConfirm": "Update",
     "updateTemplate": "Update library template",
     "updateTemplateHint": "Writes this workflow over its library template",
     "updateTitle": "Update library template",
-    "updatedFromTemplate": "Updated from template",
-    "viewOptions": "View options",
-    "visibility": "Visibility",
-    "visibilityUnknown": "Visibility unknown",
-    "visibilityUpdateFailed": "Failed to update workflow visibility",
-    "whenAtRevision": "{{when}} · revision {{revision}}",
     "workflowGone": "The workflow is no longer in this project.",
     "workflowMetadataOmitted": "Workflow metadata omitted",
     "workflowMetadataOmittedBody": "Workflow metadata was omitted because the workflow contains multiple workflow_return nodes.",
-    "workflowName": "Workflow name"
+    "workflowName": "Workflow name",
+    "sortLabel": "Sort by",
+    "sortUpdated": "Last updated",
+    "sortOpened": "Last opened",
+    "sortCreated": "Date created",
+    "sortName": "Name",
+    "thumbnailFit": "Thumbnail display",
+    "thumbnailFitCover": "Fill",
+    "thumbnailFitContain": "Fit",
+    "activeRanWhen": "Active workflow · ran {{when}}",
+    "activeWorkflowLine": "Active workflow",
+    "callable": "Callable",
+    "factCreated": "Created",
+    "factEdited": "Edited",
+    "factInProject": "In this project",
+    "factLastRun": "Last run",
+    "factUpdated": "Updated",
+    "inProject": "In project",
+    "linkedTemplate": "Linked template",
+    "modelsToInstall_one": "{{count, number}} model to install",
+    "modelsToInstall_other": "{{count, number}} models to install",
+    "nodePacksMissing_one": "{{count, number}} node pack missing",
+    "nodePacksMissing_other": "{{count, number}} node packs missing",
+    "openedWhen": "Opened {{when}}",
+    "projectCopies_one": "{{count, number}} copy",
+    "projectCopies_other": "{{count, number}} copies",
+    "projectCopiesNone": "None",
+    "projectCopyRevision": "1 copy · revision {{revision}}",
+    "ranWhen": "Ran {{when}}",
+    "readyToRun": "Ready to run",
+    "templateNewer": "Template is newer",
+    "templateRevision": "Library template is at revision {{revision}}",
+    "updateFromTemplate": "Update from template",
+    "updateFromTemplateBody": "Replace \"{{name}}\" with the library template's current version? Your edits to this copy are replaced; Undo restores them.",
+    "updateFromTemplateConfirm": "Update",
+    "updatedFromTemplate": "Updated from template",
+    "whenAtRevision": "{{when}} · revision {{revision}}",
+    "detailsAndRequirements": "Details and requirements",
+    "hideDetails": "Hide details",
+    "sortAndViewOptions": "Sort and view options",
+    "sortDirectionGroup": "Direction",
+    "missingNodePackNames_one": "Missing node pack: {{packs}}",
+    "missingNodePackNames_other": "Missing node packs: {{packs}}",
+    "sourceNamedRevision": "Linked to {{name}}, revision {{revision}}"
   },
   "settingsDialog": {
     "search": "Search settings…",

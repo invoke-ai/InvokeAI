@@ -557,14 +557,24 @@ it.each([
     await page.viewport(width!, height!);
     await waitFor(() => expect(gridGeometry(viewport()!).columns).toBe(columns));
     await settle();
-    // The wide rail clears with Clear; the narrow layout (under a 56rem dialog) removes the tag's chip.
+    // The wide rail clears with its Clear; the narrow layout (under a 56rem dialog) clears inside the Tags popover.
     const isNarrow = width! < 960;
-    const clear = isNarrow
-      ? page.getByRole('button', { name: 'workflowLibrary.removeTag', exact: true })
-      : page.getByRole('button', { name: 'workflowLibrary.clearTags', exact: true });
     const modal = document.querySelector<HTMLElement>('[role=dialog]')!;
     const outerOffset = modal.scrollTop;
-    await act(() => userEvent.click(clear));
+    if (isNarrow) {
+      const trigger = document.querySelector<HTMLElement>('[data-workflow-library-tags-trigger]')!;
+      await act(() => userEvent.click(trigger));
+      await waitFor(() => expect(document.querySelector('[data-workflow-library-tag-popover]')).not.toBeNull());
+      const popover = document.querySelector<HTMLElement>('[data-workflow-library-tag-popover]')!;
+      await act(() =>
+        userEvent.click(
+          [...popover.querySelectorAll('button')].find((button) => button.textContent === 'workflowLibrary.clearTags')!
+        )
+      );
+      await act(() => userEvent.keyboard('{Escape}'));
+    } else {
+      await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.clearTags', exact: true })));
+    }
     await settle();
     const restored = viewport()!;
     const expectedIndex = Math.floor(Number(before.id?.slice(3)) / columns!) * columns!;
@@ -574,7 +584,7 @@ it.each([
     if (width === 1280) {
       expect(Math.abs(firstVisibleRow(restored).offset - before.offset)).toBeLessThan(3);
     }
-    // Clear leaves with the last checked tag and hands focus to the first tag; the last chip, to the Tags button.
+    // Clear leaves with the last checked tag and hands focus to the first tag; closing the popover, to the Tags button.
     expect(document.activeElement).toBe(
       isNarrow
         ? document.querySelector('[data-workflow-library-tags-trigger]')

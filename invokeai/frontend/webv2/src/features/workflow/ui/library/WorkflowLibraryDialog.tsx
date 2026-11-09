@@ -72,7 +72,6 @@ import {
   WorkflowLibraryPlaceSelect,
   WorkflowLibraryRail,
   WorkflowLibraryTagButton,
-  WorkflowLibraryTagChips,
 } from './WorkflowLibraryRail';
 import { WorkflowLibraryToolbar, type WorkflowLibrarySortOption } from './WorkflowLibraryToolbar';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
@@ -764,11 +763,6 @@ export const WorkflowLibraryDialog = ({
                     onSearchChange={handleSearchChange}
                     onSortChange={handleSortChange}
                     onThumbnailFitChange={handleThumbnailFitChange}
-                  />
-                  <WorkflowLibraryTagChips
-                    checkedTags={query.tags}
-                    getFallbackFocus={getInitialFocus}
-                    onTagsChange={handleTagsChange}
                   />
                   <WorkflowThumbnailFitContext value={thumbnailFit}>
                     <WorkflowLibraryCardSizeContext value={cardSize}>

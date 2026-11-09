@@ -5,7 +5,6 @@ import type { LucideIcon } from 'lucide-react';
 import { Box, Checkbox, createListCollection, HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
-import { RemovableTag } from '@platform/ui/RemovableTag';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Select } from '@platform/ui/Select';
 import { BookOpenIcon, ClockIcon, FolderIcon, LayoutTemplateIcon, UsersIcon } from 'lucide-react';
@@ -22,18 +21,15 @@ const RAIL_WIDTH = '12.25rem';
 /**
  * The library's one layout breakpoint, on the dialog's container (`containerName: workflow-library-dialog`): below
  * 56rem (a window under about 960px) the rail, a usable card column and the 18rem detail rail no longer fit side by
- * side. There the places become a select in the toolbar, the tags a popover with removable chips, the order and size
- * controls one options menu, and the detail rail a bottom sheet (`WorkflowDetailSheet`).
+ * side. There the places become a select in the toolbar, the tags a popover behind a Tags button that counts the
+ * checked ones, the order and view controls one options menu, and the detail rail a bottom sheet
+ * (`WorkflowDetailSheet`).
  */
 export const WORKFLOW_LIBRARY_NARROW = '@container workflow-library-dialog (width < 56rem)';
 /** The complement of `WORKFLOW_LIBRARY_NARROW`: the rail, centre column and detail rail side by side. */
 export const WORKFLOW_LIBRARY_WIDE = '@container workflow-library-dialog (width >= 56rem)';
 /** Controls that only the wide layout shows. */
 export const WORKFLOW_LIBRARY_WIDE_ONLY_CSS = { [WORKFLOW_LIBRARY_NARROW]: { display: 'none' } } as const;
-const TAG_FILTER_CSS = {
-  display: 'none',
-  [WORKFLOW_LIBRARY_NARROW]: { alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '1.5' },
-} as const;
 
 const TAG_HOVER = { bg: 'bg.muted' } as const;
 
@@ -408,23 +404,6 @@ export const WorkflowLibraryPlaceSelect = ({
 
 const TAG_FILTER_POSITIONING = { placement: 'bottom-start' } as const;
 
-const CheckedTagChip = ({ tag, onRemove }: { tag: string; onRemove: (tag: string) => void }) => {
-  const { t } = useTranslation();
-  const handleRemove = useCallback(() => onRemove(tag), [onRemove, tag]);
-
-  return (
-    <RemovableTag removeLabel={t('workflowLibrary.removeTag', { tag })} onRemove={handleRemove}>
-      {tag}
-    </RemovableTag>
-  );
-};
-
-/** Finds the narrow toolbar's Tags button from within the dialog, the chips' focus fallback. */
-const findTagsTrigger = (from: Element | null): HTMLElement | null =>
-  from
-    ?.closest('[data-scope="dialog"][data-part="content"]')
-    ?.querySelector<HTMLElement>('[data-workflow-library-tags-trigger]') ?? null;
-
 /**
  * The narrow layout's tags button, in the toolbar after the places select: "Tags N" opens the tag checkboxes in a
  * popover. Absent while the place has no tags and none is checked.
@@ -471,41 +450,5 @@ export const WorkflowLibraryTagButton = ({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
-  );
-};
-
-/**
- * The narrow layout's checked tags, a row of removable chips under the toolbar while any is checked, so the filter in
- * force stays visible with the rail gone. A removed chip hands focus to its neighbour, else to the Tags button.
- */
-export const WorkflowLibraryTagChips = ({
-  checkedTags,
-  getFallbackFocus,
-  onTagsChange,
-}: Pick<WorkflowLibraryTagGroupProps, 'checkedTags' | 'getFallbackFocus' | 'onTagsChange'>) => {
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const handleRemove = useCallback(
-    (tag: string) => {
-      const index = checkedTags.indexOf(tag);
-      const removers = [...(chipsRef.current?.querySelectorAll<HTMLElement>('button') ?? [])];
-      const next =
-        removers[index + 1] ?? removers[index - 1] ?? findTagsTrigger(chipsRef.current) ?? getFallbackFocus();
-
-      next?.focus();
-      onTagsChange(checkedTags.filter((candidate) => candidate !== tag));
-    },
-    [checkedTags, getFallbackFocus, onTagsChange]
-  );
-
-  if (checkedTags.length === 0) {
-    return null;
-  }
-
-  return (
-    <HStack ref={chipsRef} css={TAG_FILTER_CSS} data-workflow-library-tag-filter flexShrink={0} gap="1" minW="0">
-      {checkedTags.map((tag) => (
-        <CheckedTagChip key={tag} tag={tag} onRemove={handleRemove} />
-      ))}
-    </HStack>
   );
 };

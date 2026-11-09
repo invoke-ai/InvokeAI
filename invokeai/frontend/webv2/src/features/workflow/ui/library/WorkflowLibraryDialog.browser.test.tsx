@@ -381,7 +381,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.whenAtRevision': '{{when}} · revision {{revision}}',
   'workflowLibrary.detailsAndRequirements': 'Details and requirements',
   'workflowLibrary.hideDetails': 'Hide details',
-  'workflowLibrary.removeTag': 'Remove tag {{tag}}',
   'workflowLibrary.sortAndViewOptions': 'Sort and view options',
   'workflowLibrary.sortDirectionGroup': 'Direction',
   'workflowLibrary.missingNodePackNames_one': 'Missing node pack: {{packs}}',
@@ -2426,7 +2425,8 @@ describe('WorkflowLibraryDialog', () => {
       await act(() => userEvent.keyboard('{Escape}'));
       await vi.waitFor(() => expect(document.activeElement).toBe(options));
 
-      // Tags open in a popover; each checked tag stays visible as a removable chip.
+      // Tags open in a popover; with the rail gone, the Tags button counts the checked tags and the result line names
+      // them. Nothing else is added under the toolbar.
       expect(tagsButton().textContent).toBe('Tags');
       await act(() => userEvent.click(tagsButton()));
       await vi.waitFor(() => expect(tagsButton().getAttribute('aria-expanded')).toBe('true'));
@@ -2435,25 +2435,26 @@ describe('WorkflowLibraryDialog', () => {
       await act(() => userEvent.click(popover.querySelector<HTMLElement>('[data-library-tag="portrait"]')!));
       await act(() => userEvent.click(popover.querySelector<HTMLElement>('[data-library-tag="upscale"]')!));
       expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenLastCalledWith({ tags: ['portrait', 'upscale'] });
+      const resultLine = content.querySelector<HTMLElement>('[data-workflow-library-results]')!;
       await act(() => userEvent.keyboard('{Escape}'));
       await vi.waitFor(() => expect(document.activeElement).toBe(tagsButton()));
       expect(tagsButton().textContent).toBe('Tags2');
       expect(results()).toBe('24 workflows · portrait or upscale');
-      const remover = (tag: string) =>
-        content.querySelector<HTMLButtonElement>(`[data-workflow-library-tag-filter] [aria-label="Remove tag ${tag}"]`);
-      for (const tag of ['portrait', 'upscale']) {
-        expectContained(remover(tag)!, content);
-      }
+      expect(toolbar.nextElementSibling).toBe(resultLine);
 
-      // Removing a chip hands focus to its neighbour, and the last one back to the Tags button.
-      await act(() => remover('portrait')!.focus());
-      await act(() => userEvent.keyboard('{Enter}'));
-      expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenLastCalledWith({ tags: ['upscale'] });
-      expect(remover('portrait')).toBeNull();
-      expect(document.activeElement).toBe(remover('upscale'));
-      await act(() => userEvent.keyboard('{Enter}'));
+      // Clear inside the popover keeps focus on its first tag, and closing it returns focus to the Tags button.
+      await act(() => userEvent.click(tagsButton()));
+      await vi.waitFor(() => expect(tagsButton().getAttribute('aria-expanded')).toBe('true'));
+      const reopened = document.getElementById(tagsButton().getAttribute('aria-controls') ?? '')!;
+      await act(() =>
+        userEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent === 'Clear')!)
+      );
       expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenLastCalledWith({ tags: [] });
-      expect(document.activeElement).toBe(tagsButton());
+      expect(document.activeElement).toBe(
+        reopened.querySelector('[data-library-tag="portrait"] input[type="checkbox"]')
+      );
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(tagsButton()));
       expect(results()).toBe('24 workflows');
 
       // Choosing a place from the select moves there, keeping the search and dropping the tags.
