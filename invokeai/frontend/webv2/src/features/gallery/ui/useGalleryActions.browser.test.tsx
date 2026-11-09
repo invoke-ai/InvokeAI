@@ -186,6 +186,7 @@ const adapter: GalleryUiAdapter = {
   ImageContextMenu: NoopContextMenu,
   antialiasProgressImages: false,
   exportProject: vi.fn(),
+  getBoardMediaUsage: vi.fn(),
   gallery: {
     clearSelection: noop,
     reconcileDeletedBoardOutcome,

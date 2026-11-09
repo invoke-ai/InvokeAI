@@ -1,0 +1,12 @@
+title: Load Video Frame
+author: helix4u
+repo: https://github.com/helix4u/load_video_frame
+summary: Load and index video frames and make videos, for animation with iterators and ControlNet.
+description: >-
+  A video frame image provider, an indexer and video creation nodes, for hooking up to iterators, ranges, ControlNets
+  and so on. Think animation and ControlNet outputs.
+categories: [video-3d, control]
+thumbnail: ./load-video-frame.webp
+images:
+  - src: https://raw.githubusercontent.com/helix4u/load_video_frame/refs/heads/main/_git_assets/dance1736978273.gif
+    alt: An animated dance made frame by frame

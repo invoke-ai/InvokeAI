@@ -49,6 +49,7 @@ const createDeps = () => {
   return {
     active,
     commands: {
+      canvas: {} as WorkbenchCommands['canvas'],
       generation: {} as WorkbenchCommands['generation'],
       notifications: { reportError } as unknown as WorkbenchCommands['notifications'],
       widgets: {} as WorkbenchCommands['widgets'],

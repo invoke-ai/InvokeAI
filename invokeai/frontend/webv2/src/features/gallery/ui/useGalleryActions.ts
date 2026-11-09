@@ -52,6 +52,7 @@ export const useGalleryActions = ({
     exportProject,
     gallery,
     galleryValues,
+    getBoardMediaUsage,
     getProjectGalleryValues,
     notifications,
     projectId,
@@ -325,6 +326,7 @@ export const useGalleryActions = ({
         }
       },
       exportProject,
+      getBoardMediaUsage,
       loadMore,
       moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
         const owner = captureAccountScope();
@@ -456,6 +458,7 @@ export const useGalleryActions = ({
     ensureProjectOnServer,
     exportProject,
     gallery,
+    getBoardMediaUsage,
     getCurrentGalleryLocation,
     getProjectGalleryValues,
     loadMore,

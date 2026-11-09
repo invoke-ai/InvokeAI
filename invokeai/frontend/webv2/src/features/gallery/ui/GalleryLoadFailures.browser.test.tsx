@@ -148,6 +148,7 @@ const Harness = ({
       ImageContextMenu: () => null,
       antialiasProgressImages: false,
       exportProject: noop,
+      getBoardMediaUsage: vi.fn(),
       followProgressSession: noop,
       followedProgressSessionId: null,
       gallery: {

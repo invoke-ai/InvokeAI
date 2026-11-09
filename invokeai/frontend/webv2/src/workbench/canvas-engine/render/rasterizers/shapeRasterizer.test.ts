@@ -50,7 +50,7 @@ describe('rasterizeShapeSource — extent + sizing', () => {
 });
 
 describe('rasterizeShapeSource — polygon', () => {
-  it('traces the stored vertices, rescaled into the stroke inset box', async () => {
+  it('traces the stored vertices for a clipped inside stroke', async () => {
     const deps = makeDeps();
     const surface = (
       await rasterizeShapeSource(
@@ -70,11 +70,10 @@ describe('rasterizeShapeSource — polygon', () => {
         deps
       )
     ).surface as StubRasterSurface;
-    // Inset 4px per side: the 60×40 box becomes 52×32 at (4, 4).
-    expect(surface.callLog.find((e) => e.op === 'moveTo')?.args).toEqual([4, 4]);
+    expect(surface.callLog.find((e) => e.op === 'moveTo')?.args).toEqual([0, 0]);
     expect(surface.callLog.filter((e) => e.op === 'lineTo').map((e) => e.args)).toEqual([
-      [56, 4],
-      [30, 36],
+      [60, 0],
+      [30, 40],
     ]);
     expect(ops(surface)).toContain('closePath');
     expect(ops(surface)).toContain('stroke');
@@ -94,15 +93,14 @@ describe('rasterizeShapeSource — rect', () => {
     expect(ops(surface)).not.toContain('stroke');
   });
 
-  it('strokes with the stroke color + width, inset so it stays within the extent', async () => {
+  it('masks a double-width centered stroke to the shape silhouette', async () => {
     const deps = makeDeps();
     const surface = (await rasterizeShapeSource(rect({ fill: null, stroke: '#0000ff', strokeWidth: 8 }), deps))
       .surface as StubRasterSurface;
     const log = surface.callLog;
     expect(log.some((e) => e.op === 'set' && e.args[0] === 'strokeStyle' && e.args[1] === '#0000ff')).toBe(true);
-    expect(log.some((e) => e.op === 'set' && e.args[0] === 'lineWidth' && e.args[1] === 8)).toBe(true);
+    expect(log.some((e) => e.op === 'set' && e.args[0] === 'lineWidth' && e.args[1] === 16)).toBe(true);
     expect(ops(surface)).toContain('stroke');
-    expect(ops(surface)).not.toContain('fill');
   });
 
   it('draws both fill and stroke when both are set', async () => {
@@ -152,7 +150,7 @@ describe('rasterizeShapeSource — triangle and star', () => {
     expect(log.filter((op) => op === 'lineTo')).toHaveLength(9);
     expect(log).toContain('closePath');
     expect(log).toContain('stroke');
-    expect((surface.ctx as unknown as { lineJoin: string }).lineJoin).toBe('round');
+    expect(surface.callLog.some((e) => e.op === 'set' && e.args[0] === 'lineJoin' && e.args[1] === 'round')).toBe(true);
   });
 });
 

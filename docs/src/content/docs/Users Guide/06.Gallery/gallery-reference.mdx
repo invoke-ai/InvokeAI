@@ -51,13 +51,13 @@ Choose **Delete board** from the board's menu. The confirmation dialog says what
 <Image src={deleteBoard} alt="The Delete board dialog with the media it holds, the Also permanently delete its items checkbox, and Cancel and Delete board buttons." width={500} />
 
 * **Delete board** — removes the board and moves everything on it to **Uncategorized**. This is the default.
-* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm.
+* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm; once the check has answered, only the items that will actually be deleted count toward that. Ticking it also checks what still uses the board's media and lists it, as [deleting media](/users-guide/gallery/introduction/#deleting-media) does.
 
 A deleted board cannot be restored, and deleted media cannot be undone. While media is being deleted, a notice says so; when it finishes, another says what was moved or deleted, and how much could not be deleted, if any.
 
 Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. A project's Inbox cannot be deleted from the Gallery; delete the project instead, which also asks what to do with the project's other boards.
 
-On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; an administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
+On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; once the check of what uses the media has answered, the dialog names only the owner's items, such as **Also permanently delete your 2 items** and **Delete board and your 2 items**, and when none of the media is theirs it says that all of it moves to Uncategorized. An administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
 
 ## The media menu
 

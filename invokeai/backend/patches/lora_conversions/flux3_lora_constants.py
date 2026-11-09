@@ -324,7 +324,7 @@ def _product(a: Any, b: Any) -> tuple[int, ...] | None:
     return a_shape[0], b_shape[1]
 
 
-def _update_shape(layer: Mapping[str, Any]) -> tuple[int, ...] | None:
+def update_shape(layer: Mapping[str, Any]) -> tuple[int, ...] | None:
     """The shape of the weight update one layer's values make, or None if they make none.
 
     A full diff is the update itself; a low-rank (or DoRA) layer's is up @ down; LoHA's the elementwise product of
@@ -367,7 +367,7 @@ def misshapen_flux3_layers(state_dict: Mapping[str | int, Any], keys: Flux3LoRAK
         values = {value_key: state_dict[key] for value_key, key in sources.items()}
         # Loading reads alpha with `.item()`, which only a single value survives.
         alpha_is_scalar = "alpha" not in values or math.prod(_shape(values["alpha"])) == 1
-        if _update_shape(values) != weight_shape or not _magnitude_fits(values, *weight_shape) or not alpha_is_scalar:
+        if update_shape(values) != weight_shape or not _magnitude_fits(values, *weight_shape) or not alpha_is_scalar:
             misshapen.update(dict.fromkeys(sources.values(), WRONG_SHAPE))
     return misshapen
 

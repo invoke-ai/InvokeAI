@@ -9,8 +9,8 @@ import { attachExternalGenerationReveal } from '@workbench/image-actions/recallP
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 
 /**
- * App-owned composition: uploads and other clients' completed generations the backend announces over the socket
- * refresh the Gallery read model, and those whose batch asked for it are revealed in the Gallery.
+ * App-owned composition: uploads and own-account socket completions refresh the Gallery in visible tabs.
+ * Only external origins whose batch asked for reveal can change Gallery selection.
  */
 export const GalleryRealtimeRuntime = () => {
   const queryClient = useQueryClient();
@@ -38,6 +38,11 @@ export const GalleryRealtimeRuntime = () => {
       invalidate: () => invalidateGallery(queryClient),
       isClientQueueItemOrigin: isWebv2QueueItemOrigin,
       onRevealRequest: revealer.request,
+      isVisible: () => document.visibilityState === 'visible',
+      onVisibilityChange: (listener) => {
+        document.addEventListener('visibilitychange', listener);
+        return () => document.removeEventListener('visibilitychange', listener);
+      },
     });
 
     runtime.start();
