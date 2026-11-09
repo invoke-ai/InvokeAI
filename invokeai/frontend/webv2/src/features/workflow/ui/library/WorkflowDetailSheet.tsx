@@ -34,26 +34,31 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workf
  */
 
 const DETAIL_RAIL_WIDTH = '18rem';
-// A flow layout (the grid's fixed viewport, see WorkflowLibraryGrid) scrolls the column, so the rail takes a height
-// the dialog body of a 320px-tall window still fits.
-const FLOW_LAYOUT = '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)';
+/**
+ * A content box too short for the panes to share its height: the column scrolls as a whole, the grid or list takes a
+ * fixed viewport of its own, and the rail takes a height the dialog body of a 320px-tall window still fits.
+ */
+export const WORKFLOW_LIBRARY_FLOW_LAYOUT =
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)';
 
 /** The grid and the detail rail side by side; in the narrow layout, the grid over the sheet's summary. */
 export const WORKFLOW_DETAIL_PANES_CSS: SystemStyleObject = {
-  [FLOW_LAYOUT]: { flex: '0 0 auto' },
+  [WORKFLOW_LIBRARY_FLOW_LAYOUT]: { flex: '0 0 auto' },
   [WORKFLOW_LIBRARY_NARROW]: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: 'minmax(0, 1fr) auto',
     rowGap: '2',
     '& > :not([data-detail-sheet])': { gridArea: '1 / 1' },
-    // Under the expanded details the grid keeps its layout and scroll position, but leaves the tab order.
-    '&:has(> [data-detail-sheet][data-expanded]) > :not([data-detail-sheet])': { visibility: 'hidden' },
+    // Under the expanded details the grid or list keeps its layout and scroll position, but leaves the tab order. The
+    // rule names its target by attribute: a `:not(...)` target makes every :has() check restyle the whole collection,
+    // which rows mounting while scrolling trigger each frame.
+    '&:has(> [data-detail-sheet][data-expanded]) > [data-workflow-library-collection]': { visibility: 'hidden' },
   },
 };
 
 const RAIL_CSS: SystemStyleObject = {
-  [FLOW_LAYOUT]: { flex: '0 0 auto', height: '17rem' },
+  [WORKFLOW_LIBRARY_FLOW_LAYOUT]: { flex: '0 0 auto', height: '17rem' },
   [WORKFLOW_LIBRARY_NARROW]: { display: 'contents' },
 };
 const DETAILS_CSS: SystemStyleObject = {
@@ -125,11 +130,15 @@ export const WorkflowMissingNodePacks = ({ packs }: { packs: readonly string[] }
   ) : null;
 };
 
-const SummaryThumbnail = ({
+/** A small 3:2 thumbnail, the image while it loads, else the silhouette: the sheet's summary and the list's rows. */
+export const WorkflowSummaryThumbnail = ({
   src,
+  w = '16',
   workflowDocument,
 }: {
   src: string | null | undefined;
+  /** Width; the height follows at 3:2. */
+  w?: string;
   workflowDocument: ProjectGraphState | null;
 }) => {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -143,7 +152,7 @@ const SummaryThumbnail = ({
       flexShrink={0}
       overflow="hidden"
       rounded="sm"
-      w="16"
+      w={w}
     >
       {src && src !== failedSrc ? (
         <WorkflowThumbnailImage src={src} onError={handleError} />
@@ -300,7 +309,7 @@ export const WorkflowDetailSheet = ({
       </Stack>
       <Box css={SUMMARY_CSS} data-detail-sheet-summary minW="0">
         <HStack gap="2.5" minW="0">
-          <SummaryThumbnail src={thumbnailSrc} workflowDocument={workflowDocument} />
+          <WorkflowSummaryThumbnail src={thumbnailSrc} workflowDocument={workflowDocument} />
           <Stack flex="1" gap="0.5" minW="0">
             {/* Expanded, the summary heads the details, so the name reads in full. */}
             <Text fontSize="md" fontWeight="600" minW="0" overflowWrap="anywhere" truncate={!isExpanded}>

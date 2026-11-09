@@ -1,7 +1,6 @@
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
-import { Badge, Box, HStack, Icon, Skeleton, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
-import { getModelBaseLabel } from '@features/models';
+import { Badge, Box, HStack, Icon, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ClippedTooltip, Tooltip } from '@platform/ui/Tooltip';
 import { EllipsisIcon, FolderCheckIcon, WorkflowIcon } from 'lucide-react';
@@ -9,6 +8,7 @@ import { memo, use, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
+import { getWorkflowLibraryEntryFacts, WorkflowLibraryFactsLine } from './WorkflowLibraryFacts';
 import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
 import {
   WORKFLOW_THUMBNAIL_ASPECT_RATIO,
@@ -74,8 +74,8 @@ export type WorkflowCardContextMenuHandler = (workflowId: string, anchor: Workfl
 export type WorkflowCardQuickAction = 'open' | 'preview';
 
 /**
- * A right-click on a card (or its quick actions), or a click on a tile's menu button, re-anchors or toggles the open
- * menu through its own handler rather than dismissing it as an outside press.
+ * A right-click on a card (or its quick actions) or a list row, or a click on a tile's or row's menu button, re-anchors
+ * or toggles the open menu through its own handler rather than dismissing it as an outside press.
  */
 export const keepCardMenuOpenForRetarget = (event: {
   detail: { originalEvent: Event };
@@ -88,7 +88,10 @@ export const keepCardMenuOpenForRetarget = (event: {
   }
 
   if (
-    (original.button === 2 && original.target.closest('[data-workflow-card],[data-workflow-card-actions]') !== null) ||
+    (original.button === 2 &&
+      original.target.closest(
+        '[data-workflow-card],[data-workflow-card-actions],[data-workflow-library-list] [data-list-row]'
+      ) !== null) ||
     (original.button === 0 && original.target.closest('[data-workflow-card-menu]') !== null)
   ) {
     event.preventDefault();
@@ -102,24 +105,6 @@ export const keepCardMenuOpenForRetarget = (event: {
 const QUICK_ACTIONS_BOTTOM = 'calc(4.375rem + 1px)';
 const NAME_FONT_SIZE = { large: 'lg', small: 'md' } as const;
 const QUICK_ACTION_SIZE = { large: 'sm', small: 'xs' } as const;
-
-/** What the facts row leads with once enrichment is ready. */
-type Readiness = 'ready' | 'models' | 'nodePacks';
-
-const READINESS_COLOR: Record<Readiness, string> = {
-  models: 'fg.warning',
-  nodePacks: 'fg.error',
-  ready: 'fg.success',
-};
-
-/**
- * Fact text in the readiness hue, pulled 30% toward the foreground: darker on light themes and lighter on dark ones,
- * so 10px text keeps 4.5:1 on the muted and emphasized fills of hovered and selected cards. The dot keeps the pure hue.
- */
-const READINESS_TEXT_COLOR: Record<Exclude<Readiness, 'ready'>, string> = {
-  models: 'color-mix(in oklab, {colors.fg.warning} 70%, {colors.fg})',
-  nodePacks: 'color-mix(in oklab, {colors.fg.error} 70%, {colors.fg})',
-};
 
 export interface WorkflowLibraryCardProps {
   entry: WorkflowLibraryEntry;
@@ -175,28 +160,8 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
 
   const showThumbnail = Boolean(item.thumbnail_url) && !hasThumbnailFailed;
   const ready = enrichment.status === 'ready' ? enrichment : null;
-  const primaryBase = ready?.requirements.primaryBase ?? null;
-  const readiness: Readiness | null =
-    ready === null || missingNodePackCount === null
-      ? null
-      : missingNodePackCount > 0
-        ? 'nodePacks'
-        : missingCount > 0
-          ? 'models'
-          : 'ready';
   const lastRun = showLastRun && item.last_run_at ? formatTimeSince(item.last_run_at, dataTime) : '';
-  const fact =
-    ready === null
-      ? null
-      : readiness === 'nodePacks'
-        ? t('workflowLibrary.nodePacksMissing', { count: missingNodePackCount ?? 0 })
-        : missingCount > 0
-          ? t('workflowLibrary.modelsToInstall', { count: missingCount })
-          : isInProject
-            ? t('workflowLibrary.inProject')
-            : lastRun
-              ? t('workflowLibrary.ranWhen', { when: lastRun })
-              : t('workflowLibrary.nodeCount', { count: ready.nodeCount });
+  const facts = getWorkflowLibraryEntryFacts({ entry, isInProject, lastRun, missingCount, missingNodePackCount }, t);
   const name = item.name || t('workflowLibrary.untitled');
   const menuContentId = getWorkflowLibraryCardMenuContentId(workflowId);
   const quickActionSize = QUICK_ACTION_SIZE[size];
@@ -280,38 +245,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
               </Badge>
             ) : null}
           </HStack>
-          <HStack gap="1.5" h="4" minW="0">
-            {enrichment.status === 'pending' ? (
-              // Show placeholders only while enriching; unreadable workflows leave facts absent.
-              <Skeleton data-enrichment-placeholder h="3" rounded="sm" w="14" />
-            ) : null}
-            {primaryBase ? (
-              <Badge flexShrink={0} variant="subtle">
-                {getModelBaseLabel(primaryBase)}
-              </Badge>
-            ) : null}
-            {readiness ? (
-              <Box
-                bg={READINESS_COLOR[readiness]}
-                boxSize="1.5"
-                data-workflow-readiness={readiness}
-                flexShrink={0}
-                rounded="full"
-              >
-                {readiness === 'ready' ? <Text srOnly>{t('workflowLibrary.readyToRun')}</Text> : null}
-              </Box>
-            ) : null}
-            {fact ? (
-              <Text
-                color={readiness && readiness !== 'ready' ? READINESS_TEXT_COLOR[readiness] : 'fg.muted'}
-                fontSize="xs"
-                minW="0"
-                truncate
-              >
-                {fact}
-              </Text>
-            ) : null}
-          </HStack>
+          <WorkflowLibraryFactsLine facts={facts} />
         </Stack>
       </Box>
       <HStack

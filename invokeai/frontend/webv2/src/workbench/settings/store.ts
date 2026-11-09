@@ -82,6 +82,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
   workflowLibraryCardSize: 'small',
+  workflowLibraryLayout: 'grid',
   workflowLibrarySort: 'opened',
   workflowLibrarySortDirection: 'desc',
   workflowLibraryThumbnailFit: 'cover',
@@ -411,6 +412,7 @@ type WorkbenchPreferencesInput = Omit<
   | 'startupDestination'
   | 'workflowEdgeStyle'
   | 'workflowLibraryCardSize'
+  | 'workflowLibraryLayout'
   | 'workflowLibrarySort'
   | 'workflowLibrarySortDirection'
   | 'workflowLibraryThumbnailFit'
@@ -421,6 +423,7 @@ type WorkbenchPreferencesInput = Omit<
   startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
   workflowLibraryCardSize?: unknown;
+  workflowLibraryLayout?: unknown;
   workflowLibrarySort?: unknown;
   workflowLibrarySortDirection?: unknown;
   workflowLibraryThumbnailFit?: unknown;
@@ -548,6 +551,8 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
   workflowLibraryCardSize:
     preferences?.workflowLibraryCardSize === 'large' ? 'large' : DEFAULT_PREFERENCES.workflowLibraryCardSize,
+  workflowLibraryLayout:
+    preferences?.workflowLibraryLayout === 'list' ? 'list' : DEFAULT_PREFERENCES.workflowLibraryLayout,
   workflowLibrarySort: isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
     ? preferences.workflowLibrarySort
     : DEFAULT_PREFERENCES.workflowLibrarySort,

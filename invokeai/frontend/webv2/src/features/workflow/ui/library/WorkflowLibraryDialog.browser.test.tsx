@@ -197,6 +197,7 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
     loadWorkflowLibraryPlaceTotals: browse.loadWorkflowLibraryPlaceTotals,
     getWorkflowLibraryBrowseSnapshot: store.getSnapshot,
     loadWorkflowLibraryRange: browse.loadWorkflowLibraryRange,
+    refreshWorkflowLibraryBrowse: vi.fn(() => Promise.resolve()),
     rememberWorkflowLibraryScroll: vi.fn(),
     setWorkflowLibraryVisibleDemand: vi.fn(),
     setWorkflowLibrarySelectedDemand: vi.fn(),
@@ -343,6 +344,9 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.tags': 'Tags',
   'workflowLibrary.tagsAnyHint': 'Showing workflows with any checked tag',
   'workflowLibrary.viewOptions': 'View options',
+  'workflowLibrary.layoutGroup': 'View',
+  'workflowLibrary.layoutGrid': 'Grid',
+  'workflowLibrary.layoutList': 'List',
   'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.updateTemplate': 'Update library template',
   'workflowLibrary.workflowName': 'Workflow name',
@@ -559,6 +563,7 @@ const COMMANDS = {
 /** Only the library's own preferences matter here; saving one republishes it, as the account store does. */
 const LIBRARY_PREFERENCES = {
   workflowLibraryCardSize: 'small',
+  workflowLibraryLayout: 'grid',
   workflowLibrarySort: 'updated',
   workflowLibrarySortDirection: 'desc',
   workflowLibraryThumbnailFit: 'cover',
@@ -2399,6 +2404,8 @@ describe('WorkflowLibraryDialog', () => {
         'Name',
         'Newest first',
         'Oldest first',
+        'Grid',
+        'List',
         'Small cards',
         'Large cards',
         'Fill',
@@ -2608,6 +2615,159 @@ describe('WorkflowLibraryDialog', () => {
     expect(heading?.getBoundingClientRect().height ?? 0).toBeGreaterThan(20);
   });
 
+  describe('list layout', () => {
+    const row = (workflowId: string) =>
+      document.getElementById(`workflow-library-card-${workflowId}`)?.closest<HTMLElement>('[data-list-row]') ?? null;
+    const primary = (workflowId: string) => row(workflowId)?.querySelector<HTMLElement>('[data-list-primary]') ?? null;
+    const rail = () => document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail;
+    const menu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+    const openAsList = async (snapshot: WorkflowLibraryBrowseSnapshot) => {
+      preferences.setSnapshot({ ...preferences.port.getSnapshot(), workflowLibraryLayout: 'list' });
+      await openWith(snapshot);
+      await vi.waitFor(() => expect(row('wf-portrait')).not.toBeNull());
+    };
+
+    it('starts as the grid, switches to rows from the view menu and keeps the choice with the account', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      const item = (label: string) =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+          (candidate) => candidate.textContent === label
+        );
+
+      expect(cards()).toHaveLength(4);
+      expect(document.querySelector('[data-workflow-library-list]')).toBeNull();
+      await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="View options"]')!));
+      await vi.waitFor(() => expect(item('List')).not.toBeUndefined());
+      expect(item('Grid')?.getAttribute('aria-checked')).toBe('true');
+      await act(() => userEvent.click(item('List')!));
+
+      expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryLayout: 'list' });
+      await vi.waitFor(() => expect(row('wf-portrait')).not.toBeNull());
+      expect(cards()).toHaveLength(0);
+      expect(row('wf-landscape')?.textContent).toContain('Landscape Pass');
+      expect(row('wf-landscape')?.textContent).toContain('1 model to install');
+      expect(
+        row('wf-landscape')?.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')
+      ).toBe('models');
+      // The project holds a copy of Portrait; the server's 20 positions past the window wait as placeholders.
+      expect(row('wf-portrait')?.querySelector('[data-workflow-in-project]')).not.toBeNull();
+      expect(row('wf-sketch')?.querySelector('[data-enrichment-placeholder]')).not.toBeNull();
+      expect(
+        document
+          .querySelector('[data-workflow-library-list] [role="list"]')
+          ?.querySelector('[aria-setsize]')
+          ?.getAttribute('aria-setsize')
+      ).toBe('24');
+      // Card size and thumbnail display shape only the grid.
+      expect(item('Small cards')).toBeUndefined();
+      expect(item('Fill')).toBeUndefined();
+    });
+
+    it('hides the list, keeping its scroll position, under the narrow sheet’s expanded details', async () => {
+      await resizeViewport(900, 700);
+      const entries = Array.from({ length: 30 }, (_, index) => ({
+        ...LANDSCAPE,
+        item: { ...LANDSCAPE.item, workflow_id: `sheet-${index}`, name: `Sheet ${index}` },
+      }));
+      await openAsList(withSnapshot({ entries: [PORTRAIT, ...entries], pages: 1, total: 31 }));
+      const list = document.querySelector<HTMLElement>('[data-workflow-library-list]')!;
+      const scroll = list.querySelector<HTMLElement>('[data-list-viewport]')!;
+      await act(async () => {
+        scroll.scrollTop = 300;
+        scroll.dispatchEvent(new Event('scroll'));
+        await settleFrame();
+      });
+      const toggle = document.querySelector<HTMLButtonElement>('[data-detail-sheet-toggle]')!;
+      expect(getComputedStyle(list).visibility).toBe('visible');
+
+      await act(() => toggle.focus({ preventScroll: true }));
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(getComputedStyle(list).visibility).toBe('hidden');
+      expect(scroll.scrollTop).toBe(300);
+
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(getComputedStyle(list).visibility).toBe('visible'));
+    });
+
+    it('selects on a press, opens on a double-click, and moves the selection with ArrowDown and Enter', async () => {
+      await openAsList(LOADED_SNAPSHOT);
+
+      await act(() => userEvent.click(primary('wf-landscape')!));
+      expect(rail()).toBe('wf-landscape');
+      expect(primary('wf-landscape')?.getAttribute('aria-current')).toBe('true');
+
+      await act(() => {
+        primary('wf-landscape')?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      });
+      expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+
+      await act(() => userEvent.keyboard('{ArrowDown}'));
+      expect(document.activeElement).toBe(primary('wf-sketch'));
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(rail()).toBe('wf-sketch');
+    });
+
+    it('raises the same actions menu from a right-click and the More button, handing focus back to its source', async () => {
+      await openAsList(LOADED_SNAPSHOT);
+
+      await act(() => primary('wf-landscape')?.focus());
+      await act(() =>
+        primary('wf-landscape')?.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 200 })
+        )
+      );
+      expect(rail()).toBe('wf-landscape');
+      await vi.waitFor(() => expect(menu()?.querySelector('[data-menu-item="open"]')).not.toBeNull());
+      // The row's button names the menu, so the dialog's focus trap lets focus into it.
+      expect(primary('wf-landscape')?.getAttribute('aria-expanded')).toBe('true');
+      expect(primary('wf-landscape')?.getAttribute('aria-controls')).toBe(menu()?.id);
+      await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), {
+        timeout: 2000,
+      });
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(menu()).toBeNull());
+      await vi.waitFor(() => expect(document.activeElement).toBe(primary('wf-landscape')));
+
+      const more = row('wf-portrait')?.querySelector<HTMLButtonElement>('[data-workflow-card-menu]') ?? null;
+      await pressTileMenuButton(more);
+      expect(rail()).toBe('wf-portrait');
+      await vi.waitFor(() => expect(menu()?.querySelector('[data-menu-item="open"]')).not.toBeNull());
+      expect(more?.getAttribute('aria-expanded')).toBe('true');
+      expect(primary('wf-portrait')?.hasAttribute('aria-expanded')).toBe(false);
+      await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), {
+        timeout: 2000,
+      });
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(menu()).toBeNull());
+      await vi.waitFor(() => expect(document.activeElement).toBe(more));
+    });
+
+    it('opens from the Open quick action without taking focus off the row, asking first when the project holds a copy', async () => {
+      await openAsList(LOADED_SNAPSHOT);
+
+      await act(() => userEvent.hover(primary('wf-portrait')!));
+      const quickOpen = row('wf-portrait')?.querySelector<HTMLElement>('[data-row-action="open"]');
+      expect(quickOpen?.textContent).toBe('Open…');
+      expect(quickOpen?.tabIndex).toBe(-1);
+      await act(() => userEvent.click(quickOpen!));
+
+      expect(workflowUiStore.getSnapshot().libraryCopyChoice?.item.workflow_id).toBe('wf-portrait');
+      expect(loader.open).not.toHaveBeenCalled();
+      // The question returns focus to the row it was raised from.
+      await vi.waitFor(() => expect(document.querySelector('[data-library-copy-choice]')).not.toBeNull());
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(primary('wf-portrait')));
+
+      await act(() => userEvent.hover(primary('wf-upscale')!));
+      const upscaleOpen = row('wf-upscale')?.querySelector<HTMLElement>('[data-row-action="open"]');
+      expect(upscaleOpen?.textContent).toBe('Open');
+      await act(() => userEvent.click(upscaleOpen!));
+      expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'first-copy');
+      expect(document.activeElement).toBe(primary('wf-upscale'));
+    });
+  });
+
   it('shows the busy overlay while a workflow is being applied', async () => {
     loader.phase.current = 'applying';
 
@@ -2729,6 +2889,7 @@ describe('WorkflowLibraryDialog — This project', () => {
       command.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
+    preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
     browse.setSnapshot?.(LOADED_SNAPSHOT);
     accountLifecycle.invalidate();
     // The library opens on the project's own workflows, as it does from the workflow header.
@@ -2770,6 +2931,43 @@ describe('WorkflowLibraryDialog — This project', () => {
     await act(() => userEvent.hover(card('wf-user')!));
     expect(quickOpen('wf-alpha')).toBeNull();
     expect(quickOpen('wf-user')).not.toBeNull();
+  });
+
+  it('lists the project’s workflows as rows: Active on the open one, which offers no Open, and a run date', async () => {
+    preferences.setSnapshot({ ...preferences.port.getSnapshot(), workflowLibraryLayout: 'list' });
+    await renderDialog();
+    const row = (workflowId: string) =>
+      document.querySelector<HTMLElement>(`[data-workflow-library-list] [data-list-row="${workflowId}"]`);
+
+    await vi.waitFor(() => expect(row('wf-alpha')).not.toBeNull());
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[data-workflow-library-list] [data-list-row]')].map(
+        (element) => element.dataset.listRow
+      )
+    ).toEqual(['wf-alpha', 'wf-bundled', 'wf-user']);
+    expect(cards()).toHaveLength(0);
+    expect(row('wf-alpha')?.querySelector('[data-active-workflow]')?.textContent).toBe('Active');
+    expect(row('wf-user')?.querySelector('[data-active-workflow]')).toBeNull();
+    // Project rows never mark a template copy: the view is the project's own collection.
+    expect(document.querySelector('[data-workflow-library-list] [data-workflow-in-project]')).toBeNull();
+
+    // The active workflow is already open: no Open on its row, as its rail disables Open.
+    const quickOpen = (workflowId: string) => row(workflowId)!.querySelector<HTMLElement>('[data-row-action="open"]')!;
+    await act(() => userEvent.hover(row('wf-alpha')!.querySelector('[data-list-primary]')!));
+    expect(getComputedStyle(quickOpen('wf-alpha')).visibility).toBe('hidden');
+    await act(() => userEvent.hover(row('wf-user')!.querySelector('[data-list-primary]')!));
+    expect(getComputedStyle(quickOpen('wf-user')).visibility).toBe('visible');
+
+    // Pressing a row selects it for the rail; a double-click opens it and closes the library.
+    await click(row('wf-user')!.querySelector<HTMLElement>('[data-list-primary]'));
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
+    await act(() => {
+      row('wf-bundled')
+        ?.querySelector('[data-list-primary]')
+        ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    expect(COMMANDS.selectWorkflow).toHaveBeenCalledWith('wf-bundled');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('starts a fresh workflow from the toolbar', async () => {

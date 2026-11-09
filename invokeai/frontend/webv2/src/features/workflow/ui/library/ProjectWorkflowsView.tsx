@@ -1,4 +1,5 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { WorkflowLibraryLayout } from '@features/workflow/ui/WorkflowUiContext';
 
 import { Badge, Box, DataList, HStack, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
@@ -37,6 +38,7 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectWorkflowLibraryEntry } from './projectWorkflowEntries';
+import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 
 import { isUpdatableSource, toProjectWorkflowLibraryEntries } from './projectWorkflowEntries';
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
@@ -57,6 +59,7 @@ import {
 } from './WorkflowLibraryCard';
 import { WorkflowDetailFact } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
+import { WorkflowLibraryList } from './WorkflowLibraryList';
 import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
 import {
   getMissingNodePacks,
@@ -82,9 +85,12 @@ export interface ProjectWorkflowsViewProps {
   contextMenuTriggerId: string | null;
   /** The project's workflows the toolbar and tags let through, in the toolbar's order. */
   entries: readonly ProjectWorkflowLibraryEntry[];
+  layout: WorkflowLibraryLayout;
   /** Missing-model counts for `entries`, by workflow id. */
   missingCounts: ReadonlyMap<string, number>;
   selectedWorkflowId: string | null;
+  /** The date the list's rows show, from the current order. */
+  trailingField: WorkflowLibraryListTrailingField;
   onClose: () => void;
   onContextMenu: WorkflowCardContextMenuHandler;
   onContextMenuClose: () => void;
@@ -96,8 +102,10 @@ export const ProjectWorkflowsView = ({
   contextMenuPoint,
   contextMenuTriggerId,
   entries,
+  layout,
   missingCounts,
   selectedWorkflowId,
+  trailingField,
   onClose,
   onContextMenu,
   onContextMenuClose,
@@ -169,19 +177,36 @@ export const ProjectWorkflowsView = ({
   return (
     <>
       <HStack css={WORKFLOW_LIBRARY_PANES_CSS} align="stretch" flex="1" gap="3" minH="0" minW="0">
-        <WorkflowLibraryGrid
-          activeWorkflowId={activeWorkflowId}
-          entries={entries}
-          error={null}
-          missingCounts={missingCounts}
-          openMenuAnchor={contextMenuPoint}
-          selectedWorkflowId={activeSelectionId}
-          status="loaded"
-          onContextMenu={onContextMenu}
-          onOpen={openWorkflow}
-          onPreview={previewWorkflow}
-          onSelect={onSelect}
-        />
+        {layout === 'list' ? (
+          <WorkflowLibraryList
+            activeWorkflowId={activeWorkflowId}
+            entries={entries}
+            error={null}
+            missingCounts={missingCounts}
+            openMenuAnchor={contextMenuPoint}
+            selectedWorkflowId={activeSelectionId}
+            status="loaded"
+            onContextMenu={onContextMenu}
+            onOpen={openWorkflow}
+            onPreview={previewWorkflow}
+            onSelect={onSelect}
+            trailingField={trailingField}
+          />
+        ) : (
+          <WorkflowLibraryGrid
+            activeWorkflowId={activeWorkflowId}
+            entries={entries}
+            error={null}
+            missingCounts={missingCounts}
+            openMenuAnchor={contextMenuPoint}
+            selectedWorkflowId={activeSelectionId}
+            status="loaded"
+            onContextMenu={onContextMenu}
+            onOpen={openWorkflow}
+            onPreview={previewWorkflow}
+            onSelect={onSelect}
+          />
+        )}
         <ProjectWorkflowDetailPanel
           contextMenuPoint={contextMenuPoint}
           contextMenuTriggerId={contextMenuTriggerId}

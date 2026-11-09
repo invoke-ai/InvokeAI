@@ -7,7 +7,7 @@ import type {
   WorkflowLibrarySort,
 } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
-import type { WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
+import type { WorkflowLibraryLayout, WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 
 import { Box, HStack, Portal, Spinner, Stack, type SystemStyleObject, Text } from '@chakra-ui/react';
 import { useOptionalGalleryHostProjectContext } from '@features/gallery/react';
@@ -48,6 +48,7 @@ import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 import type { WorkflowLibraryCardSize } from './workflowThumbnail';
 
 import {
@@ -161,6 +162,13 @@ const getDirectionLabelKey = (sort: WorkflowLibrarySort | ProjectWorkflowSort, d
 };
 
 const flipDirection = (direction: 'asc' | 'desc') => (direction === 'asc' ? 'desc' : 'asc');
+
+/** The date a list row shows: the one the current order sorts by, else when the workflow last changed. */
+const TRAILING_FIELDS: Partial<Record<WorkflowLibrarySort | ProjectWorkflowSort, WorkflowLibraryListTrailingField>> = {
+  created: 'created_at',
+  lastRun: 'last_run_at',
+  opened: 'opened_at',
+};
 
 const PLACE_EMPTY_KEYS: Partial<Record<WorkflowLibraryTab, string>> = {
   recent: 'workflowLibrary.emptyRecent',
@@ -286,6 +294,7 @@ export const WorkflowLibraryDialog = ({
   const { setLibraryPreferences } = useWorkflowUi();
   const sort = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibrarySort);
   const sortDirection = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibrarySortDirection);
+  const layout = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryLayout);
   const cardSize = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryCardSize);
   const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
@@ -352,6 +361,7 @@ export const WorkflowLibraryDialog = ({
       : { direction: sortDirection, place: tab === 'project' ? 'user' : tab, sort }
   );
   const shownOrder = isProjectTab ? projectOrder : libraryOrder;
+  const trailingField = TRAILING_FIELDS[shownOrder.sort] ?? 'updated_at';
   const directionLabels = useMemo(
     () => ({
       asc: t(getDirectionLabelKey(shownOrder.sort, 'asc')),
@@ -530,6 +540,10 @@ export const WorkflowLibraryDialog = ({
     }
   }, [isProjectTab, libraryOrder.direction, projectOrder, setLibraryPreferences, tab]);
 
+  const handleLayoutChange = useCallback(
+    (workflowLibraryLayout: WorkflowLibraryLayout) => setLibraryPreferences({ workflowLibraryLayout }),
+    [setLibraryPreferences]
+  );
   const handleCardSizeChange = useCallback(
     (workflowLibraryCardSize: WorkflowLibraryCardSize) => setLibraryPreferences({ workflowLibraryCardSize }),
     [setLibraryPreferences]
@@ -737,6 +751,7 @@ export const WorkflowLibraryDialog = ({
                     directionLabels={directionLabels}
                     isDirectionFixed={tab === 'recent'}
                     isSortFixed={tab === 'recent' || tab === 'default'}
+                    layout={layout}
                     search={query.search}
                     searchInputRef={searchInputRef}
                     sort={shownOrder.sort}
@@ -744,6 +759,7 @@ export const WorkflowLibraryDialog = ({
                     thumbnailFit={thumbnailFit}
                     onCardSizeChange={handleCardSizeChange}
                     onDirectionToggle={handleDirectionToggle}
+                    onLayoutChange={handleLayoutChange}
                     onNewWorkflow={isProjectTab ? handleNewWorkflow : undefined}
                     onSearchChange={handleSearchChange}
                     onSortChange={handleSortChange}
@@ -763,8 +779,10 @@ export const WorkflowLibraryDialog = ({
                             contextMenuPoint={contextMenuPoint}
                             contextMenuTriggerId={contextMenuTriggerId}
                             entries={projectEntries}
+                            layout={layout}
                             missingCounts={missingCounts}
                             selectedWorkflowId={projectSelectionId}
+                            trailingField={trailingField}
                             onClose={closeDialog}
                             onContextMenu={handleCardContextMenu}
                             onContextMenuClose={closeContextMenu}
@@ -778,11 +796,13 @@ export const WorkflowLibraryDialog = ({
                           contextMenuTriggerId={contextMenuTriggerId}
                           emptyMessage={emptyMessage}
                           isOpen={isOpen}
+                          layout={layout}
                           projectWorkflows={projectWorkflows}
                           removedWorkflowId={removedWorkflowId}
                           selectedWorkflowId={selectedWorkflowId}
                           tab={tab}
                           tagsText={tagsText}
+                          trailingField={trailingField}
                           onCardPreview={handleCardPreview}
                           onClose={closeDialog}
                           onContextMenu={handleCardContextMenu}

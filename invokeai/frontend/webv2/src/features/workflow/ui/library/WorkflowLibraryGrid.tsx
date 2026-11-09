@@ -5,10 +5,8 @@ import {
   getWorkflowLibraryBrowseSnapshot,
   loadWorkflowLibraryRange,
   rememberWorkflowLibraryScroll,
-  setWorkflowLibraryVisibleDemand,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Scrollable } from '@platform/ui';
@@ -26,6 +24,7 @@ import {
 import { defaultRangeExtractor, useVirtualizer, type VirtualItem, type Virtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
+import { WORKFLOW_LIBRARY_FLOW_LAYOUT } from './WorkflowDetailSheet';
 import {
   WorkflowLibraryCard,
   getWorkflowLibraryCardId,
@@ -33,6 +32,12 @@ import {
   type WorkflowCardContextMenuHandler,
   type WorkflowCardMenuAnchor,
 } from './WorkflowLibraryCard';
+import {
+  dedupeWorkflowLibraryEntries,
+  getWorkflowLibraryDemandIds,
+  useLinkedLibraryTemplates,
+  WorkflowLibraryDemand,
+} from './workflowLibraryCollection';
 import {
   getWorkflowLibraryCardWidth,
   getWorkflowLibraryGridBounds,
@@ -89,17 +94,9 @@ const selectVirtualizerView = (
  */
 const ROW_CHROME_PX = 76;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
-const NO_LINKED_TEMPLATES: ReadonlySet<string> = new Set();
-
-/** The library templates the project holds copies of, as one string so unrelated project edits keep it equal. */
-const selectLinkedTemplateKey = (project: { workflows: readonly { source?: { libraryWorkflowId: string } }[] }) =>
-  project.workflows
-    .flatMap((workflow) => (workflow.source ? [workflow.source.libraryWorkflowId] : []))
-    .sort()
-    .join('\n');
 // A flow layout still needs a finite virtual viewport, independent of the collection's total row height.
 const GRID_CSS = {
-  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+  [WORKFLOW_LIBRARY_FLOW_LAYOUT]: {
     flex: '1 1 16rem',
     height: '16rem',
   },
@@ -146,21 +143,6 @@ export interface WorkflowLibraryGridProps {
   onSelect: (workflowId: string) => void;
 }
 
-/** Keep duplicate server identities from corrupting card reconciliation. */
-const dedupeByWorkflowId = (entries: readonly WorkflowLibraryEntry[]): WorkflowLibraryEntry[] => {
-  const seen = new Set<string>();
-  const unique: WorkflowLibraryEntry[] = [];
-
-  for (const entry of entries) {
-    if (!seen.has(entry.item.workflow_id)) {
-      seen.add(entry.item.workflow_id);
-      unique.push(entry);
-    }
-  }
-
-  return unique;
-};
-
 export const WorkflowLibraryGrid = ({
   activeWorkflowId = null,
   emptyMessage,
@@ -185,11 +167,7 @@ export const WorkflowLibraryGrid = ({
   const templates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : null;
   // Only library cards mark templates the project holds; the project view is that collection.
   const isProjectCollection = browseWindow === undefined;
-  const linkedTemplateKey = useWorkflowProjectSelector(selectLinkedTemplateKey);
-  const linkedTemplates = useMemo(
-    () => (isProjectCollection || !linkedTemplateKey ? NO_LINKED_TEMPLATES : new Set(linkedTemplateKey.split('\n'))),
-    [isProjectCollection, linkedTemplateKey]
-  );
+  const linkedTemplates = useLinkedLibraryTemplates(isProjectCollection);
 
   const pendingFocus = useRef<{
     index: number;
@@ -264,7 +242,7 @@ export const WorkflowLibraryGrid = ({
   if (focusCard?.entry.item.workflow_id === removedWorkflowId && focusCard !== null) {
     setFocusCard(null);
   }
-  const visibleEntries = useMemo(() => dedupeByWorkflowId(entries), [entries]);
+  const visibleEntries = useMemo(() => dedupeWorkflowLibraryEntries(entries), [entries]);
   const startIndex = browseWindow?.startIndex ?? 0;
   const total = browseWindow?.total ?? visibleEntries.length;
   const columns = getWorkflowLibraryGridColumns(width, cardSize);
@@ -468,19 +446,10 @@ export const WorkflowLibraryGrid = ({
   const visibleLast = Math.min(total - 1, (lastVisibleRow + 1) * columns - 1);
   const first = Math.max(0, firstVisibleRow - overscanRows) * columns;
   const last = Math.min(total - 1, (lastVisibleRow + overscanRows + 1) * columns - 1);
-  const ids = useMemo(() => {
-    const visible: string[] = [];
-    const overscan: string[] = [];
-    for (const [index, entry] of visibleEntries.entries()) {
-      const position = startIndex + index;
-      if (position >= first && position <= last) {
-        // The owner's bounded enrichment slots must reach every visible card before either overscan edge.
-        const demand = position >= visibleFirst && position <= visibleLast ? visible : overscan;
-        demand.push(entry.item.workflow_id);
-      }
-    }
-    return visible.concat(overscan);
-  }, [visibleEntries, startIndex, first, last, visibleFirst, visibleLast]);
+  const ids = useMemo(
+    () => getWorkflowLibraryDemandIds(visibleEntries, startIndex, { first, last, visibleFirst, visibleLast }),
+    [visibleEntries, startIndex, first, last, visibleFirst, visibleLast]
+  );
   const hasEntries = visibleEntries.length > 0;
   // Idle precedes the first open-time load; render loading rather than an empty result.
   const isPending = status === 'idle' || status === 'loading';
@@ -666,6 +635,7 @@ export const WorkflowLibraryGrid = ({
   return (
     <Scrollable
       css={GRID_CSS}
+      data-workflow-library-collection=""
       flex="1"
       label={t('workflowLibrary.title')}
       minH="0"
@@ -676,7 +646,7 @@ export const WorkflowLibraryGrid = ({
       contentProps={CONTENT_PROPS}
     >
       {browseWindow && width > 0 ? (
-        <GridDemand key={`${first}:${last}:${ids.join(',')}`} ids={ids} start={first} end={last} />
+        <WorkflowLibraryDemand key={`${first}:${last}:${ids.join(',')}`} ids={ids} start={first} end={last} />
       ) : null}
       <Box display="flex" flexDirection="column" gap="3" minW="0" pr="2" w="full">
         {hasEntries && error ? (
@@ -809,22 +779,4 @@ const GridPlaceholder = ({ height }: { height: number }) => {
   const style = useMemo(() => ({ height: `${height}px` }), [height]);
 
   return <Box aria-busy="true" bg="bg.subtle" rounded="lg" style={style} />;
-};
-
-// Mount leases keep external-store writes out of render and release detail demand when the viewport leaves.
-let demandLease = 0;
-const GridDemand = ({ ids, start, end }: { ids: readonly string[]; start: number; end: number }) => {
-  useMountEffect(() => {
-    const lease = ++demandLease;
-    setWorkflowLibraryVisibleDemand(ids);
-    void loadWorkflowLibraryRange(start, end);
-    return () => {
-      queueMicrotask(() => {
-        if (lease === demandLease) {
-          setWorkflowLibraryVisibleDemand([]);
-        }
-      });
-    };
-  });
-  return null;
 };

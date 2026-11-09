@@ -61,6 +61,7 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
   workflowLibraryCardSize: preferences.workflowLibraryCardSize,
+  workflowLibraryLayout: preferences.workflowLibraryLayout,
   workflowLibrarySort: preferences.workflowLibrarySort,
   workflowLibrarySortDirection: preferences.workflowLibrarySortDirection,
   workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,

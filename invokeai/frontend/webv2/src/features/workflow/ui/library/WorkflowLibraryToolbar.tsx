@@ -1,4 +1,4 @@
-import type { WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
+import type { WorkflowLibraryLayout, WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 import type { ChangeEvent, ReactNode, RefObject } from 'react';
 
 import { Box, HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
@@ -9,7 +9,8 @@ import {
   ArrowDownWideNarrowIcon,
   ArrowUpNarrowWideIcon,
   ChevronDownIcon,
-  EllipsisIcon,
+  LayoutGridIcon,
+  ListIcon,
   PlusIcon,
   SearchIcon,
   SlidersHorizontalIcon,
@@ -23,9 +24,9 @@ import { WORKFLOW_LIBRARY_NARROW, WORKFLOW_LIBRARY_WIDE_ONLY_CSS } from './Workf
 
 /**
  * The library's one toolbar, the same on every place: one row of equal-height controls 8px apart. Wide: search, the
- * Sort menu (key and direction, its glyph showing the direction), the view menu (card size, thumbnail fit) and, on This
- * project, New workflow at the row's end. Narrow (`WORKFLOW_LIBRARY_NARROW`): the places select and Tags button lead,
- * and one menu holds the order and view choices.
+ * Sort menu (key and direction, its glyph showing the direction), the view menu (grid or list, its glyph showing which,
+ * and for the grid card size and thumbnail fit) and, on This project, New workflow at the row's end. Narrow
+ * (`WORKFLOW_LIBRARY_NARROW`): the places select and Tags button lead, and one menu holds the order and view choices.
  */
 
 const SEARCH_START_ELEMENT = <Icon aria-hidden as={SearchIcon} boxSize="3.5" color="fg.subtle" />;
@@ -39,6 +40,7 @@ const NARROW_LEAD_CSS = {
 const DESCENDING_FIRST = ['desc', 'asc'] as const;
 const ASCENDING_FIRST = ['asc', 'desc'] as const;
 const CARD_SIZES = ['small', 'large'] as const;
+const LAYOUTS = ['grid', 'list'] as const;
 
 export interface WorkflowLibrarySortOption {
   label: string;
@@ -59,6 +61,8 @@ export interface WorkflowLibraryToolbarProps {
   /** What each direction means for the current key, such as "Newest first". */
   directionLabels: Readonly<Record<'asc' | 'desc', string>>;
   isDirectionFixed: boolean;
+  /** Grid of cards or list rows; card size and thumbnail fit apply to the grid only. */
+  layout: WorkflowLibraryLayout;
   cardSize: WorkflowLibraryCardSize;
   thumbnailFit: WorkflowThumbnailFit;
   /** Offered on This project only. */
@@ -66,6 +70,7 @@ export interface WorkflowLibraryToolbarProps {
   onSearchChange: (search: string) => void;
   onSortChange: (sort: string) => void;
   onDirectionToggle: () => void;
+  onLayoutChange: (layout: WorkflowLibraryLayout) => void;
   onCardSizeChange: (cardSize: WorkflowLibraryCardSize) => void;
   onThumbnailFitChange: (fit: WorkflowThumbnailFit) => void;
 }
@@ -76,6 +81,7 @@ export const WorkflowLibraryToolbar = ({
   directionLabels,
   isDirectionFixed,
   isSortFixed,
+  layout,
   narrowLead,
   search,
   searchInputRef,
@@ -84,6 +90,7 @@ export const WorkflowLibraryToolbar = ({
   thumbnailFit,
   onCardSizeChange,
   onDirectionToggle,
+  onLayoutChange,
   onNewWorkflow,
   onSearchChange,
   onSortChange,
@@ -107,6 +114,10 @@ export const WorkflowLibraryToolbar = ({
       }
     },
     [direction, onDirectionToggle]
+  );
+  const handleLayoutChange = useCallback(
+    ({ value }: { value: string }) => onLayoutChange(value === 'list' ? 'list' : 'grid'),
+    [onLayoutChange]
   );
   const handleCardSizeChange = useCallback(
     ({ value }: { value: string }) => onCardSizeChange(value === 'large' ? 'large' : 'small'),
@@ -145,8 +156,10 @@ export const WorkflowLibraryToolbar = ({
       </Menu.ItemGroup>
     </>
   );
-  const viewGroups = (
+  // Card size and thumbnail display shape only the grid; the list shows neither.
+  const gridViewGroups = (
     <>
+      <Menu.Separator />
       <Menu.ItemGroup>
         <Menu.ItemGroupLabel>{t('workflowLibrary.cardSize')}</Menu.ItemGroupLabel>
         <Menu.RadioItemGroup value={cardSize} onValueChange={handleCardSizeChange}>
@@ -174,6 +187,24 @@ export const WorkflowLibraryToolbar = ({
           </Menu.RadioItem>
         </Menu.RadioItemGroup>
       </Menu.ItemGroup>
+    </>
+  );
+  const viewGroups = (
+    <>
+      <Menu.ItemGroup>
+        <Menu.ItemGroupLabel>{t('workflowLibrary.layoutGroup')}</Menu.ItemGroupLabel>
+        <Menu.RadioItemGroup value={layout} onValueChange={handleLayoutChange}>
+          {LAYOUTS.map((value) => (
+            <Menu.RadioItem key={value} value={value}>
+              <Menu.ItemIndicator />
+              <Menu.ItemText>
+                {t(value === 'list' ? 'workflowLibrary.layoutList' : 'workflowLibrary.layoutGrid')}
+              </Menu.ItemText>
+            </Menu.RadioItem>
+          ))}
+        </Menu.RadioItemGroup>
+      </Menu.ItemGroup>
+      {layout === 'grid' ? gridViewGroups : null}
     </>
   );
 
@@ -233,8 +264,8 @@ export const WorkflowLibraryToolbar = ({
               takes focus and the first pointer move onto it closes it. */}
           <Menu.Trigger asChild>
             <Tooltip content={t('workflowLibrary.viewOptions')} ids={viewIds}>
-              <IconButton aria-label={t('workflowLibrary.viewOptions')} variant="outline">
-                <EllipsisIcon />
+              <IconButton aria-label={t('workflowLibrary.viewOptions')} data-workflow-library-view variant="outline">
+                {layout === 'list' ? <ListIcon /> : <LayoutGridIcon />}
               </IconButton>
             </Tooltip>
           </Menu.Trigger>

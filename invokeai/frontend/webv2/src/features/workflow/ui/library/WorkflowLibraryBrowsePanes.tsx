@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowLibraryLayout } from '@features/workflow/ui/WorkflowUiContext';
 import type { WorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 
 import { HStack, type SystemStyleObject, Text } from '@chakra-ui/react';
@@ -15,23 +16,25 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 
 import { WORKFLOW_DETAIL_PANES_CSS } from './WorkflowDetailSheet';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
+import { WorkflowLibraryList } from './WorkflowLibraryList';
 import { WORKFLOW_LIBRARY_WIDE } from './WorkflowLibraryRail';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
 
 /**
- * The template places' result line, grid and detail rail. They alone subscribe to the listing's entries, so range
- * loads and enrichment results re-render this subtree, never the dialog shell, its rail or its toolbar.
+ * The template places' result line, grid or list, and detail rail. They alone subscribe to the listing's entries, so
+ * range loads and enrichment results re-render this subtree, never the dialog shell, its rail or its toolbar.
  */
 
 /**
- * The card grid and the detail rail, in both views. In the wide layout their box dissolves into the dialog body's grid
- * (see `WorkflowLibraryDialog`): the cards take the centre column under the toolbar, and the detail rail becomes a
- * flush column from under the header to the dialog's bottom edge, separated by a 1px border rather than drawn as a
- * card. The narrow layout keeps the sheet's own grid (`WORKFLOW_DETAIL_PANES_CSS`).
+ * The card grid (or the list) and the detail rail, in both views. In the wide layout their box dissolves into the
+ * dialog body's grid (see `WorkflowLibraryDialog`): the cards take the centre column under the toolbar, and the detail
+ * rail becomes a flush column from under the header to the dialog's bottom edge, separated by a 1px border rather than
+ * drawn as a card. The narrow layout keeps the sheet's own grid (`WORKFLOW_DETAIL_PANES_CSS`).
  */
 export const WORKFLOW_LIBRARY_PANES_CSS: SystemStyleObject = {
   ...WORKFLOW_DETAIL_PANES_CSS,
@@ -103,7 +106,10 @@ export const WorkflowLibraryResultLine = memo(function WorkflowLibraryResultLine
 export interface WorkflowLibraryBrowsePanesProps {
   /** Whether the dialog is open; selected-detail demand runs only then. */
   isOpen: boolean;
+  layout: WorkflowLibraryLayout;
   tab: WorkflowLibraryTab;
+  /** The date the list's rows show, from the current order. */
+  trailingField: WorkflowLibraryListTrailingField;
   tagsText: string;
   emptyMessage: string | undefined;
   contextMenuPoint: WorkflowCardMenuAnchor | null;
@@ -129,11 +135,13 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
   contextMenuTriggerId,
   emptyMessage,
   isOpen,
+  layout,
   projectWorkflows,
   removedWorkflowId,
   selectedWorkflowId,
   tab,
   tagsText,
+  trailingField,
   onCardPreview,
   onClose,
   onContextMenu,
@@ -180,23 +188,44 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
         {isOpen ? (
           <SelectedDemand key={`${authSession.user?.user_id}:${viewKey}:${activeWorkflowId}`} id={activeWorkflowId} />
         ) : null}
-        <WorkflowLibraryGrid
-          key={`${authSession.user?.user_id}:${viewKey}`}
-          window={browseWindow}
-          removedWorkflowId={removedWorkflowId}
-          emptyMessage={emptyMessage}
-          entries={entries}
-          error={error}
-          missingCounts={missingCounts}
-          openMenuAnchor={contextMenuPoint}
-          showVisibilityStatus={authSession.multiuserEnabled}
-          selectedWorkflowId={activeWorkflowId}
-          status={status}
-          onContextMenu={onContextMenu}
-          onOpen={onOpen}
-          onPreview={onCardPreview}
-          onSelect={onSelect}
-        />
+        {layout === 'list' ? (
+          <WorkflowLibraryList
+            key={`${authSession.user?.user_id}:${viewKey}`}
+            window={browseWindow}
+            removedWorkflowId={removedWorkflowId}
+            emptyMessage={emptyMessage}
+            entries={entries}
+            error={error}
+            missingCounts={missingCounts}
+            openMenuAnchor={contextMenuPoint}
+            showVisibilityStatus={authSession.multiuserEnabled}
+            selectedWorkflowId={activeWorkflowId}
+            status={status}
+            onContextMenu={onContextMenu}
+            onOpen={onOpen}
+            onPreview={onCardPreview}
+            onSelect={onSelect}
+            trailingField={trailingField}
+          />
+        ) : (
+          <WorkflowLibraryGrid
+            key={`${authSession.user?.user_id}:${viewKey}`}
+            window={browseWindow}
+            removedWorkflowId={removedWorkflowId}
+            emptyMessage={emptyMessage}
+            entries={entries}
+            error={error}
+            missingCounts={missingCounts}
+            openMenuAnchor={contextMenuPoint}
+            showVisibilityStatus={authSession.multiuserEnabled}
+            selectedWorkflowId={activeWorkflowId}
+            status={status}
+            onContextMenu={onContextMenu}
+            onOpen={onOpen}
+            onPreview={onCardPreview}
+            onSelect={onSelect}
+          />
+        )}
         <WorkflowLibraryDetailPanel
           contextMenuPoint={contextMenuPoint}
           contextMenuTriggerId={contextMenuTriggerId}

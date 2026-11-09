@@ -370,16 +370,18 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
 describe('normalizeWorkbenchPreferences workflow library', () => {
   const DEFAULTS = {
     workflowLibraryCardSize: 'small',
+    workflowLibraryLayout: 'grid',
     workflowLibrarySort: 'opened',
     workflowLibrarySortDirection: 'desc',
     workflowLibraryThumbnailFit: 'cover',
   };
 
-  it('lists most recently opened first in small filled cards unless a known choice is stored', () => {
+  it('lists most recently opened first in a grid of small filled cards unless a known choice is stored', () => {
     expect(store.normalizeWorkbenchPreferences({})).toMatchObject(DEFAULTS);
     expect(
       store.normalizeWorkbenchPreferences({
         workflowLibraryCardSize: 'huge',
+        workflowLibraryLayout: 'table',
         workflowLibrarySort: 'size',
         workflowLibrarySortDirection: 'DESC',
         workflowLibraryThumbnailFit: 'stretch',
@@ -388,12 +390,14 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
     expect(
       store.normalizeWorkbenchPreferences({
         workflowLibraryCardSize: 'large',
+        workflowLibraryLayout: 'list',
         workflowLibrarySort: 'lastRun',
         workflowLibrarySortDirection: 'asc',
         workflowLibraryThumbnailFit: 'contain',
       })
     ).toMatchObject({
       workflowLibraryCardSize: 'large',
+      workflowLibraryLayout: 'list',
       workflowLibrarySort: 'lastRun',
       workflowLibrarySortDirection: 'asc',
       workflowLibraryThumbnailFit: 'contain',
