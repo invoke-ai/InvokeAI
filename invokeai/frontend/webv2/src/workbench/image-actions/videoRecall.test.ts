@@ -20,6 +20,7 @@ import {
   getVideoSizeRecalls,
   parseVideoRecallRecord,
   resolveVideoSizeRecall,
+  settleMediaSizedRecall,
 } from './videoRecall';
 
 const isVideoGenerationMetadata = (metadata: unknown): boolean =>
@@ -442,40 +443,81 @@ describe('buildVideoRecallSettings', () => {
     });
   });
 
-  describe('a canvas the recorded media sized', () => {
-    const wanValues = { ...createDefaultVideoWidgetValues([WAN_I2V]), aspectRatioId: '1:1' as const };
-    const recall = (kind: 'all' | 'remix', metadata: Record<string, unknown>) =>
-      buildVideoRecallSettings({ currentValues: wanValues, kind, metadata, models: catalog });
-    const withFirstFrame = (width: number, height: number) =>
-      wanMetadata({
-        first_frame_image: { image_name: 'first.png' },
-        generation_mode: 'wan_i2v',
-        height,
-        model: { key: WAN_I2V.key },
-        width,
-      });
+  describe('a canvas the recorded media sized, settled against them once hydrated', () => {
+    const recallFirstFrame = (
+      currentValues: VideoWidgetValues,
+      record: Record<string, unknown>,
+      hydratedFrame: VideoWidgetValues['firstFrameImage']
+    ) => {
+      const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: record, models: catalog })!;
 
-    it.each(['all', 'remix'] as const)(
-      'restores the target resolution that sized it on a %s recall, leaving the aspect ratio to the media',
-      (kind) => {
-        // A 10:7 first frame at 480p: 1000x700 scales by 480 / 700 to 685.7x480, snapped to 688x480. No preset gives
-        // that canvas, and of Wan's resolutions only 480p gives it from a frame of its own shape.
-        const result = recall(kind, withFirstFrame(688, 480));
+      // The pure recall restores no resolution for it: the recorded canvas lost the media's exact ratio to snapping.
+      expect(result.fields).not.toContain('size');
 
-        expect(result?.values).toMatchObject({ aspectRatioId: '1:1', targetResolution: '480p' });
-        expect(result?.fields).toContain('size');
+      return settleMediaSizedRecall({ ...result, values: { ...result.values, firstFrameImage: hydratedFrame } });
+    };
+    const h3Values = { ...createDefaultVideoWidgetValues([h3Model()]), targetResolution: '768 lowres' as const };
+    // 1800x1000 at 768 highres: 1382.4x768 is over the area cap, scaled by 0.986 to 1363.1x757.3, snapped to 1376x768.
+    // Fed back, 1376x768 would give 1344x768; at 768 lowres the frame gives 768x416.
+    const h3Record = {
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'minimax_h3_i2v',
+      height: 768,
+      model: { key: h3Model().key },
+      width: 1376,
+    };
+    const wanValues = createDefaultVideoWidgetValues([WAN_I2V]);
+    // 1000x700 at 1080p: 1542.9x1080, snapped to 1536x1088. Fed back, 1536x1088 would give 1520x1088; 720p and 480p
+    // give the frame 1024x720 and 688x480.
+    const wanRecord = wanMetadata({
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'wan_i2v',
+      height: 1088,
+      model: { key: WAN_I2V.key },
+      width: 1536,
+    });
+    const frame = (width: number, height: number) => ({ height, image_name: 'first.png', width });
+
+    it.each([
+      ['an area-capped H3 canvas', h3Values, h3Record, frame(1800, 1000), '768 highres'],
+      ['a Wan 1080p canvas snapped off its short side', wanValues, wanRecord, frame(1000, 700), '1080p'],
+    ] as const)(
+      'restores the target resolution of %s from the hydrated media, leaving the aspect ratio to them',
+      (_, currentValues, record, hydratedFrame, targetResolution) => {
+        const settled = recallFirstFrame(currentValues, record, hydratedFrame);
+
+        expect(settled.values).toMatchObject({ aspectRatioId: currentValues.aspectRatioId, targetResolution });
+        expect(settled.fields).toContain('size');
       }
     );
 
-    it('leaves the target resolution alone when no resolution gives the canvas, or no medium sized it', () => {
-      // The frame's own 1000x700, which Wan gives a frame of that shape at none of its resolutions.
-      const unmatched = recall('all', withFirstFrame(1000, 700));
-      const unsized = recall('all', wanMetadata({ height: 480, model: { key: WAN_I2V.key }, width: 688 }));
+    it('leaves the target resolution and reports no size when the media are gone or reach the canvas nowhere', () => {
+      // 1000x700 at 480p is 688x480, a canvas that fed back would give itself: only the missing frame refuses it. A 16:9
+      // frame gives Wan 848x480, 1280x720 or 1920x1088, never 1536x1088.
+      const wan480Record = { ...wanRecord, height: 480, width: 688 };
 
-      for (const result of [unmatched, unsized]) {
-        expect(result?.values).toMatchObject({ aspectRatioId: '1:1', targetResolution: '720p' });
-        expect(result?.fields).not.toContain('size');
+      for (const [record, hydratedFrame] of [
+        [wan480Record, null],
+        [wanRecord, frame(1280, 720)],
+      ] as const) {
+        const settled = recallFirstFrame(wanValues, record, hydratedFrame);
+
+        expect(settled.values.targetResolution).toBe(wanValues.targetResolution);
+        expect(settled.fields).not.toContain('size');
       }
+    });
+
+    it('settles nothing for a canvas no medium sized', () => {
+      const result = buildVideoRecallSettings({
+        currentValues: wanValues,
+        kind: 'all',
+        metadata: wanMetadata({ height: 1088, model: { key: WAN_I2V.key }, width: 1536 }),
+        models: catalog,
+      })!;
+
+      expect(
+        settleMediaSizedRecall({ ...result, values: { ...result.values, firstFrameImage: frame(1000, 700) } })
+      ).toEqual({ fields: result.fields, values: { ...result.values, firstFrameImage: frame(1000, 700) } });
     });
   });
 

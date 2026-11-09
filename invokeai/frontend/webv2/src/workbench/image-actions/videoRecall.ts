@@ -114,6 +114,12 @@ export type VideoRecalledField =
 export interface VideoRecallResult {
   fields: VideoRecalledField[];
   values: VideoWidgetValues;
+  /**
+   * The recorded canvas, when the run's media sized it rather than a preset. Snapping loses the media's exact ratio,
+   * so only the media themselves say which target resolution produced it: `settleMediaSizedRecall` decides once the
+   * executor has hydrated them.
+   */
+  mediaSizedCanvas?: { height: number; width: number };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -428,8 +434,9 @@ type VideoSizeRecall = VideoSizePreset | Pick<VideoSizePreset, 'targetResolution
 /**
  * The presets whose canvas is exactly the recorded size; a recall restores aspect ratio and resolution only on such a
  * match. A canvas sized by conditioning media has the media's shape rather than a preset's: the media keep the aspect
- * ratio, and only the target resolution that sized the canvas is recalled (`getMediaSizedResolution`). Returns every
- * match: presets that agree without media can differ under held media.
+ * ratio, and only the target resolution at which they reproduce the canvas is recalled, judged against the media
+ * themselves (`settleMediaSizedRecall`, `resolveVideoSizeRecall`). Returns every match: presets that agree without
+ * media can differ under held media.
  */
 export const getVideoSizeRecalls = (
   model: MainModelConfig,
@@ -462,10 +469,7 @@ export const getVideoSizeRecalls = (
   return recalls;
 };
 
-/**
- * The one target resolution at which `media` size the canvas to exactly `width` x `height`; null when none does, or
- * several do. A canvas snapped off its own short side does not come back: Wan's extrapolated 1080p snaps 1080 to 1088.
- */
+/** The one target resolution at which `media` size the canvas to exactly `width` x `height`; null when none or several do. */
 const getMediaSizedResolution = (
   model: MainModelConfig,
   media: Pick<
@@ -847,24 +851,9 @@ export const buildVideoRecallSettings = ({
   }
 
   const { height, width } = record;
-  // The executor hydrates the recorded media only later, so the recorded canvas, as a frame of its own shape, stands
-  // in for the media that sized it: every canvas resolver reads only its input's ratio.
-  const sizeRecall =
-    getVideoSizeRecalls(model, width, height)[0] ??
-    (width !== null && height !== null && isCanvasFromRecordedMedia(record)
-      ? getMediaSizedResolution(
-          model,
-          {
-            aspectRatioId: values.aspectRatioId,
-            conditioningClip: null,
-            firstFrameImage: { height, image_name: '', width },
-            lastFrameImage: null,
-            sourceVideo: null,
-          },
-          width,
-          height
-        )
-      : null);
+  const [sizeRecall] = getVideoSizeRecalls(model, width, height);
+  const mediaSizedCanvas =
+    !sizeRecall && width !== null && height !== null && isCanvasFromRecordedMedia(record) ? { height, width } : null;
 
   if (sizeRecall) {
     values = { ...values, ...sizeRecall };
@@ -1032,7 +1021,31 @@ export const buildVideoRecallSettings = ({
     fields.push('extendContext');
   }
 
-  return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
+  return fields.length > 0
+    ? { fields, mediaNames, ...(mediaSizedCanvas ? { mediaSizedCanvas } : {}), values: { ...values, ...promptPatch } }
+    : null;
+};
+
+/**
+ * A recall whose canvas its media sized, settled against those media as hydrated into the panel: the target
+ * resolution is restored only when they reproduce the recorded canvas at exactly one. Media that did not hydrate, or
+ * reach the canvas at no resolution, leave the panel's resolution, and the size goes unreported.
+ */
+export const settleMediaSizedRecall = ({
+  fields,
+  mediaSizedCanvas,
+  values,
+}: VideoRecallResult): Pick<VideoRecallResult, 'fields' | 'values'> => {
+  const { model } = values;
+  const panelCanvas = model ? getVideoDimensions(model, values) : null;
+  const sized =
+    model && mediaSizedCanvas && panelCanvas && panelCanvas.source !== 'aspect-ratio'
+      ? getMediaSizedResolution(model, values, mediaSizedCanvas.width, mediaSizedCanvas.height)
+      : null;
+
+  return sized
+    ? { fields: fields.includes('size') ? fields : [...fields, 'size'], values: { ...values, ...sized } }
+    : { fields, values };
 };
 
 export const getVideoRecallTitle = (kind: VideoRecallKind, t: TFunction): string =>

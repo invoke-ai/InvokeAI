@@ -71,6 +71,7 @@ import {
   getVideoRecallTitle,
   getVideoSizeRecalls,
   parseVideoRecallRecord,
+  settleMediaSizedRecall,
 } from './videoRecall';
 
 /** What a contract entry may consult: the recorded run, as tuned, and what its graph wrote. */
@@ -276,8 +277,9 @@ const VIDEO_RECALL_KINDS = Object.keys({
 
 const DEFAULT_KINDS: readonly VideoRecallKind[] = ['all', 'remix'];
 
-// Distinct names per slot so a swapped slot cannot pass; a 10:7 ratio, which no preset has, so a media-sized canvas is
-// never also a preset's; and trims inside the clips, so a trim is a recorded choice and not the clip's own bounds.
+// Distinct names per slot so a swapped slot cannot pass; a 10:7 ratio, which no preset has and no canvas keeps once
+// snapped, so a media-sized canvas is never also a preset's and only the media say which resolution sized it; and trims
+// inside the clips, so a trim is a recorded choice and not the clip's own bounds.
 const FIRST_FRAME = { height: 700, image_name: 'first.png', width: 1000 };
 const LAST_FRAME = { height: 700, image_name: 'last.png', width: 1000 };
 const SOURCE_VIDEO: VideoSourceClip = {
@@ -441,9 +443,13 @@ const tunedValuesFor = (testCase: Case, model: MainModelConfig): VideoWidgetValu
     seedMode: 'fixed',
     stgScale: nudged(ui.stgVisible, defaults.stgScale, conditioned.stgScale),
     steps: ui.stepsEditable ? defaults.steps + 1 : conditioned.steps,
+    // The last single-stage resolution besides the default: on Wan the extrapolated 1080p, whose short side snaps off
+    // the grid, so a media-sized canvas there cannot be resolved from its own shape.
     targetResolution:
       testCase.targetResolution ??
-      targetResolutions.find((option) => option.id !== defaults.targetResolution && option.stages === undefined)!.id,
+      targetResolutions
+        .filter((option) => option.id !== defaults.targetResolution && option.stages === undefined)
+        .at(-1)!.id,
   };
 
   expect(resolveVideoMode(tuned), `${testCase.label}: the tuned media resolve to another mode`).toBe(testCase.mode);
@@ -505,12 +511,37 @@ const recorded = (testCase: Case): RecordedCase => {
   return recordedCase;
 };
 
-const recall = (
+const build = (
   run: RecordedCase,
   kind: VideoRecallKind,
   metadata: Record<string, unknown> = run.written,
   currentValues: VideoWidgetValues = PANEL
 ) => buildVideoRecallSettings({ currentValues, kind, metadata, models: run.catalog });
+
+/**
+ * A recall as the executor applies it: a full one hydrates the media it names -- here the run's own, as the gallery
+ * returns them -- and then settles a media-sized canvas's target resolution against them.
+ */
+const recall = (...args: Parameters<typeof build>) => {
+  const [run, kind] = args;
+  const result = build(...args);
+
+  if (!result || (kind !== 'all' && kind !== 'remix')) {
+    return result;
+  }
+
+  const { mediaNames, values } = result;
+  const hydrated: VideoWidgetValues = {
+    ...values,
+    conditioningClip: mediaNames.conditioningClip ? run.tuned.conditioningClip : values.conditioningClip,
+    firstFrameImage: mediaNames.firstFrameName ? run.tuned.firstFrameImage : values.firstFrameImage,
+    lastFrameImage: mediaNames.lastFrameName ? run.tuned.lastFrameImage : values.lastFrameImage,
+    references: mediaNames.references.length > 0 ? run.tuned.references : values.references,
+    sourceVideo: mediaNames.sourceVideoName ? run.tuned.sourceVideo : values.sourceVideo,
+  };
+
+  return { ...result, ...settleMediaSizedRecall({ ...result, values: hydrated }) };
+};
 
 const without = (record: Record<string, unknown>, key: string): Record<string, unknown> => {
   const { [key]: _removed, ...rest } = record;
@@ -634,9 +665,11 @@ describe('video recall contract', () => {
 
     expect(result?.mediaNames, `G2 ${testCase.label}: the media recall names`).toEqual(expectedMedia);
     // A full recall clears the panel's media wholesale; the executor hydrates `mediaNames` into these slots.
+    const built = build(run, 'all');
+
     expect(
-      result &&
-        pick(result.values, ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo']),
+      built &&
+        pick(built.values, ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo']),
       `G2 ${testCase.label}: the panel's media survive the recall`
     ).toEqual({
       conditioningClip: null,
