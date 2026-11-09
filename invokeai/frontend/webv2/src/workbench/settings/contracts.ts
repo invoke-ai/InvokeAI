@@ -92,8 +92,8 @@ export interface StoredGeneratePreset {
 
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */
 export interface WorkbenchPreferences {
-  /** The alpha-build notice was dismissed; shown once per account until then. */
-  alphaNoticeAcknowledged: boolean;
+  /** The beta-build notice was dismissed; shown once per account until then. */
+  betaNoticeAcknowledged: boolean;
   /** Server version whose What's New notes were last dismissed; a different version shows them once. */
   whatsNewSeenVersion: string | null;
   themeId: WorkbenchThemeId;
