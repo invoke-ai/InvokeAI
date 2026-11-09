@@ -94,6 +94,9 @@ const renderField = async (
       </ChakraProvider>
     );
   });
+
+  // The field widget is lazily imported, so wait for its fallback to be replaced.
+  await vi.waitFor(() => expect(host.querySelector('input[type="file"]')).not.toBeNull());
 };
 
 const findButton = (label: string): HTMLButtonElement => {

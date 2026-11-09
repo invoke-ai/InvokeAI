@@ -69,7 +69,6 @@ import {
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { isSeedInputField } from '@features/workflow/graph';
-import { FileFieldInput } from '@features/workflow/ui/fields/FileFieldInput';
 import {
   getWorkflowMediaFieldDropId,
   getWorkflowMediaFieldDropItem,
@@ -152,6 +151,8 @@ const StylePresetInput = lazy(() =>
 const SystemPromptInput = lazy(() =>
   import('./RecordPickerInput').then((module) => ({ default: module.SystemPromptInput }))
 );
+// Managed-file controls load with their node; uploads and file metadata stay out of the editor's boot graph.
+const FileFieldInput = lazy(() => import('./FileFieldInput').then((module) => ({ default: module.FileFieldInput })));
 
 export const getWorkflowSelectedGalleryImage = getSelectedGalleryImageFromValues;
 
@@ -1922,7 +1923,11 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
     case 'BoardField':
       return <BoardInput {...props} />;
     case 'FileField':
-      return <FileFieldInput {...props} />;
+      return (
+        <Suspense fallback={RECORD_PICKER_FALLBACK}>
+          <FileFieldInput {...props} />
+        </Suspense>
+      );
     case 'ImageField':
       return <MediaInput {...props} kind="image" />;
     case 'VideoField':
