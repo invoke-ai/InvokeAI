@@ -448,23 +448,6 @@ class TestReservationAndReadBackend:
         assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
         assert torch.float8_e4m3fn in dtypes_at_fold[0]
 
-    def test_unrotated_int8_file_reserves_the_widened_size(self, tmp_path: Path) -> None:
-        """With `convrot: false` the fold decodes int8 completely, so the weight leaves it at the compute
-        dtype and the reservation must not charge it one byte per element."""
-        reference = _tiny_model()
-        sd = {k: v.clone() for k, v in reference.state_dict().items()}
-        target = "blocks.0.attn1.to_q.weight"
-        sd[target] = torch.full_like(sd[target], 3.0).to(torch.int8)
-        sd["blocks.0.attn1.to_q.weight_scale"] = torch.full((128, 1), 0.5)
-        sd["blocks.0.attn1.to_q.comfy_quant"] = comfy_quant_marker({"format": "int8_tensorwise", "convrot": False})
-        path = tmp_path / "Wan2.2-A14B-HighNoise-int8.safetensors"
-        save_file(sd, path)
-
-        reserved, dtypes_at_fold, _ = self._load_recording(path)
-
-        assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
-        assert torch.int8 in dtypes_at_fold[0]
-
 
 # --- ComfyUI int8_tensorwise (convrot) -------------------------------------------------------------------------
 

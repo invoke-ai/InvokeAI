@@ -439,8 +439,7 @@ def _predict_folded_cast_size(sd: dict, dtype: torch.dtype) -> int:
     """Bytes the state dict occupies once the scale fold and the cast to ``dtype`` have run.
 
     The fold consumes and strips the scale tensors, and it widens every weight that has a sibling
-    scale to ``dtype`` whatever its stored dtype (unrotated int8 included), so those are charged at
-    ``dtype`` too.
+    scale to ``dtype`` whatever its stored dtype, so those are charged at ``dtype`` too.
     """
     kept = {k: v for k, v in sd.items() if not is_scale_metadata_key(k)}
     folded = {weight_key for weight_key, _ in iter_weight_scale_pairs(sd)}
