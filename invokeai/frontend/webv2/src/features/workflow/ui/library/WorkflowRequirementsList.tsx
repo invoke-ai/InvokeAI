@@ -4,6 +4,7 @@ import type {
   ResolvedModelRequirement,
   WorkflowModelRequirement,
 } from '@features/workflow/core/modelRequirements';
+import type { InvocationTemplates } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
 import type { ElementType } from 'react';
 
@@ -103,6 +104,34 @@ export const resolveEntryRequirements = (
   resolutionCache.set(enrichment, { deps, resolved });
 
   return resolved;
+};
+
+const nodePackCache = new WeakMap<ReadyEnrichment, { templates: InvocationTemplates; packs: readonly string[] }>();
+
+/**
+ * The node packs a workflow uses that this server does not have: the packs of its invocation nodes whose type is
+ * absent from the loaded templates. Cached by enrichment and templates identity, so a card computes it once.
+ */
+export const getMissingNodePacks = (enrichment: ReadyEnrichment, templates: InvocationTemplates): readonly string[] => {
+  const cached = nodePackCache.get(enrichment);
+
+  if (cached && cached.templates === templates) {
+    return cached.packs;
+  }
+
+  const packs = new Set<string>();
+
+  for (const node of enrichment.document.nodes) {
+    if (node.type === 'invocation' && templates[node.data.type] === undefined) {
+      packs.add(node.data.nodePack || node.data.type);
+    }
+  }
+
+  const result = [...packs].sort();
+
+  nodePackCache.set(enrichment, { packs: result, templates });
+
+  return result;
 };
 
 /** Count only models the install action can download so card badges agree with the offered operation. */
