@@ -25,6 +25,7 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
   { label: 'Qwen3 Encoder', pluralLabel: 'Qwen3 Encoders', type: 'qwen3_encoder' },
   { label: 'Qwen VL Encoder', pluralLabel: 'Qwen VL Encoders', type: 'qwen_vl_encoder' },
   { label: 'Qwen3 VL Encoder', pluralLabel: 'Qwen3 VL Encoders', type: 'qwen3_vl_encoder' },
+  { label: 'Qwen3 VL Vision Tower', pluralLabel: 'Qwen3 VL Vision Towers', type: 'qwen3_vl_vision_tower' },
   { label: 'Qwen3.5 Encoder', pluralLabel: 'Qwen3.5 Encoders', type: 'qwen3_5_encoder' },
   { label: 'Mistral Encoder', pluralLabel: 'Mistral Encoders', type: 'mistral_encoder' },
   { label: 'Gemma 2 Encoder', pluralLabel: 'Gemma 2 Encoders', type: 'gemma2_encoder' },
@@ -188,6 +189,7 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   qwen3_5_encoder: ['qwen3_5_4b', 'qwen3_5_9b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
+  qwen3_vl_vision_tower: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };
 
 /**
