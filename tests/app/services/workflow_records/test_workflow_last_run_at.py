@@ -76,3 +76,22 @@ def test_update_last_run_at_missing_workflow_is_a_no_op(
     `get()` first (see tests/app/routers/test_multiuser_authorization.py::TestWorkflowMutationAuth
     ::test_update_last_run_at_missing_workflow_404s)."""
     workflow_records.update_last_run_at("does-not-exist")
+
+
+def test_order_by_last_run_at_lists_run_workflows_by_recency(workflow_records: WorkflowRecordsStorage) -> None:
+    never_run = workflow_records.create(workflow=create_minimal_user_workflow()).workflow_id
+    run = workflow_records.create(workflow=create_minimal_user_workflow()).workflow_id
+    workflow_records.update_last_run_at(run)
+
+    def listed_ids(direction: SQLiteDirection) -> list[str]:
+        page = workflow_records.get_many(
+            order_by=WorkflowRecordOrderBy.LastRunAt,
+            direction=direction,
+            categories=[WorkflowCategory.User],
+            page=0,
+            per_page=10,
+        )
+        return [item.workflow_id for item in page.items]
+
+    assert listed_ids(SQLiteDirection.Descending) == [run, never_run]
+    assert listed_ids(SQLiteDirection.Ascending) == [never_run, run]

@@ -1,4 +1,5 @@
 /* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- the probe wires fakes directly */
+import type * as WorkflowApi from '@features/workflow/data/api';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { workflowFitViewRequestStore } from '@features/workflow/ui/editor/flowInstanceStore';
@@ -31,7 +32,9 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useAuthSession: () => identity.session,
 }));
 
-vi.mock('@features/workflow/queries', () => ({
+vi.mock('@features/workflow/queries', async () => ({
+  isBundledLibraryWorkflowId: (await vi.importActual<typeof WorkflowApi>('@features/workflow/data/api'))
+    .isBundledLibraryWorkflowId,
   getLibraryWorkflowRecordCached: (workflowId: string) => {
     library.beforeAnswer();
     return library.getLibraryWorkflowRecordCached(workflowId);

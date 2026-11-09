@@ -200,18 +200,21 @@ def test_each_order_key_sorts_by_its_column(
             "created_at": "2026-01-01 00:00:00.000",
             "updated_at": "2026-01-03 00:00:00.000",
             "opened_at": "2026-01-02 00:00:00.000",
+            "last_run_at": "2026-01-01 00:00:00.000",
             "is_public": True,
         },
         "a": {
             "created_at": "2026-01-02 00:00:00.000",
             "updated_at": "2026-01-01 00:00:00.000",
             "opened_at": "2026-01-03 00:00:00.000",
+            "last_run_at": "2026-01-03 00:00:00.000",
             "is_public": False,
         },
         "b": {
             "created_at": "2026-01-03 00:00:00.000",
             "updated_at": "2026-01-02 00:00:00.000",
             "opened_at": "2026-01-01 00:00:00.000",
+            "last_run_at": "2026-01-02 00:00:00.000",
             "is_public": False,
         },
     }

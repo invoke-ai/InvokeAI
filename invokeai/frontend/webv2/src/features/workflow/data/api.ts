@@ -44,7 +44,9 @@ export interface ListWorkflowsParams {
   tags?: string[];
   isPublic?: boolean;
   callable?: boolean;
-  orderBy?: 'created_at' | 'name' | 'opened_at' | 'updated_at';
+  /** True lists only workflows this account has opened (`opened_at` set), false only those it never opened. */
+  hasBeenOpened?: boolean;
+  orderBy?: 'created_at' | 'last_run_at' | 'name' | 'opened_at' | 'updated_at';
   direction?: 'ASC' | 'DESC';
   signal?: AbortSignal;
 }
@@ -54,6 +56,7 @@ export const listLibraryWorkflows = ({
   categories,
   callable,
   direction = 'DESC',
+  hasBeenOpened,
   page,
   perPage = 20,
   query,
@@ -81,6 +84,10 @@ export const listLibraryWorkflows = ({
     params.set('callable', String(callable));
   }
 
+  if (hasBeenOpened !== undefined) {
+    params.set('has_been_opened', String(hasBeenOpened));
+  }
+
   if (query?.trim()) {
     params.set('query', query.trim());
   }
@@ -106,6 +113,10 @@ export interface WorkflowRecordDTO {
   call_saved_workflow_compatibility?: WorkflowCallCompatibility | null;
   workflow: Record<string, unknown>;
 }
+
+/** Bundled template ids are a server invariant (`default_` prefix); they are read-only whoever asks. */
+export const isBundledLibraryWorkflowId = (libraryWorkflowId: string): boolean =>
+  libraryWorkflowId.startsWith('default_');
 
 export const getWorkflowRecordCategory = (record: WorkflowRecordDTO): WorkflowLibraryCategory | undefined => {
   const meta = record.workflow.meta;
@@ -300,6 +311,23 @@ export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: 
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
 
   for (const listener of openedListeners) {
+    listener();
+  }
+};
+
+const runListeners = new Set<() => void>();
+
+/** Registers a listener fired once the server has recorded a run: lists ordered by last run have moved. */
+export const onLibraryWorkflowRun = (listener: () => void): (() => void) => {
+  runListeners.add(listener);
+  return () => runListeners.delete(listener);
+};
+
+/** Marks the template as run now, for lists ordered by last run. The server refuses bundled and foreign templates. */
+export const touchLibraryWorkflowLastRunAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/last_run_at`, { method: 'PUT', signal });
+
+  for (const listener of runListeners) {
     listener();
   }
 };

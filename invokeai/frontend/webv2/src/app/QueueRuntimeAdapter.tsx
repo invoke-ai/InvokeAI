@@ -18,7 +18,7 @@ import {
 } from '@workbench/queue-integration/queueRecallCache';
 import { createAccountOwnedQueueRunJournal, type QueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
 import { createQueueRunLockPort } from '@workbench/queue-integration/queueRunLocks';
-import { withQueueRecallCache } from '@workbench/queue-integration/queueRunPersistence';
+import { withLibraryWorkflowRunTouch, withQueueRecallCache } from '@workbench/queue-integration/queueRunPersistence';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
 /** App-owned production composition of Queue, Workbench, Gallery, Workflow, Nodes, and Models adapters. */
@@ -32,6 +32,7 @@ export const QueueRuntimeAdapter = () => {
     const owner = captureAccountScope();
     // Changing users remounts the workbench route, so the session read here stays the runtime's viewer.
     const session = getAuthSession();
+    const viewerUserId = session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
     let isDisposed = false;
     let journal: QueueRunJournal | undefined;
     let recallCache: QueueRecallCache | undefined;
@@ -123,6 +124,12 @@ export const QueueRuntimeAdapter = () => {
             recordError: notifications.reportError,
             refreshBackendData: () => void invalidateGallery(queryClient),
             refreshBoardDestinations: () => void invalidateGalleryBoardDestinations(queryClient),
+            routeResults: withLibraryWorkflowRunTouch(queue.routeResults, {
+              getProject: (projectId) => queries.getSnapshot().projects.find((project) => project.id === projectId),
+              isDisposed: () => isDisposed,
+              owner,
+              viewerUserId,
+            }),
           },
           getSnapshot: () => {
             const snapshot = queries.getSnapshot();
@@ -153,7 +160,7 @@ export const QueueRuntimeAdapter = () => {
         locks: createQueueRunLockPort(owner.storageSuffix),
         modelLoads: modelLoadActivitySink,
         nodeExecution: nodeExecutionStore,
-        viewerUserId: session.multiuserEnabled ? (session.user?.user_id ?? null) : null,
+        viewerUserId,
       });
       runtime.start();
     };

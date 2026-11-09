@@ -132,6 +132,7 @@ _ORDER_COLUMNS: dict[WorkflowRecordOrderBy, ColumnElement[Any]] = {
     WorkflowRecordOrderBy.CreatedAt: _W.created_at,
     WorkflowRecordOrderBy.UpdatedAt: _W.updated_at,
     WorkflowRecordOrderBy.OpenedAt: _W.opened_at,
+    WorkflowRecordOrderBy.LastRunAt: _W.last_run_at,
     WorkflowRecordOrderBy.Name: CaseInsensitiveOrder(_W.name),
     WorkflowRecordOrderBy.IsPublic: _W.is_public,
 }

@@ -1193,6 +1193,38 @@ test('the workflow list orders as the server does: names ignoring case, dates wi
   });
 });
 
+test('workflow runs order the list by last run, and has_been_opened narrows lists and tag counts', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const ran = 'fixture-workflow-002';
+    await getJson(backend, `/api/v1/workflows/i/${ran}/last_run_at`, { method: 'PUT' });
+    const ids = async (direction) =>
+      (
+        await getJson(
+          backend,
+          `/api/v1/workflows/?categories=user&order_by=last_run_at&direction=${direction}&per_page=100`
+        )
+      ).items.map((item) => item.workflow_id);
+
+    assert.equal((await ids('DESC'))[0], ran);
+    assert.equal((await ids('ASC')).at(-1), ran);
+
+    const listed = async (opened) =>
+      (await getJson(backend, `/api/v1/workflows/?categories=user&has_been_opened=${opened}&per_page=100`)).items;
+    const openedItems = await listed(true);
+    const neverOpened = await listed(false);
+
+    assert.ok(openedItems.length > 0 && neverOpened.length > 0);
+    assert.ok(openedItems.every((item) => item.opened_at !== null));
+    assert.ok(neverOpened.every((item) => !item.opened_at));
+
+    const counts = await getJson(
+      backend,
+      '/api/v1/workflows/counts_by_tag?categories=user&tags=fixture&has_been_opened=true'
+    );
+    assert.deepEqual(counts, { fixture: openedItems.length });
+  });
+});
+
 test('workflow thumbnails round-trip their bytes and refresh the listed URL on every replacement', async () => {
   await withRepresentativeBackend(async (backend) => {
     const path = '/api/v1/workflows/i/fixture-workflow-002/thumbnail';

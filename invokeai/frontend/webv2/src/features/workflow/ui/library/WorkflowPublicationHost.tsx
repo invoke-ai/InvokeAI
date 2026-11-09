@@ -5,7 +5,7 @@ import type { FormEvent } from 'react';
 import { Checkbox, chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { getAuthSession, useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
-import { getLibraryWorkflowRecord } from '@features/workflow/queries';
+import { getLibraryWorkflowRecord, isBundledLibraryWorkflowId } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { clearWorkflowPublicationIntent, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
@@ -30,7 +30,7 @@ import {
   DeferredGraphPreviewDialog,
   preloadGraphPreview,
 } from './libraryPreviewSource';
-import { isBundledLibraryWorkflowId, isUpdatableSource } from './projectWorkflowEntries';
+import { isUpdatableSource } from './projectWorkflowEntries';
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import {
   discardUnresolvedWorkflowPublication,
