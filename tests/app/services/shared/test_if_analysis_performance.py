@@ -2,17 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Any
+from unittest.mock import Mock
 
 import networkx as nx
 import pytest
 
+from invokeai.app.invocations.collections import CollectionConcatInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.primitives import BooleanInvocation
 from invokeai.app.services.shared import graph_if_dependencies
 from invokeai.app.services.shared.execution_engine import ActivationDependency
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState, IterateInvocation, _ExecutionScheduler
 from invokeai.app.services.shared.graph_validation import _EdgeList
-from tests.test_nodes import AnyTypeTestInvocation, create_edge
+from tests.test_nodes import AnyTypeTestInvocation, FixedCollectionTestInvocation, create_edge
 
 
 class _CountingNodes(dict[str, Any]):
@@ -277,3 +279,77 @@ def test_nested_if_analysis_materializes_gate_frontiers_and_bounds_mask_payload(
         measurements.append((depth, relation_count, mask_payload_bits))
 
     assert measurements[-1][1] <= 9 * measurements[0][1]
+
+
+def _count_prepared_if_frame_visits(item_count: int, force_compatibility: bool) -> tuple[int, int]:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="src", first=list(range(item_count))))
+    graph.add_node(IterateInvocation(id="it"))
+    graph.add_node(FixedCollectionTestInvocation(id="cond"))
+    graph.add_node(AnyTypeTestInvocation(id="branch", value="B"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="F"))
+    graph.add_node(AnyTypeTestInvocation(id="after"))
+    for edge in (
+        ("src", "collection", "it", "collection"),
+        ("it", "item", "cond", "value"),
+        ("it", "item", "branch", "value"),
+        ("cond", "condition", "if", "condition"),
+        ("branch", "value", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "after", "value"),
+    ):
+        graph.add_edge(create_edge(*edge))
+
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility:
+        state._execution_scheduler = _ExecutionScheduler(state)
+    original_register = state._register_prepared_exec_node
+    original_get_frames = state._prepared_if_exec_frames
+    frame_visits = 0
+    owner_id_visits = 0
+
+    class _CountingPreparedIds(set[str]):
+        def __iter__(self) -> Iterator[str]:
+            nonlocal owner_id_visits
+            owner_id_visits += len(self)
+            return super().__iter__()
+
+    def count_prepared_id_iterations() -> None:
+        # Count actual scans of the If owner-ID set, including scans hidden inside index builders.
+        prepared_ids = state.source_prepared_mapping.get("if")
+        if prepared_ids is not None and not isinstance(prepared_ids, _CountingPreparedIds):
+            state.source_prepared_mapping["if"] = _CountingPreparedIds(prepared_ids)
+
+    def register_prepared_exec_node(execution_node_id: str, source_node_id: str) -> Any:
+        result = original_register(execution_node_id, source_node_id)
+        count_prepared_id_iterations()
+        return result
+
+    def count_frame_visits(source_node_id: str) -> tuple[tuple[int, ...], ...]:
+        nonlocal frame_visits
+        frames = original_get_frames(source_node_id)
+        frame_visits += len(frames)
+        return frames
+
+    state._prepared_if_exec_frames = count_frame_visits  # type: ignore[method-assign]
+    state._register_prepared_exec_node = register_prepared_exec_node  # type: ignore[method-assign]
+    while (node := state.next()) is not None:
+        state.complete(node.id, node.invoke(Mock()))
+    assert state.is_complete()
+    return frame_visits, owner_id_visits
+
+
+@pytest.mark.platform_independent
+@pytest.mark.parametrize("force_compatibility", [False, True], ids=["generic", "compatibility"])
+def test_if_dependency_frame_visits_scale_linearly(force_compatibility: bool) -> None:
+    visits = {
+        item_count: _count_prepared_if_frame_visits(item_count, force_compatibility) for item_count in (8, 16, 32)
+    }
+    frame_visits = {item_count: counts[0] for item_count, counts in visits.items()}
+    owner_id_visits = {item_count: counts[1] for item_count, counts in visits.items()}
+    assert frame_visits[16] <= max(1, frame_visits[8]) * 3, f"candidate frame visits: {frame_visits}"
+    assert frame_visits[32] <= max(1, frame_visits[16]) * 3, f"candidate frame visits: {frame_visits}"
+    assert owner_id_visits[16] <= max(1, owner_id_visits[8]) * 3, f"owner execution visits: {owner_id_visits}"
+    assert owner_id_visits[32] <= max(1, owner_id_visits[16]) * 3, f"owner execution visits: {owner_id_visits}"
+    assert owner_id_visits[32] <= 20 * 32, f"owner execution visits exceeded linear work: {owner_id_visits}"

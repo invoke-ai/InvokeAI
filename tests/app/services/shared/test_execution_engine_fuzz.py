@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import random
+from collections import Counter, defaultdict
 from typing import Any
 from unittest.mock import Mock
 
@@ -464,6 +465,26 @@ def _get_reload_observations(state: GraphExecutionState, graph: Graph) -> tuple[
     return tuple(sorted(observations, key=repr))
 
 
+def _assert_v2_reload_observations_preserve_known_axes(
+    intact: tuple[_ReloadObservation, ...], reconstructed: tuple[_ReloadObservation, ...]
+) -> None:
+    def signatures(observations: tuple[_ReloadObservation, ...]):
+        rows: Counter[tuple[str, tuple[int, ...], str]] = Counter()
+        axes_by_row: dict[tuple[str, tuple[int, ...], str], Counter[tuple[str, ...]]] = defaultdict(Counter)
+        for source_id, path, axes, result in observations:
+            row = (source_id, path, repr(result))
+            rows[row] += 1
+            if axes is not None:
+                axes_by_row[row][axes] += 1
+        return rows, axes_by_row
+
+    intact_rows, intact_axes = signatures(intact)
+    reconstructed_rows, reconstructed_axes = signatures(reconstructed)
+    assert intact_rows == reconstructed_rows
+    for row, axes in intact_axes.items():
+        assert not axes - reconstructed_axes[row], f"known axes changed for {row}: {axes} -> {reconstructed_axes[row]}"
+
+
 def _run(
     seed: int,
     *,
@@ -473,7 +494,11 @@ def _run(
     capture_reload_observations: bool = False,
 ) -> (
     dict[str, list[tuple[tuple[int, ...], Any]]]
-    | tuple[tuple[_ReloadObservation, ...], tuple[_RawOutputObservation, ...]]
+    | tuple[
+        tuple[_ReloadObservation, ...],
+        tuple[_RawOutputObservation, ...],
+        dict[str, list[tuple[tuple[int, ...], Any]]],
+    ]
 ):
     desc, graph_factory = build(seed)
     graph = graph_factory()
@@ -563,7 +588,8 @@ def _run(
                 key=repr,
             )
         )
-        return reload_observations, raw_observations
+        normalized_outputs = _normalize_collect_fed_iterate_permutations(graph, state, outputs, output_execution_ids)
+        return reload_observations, raw_observations, normalized_outputs
     return _normalize_collect_fed_iterate_permutations(graph, state, outputs, output_execution_ids)
 
 
@@ -576,16 +602,35 @@ def test_v2_snapshot_without_prepared_iteration_axes_matches_uninterrupted(
     seed: int, checkpoint: int, forced_compatibility: bool
 ) -> None:
     uninterrupted = _run(seed, forced_compatibility=forced_compatibility, roundtrip_at=None)
-    intact_snapshot = _run(seed, forced_compatibility=forced_compatibility, roundtrip_at=checkpoint)
-    missing_axes_snapshot = _run(
+    intact_snapshot_observations = _run(
+        seed,
+        forced_compatibility=forced_compatibility,
+        roundtrip_at=checkpoint,
+        capture_reload_observations=True,
+    )
+    missing_axes_snapshot_observations = _run(
         seed,
         forced_compatibility=forced_compatibility,
         roundtrip_at=checkpoint,
         omit_prepared_iteration_axes=True,
+        capture_reload_observations=True,
     )
+
+    assert isinstance(intact_snapshot_observations, tuple)
+    assert isinstance(missing_axes_snapshot_observations, tuple)
+    intact_reload, _, intact_snapshot = intact_snapshot_observations
+    missing_axes_reload, _, missing_axes_snapshot = missing_axes_snapshot_observations
 
     assert intact_snapshot == uninterrupted
     assert missing_axes_snapshot == uninterrupted
+    _assert_v2_reload_observations_preserve_known_axes(intact_reload, missing_axes_reload)
+
+
+def test_v2_reload_axis_oracle_rejects_named_axis_reordering() -> None:
+    intact = (("for1", (0, 0), ("it0", "it1"), None),)
+    reordered = (("for1", (0, 0), ("it1", "it0"), None),)
+    with pytest.raises(AssertionError, match="known axes changed"):
+        _assert_v2_reload_observations_preserve_known_axes(intact, reordered)
 
 
 @pytest.mark.parametrize("forced_compatibility", [False, True], ids=["generic", "compatibility"])
@@ -600,7 +645,7 @@ def test_v2_sibling_reiterate_snapshot_preserves_raw_frames_and_axis_metadata(
         capture_reload_observations=True,
     )
     assert isinstance(observations, tuple)
-    reload_observations, raw_outputs = observations
+    reload_observations, raw_outputs, _ = observations
 
     assert reload_observations == (
         ("if", (0,), ("it0",), "F:['c', 'a']"),

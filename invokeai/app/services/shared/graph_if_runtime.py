@@ -1173,19 +1173,30 @@ def _get_source_activation_dependencies_for_preparation(
             shared_axis_indices = [
                 (owner_axes.index(axis_id), edge_axes.index(axis_id)) for axis_id in owner_axes if axis_id in edge_axes
             ]
-        candidate_frames = state._prepared_if_exec_frames(dependency.owner_id)
-        matching_frames = [
-            frame
-            for frame in candidate_frames
-            if all(
-                owner_index < len(frame)
-                and source_index < len(iteration_path)
-                and frame[owner_index] == iteration_path[source_index]
-                for owner_index, source_index in shared_axis_indices
-            )
-        ]
-        if not matching_frames and iteration_path and candidate_frames == ((),):
-            matching_frames = [()]
+        exact_frame_mapping = (
+            len(iteration_path) == len(owner_axes) == len(source_axes)
+            and len(shared_axis_indices) == len(owner_axes)
+            and all(owner_index == source_index for owner_index, source_index in shared_axis_indices)
+        )
+        matching_frames = (
+            [iteration_path]
+            if exact_frame_mapping and state._prepared_if_exec_ids(dependency.owner_id, iteration_path)
+            else []
+        )
+        if not matching_frames:
+            candidate_frames = state._prepared_if_exec_frames(dependency.owner_id)
+            matching_frames = [
+                frame
+                for frame in candidate_frames
+                if all(
+                    owner_index < len(frame)
+                    and source_index < len(iteration_path)
+                    and frame[owner_index] == iteration_path[source_index]
+                    for owner_index, source_index in shared_axis_indices
+                )
+            ]
+            if not matching_frames and iteration_path and candidate_frames == ((),):
+                matching_frames = [()]
         if not matching_frames:
             resolved_dependencies.append(dependency)
             continue
