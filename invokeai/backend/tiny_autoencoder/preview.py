@@ -10,36 +10,7 @@ from PIL import Image
 
 from invokeai.backend.architectures import LatentSpace, latent_space_with_channels
 from invokeai.backend.model_manager.configs.tiny_autoencoder import TinyAutoencoder_Checkpoint_Config_Base
-from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
-
-MAX_PREVIEW_EDGE: Final = 1024
-"""Longest edge of a TAE preview, in pixels. Bounds the decode's memory and the frame's payload.
-
-At 1024 a decode costs ~640 MiB of VRAM for the 8x TAEs (~160 MiB for TAEQI2.1) and ~25 ms (RTX 4090,
-fp16) at any generation size; uncapped, 2048 costs ~2.5 GiB and ~100 ms. Decoding at full size and then
-scaling down would look better (SDXL 36.3 vs 30.7 dB against the VAE) but carries that uncapped cost, which
-is why the latent is area-downsampled before the decode instead.
-"""
-
-_LAST_STAGE_CHANNELS: Final = 64
-"""Width of a TAESD decoder's full-resolution stage, the last `Block` and the convolution before it."""
-
-_LIVE_ACTIVATIONS: Final = 3
-"""Full-resolution activations a TAESD decode holds at once, read off the vendored decoder.
-
-The peak is in the last `Block`, the only one at full resolution. Its input stays referenced while its conv branch
-runs, and `nn.ReLU` is not in place, so each layer of the branch has its own input and output live next to the block's
-input: three tensors. Adding the branch's output to the input (the skip is an identity) and fusing the sum holds three
-again. Every earlier stage runs at half resolution or less. TAEQI2.1's last stage runs at half resolution and holds a
-quarter of this; the bound reserves it the same.
-"""
-
-_CONV_WORKSPACE_ACTIVATIONS: Final = 2
-"""The convolutions' workspace on top, in activation-sized buffers. Measured, and it depends on the algorithm the
-backend picks: on an RTX 4090 in fp16, `max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five
-activations, two more than the structure holds.
-"""
-
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 
 _POOLING_NEEDS_DIVISIBLE_SIZES: Final = frozenset({"mps"})
 """Device types whose adaptive average pooling, behind `F.interpolate(mode="area")`, refuses an output size that does
@@ -48,26 +19,26 @@ not divide the input ("input sizes must be divisible by output sizes", pytorch#9
 TinyAutoencoderConfig = TypeVar("TinyAutoencoderConfig", bound=TinyAutoencoder_Checkpoint_Config_Base)
 
 
-def _preview_latent_size(decoder: TaesdDecoder, height: int, width: int) -> tuple[int, int]:
-    """The latent size a `(height, width)` latent is decoded at: downsampled until the image fits `MAX_PREVIEW_EDGE`."""
+def _preview_latent_size(decoder: TinyAutoencoderDecoder, height: int, width: int) -> tuple[int, int]:
+    """The latent size a `(height, width)` latent is decoded at: downsampled until the image fits the decoder's
+    `max_preview_edge`."""
     longest_edge = max(height, width) * decoder.spatial_compression
-    if longest_edge <= MAX_PREVIEW_EDGE:
+    if longest_edge <= decoder.max_preview_edge:
         return height, width
-    scale = MAX_PREVIEW_EDGE / longest_edge
+    scale = decoder.max_preview_edge / longest_edge
     return max(1, math.floor(height * scale)), max(1, math.floor(width * scale))
 
 
-def decode_working_memory_bytes(decoder: TaesdDecoder, sample: torch.Tensor) -> int:
-    """The working memory `decode_preview(decoder, sample)` needs on its device besides the decoder's weights.
+def decode_working_memory_bytes(decoder: TinyAutoencoderDecoder, sample: torch.Tensor) -> int:
+    """The working memory `decode_preview(decoder, sample)` needs on its device besides the decoder's weights: the
+    decoder's own bound (`preview_working_memory_bytes`) at the capped size, for every latent frame of a window.
 
-    The live activations plus the convolutions' workspace, at the capped output size and the decoder's element size:
-    640 MiB at 1024x1024 in fp16. The cache's working-memory floor (`device_working_mem_gb`, 3 GB by default) covers
-    it, so the reservation matters only where that floor is set lower.
+    The cache's working-memory floor (`device_working_mem_gb`, 3 GB by default) covers every supported decoder's, so
+    the reservation matters only where that floor is set lower.
     """
     height, width = _preview_latent_size(decoder, *sample.shape[-2:])
-    activation_bytes = height * width * decoder.spatial_compression**2 * _LAST_STAGE_CHANNELS
-    activation_bytes *= next(decoder.parameters()).element_size()
-    return (_LIVE_ACTIVATIONS + _CONV_WORKSPACE_ACTIVATIONS) * activation_bytes
+    frames = sample.shape[2] if sample.dim() == 5 else 1
+    return decoder.preview_working_memory_bytes(height, width, frames)
 
 
 def _area_downsample(latents: torch.Tensor, size: tuple[int, int]) -> torch.Tensor:
@@ -79,12 +50,16 @@ def _area_downsample(latents: torch.Tensor, size: tuple[int, int]) -> torch.Tens
     return F.interpolate(latents, size=size, mode="area")
 
 
-def decode_preview(decoder: TaesdDecoder, sample: torch.Tensor, device: torch.device | None = None) -> Image.Image:
-    """Decode the first latent of `sample` into an RGB preview no larger than `MAX_PREVIEW_EDGE`.
+def decode_preview(
+    decoder: TinyAutoencoderDecoder, sample: torch.Tensor, device: torch.device | None = None
+) -> Image.Image:
+    """Decode the first latent of `sample` into an RGB preview no larger than `decoder.max_preview_edge`.
 
-    `sample` is `(C, h, w)` or `(B, C, h, w)` in the decoder's latent space. A latent whose decode would
-    exceed the cap is area-downsampled first, which is far cheaper than decoding at full size and scaling
-    the image. Alpha, where the decoder has it, is dropped.
+    `sample` is `(C, h, w)` or `(B, C, h, w)` in the decoder's latent space, or a `(B, C, T, h, w)` window
+    of latent frames, which a video decoder renders as its last frame with the earlier ones as temporal
+    context (a TAESD decoder refuses it). A latent whose decode would exceed the cap is area-downsampled
+    first, which is far cheaper than decoding at full size and scaling the image. Alpha, where the decoder
+    has it, is dropped.
 
     The decode runs on `device`, which a caller holding the model through the model cache passes as the
     cache's compute device: a partially loaded decoder keeps some weights elsewhere, so its parameters
@@ -93,8 +68,10 @@ def decode_preview(decoder: TaesdDecoder, sample: torch.Tensor, device: torch.de
     """
     if sample.dim() == 3:
         sample = sample.unsqueeze(0)
-    elif sample.dim() != 4:
-        raise ValueError(f"expected a (C, h, w) or (B, C, h, w) latent, got shape {tuple(sample.shape)}")
+    elif sample.dim() not in (4, 5):
+        raise ValueError(
+            f"expected a (C, h, w) or (B, C, h, w) latent or a (B, C, T, h, w) window, got shape {tuple(sample.shape)}"
+        )
     if sample.shape[1] != decoder.latent_channels:
         raise ValueError(
             f"the decoder reads {decoder.latent_channels} latent channels, the sample has {sample.shape[1]}"
@@ -105,9 +82,16 @@ def decode_preview(decoder: TaesdDecoder, sample: torch.Tensor, device: torch.de
         latents = sample[0:1].to(device=device or parameter.device, dtype=parameter.dtype)
         size = _preview_latent_size(decoder, *latents.shape[-2:])
         if size != tuple(latents.shape[-2:]):
-            latents = _area_downsample(latents, size)
-        image = decoder(latents)[0, :3].clamp(0, 1)
-        pixels = image.mul(255).round().to(torch.uint8).permute(1, 2, 0).cpu()
+            if latents.dim() == 5:
+                # A window's frames are folded into the batch, so they are pooled in space only and through
+                # the same 2-D path as single latents (3-D adaptive pooling is not verified on every backend).
+                frames = latents.transpose(1, 2)
+                pooled = _area_downsample(frames.flatten(0, 1), size)
+                latents = pooled.unflatten(0, frames.shape[:2]).transpose(1, 2)
+            else:
+                latents = _area_downsample(latents, size)
+        image = decoder.decode_window(latents) if latents.dim() == 5 else decoder(latents)
+        pixels = image[0, :3].clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).cpu()
     return Image.fromarray(pixels.numpy())
 
 

@@ -1,0 +1,36 @@
+---
+import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
+
+import { getCurrentTopic } from '../../config/topics';
+import { mountSidebarState, resolveOpen, sidebarStateKey, visibleScrollTop } from '../sidebar-state.mjs';
+import MainNav from './MainNav.astro';
+import SidebarTree from './SidebarTree.astro';
+import TopicSwitcher from './TopicSwitcher.astro';
+
+// Starlight's sidebar, with the topic switcher in place of starlight-sidebar-topics' topic list (its route middleware
+// has already narrowed the sidebar to the topic), section icons (`SidebarTree.astro`) and the section state kept per
+// topic (see `sidebar-state.mjs`) instead of by Starlight's persister.
+const { sidebar } = Astro.locals.starlightRoute;
+const topic = getCurrentTopic(Astro.locals);
+const mountScript = `(${mountSidebarState})(document.currentScript.previousElementSibling, ${JSON.stringify(
+  sidebarStateKey(topic?.id ?? 'docs')
+)}, ${resolveOpen}, ${visibleScrollTop});`;
+---
+
+<div class="md:sl-hidden">
+  <MainNav placement="drawer" />
+</div>
+{topic && <TopicSwitcher current={topic} />}
+<docs-sidebar-tree>
+  <SidebarTree sublist={sidebar} />
+</docs-sidebar-tree>
+<script is:inline set:html={mountScript} />
+<div class="md:sl-hidden">
+  <MobileMenuFooter />
+</div>
+
+<style>
+  docs-sidebar-tree {
+    display: contents;
+  }
+</style>

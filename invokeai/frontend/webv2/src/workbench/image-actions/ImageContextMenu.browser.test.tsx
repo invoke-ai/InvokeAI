@@ -21,7 +21,7 @@ import { userEvent } from 'vitest/browser';
 import type * as ModelOnlyUpscaleModule from './modelOnlyUpscale';
 import type { ImageActions } from './useImageActions';
 
-import { ImageContextMenu, type ImageContextMenuTarget } from './ImageContextMenu';
+import { ImageContextMenu, type ImageContextMenuTarget, type ImageContextMenuVariant } from './ImageContextMenu';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
@@ -278,7 +278,8 @@ const renderItemMenu = async (
     onCopyCurrentFrame: () => void;
     onOpenDetails: () => void;
   },
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  variant?: ImageContextMenuVariant
 ) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -293,6 +294,7 @@ const renderItemMenu = async (
             boards={NO_BOARDS}
             previewVideoActions={previewVideoActions}
             target={target as unknown as ImageContextMenuTarget}
+            variant={variant}
             onClose={vi.fn()}
           />
         </ChakraProvider>
@@ -315,8 +317,29 @@ describe('ImageContextMenu deletion delegation', () => {
 
     await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
 
-    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }], {
+      returnFocus: undefined,
+    });
     expect(getOpenAlertDialog()).toBeNull();
+  });
+
+  it('hands the deletion the place its host says focus returns to, since the menu is gone by then', async () => {
+    const deleteItems = vi.fn(() => Promise.resolve());
+    const target = item('image', 'right-clicked.png');
+    const returnFocus = () => null;
+    await renderItemMenu(createActions(deleteItems), {
+      itemRefs: [{ kind: 'image', name: target.name }],
+      items: [target],
+      returnFocus,
+      x: 20,
+      y: 20,
+    });
+
+    await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
+
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'right-clicked.png' }], {
+      returnFocus,
+    });
   });
 });
 
@@ -681,10 +704,10 @@ describe('ImageContextMenu video placement', () => {
     const actions = { ...createActions(vi.fn()), canUseAsReferenceVideo: true };
     await renderVideoMenu(actions, video);
 
-    await interact(() => getMenuItem('widgets.gallery.itemMenu.extendInVideo').click());
+    await pickItem('widgets.gallery.itemMenu.extendInVideo');
     expect(actions.sendToInitialVideo).toHaveBeenCalledExactlyOnceWith(video);
 
-    await interact(() => getMenuItem('widgets.gallery.itemMenu.useAsReferenceVideo').click());
+    await pickItem('widgets.gallery.itemMenu.useAsReferenceVideo');
     expect(actions.useAsReferenceVideo).toHaveBeenCalledExactlyOnceWith(video);
   });
 
@@ -771,6 +794,30 @@ describe('ImageContextMenu video placement', () => {
 
     await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false));
     expect(isDisabled('widgets.gallery.itemActions.recall.verbs.seed')).toBe(false);
+    // The record names no size, so Use Size stays off.
+    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.dimensions')).toBe(true);
+  });
+
+  it('lists the reuse verbs remix first, Use Size last, and recalls the size the record names', async () => {
+    galleryMock.videoMetadata.mockResolvedValueOnce({ generation_mode: 'wan_t2v', height: 720, width: 1280 });
+    const video = item('video', 'sized.mp4');
+    const actions = createActions(vi.fn());
+    await renderVideoMenu(actions, video);
+    await openReuseSubmenu();
+
+    const reuseLabels = [
+      'widgets.gallery.itemMenu.remixVideo',
+      'widgets.gallery.itemMenu.allSettings',
+      'widgets.gallery.itemActions.recall.verbs.prompts',
+      'widgets.gallery.itemActions.recall.verbs.seed',
+      'widgets.gallery.itemActions.recall.verbs.dimensions',
+    ];
+    const menuLabels = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(itemLabel);
+    expect(menuLabels.filter((label) => label && reuseLabels.includes(label))).toEqual(reuseLabels);
+
+    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.dimensions')).toBe(false));
+    await pickItem('widgets.gallery.itemActions.recall.verbs.dimensions');
+    expect(actions.recallVideoData).toHaveBeenCalledExactlyOnceWith(video, 'size');
   });
 
   it("reads a video's metadata once across opens, and reads a failed one again on the next open", async () => {
@@ -838,7 +885,7 @@ describe('ImageContextMenu video placement', () => {
     await renderVideoMenu(actions, video);
     await openConditioningSubmenu();
 
-    await interact(() => getMenuItem('widgets.video.conditioningRoleAudio').click());
+    await pickItem('widgets.video.conditioningRoleAudio');
 
     expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'audio');
   });
@@ -850,7 +897,7 @@ describe('ImageContextMenu video placement', () => {
     await openConditioningSubmenu();
 
     expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).toBe('true');
-    await interact(() => getMenuItem('widgets.video.conditioningRoleVideo').click());
+    await pickItem('widgets.video.conditioningRoleVideo');
     expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'video');
   });
 
@@ -921,6 +968,44 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     await interact(() => details.click());
     expect(onOpenDetails).toHaveBeenCalledOnce();
     expect(onCopyCurrentFrame).not.toHaveBeenCalled();
+  });
+
+  it("keeps only housekeeping in a Preview video's housekeeping menu, leaving use and reuse to the Use menu", async () => {
+    const video = item('video', 'preview.mp4');
+    await renderItemMenu(
+      createActions(vi.fn()),
+      { itemRefs: [{ kind: 'video', name: video.name }], items: [video], x: 20, y: 20 },
+      {
+        isCopyCurrentFrameAvailable: true,
+        itemKey: 'video:preview.mp4',
+        onCopyCurrentFrame: vi.fn(),
+        onOpenDetails: vi.fn(),
+      },
+      undefined,
+      'housekeeping'
+    );
+
+    // The quick row stays, as for an image's housekeeping menu.
+    for (const label of [
+      'widgets.gallery.itemMenu.openInNewTab',
+      'widgets.gallery.itemMenu.downloadVideo',
+      'widgets.gallery.itemMenu.openInPreview',
+      'widgets.preview.starVideo',
+    ]) {
+      expect(document.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+    }
+    const rowLabels = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+      .filter((candidate) => !candidate.hasAttribute('aria-label'))
+      .map(itemLabel);
+    expect(rowLabels).toEqual([
+      'widgets.gallery.itemActions.loadWorkflow.label',
+      'widgets.preview.copyCurrentFrame',
+      'widgets.preview.videoDetails',
+      'widgets.gallery.findInGallery',
+      'widgets.gallery.changeBoard',
+      'widgets.gallery.itemMenu.deleteVideo',
+    ]);
+    expect(galleryMock.videoMetadata).not.toHaveBeenCalledWith('preview.mp4', expect.anything());
   });
 
   it('hides Preview video extras when the captured menu target is no longer the selected video', async () => {

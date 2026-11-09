@@ -89,6 +89,11 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.util.llamacpp_t5 import (
+    convert_llamacpp_t5_keys,
+    has_per_layer_relative_bias,
+    make_feed_forward_gguf_safe,
+)
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
@@ -612,7 +617,16 @@ class T5EncoderGGUFModel(ModelLoader):
         # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
         sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
 
-        sd = self._convert_t5_gguf_to_transformers(sd)
+        if has_per_layer_relative_bias(sd):
+            # Identification files these under Wan, but a record made by an earlier version can still point
+            # here, and T5 v1.1 would run every block on block 0's bias.
+            raise ValueError(
+                f"'{config.name}' is a UMT5-XXL text encoder (Wan 2.2), not a T5-XXL encoder for FLUX or SD3. "
+                "Re-identify it in the Model Manager (the model's menu, 'Re-identify model') or reinstall it, "
+                "and it becomes a Wan T5 Encoder."
+            )
+
+        sd = convert_llamacpp_t5_keys(sd)
 
         t5_config = infer_t5_encoder_config(sd)
 
@@ -638,7 +652,7 @@ class T5EncoderGGUFModel(ModelLoader):
                 rel_bias.get_dequantized_tensor(), requires_grad=False
             )
 
-        make_t5_feed_forward_safe(model)
+        make_feed_forward_gguf_safe(model)
 
         # Fail loudly if anything was left unloaded (meta tensors).
         meta_params = [name for name, p in model.named_parameters() if p.is_meta]
@@ -649,71 +663,6 @@ class T5EncoderGGUFModel(ModelLoader):
             )
 
         return model
-
-    def _convert_t5_gguf_to_transformers(self, sd: dict[str, Any]) -> dict[str, Any]:
-        """Convert llama.cpp T5 encoder GGUF keys to HuggingFace transformers T5 naming.
-
-        llama.cpp T5 encoder format:
-        - token_embd.weight                  -> shared.weight
-        - enc.output_norm.weight             -> encoder.final_layer_norm.weight
-        - enc.blk.N.attn_q/k/v/o.weight      -> encoder.block.N.layer.0.SelfAttention.q/k/v/o.weight
-        - enc.blk.0.attn_rel_b.weight        -> encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight
-        - enc.blk.N.attn_norm.weight         -> encoder.block.N.layer.0.layer_norm.weight
-        - enc.blk.N.ffn_gate.weight          -> encoder.block.N.layer.1.DenseReluDense.wi_0.weight (gated/activated)
-        - enc.blk.N.ffn_up.weight            -> encoder.block.N.layer.1.DenseReluDense.wi_1.weight (linear)
-        - enc.blk.N.ffn_down.weight          -> encoder.block.N.layer.1.DenseReluDense.wo.weight
-        - enc.blk.N.ffn_norm.weight          -> encoder.block.N.layer.1.layer_norm.weight
-        """
-        import re
-
-        attn_map = {
-            "attn_q": "SelfAttention.q",
-            "attn_k": "SelfAttention.k",
-            "attn_v": "SelfAttention.v",
-            "attn_o": "SelfAttention.o",
-            "attn_rel_b": "SelfAttention.relative_attention_bias",
-            "attn_norm": "layer_norm",
-        }
-        ffn_map = {
-            "ffn_gate": "DenseReluDense.wi_0",
-            "ffn_up": "DenseReluDense.wi_1",
-            "ffn_down": "DenseReluDense.wo",
-            "ffn_norm": "layer_norm",
-        }
-
-        new_sd: dict[str, Any] = {}
-        blk_pattern = re.compile(r"^enc\.blk\.(\d+)\.(.+)$")
-
-        for key, value in sd.items():
-            if not isinstance(key, str):
-                new_sd[key] = value
-                continue
-
-            if key == "token_embd.weight":
-                new_sd["shared.weight"] = value
-                continue
-            if key == "enc.output_norm.weight":
-                new_sd["encoder.final_layer_norm.weight"] = value
-                continue
-
-            match = blk_pattern.match(key)
-            if match:
-                layer_idx = match.group(1)
-                rest = match.group(2)
-                component = rest.split(".", 1)[0]
-
-                if component in attn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.0.{attn_map[component]}.weight"] = value
-                elif component in ffn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.1.{ffn_map[component]}.weight"] = value
-                else:
-                    # Unknown component - keep as-is so the meta-tensor check surfaces it.
-                    new_sd[key] = value
-                continue
-
-            new_sd[key] = value
-
-        return new_sd
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.Checkpoint)

@@ -21,6 +21,7 @@ import {
 } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
 import {
+  areRegionalNegativesActive,
   getEffectiveLayoutKind,
   getLayoutRegionIssue,
   getRegionalGuidanceSupport,
@@ -47,7 +48,7 @@ import { PaletteIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useSelectedModelBase } from './useSelectedModelBase';
+import { useSelectedCfgScale, useSelectedModelBase } from './useSelectedModelBase';
 
 /** The regional-guidance fields patchable via `updateCanvasLayerConfig`. */
 interface RegionalConfigPatch {
@@ -86,6 +87,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
   const base = useSelectedModelBase();
+  const cfgScale = useSelectedCfgScale();
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
@@ -114,6 +116,11 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   // no model/policy is known.
   const showNegativeControls = !hasCapabilities || support?.negativePrompt !== false;
   const unsupportedModel = hasCapabilities && base !== null && support === null;
+  // Controls stay editable so values carry over; the hint says why they do nothing at this CFG Scale.
+  const negativesIgnoredAtCfg =
+    support !== null && cfgScale !== null && support.negativePrompt && !areRegionalNegativesActive(support, cfgScale);
+  const negativeFieldId = useId();
+  const negativeHelpId = negativesIgnoredAtCfg ? `${negativeFieldId}-help` : undefined;
 
   // A previewed fill records from where its preview started; any other change from the live layer.
   const commitConfig = useCallback(
@@ -374,8 +381,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       ) : null}
       {isLayout ? <VisuallyHidden role="status">{layoutIssueMessage}</VisuallyHidden> : null}
       {showNegativeControls && (
-        <Field label={t('widgets.layers.regionalGuidance.negativePrompt')}>
+        <Field
+          helpText={negativesIgnoredAtCfg ? t('widgets.layers.regionalGuidance.negativesNeedCfg') : undefined}
+          id={negativeFieldId}
+          label={t('widgets.layers.regionalGuidance.negativePrompt')}
+        >
           <PromptTextarea
+            aria-describedby={negativeHelpId}
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
             attentionSyntax={attentionSyntax}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
@@ -392,7 +404,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       )}
       {showNegativeControls && (
         <Switch.Root checked={layer.autoNegative} onCheckedChange={handleAutoNegative}>
-          <Switch.HiddenInput />
+          <Switch.HiddenInput aria-describedby={negativeHelpId} />
           <Switch.Control>
             <Switch.Thumb />
           </Switch.Control>

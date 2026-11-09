@@ -1,7 +1,7 @@
 import type { SettingDefinition, SettingsContribution, SettingsText } from '@platform/ui/settings/contracts';
 
 import { intermediatesSettingsContribution } from '@features/intermediates/settingsContribution';
-import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { getWorkbenchLanguageAvailability, WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
 
 const text =
   (key: string, fallback?: string): SettingsText =>
@@ -42,7 +42,16 @@ export const appearanceSettings = section('appearance', 'Appearance', [
     label: text('language.label', 'Language'),
     kind: 'select',
     scope: 'preference',
-    options: WORKBENCH_LANGUAGE_OPTIONS,
+    description: text('language.description'),
+    options: WORKBENCH_LANGUAGE_OPTIONS.map((option): { value: string; label: SettingsText } => ({
+      value: option.value,
+      label: (t) => {
+        const availability = getWorkbenchLanguageAvailability(option.value);
+        return availability === 'available'
+          ? option.label
+          : t(`settings.catalog.language.${availability}`, { label: option.label });
+      },
+    })),
   },
   preference('reduceMotion', 'Reduce motion', 'animation'),
   preference('highContrast', 'High contrast', 'accessibility a11y readability'),
