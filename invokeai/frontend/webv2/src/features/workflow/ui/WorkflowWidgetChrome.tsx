@@ -4,6 +4,7 @@ import { Box, HStack, Icon, Menu, Stack, Text, VisuallyHidden } from '@chakra-ui
 import { useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
+import { isBundledLibraryWorkflowId } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   buildConnectorNode,
@@ -42,10 +43,22 @@ import {
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ElementType } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ElementType,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
+import type * as WorkflowLibraryDialogModule from './library/WorkflowLibraryDialog';
 import type { WorkflowProjectPersistence } from './WorkflowUiContext';
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
@@ -53,8 +66,7 @@ import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRunt
 import { getWorkflowViewCenter } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
 import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
-import { isBundledLibraryWorkflowId, isUpdatableSource } from './library/projectWorkflowEntries';
-import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
+import { isUpdatableSource } from './library/projectWorkflowEntries';
 import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
 import { PendingWorkflowLoader } from './PendingLibraryWorkflowLoader';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
@@ -79,6 +91,24 @@ import {
  * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick
  * actions, and shared menu actions.
  */
+
+/**
+ * The library dialog's chunk (cards, rails, toolbar, detail sheet) stays out of the editor's startup bundle until the
+ * library first opens; its entry points preload it on hover or focus so that opening feels immediate. A failed load
+ * (an offline moment, a redeploy) retries on the next attempt.
+ */
+let workflowLibraryDialogModule: Promise<typeof WorkflowLibraryDialogModule> | null = null;
+const loadWorkflowLibraryDialog = (): Promise<typeof WorkflowLibraryDialogModule> =>
+  (workflowLibraryDialogModule ??= import('./library/WorkflowLibraryDialog').catch((error: unknown) => {
+    workflowLibraryDialogModule = null;
+    throw error;
+  }));
+const preloadWorkflowLibraryDialog = (): void => {
+  void loadWorkflowLibraryDialog().catch(() => {});
+};
+const LazyWorkflowLibraryDialog = lazy(() =>
+  loadWorkflowLibraryDialog().then((module) => ({ default: module.WorkflowLibraryDialog }))
+);
 
 /** How the project's own persistence is shown beside the library actions. */
 const PERSISTENCE_VIEW: Record<
@@ -194,6 +224,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
           size="sm"
           variant="ghost"
           onClick={openProjectWorkflows}
+          onFocus={preloadWorkflowLibraryDialog}
+          onPointerEnter={preloadWorkflowLibraryDialog}
         >
           <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
           <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
@@ -271,7 +303,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       <Menu.Item value="rename" onClick={renameActiveWorkflow}>
         {t('widgets.workflow.renameWithEllipsis')}
       </Menu.Item>
-      <Menu.Item value="library" onClick={openLibrary}>
+      <Menu.Item value="library" onClick={openLibrary} onPointerEnter={preloadWorkflowLibraryDialog}>
         {t('widgets.workflow.libraryWithEllipsis')}
       </Menu.Item>
       <Menu.Item value="save-to-library" onClick={saveToLibrary}>
@@ -351,6 +383,8 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
             size="sm"
             variant="ghost"
             onClick={openWorkflowLibrary}
+            onFocus={preloadWorkflowLibraryDialog}
+            onPointerEnter={preloadWorkflowLibraryDialog}
           >
             <Icon as={LibraryIcon} boxSize="3.5" />
           </IconButton>
@@ -413,6 +447,10 @@ export const WorkflowDialogHost = () => {
   const importRequestCount = workflowUiStore.useSelector((snapshot) => snapshot.importRequestCount);
   const isAddNodeOpen = workflowUiStore.useSelector((snapshot) => snapshot.isAddNodeOpen);
   const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+  const [hasOpenedLibrary, setHasOpenedLibrary] = useState(isLibraryOpen);
+  if (isLibraryOpen && !hasOpenedLibrary) {
+    setHasOpenedLibrary(true);
+  }
   const lastImportRequestRef = useRef(importRequestCount);
   // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
   // one; closing records the request as handled.
@@ -674,7 +712,13 @@ export const WorkflowDialogHost = () => {
         onAddNote={addNote}
         onOpenChange={setAddNodeOpen}
       />
-      <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      {/* Loaded on the first opening and kept mounted after, so its exit transitions, reset on close and remembered
+          place behave as for an always-mounted dialog. Its own busy overlay covers loading once it shows. */}
+      {hasOpenedLibrary ? (
+        <Suspense fallback={null}>
+          <LazyWorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+        </Suspense>
+      ) : null}
       <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}

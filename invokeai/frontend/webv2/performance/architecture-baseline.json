@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 816492,
+        "brotliBytes": 816542,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 816093,
+        "gzipBytes": 815312,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2106927,
-        "largestAssetRawBytes": 751079,
+        "initialRawBytes": 2108233,
+        "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 115509,
+        "ownedRawBytes": 115499,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -361,15 +361,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1272615,
+        "brotliBytes": 1273806,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1265631,
+        "gzipBytes": 1266186,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3516969,
-        "largestAssetRawBytes": 751079,
+        "initialRawBytes": 3520316,
+        "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 176678,
+        "ownedRawBytes": 178002,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [

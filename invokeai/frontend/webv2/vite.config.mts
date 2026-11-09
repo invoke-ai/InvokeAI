@@ -299,6 +299,17 @@ const WORKFLOW_CORE_MODULES = [
   '/workbench/projectWorkflows.ts',
 ] as const;
 
+// The workflow queries entry and the library transport behind it are one chunk: the editor's boot hosts (publication,
+// copy choice, pending load) and the lazy library dialog both read the transport, and the Launchpad palette reaches the
+// entry lazily, so splitting the transport out by importer costs every editor boot a request.
+const WORKFLOW_QUERIES_MODULES = [
+  '/features/workflow/data/api.ts',
+  '/features/workflow/data/libraryCache.ts',
+  '/features/workflow/data/publication.ts',
+  '/features/workflow/data/savedWorkflowQueries.ts',
+  '/features/workflow/queries.ts',
+] as const;
+
 // Keep widget metadata separate so Launchpad settings cannot import editor boot UI.
 const WIDGET_METADATA_MODULES = [
   '/features/gallery/settingsContribution.ts',
@@ -401,6 +412,9 @@ const WIDGET_HOST_MODULES = [
   '/platform/react/focusIfUnclaimed.ts',
   '/features/queue/ui/QueueDataRuntime.tsx',
   '/features/workflow/ui/WorkflowWidgetChrome.tsx',
+  // The graph preview and the lazy library dialog share the workflow menu rows; alone they cost the workflow widget's
+  // activation a request.
+  '/features/workflow/ui/MenuActionItem.tsx',
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
@@ -584,6 +598,12 @@ export default defineConfig({
               name: 'workflow-core',
               priority: 30,
               test: (id) => matchesAnySuffix(id, WORKFLOW_CORE_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'workflow-queries',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKFLOW_QUERIES_MODULES),
             },
             {
               includeDependenciesRecursively: false,
