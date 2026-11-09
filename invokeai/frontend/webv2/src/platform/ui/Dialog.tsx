@@ -14,8 +14,22 @@ const ModalPresenceRegistration = () => {
 // the exit animation, but stops being present the moment it closes, and is present again if it reopens meanwhile.
 const ModalPresence = () => (useDialogContext().open ? <ModalPresenceRegistration /> : null);
 
-const DialogRoot = ({ children, ...props }: ChakraDialog.RootProps) => (
-  <ChakraDialog.Root {...props}>
+type LayerDismissEvent = Parameters<NonNullable<ChakraDialog.RootProps['onRequestDismiss']>>[0];
+
+/**
+ * The layer stack dismisses every layer registered after one being torn down, as if nested in it. A menu item can
+ * open a dialog that registers before the closing menu's layer is removed (an already-loaded dialog, a controlled
+ * menu), so that removal would close the dialog the menu just opened. A dialog is never a menu's child; only layers
+ * that really nest it may dismiss it.
+ */
+const keepOpenThroughMenuTeardown = (event: LayerDismissEvent) => {
+  if (event.detail.targetLayer?.dataset.scope === 'menu') {
+    event.preventDefault();
+  }
+};
+
+const DialogRoot = ({ children, ...props }: Dialog.RootProps) => (
+  <ChakraDialog.Root {...props} onRequestDismiss={keepOpenThroughMenuTeardown}>
     {props.modal === false ? null : <ModalPresence />}
     {children}
   </ChakraDialog.Root>
@@ -48,5 +62,5 @@ export const Dialog = {
 
 export declare namespace Dialog {
   export type OpenChangeDetails = ChakraDialog.OpenChangeDetails;
-  export type RootProps = ChakraDialog.RootProps;
+  export type RootProps = Omit<ChakraDialog.RootProps, 'onRequestDismiss'>;
 }
