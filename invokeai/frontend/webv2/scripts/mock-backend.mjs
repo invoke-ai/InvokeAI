@@ -1696,6 +1696,18 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(200, null);
         }
       }
+      if (method === 'GET' && path === '/api/v1/remote_workers/settings') {
+        return json(200, {
+          enabled: false,
+          dispatchMode: 'distributed',
+          workerUrls: '',
+          workerNames: {},
+          disabledWorkerUrls: [],
+          autoTransferMissingModels: true,
+          keepRemoteCopies: false,
+          modelTransferHost: '',
+        });
+      }
 
       if (method === 'GET' && path === '/api/v1/app/external_providers/config') {
         return json(200, [...state.externalProviders.values()].map(clone));
