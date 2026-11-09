@@ -69,6 +69,19 @@ const PINNED_HEADER_WRAPPER_STYLE: CSSProperties = {
   zIndex: 1,
 };
 
+/**
+ * The scroll area writes its overflow offsets as inherited custom properties on the viewport at every scroll event,
+ * which restyles every element below it. Rows use none of them; pinning them on the row container stops that restyle
+ * there, which otherwise costs each scroll frame a style pass over every mounted row.
+ */
+const ROW_CONTAINER_CSS = {
+  '--scroll-area-overflow-x-start': '0px',
+  '--scroll-area-overflow-x-end': '0px',
+  '--scroll-area-overflow-y-start': '0px',
+  '--scroll-area-overflow-y-end': '0px',
+};
+const ROW_CONTAINER_WITH_DIVIDERS_CSS = [ROW_CONTAINER_CSS, IN_SLOT_DIVIDER_HIDING_CSS];
+
 export type ListSurface = 'bg' | 'bg.subtle' | 'bg.panel';
 
 /**
@@ -123,6 +136,17 @@ export interface ListProps<T> {
   revealActiveOnMount?: boolean;
   /** Receives the final scroll offset on unmount; must be referentially stable. */
   onScrollOffsetPersist?: (offset: number) => void;
+  /**
+   * Receives the visible row-index range (headers and items share the index space) on mount and whenever it changes,
+   * never per scrolled pixel; rows within the overscan around it are mounted too. For callers that load rows on
+   * demand, such as a server-windowed collection. Must be referentially stable.
+   */
+  onRangeChange?: (range: ListRange) => void;
+}
+
+export interface ListRange {
+  startIndex: number;
+  endIndex: number;
 }
 
 const findItemIndex = <T,>(rows: readonly ListRow<T>[], from: number, step: 1 | -1): number => {
@@ -159,6 +183,7 @@ export const List = <T,>({
   rows,
   status = 'ready',
   surface = 'bg',
+  onRangeChange,
   onScrollOffsetPersist,
 }: ListProps<T>) => {
   const { t } = useTranslation();
@@ -229,6 +254,22 @@ export const List = <T,>({
     return Math.max(0, offset - (hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0));
   }, [activeIndex, estimateSize, hasHeaders]);
   const getScrollElement = useCallback(() => viewportRef.current, []);
+  const reportedRange = useRef<ListRange | null>(null);
+  // The virtualizer also notifies for scroll start and stop and for measurements; report only a moved range.
+  const handleVirtualizerChange = useCallback(
+    (instance: { range: { startIndex: number; endIndex: number } | null }) => {
+      const range = instance.range;
+      const last = reportedRange.current;
+
+      if (!onRangeChange || !range || (last?.startIndex === range.startIndex && last.endIndex === range.endIndex)) {
+        return;
+      }
+
+      reportedRange.current = { endIndex: range.endIndex, startIndex: range.startIndex };
+      onRangeChange(reportedRange.current);
+    },
+    [onRangeChange]
+  );
   // A viewport that unmounts (empty or loading state) takes no blur with it; forget ownership so a later remount
   // cannot pull focus away from wherever the user went meanwhile.
   const attachViewport = useCallback((element: HTMLDivElement | null) => {
@@ -244,6 +285,7 @@ export const List = <T,>({
     getItemKey,
     getScrollElement,
     initialOffset: initialScrollOffset ?? getActiveRowOffset,
+    onChange: onRangeChange ? handleVirtualizerChange : undefined,
     overscan: OVERSCAN_ROWS,
     rangeExtractor,
     scrollPaddingStart: hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0,
@@ -414,7 +456,7 @@ export const List = <T,>({
         <Box
           aria-busy={isBusy || undefined}
           aria-label={label}
-          css={dividers ? IN_SLOT_DIVIDER_HIDING_CSS : undefined}
+          css={dividers ? ROW_CONTAINER_WITH_DIVIDERS_CSS : ROW_CONTAINER_CSS}
           role="list"
           style={containerStyle}
         >

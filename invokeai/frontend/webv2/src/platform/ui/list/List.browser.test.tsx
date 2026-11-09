@@ -12,7 +12,7 @@ import type { ListRow } from './listRows';
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
 import { LIST_ROW_GAP_PX } from './listLayout';
-import { listRowsFromSections } from './listRows';
+import { listRowsFromItems, listRowsFromSections } from './listRows';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -410,6 +410,65 @@ describe('List scroll offset persistence', () => {
 
     expect(onScrollOffsetPersist).toHaveBeenCalledTimes(1);
     expect(onScrollOffsetPersist).toHaveBeenCalledWith(1234);
+  });
+});
+
+describe('List range reporting', () => {
+  it('reports the visible range on mount and when a scroll moves it, not on every scroll event', async () => {
+    const onRangeChange = vi.fn();
+    // No section headers, so every index is a row slot.
+    const rows = listRowsFromItems(section('main', 'Main', 200).items, (item) => item.id);
+    const element = (
+      <ChakraProvider value={system}>
+        <List
+          density="comfortable"
+          label="subjects"
+          renderItem={(item: Item, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.name} />}
+          rows={rows}
+          onRangeChange={onRangeChange}
+        />
+      </ChakraProvider>
+    );
+
+    await render(element);
+    // The rows the viewport actually shows, read from the rendered slots.
+    const shownRange = () => {
+      const bounds = viewport().getBoundingClientRect();
+      const shown = [...host.querySelectorAll<HTMLElement>('[data-index]')]
+        .filter((slot) => {
+          const box = slot.getBoundingClientRect();
+          return box.bottom > bounds.top + 0.5 && box.top < bounds.bottom - 0.5;
+        })
+        .map((slot) => Number(slot.dataset.index));
+      return { endIndex: Math.max(...shown), startIndex: Math.min(...shown) };
+    };
+    expect(onRangeChange).toHaveBeenCalledTimes(1);
+    expect(onRangeChange).toHaveBeenLastCalledWith(shownRange());
+
+    // Thirty scroll events over 90px cross only a few row boundaries; each report is a new range.
+    for (let step = 1; step <= 30; step += 1) {
+      await scrollTo(ROW_PX * 50 + step * 3);
+    }
+    const reports = onRangeChange.mock.calls.map((call) => call[0] as { endIndex: number; startIndex: number });
+    expect(reports.length).toBeGreaterThan(1);
+    expect(reports.length).toBeLessThan(8);
+    reports.slice(1).forEach((range, index) => expect(range).not.toEqual(reports[index]));
+    expect(reports.at(-1)).toEqual(shownRange());
+  });
+});
+
+describe('List scrolling cost', () => {
+  it('pins the scroll area’s overflow properties above the rows, so scrolling restyles none of them', async () => {
+    await render(<Harness rows={listRowsFromItems(section('main', 'Main', 60).items, (item) => item.id)} />);
+    await scrollTo(400);
+
+    // Whatever custom properties the scroll area writes on its viewport, none may reach the rows changing.
+    const viewportProperties = () => [...viewport().style].filter((name) => name.startsWith('--'));
+    await vi.waitFor(() => expect(viewportProperties().length).toBeGreaterThan(0));
+    const style = getComputedStyle(host.querySelector('[data-list-row]')!);
+    for (const name of viewportProperties()) {
+      expect(['', '0px'], name).toContain(style.getPropertyValue(name).trim());
+    }
   });
 });
 
