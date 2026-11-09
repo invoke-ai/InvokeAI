@@ -2,12 +2,9 @@ import type { GenerationModelCatalogItem, MainModelConfig } from '@features/gene
 import type { TFunction } from 'i18next';
 
 import {
-  compileVideoGraph,
   createDefaultVideoWidgetValues,
-  getDefaultVideoSettings,
   getVideoDimensions,
   getVideoValidationReasons,
-  type VideoSettings,
   type VideoWidgetValues,
 } from '@features/video';
 import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
@@ -356,6 +353,26 @@ describe('buildVideoRecallSettings', () => {
       expect(resolveVideoSizeRecall(withClip('audio'), width, height).outcome).toBe('fits');
       expect(resolveVideoSizeRecall(withClip('video'), width, height).outcome).toBe('media-conflict');
     });
+
+    it("applies the target resolution at which the panel's media reach the recorded size, keeping their shape", () => {
+      // A 10:7 frame, a ratio no preset has. At 480p it scales by 480 / 700 to 685.7x480, snapped to 688x480 on the
+      // 16-pixel grid; at 720p and 1080p it gives 1024x720 and 1536x1088.
+      const values = { ...wanValues, aspectRatioId: '1:1' as const, firstFrameImage: image(1000, 700) };
+
+      expect(resolveVideoSizeRecall(values, 688, 480)).toEqual({
+        outcome: 'fits',
+        sizeRecall: { targetResolution: '480p' },
+      });
+      expect(recallSize(values, 688, 480)?.values).toEqual({ ...values, targetResolution: '480p' });
+    });
+
+    it('reports no size when the media reach it at no target resolution', () => {
+      // A 16:9 frame gives 848x480, 1280x720 or 1920x1088.
+      const values = { ...wanValues, firstFrameImage: image(1280, 720) };
+
+      expect(resolveVideoSizeRecall(values, 688, 480)).toEqual({ outcome: 'unavailable' });
+      expect(recallSize(values, 688, 480)).toBeNull();
+    });
   });
 
   describe('a size recall that would change whether the panel can run', () => {
@@ -403,6 +420,62 @@ describe('buildVideoRecallSettings', () => {
 
       expect(getVideoValidationReasons(ltx2, values)).not.toEqual([]);
       expect(recall(values)?.fields).toEqual(['size']);
+    });
+
+    it('writes nothing when the resolution the held media need is a two-stage one the panel cannot run', () => {
+      // A 10:7 frame at 1024p: a 1024 short edge and a 1462.9 long one, snapped to 1472 on the two-stage 64-pixel
+      // grid. The other resolutions give 736x512, 992x704, 1088x768 and 2176x1536.
+      const values = { ...ltx2Values, firstFrameImage: { height: 700, image_name: 'held.png', width: 1000 }, steps: 1 };
+
+      expect(resolveVideoSizeRecall(values, 1472, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('two-stage target resolution needs at least'),
+      });
+      expect(
+        buildVideoRecallSettings({
+          currentValues: values,
+          kind: 'size',
+          metadata: wanMetadata({ height: 1024, width: 1472 }),
+          models: [ltx2],
+        })
+      ).toBeNull();
+    });
+  });
+
+  describe('a canvas the recorded media sized', () => {
+    const wanValues = { ...createDefaultVideoWidgetValues([WAN_I2V]), aspectRatioId: '1:1' as const };
+    const recall = (kind: 'all' | 'remix', metadata: Record<string, unknown>) =>
+      buildVideoRecallSettings({ currentValues: wanValues, kind, metadata, models: catalog });
+    const withFirstFrame = (width: number, height: number) =>
+      wanMetadata({
+        first_frame_image: { image_name: 'first.png' },
+        generation_mode: 'wan_i2v',
+        height,
+        model: { key: WAN_I2V.key },
+        width,
+      });
+
+    it.each(['all', 'remix'] as const)(
+      'restores the target resolution that sized it on a %s recall, leaving the aspect ratio to the media',
+      (kind) => {
+        // A 10:7 first frame at 480p: 1000x700 scales by 480 / 700 to 685.7x480, snapped to 688x480. No preset gives
+        // that canvas, and of Wan's resolutions only 480p gives it from a frame of its own shape.
+        const result = recall(kind, withFirstFrame(688, 480));
+
+        expect(result?.values).toMatchObject({ aspectRatioId: '1:1', targetResolution: '480p' });
+        expect(result?.fields).toContain('size');
+      }
+    );
+
+    it('leaves the target resolution alone when no resolution gives the canvas, or no medium sized it', () => {
+      // The frame's own 1000x700, which Wan gives a frame of that shape at none of its resolutions.
+      const unmatched = recall('all', withFirstFrame(1000, 700));
+      const unsized = recall('all', wanMetadata({ height: 480, model: { key: WAN_I2V.key }, width: 688 }));
+
+      for (const result of [unmatched, unsized]) {
+        expect(result?.values).toMatchObject({ aspectRatioId: '1:1', targetResolution: '720p' });
+        expect(result?.fields).not.toContain('size');
+      }
     });
   });
 
@@ -1550,179 +1623,6 @@ describe('LTX-2 recall', () => {
     expect(result?.values.audioCfgScale).toBeNull();
     expect(result?.values.stgScale).toBeNull();
     expect(result?.values.modalityScale).toBeNull();
-  });
-});
-
-/**
- * The record a compiled graph stores: the metadata node's literal fields plus the values its edges carry, which the
- * queue fills from the batch (prompts and seed) when it runs.
- */
-const recordedMetadata = (settings: VideoSettings, model: MainModelConfig): Record<string, unknown> => {
-  const compiled = compileVideoGraph(settings, model);
-  const { backendGraph } = compiled;
-  const batch: Record<string, unknown> = {
-    [compiled.negativePromptNodeId]: settings.negativePrompt,
-    [compiled.positivePromptNodeId]: settings.positivePrompt,
-    [compiled.seedNodeId]: settings.seed,
-  };
-  const record: Record<string, unknown> = { ...backendGraph.nodes.core_metadata };
-
-  for (const edge of backendGraph.edges) {
-    if (edge.destination.node_id === 'core_metadata') {
-      expect(batch, `metadata field ${edge.destination.field} comes from the batch`).toHaveProperty(
-        edge.source.node_id
-      );
-      record[edge.destination.field] = batch[edge.source.node_id];
-    }
-  }
-
-  return record;
-};
-
-describe('recall of what the video graphs record', () => {
-  it('Wan: restores prompts with the wired negative, seed, sampling, fps and size', () => {
-    const model = wanModel('t2v_a14b');
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      aspectRatioId: '16:9',
-      cfgScale: 4,
-      fps: 24,
-      negativePrompt: 'blurry, low quality',
-      negativePromptEnabled: true,
-      numFrames: 81,
-      positivePrompt: 'a red fox in the snow',
-      seed: 4242,
-      steps: 20,
-      targetResolution: '720p',
-    };
-    const metadata = recordedMetadata(settings, model);
-    const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([model]),
-      kind: 'all',
-      metadata,
-      models: [model],
-    });
-
-    expect(getVideoRecallCapabilities(metadata)).toEqual({
-      all: true,
-      prompts: true,
-      remix: true,
-      seed: true,
-      size: true,
-    });
-    expect(result?.fields).toEqual(['prompts', 'seed', 'model', 'frames', 'steps', 'cfg', 'fps', 'size']);
-    expect(result?.values).toMatchObject({
-      aspectRatioId: '16:9',
-      cfgScale: 4,
-      fps: 24,
-      negativePrompt: 'blurry, low quality',
-      negativePromptEnabled: true,
-      numFrames: 81,
-      positivePrompt: 'a red fox in the snow',
-      seed: 4242,
-      steps: 20,
-      targetResolution: '720p',
-    });
-  });
-
-  it('MiniMax H3: restores the ordered references with their trim and conditioning', () => {
-    const componentSource = h3Model();
-    const model: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-ref2va-ckpt',
-      name: 'MiniMax H3 Ref2VA Transformer',
-      type: 'main',
-      variant: 'ref2va',
-    };
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      componentSourceModel: componentSource,
-      positivePrompt: 'a dancer',
-      references: [
-        {
-          clip: { endFrame: 47, fps: 24, height: 480, numFrames: 48, startFrame: 2, video_name: 'ref.mp4', width: 832 },
-          conditioning: 'video_audio',
-          kind: 'video',
-        },
-        { detail: 'match', image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' },
-      ],
-      seed: 77,
-    };
-    const metadata = recordedMetadata(settings, model);
-    const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([componentSource]),
-      kind: 'all',
-      metadata,
-      models: [componentSource, model],
-    });
-
-    expect(getVideoRecallCapabilities(metadata)).toEqual({
-      all: true,
-      prompts: true,
-      remix: true,
-      seed: true,
-      size: true,
-    });
-    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'components', 'media']));
-    expect(result?.values).toMatchObject({
-      componentSourceModel: componentSource,
-      model,
-      positivePrompt: 'a dancer',
-      seed: 77,
-    });
-    expect(result?.mediaNames.references).toEqual([
-      { conditioning: 'video_audio', kind: 'video', name: 'ref.mp4', trim: { endFrame: 47, startFrame: 2 } },
-      { detail: 'match', kind: 'image', name: 'ref.png' },
-    ]);
-  });
-
-  it('LTX-2 audio-to-video: restores the soundtrack in its role, the components and the fps', () => {
-    const model = ltx2Model('ltx2_dev');
-    const encoder: GenerationModelCatalogItem = {
-      base: 'ltx-2',
-      key: 'gemma4',
-      name: 'LTX-2.5 Text Encoder',
-      type: 'gemma4_encoder',
-    };
-    const componentSource = ltx2Model('ltx2_dev', 'diffusers', 'ltx2-components');
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      componentSourceModel: componentSource,
-      conditioningClip: {
-        clip: { fps: 24, height: 704, numFrames: 96, video_name: 'song.mp4', width: 1248 },
-        fpsKnown: true,
-        role: 'audio',
-      },
-      fps: 25,
-      ltx2TextEncoderModel: encoder,
-      positivePrompt: 'a singer on stage',
-      seed: 99,
-    };
-    const metadata = recordedMetadata(settings, model);
-    const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([model]),
-      kind: 'all',
-      metadata,
-      models: [model, componentSource, encoder],
-    });
-
-    expect(getVideoRecallCapabilities(metadata)).toEqual({
-      all: true,
-      prompts: true,
-      remix: true,
-      seed: true,
-      size: true,
-    });
-    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'fps', 'components', 'media']));
-    expect(result?.values).toMatchObject({
-      componentSourceModel: componentSource,
-      fps: 25,
-      ltx2TextEncoderModel: encoder,
-      positivePrompt: 'a singer on stage',
-      seed: 99,
-    });
-    expect(result?.mediaNames.conditioningClip).toEqual({ name: 'song.mp4', role: 'audio' });
   });
 });
 

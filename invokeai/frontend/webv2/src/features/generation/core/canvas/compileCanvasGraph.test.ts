@@ -1,4 +1,4 @@
-import type { BackendGraphContract, GenerationProjectSettings } from '@features/generation/core/contracts';
+import type { BackendGraphContract } from '@features/generation/core/contracts';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
@@ -11,17 +11,26 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
-import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
+import type { Rect } from './types';
 
 import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
+import {
+  bbox,
+  compile,
+  COMPONENT_OVERRIDES,
+  COMPOSITING_FIXTURE,
+  PROJECT_SETTINGS,
+  qwen3Encoder,
+  qwenImageVae,
+  settingsFor,
+} from './compileCanvasGraph.testing';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -102,98 +111,6 @@ const externalModel: GenerateModelConfig = {
   provider_id: 'openai',
   type: 'external_image_generator',
 };
-
-const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
-const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = {
-  base: 'any',
-  key: 'clip',
-  name: 'CLIP Embed',
-  type: 'clip_embed',
-  variant: 'large',
-};
-const qwen3Encoder: ComponentModelConfig = {
-  base: 'any',
-  key: 'qwen3',
-  name: 'Qwen3 Encoder',
-  type: 'qwen3_encoder',
-  variant: 'qwen3_06b',
-};
-
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
-
-const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
-  ...getDefaultGenerateSettings(model),
-  seed: 1,
-  seedMode: 'fixed',
-  ...overrides,
-});
-
-/** Per-base overrides needed to pass component validation. */
-const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = {
-  flux: { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae },
-  anima: { qwen3EncoderModel: qwen3Encoder, vae: qwenImageVae },
-};
-
-const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
-
-const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
-  coherenceEdgeSize: 16,
-  coherenceMinDenoise: 0,
-  coherenceMode: 'Gaussian Blur',
-  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
-  infillMethod: 'lama',
-  infillPatchmatchDownscaleSize: 1,
-  infillTileSize: 32,
-  maskBlur: 16,
-  outputOnlyMaskedRegions: false,
-};
-
-const compile = (
-  model: GenerateModelConfig,
-  mode: CanvasCompileMode,
-  overrides: {
-    settings?: Partial<GenerateSettings>;
-    bbox?: Rect;
-    compositeImageName?: string | null;
-    maskImageName?: string | null;
-    noiseMaskImageName?: string | null;
-    compositing?: Partial<CanvasCompositingSettings>;
-    scaling?: CanvasScalingSettings;
-    strength?: number;
-    destination?: 'canvas' | 'gallery';
-    outputOnlyMaskedRegions?: boolean;
-    controlLayers?: readonly ControlLayerGraphInput[];
-    regionalGuidance?: readonly RegionalGuidanceInput[];
-    projectSettings?: Partial<GenerationProjectSettings>;
-  } = {}
-) =>
-  compileCanvasGraph({
-    bbox: overrides.bbox ?? bbox,
-    compositeImageName:
-      'compositeImageName' in overrides ? (overrides.compositeImageName ?? null) : 'canvas-composite.png',
-    compositing: {
-      ...COMPOSITING_FIXTURE,
-      outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
-      ...overrides.compositing,
-    },
-    controlLayers: overrides.controlLayers,
-    regionalGuidance: overrides.regionalGuidance,
-    scaling: overrides.scaling,
-    destination: overrides.destination ?? 'canvas',
-    maskImageName:
-      'maskImageName' in overrides ? overrides.maskImageName : mode === 'inpaint' ? 'canvas-mask.png' : null,
-    mode,
-    model,
-    noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    projectSettings: { ...PROJECT_SETTINGS, ...overrides.projectSettings },
-    settings: settingsFor(model, {
-      ...COMPONENT_OVERRIDES[model.base],
-      ...overrides.settings,
-    }),
-    strength: overrides.strength ?? 0.6,
-  });
 
 const getEdge = (graph: BackendGraphContract, targetNodeId: string, targetField: string) =>
   graph.edges.find((edge) => edge.destination.node_id === targetNodeId && edge.destination.field === targetField);

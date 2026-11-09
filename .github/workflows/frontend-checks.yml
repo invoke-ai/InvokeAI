@@ -64,6 +64,8 @@ jobs:
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
+              # The type check reads the generated API types, the recall contract's declared-key gate included.
+              - 'invokeai/frontend/api/schema.ts'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}

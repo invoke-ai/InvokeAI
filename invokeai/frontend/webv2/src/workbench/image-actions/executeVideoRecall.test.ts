@@ -7,6 +7,7 @@ import type { TFunction } from 'i18next';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
+import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
@@ -28,6 +29,24 @@ import { createDefaultVideoWidgetValues } from '@features/video';
 import { applyVideoRecallMetadata, executeVideoRecall } from './executeVideoRecall';
 
 const t = ((key: string) => key) as unknown as TFunction;
+
+const englishCatalog = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+
+/** The English copy, for asserting what a notice shows rather than which key it asked for. */
+const createEnglishTranslator = async (): Promise<TFunction> => {
+  const instance = createInstance();
+
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
+  });
+
+  return ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+};
 
 const wanModel = {
   base: 'wan',
@@ -330,7 +349,7 @@ describe('executeVideoRecall', () => {
 
     const didRecall = await executeVideoRecall({
       queryClient,
-      t,
+      t: await createEnglishTranslator(),
       commands,
       getVideoValues: () => videoValues as unknown as Record<string, unknown>,
       item,
@@ -345,9 +364,11 @@ describe('executeVideoRecall', () => {
       { ...videoValues, aspectRatioId: '9:16', targetResolution: '720p' },
       undefined
     );
-    expect(commands.notifications.add).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.videoTitles.size' })
-    );
+    expect(commands.notifications.add).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Applied size.',
+      title: 'Recalled size',
+    });
   });
 
   it('says the recorded size has no preset on the panel model, not that the metadata is missing', async () => {

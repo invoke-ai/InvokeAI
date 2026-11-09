@@ -141,6 +141,10 @@ describe('architecture workflow', () => {
       for (const [workflowPath] of workflows) {
         expect(patterns, path).toContain(workflowPath.replace('../../../../../', ''));
       }
+      // A backend change regenerates the API types the type check reads, so it has to run the check too.
+      if (path.endsWith('/frontend-checks.yml')) {
+        expect(patterns, path).toContain('invokeai/frontend/api/schema.ts');
+      }
     }
   });
 

@@ -6106,7 +6106,8 @@
             "all": "Recalled video data",
             "prompts": "Recalled prompts",
             "remix": "Remixed video",
-            "seed": "Recalled seed"
+            "seed": "Recalled seed",
+            "size": "Recalled size"
           },
           "beforeCanvasRecall": "Before metadata recall",
           "canvasImagesTemporary": "Canvas was recalled, but some restored paint images are still temporary. Keep the project open or save it before closing to protect them from intermediate cleanup.",
