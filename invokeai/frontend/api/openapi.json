@@ -6725,6 +6725,144 @@
         }
       }
     },
+    "/api/v1/files/upload": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload File",
+        "description": "Uploads a managed file for node inputs.",
+        "operationId": "upload_file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The file was uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is too large or managed file storage is full"
+          },
+          "415": {
+            "description": "The file type is not supported"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/files/i/{file_id}": {
+      "get": {
+        "tags": ["files"],
+        "summary": "Get File Dto",
+        "description": "Gets metadata for a managed file.",
+        "operationId": "get_file_dto",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["files"],
+        "summary": "Delete File",
+        "description": "Deletes a managed file.",
+        "operationId": "delete_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/image_moves/start": {
       "post": {
         "tags": ["image_moves"],
@@ -24017,6 +24155,18 @@
         "required": ["is_public"],
         "title": "Body_update_workflow_is_public"
       },
+      "Body_upload_file": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": ["file"],
+        "title": "Body_upload_file"
+      },
       "Body_upload_font": {
         "properties": {
           "file": {
@@ -38158,6 +38308,53 @@
         "enum": ["input", "output", "internal", "node_attribute"],
         "title": "FieldKind",
         "type": "string"
+      },
+      "FileDTO": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "title": "File Id",
+            "description": "The managed file ID."
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name",
+            "description": "The original file name."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "The uploaded file content type."
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "description": "The size of the file in bytes."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the file was uploaded."
+          }
+        },
+        "type": "object",
+        "required": ["file_id", "file_name", "content_type", "size_bytes", "created_at"],
+        "title": "FileDTO"
+      },
+      "FileField": {
+        "description": "A managed file primitive field",
+        "properties": {
+          "file_id": {
+            "description": "The id of the managed file",
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": ["file_id"],
+        "title": "FileField",
+        "type": "object"
       },
       "FloatBatchInvocation": {
         "category": "batch",
@@ -65258,6 +65455,22 @@
             "title": "Max Font Library Bytes",
             "description": "Maximum total size of uploaded custom fonts in bytes per account or shared library.",
             "default": 1073741824
+          },
+          "max_file_upload_size_bytes": {
+            "type": "integer",
+            "maximum": 1073741824.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Upload Size Bytes",
+            "description": "Maximum size in bytes of one managed file upload.",
+            "default": 52428800
+          },
+          "max_file_library_bytes": {
+            "type": "integer",
+            "maximum": 17179869184.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Library Bytes",
+            "description": "Maximum total size in bytes of all managed files.",
+            "default": 5368709120
           },
           "image_subfolder_strategy": {
             "type": "string",
