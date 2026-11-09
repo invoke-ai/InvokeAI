@@ -27,6 +27,7 @@ from fastapi.routing import (
     websocket_session,
 )
 from pydantic.fields import FieldInfo
+from socketio import ASGIApp as SocketIOASGIApp
 from starlette.requests import Request
 from starlette.routing import BaseRoute, Match, Mount, Route, get_route_path
 from starlette.staticfiles import StaticFiles
@@ -207,7 +208,7 @@ def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[i
         for child in route.routes:
             child_clone = copy.copy(child)
             child_clone.methods = set(child.methods)
-            child_clone.app = _snapshot_static_files(child.app)
+            child_clone.app = _snapshot_asgi_app(child.app)
             clone.routes.append(child_clone)
         clone.dependencies = _copy_config(route.dependencies)
         clone.dependant = _copy_config(route.dependant)
@@ -243,12 +244,20 @@ def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[i
             if route.methods is not None:
                 clone.methods = set(route.methods)
         if isinstance(route, Mount):
-            clone.app = _snapshot_static_files(route.app)
+            clone.app = _snapshot_asgi_app(route.app)
     routes[id(route)] = clone
     return clone
 
 
-def _snapshot_static_files(app: Any) -> Any:
+def _snapshot_asgi_app(app: Any) -> Any:
+    if isinstance(app, SocketIOASGIApp):
+        clone = copy.copy(app)
+        clone.static_files = _copy_config(app.static_files)
+        return clone
+    if isinstance(getattr(app, "_app", None), SocketIOASGIApp):
+        clone = copy.copy(app)
+        clone._app = _snapshot_asgi_app(app._app)
+        return clone
     if not isinstance(app, StaticFiles):
         return app
     clone = copy.copy(app)
@@ -396,7 +405,7 @@ def get_original_frontend(app: FastAPI) -> Any | None:
     """Return the root mount's original ASGI application."""
     return next(
         (
-            _snapshot_static_files(route.app)
+            _snapshot_asgi_app(route.app)
             for route in app.router.routes
             if isinstance(route, Mount) and route.path in ("", "/")
         ),

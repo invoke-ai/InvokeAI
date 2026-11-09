@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -776,3 +777,68 @@ def test_trusted_guard_detaches_included_router_lifespan_handlers() -> None:
         assert events == ["root start", "included start"]
 
     assert events == ["root start", "included start", "included stop", "root stop"]
+
+
+def test_trusted_socketio_mount_detaches_dispatcher_configuration(tmp_path: Path) -> None:
+    from invokeai.app.api.sockets import SocketIO
+    from invokeai.app.api.trusted_routes import TrustedRouteGuard, snapshot_core_routes
+
+    app = FastAPI()
+    socket_io = SocketIO(app)
+    routes = snapshot_core_routes(app)
+    exposed_file = tmp_path / "exposed.txt"
+    exposed_file.write_text("late static route")
+    socket_io._app.static_files["/ws/exposed.txt"] = {
+        "filename": str(exposed_file),
+        "content_type": "text/plain",
+    }
+    custom_app = FastAPI()
+
+    @custom_app.get("/custom")
+    async def custom_route() -> PlainTextResponse:
+        return PlainTextResponse("exposed")
+
+    late_app = FastAPI()
+
+    @late_app.get("/custom")
+    async def late_custom_route() -> PlainTextResponse:
+        return PlainTextResponse("late exposure")
+
+    # Simulate a node changing Engine.IO's fallback dispatcher after core routes were captured.
+    socket_io._app.other_asgi_app = custom_app
+    guarded = TrustedRouteGuard(app=app, routes=routes, frontend=None)
+
+    async def exercise() -> None:
+        transport = httpx.ASGITransport(app=guarded)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            sid: str | None = None
+            try:
+                handshake = await client.get("/ws/socket.io/", params={"EIO": "4", "transport": "polling"})
+                assert handshake.status_code == 200
+                open_packet = json.loads(handshake.text[1:])
+                sid = open_packet["sid"]
+                assert isinstance(sid, str) and sid
+                assert sid in socket_io._sio.eio.sockets
+
+                original_transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=original_transport, base_url="http://testserver") as original:
+                    exposed = await original.get("/ws/exposed.txt")
+                    assert exposed.status_code == 200
+                    assert exposed.text == "late static route"
+
+                response = await client.get("/ws/custom")
+                assert response.status_code == 404
+                assert (await client.get("/ws/exposed.txt")).status_code == 404
+
+                # Reassigning the original dispatcher after construction must not change the guard.
+                socket_io._app.other_asgi_app = late_app
+                assert (await client.get("/ws/custom")).status_code == 404
+            finally:
+                if sid is not None:
+                    closed = await client.post(
+                        "/ws/socket.io/", params={"EIO": "4", "transport": "polling", "sid": sid}, content="1"
+                    )
+                    assert closed.status_code == 200
+                await socket_io._sio.shutdown()
+
+    asyncio.run(exercise())
