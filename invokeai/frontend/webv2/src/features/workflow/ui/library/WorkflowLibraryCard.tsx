@@ -20,7 +20,7 @@ import {
  * A library card is presentation only: the grid handles its click (select), double-click (open), right-click and menu
  * button (actions menu) and quick actions by delegation from the data attributes below, so a card renders again only
  * when its own entry or state changes. Reserve enrichment height so async facts cannot reflow the grid. Pointer hover
- * (and focus within the card) reveals quick actions over the bottom of the image: Open and Preview are pointer
+ * (and focus within the card) reveals quick actions over the top of the image: Open and Preview are pointer
  * conveniences outside the tab order that never take focus (the grid hands it to the card on press), and the menu
  * button beside them is the card's keyboard-reachable control.
  */
@@ -33,19 +33,22 @@ const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
 
 /**
- * Quick actions show while the pointer is over the card, focus is inside it, or its menu is open. Without hover
- * (touch), the pointer-only actions never show and the menu button always does, so a tap on the image still selects.
+ * Quick actions show while the pointer is over the card, focus is inside it, or its menu is open, and take the pointer
+ * only while shown: a transparent control would swallow a press meant for the card. Without hover (touch), the
+ * pointer-only actions never show and the menu button always does, so a tap on the image still selects.
  */
+const QUICK_ACTION_SHOWN = { opacity: 1, pointerEvents: 'auto' } as const;
 const CARD_ROOT_CSS: SystemStyleObject = {
   '& [data-card-quick-action]': {
     opacity: 0,
+    pointerEvents: 'none',
     transition: 'opacity var(--wb-motion-duration-fast) ease',
   },
-  '&:focus-within [data-card-quick-action], &[data-menu-open] [data-card-quick-action]': { opacity: 1 },
-  '@media (hover: hover)': { '&:hover [data-card-quick-action]': { opacity: 1 } },
+  '&:focus-within [data-card-quick-action], &[data-menu-open] [data-card-quick-action]': QUICK_ACTION_SHOWN,
+  '@media (hover: hover)': { '&:hover [data-card-quick-action]': QUICK_ACTION_SHOWN },
   '@media (hover: none)': {
     '& [data-card-quick-action][data-pointer-only]': { display: 'none' },
-    '& [data-card-quick-action]': { opacity: 1 },
+    '& [data-card-quick-action]': QUICK_ACTION_SHOWN,
   },
 };
 
@@ -98,11 +101,6 @@ export const keepCardMenuOpenForRetarget = (event: {
   }
 };
 
-/**
- * The quick actions sit just above the card body: its padding (2.5 twice), title row (6), gap (1) and facts row (4)
- * make 4rem, plus the bottom border, plus a 1.5 inset.
- */
-const QUICK_ACTIONS_BOTTOM = 'calc(4.375rem + 1px)';
 const NAME_FONT_SIZE = { large: 'lg', small: 'md' } as const;
 const QUICK_ACTION_SIZE = { large: 'sm', small: 'xs' } as const;
 
@@ -218,7 +216,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
               px="1"
               py="0.5"
               rounded="sm"
-              top="1.5"
+              bottom="1.5"
             >
               <Icon aria-hidden as={FolderCheckIcon} boxSize="3" />
               <Text srOnly>{t('workflowLibrary.inProject')}</Text>
@@ -249,7 +247,9 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
         </Stack>
       </Box>
       <HStack
-        bottom={QUICK_ACTIONS_BOTTOM}
+        // Over the top of the image, clear of the card's centre (there a press selects the card, and a strip the hover
+        // revealed would take it instead) and of the in-project marker at the image's bottom corner.
+        top="1.5"
         data-workflow-card-actions={workflowId}
         gap="1"
         insetEnd="1.5"
@@ -265,7 +265,6 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
             data-card-action={'open' satisfies WorkflowCardQuickAction}
             data-card-quick-action
             data-pointer-only
-            pointerEvents="auto"
             size={quickActionSize}
             tabIndex={-1}
             variant="solid"
@@ -284,7 +283,6 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
               data-card-quick-action
               data-pointer-only
               disabled={ready === null}
-              pointerEvents="auto"
               size={quickActionSize}
               tabIndex={-1}
               variant="outline"
@@ -305,7 +303,6 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
             data-card-quick-action
             data-workflow-card-menu={workflowId}
             id={getWorkflowLibraryCardMenuId(workflowId)}
-            pointerEvents="auto"
             size={quickActionSize}
             variant="outline"
           >

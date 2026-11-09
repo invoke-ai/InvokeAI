@@ -2110,6 +2110,39 @@ describe('WorkflowLibraryDialog', () => {
       ?.closest('[data-workflow-card-root]')
       ?.querySelector<HTMLButtonElement>(`[data-card-action="${action}"]`) ?? null;
 
+  it('selects a small card from a real click at its centre after the pointer rests on it, never opening it', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    const target = card('wf-upscale')!;
+    const box = target.getBoundingClientRect();
+    const centre = { x: box.width / 2, y: box.height / 2 };
+
+    // Resting reveals the quick actions; none of them may sit under the card's centre.
+    await act(() => userEvent.hover(target, { position: centre }));
+    await vi.waitFor(() => expect(getComputedStyle(quickAction('wf-upscale', 'open')!).opacity).toBe('1'));
+    const hit = document.elementFromPoint(box.left + centre.x, box.top + centre.y);
+    expect(hit?.closest('[data-workflow-card]')).toBe(target);
+
+    await act(() => userEvent.click(target, { position: centre }));
+    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-upscale');
+    expect(target.getAttribute('aria-pressed')).toBe('true');
+    expect(loader.open).not.toHaveBeenCalled();
+  });
+
+  it('keeps hidden quick actions from taking the pointer until the card shows them', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    await act(() => userEvent.unhover(card('wf-landscape')!));
+    const open = () => quickAction('wf-landscape', 'open');
+    const menu = document.querySelector<HTMLElement>('[data-workflow-card-menu="wf-landscape"]')!;
+
+    // At rest the strip is transparent and lets presses through to the card beneath.
+    expect(getComputedStyle(menu).pointerEvents).toBe('none');
+
+    await act(() => userEvent.hover(card('wf-landscape')!));
+    await vi.waitFor(() => expect(getComputedStyle(open()!).pointerEvents).toBe('auto'));
+    await act(() => userEvent.click(open()!));
+    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+  });
+
   it('opens from the Open quick action without taking focus, asking first when the project holds a copy', async () => {
     await openWith(LOADED_SNAPSHOT);
 
@@ -3093,6 +3126,8 @@ describe('WorkflowLibraryDialog — This project', () => {
       expect(element).not.toBeNull();
       return element!;
     });
+    // The menu button takes the pointer once the card shows it, as for a user moving onto the card first.
+    await act(() => userEvent.hover(card('wf-bundled')!));
     await act(() => userEvent.click(button));
 
     await vi.waitFor(() =>
