@@ -87,6 +87,17 @@ beforeEach(async () => {
 });
 
 describe('loadWorkbenchSettings', () => {
+  it.each(['ar', 'fr', 'en-GB'])(
+    'preserves requested %s content through backend load, save and reload',
+    async (language) => {
+      seedBackendPreferences({ language });
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+      await store.patchWorkbenchPreferences({ reduceMotion: true });
+      expect(readBackendPreferences().language).toBe(language);
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+    }
+  );
+
   it('migrates a preference stored under a renamed theme id', async () => {
     seedBackendPreferences({ themeId: 'forest' });
 
@@ -495,6 +506,11 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all' }).queueJobsScope).toBe('all');
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all-projects' }).queueJobsScope).toBe('all');
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'current-project' }).queueJobsScope).toBe('all');
+  });
+
+  it('treats a dismissed alpha notice as a dismissed beta notice', () => {
+    expect(store.normalizeWorkbenchPreferences({ alphaNoticeAcknowledged: true }).betaNoticeAcknowledged).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({}).betaNoticeAcknowledged).toBe(false);
   });
 });
 

@@ -226,6 +226,28 @@ describe('graph export', () => {
     });
   });
 
+  it('opens the Qwen-Image-2.1 Vision Tower slot from a GGUF encoder pick, whatever order the picks are listed in', () => {
+    const qwen21Models = [
+      ...MODELS,
+      model('q21-gguf', 'qwen-image-2-1', 'main', { format: 'gguf_quantized', variant: 'qwen_image_21_base' }),
+      model('q21-encoder', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
+      model('q21-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
+      model('q21-vae', 'qwen-image-2-1', 'vae', { format: 'checkpoint' }),
+    ];
+    const picks = { qwen3VLEncoderModel: 'q21-encoder', qwen3VLVisionTowerModel: 'q21-mmproj', vae: 'q21-vae' };
+    const towerFirst = { qwen3VLVisionTowerModel: 'q21-mmproj', qwen3VLEncoderModel: 'q21-encoder', vae: 'q21-vae' };
+
+    for (const components of [picks, towerFirst]) {
+      const { batch, components: used } = exportOne(
+        sdxlCase('q21', { components, model_key: 'q21-gguf' }),
+        qwen21Models
+      );
+
+      expect(used).toEqual(picks);
+      expect(batch.graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'q21-mmproj' } });
+    }
+  });
+
   // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
   it("decodes with the main model's default VAE, which a pick replaces where the model has a VAE slot", () => {
     const withDefaultVae = (key: string, vaeKey: string) => [

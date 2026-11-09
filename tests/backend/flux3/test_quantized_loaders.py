@@ -291,7 +291,7 @@ def test_int8_weights_without_a_marker_are_refused_before_room_is_reserved(monke
     build = _build("int8_convrot")
     unmarked = {key: value for key, value in build.state_dict.items() if not key.endswith(".comfy_quant")}
 
-    run = _refused(monkeypatch, build._replace(state_dict=unmarked), "no `comfy_quant` marker")
+    run = _refused(monkeypatch, build._replace(state_dict=unmarked), "no readable int8_tensorwise marker")
 
     assert run.reserved == []
 

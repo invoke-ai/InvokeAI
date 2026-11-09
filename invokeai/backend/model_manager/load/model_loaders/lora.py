@@ -22,6 +22,9 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+    lora_model_from_ernie_image_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
 from invokeai.backend.patches.lora_conversions.flux3_lora_conversion_utils import lora_model_from_flux3_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
@@ -58,6 +61,9 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
 from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils import (
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_conversion_utils import (
+    lora_model_from_ideogram4_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
     lora_model_from_krea2_state_dict,
@@ -246,6 +252,14 @@ class LoRALoader(ModelLoader):
             # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
             # is what the published distilled accelerator (no .alpha tensors) expects.
             model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.ErnieImage:
+            # ERNIE-Image LoRAs already name the transformer's own (diffusers) modules; only the container
+            # prefix is stripped. Without .alpha tensors (ai-toolkit) alpha = rank, i.e. the patch applies unscaled.
+            model = lora_model_from_ernie_image_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Ideogram4:
+            # Converted onto the vendored transformer every Ideogram 4 build loads into; diffusers' split q/k/v
+            # are fused into its single `attention.qkv`. Without .alpha tensors alpha = rank (unscaled).
+            model = lora_model_from_ideogram4_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.StableDiffusion3:
             # diffusers, PEFT, SimpleTuner LyCORIS and kohya MMDiT names, all onto diffusers' SD3Transformer2DModel
             # and the two CLIP encoders; T5 layers are dropped with a warning.

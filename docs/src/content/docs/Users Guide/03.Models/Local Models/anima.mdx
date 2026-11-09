@@ -149,10 +149,13 @@ The **negative prompt** is used only when CFG Scale is above 1; at CFG 1 it is i
 
 ## Regional prompting
 
-On the Canvas, **Regional Guidance** layers with a positive prompt work with Anima: each region's prompt is
-steered to its masked area, alongside the global prompt. The restriction is applied on alternating
-transformer blocks, leaving the others unrestricted to keep the image coherent. Regional negative prompts and regional
-reference images are not supported.
+On the Canvas, **Regional Guidance** layers support positive and negative prompts: each prompt is steered to
+its masked area, alongside the global prompt. The global positive prompt covers the area outside the regions,
+while the global negative prompt applies to the whole image. **Auto-Negative** uses the region's positive
+prompt as a negative outside its mask. Regional negatives and auto-negative take effect only when **CFG
+Scale** is above 1; Turbo's default CFG 1 ignores them. The restriction is applied on alternating transformer
+blocks, leaving the others unrestricted to keep the image coherent. Regional reference images are not
+supported.
 
 In the workflow editor, the **Prompt - Anima** node has an optional **mask** input, and **Denoise -
 Anima** accepts a collection of conditionings for its positive and negative inputs.

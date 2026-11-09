@@ -2661,10 +2661,11 @@ def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImage
 class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
 
-    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.
-    The loader keeps scaled fp8 weights when fp8 compute is available or the
+    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled, nvfp4 and int8_tensorwise(+convrot)
+    checkpoints. The loader keeps scaled fp8 weights when fp8 compute is available or the
     `default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),
-    and dequantizes them to bf16 at load time otherwise.
+    and dequantizes them to bf16 at load time otherwise. An int8 weight whose marker is missing or
+    names another format is refused at install, as the loader would refuse it.
     """
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
@@ -2684,6 +2685,17 @@ class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base,
 
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+        # Not `_raise_for_unsupported_comfy_quantization`: it refuses nvfp4, which this family loads. The loader reads
+        # both the per-tensor markers and the `_quantization_metadata` header.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            sd,
+            accepted_convrot_formats(accept_int4=False),
+            read_header=True,
+            what="Qwen Image transformer",
+            supported="Only the int8_tensorwise build (rotated or not) is supported.",
+        )
 
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 
@@ -2828,6 +2840,84 @@ class Main_GGUF_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
 
         return cls(**override_fields, variant=variant)
+
+
+# Top-level modules that legitimately ride along in a single-file Wan checkpoint
+# without being part of the transformer. Dropping these is correct: the pipeline
+# sources its VAE and text encoder from separately-wired models, and the EMA copy
+# is not the weight set we generate with.
+#
+# ``vae`` / ``text_encoders`` / ``clip`` / ``cond_stage_model`` / ``first_stage_model``
+# are the "all-in-one" packaging convention — one file holding transformer + VAE +
+# CLIP so ComfyUI's ``Load Checkpoint`` node can supply all three. The
+# Phr00t/WAN2.2-14B-Rapid-AllInOne family and its ~110 GGUF conversions
+# (befox/WAN2.2-14B-Rapid-AllInOne-GGUF) ship this way and loaded fine before the
+# unexpected-key check existed, so refusing them would be a regression.
+_BENIGN_EXTRA_MODULES = frozenset(
+    {
+        "vae",
+        "first_stage_model",
+        "text_encoders",
+        "cond_stage_model",
+        "clip",
+        "model_ema",
+    }
+)
+
+# Trailing segments marking a merged-in LoRA's leftover adapter tensors. The main-model
+# probe deliberately admits checkpoints that retain these — see
+# ``configs.main._has_wan_transformer_block_weights``, which uses a *positive* structural
+# test precisely so merged-LoRA mains aren't turned away — so the loader has to admit
+# them too, or the two halves disagree about the same file.
+#
+# Kept in step with the suffix set ``LoRA_LyCORIS_Wan_Config`` matches on
+# (``configs/lora.py``): kohya, PEFT, DoRA and LoKr. Matched against the *last* path
+# segment rather than as a substring anywhere in the key, so a future conditioning branch
+# that merely contains "lora_a" in a module name still trips the backstop instead of
+# being silently discarded by it.
+_MERGED_LORA_SEGMENTS = frozenset(
+    {
+        "alpha",
+        "dora_scale",
+        "lora_magnitude_vector",
+        "lokr_w1",
+        "lokr_w2",
+        "lokr_w1_a",
+        "lokr_w1_b",
+        "lokr_w2_a",
+        "lokr_w2_b",
+        "hada_w1_a",
+        "hada_w1_b",
+        "hada_w2_a",
+        "hada_w2_b",
+        "oft_blocks",
+    }
+)
+_MERGED_LORA_PENULTIMATE = frozenset({"lora_a", "lora_b", "lora_down", "lora_up", "lora_mid", "lora_magnitude"})
+
+
+def _is_benign_extra_key(key: str) -> bool:
+    """True if an unexpected key is packaging rather than an unsupported branch."""
+    parts = key.lower().split(".")
+    if parts[0] in _BENIGN_EXTRA_MODULES:
+        return True
+    if parts[-1] in _MERGED_LORA_SEGMENTS:
+        return True
+    # `...to_q.lora_down.weight` — the marker is the segment before the tensor name.
+    return len(parts) >= 2 and parts[-2] in _MERGED_LORA_PENULTIMATE
+
+
+def _benign_extra_wan_layers(state_dict: dict[str | int, Any]) -> tuple[str, ...]:
+    """Layer paths of the bundled/merged weights the Wan loader drops before it reads any quantization marker.
+
+    Keys are compared without the ComfyUI prefix, as the loader compares them after stripping it.
+    """
+    stripped = CheckpointPrefix.detect(state_dict).strip(state_dict)
+    return tuple(
+        key[: -len(".weight")]
+        for key in stripped
+        if isinstance(key, str) and key.endswith(".weight") and _is_benign_extra_key(key)
+    )
 
 
 def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -3295,7 +3385,9 @@ class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
     Hugging Face repos: one ``.safetensors`` per transformer, in either the native
     upstream key layout or the diffusers one, optionally under a
     ``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``
-    quantized. The loader normalises all of those.
+    quantized, or ComfyUI ``int8_tensorwise`` (convrot) quantized, which stays int8 in memory. The loader
+    normalises all of those. An int8 weight without a decodable ``int8_tensorwise`` marker (a bare
+    ``{"convrot": true}``, int4) is refused at install.
 
     As with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``
     records which one this is so the Wan model loader invocation can pair them.
@@ -3355,6 +3447,19 @@ class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         normalized_identity = "".join(character for character in mod.path.stem.lower() if character.isalnum())
         if "wan21" in normalized_identity:
             raise NotAMatchError("Wan 2.1 models are not supported by the Wan 2.2 loader")
+
+        # After the variant and Wan 2.1 checks, so Animate and Wan 2.1 stay unknown models rather than a refusal
+        # about their quantization. The loader reads both the per-tensor markers and the safetensors header, and
+        # drops bundled VAE/text-encoder weights before it reads either.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            sd,
+            accepted_convrot_formats(accept_int4=False),
+            read_header=True,
+            discarded=_benign_extra_wan_layers(sd),
+            what="Wan transformer",
+            supported="Only ComfyUI's int8_tensorwise (convrot) build is supported.",
+        )
 
         explicit_variant = override_fields.pop("variant", None)
         variant = explicit_variant or _detect_wan_variant_from_state_dict(sd)

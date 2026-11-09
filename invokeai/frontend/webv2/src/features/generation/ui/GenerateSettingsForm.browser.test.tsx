@@ -457,6 +457,109 @@ describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
   });
 });
 
+describe('GenerateSettingsForm Qwen-Image-2.1 Vision Tower', () => {
+  const QWEN21 = { ...MODEL, base: 'qwen-image-2-1', format: 'checkpoint', key: 'qwen21', name: 'Qwen-Image-2.1' };
+  const encoder = (format: string) =>
+    ({
+      base: 'any',
+      format,
+      key: `enc-${format}`,
+      name: `Encoder ${format}`,
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    }) as const;
+  const tower = (variant: string) =>
+    ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: `mmproj ${variant}`,
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    }) as const;
+  const TOWER_8B = tower('qwen3_vl_8b');
+  const towerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="qwen3_vl_vision_tower"]');
+
+  const REFERENCES = [
+    {
+      config: {
+        image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
+        type: 'qwen_image_2_1_reference_image',
+      },
+      id: 'edit',
+      isEnabled: true,
+    },
+  ];
+  const towerField = () => towerSlot()?.closest('[data-scope="field"]');
+
+  const useEncoder = async (
+    qwen3VLEncoderModel: ReturnType<typeof encoder>,
+    { main = QWEN21, referenceImages = [] as unknown[] } = {}
+  ) => {
+    stableGroups.models.catalog = [
+      MODEL,
+      main,
+      encoder('gguf_quantized'),
+      encoder('checkpoint'),
+      TOWER_8B,
+      tower('qwen3_vl_4b'),
+    ] as GenerationModelCatalogItem[];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(main as never),
+        modelKey: main.key,
+        qwen3VLEncoderModel,
+        referenceImages,
+      })
+    );
+  };
+
+  it('shows the slot for a GGUF encoder only, and lists only 8B towers', async () => {
+    await useEncoder(encoder('gguf_quantized'));
+
+    expect(towerSlot()).not.toBeNull();
+    expect(
+      [...(towerSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([TOWER_8B.key]);
+
+    await settle(() => host!.querySelector<HTMLElement>(`[data-component-pick="${TOWER_8B.key}"]`)?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLVisionTowerModel: { key: TOWER_8B.key } });
+  });
+
+  it('shows the missing-tower issue under the slot, and the encoder fix beside it on a Diffusers main', async () => {
+    await useEncoder(encoder('gguf_quantized'), { referenceImages: REFERENCES });
+
+    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(towerField()?.querySelector('[role="alert"]')?.textContent).toContain('Vision Tower');
+    expect(towerField()?.closest('[data-issue-id]')).not.toBeNull();
+
+    await useEncoder(encoder('gguf_quantized'), {
+      main: { ...QWEN21, format: 'diffusers', key: 'qwen21-diffusers' },
+      referenceImages: REFERENCES,
+    });
+    const fix = towerField()?.parentElement?.querySelector<HTMLElement>('[data-issue-fix]');
+
+    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(fix).not.toBeNull();
+
+    await settle(() => fix?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLEncoderModel: null });
+  });
+
+  it('hides the slot for a safetensors encoder', async () => {
+    await useEncoder(encoder('checkpoint'));
+
+    expect(towerSlot()).toBeNull();
+  });
+});
+
 describe('GenerateSettingsForm required components', () => {
   const krea2 = (format: string) =>
     ({ ...MODEL, base: 'krea-2', format, key: `krea-2-${format}`, name: 'Krea-2' }) as GenerationModelCatalogItem;
