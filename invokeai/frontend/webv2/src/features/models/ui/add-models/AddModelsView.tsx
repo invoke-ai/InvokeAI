@@ -8,6 +8,8 @@ import { isInModelsDir } from '@features/models/core/schemas';
 import {
   DEFAULT_STARTER_MODEL_FILTERS,
   filterStarterModels,
+  findBundlePreviewDecoder,
+  type BundlePreviewDecoder,
   type StarterModelFilters,
 } from '@features/models/core/starters';
 import { getHuggingFaceModels, scanFolderForModels, type InstallModelRequest } from '@features/models/data/api';
@@ -28,6 +30,7 @@ import {
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { focusIfUnclaimed } from '@platform/react/focusIfUnclaimed';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import {
@@ -68,6 +71,9 @@ const SOURCE_KIND_ICONS: Record<string, ElementType> = {
  * explicit `false` would override that.
  */
 const FP8_STORAGE_INSTALL_CONFIG: ModelRecordChanges = { default_settings: { fp8_storage: true } };
+
+/** How long to wait for a revealed starter's row; the deferred search re-renders within a few frames. */
+const REVEAL_WAIT_MS = 1500;
 
 export const AddModelsView = () => {
   const { t } = useTranslation();
@@ -159,6 +165,10 @@ export const AddModelsView = () => {
     () => selectedBundle?.models ?? response?.starter_models ?? [],
     [response, selectedBundle]
   );
+  const bundleDecoder = useMemo(
+    () => (selectedBundle ? findBundlePreviewDecoder(selectedBundle, response?.starter_models ?? []) : null),
+    [response, selectedBundle]
+  );
   const selectedBundleSources = useMemo(
     () => (selectedBundle ? new Set(selectedBundle.models.map((model) => model.source)) : undefined),
     [selectedBundle]
@@ -170,6 +180,46 @@ export const AddModelsView = () => {
     () => filterStarterModels(sourceModels, starterFilters, deferredTrimmed),
     [deferredTrimmed, sourceModels, starterFilters]
   );
+
+  const starterListRef = useRef<HTMLDivElement | null>(null);
+  const starterFilterMenuRef = useRef<HTMLDivElement | null>(null);
+  // The base and type a decoder reveal set. No bundle holds a decoder, so selecting a bundle by any path (a chip, the
+  // Launchpad) drops each one still holding the reveal's value; a base or type the user picked since stays.
+  const [revealedFilters, setRevealedFilters] = useState<Pick<StarterModelFilters, 'baseFilter' | 'typeFilter'> | null>(
+    null
+  );
+  const [previousBundleName, setPreviousBundleName] = useState(selectedBundleName);
+  if (selectedBundleName !== previousBundleName) {
+    setPreviousBundleName(selectedBundleName);
+    if (selectedBundleName !== null && revealedFilters) {
+      setRevealedFilters(null);
+      setStarterFilters({
+        ...starterFilters,
+        baseFilter: starterFilters.baseFilter === revealedFilters.baseFilter ? null : starterFilters.baseFilter,
+        typeFilter: starterFilters.typeFilter === revealedFilters.typeFilter ? null : starterFilters.typeFilter,
+      });
+    }
+  }
+
+  /** Reveal, not install: the starters filtered to the decoder's type and the family show it with its install button. */
+  const showBundleDecoder = async ({ decoder, family }: BundlePreviewDecoder) => {
+    // Search text and other filters reset so they cannot hide it.
+    updateModelsUi({ addModelsQuery: '', selectedBundleName: null });
+    setRevealedFilters({ baseFilter: family, typeFilter: decoder.type });
+    setStarterFilters({ ...DEFAULT_STARTER_MODEL_FILTERS, baseFilter: family, typeFilter: decoder.type });
+    // The hint left with the bundle bar, dropping focus. The row appears once the deferred search catches up: wait a
+    // bounded time, then hand focus to its install button, else to the filter menu that now shows it.
+    const findRow = () =>
+      starterListRef.current?.querySelector<HTMLElement>(`[data-list-row="${CSS.escape(decoder.source)}"]`) ?? null;
+    const deadline = performance.now() + REVEAL_WAIT_MS;
+    while (!findRow() && performance.now() < deadline) {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    }
+    focusIfUnclaimed(findRow());
+    focusIfUnclaimed(starterFilterMenuRef.current);
+  };
 
   const installStarter = async (model: StarterModel) => {
     const owner = captureAccountScope();
@@ -431,12 +481,14 @@ export const AddModelsView = () => {
               starterCount={response?.starter_models.length ?? 0}
               trailing={
                 response ? (
-                  <StarterFilterMenu
-                    availableBases={availableStarterBases}
-                    availableTypes={availableStarterTypes}
-                    filters={starterFilters}
-                    onChange={setStarterFilters}
-                  />
+                  <Box ref={starterFilterMenuRef} display="contents">
+                    <StarterFilterMenu
+                      availableBases={availableStarterBases}
+                      availableTypes={availableStarterTypes}
+                      filters={starterFilters}
+                      onChange={setStarterFilters}
+                    />
+                  </Box>
                 ) : undefined
               }
               onSelect={(name) => updateModelsUi({ selectedBundleName: name })}
@@ -445,8 +497,14 @@ export const AddModelsView = () => {
             {selectedBundle ? (
               <SelectedBundleBar
                 bundle={selectedBundle}
+                decoder={bundleDecoder}
                 isInstalling={installingBundle === selectedBundle.name}
                 onInstall={() => void installBundle()}
+                onShowDecoder={() => {
+                  if (bundleDecoder) {
+                    void showBundleDecoder(bundleDecoder);
+                  }
+                }}
               />
             ) : null}
           </>
@@ -455,7 +513,7 @@ export const AddModelsView = () => {
 
       <Box flex="1" minH="0">
         <Scrollable h="full" label={t('models.addModelsResults')} minH="0" px="3" pb="3">
-          <Stack gap="3">
+          <Stack ref={starterListRef} gap="3">
             {hfLookup ? (
               <HuggingFaceFiles
                 fp8Storage={fp8Storage}

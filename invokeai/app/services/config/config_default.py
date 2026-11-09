@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 import invokeai.configs as model_configs
+from invokeai.app.services.files.files_common import DEFAULT_FILE_LIBRARY_MAX_BYTES, DEFAULT_FILE_UPLOAD_MAX_BYTES
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -219,6 +220,8 @@ class InvokeAIAppConfig(BaseSettings):
     fonts_storage_dir:             Path = Field(default=Path("fonts-uploaded"), description="Path to application-managed uploaded fonts.")
     max_font_upload_bytes:          int = Field(default=32 * 1024 * 1024, gt=0, le=128 * 1024 * 1024, description="Maximum size of one uploaded custom font in bytes.")
     max_font_library_bytes:         int = Field(default=1024 * 1024 * 1024, gt=0, le=16 * 1024 * 1024 * 1024, description="Maximum total size of uploaded custom fonts in bytes per account or shared library.")
+    max_file_upload_size_bytes:     int = Field(default=DEFAULT_FILE_UPLOAD_MAX_BYTES, gt=0, le=1024 * 1024 * 1024, description="Maximum size in bytes of one managed file upload.")
+    max_file_library_bytes:         int = Field(default=DEFAULT_FILE_LIBRARY_MAX_BYTES, gt=0, le=16 * 1024 * 1024 * 1024, description="Maximum total size in bytes of all managed files.")
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")

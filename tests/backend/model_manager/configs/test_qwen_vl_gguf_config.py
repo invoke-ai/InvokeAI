@@ -120,7 +120,7 @@ def _encoder(tmp_path: Path, name: str = "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf", *
 def _write_mmproj(path: Path, projector_type: str) -> Path:
     """The companion vision tower, with the metadata the real `mmproj-F16.gguf` carries."""
     writer = gguf.GGUFWriter(str(path), "clip")
-    writer.add_string("general.type", "clip-vision")
+    writer.add_string("general.type", "mmproj")
     writer.add_string("clip.projector_type", projector_type)
     writer.add_uint32("clip.vision.block_count", 1)
     for name in ("v.blk.0.attn_q.weight", "v.blk.0.attn_q.bias", "v.blk.0.ln1.weight", "mm.0.weight"):
@@ -197,12 +197,12 @@ def test_the_mmproj_vision_tower_is_refused_with_its_reason(tmp_path: Path, proj
 
 
 def test_the_qwen3_vl_mmproj_gets_only_its_own_refusal(tmp_path: Path) -> None:
-    """Qwen3-VL's tower has its own refusal, which names the Krea-2 encoder to install instead; a second one pointing
-    at Qwen-Image would contradict it."""
+    """Qwen3-VL's tower is its own model type with its own verdict (this stub's tensors state no width, so it is
+    refused); a second one pointing at Qwen-Image would contradict it."""
     result = _identify(_write_mmproj(tmp_path / "mmproj-Qwen3VL-4B.gguf", "qwen3vl_merger"), allow_unknown=True)
 
     [reason] = result.invalid_matches
-    assert "Qwen3-VL visual tower" in str(reason)
+    assert "Qwen3-VL vision tower" in str(reason)
 
 
 @pytest.mark.parametrize(

@@ -16,8 +16,6 @@ import { useOpenLibraryWorkflow, type OpenLibraryWorkflow } from './useOpenLibra
 
 /**
  * Asks what opening a template the project already holds should do; one host serves the library and the palette.
- * The root stays mounted and only its `open` changes: a dialog that mounts open while the menu that asked for it is
- * still closing gets dismissed with that menu's layer.
  */
 export const LibraryCopyChoiceHost = () => {
   const { project } = useWorkflowUi();
