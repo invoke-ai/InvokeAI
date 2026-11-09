@@ -3693,6 +3693,399 @@ class GraphExecutionState(BaseModel):
             else:
                 metadata.state = "pending"
 
+    def _reconstruct_prepared_iteration_axes(self) -> None:
+        """Rebuild omitted v2 axes from prepared iterator provenance and observed source-edge contexts."""
+        registry = self._prepared_registry()
+        materializer = self._materializer()
+        execution_graph = self._get_execution_graph_flat()
+        iterator_ancestry = materializer._get_iterator_ancestry(materializer.iterator_graph())
+        source_graph = self._get_source_graph_flat()
+        source_context_is_static: dict[str, bool] = {}
+        for source_node_id in nx.topological_sort(source_graph):
+            source_node = self.graph.get_node(source_node_id)
+            has_dynamic_if = (
+                isinstance(source_node, IfInvocation)
+                and graph_if_runtime._get_static_if_selection(self, source_node_id) is None
+            )
+            data_predecessors = (
+                edge.source.node_id
+                for edge in self.graph._get_input_edges(source_node_id)
+                if edge.destination.field != LOOP_LINKAGE_FIELD
+            )
+            source_context_is_static[source_node_id] = not has_dynamic_if and all(
+                source_context_is_static.get(predecessor, False) for predecessor in data_predecessors
+            )
+
+        def edge_identity(edge: Edge) -> tuple[str, str, str, str]:
+            return (
+                edge.source.node_id,
+                edge.source.field,
+                edge.destination.node_id,
+                edge.destination.field,
+            )
+
+        source_edges: dict[tuple[str, str, str, str], Edge] = {edge_identity(edge): edge for edge in self.graph.edges}
+        static_edge_axes: dict[tuple[str, str, str, str], tuple[str, ...] | None] = {}
+        static_frame_axes_cache: dict[str, Optional[tuple[str, ...]]] = {}
+
+        def get_static_edge_axes(edge: Edge) -> tuple[str, ...] | None:
+            if not source_context_is_static.get(edge.source.node_id, False):
+                return None
+            identity = edge_identity(edge)
+            if identity not in static_edge_axes:
+                static_edge_axes[identity] = graph_if_runtime._get_edge_frame_axes(
+                    self,
+                    iterator_ancestry,
+                    edge,
+                    static_frame_axes_cache,
+                    use_runtime_if_selection=False,
+                )
+            return static_edge_axes[identity]
+
+        static_source_output_axes: dict[str, tuple[str, ...] | None] = {}
+
+        def get_static_source_output_axes(source_node_id: str) -> tuple[str, ...] | None:
+            if source_node_id not in static_source_output_axes:
+                candidates = {
+                    axes
+                    for edge in self.graph._get_output_edges(source_node_id)
+                    if (axes := get_static_edge_axes(edge))
+                }
+                static_source_output_axes[source_node_id] = next(iter(candidates)) if len(candidates) == 1 else None
+            return static_source_output_axes[source_node_id]
+
+        static_iterator_axes: dict[str, tuple[str, ...] | None] = {}
+
+        def get_static_iterator_axes(source_node_id: str) -> tuple[str, ...] | None:
+            if source_node_id not in static_iterator_axes:
+                node = self.graph.get_node(source_node_id)
+                candidates: set[tuple[str, ...]] = set()
+                if isinstance(node, (ForInvocation, IterateInvocation)):
+                    for edge in self.graph._get_output_edges(source_node_id):
+                        axes = get_static_edge_axes(edge)
+                        if axes is None:
+                            continue
+                        if (
+                            isinstance(node, ForInvocation)
+                            and get_output_field_scope(node, edge.source.field) == OutputScope.Final
+                        ):
+                            axes = (*axes, source_node_id)
+                        elif axes[-1] != source_node_id:
+                            axes = (*axes, source_node_id)
+                        candidates.add(axes)
+                static_iterator_axes[source_node_id] = next(iter(candidates)) if len(candidates) == 1 else None
+            return static_iterator_axes[source_node_id]
+
+        def edge_path(edge: Edge, exec_node_id: str) -> tuple[int, ...]:
+            source_node = self.graph.get_node(edge.source.node_id)
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+            ):
+                return self._get_for_parent_iteration_path(exec_node_id)
+            return self._get_iteration_path(exec_node_id)
+
+        def edge_axes(edge: Edge, axes: tuple[str, ...]) -> tuple[str, ...] | None:
+            source_node = self.graph.get_node(edge.source.node_id)
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+                and axes
+                and axes[-1] == source_node.id
+            ):
+                return axes[:-1]
+            if not axes:
+                return get_static_edge_axes(edge)
+            return axes
+
+        def choose_unique_axes(candidates: list[tuple[str, ...]], path_depth: int) -> tuple[str, ...] | None:
+            matching = {candidate for candidate in candidates if len(candidate) == path_depth and candidate}
+            return next(iter(matching)) if len(matching) == 1 else None
+
+        prepared_axes: dict[str, tuple[str, ...]] = {}
+        source_edge_contexts: dict[tuple[tuple[str, str, str, str], tuple[int, ...], str], set[tuple[str, ...]]] = {}
+        topological_order = nx.topological_sort(execution_graph)
+        for exec_node_id in topological_order:
+            source_node_id = self.prepared_source_mapping.get(exec_node_id)
+            if source_node_id is None:
+                continue
+            node = self.execution_graph.get_node(exec_node_id)
+            path = self._get_iteration_path(exec_node_id)
+            parents: list[tuple[str, tuple[str, ...]]] = []
+            for incoming in self.execution_graph._get_input_edges(exec_node_id):
+                parent_exec_id = incoming.source.node_id
+                parent_source_id = self.prepared_source_mapping.get(parent_exec_id)
+                parent_axes = prepared_axes.get(parent_exec_id)
+                if parent_axes is None:
+                    parent_axes = registry.get_iteration_axes(parent_exec_id)
+                if parent_source_id is None or parent_axes is None:
+                    continue
+                identity = (
+                    parent_source_id,
+                    incoming.source.field,
+                    source_node_id,
+                    incoming.destination.field,
+                )
+                edge = source_edges.get(identity)
+                if edge is None:
+                    continue
+                candidate = edge_axes(edge, parent_axes)
+                if candidate is not None and len(edge_path(edge, parent_exec_id)) <= len(path):
+                    parents.append((identity[3], candidate))
+
+            parent_candidates = [candidate for _, candidate in parents]
+            has_own_iteration_axis = isinstance(node, (ForInvocation, IterateInvocation)) and node.index >= 0
+            parent_depth = len(path) - 1 if has_own_iteration_axis else len(path)
+            axes = choose_unique_axes(parent_candidates, parent_depth)
+            if axes is None and parent_candidates:
+                longest = max(parent_candidates, key=len)
+                static_axes = get_static_source_output_axes(source_node_id)
+                if static_axes is not None and len(longest) < parent_depth and static_axes[: len(longest)] == longest:
+                    axes = choose_unique_axes([static_axes], parent_depth)
+
+            if has_own_iteration_axis:
+                if axes is not None and (not axes or axes[-1] != source_node_id):
+                    axes = (*axes, source_node_id)
+                elif axes is None:
+                    static_axes = get_static_iterator_axes(source_node_id)
+                    axes = static_axes if static_axes is not None and len(static_axes) == len(path) else None
+
+            if axes is None and not path:
+                axes = ()
+            if axes is not None and len(axes) == len(path):
+                prepared_axes[exec_node_id] = axes
+
+            # Preserve observed axis tuples separately so equal numeric paths from distinct lineages do not collapse.
+            for edge in self.graph._get_output_edges(source_node_id):
+                identity = edge_identity(edge)
+                branch_signature = edge.destination.field
+                projected_axes = edge_axes(edge, axes) if axes is not None else None
+                if projected_axes is not None:
+                    context_key = (identity, edge_path(edge, exec_node_id), branch_signature)
+                    source_edge_contexts.setdefault(context_key, set()).add(projected_axes)
+
+        sibling_axes_by_collect: dict[str, set[str]] = {}
+        for source_node_id, source_node in self.graph.nodes.items():
+            if not isinstance(source_node, IterateInvocation):
+                continue
+            collection_edges = self.graph._get_input_edges(source_node_id, COLLECTION_FIELD)
+            if len(collection_edges) != 1 or not isinstance(
+                self.graph.get_node(collection_edges[0].source.node_id), CollectInvocation
+            ):
+                continue
+            collect_id = collection_edges[0].source.node_id
+            sibling_axes_by_collect.setdefault(collect_id, set()).add(source_node_id)
+
+        sibling_axes: set[str] = set()
+        for collect_id in sibling_axes_by_collect:
+            item_edges = self.graph._get_input_edges(collect_id, ITEM_FIELD)
+            item_axes = [get_static_edge_axes(edge) for edge in item_edges]
+            if any(axes is None for axes in item_axes):
+                continue
+            iterator_ids = [axes[-1:] for axes in item_axes if axes is not None]
+            axis_ids = [axes[0] if axes else None for axes in iterator_ids]
+            has_final_input = any(
+                isinstance((source_node := self.graph.get_node(edge.source.node_id)), ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+                for edge in item_edges
+            )
+            if (
+                len(axis_ids) > 1
+                and not has_final_input
+                and all(axis_id is not None for axis_id in axis_ids)
+                and len(set(axis_ids)) == len(axis_ids)
+                and all(isinstance(self.graph.get_node(axis_id), IterateInvocation) for axis_id in axis_ids)
+            ):
+                sibling_axes.update(sibling_axes_by_collect[collect_id])
+
+        prepared_frames_by_source: dict[str, list[tuple[tuple[int, ...], tuple[str, ...]]]] = {}
+        for exec_node_id, source_node_id in self.prepared_source_mapping.items():
+            axes = prepared_axes.get(exec_node_id)
+            if axes is None:
+                axes = registry.get_iteration_axes(exec_node_id)
+            if axes is not None:
+                prepared_frames_by_source.setdefault(source_node_id, []).append(
+                    (self._get_iteration_path(exec_node_id), axes)
+                )
+
+        source_projection_valid: set[str] = set()
+        for source_node_id, frames in prepared_frames_by_source.items():
+            if isinstance(self.graph.get_node(source_node_id), IterateInvocation):
+                prepared_ids = self.source_prepared_mapping.get(source_node_id, ())
+                if (
+                    len(frames) == len(prepared_ids)
+                    and graph_if_runtime._project_prepared_iteration_paths(frames, sibling_axes) is not None
+                ):
+                    source_projection_valid.add(source_node_id)
+
+        projection_group_axes: dict[tuple[tuple[str, str, str, str], str, tuple[int, ...]], tuple[str, ...]] = {}
+        invalid_projection_groups: set[tuple[tuple[str, str, str, str], str, tuple[int, ...]]] = set()
+        context_projection_groups: dict[
+            tuple[tuple[str, str, str, str], tuple[int, ...], str],
+            tuple[tuple[str, str, str, str], str, tuple[int, ...]],
+        ] = {}
+        for context_key, candidate_axes in source_edge_contexts.items():
+            identity, path, destination_field = context_key
+            if len(candidate_axes) != 1:
+                continue
+            axes = next(iter(candidate_axes))
+            if len(axes) != len(path):
+                continue
+            if any(axis_id in sibling_axes and axis_id not in source_projection_valid for axis_id in axes):
+                continue
+            projected_path = tuple(
+                coordinate for axis_id, coordinate in zip(axes, path, strict=True) if axis_id not in sibling_axes
+            )
+            projected_axes = tuple(axis_id for axis_id in axes if axis_id not in sibling_axes)
+            group_key = (identity, destination_field, projected_path)
+            previous_axes = projection_group_axes.setdefault(group_key, projected_axes)
+            if previous_axes != projected_axes:
+                invalid_projection_groups.add(group_key)
+            else:
+                context_projection_groups[context_key] = group_key
+        context_projection_valid = {
+            context_key
+            for context_key, group_key in context_projection_groups.items()
+            if group_key not in invalid_projection_groups
+        }
+
+        branch_edge_ids: dict[tuple[str, str], tuple[tuple[str, str, str, str], ...]] = {}
+        branch_static_axes_by_depth: dict[tuple[str, str, int], tuple[str, ...]] = {}
+        branch_static_axes: dict[tuple[str, str], tuple[str, ...]] = {}
+        branch_final_axes: dict[tuple[str, str], set[str]] = {}
+        root_selected_fields: dict[str, set[str]] = {}
+        edge_branch_owner: dict[tuple[str, str, str, str], tuple[str, str]] = {}
+        edge_for_final_only_axes: dict[tuple[str, str, str, str], set[str]] = {}
+        static_if_selections: dict[str, str | None] = {}
+        for source_node_id, source_node in self.graph.nodes.items():
+            if not isinstance(source_node, IfInvocation):
+                continue
+            static_if_selections[source_node_id] = graph_if_runtime._get_static_if_selection(self, source_node_id)
+            axes_by_branch, final_axes_by_branch = graph_if_runtime._get_if_static_frame_analysis(
+                self, iterator_ancestry, source_node_id
+            )
+            for branch_field in ("true_input", "false_input"):
+                edges = self.graph._get_input_edges(source_node_id, branch_field)
+                identities = tuple(edge_identity(edge) for edge in edges)
+                branch_edge_ids[(source_node_id, branch_field)] = identities
+                branch_static_axes[(source_node_id, branch_field)] = axes_by_branch[branch_field]
+                branch_final_axes[(source_node_id, branch_field)] = final_axes_by_branch[branch_field]
+                static_axes = [get_static_edge_axes(edge) for edge in edges]
+                if edges and all(axes is not None for axes in static_axes):
+                    axes_by_depth: dict[int, set[tuple[str, ...]]] = {}
+                    for axes in static_axes:
+                        assert axes is not None
+                        axes_by_depth.setdefault(len(axes), set()).add(axes)
+                    for depth, candidates in axes_by_depth.items():
+                        if len(candidates) == 1:
+                            branch_static_axes_by_depth[(source_node_id, branch_field, depth)] = next(iter(candidates))
+                    if all(axes == () for axes in static_axes):
+                        root_selected_fields.setdefault(source_node_id, set()).add(branch_field)
+                for edge in edges:
+                    identity = edge_identity(edge)
+                    edge_branch_owner[identity] = (source_node_id, branch_field)
+                    final_axes, direct_axes = graph_if_runtime._get_if_final_axes_for_edge(
+                        self, iterator_ancestry, edge
+                    )
+                    edge_for_final_only_axes[identity] = final_axes - direct_axes
+
+        observed: dict[
+            tuple[str, tuple[int, ...], str],
+            dict[tuple[str, str, str, str], tuple[set[tuple[str, ...]], bool]],
+        ] = {}
+        summary_safe: dict[tuple[str, tuple[int, ...], str], bool] = {}
+        summary_axes: dict[tuple[str, tuple[int, ...], str], tuple[str, ...]] = {}
+        ambiguous_summaries: set[tuple[str, tuple[int, ...], str]] = set()
+        for context_key, candidate_axes in source_edge_contexts.items():
+            identity, path, branch_field = context_key
+            owner = edge_branch_owner.get(identity)
+            if owner is None or owner[1] != branch_field:
+                continue
+            source_node_id = owner[0]
+            summary_key = (source_node_id, path, branch_field)
+            valid_projection = context_key in context_projection_valid
+            observed.setdefault(summary_key, {})[identity] = (candidate_axes, valid_projection)
+
+        branch_path_axes: dict[tuple[str, tuple[int, ...], str], tuple[str, ...]] = {}
+        for summary_key, edge_records in observed.items():
+            source_node_id, _path, branch_field = summary_key
+            path = summary_key[1]
+            for identity, (candidate_axes, valid_projection) in edge_records.items():
+                safe = valid_projection and len(candidate_axes) == 1
+                if safe:
+                    axes = next(iter(candidate_axes))
+                    safe = len(axes) == len(path) and not (set(axes) & edge_for_final_only_axes[identity])
+                if not safe:
+                    summary_safe[summary_key] = False
+                    continue
+                summary_safe.setdefault(summary_key, True)
+                previous_axes = summary_axes.setdefault(summary_key, axes)
+                if previous_axes != axes:
+                    ambiguous_summaries.add(summary_key)
+            if (
+                len(edge_records) == len(branch_edge_ids[(source_node_id, branch_field)])
+                and summary_safe.get(summary_key, False)
+                and summary_key not in ambiguous_summaries
+            ):
+                branch_path_axes[summary_key] = summary_axes[summary_key]
+
+        activation_fields_by_owner: dict[str, set[str]] = {}
+        for token in self.execution_tokens.values():
+            if token.token_kind == "activation":
+                activation_fields_by_owner.setdefault(token.owner_node_id, set()).add(token.port)
+
+        for exec_node_id, source_node_id in self.prepared_source_mapping.items():
+            if registry.get_iteration_axes(exec_node_id) is not None:
+                continue
+            if exec_node_id not in prepared_axes:
+                node = self.graph.get_node(source_node_id)
+                if isinstance(node, IfInvocation):
+                    path = self._get_iteration_path(exec_node_id)
+                    static_selection = static_if_selections[source_node_id]
+                    token_fields = activation_fields_by_owner.get(exec_node_id, set())
+                    selected_field = (
+                        static_selection
+                        if static_selection is not None
+                        else next(iter(token_fields))
+                        if len(token_fields) == 1
+                        else None
+                    )
+                    axes = None
+                    if selected_field is not None:
+                        selected_key = (source_node_id, path, selected_field)
+                        if selected_key in branch_path_axes:
+                            axes = branch_path_axes[selected_key]
+                        else:
+                            axes = branch_static_axes_by_depth.get((source_node_id, selected_field, len(path)))
+                            if axes is None and selected_field in root_selected_fields.get(source_node_id, set()):
+                                other_field = "false_input" if selected_field == "true_input" else "true_input"
+                                opposite_key = (source_node_id, path, other_field)
+                                expected_axes = branch_static_axes[(source_node_id, other_field)]
+                                if (
+                                    opposite_key in branch_path_axes
+                                    and branch_path_axes[opposite_key] == expected_axes
+                                    and expected_axes
+                                    and not any(
+                                        axis in branch_final_axes[(source_node_id, other_field)]
+                                        for axis in expected_axes
+                                    )
+                                ):
+                                    axes = expected_axes
+                    else:
+                        true_key = (source_node_id, path, "true_input")
+                        false_key = (source_node_id, path, "false_input")
+                        if (
+                            true_key in branch_path_axes
+                            and false_key in branch_path_axes
+                            and branch_path_axes[true_key] == branch_path_axes[false_key]
+                        ):
+                            axes = branch_path_axes[true_key]
+                    if axes is not None:
+                        prepared_axes[exec_node_id] = axes
+
+            if (axes := prepared_axes.get(exec_node_id)) is not None:
+                registry.set_iteration_axes(exec_node_id, axes)
+
     def _apply_if_condition_inputs(self, exec_node_id: str, node: IfInvocation) -> bool:
         condition_edges = self.execution_graph._get_input_edges(exec_node_id, "condition")
         if any(edge.source.node_id not in self.executed for edge in condition_edges):
@@ -3983,9 +4376,11 @@ class GraphExecutionState(BaseModel):
                 continue
             self._enqueue_if_ready(exec_node_id)
 
-    def _rehydrate_runtime_state(self) -> None:
+    def _rehydrate_runtime_state(self, *, reconstruct_iteration_axes: bool = False) -> None:
         self._reset_runtime_caches()
         self._rehydrate_prepared_exec_metadata()
+        if reconstruct_iteration_axes:
+            self._reconstruct_prepared_iteration_axes()
         self._rehydrate_resolved_if_exec_branches()
         self._rehydrate_generic_runtime_state()
         if self.has_error():
@@ -4018,7 +4413,8 @@ class GraphExecutionState(BaseModel):
             and reference.exec_node_id not in self.errors
             and self._is_pending_lifecycle_execution(reference.exec_node_id, effects)
         }
-        self._rehydrate_runtime_state()
+        reconstruct_iteration_axes = isinstance(__context, dict) and __context.get("missing_v2_iteration_axes", False)
+        self._rehydrate_runtime_state(reconstruct_iteration_axes=reconstruct_iteration_axes)
 
     model_config = ConfigDict(json_schema_extra=_hide_execution_state_runtime_fields)
 

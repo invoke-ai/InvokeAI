@@ -1,6 +1,6 @@
 """If activation and selected-branch context helpers operating on graph execution state."""
 
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from invokeai.app.invocations.fields import OutputScope
 from invokeai.app.invocations.logic import IfInvocation
@@ -849,6 +849,42 @@ def _get_if_iteration_paths_with_ancestry(
     iterator_ancestry: _IteratorAncestry,
 ) -> list[tuple[int, ...]]:
     """Infer selected branch paths using the ancestry context's iterative edge traversal."""
+    path_terminal = object()
+    has_descendant = object()
+
+    def make_path_index(paths: set[tuple[int, ...]]) -> dict[object, Any]:
+        index: dict[object, Any] = {}
+        for path in paths:
+            node = index
+            if path:
+                node[has_descendant] = True
+            for path_index, coordinate in enumerate(path):
+                node = node.setdefault(coordinate, {})
+                if path_index < len(path) - 1:
+                    node[has_descendant] = True
+            node[path_terminal] = True
+        return index
+
+    def has_path_prefix(path: tuple[int, ...], index: dict[object, Any]) -> bool:
+        node = index
+        if path_terminal in node:
+            return True
+        for coordinate in path:
+            node = node.get(coordinate)
+            if not isinstance(node, dict):
+                return False
+            if path_terminal in node:
+                return True
+        return False
+
+    def has_longer_path(path: tuple[int, ...], index: dict[object, Any]) -> bool:
+        node = index
+        for coordinate in path:
+            node = node.get(coordinate)
+            if not isinstance(node, dict):
+                return False
+        return has_descendant in node
+
     effective_paths_by_edge = iterator_ancestry.effective_iteration_paths_by_edge
     node = state.graph.get_node(node_id)
     assert isinstance(node, IfInvocation)
@@ -1053,15 +1089,19 @@ def _get_if_iteration_paths_with_ancestry(
                 frame_paths = set(projected_paths.values())
                 paths = {projected_paths.get(path, path) for path in paths}
                 preserve_projected_prefixes = True
+        branch_path_index = make_path_index(branch_paths)
+        frame_path_index = make_path_index(frame_paths)
         paths = {
             frame_path
             for frame_path in frame_paths
-            if any(frame_path[:prefix_length] in branch_paths for prefix_length in range(len(frame_path) + 1))
-        } | {
-            branch_path
-            for branch_path in branch_paths
-            if any(branch_path[:prefix_length] in frame_paths for prefix_length in range(len(branch_path) + 1))
-        }
+            if not (
+                preserve_projected_prefixes
+                and frame_path
+                and frame_path not in branch_paths
+                and has_longer_path(frame_path, branch_path_index)
+            )
+            and has_path_prefix(frame_path, branch_path_index)
+        } | {branch_path for branch_path in branch_paths if has_path_prefix(branch_path, frame_path_index)}
 
     if not paths:
         if not has_selected_edges:
@@ -1072,8 +1112,8 @@ def _get_if_iteration_paths_with_ancestry(
         return []
     if preserve_projected_prefixes:
         return sorted(paths)
-    proper_prefixes = {path[:prefix_length] for path in paths for prefix_length in range(len(path))}
-    return sorted(path for path in paths if path not in proper_prefixes)
+    paths_index = make_path_index(paths)
+    return sorted(path for path in paths if not has_longer_path(path, paths_index))
 
 
 def _record_activation_dependencies(

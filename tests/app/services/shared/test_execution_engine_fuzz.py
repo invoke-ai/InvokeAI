@@ -445,9 +445,36 @@ def _normalize_collect_fed_iterate_permutations(
     return outputs
 
 
+_ReloadObservation = tuple[str, tuple[int, ...], tuple[str, ...] | None, Any]
+_RawOutputObservation = tuple[str, tuple[int, ...], Any]
+
+
+def _get_reload_observations(state: GraphExecutionState, graph: Graph) -> tuple[_ReloadObservation, ...]:
+    registry = state._prepared_registry()
+    observations = []
+    for exec_id, source_id in state.prepared_source_mapping.items():
+        result = state.results.get(exec_id)
+        value = None
+        if result is not None and isinstance(graph.get_node(source_id), (CollectInvocation, IfInvocation)):
+            value = getattr(result, "collection", getattr(result, "value", getattr(result, "item", None)))
+            value = _canonical_result(graph, source_id, value)
+        observations.append(
+            (source_id, state._get_iteration_path(exec_id), registry.get_iteration_axes(exec_id), value)
+        )
+    return tuple(sorted(observations, key=repr))
+
+
 def _run(
-    seed: int, *, forced_compatibility: bool, roundtrip_at: int | None
-) -> dict[str, list[tuple[tuple[int, ...], Any]]]:
+    seed: int,
+    *,
+    forced_compatibility: bool,
+    roundtrip_at: int | None,
+    omit_prepared_iteration_axes: bool = False,
+    capture_reload_observations: bool = False,
+) -> (
+    dict[str, list[tuple[tuple[int, ...], Any]]]
+    | tuple[tuple[_ReloadObservation, ...], tuple[_RawOutputObservation, ...]]
+):
     desc, graph_factory = build(seed)
     graph = graph_factory()
     state = GraphExecutionState(graph=graph)
@@ -458,12 +485,21 @@ def _run(
     trace: list[tuple[str, tuple[int, ...]]] = []
     completed_before_reload: set[str] = set()
     reloaded = False
+    reload_observations: tuple[_ReloadObservation, ...] = ()
     try:
         for step in range(2000):
             if roundtrip_at == step:
                 completed_before_reload = set(state.results)
                 reloaded = True
-                state = load_execution_state(json.loads(json.dumps(dump_execution_state(state))))
+                snapshot = json.loads(json.dumps(dump_execution_state(state)))
+                if omit_prepared_iteration_axes:
+                    snapshot.pop("prepared_iteration_axes", None)
+                    snapshot["execution_state_version"] = 2
+                state = load_execution_state(snapshot)
+                if omit_prepared_iteration_axes:
+                    assert dump_execution_state(state)["execution_state_version"] == 3
+                if capture_reload_observations:
+                    reload_observations = _get_reload_observations(state, graph)
                 state._execution_scheduler = (
                     _ExecutionScheduler(state)
                     if route_type is _ExecutionScheduler
@@ -520,7 +556,72 @@ def _run(
         executions.sort(key=lambda item: (item[0], repr(item[1])))
         outputs[node_id] = [(path, value) for path, value, _ in executions]
         output_execution_ids[node_id] = [exec_id for _, _, exec_id in executions]
+    if capture_reload_observations:
+        raw_observations = tuple(
+            sorted(
+                [(node_id, path, value) for node_id, executions in outputs.items() for path, value in executions],
+                key=repr,
+            )
+        )
+        return reload_observations, raw_observations
     return _normalize_collect_fed_iterate_permutations(graph, state, outputs, output_execution_ids)
+
+
+@pytest.mark.parametrize(
+    ("seed", "checkpoint"),
+    [(1717, 5), (1717, 6), (1717, 10), (2447, 5), (2447, 10), (2704, 5), (2704, 10)],
+)
+@pytest.mark.parametrize("forced_compatibility", [False, True], ids=["generic", "compatibility"])
+def test_v2_snapshot_without_prepared_iteration_axes_matches_uninterrupted(
+    seed: int, checkpoint: int, forced_compatibility: bool
+) -> None:
+    uninterrupted = _run(seed, forced_compatibility=forced_compatibility, roundtrip_at=None)
+    intact_snapshot = _run(seed, forced_compatibility=forced_compatibility, roundtrip_at=checkpoint)
+    missing_axes_snapshot = _run(
+        seed,
+        forced_compatibility=forced_compatibility,
+        roundtrip_at=checkpoint,
+        omit_prepared_iteration_axes=True,
+    )
+
+    assert intact_snapshot == uninterrupted
+    assert missing_axes_snapshot == uninterrupted
+
+
+@pytest.mark.parametrize("forced_compatibility", [False, True], ids=["generic", "compatibility"])
+def test_v2_sibling_reiterate_snapshot_preserves_raw_frames_and_axis_metadata(
+    forced_compatibility: bool,
+) -> None:
+    observations = _run(
+        2704,
+        forced_compatibility=forced_compatibility,
+        roundtrip_at=10,
+        omit_prepared_iteration_axes=True,
+        capture_reload_observations=True,
+    )
+    assert isinstance(observations, tuple)
+    reload_observations, raw_outputs = observations
+
+    assert reload_observations == (
+        ("if", (0,), ("it0",), "F:['c', 'a']"),
+        ("it0", (0,), ("it0",), None),
+        ("itb", (0,), ("itb",), None),
+        ("m1", (0,), ("it0",), None),
+        ("m2", (0,), ("it0",), None),
+        ("out", (), (), ("F:['c', 'a']", "np")),
+        ("rit", (0,), ("rit",), None),
+        ("rit", (1,), ("rit",), None),
+        ("sbs", (), (), None),
+        ("src", (), (), None),
+        ("sx", (0,), ("itb",), None),
+    )
+    assert raw_outputs == (
+        ("if", (0,), "F:['c', 'a']"),
+        ("out", (), ("F:['c', 'a']", "np")),
+        ("out2", (), ("RR", "RR")),
+        ("rif", (), "RR"),
+        ("rif", (), "RR"),
+    )
 
 
 @pytest.mark.slow

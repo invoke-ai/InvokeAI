@@ -7,7 +7,7 @@ from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvoca
 from invokeai.app.services.shared.execution_effects import normalize_persisted_execution_effects
 from invokeai.app.services.shared.graph import GraphExecutionState
 
-CURRENT_EXECUTION_STATE_VERSION: Final[int] = 2
+CURRENT_EXECUTION_STATE_VERSION: Final[int] = 3
 LEGACY_EXECUTION_STATE_VERSION: Final[int] = 0
 
 
@@ -195,6 +195,7 @@ def load_execution_state(snapshot: Mapping[str, Any]) -> GraphExecutionState:
         raise UnsupportedExecutionStateVersionError(f"Execution state snapshot version {version} is unsupported")
 
     legacy_execution_snapshot = version == LEGACY_EXECUTION_STATE_VERSION
+    missing_v2_iteration_axes = version == 2 and "prepared_iteration_axes" not in payload
     execution_effects_persisted = "execution_effects" in payload and not legacy_execution_snapshot
     normalized_payload = _normalize_persisted_effects_in_snapshot(payload)
     return GraphExecutionState.model_validate(
@@ -203,5 +204,6 @@ def load_execution_state(snapshot: Mapping[str, Any]) -> GraphExecutionState:
         context={
             "execution_effects_persisted": execution_effects_persisted,
             "legacy_execution_snapshot": legacy_execution_snapshot,
+            "missing_v2_iteration_axes": missing_v2_iteration_axes,
         },
     )

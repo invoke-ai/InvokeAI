@@ -2602,6 +2602,27 @@ class _ExecutionNodeBuilder:
             return iterator_nodes[-1:]
         return iterator_nodes
 
+    def _get_root_if_projected_sibling_frame_count(
+        self, node_id: str, selected_field: str, iterator_graph: "nx.DiGraph", iterator_ancestry: _IteratorAncestry
+    ) -> int:
+        """Count projected sibling frames only when the selected branch itself is root-scoped."""
+        selected_edges = self._state.graph._get_input_edges(node_id, selected_field)
+        if self._get_ordered_iterator_axes_for_edges(selected_edges, iterator_graph):
+            return 1
+
+        other_field = "false_input" if selected_field == "true_input" else "true_input"
+        other_edges = self._state.graph._get_input_edges(node_id, other_field)
+        other_axes = self._get_ordered_iterator_axes_for_edges(other_edges, iterator_graph)
+        reiterated_axes = graph_if_runtime._get_sibling_collect_iterate_axes_to_project(
+            self._state, iterator_ancestry, other_axes
+        )
+        axis_id = next((axis_id for axis_id in reversed(other_axes) if axis_id in reiterated_axes), None)
+        if axis_id is None:
+            return 1
+
+        prepared_ids = self._get_prepared_nodes_for_source(axis_id)
+        return len(prepared_ids) if prepared_ids else 1
+
     def _get_if_condition_iteration_mappings(
         self, node_id: str, graph: "nx.DiGraph"
     ) -> Iterable[list[tuple[str, str]]]:
@@ -2642,7 +2663,12 @@ class _ExecutionNodeBuilder:
                         selected_field = "true_input" if condition_value else "false_input"
                         axes = branch_axes_by_field[selected_field]
                         if not axes:
-                            yield mapping
+                            for _ in range(
+                                self._get_root_if_projected_sibling_frame_count(
+                                    node_id, selected_field, iterator_graph, iterator_ancestry
+                                )
+                            ):
+                                yield mapping
                             continue
                         axis_id = axes[-1]
                         prepared_axis_ids = (
@@ -3501,7 +3527,8 @@ class _ExecutionNodeBuilder:
     def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g if base_g is not None else self._state._get_source_graph_flat()
         self._get_sibling_iterate_if_collect_branches()
-        iterator_ancestry = self._get_iterator_ancestry(self.iterator_graph(g))
+        iterator_graph = self.iterator_graph(g)
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         iterator_ancestry.clear_effective_iteration_paths()
         self._attach_pending_if_inputs()
         expanded_if_id = self._expand_root_if_for_completed_collect_branch(g)
@@ -3982,13 +4009,20 @@ class _ExecutionNodeBuilder:
                         iteration_axes = prepared_path_axes.get(iteration_path)
                         if iteration_axes is None and len(frame_axes) >= len(iteration_path):
                             iteration_axes = frame_axes[: len(iteration_path)]
-                        create_results = self.create_execution_node(
-                            next_node_id,
-                            [],
-                            iteration_path,
-                            iteration_axes=iteration_axes,
-                        )
-                        new_node_ids.extend(create_results)
+                        for _ in range(
+                            self._get_root_if_projected_sibling_frame_count(
+                                next_node_id, selected_field, iterator_graph, iterator_ancestry
+                            )
+                            if not iteration_path
+                            else 1
+                        ):
+                            create_results = self.create_execution_node(
+                                next_node_id,
+                                [],
+                                iteration_path,
+                                iteration_axes=iteration_axes,
+                            )
+                            new_node_ids.extend(create_results)
         else:
             parent_iterator_nodes = self.get_node_iterators(next_node_id)
             iteration_mappings_iter = (
