@@ -29,6 +29,7 @@ import {
 } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { isModelFromRepo } from '@features/generation/core/baseGenerationPolicies';
+import { servesAsType } from '@features/generation/core/componentCompatibility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
@@ -678,7 +679,7 @@ const ExpandPromptButton = ({
   const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
   // Keyed by image so unticking one frame does not carry over to the next one.
   const [excludedImageName, setExcludedImageName] = useState<string | null>(null);
-  const textLlmModels = models.filter((model) => model.type === 'text_llm');
+  const textLlmModels = models.filter((model) => servesAsType(model, 'text_llm'));
   const suggestedModelKey = suggestion?.modelSource
     ? (textLlmModels.find((model) =>
         isModelFromRepo(typeof model.source === 'string' ? model.source : null, suggestion.modelSource ?? '')

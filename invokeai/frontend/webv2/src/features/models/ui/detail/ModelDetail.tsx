@@ -10,7 +10,12 @@ import {
 } from '@features/models/core/externalModelFields';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
+import {
+  getModelSourceHref,
+  getModelTypeLabel,
+  getModelVariantLabel,
+  getUnrecordedModelFact,
+} from '@features/models/core/taxonomy';
 import { supportsWorkingMemoryCalibration } from '@features/models/core/workingMemory';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
@@ -71,6 +76,7 @@ type ModelIdentityModel = Pick<
   | 'provider_id'
   | 'provider_model_id'
   | 'repo_variant'
+  | 'roles'
   | 'scale'
   | 'source'
   | 'source_type'
@@ -121,6 +127,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
+        roles: model.roles,
         scale: model.scale,
         source: model.source,
         source_type: model.source_type,
@@ -514,7 +521,7 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
 });
 
 const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const pathDialog = useExitPresence(isPathDialogOpen);
@@ -528,6 +535,20 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    ...(model.roles?.length
+      ? [
+          {
+            label: t('models.alsoUsableAs'),
+            value: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+              model.roles.map((role) =>
+                role.variant
+                  ? `${getModelTypeLabel(role.type)} · ${getModelVariantLabel(role.variant)}`
+                  : getModelTypeLabel(role.type)
+              )
+            ),
+          },
+        ]
+      : []),
     // Recorded by the probe for upscalers; an unrecorded one is explained by the notice above instead.
     ...(typeof model.scale === 'number'
       ? [{ label: t('models.nativeScale'), value: t('models.nativeScaleValue', { scale: model.scale }) }]

@@ -2453,6 +2453,65 @@ describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
   });
 });
 
+describe('Text LLM records that also serve as an encoder', () => {
+  const textLlm = (roleType: string, roleVariant: string): ComponentModelConfig => ({
+    base: 'any',
+    format: 'checkpoint',
+    key: `llm-${roleVariant}`,
+    name: `LLM ${roleVariant}`,
+    roles: [{ type: roleType, variant: roleVariant }],
+    type: 'text_llm',
+  });
+  const offers = (model: MainModelConfig, slotKey: string, candidate: ComponentModelConfig): boolean | undefined => {
+    const settings = createSettings(model);
+    const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === slotKey);
+
+    return slot?.filter?.(candidate, { model, selectedComponents: settings, settings });
+  };
+
+  it('offers a role-serving Text LLM only to the slot whose encoder size it matches', () => {
+    const moss = createModel('moss-image', { format: 'checkpoint' });
+    const zImage = createModel('z-image', { format: 'checkpoint' });
+    const klein4b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_4b' });
+    const anima = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
+
+    expect(offers(moss, 'qwen35EncoderModel', textLlm('qwen3_5_encoder', 'qwen3_5_9b'))).toBe(true);
+    expect(offers(moss, 'qwen35EncoderModel', textLlm('qwen3_5_encoder', 'qwen3_5_4b'))).toBe(false);
+    expect(offers(zImage, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
+    expect(offers(zImage, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_8b'))).toBe(false);
+    expect(offers(klein4b, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
+    expect(offers(klein4b, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_8b'))).toBe(false);
+    expect(offers(anima, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_06b'))).toBe(true);
+    expect(offers(zImage, 'qwen3EncoderModel', { ...textLlm('qwen3_encoder', 'qwen3_4b'), roles: [] })).toBe(false);
+  });
+
+  it('counts a selected role-serving Text LLM as the missing encoder', () => {
+    const moss = createModel('moss-image', { format: 'checkpoint' });
+    const zImage = createModel('z-image', { format: 'checkpoint' });
+
+    expect(
+      getGenerationValidationReasons(
+        moss,
+        createSettings(moss, { qwen35EncoderModel: textLlm('qwen3_5_encoder', 'qwen3_5_9b'), vae: flux2Vae })
+      )
+    ).toEqual([]);
+    expect(
+      getGenerationValidationReasons(
+        zImage,
+        createSettings(zImage, { qwen3EncoderModel: textLlm('qwen3_encoder', 'qwen3_4b'), vae: fluxVae })
+      )
+    ).toEqual([]);
+    expect(
+      getGenerationValidationReasons(
+        zImage,
+        createSettings(zImage, { qwen3EncoderModel: textLlm('qwen3_encoder', 'qwen3_8b'), vae: fluxVae })
+      )
+    ).toEqual([
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.',
+    ]);
+  });
+});
+
 describe('Anima IP-Adapter references', () => {
   const animaQwen3 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
   const animaQwen35 = createModel('anima', { format: 'checkpoint', key: 'anima-3.8b', variant: 'anima_qwen35' });

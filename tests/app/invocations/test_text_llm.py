@@ -61,3 +61,31 @@ def test_the_node_takes_its_tokenizer_from_the_model_loader(monkeypatch: pytest.
     assert requested == [SubModelType.Tokenizer, None]
     assert _RecordingPipeline.received == [tokenizer]
     context.models.get_absolute_path.assert_not_called()
+
+
+def test_the_node_asks_for_the_model_as_a_text_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A Qwen3.5 encoder record whose whole-model file serves as a Text LLM is offered in the field with its own type.
+    asked: list[tuple[str, str]] = []
+
+    def load(identifier: ModelIdentifierField, submodel_type: SubModelType | None = None) -> Any:
+        asked.append((identifier.key, identifier.type.value))
+        loaded = MagicMock()
+        if submodel_type is SubModelType.Tokenizer:
+            loaded.model = MagicMock(spec=PreTrainedTokenizerBase)
+        else:
+            loaded.model_on_device.return_value.__enter__.return_value = (None, torch.nn.Linear(1, 1))
+        return loaded
+
+    context = MagicMock()
+    context.models.load.side_effect = load
+    monkeypatch.setattr(text_llm_module, "TextLLMPipeline", _RecordingPipeline)
+    node = TextLLMInvocation(
+        id="text-llm",
+        prompt="a fox",
+        text_llm_model=ModelIdentifierField(key="enc", hash="x", name="enc", base="any", type="qwen3_5_encoder"),
+        seed=1,
+    )
+
+    node.invoke(context)
+
+    assert asked == [("enc", "text_llm"), ("enc", "text_llm")]

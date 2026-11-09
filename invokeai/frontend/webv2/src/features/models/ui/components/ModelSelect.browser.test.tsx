@@ -234,6 +234,53 @@ describe('ModelSelect loading states', () => {
     expect(optionTexts().join(' ')).toContain('LoRA');
   });
 
+  it('offers a Text LLM that serves a role in a picker of that type, without a type badge, and shows the role type in a mixed picker', async () => {
+    const textLlm = {
+      ...model,
+      base: 'any',
+      key: 'text-llm',
+      name: 'Qwen3.5 VLM',
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+      type: 'text_llm',
+    } as ModelConfig;
+    const encoder = {
+      ...model,
+      base: 'any',
+      key: 'encoder',
+      name: 'Plain Encoder',
+      type: 'qwen3_5_encoder',
+    } as ModelConfig;
+
+    setModelsSnapshotForTests({ error: null, models: [textLlm, model], status: 'loaded' });
+    await renderPicker({ id: 'test-role-only', modelTypes: ['qwen3_5_encoder'] });
+
+    // Only the role-serving model qualifies; a single-type picker shows no type badge at all.
+    expect(optionTexts()).toHaveLength(1);
+    expect(optionTexts()[0]).toContain('Qwen3.5 VLM');
+    expect(optionTexts()[0]).not.toContain('Text LLM');
+    expect(optionTexts()[0]).not.toContain('Qwen3.5 Encoder');
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [textLlm, encoder], status: 'loaded' });
+    await renderPicker({ id: 'test-role-and-primary', modelTypes: ['qwen3_5_encoder'] });
+
+    expect(optionTexts().join(' ')).not.toContain('Qwen3.5 Encoder');
+    expect(optionTexts().join(' ')).not.toContain('Text LLM');
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [textLlm, model], status: 'loaded' });
+    await renderPicker({ id: 'test-role-mixed', modelTypes: ['main', 'qwen3_5_encoder'] });
+
+    // In a mixed picker the role candidate shows the type it qualifies as, never its primary type.
+    expect(optionTexts().find((text) => text.includes('Qwen3.5 VLM'))).toContain('Qwen3.5 Encoder');
+    expect(optionTexts().find((text) => text.includes('Qwen3.5 VLM'))).not.toContain('Text LLM');
+    expect(optionTexts().find((text) => text.includes('SDXL Main'))).toContain('Main');
+  });
+
   it('moves the active row across a group boundary and selects with Enter', async () => {
     const onChange = vi.fn();
 

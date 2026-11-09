@@ -564,7 +564,7 @@ const EXTERNAL_MODEL_FIXTURES = [
 /** The last slots of the model library hold the hosted-provider records so the profile counts stay as declared. */
 const createModels = (count) => [
   ...createLocalModels(Math.max(0, count - EXTERNAL_MODEL_FIXTURES.length)),
-  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => structuredClone(model)),
+  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => ({ roles: [], ...structuredClone(model) })),
 ];
 
 const createLocalModels = (count) =>
@@ -590,6 +590,7 @@ const createLocalModels = (count) =>
       key: `fixture-model-${id}`,
       name: `Fixture Model ${id}`,
       path: `fixtures/models/fixture-model-${id}.safetensors`,
+      roles: [],
       source: `fixtures/models/fixture-model-${id}.safetensors`,
       source_type: 'path',
       source_url: null,
@@ -614,6 +615,7 @@ const seedModel = ({ key, name, ...fields }) => ({
   key,
   name,
   path: `seeds/${key}.safetensors`,
+  roles: [],
   source: `seeds/${key}.safetensors`,
   source_type: 'path',
   source_url: null,
@@ -730,6 +732,65 @@ export const MODEL_SEED_SETS = Object.freeze({
       type: 'control_lora',
     }),
     controlSeed('flux-controlnet-union-pro', 'flux', null),
+  ],
+  // Models whose files also serve as another type: single-file MOSS-Image and Z-Image mains with their VAEs, a Text
+  // LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 encoder that is also a Text LLM, and a Qwen3 4B causal-LM
+  // folder that is also the Qwen3 encoder.
+  'model-roles': [
+    {
+      record: seedModel({
+        base: 'moss-image',
+        key: 'seed-moss-image-main',
+        name: 'MOSS-Image (single file)',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
+    {
+      record: seedModel({ base: 'flux2', cpu_only: null, key: 'seed-flux2-vae', name: 'FLUX.2 VAE', type: 'vae' }),
+    },
+    {
+      record: seedModel({
+        cpu_only: null,
+        key: 'seed-text-llm-qwen35-9b',
+        name: 'Qwen3.5 9B VLM (int8)',
+        roles: [{ format: null, type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+        supports_images: true,
+        type: 'text_llm',
+        variant: undefined,
+      }),
+    },
+    {
+      record: seedModel({
+        cpu_only: null,
+        key: 'seed-qwen35-encoder-9b',
+        name: 'Qwen3.5 9B Encoder (int8)',
+        roles: [{ format: null, type: 'text_llm', variant: null }],
+        type: 'qwen3_5_encoder',
+        variant: 'qwen3_5_9b',
+      }),
+    },
+    {
+      record: seedModel({
+        base: 'z-image',
+        key: 'seed-z-image-main',
+        name: 'Z-Image (single file)',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
+    { record: seedModel({ base: 'flux', cpu_only: null, key: 'seed-flux-vae', name: 'FLUX VAE', type: 'vae' }) },
+    {
+      record: seedModel({
+        cpu_only: null,
+        format: 'diffusers',
+        key: 'seed-qwen3-4b-llm',
+        name: 'Qwen3 4B',
+        roles: [{ format: 'qwen3_encoder', type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+        type: 'text_llm',
+        variant: undefined,
+      }),
+    },
   ],
 });
 

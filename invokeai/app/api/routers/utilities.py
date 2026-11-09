@@ -33,6 +33,7 @@ from invokeai.app.services.wildcard_records.wildcard_records_common import build
 from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
+from invokeai.backend.model_manager.configs.roles import serves_as, view_as
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import (
     DEFAULT_SYSTEM_PROMPT,
@@ -447,8 +448,9 @@ def _run_expand_prompt(
     events = ApiDependencies.invoker.services.events
     model_config = model_manager.store.get_model(model_key)
 
-    if model_config.type != ModelType.TextLLM:
+    if not serves_as(model_config, ModelType.TextLLM):
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
+    model_config = view_as(model_config, ModelType.TextLLM)
     # Only the TextLLM config carries the flag (the record type is a union); older records validate to False.
     if image_name is not None and not getattr(model_config, "supports_images", False):
         raise ValueError(f"Model '{model_config.name}' cannot read images; choose a vision-capable text LLM")

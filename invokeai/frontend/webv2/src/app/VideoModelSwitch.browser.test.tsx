@@ -110,7 +110,11 @@ vi.mock('@features/models/react', async (importOriginal) => ({
     }
 
     const options = (useModelSnapshot().models as ModelConfig[]).filter(
-      (candidate) => modelTypes.includes(candidate.type) && (!filter || filter(candidate))
+      (candidate) =>
+        [candidate.type, ...(candidate.roles ?? []).map((role) => role.type)].some((type) =>
+          modelTypes.includes(type)
+        ) &&
+        (!filter || filter(candidate))
     );
 
     return (

@@ -12,7 +12,11 @@ import { userEvent } from 'vitest/browser';
 
 import { ModelLibraryList } from './ModelLibraryList';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => (options ? `${key} ${JSON.stringify(options)}` : key),
+  }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -37,16 +41,26 @@ const library: ModelConfig[] = [
 
 const noop = () => undefined;
 
-const Harness = ({ filters }: { filters: ModelLibraryFilters }) => (
+const Harness = ({
+  activeModelKey = null,
+  filters,
+  onActivate = noop,
+  onToggleSelected = noop,
+}: {
+  activeModelKey?: string | null;
+  filters: ModelLibraryFilters;
+  onActivate?: (modelKey: string) => void;
+  onToggleSelected?: (modelKey: string) => void;
+}) => (
   <ChakraProvider value={system}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '800px', width: '360px' }}>
       <ModelLibraryList
-        activeModelKey={null}
+        activeModelKey={activeModelKey}
         filters={filters}
         instanceId="manager"
         selectedKeys={new Set<string>()}
-        onActivate={noop}
-        onToggleSelected={noop}
+        onActivate={onActivate}
+        onToggleSelected={onToggleSelected}
       />
     </div>
   </ChakraProvider>
@@ -144,6 +158,106 @@ describe('ModelLibraryList keyboard context menu', () => {
     await userEvent.keyboard('{Escape}');
     await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
     expect(document.activeElement).toBe(primary);
+  });
+});
+
+describe('ModelLibraryList role rows', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const textLlm = {
+    ...model('llm', 'text_llm'),
+    roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+  } as ModelConfig;
+
+  beforeEach(() => {
+    accountLifecycle.activate('library-roles-test-a', ':user:library-roles-test-a');
+    setModelsSnapshotForTests({ models: [model('main-0', 'main'), textLlm], status: 'loaded' });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  const renderList = async (props: Partial<Parameters<typeof Harness>[0]> = {}) => {
+    await act(() => root.render(<Harness filters={DEFAULT_LIBRARY_FILTERS} {...props} />));
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+  const rowKeys = () => [...host.querySelectorAll('[data-list-row]')].map((row) => row.getAttribute('data-list-row'));
+  const roleRow = () => host.querySelector<HTMLElement>('[data-list-row="qwen3_5_encoder:llm"]')!;
+
+  it('lists the model under its primary type and again under each role type, with unique rows', async () => {
+    await renderList();
+
+    expect(rowKeys().filter((key) => key?.startsWith('header:') === false)).toEqual(
+      expect.arrayContaining(['main-0', 'llm', 'qwen3_5_encoder:llm'])
+    );
+    expect(new Set(rowKeys()).size).toBe(rowKeys().length);
+    expect(host.querySelectorAll('[data-list-row="llm"]')).toHaveLength(1);
+  });
+
+  it('shows the same tags on the role row, activates the same model and keeps the highlight on the primary row', async () => {
+    const onActivate = vi.fn();
+
+    await renderList({ activeModelKey: 'llm', onActivate });
+
+    // The same tags in every section: the role row reads exactly like the primary row.
+    expect(roleRow().textContent).toBe(host.querySelector('[data-list-row="llm"]')!.textContent);
+    expect(host.querySelector('[data-list-row="llm"] [aria-current="true"]')).not.toBeNull();
+    expect(roleRow().querySelector('[aria-current="true"]')).toBeNull();
+
+    await act(() => roleRow().querySelector<HTMLButtonElement>('[data-list-primary]')!.click());
+    expect(onActivate).toHaveBeenCalledExactlyOnceWith('llm');
+  });
+
+  it('names the section a role row is listed in, since sections are not announced', async () => {
+    await renderList();
+
+    const primaryLabel = host.querySelector('[data-list-row="llm"] [data-list-primary]')!.getAttribute('aria-label');
+    const roleLabel = roleRow().querySelector('[data-list-primary]')!.getAttribute('aria-label');
+
+    expect(primaryLabel).toBeNull();
+    expect(roleLabel).toContain('models.listedAs');
+    expect(roleLabel).toContain('Qwen3.5 Encoder');
+  });
+
+  it('selects the model, not the row, from a role row checkbox', async () => {
+    const onToggleSelected = vi.fn();
+
+    await renderList({ onToggleSelected });
+    await act(() => roleRow().querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+
+    expect(onToggleSelected).toHaveBeenCalledExactlyOnceWith('llm');
+  });
+
+  it('opens the context menu for one row only', async () => {
+    await renderList();
+
+    await act(() => {
+      roleRow().dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 5, clientY: 5 })
+      );
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    const open = [...host.querySelectorAll('[data-menu-open]')];
+
+    expect(open).toHaveLength(1);
+    expect(open[0]!.closest('[data-list-row]')?.getAttribute('data-list-row')).toBe('qwen3_5_encoder:llm');
+  });
+
+  it('lists the model once under the filtered type, as an ordinary row the list can mark current', async () => {
+    await renderList({ activeModelKey: 'llm', filters: { ...DEFAULT_LIBRARY_FILTERS, typeFilter: 'qwen3_5_encoder' } });
+
+    expect(rowKeys().filter((key) => !key?.startsWith('header:'))).toEqual(['llm']);
+    expect(host.querySelector('[data-list-row="llm"] [aria-current="true"]')).not.toBeNull();
+    expect(host.querySelector('[data-list-row="llm"] [data-list-primary]')!.getAttribute('aria-label')).toBeNull();
   });
 });
 

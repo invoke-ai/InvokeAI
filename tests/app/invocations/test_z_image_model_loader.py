@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen3VariantType,
     SubModelType,
 )
+from tests.fixtures.model_roles import node_context, text_llm_qwen3_folder
 
 
 def _make_main_model() -> ModelIdentifierField:
@@ -211,3 +212,40 @@ class TestQwen3SourceFieldTemplate:
             return False
 
         assert not is_filtered_out(sdnq_pipeline_config)
+
+
+class TestQwen3TextLLMServingAsEncoder:
+    """A Qwen3 folder installed as a Text LLM serves as the Qwen3 encoder; the node asks for that role."""
+
+    @staticmethod
+    def _invoke(llm_variant: Qwen3VariantType | None):
+        # The UI puts the record's own type (text_llm) on the node.
+        encoder = ModelIdentifierField(
+            key="llm", hash="h-llm", name="llm folder", base=BaseModelType.Any, type=ModelType.TextLLM
+        )
+        vae = ModelIdentifierField(
+            key="vae", hash="h-vae", name="FLUX VAE", base=BaseModelType.Flux, type=ModelType.VAE
+        )
+        configs = {
+            "z-image-sdnq-key": SimpleNamespace(
+                type=ModelType.Main, format=ModelFormat.GGUFQuantized, submodels=None, name="Z-Image GGUF"
+            ),
+            "llm": text_llm_qwen3_folder("llm", llm_variant),
+        }
+        invocation = ZImageModelLoaderInvocation(model=_make_main_model(), vae_model=vae, qwen3_encoder_model=encoder)
+        return invocation.invoke(node_context(configs))  # type: ignore[arg-type]
+
+    def test_the_4b_folder_is_emitted_as_a_qwen3_encoder(self):
+        output = self._invoke(Qwen3VariantType.Qwen3_4B)
+
+        for field in (output.qwen3_encoder.text_encoder, output.qwen3_encoder.tokenizer):
+            assert (field.key, field.type) == ("llm", ModelType.Qwen3Encoder)
+        assert output.qwen3_encoder.text_encoder.submodel_type is SubModelType.TextEncoder
+
+    def test_a_folder_of_another_size_is_refused_by_its_role_variant(self):
+        with pytest.raises(ValueError, match="'llm folder' is a Qwen3 encoder of variant 'qwen3_8b'"):
+            self._invoke(Qwen3VariantType.Qwen3_8B)
+
+    def test_a_folder_without_the_role_keeps_the_clear_refusal(self):
+        with pytest.raises(ValueError, match="'llm folder' is not a Qwen3 encoder"):
+            self._invoke(None)

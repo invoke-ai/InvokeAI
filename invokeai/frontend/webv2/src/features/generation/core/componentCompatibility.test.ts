@@ -9,7 +9,9 @@ import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from '
 
 import {
   getCompatibleSelectedComponentKey,
+  isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isMossImageQwen35Encoder,
   isErnieImageMistralEncoder,
   isBundledFlux2Main,
   isFlux2EncoderSourceForModel,
@@ -21,6 +23,9 @@ import {
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  roleVariantOf,
+  servesAsType,
+  servesAsVariant,
   type GenerateComponentCandidate,
 } from './componentCompatibility';
 
@@ -257,6 +262,55 @@ describe('Generate component compatibility', () => {
     expect(isVaeCompatibleWithGenerateModel(wanMain('i2v_a14b'), wanVae(48))).toBe(false);
     expect(isVaeCompatibleWithGenerateModel(wanMain('ti2v_5b'), wanVae(48))).toBe(true);
     expect(isVaeCompatibleWithGenerateModel(wanMain('ti2v_5b'), wanVae(16))).toBe(false);
+  });
+});
+
+describe('encoder predicates over roles', () => {
+  const textLlm = (roleType: string, roleVariant: string | null): GenerateComponentCandidate =>
+    candidate({ roles: [{ type: roleType, variant: roleVariant }], type: 'text_llm' });
+
+  it('answers primary type and role with the variant of the matching source', () => {
+    const withBothVariants = candidate({
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+      type: 'qwen3_encoder',
+      variant: 'qwen3_4b',
+    });
+
+    expect(servesAsType(withBothVariants, 'qwen3_encoder')).toBe(true);
+    expect(servesAsType(withBothVariants, 'qwen3_5_encoder')).toBe(true);
+    expect(servesAsType(withBothVariants, 'text_llm')).toBe(false);
+    expect(roleVariantOf(withBothVariants, 'qwen3_encoder')).toBe('qwen3_4b');
+    expect(roleVariantOf(withBothVariants, 'qwen3_5_encoder')).toBe('qwen3_5_9b');
+    expect(servesAsVariant(withBothVariants, 'qwen3_5_encoder', 'qwen3_4b')).toBe(false);
+  });
+
+  it.each([
+    ['Anima Qwen3', isAnimaQwen3Encoder, 'qwen3_encoder', 'qwen3_06b'],
+    ['Z-Image Qwen3', isZImageQwen3Encoder, 'qwen3_encoder', 'qwen3_4b'],
+    ['Anima Qwen3.5', isAnimaQwen35Encoder, 'qwen3_5_encoder', 'qwen3_5_4b'],
+    ['MOSS-Image Qwen3.5', isMossImageQwen35Encoder, 'qwen3_5_encoder', 'qwen3_5_9b'],
+  ] as const)(
+    '%s: primary match, role match, wrong role variant and a bare Text LLM',
+    (_name, predicate, type, variant) => {
+      expect(predicate(candidate({ type, variant }))).toBe(true);
+      expect(predicate(textLlm(type, variant))).toBe(true);
+      expect(predicate(textLlm(type, 'other_variant'))).toBe(false);
+      expect(predicate(textLlm(type, null))).toBe(false);
+      expect(predicate(candidate({ type: 'text_llm' }))).toBe(false);
+      // A role of another type with the right variant string does not count.
+      expect(predicate(textLlm(type === 'qwen3_encoder' ? 'qwen3_5_encoder' : 'qwen3_encoder', variant))).toBe(false);
+    }
+  );
+
+  it('takes a Qwen3 causal LM as the FLUX.2 Klein encoder by the variant of its role', () => {
+    const klein9b = isFlux2Qwen3EncoderForModel(flux2Model('klein_9b'));
+    const anyKlein = isFlux2Qwen3EncoderForModel({ base: 'flux2', key: 'k', name: 'k', type: 'main' });
+
+    expect(klein9b(textLlm('qwen3_encoder', 'qwen3_8b'))).toBe(true);
+    expect(klein9b(textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(false);
+    expect(anyKlein(textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
+    expect(anyKlein(textLlm('qwen3_encoder', 'qwen3_06b'))).toBe(false);
+    expect(anyKlein(candidate({ type: 'text_llm' }))).toBe(false);
   });
 });
 

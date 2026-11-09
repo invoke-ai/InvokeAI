@@ -1,3 +1,5 @@
+import type { ModelRole } from '@features/models';
+
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from './types';
 
 import { getArchitectureCapabilityRow } from './architectureCapabilities';
@@ -13,6 +15,8 @@ export type GenerateComponentCandidate = {
   key?: string;
   /** VAE latent width. Only `wan` ships more than one, and its two are different decoders. */
   latent_channels?: number | null;
+  /** Other types the same files serve as; the backend always sends it. */
+  roles?: readonly ModelRole[];
   submodels?: Record<string, unknown> | null;
   type: string;
   variant?: unknown;
@@ -74,20 +78,31 @@ export const isClipVariant =
   (model) =>
     model.type === 'clip_embed' && model.variant === variant;
 
+/** Whether the model is a `type`, as its primary type or through a role. */
+export const servesAsType = (model: GenerateComponentCandidate, type: string): boolean =>
+  model.type === type || (model.roles ?? []).some((role) => role.type === type);
+
+/** The variant the model has as a `type`: its own for the primary type, the role's for a role. */
+export const roleVariantOf = (model: GenerateComponentCandidate, type: string): unknown =>
+  model.type === type ? model.variant : (model.roles ?? []).find((role) => role.type === type)?.variant;
+
+export const servesAsVariant = (model: GenerateComponentCandidate, type: string, variant: unknown): boolean =>
+  roleVariantOf(model, type) === variant;
+
 export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant === 'qwen3_06b';
+  servesAsVariant(model, 'qwen3_encoder', 'qwen3_06b');
 
 /** Anima-3.8B's semantic connector was trained on the Qwen3.5 4B. */
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
+  servesAsVariant(model, 'qwen3_5_encoder', 'qwen3_5_4b');
 
 /** MOSS-Image conditions on the Qwen3.5 9B; the 4B's hidden size does not fit its text embedder. */
 export const isMossImageQwen35Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_9b';
+  servesAsVariant(model, 'qwen3_5_encoder', 'qwen3_5_9b');
 
 /** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
 export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';
+  servesAsVariant(model, 'qwen3_encoder', 'qwen3_4b');
 
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
@@ -132,11 +147,17 @@ export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig):
     typeof selectedModel.variant === 'string' ? KLEIN_TO_QWEN3_VARIANT[selectedModel.variant] : null;
 
   return (model) => {
-    if (model.type !== 'qwen3_encoder' || model.variant === 'qwen3_06b') {
+    if (!servesAsType(model, 'qwen3_encoder')) {
       return false;
     }
 
-    return requiredVariant ? model.variant === requiredVariant : true;
+    const variant = roleVariantOf(model, 'qwen3_encoder');
+
+    if (variant === 'qwen3_06b') {
+      return false;
+    }
+
+    return requiredVariant ? variant === requiredVariant : true;
   };
 };
 

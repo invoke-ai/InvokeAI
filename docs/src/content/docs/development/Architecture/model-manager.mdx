@@ -56,6 +56,7 @@ All model metadata classes inherit from this pydantic class. it provides the fol
 | `hash`           | str           | Hash of the model |
 | `description`    | str           | Human-readable description of the model (optional) |
 | `source`         | str           | Model's source URL or repo id (optional) |
+| `roles`          | list          | Other model types the same files serve as: `{type, format, variant}` entries; `format` is set only when it differs from the record's |
 
 The `key` is a unique 32-character random ID which was generated at install time. The `hash` field stores a hash of the model's contents at install time obtained by sampling several parts of the model's files using the `imohash` library. Over the course of the model's lifetime it may be transformed in various ways, such as changing its precision or converting it from a .safetensors to a diffusers model.
 
@@ -103,6 +104,16 @@ The `SchedulerPredictionType` enum can be imported from either `invokeai.app.ser
 ### Other config classes
 
 There are a series of such classes each discriminated by their `ModelFormat`, including `LoRAConfig`, `IPAdapterConfig`, and so forth. These are rarely needed outside the model manager's internal code, but available in `invokeai.backend.model_manager.config` if needed. There is also a Union of all ModelConfig classes, called `AnyModelConfig` that can be imported from the same file.
+
+### Roles
+
+Some files serve as more than one model type, such as a Qwen3.5 9B vision-language model (Text LLM and MOSS-Image's Qwen3.5 encoder) or a complete Qwen3 language-model folder (Text LLM and Qwen3 encoder). The record keeps one primary `type`, which is its identity, and lists the others in `roles`. Each family's identification derives the roles from the files; nothing is configured.
+
+- **Selection.** `GET /api/v2/models/?model_type=` and `search_by_attr(model_type=...)` filter by the primary type only. The UI lists a model under each of its roles.
+- **Nodes.** A node asks for a model in a role through the `type` of the `ModelIdentifierField` it passes to `context.models.load()` or `get_config()`. The invocation context then returns a role view: an instance of the role's config class built from the record (`serves_as`, `role_variant` and `view_as` in `invokeai/backend/model_manager/configs/roles.py`). The loader nodes of MOSS-Image, Z-Image, FLUX.2 Klein, Anima and the Text LLM nodes do this themselves, so graphs keep sending the record's own type.
+- **Node authors.** A node that takes a role-capable model field must request the role by setting the identifier's `type` before `load` or `get_config`. The UI offers role-serving models in every picker of that type, and workflow fields store the record's own type, so the node cannot rely on the field to carry the role.
+- **Loading and cache.** A role view loads through the role's loader and is cached under `<key>[:<submodel>]:as_<type>[:<variant>]` (the loader's device-format suffix comes last), so the encoder and the Text LLM of one file never share a cache entry. Editing or re-identifying the record evicts both. Model load socket events carry the role view's config: the record key and the role type.
+- **Lifecycle.** Re-identification recomputes the roles. Changing `type` by hand through `update_model_record()` discards them.
 
 ### Limitations of the Data Model
 
@@ -168,7 +179,7 @@ Returns the configurations of the models whose file has the given hash.
 
 #### search_by_attr(model_name, base_model, model_type, model_format, order_by, direction) -> List[AnyModelConfig]
 
-Returns the models that match every filter given among `model_name`, `base_model`, `model_type` and `model_format`, ordered by a `ModelRecordOrderBy` (type, base, name and format by default; names and bases ignore case) in `direction`. Models that tie are ordered by key, in the same direction. Calling it without filters returns all the models in the database.
+Returns the models that match every filter given among `model_name`, `base_model`, `model_type` and `model_format`, ordered by a `ModelRecordOrderBy` (type, base, name and format by default; names and bases ignore case) in `direction`. Models that tie are ordered by key, in the same direction. `model_type` matches the primary type only, not `roles`. Calling it without filters returns all the models in the database.
 
 A stored config that no longer validates, for instance one written by a newer version of the application, is skipped with a warning in the log.
 

@@ -289,9 +289,9 @@ ComfyUI's w4a8 build and single files in fp8 scaled, nvfp4 or mxfp8 are refused 
 upsampler is not recognized; [Model Format Support](/users-guide/models/model-format-support/#text-llms) lists what
 loads.
 
-Before this release, InvokeAI did not install the upsampler as a Text LLM: the folder was not identified, and both
-ComfyUI single files, bf16 and int8, were identified as Qwen3.5 encoders. Use **Re-identify model** in the Model
-Manager on such an install.
+The two ComfyUI single files also serve as a Qwen3.5 9B encoder, so MOSS-Image's encoder picker lists them. MOSS-Image
+was trained on the stock encoder, so use Comfy-Org's MOSS-Image encoder file for it. An upsampler file installed as a
+Qwen3.5 Encoder also serves as a Text LLM once it is re-identified (**Re-identify** in the Model Manager).
 
 ## PiD super-resolution decode
 

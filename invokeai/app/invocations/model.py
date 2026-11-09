@@ -62,7 +62,10 @@ class ModelIdentifierField(BaseModel):
     hash: str = Field(description="The model's BLAKE3 hash")
     name: str = Field(description="The model's name")
     base: BaseModelType = Field(description="The model's base model type")
-    type: ModelType = Field(description="The model's type")
+    type: ModelType = Field(
+        description="The model's type, or a role it serves as (see its config's `roles`) when a node asks for it in "
+        "that role"
+    )
     submodel_type: SubModelType | None = Field(
         description="The submodel to load, if this is a main model",
         default=None,

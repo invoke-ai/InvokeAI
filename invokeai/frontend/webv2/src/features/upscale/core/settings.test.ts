@@ -105,6 +105,20 @@ describe('upscale settings', () => {
     });
   });
 
+  it('keeps a saved Text LLM that serves as the encoder through a role, and drops one without the role', () => {
+    const textLlm = {
+      ...model('llm', 'text_llm', 'any'),
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+    };
+
+    expect(normalizeUpscaleWidgetValues({ qwen3EncoderModel: textLlm })).toMatchObject({
+      qwen3EncoderModel: { key: 'llm', type: 'text_llm' },
+    });
+    expect(normalizeUpscaleWidgetValues({ qwen3EncoderModel: { ...textLlm, roles: [] } })).toMatchObject({
+      qwen3EncoderModel: null,
+    });
+  });
+
   it('normalizes partial persisted values and calculates multiple-of-eight output dimensions', () => {
     expect(
       normalizeUpscaleWidgetValues({ negativePromptHeightPx: 4, positivePrompt: 'detail', positivePromptHeightPx: 999 })
@@ -317,6 +331,23 @@ const QWEN3_06B = withVariant(model('qwen3-06b', 'qwen3_encoder', 'any'), 'qwen3
 const QWEN35 = withVariant(model('qwen35', 'qwen3_5_encoder', 'any'), 'qwen3_5_4b');
 
 describe('text encoder and VAE components', () => {
+  it('offers a Qwen3 4B Text LLM to Z-Image upscale through its role and refuses an 8B one', () => {
+    const roleLlm = (variant: string): ModelConfig =>
+      ({ ...model(`llm-${variant}`, 'text_llm', 'any'), roles: [{ type: 'qwen3_encoder', variant }] }) as ModelConfig;
+    const values = (llm: ModelConfig) => ({
+      ...createDefaultUpscaleWidgetValues([
+        model('spandrel', 'spandrel_image_to_image', 'any'),
+        model('z', 'main', 'z-image'),
+        model('flux-vae', 'vae', 'flux'),
+        llm,
+      ]),
+      inputImage: { height: 64, image_name: 'in.png', width: 64 },
+    });
+
+    expect(values(roleLlm('qwen3_4b')).qwen3EncoderModel?.key).toBe('llm-qwen3_4b');
+    expect(values(roleLlm('qwen3_8b')).qwen3EncoderModel).toBeNull();
+  });
+
   const ready = (models: ModelConfig[]) => ({
     ...createDefaultUpscaleWidgetValues(models),
     inputImage: { height: 64, image_name: 'in.png', width: 64 },

@@ -55,6 +55,7 @@ import {
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
   isZImageQwen3Encoder,
+  servesAsType,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
@@ -914,8 +915,8 @@ const qwen3EncoderSlot = (helpText: string, filter?: GenerateComponentFilter): C
     valueKind: 'component',
     helpText,
     filter: filter
-      ? (candidate) => candidate.type === 'qwen3_encoder' && filter(candidate)
-      : (candidate) => candidate.type === 'qwen3_encoder',
+      ? (candidate) => servesAsType(candidate, 'qwen3_encoder') && filter(candidate)
+      : (candidate) => servesAsType(candidate, 'qwen3_encoder'),
   });
 
 const mistralEncoderSlot = (

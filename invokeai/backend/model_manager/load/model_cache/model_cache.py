@@ -1222,8 +1222,8 @@ class ModelCache:
         Used by the session queue's device-affinity heuristic to prefer pending items whose
         models are already warm on the claiming device. Two properties matter to that caller:
 
-        - Entries keyed by `get_model_cache_key` (model key plus optional ``:submodel`` suffix)
-          are reported with the suffix stripped so they match plain model keys. Entries keyed by
+        - Entries keyed by `get_model_cache_key` (model key plus optional ``:submodel`` and
+          ``:as_<type>`` role suffixes) are reported with the suffixes stripped so they match plain model keys. Entries keyed by
           filesystem path (`load_model_from_path`) are excluded: a path - or the bare Windows
           drive letter that splitting ``C:\\...`` on ``:`` would leave - is not a model key, and
           such short strings would corrupt substring-based affinity scoring.
@@ -3084,8 +3084,9 @@ class ModelCache:
     def drop_model(self, model_key: str) -> int:
         """Drop all cache entries belonging to a model so the next load rebuilds them.
 
-        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
-        so a single model may have multiple entries. Locked entries - and entries inside a
+        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`), plus
+        `:as_<type>` for a role view of the record (see `ModelLoader._load_and_cache`), so a single model may have
+        multiple entries. Locked entries - and entries inside a
         first-use window (a LoadedModel wrapper obtained but not yet locked) - are marked
         `is_stale` and evicted as soon as the last lock (or the window) releases - without that,
         a setting toggled during an in-flight generation would survive on the locked entry and quietly

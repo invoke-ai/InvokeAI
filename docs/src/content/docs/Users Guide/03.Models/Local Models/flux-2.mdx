@@ -98,7 +98,10 @@ FLUX.2 pipeline automatically, so you don't need standalone ones:
 Standalone Qwen3 encoders are available as starter models too: *FLUX.2 Klein Qwen3 4B Encoder* (~8 GB) and
 its *FP4 mixed* build (~3.6 GB download), and *FLUX.2 Klein Qwen3 8B Encoder* (~16 GB) with *FP4 mixed*
 (~6.3 GB download) and *int8* (~9.4 GB) builds. A 4B encoder only works with Klein 4B models, an 8B encoder
-only with Klein 9B.
+only with Klein 9B. A complete Qwen3 folder of the right size installed as a Text LLM (such as `Qwen/Qwen3-4B`)
+can be selected as the Qwen3 encoder as well; roles are recorded at install or Re-identify. Any Qwen3 fine-tune of
+that size is offered, and conditioning follows its weights
+([details](/users-guide/models/model-format-support/#text-llms)).
 
 When you install an FP8 checkpoint, FP8 Storage is switched on for it automatically, which keeps the file's
 fp8 weights instead of expanding them.

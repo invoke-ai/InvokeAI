@@ -35,6 +35,7 @@ import {
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   sanitizeBatchCount,
+  servesAsType,
 } from '@features/generation/settings';
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
@@ -571,7 +572,7 @@ export const isSupportedUpscaleMainModel = (value: unknown): value is MainModelC
   isMainModelConfig(value) && isUpscaleBase(value.base);
 
 const isComponentModelOfType = (value: unknown, type: string): value is ComponentModelConfig =>
-  isRecord(value) && value.type === type && isModelIdentifierConfig(value);
+  isRecord(value) && isModelIdentifierConfig(value) && servesAsType(value, type);
 
 type UpscaleComponentValues = Record<UpscaleComponentField, ComponentModelConfig | null>;
 

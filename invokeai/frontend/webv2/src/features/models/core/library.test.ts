@@ -9,6 +9,7 @@ import {
   DEFAULT_LIBRARY_FILTERS,
   filterModels,
   getModelPickerGroups,
+  getQualifyingType,
   groupModelsByType,
 } from './library';
 
@@ -80,12 +81,93 @@ describe('filterModels', () => {
   });
 });
 
+const textLlm = createModel({
+  base: 'any',
+  key: 'llm',
+  name: 'Qwen3.5 9B VLM',
+  roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+  type: 'text_llm',
+});
+const roleLibrary = [...library, textLlm];
+
+describe('role-serving models', () => {
+  it('filters by role type as well as primary type', () => {
+    const keys = (typeFilter: ModelConfig['type']) =>
+      filterModels(roleLibrary, { ...DEFAULT_LIBRARY_FILTERS, typeFilter }, NO_MISSING).map((m) => m.key);
+
+    expect(keys('qwen3_5_encoder')).toEqual(['llm']);
+    expect(keys('text_llm')).toEqual(['llm']);
+    expect(keys('qwen3_encoder')).toEqual([]);
+  });
+
+  it('finds a model by its role type in the search', () => {
+    expect(
+      filterModels(roleLibrary, { ...DEFAULT_LIBRARY_FILTERS, searchTerm: 'qwen3_5_encoder' }, NO_MISSING).map(
+        (m) => m.key
+      )
+    ).toEqual(['llm']);
+  });
+
+  it('lists the model in its primary and each role group, and only in the filtered one under a type filter', () => {
+    const groups = groupModelsByType(roleLibrary);
+    const entriesOf = (type: string) => groups.find((group) => group.type === type)?.entries;
+
+    expect(entriesOf('text_llm')).toEqual([{ model: textLlm, viaType: null }]);
+    expect(entriesOf('qwen3_5_encoder')).toEqual([{ model: textLlm, viaType: 'qwen3_5_encoder' }]);
+
+    const filtered = groupModelsByType([textLlm], 'qwen3_5_encoder');
+
+    expect(filtered.map((group) => group.type)).toEqual(['qwen3_5_encoder']);
+    // The only row of the model, so it keeps its plain identity.
+    expect(filtered[0]?.entries).toEqual([{ model: textLlm, viaType: null }]);
+    expect(groupModelsByType([textLlm], 'text_llm')[0]?.entries).toEqual([{ model: textLlm, viaType: null }]);
+  });
+
+  it('leads a picker with models of the asked type, then those that only serve as it', () => {
+    const encoder = createModel({ base: 'any', key: 'enc', name: 'Zeta Encoder', type: 'qwen3_5_encoder' });
+    const roleEncoder = createModel({
+      base: 'any',
+      key: 'role-enc',
+      name: 'Alpha Encoder',
+      roles: [{ type: 'text_llm' }],
+      type: 'qwen3_5_encoder',
+    });
+    const realLlm = createModel({ base: 'any', key: 'llm-z', name: 'Zeta LLM', type: 'text_llm' });
+    const keysFor = (models: ModelConfig[], modelTypes: ModelConfig['type'][]) =>
+      getModelPickerGroups(models, { modelTypes }).groups.flatMap((group) => group.models.map((m) => m.key));
+
+    // Name order alone would put the role candidates first.
+    expect(keysFor([roleEncoder, realLlm], ['text_llm'])).toEqual(['llm-z', 'role-enc']);
+    expect(keysFor([textLlm, encoder], ['qwen3_5_encoder'])).toEqual(['enc', 'llm']);
+    expect(getQualifyingType(textLlm, ['qwen3_5_encoder'])).toBe('qwen3_5_encoder');
+    expect(getQualifyingType(textLlm, ['text_llm', 'qwen3_5_encoder'])).toBe('text_llm');
+  });
+
+  it('collects role types', () => {
+    expect(collectTypes(roleLibrary)).toEqual(expect.arrayContaining(['text_llm', 'qwen3_5_encoder']));
+  });
+
+  it('offers a role-serving model to a picker of the role type and nothing else', () => {
+    const picker = (modelTypes: ModelConfig['type'][]) =>
+      getModelPickerGroups(roleLibrary, { modelTypes }).candidates.map((m) => m.key);
+
+    expect(picker(['qwen3_5_encoder'])).toEqual(['llm']);
+    expect(picker(['qwen3_encoder'])).toEqual([]);
+    expect(
+      getModelPickerGroups(roleLibrary, {
+        filter: (model) => model.roles?.[0]?.variant === 'qwen3_5_4b',
+        modelTypes: ['qwen3_5_encoder'],
+      }).candidates
+    ).toEqual([]);
+  });
+});
+
 describe('groupModelsByType', () => {
   it('groups in canonical category order', () => {
     const groups = groupModelsByType(filterModels(library, DEFAULT_LIBRARY_FILTERS, NO_MISSING));
 
     expect(groups.map((group) => group.type)).toEqual(['main', 'lora', 'vae']);
-    expect(groups.reduce((count, group) => count + group.models.length, 0)).toBe(library.length);
+    expect(groups.reduce((count, group) => count + group.entries.length, 0)).toBe(library.length);
   });
 });
 

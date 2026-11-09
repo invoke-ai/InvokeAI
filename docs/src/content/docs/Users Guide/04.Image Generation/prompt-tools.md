@@ -15,7 +15,7 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 1. Type a brief prompt (e.g. "a cat in a garden")
 2. Click **Expand prompt** (the pencil-and-sparkles button) in the prompt toolbar
-3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project.
+3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project. The list includes models that also serve as a Text LLM, such as a Qwen3.5 9B encoder single file with LM head and vision tower.
 4. Choose a **System prompt**, the instructions that tell the model how to rewrite your prompt
 5. Click **Expand**
 6. Your prompt is replaced with the expanded version, which you can edit before generating

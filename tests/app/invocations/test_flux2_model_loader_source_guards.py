@@ -71,7 +71,10 @@ def test_klein_loader_extracts_vae_from_a_dev_pipeline() -> None:
                 name="Klein 4B", format=ModelFormat.GGUFQuantized, variant=Flux2VariantType.Klein4B
             ),
             "qwen3-4b": SimpleNamespace(
-                name="Qwen3 4B", format=ModelFormat.Diffusers, variant=Qwen3VariantType.Qwen3_4B
+                type=ModelType.Qwen3Encoder,
+                name="Qwen3 4B",
+                format=ModelFormat.Diffusers,
+                variant=Qwen3VariantType.Qwen3_4B,
             ),
             "flux2-dev-diffusers": SimpleNamespace(
                 name="FLUX.2 [dev]", format=ModelFormat.Diffusers, variant=Flux2VariantType.Dev
@@ -201,7 +204,10 @@ def test_klein_loader_rejects_a_standalone_encoder_from_the_wrong_family() -> No
                 name="Klein 4B", format=ModelFormat.GGUFQuantized, variant=Flux2VariantType.Klein4B
             ),
             "qwen3-8b": SimpleNamespace(
-                name="Qwen3 8B", format=ModelFormat.Diffusers, variant=Qwen3VariantType.Qwen3_8B
+                type=ModelType.Qwen3Encoder,
+                name="Qwen3 8B",
+                format=ModelFormat.Diffusers,
+                variant=Qwen3VariantType.Qwen3_8B,
             ),
             "klein-diffusers": SimpleNamespace(
                 name="Klein 4B", format=ModelFormat.Diffusers, variant=Flux2VariantType.Klein4B
@@ -290,7 +296,10 @@ def test_vae_source_must_still_be_diffusers(source_format: ModelFormat) -> None:
                 name="Klein 4B", format=ModelFormat.GGUFQuantized, variant=Flux2VariantType.Klein4B
             ),
             "qwen3-4b": SimpleNamespace(
-                name="Qwen3 4B", format=ModelFormat.Diffusers, variant=Qwen3VariantType.Qwen3_4B
+                type=ModelType.Qwen3Encoder,
+                name="Qwen3 4B",
+                format=ModelFormat.Diffusers,
+                variant=Qwen3VariantType.Qwen3_4B,
             ),
             "not-diffusers": SimpleNamespace(
                 name="Klein single-file", format=source_format, variant=Flux2VariantType.Klein4B

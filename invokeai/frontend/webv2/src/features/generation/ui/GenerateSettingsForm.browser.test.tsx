@@ -143,7 +143,13 @@ const MainModelPicker = ({
       data-component-value={value ?? ''}
     >
       {stableGroups.models.catalog
-        .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
+        .filter(
+          (model) =>
+            [model.type, ...((model.roles as { type: string }[] | undefined) ?? []).map((role) => role.type)].some(
+              (type) => modelTypes.includes(type)
+            ) &&
+            (filter?.(model) ?? true)
+        )
         .map((model) => (
           <button key={model.key} data-component-pick={model.key} type="button" onClick={() => onChange(model)}>
             {model.name}

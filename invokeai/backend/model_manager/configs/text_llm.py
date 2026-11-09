@@ -6,7 +6,12 @@ from typing import (
 from pydantic import Field
 from typing_extensions import Any
 
-from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.base import (
+    Checkpoint_Config_Base,
+    Config_Base,
+    Diffusers_Config_Base,
+    ModelRole,
+)
 from invokeai.backend.model_manager.configs.gemma4_encoder import is_ltx2_gemma4_encoder_folder
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
@@ -18,9 +23,13 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
 )
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
-    is_moss_image_encoder_source,
-    is_qwen3_5_vision_language_lm,
+    get_qwen3_5_variant,
+    is_text_llm_qwen3_5_file,
     raise_for_unsupported_qwen3_5_quantization,
+)
+from invokeai.backend.model_manager.configs.qwen3_encoder import (
+    folder_is_sdnq_quantized,
+    qwen3_variant_from_hidden_size,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
@@ -28,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.qwen3_5.qwen3_5_vl import QWEN3_5_VL_LANGUAGE_MODEL_PREFIX
 
 # Gemma-2-2b's hidden size. Only this size is handled by the dedicated PiD Gemma2 encoder config; larger
 # Gemma 2 variants (9B=3584, 27B=4608) are rejected there and must stay classifiable as a generic TextLLM.
@@ -47,6 +57,22 @@ _PROCESSOR_CONFIG_FILES = ("processor_config.json", "preprocessor_config.json")
 _SUPPORTS_IMAGES_DESCRIPTION = (
     "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image"
 )
+
+
+def _qwen3_encoder_roles(mod: ModelOnDisk, config_dict: dict[str, Any], class_name: str) -> list[ModelRole]:
+    """The Qwen3 encoder role of a complete Qwen3 causal-LM folder.
+
+    `Qwen3EncoderLoader` reads the standalone layout: config.json at the folder root, unquantized. Qwen2, Qwen-VL and
+    quantized folders, and sizes no Qwen3 encoder comes in, serve no such role.
+    """
+    if class_name != "Qwen3ForCausalLM" or not (mod.path / "config.json").is_file():
+        return []
+    if "quantization_config" in config_dict or folder_is_sdnq_quantized(mod):
+        return []
+    variant = qwen3_variant_from_hidden_size(config_dict.get("hidden_size"))
+    if variant is None:
+        return []
+    return [ModelRole(type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder, variant=variant)]
 
 
 class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
@@ -109,7 +135,9 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
             and "vision_config" in config_dict
             and any((mod.path / f).exists() for f in _PROCESSOR_CONFIG_FILES)
         )
-        return cls(**override_fields, supports_images=supports_images)
+        return cls(
+            **override_fields, supports_images=supports_images, roles=_qwen3_encoder_roles(mod, config_dict, class_name)
+        )
 
 
 class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
@@ -118,8 +146,8 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     The layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3
     prompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file
     carries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,
-    which exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are
-    `Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source.
+    which exist for the 9B. The same file is Comfy-Org's MOSS-Image text encoder, so it also serves as a Qwen3.5
+    encoder (role).
     """
 
     type: Literal[ModelType.TextLLM] = Field(default=ModelType.TextLLM)
@@ -137,16 +165,12 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        if override_fields.get("type") != ModelType.TextLLM and is_moss_image_encoder_source(
-            override_fields.get("source")
-        ):
-            raise NotAMatchError("Comfy-Org's MOSS-Image text encoders are Qwen3.5 encoders, not Text LLMs")
-
         state_dict = mod.load_state_dict()
-        if not is_qwen3_5_vision_language_lm(state_dict):
+        if not is_text_llm_qwen3_5_file(mod.path, state_dict):
             raise NotAMatchError(
                 "state dict is not a whole Qwen3.5 vision-language model (model.language_model.*, model.visual.*, "
                 "lm_head) of a size with a vendored config"
             )
         raise_for_unsupported_qwen3_5_quantization(mod, state_dict)
-        return cls(**override_fields)
+        variant = get_qwen3_5_variant(state_dict, QWEN3_5_VL_LANGUAGE_MODEL_PREFIX)
+        return cls(**override_fields, roles=[ModelRole(type=ModelType.Qwen35Encoder, variant=variant)])

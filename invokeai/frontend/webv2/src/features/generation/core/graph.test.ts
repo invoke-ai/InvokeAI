@@ -558,6 +558,21 @@ describe('compileGenerateGraph', () => {
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
   });
 
+  it('sends a standalone Z-Image transformer a Qwen3 4B Text LLM as its stored config', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const textLlm: ComponentModelConfig = {
+      base: 'any',
+      format: 'diffusers',
+      key: 'llm-4b',
+      name: 'Qwen3 4B',
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+      type: 'text_llm',
+    };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: textLlm, vae: fluxVae });
+
+    expect(graph.nodes.model_loader?.qwen3_encoder_model).toEqual(textLlm);
+  });
+
   it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
     const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
@@ -2175,6 +2190,20 @@ describe('MOSS-Image graphs', () => {
       qwen3_5_encoder: { key: 'qwen35-qwen3_5_9b' },
       vae: { key: 'flux2-vae' },
     });
+  });
+
+  it('sends a role-serving Text LLM as the stored config', () => {
+    const textLlm: ComponentModelConfig = {
+      base: 'any',
+      format: 'checkpoint',
+      key: 'llm-9b',
+      name: 'Qwen3.5 9B VLM',
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+      type: 'text_llm',
+    };
+    const graph = compile(mossSingleFile, { qwen35EncoderModel: textLlm, vae: flux2Vae });
+
+    expect(graph.nodes.model_loader?.qwen3_5_encoder_model).toEqual(textLlm);
   });
 
   it('keeps a Qwen3.5 4B selection left over from Anima out of a Diffusers graph', () => {
