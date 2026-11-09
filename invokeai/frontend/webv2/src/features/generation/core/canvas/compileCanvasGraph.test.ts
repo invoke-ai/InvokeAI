@@ -2740,6 +2740,47 @@ describe('compileCanvasGraph — regional guidance', () => {
     }
   });
 
+  const upsampler = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+  const upsamplerSettings = {
+    flux3PromptUpsamplerEnabled: true,
+    flux3PromptUpsamplerModel: upsampler,
+    positivePrompt: 'a beach at noon',
+  };
+
+  it('hands the FLUX.3 regions to the prompt upsampler and records its caption once', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: upsamplerSettings,
+    });
+
+    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
+    expect(backendGraph.nodes.prompt_upsampler?.regions).toEqual(FLUX3_ROWS);
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toEqual([
+      expect.objectContaining({ source: { field: 'value', node_id: 'prompt_upsampler' } }),
+    ]);
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')).toBeDefined();
+    // The regions are recorded for recall as they are with the layout node.
+    expect(metadata.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('still upsamples the prompt when no FLUX.3 region can be placed', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+      settings: upsamplerSettings,
+    });
+
+    expect(backendGraph.nodes.prompt_upsampler).not.toHaveProperty('regions');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('prompt_upsampler');
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toHaveLength(1);
+  });
+
   it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -2769,8 +2810,27 @@ describe('compileCanvasGraph — regional guidance', () => {
     let txt2img: BackendGraphContract;
     let inpaint: BackendGraphContract;
     let edit: BackendGraphContract;
+    let upsampledTxt2img: BackendGraphContract;
+    let upsampledEdit: BackendGraphContract;
     try {
       const settings = { positivePrompt: 'a beach at noon' };
+      const upsampled = {
+        ...settings,
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: {
+          base: 'any',
+          hash: 'blake3:pup',
+          key: 'pup',
+          name: 'FLUX.3 Prompt Upsampler',
+          supports_images: true,
+          type: 'text_llm',
+        },
+      };
+      upsampledTxt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings: upsampled }).backendGraph;
+      upsampledEdit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...upsampled, referenceImages: [reference] },
+      }).backendGraph;
       txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
       inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
       edit = compile(model, 'txt2img', {
@@ -2787,6 +2847,8 @@ describe('compileCanvasGraph — regional guidance', () => {
       edit: { ...edit, id: 'flux3_layout_canvas_edit' },
       inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
       txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+      upsampled_edit: { ...upsampledEdit, id: 'flux3_upsampled_canvas_edit' },
+      upsampled_txt2img: { ...upsampledTxt2img, id: 'flux3_upsampled_canvas_txt2img' },
     };
     await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
       '../__snapshots__/flux3LayoutCanvasGraphs.json'

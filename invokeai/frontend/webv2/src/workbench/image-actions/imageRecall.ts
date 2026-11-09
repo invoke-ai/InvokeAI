@@ -841,11 +841,32 @@ const getMetadataAnimaInpaintAdapter = (
 const hasAnimaInpaintAdapterSettings = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataAnimaInpaintAdapter(metadata, model)).length > 0;
 
+/**
+ * The prompt upsampler switch; only a FLUX.3 image can carry it. A recorded model means the upsampler ran, so the
+ * switch turns on. `core_metadata` drops `null` on write, so a FLUX.3 record without the key ran without it: the
+ * switch turns off and the current pick stays. Other records say nothing about it.
+ */
+const getMetadataFlux3PromptUpsampler = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<Pick<GenerateWidgetValues, 'flux3PromptUpsamplerEnabled'>> => {
+  if (model?.base !== 'flux3' || !isRecord(metadata)) {
+    return {};
+  }
+
+  if ('flux3_prompt_upsampler' in metadata) {
+    return { flux3PromptUpsamplerEnabled: true };
+  }
+
+  return getString(metadata, 'generation_mode')?.startsWith('flux3_') ? { flux3PromptUpsamplerEnabled: false } : {};
+};
+
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
   | 'componentSourceModel'
+  | 'flux3PromptUpsamplerModel'
   | 'gemma2EncoderModel'
   | 'ideogram4UnconditionalModel'
   | 'mistralEncoderModel'
@@ -879,6 +900,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
   { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
@@ -1381,7 +1403,9 @@ export const getImageRecallCapabilities = ({
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
-  const hasAdapterSettings = hasAnimaInpaintAdapterSettings(metadata, clipSkipModel);
+  const hasSwitchSettings =
+    hasAnimaInpaintAdapterSettings(metadata, clipSkipModel) ||
+    Object.keys(getMetadataFlux3PromptUpsampler(metadata, clipSkipModel)).length > 0;
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1401,7 +1425,7 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings ||
+    hasSwitchSettings ||
     hasCanvasRecall(metadata);
   const hasNonSeedMetadata =
     hasModel ||
@@ -1419,7 +1443,7 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings ||
+    hasSwitchSettings ||
     hasCanvasRecall(metadata);
 
   return {
@@ -1533,7 +1557,7 @@ export const buildImageRecallSettings = ({
     }
 
     const adapterPatch = getMetadataAnimaInpaintAdapter(metadata, values.model);
-    values = { ...values, ...adapterPatch };
+    values = { ...values, ...adapterPatch, ...getMetadataFlux3PromptUpsampler(metadata, values.model) };
 
     if (adapterPatch.animaInpaintAdapterWeight !== undefined) {
       fields.push('animaInpaintAdapterWeight');
@@ -1557,7 +1581,8 @@ export const buildImageRecallSettings = ({
     // change too: a record can turn it off without touching the pick.
     if (
       recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
-      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled
+      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled ||
+      values.flux3PromptUpsamplerEnabled !== currentValues.flux3PromptUpsamplerEnabled
     ) {
       fields.push('components');
     }
