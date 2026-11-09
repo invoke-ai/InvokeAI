@@ -1,10 +1,12 @@
 import type { AuthSession } from '@features/identity';
 import type { InvocationTemplates, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
-import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibraryEntry, WorkflowTagCount } from '@features/workflow/data/libraryBrowseStore';
+import type { ProjectWorkflowOrder } from '@features/workflow/ui/workflowUiStore';
 
 import { galleryImageUrls } from '@features/gallery/utility';
-import { parseWorkflowTags } from '@features/workflow/core/libraryTags';
+import { parseWorkflowTags, sortTagCounts } from '@features/workflow/core/libraryTags';
 import { extractWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
+import { isBundledLibraryWorkflowId } from '@features/workflow/queries';
 
 /**
  * A project workflow presented through the library's card and detail contracts. The mapping is cached per entry
@@ -20,10 +22,6 @@ const cache = new WeakMap<
   ProjectWorkflowEntry,
   { entry: ProjectWorkflowLibraryEntry; templates: InvocationTemplates | null }
 >();
-
-/** Bundled template ids are a server invariant (`default_` prefix); they are read-only whoever asks. */
-export const isBundledLibraryWorkflowId = (libraryWorkflowId: string): boolean =>
-  libraryWorkflowId.startsWith('default_');
 
 /** Whether a source can be written to at all; the server still has the final word (ownership, deletion). */
 export const isUpdatableSource = (source: ProjectWorkflowSource | undefined, session: AuthSession): boolean =>
@@ -84,3 +82,79 @@ export const findProjectCopiesOf = (
   workflows: readonly ProjectWorkflowEntry[],
   libraryWorkflowId: string
 ): ProjectWorkflowEntry[] => workflows.filter((entry) => entry.source?.libraryWorkflowId === libraryWorkflowId);
+
+/**
+ * How many of the project's workflows carry each tag, most used first. Case variants are one tag, labelled with the
+ * casing seen first, and a workflow listing a tag twice counts once.
+ */
+export const countProjectWorkflowTags = (workflows: readonly ProjectWorkflowEntry[]): WorkflowTagCount[] => {
+  const counts = new Map<string, WorkflowTagCount>();
+
+  for (const { document } of workflows) {
+    const seen = new Set<string>();
+
+    for (const tag of parseWorkflowTags(document.tags)) {
+      const key = tag.toLocaleLowerCase();
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        const existing = counts.get(key);
+        counts.set(key, { count: (existing?.count ?? 0) + 1, tag: existing?.tag ?? tag });
+      }
+    }
+  }
+
+  return sortTagCounts([...counts.values()]);
+};
+
+export interface ProjectWorkflowQuery {
+  /** Matched case-insensitively within names, descriptions and tags, as the server matches library searches. */
+  search: string;
+  /** Any-of, compared case-insensitively. */
+  tags: readonly string[];
+  order: ProjectWorkflowOrder;
+}
+
+const compareText = (left: string, right: string) => left.localeCompare(right, undefined, { sensitivity: 'base' });
+/** ISO instants order as plain strings. */
+const compareInstants = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
+
+/**
+ * The project's workflows filtered and ordered like the library places, but locally. A workflow that never ran counts
+ * as the oldest run, as the server orders a missing `last_run_at` lowest: first oldest-first, last newest-first. Ties
+ * keep project order.
+ */
+export const queryProjectWorkflowEntries = <Entry extends ProjectWorkflowLibraryEntry>(
+  entries: readonly Entry[],
+  { order, search, tags }: ProjectWorkflowQuery
+): readonly Entry[] => {
+  const needle = search.trim().toLocaleLowerCase();
+  const wanted = new Set(tags.map((tag) => tag.toLocaleLowerCase()));
+  const filtered =
+    needle || wanted.size > 0
+      ? entries.filter(
+          ({ item, tags: entryTags }) =>
+            (!needle ||
+              item.name.toLocaleLowerCase().includes(needle) ||
+              item.description.toLocaleLowerCase().includes(needle) ||
+              entryTags.some((tag) => tag.toLocaleLowerCase().includes(needle))) &&
+            (wanted.size === 0 || entryTags.some((tag) => wanted.has(tag.toLocaleLowerCase())))
+        )
+      : entries;
+  const sign = order.direction === 'asc' ? 1 : -1;
+
+  switch (order.sort) {
+    case 'order':
+      return order.direction === 'asc' ? filtered : [...filtered].reverse();
+    case 'name':
+      return [...filtered].sort((left, right) => sign * compareText(left.item.name, right.item.name));
+    case 'updated':
+      return [...filtered].sort(
+        (left, right) => sign * compareInstants(left.item.updated_at ?? '', right.item.updated_at ?? '')
+      );
+    case 'lastRun':
+      return [...filtered].sort(
+        (left, right) => sign * compareInstants(left.item.last_run_at ?? '', right.item.last_run_at ?? '')
+      );
+  }
+};

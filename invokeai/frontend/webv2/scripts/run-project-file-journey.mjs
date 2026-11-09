@@ -590,7 +590,7 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
 /**
  * The primary workflow journey: open a template into the project, edit it, switch away and back, save it to the
  * library under a new name, restart, and find both workflows intact. Project edits and runs issue no library writes;
- * the This-project view fetches no templates.
+ * the In this project view reads no library pages or records (the rail's one-row place totals and tag counts aside).
  */
 const runWorkflowCollection = async ({ browser, contexts, errors, imported }) => {
   const projectId = imported.project_id;
@@ -625,6 +625,15 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   const page = await context.newPage();
 
   observeBrowserErrors(page, 'workflow-collection', errors);
+  // The browser's own library reads, with their queries: the mock's request log keeps paths only.
+  const libraryReads = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.startsWith('/api/v1/workflows')) {
+      libraryReads.push(url);
+    }
+  });
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await page.goto(`${origin}/#/app?project=${encodeURIComponent(projectId)}`, { waitUntil: 'domcontentloaded' });
@@ -642,17 +651,27 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   const currentWorkflowName = async () =>
     (await workflowName().getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
 
-  // The migrated project owns exactly its old graph, marked active; opening the local view fetched nothing.
+  // The migrated project owns exactly its old graph, marked active. Opening on In this project reads no library page
+  // (a listing of more than one row) and no workflow record; the rail's one-row place totals and tag counts may run.
   await openProjectWorkflows();
   assert.equal(await cards.count(), 1);
   await cards.first().locator('[data-active-workflow]').waitFor();
-  assert.equal(
-    (await workflowRequests()).slice(requestsBefore).some((entry) => entry.method === 'GET'),
-    false
+  const libraryPageOrRecordReads = libraryReads.filter(
+    (url) =>
+      /^\/api\/v1\/workflows\/i\/[^/]+$/.test(url.pathname) ||
+      (url.pathname === '/api/v1/workflows/' && Number(url.searchParams.get('per_page') ?? 'Infinity') > 1)
+  );
+  assert.deepEqual(
+    libraryPageOrRecordReads.map((url) => `${url.pathname}${url.search}`),
+    [],
+    'opening In this project must read no library pages or records'
   );
 
-  // A template opened from the library tabs becomes an independent copy in this project.
-  await dialog.getByText('Yours', { exact: true }).click();
+  // A template opened from My library becomes an independent copy in this project.
+  await dialog
+    .getByRole('navigation', { name: 'Places' })
+    .getByRole('button', { name: /^My library/ })
+    .click();
   await dialog.locator('[data-library-tab="user"]').waitFor();
   await dialog.locator(`[data-workflow-card="${template.workflow_id}"]`).click();
   await dialog

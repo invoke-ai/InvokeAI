@@ -1,7 +1,8 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
-import type { WorkflowLibrarySort } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibrarySort, WorkflowLibrarySortDirection } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibraryCardSize } from '@features/workflow/ui/library/workflowThumbnail';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -25,7 +26,9 @@ export interface WorkflowPreferences {
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
   workflowGroupNodesByCategory: boolean;
+  workflowLibraryCardSize: WorkflowLibraryCardSize;
   workflowLibrarySort: WorkflowLibrarySort;
+  workflowLibrarySortDirection: WorkflowLibrarySortDirection;
   workflowLibraryThumbnailFit: WorkflowThumbnailFit;
   workflowShowMinimap: boolean;
   workflowSnapToGrid: boolean;
@@ -93,7 +96,15 @@ export interface WorkflowUiAdapter {
   getProjectGraph(): ProjectGraphState;
   /** Saves the library's account-bound display choices. */
   setLibraryPreferences(
-    patch: Partial<Pick<WorkflowPreferences, 'workflowLibrarySort' | 'workflowLibraryThumbnailFit'>>
+    patch: Partial<
+      Pick<
+        WorkflowPreferences,
+        | 'workflowLibraryCardSize'
+        | 'workflowLibrarySort'
+        | 'workflowLibrarySortDirection'
+        | 'workflowLibraryThumbnailFit'
+      >
+    >
   ): void;
   notifications: {
     error(title: string, message?: string): void;

@@ -368,17 +368,51 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
 });
 
 describe('normalizeWorkbenchPreferences workflow library', () => {
-  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
-    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
-      workflowLibrarySort: 'updated',
-      workflowLibraryThumbnailFit: 'cover',
+  const DEFAULTS = {
+    workflowLibraryCardSize: 'small',
+    workflowLibrarySort: 'opened',
+    workflowLibrarySortDirection: 'desc',
+    workflowLibraryThumbnailFit: 'cover',
+  };
+
+  it('lists most recently opened first in small filled cards unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject(DEFAULTS);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        workflowLibraryCardSize: 'huge',
+        workflowLibrarySort: 'size',
+        workflowLibrarySortDirection: 'DESC',
+        workflowLibraryThumbnailFit: 'stretch',
+      })
+    ).toMatchObject(DEFAULTS);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        workflowLibraryCardSize: 'large',
+        workflowLibrarySort: 'lastRun',
+        workflowLibrarySortDirection: 'asc',
+        workflowLibraryThumbnailFit: 'contain',
+      })
+    ).toMatchObject({
+      workflowLibraryCardSize: 'large',
+      workflowLibrarySort: 'lastRun',
+      workflowLibrarySortDirection: 'asc',
+      workflowLibraryThumbnailFit: 'contain',
     });
+  });
+
+  it('gives a key stored before directions existed its natural direction', () => {
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'name' })).toMatchObject({
+      workflowLibrarySort: 'name',
+      workflowLibrarySortDirection: 'asc',
+    });
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'updated' })).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibrarySortDirection: 'desc',
+    });
+    // A stored direction wins.
     expect(
-      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
-    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
-    expect(
-      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
-    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'name', workflowLibrarySortDirection: 'desc' })
+    ).toMatchObject({ workflowLibrarySortDirection: 'desc' });
   });
 });
 
