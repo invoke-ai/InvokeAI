@@ -757,25 +757,20 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                 />
               </Box>
 
-              <HStack align="flex-start" css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
-                <Stack flex="1" gap="0.5" minW="0">
-                  {/*
-                   * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width
-                   * permits containment without truncation.
-                   */}
-                  <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
-                    {name}
+              <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
+                {/*
+                 * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width
+                 * permits containment without truncation.
+                 */}
+                <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
+                  {name}
+                </Text>
+                {openedWhen ? (
+                  <Text color="fg.muted" fontSize="xs">
+                    {t('workflowLibrary.openedWhen', { when: openedWhen })}
                   </Text>
-                  {openedWhen ? (
-                    <Text color="fg.muted" fontSize="xs">
-                      {t('workflowLibrary.openedWhen', { when: openedWhen })}
-                    </Text>
-                  ) : null}
-                </Stack>
-                <Button data-workflow-detail-open flexShrink={0} size="sm" onClick={handleOpen}>
-                  {openLabel}
-                </Button>
-              </HStack>
+                ) : null}
+              </Stack>
 
               {primaryBase || enrichment?.status === 'ready' || isCallable || missingNodePacks.length > 0 ? (
                 <HStack flexWrap="wrap" gap="1" minW="0">
@@ -903,42 +898,44 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
             </Stack>
           </Scrollable>
 
-          <HStack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
+          {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
+          carries Open and More instead. */}
+          <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
             <Button
               disabled={enrichment?.status !== 'ready'}
-              flex="1"
               minW="0"
               size="lg"
               variant="outline"
+              w="full"
               onClick={handlePreview}
             >
               <WorkflowIcon />
               {t('workflowLibrary.previewGraph')}
             </Button>
-            <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
-              {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
-              menu never takes focus and the first pointer move onto it closes it. */}
-              <Menu.Trigger asChild>
-                <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-                  <IconButton
-                    aria-label={t('workflowLibrary.moreActions')}
-                    css={WORKFLOW_DETAIL_WIDE_ONLY_CSS}
-                    size="lg"
-                    variant="outline"
-                  >
-                    <EllipsisIcon />
-                  </IconButton>
-                </Tooltip>
-              </Menu.Trigger>
-              <Portal>
-                <Menu.Positioner>
-                  <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
-                    {actionItems}
-                  </MenuContent>
-                </Menu.Positioner>
-              </Portal>
-            </Menu.Root>
-          </HStack>
+            <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
+              <Button data-workflow-detail-open flex="1" minW="0" size="lg" onClick={handleOpen}>
+                {openLabel}
+              </Button>
+              <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
+                {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
+                menu never takes focus and the first pointer move onto it closes it. */}
+                <Menu.Trigger asChild>
+                  <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
+                    <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
+                      <EllipsisIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Menu.Trigger>
+                <Portal>
+                  <Menu.Positioner>
+                    <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                      {actionItems}
+                    </MenuContent>
+                  </Menu.Positioner>
+                </Portal>
+              </Menu.Root>
+            </HStack>
+          </Stack>
         </WorkflowDetailSheet>
       ) : (
         <WorkflowDetailRailPlaceholder />
