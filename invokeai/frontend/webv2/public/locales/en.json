@@ -1981,6 +1981,12 @@
     "fieldInfo": "Field: {{name}} · Type: {{type}}",
     "fieldName": "Field: {{name}}",
     "fieldType": "Type: {{type}}",
+    "fileUnavailable": "This file is unavailable. It may have been deleted or access was revoked.",
+    "fileUpload": "Upload file",
+    "fileUploadDropHint": "Drop a file here, or choose one.",
+    "fileUploadFailed": "File upload failed",
+    "fileUploadRejected": "File type not supported",
+    "fileUploadRejectedDescription": "Choose a PDF, Markdown, text, CSV, JSON, or YAML file.",
     "required": "Required",
     "optional": "Optional",
     "inputModes": {
