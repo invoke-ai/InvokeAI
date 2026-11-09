@@ -1643,6 +1643,51 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/i/{image_name}/export-formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Export Formats
+         * @description Lists the formats the image can be downloaded in besides its gallery file: `png16` for an image with a
+         *     precise asset, none for an ordinary image.
+         */
+        get: operations["get_image_export_formats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/i/{image_name}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Image
+         * @description Downloads the image as a 16-bit PNG made from its precise asset (`format=png16`).
+         *
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+         *     Returns 409 for an image without an exportable precise asset (the detail says why), for non-finite pixels, and
+         *     while image storage maintenance is active; 503 with `Retry-After` while another export runs.
+         */
+        get: operations["export_image"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/i/{image_name}/thumbnail": {
         parameters: {
             query?: never;
@@ -1824,7 +1869,7 @@ export type paths = {
         };
         /**
          * Get Bulk Download Item
-         * @description Gets a bulk download zip file.
+         * @description Gets a bulk download zip file, or answers 202 while it is being built.
          *
          *     Requires authentication.  The caller must be the user who initiated the
          *     download (tracked by the bulk download service) or an admin.
@@ -6950,6 +6995,8 @@ export type components = {
              * @description The board from which image should be downloaded
              */
             board_id?: string | null;
+            /** @description `png16` stores each image with an exportable precise asset as a 16-bit PNG; the other images keep their gallery files. Omit for the gallery files. */
+            export_format?: components["schemas"]["ImageExportFormat"] | null;
         };
         /** Body_enqueue_batch */
         Body_enqueue_batch: {
@@ -18186,6 +18233,11 @@ export type components = {
              * @description Whether to show the Donate to InvokeAI menu link
              */
             show_donation_link: boolean;
+            /**
+             * Precise Image Storage
+             * @description Whether precise image storage is on; the UI offers 16-bit bulk downloads only then
+             */
+            precise_image_storage: boolean;
         };
         /**
          * GalleryItem
@@ -18403,6 +18455,11 @@ export type components = {
             images_archived: number;
             /** Thumbnails Archived */
             thumbnails_archived: number;
+            /**
+             * Precise Archived
+             * @default 0
+             */
+            precise_archived?: number;
             /** Thumbnails Regenerated */
             thumbnails_regenerated: number;
             /** Archive Path */
@@ -21583,6 +21640,20 @@ export type components = {
              * @description The id of the board the image belongs to, if one exists.
              */
             board_id?: string | null;
+        };
+        /**
+         * ImageExportFormat
+         * @description A file format an image can be downloaded in besides its gallery file.
+         * @enum {string}
+         */
+        ImageExportFormat: "png16";
+        /** ImageExportFormats */
+        ImageExportFormats: {
+            /**
+             * Formats
+             * @description The export formats available for the image; empty for an ordinary image.
+             */
+            formats: components["schemas"]["ImageExportFormat"][];
         };
         /**
          * ImageField
@@ -25023,9 +25094,10 @@ export type components = {
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
          *         attention_backend: Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.<br>Valid values: `auto`, `sage`, `cudnn`, `flash`, `efficient`, `math`
-         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
-         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, ERNIE-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Ideogram 4 decode with a standalone FLUX.2 VAE, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, ERNIE-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, the Ideogram 4 decode with a standalone FLUX.2 VAE, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2, Z-Image, ERNIE-Image and Ideogram 4 (standalone VAE) decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+         *         precise_image_storage: Opt-in. Nodes that produce 16-bit color or floating-point sRGB images store the exact pixels (including values beyond 0-1) next to the gallery PNG, in `outputs/images/precise/`, so later nodes read them back losslessly; the PNG stays an 8-bit display copy. Linear, unbounded or premultiplied images are refused. Adds width x height x channels x 2 bytes (16-bit, float16) or x 4 bytes (float32) per such image, e.g. 64 MiB for a 2048x2048 RGBA float32 image. Off by default: those nodes then save 8-bit PNGs only. Turning it off stops new precise images and never deletes existing ones.
          *         max_queue_size: Maximum number of items in the session queue.
          *         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
          *         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
@@ -25532,13 +25604,13 @@ export type components = {
             attention_backend?: "auto" | "sage" | "cudnn" | "flash" | "efficient" | "math";
             /**
              * Force Tiled Decode
-             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, ERNIE-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Ideogram 4 decode with a standalone FLUX.2 VAE, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
              * @default false
              */
             force_tiled_decode?: boolean;
             /**
              * Auto Tiled Decode
-             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, ERNIE-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, the Ideogram 4 decode with a standalone FLUX.2 VAE, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2, Z-Image, ERNIE-Image and Ideogram 4 (standalone VAE) decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
              * @default true
              */
             auto_tiled_decode?: boolean;
@@ -25548,6 +25620,12 @@ export type components = {
              * @default 1
              */
             pil_compress_level?: number;
+            /**
+             * Precise Image Storage
+             * @description Opt-in. Nodes that produce 16-bit color or floating-point sRGB images store the exact pixels (including values beyond 0-1) next to the gallery PNG, in `outputs/images/precise/`, so later nodes read them back losslessly; the PNG stays an 8-bit display copy. Linear, unbounded or premultiplied images are refused. Adds width x height x channels x 2 bytes (16-bit, float16) or x 4 bytes (float32) per such image, e.g. 64 MiB for a 2048x2048 RGBA float32 image. Off by default: those nodes then save 8-bit PNGs only. Turning it off stops new precise images and never deletes existing ones.
+             * @default false
+             */
+            precise_image_storage?: boolean;
             /**
              * Max Queue Size
              * @description Maximum number of items in the session queue.
@@ -62977,6 +63055,110 @@ export interface operations {
             };
         };
     };
+    get_image_export_formats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the image */
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageExportFormats"];
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_image: {
+        parameters: {
+            query: {
+                /** @description The export format */
+                format: components["schemas"]["ImageExportFormat"];
+            };
+            header?: never;
+            path: {
+                /** @description The name of the image to export */
+                image_name: string;
+            };
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image in the requested format */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The image has no exportable precise asset, its pixels cannot be represented, or image storage maintenance is active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The precise asset is corrupt or the export failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another export is running; retry shortly */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_image_thumbnail: {
         parameters: {
             query?: never;
@@ -63256,6 +63438,13 @@ export interface operations {
                     "application/zip": unknown;
                 };
             };
+            /** @description The archive is still being built; retry after the `Retry-After` seconds */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Image not found */
             404: {
                 headers: {
@@ -63271,6 +63460,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Building the archive failed; the detail says why (reported once) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

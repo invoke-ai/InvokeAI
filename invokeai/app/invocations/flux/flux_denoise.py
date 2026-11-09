@@ -356,7 +356,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 raise ValueError("fill_conditioning was provided, but the model is not a FLUX Fill model.")
 
             if self.control_lora is not None:
-                img_cond = self._prep_structural_control_img_cond(context)
+                img_cond = self._prep_structural_control_img_cond(context, dtype=inference_dtype)
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
@@ -833,7 +833,7 @@ class FluxDenoiseInvocation(BaseInvocation):
 
         return controlnet_extensions
 
-    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
+    def _prep_structural_control_img_cond(self, context: InvocationContext, dtype: torch.dtype) -> torch.Tensor | None:
         if self.control_lora is None:
             return None
 
@@ -856,7 +856,9 @@ class FluxDenoiseInvocation(BaseInvocation):
         vae_info = context.models.load(self.controlnet_vae.vae)
         img_cond = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=img_cond)
 
-        return pack(img_cond)
+        # The VAE encodes in its own dtype (float32 under `precise_image_storage`, or a configured float32); the
+        # transformer takes this concatenated onto its bf16 image tokens.
+        return pack(img_cond).to(dtype=dtype)
 
     def _prep_flux_fill_img_cond(
         self, context: InvocationContext, device: torch.device, dtype: torch.dtype
@@ -907,7 +909,8 @@ class FluxDenoiseInvocation(BaseInvocation):
         cond_img = cond_img * (1 - mask)
         vae_info = context.models.load(self.controlnet_vae.vae)
         cond_img = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=cond_img)
-        cond_img = pack(cond_img)
+        # The VAE's dtype, not the transformer's (see `_prep_structural_control_img_cond`).
+        cond_img = pack(cond_img).to(dtype=dtype)
 
         # Prepare mask conditioning.
         mask = mask[:, 0, :, :]

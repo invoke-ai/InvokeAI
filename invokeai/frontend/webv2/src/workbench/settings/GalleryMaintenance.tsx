@@ -407,6 +407,7 @@ const LatestOutcomeView = ({
           examined: value.examined_count,
           failed: value.failed_count,
           imagesArchived: value.images_archived,
+          preciseArchived: value.precise_archived,
           recordsRemoved: value.records_removed,
           skipped: value.skipped_count,
           thumbnailsArchived: value.thumbnails_archived,

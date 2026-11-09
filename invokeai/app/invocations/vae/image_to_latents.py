@@ -22,9 +22,9 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import BaseModelType, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.vae_working_memory import (
     SD_VAE_TILE_OVERLAP_FACTOR,
@@ -137,12 +137,10 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.images.get_pil(self.image.image_name)
-
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
 
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+        image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
 
         if self.color_compensation != "None" and vae_info.config.base == BaseModelType.StableDiffusionXL:
             scale, bias = COLOR_COMPENSATION_MAP[self.color_compensation]

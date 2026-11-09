@@ -50,6 +50,8 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteInUse.surface.canvasRaster': 'Canvas raster layers',
         'widgets.gallery.downloadBoard': 'Download board',
         'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
+        'widgets.gallery.downloadBoardPng16': 'Download board (16-bit PNG)',
+        'widgets.gallery.downloadBoardPng16WithOmission': `Download board (16-bit PNG, ${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
         'widgets.gallery.mediaCountsThree': `${String(values?.first)}, ${String(values?.second)} and ${String(
           values?.third
@@ -109,13 +111,18 @@ const targetContext = {
   gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1', followSelectedBoard: false } },
 } as unknown as GalleryWidgetContextValue;
 
-let host: HTMLDivElement | null = null;
+const FRONTEND_CONFIG_KEY = ['frontend-config'];
 let queryClient = new QueryClient();
+const setPreciseImageStorage = (enabled: boolean) =>
+  queryClient.setQueryData(FRONTEND_CONFIG_KEY, { precise_image_storage: enabled, show_donation_link: false });
+
+let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
-  queryClient = new QueryClient();
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  setPreciseImageStorage(false);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -143,6 +150,39 @@ afterEach(async () => {
 
 it('states the exact number of videos omitted from the image-only board archive', () => {
   expect(document.body.textContent).toContain('Download board (1 video omitted)');
+});
+
+it('leaves the 16-bit entry out until the server confirms precise image storage', () => {
+  expect(menuItemLabels()).toEqual(expect.arrayContaining(['Download board (1 video omitted)']));
+  expect(document.body.textContent).not.toContain('16-bit');
+});
+
+it('leaves the 16-bit entry out while the config loads and after it failed', async () => {
+  queryClient.removeQueries({ queryKey: FRONTEND_CONFIG_KEY });
+  void queryClient.prefetchQuery({ queryFn: () => new Promise<never>(() => {}), queryKey: FRONTEND_CONFIG_KEY });
+  await renderMenuFor(board as GalleryBoard);
+  expect(document.body.textContent).not.toContain('16-bit');
+
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await queryClient.prefetchQuery({
+    queryFn: () => Promise.reject(new Error('offline')),
+    queryKey: FRONTEND_CONFIG_KEY,
+  });
+  await renderMenuFor(board as GalleryBoard);
+  expect(document.body.textContent).not.toContain('16-bit');
+});
+
+it('downloads the board as 16-bit PNG when precise image storage is on, naming omitted videos', async () => {
+  setPreciseImageStorage(true);
+  await renderMenuFor(board as GalleryBoard);
+
+  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (element) => element.textContent === 'Download board (16-bit PNG, 1 video omitted)'
+  );
+
+  expect(item).toBeDefined();
+  await act(() => item?.click());
+  expect(context.actions.downloadBoard).toHaveBeenCalledWith('board-1', { exportFormat: 'png16' });
 });
 
 it('offers a plain board download when the board holds no videos', async () => {

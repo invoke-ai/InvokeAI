@@ -10,6 +10,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import DenoiseMaskOutput
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
@@ -43,8 +44,8 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> DenoiseMaskOutput:
         if self.image is not None:
-            image = context.images.get_pil(self.image.image_name)
-            image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+            # An image with a precise file encodes its stored values; any other takes the unchanged 8-bit path.
+            image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
             if image_tensor.dim() == 3:
                 image_tensor = image_tensor.unsqueeze(0)
         else:

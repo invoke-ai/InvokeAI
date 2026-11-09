@@ -138,6 +138,7 @@ def test_the_pipelines_vae_loads_at_the_configured_precision_but_never_float16(
             return torch.nn.Identity()
 
     loader = object.__new__(QwenImage21DiffusersModel)
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
     loader._torch_dtype = precision
     loader._torch_device = torch.device("cpu")
     monkeypatch.setattr(loader, "get_hf_load_class", lambda *_args: _VAE)

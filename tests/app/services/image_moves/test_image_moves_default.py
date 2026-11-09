@@ -4,11 +4,13 @@ from pathlib import Path
 from shutil import copy2
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 from PIL import Image
 from sqlalchemy import insert, select, update
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import (
     ImageMoveJob,
@@ -19,6 +21,7 @@ from invokeai.app.services.image_moves.image_moves_default import (
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
+from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.image_moves import (
@@ -27,6 +30,19 @@ from invokeai.app.services.shared.database.schema.image_moves import (
 )
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.session_queue import session_queue
+from invokeai.backend.image_util.raster import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    RasterImage,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.precise_asset import (
+    PRECISE_ASSET_FORMAT,
+    PRECISE_ASSET_VERSION,
+    write_precise_asset,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 
 
@@ -1205,3 +1221,278 @@ def test_commit_reports_item_errors_in_image_name_order(tmp_path: Path, database
     # Failed items moved nothing, so their records stay where they were.
     assert records.get("image-i.png").image_subfolder == ""
     assert records.get("image-j.png").image_subfolder == ""
+
+
+def _raster(seed: int) -> RasterImage:
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    pixels = np.full((1, 2, 3), 0.25 * seed + 1.5, np.float32)
+    return RasterImage.from_array(pixels, descriptor)
+
+
+def _save_precise_image(
+    database: Database,
+    service: ImageMoveService,
+    records: ImageRecordStorage,
+    image_name: str,
+    subfolder: str,
+    created_at: str,
+    seed: int = 1,
+    is_intermediate: bool = False,
+    with_row: bool = True,
+) -> RasterImage:
+    """An image with its PNG, thumbnail and precise file; the precise row unless `with_row` is false."""
+    _save_image(database, service, records, image_name, subfolder, created_at, "red", is_intermediate)
+    raster = _raster(seed)
+    path = service.image_files.get_precise_path(image_name, subfolder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_precise_asset(raster, path)
+    if with_row:
+        with database.queries.transaction() as q:
+            q.image_precise_assets.insert(
+                image_name=image_name, asset_format=PRECISE_ASSET_FORMAT, format_version=PRECISE_ASSET_VERSION
+            )
+    return raster
+
+
+def _move_png_and_thumbnail(move) -> None:
+    """The files a crash right after the PNG and thumbnail moves leaves behind."""
+    move.new_path.parent.mkdir(parents=True, exist_ok=True)
+    move.new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(move.old_path, move.new_path)
+    os.replace(move.old_thumbnail_path, move.new_thumbnail_path)
+
+
+def test_move_relocates_the_precise_file_with_its_image(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    expected = _save_precise_image(database, service, records, "with.png", "old/nested", "2025-03-04 05:06:07.000")
+    _save_image(database, service, records, "without.png", "", "2025-03-04 05:06:07.000", "blue")
+    old_precise = service.image_files.get_precise_path("with.png", "old/nested")
+
+    result = service.move_all_images()
+
+    assert (result.committed, result.errors) == (2, 0)
+    assert records.get("with.png").image_subfolder == "2025/03/04"
+    new_precise = service.image_files.get_precise_path("with.png", "2025/03/04")
+    assert new_precise.exists() and not old_precise.exists()
+    assert not old_precise.parent.exists()
+    assert service.image_files.precise_root.exists()
+    raster = service.image_files.read_precise("with.png", "2025/03/04")
+    assert raster.view().tobytes() == expected.view().tobytes()
+    assert not service.image_files.get_precise_path("without.png", "2025/03/04").exists()
+    assert service.image_files.get_path("without.png", image_subfolder="2025/03/04").exists()
+
+
+def test_a_precise_file_without_a_row_is_left_in_place_and_does_not_block(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "stray.png", "", "2025-03-04 05:06:07.000", with_row=False)
+    stray = service.image_files.get_precise_path("stray.png", "")
+    # Even a file at the destination does not matter: the image has no precise asset.
+    blocker = service.image_files.get_precise_path("stray.png", "2025/03/04")
+    blocker.parent.mkdir(parents=True)
+    blocker.write_bytes(b"x")
+
+    result = service.move_all_images()
+
+    assert (result.committed, result.errors) == (1, 0)
+    assert records.get("stray.png").image_subfolder == "2025/03/04"
+    assert stray.exists()
+    assert blocker.read_bytes() == b"x"
+
+
+def test_a_missing_source_precise_file_fails_the_image_unless_it_is_intermediate(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "gone.png", "", "2025-03-04 05:06:07.000")
+    _save_precise_image(database, service, records, "temp.png", "", "2025-03-04 05:06:07.000", is_intermediate=True)
+    service.image_files.get_precise_path("gone.png", "").unlink()
+    service.image_files.get_precise_path("temp.png", "").unlink()
+
+    with pytest.raises(FileNotFoundError, match="precise asset"):
+        service.plan_batch(last_image_name="", limit=100)
+    result = service.move_all_images()
+
+    assert (result.planned, result.committed, result.errors) == (1, 1, 1)
+    assert records.get("gone.png").image_subfolder == ""
+    assert records.get("temp.png").image_subfolder == "2025/03/04"
+    assert service.image_files.get_path("gone.png").exists()
+
+
+def test_preflight_rejects_an_existing_destination_precise_file(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "clash.png", "", "2025-03-04 05:06:07.000")
+    destination = service.image_files.get_precise_path("clash.png", "2025/03/04")
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"x")
+
+    with pytest.raises(FileExistsError, match="precise asset"):
+        service.plan_batch(last_image_name="", limit=100)
+
+
+def test_preflight_rejects_a_precise_move_across_filesystems(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "cross.png", "", "2025-03-04 05:06:07.000")
+    original = service._assert_same_filesystem
+
+    def refuse_precise(source: Path, destination: Path) -> None:
+        if source.suffix == ".safetensors":
+            raise ValueError("Cross-filesystem image move is not supported")
+        original(source, destination)
+
+    with patch.object(service, "_assert_same_filesystem", side_effect=refuse_precise):
+        with pytest.raises(ValueError, match="Cross-filesystem"):
+            service.plan_batch(last_image_name="", limit=100)
+
+
+def test_recovery_moves_a_precise_file_left_behind_by_a_crash_after_the_png_move(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    expected = _save_precise_image(database, service, records, "crash.png", "", "2025-03-04 05:06:07.000")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    _move_png_and_thumbnail(moves[0])
+
+    recovered = service.startup_recovery()
+
+    assert (recovered.committed, recovered.errors) == (1, 0)
+    assert service.get_job(job_id).state == "committed"
+    assert not moves[0].old_precise_path.exists()
+    assert records.get("crash.png").image_subfolder == "2025/03/04"
+    raster = service.image_files.read_precise("crash.png", "2025/03/04")
+    assert raster.view().tobytes() == expected.view().tobytes()
+
+
+def test_recovery_commits_when_every_file_including_the_precise_one_already_moved(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "done.png", "", "2025-03-04 05:06:07.000")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+    service.perform_filesystem_moves(job_id)
+
+    recovered = service.startup_recovery()
+
+    assert (recovered.committed, recovered.errors) == (1, 0)
+    assert records.get("done.png").image_subfolder == "2025/03/04"
+    assert service.image_files.get_precise_path("done.png", "2025/03/04").exists()
+
+
+def test_recovery_halts_an_item_whose_precise_file_exists_at_both_paths(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "both.png", "", "2025-03-04 05:06:07.000")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    moves[0].new_precise_path.parent.mkdir(parents=True)
+    copy2(moves[0].old_precise_path, moves[0].new_precise_path)
+
+    recovered = service.startup_recovery()
+
+    assert (recovered.committed, recovered.errors) == (0, 1)
+    assert _job_item_states(database, job_id) == {"both.png": "error"}
+    assert records.get("both.png").image_subfolder == ""
+    # Nothing moved before the ambiguity was found.
+    assert moves[0].old_path.exists() and not moves[0].new_path.exists()
+
+
+def test_recovery_halts_a_non_intermediate_item_whose_precise_file_is_gone(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "lost.png", "", "2025-03-04 05:06:07.000")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    moves[0].old_precise_path.unlink()
+
+    recovered = service.startup_recovery()
+
+    assert (recovered.committed, recovered.errors) == (0, 1)
+    assert _job_item_states(database, job_id) == {"lost.png": "error"}
+    assert records.get("lost.png").image_subfolder == ""
+    assert moves[0].old_path.exists()
+
+
+def test_reconcile_never_repoints_a_record_whose_precise_file_is_only_at_the_old_path(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "half.png", "", "2025-03-04 05:06:07.000")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    service.create_move_job(moves)
+    _move_png_and_thumbnail(moves[0])
+
+    service._reconcile_destination_subfolder(moves[0])
+
+    assert records.get("half.png").image_subfolder == ""
+    assert moves[0].old_precise_path.exists()
+
+
+def test_reconcile_repoints_a_record_whose_precise_file_is_lost_and_reading_it_fails_explicitly(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "lost.png", "", "2025-03-04 05:06:07.000")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    service.create_move_job(moves)
+    _move_png_and_thumbnail(moves[0])
+    moves[0].old_precise_path.unlink()
+
+    service._reconcile_destination_subfolder(moves[0])
+
+    assert records.get("lost.png").image_subfolder == "2025/03/04"
+    invoker = MagicMock()
+    invoker.services.database = database
+    invoker.services.image_records = records
+    invoker.services.image_files = service.image_files
+    images = ImageService()
+    images.start(invoker)
+    with pytest.raises(ImageFileNotFoundException):
+        images.get_raster("lost.png")
+    with images.get_pil_image("lost.png") as pil:
+        assert pil.size == (16, 16)
+
+
+def test_recovery_of_a_missing_intermediate_deletes_its_precise_files_at_both_paths(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "temp.png", "", "2025-03-04 05:06:07.000", is_intermediate=True)
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    moves[0].old_path.unlink()
+    moves[0].new_precise_path.parent.mkdir(parents=True)
+    write_precise_asset(_raster(2), moves[0].new_precise_path)
+
+    recovered = service.startup_recovery()
+
+    assert (recovered.committed, recovered.errors) == (1, 0)
+    assert service.get_job(job_id).state == "committed"
+    assert not moves[0].old_precise_path.exists()
+    assert not moves[0].new_precise_path.exists()
+
+
+def test_precise_move_fsyncs_the_file_and_both_directories(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "sync.png", "", "2025-01-02 03:04:05.000")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+
+    with (
+        patch.object(service, "_fsync_file") as fsync_file,
+        patch.object(service, "_fsync_dir") as fsync_dir,
+    ):
+        service.perform_filesystem_moves(job_id)
+
+    moved = service._get_items(job_id)[0]
+    fsync_file.assert_any_call(moved.new_precise_path)
+    fsync_dir.assert_any_call(moved.new_precise_path.parent)
+    fsync_dir.assert_any_call(moved.old_precise_path.parent)
+
+
+def test_cleanup_keeps_a_precise_directory_that_still_holds_a_stray_file(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_precise_image(database, service, records, "keep.png", "old/a", "2025-01-02 03:04:05.000")
+    _save_precise_image(database, service, records, "stay.png", "old/a", "2025-01-02 03:04:05.000", with_row=False)
+
+    service.move_all_images()
+
+    assert service.image_files.get_precise_path("stay.png", "old/a").exists()
+    assert service.image_files.precise_root.exists()
+    assert service.image_files.get_precise_path("keep.png", "2025/01/02").exists()

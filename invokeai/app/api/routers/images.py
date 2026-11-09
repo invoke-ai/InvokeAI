@@ -3,13 +3,15 @@ import io
 import json
 import traceback
 from datetime import date
+from pathlib import PurePath
 from typing import Annotated, ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, StringConstraints, model_validator
+from starlette.background import BackgroundTask
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -35,6 +37,11 @@ from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE, MAX_IMAGE_BATC
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
+from invokeai.app.services.bulk_download.bulk_download_common import (
+    BulkDownloadBusyError,
+    BulkDownloadException,
+    BulkDownloadStatus,
+)
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -47,6 +54,10 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_common import (
     DeleteImagesResult,
     ImageDTO,
+    ImageExportBusyError,
+    ImageExportFormat,
+    ImageExportFormats,
+    ImageExportUnavailableError,
     ImageUrlsDTO,
     StarredImagesResult,
     UnstarredImagesResult,
@@ -54,6 +65,9 @@ from invokeai.app.services.images.images_common import (
 from invokeai.app.services.intermediates.intermediates_base import IntermediatesCaller
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
+from invokeai.backend.image_util.raster.descriptor import RasterConversionError
+from invokeai.backend.image_util.raster.png_codec import PngCodecError
+from invokeai.backend.image_util.raster.precise_asset import PreciseAssetError
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
@@ -65,6 +79,15 @@ IMAGE_MAX_AGE = 31536000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.
 ImageName = Annotated[str, StringConstraints(max_length=255)]
+
+
+_EXPORT_CHUNK_BYTES = 4 * 1024 * 1024
+
+
+async def _iter_chunks(content: bytes):
+    view = memoryview(content)
+    for start in range(0, len(view), _EXPORT_CHUNK_BYTES):
+        yield view[start : start + _EXPORT_CHUNK_BYTES]
 
 
 def _get_image_cache_control() -> str:
@@ -136,15 +159,15 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Not an image")
 
     contents = await file.read()
+
+    def _read_image() -> Image.Image:
+        image = Image.open(io.BytesIO(contents))
+        # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
+        image.load()
+        return image
+
     try:
-
-        def _read_image() -> Image.Image:
-            image = Image.open(io.BytesIO(contents))
-            # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
-            image.load()
-            return image
-
-        pil_image = await asyncio.to_thread(_read_image)
+        pil_image: Optional[Image.Image] = await asyncio.to_thread(_read_image)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
@@ -188,22 +211,37 @@ async def upload_image(
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
+    services = ApiDependencies.invoker.services
+    save_options = {
+        "image_origin": ResourceOrigin.EXTERNAL,
+        "image_category": image_category,
+        "session_id": session_id,
+        "board_id": board_id,
+        "metadata": extracted_metadata.invokeai_metadata,
+        "workflow": extracted_metadata.invokeai_workflow,
+        "graph": extracted_metadata.invokeai_graph,
+        "resolved_inputs": extracted_metadata.invokeai_resolved_inputs,
+        "is_intermediate": is_intermediate,
+        "user_id": current_user.user_id,
+        "project_id": project_id,
+    }
+
     try:
-        image_dto = await asyncio.to_thread(
-            ApiDependencies.invoker.services.images.create,
-            image=pil_image,
-            image_origin=ResourceOrigin.EXTERNAL,
-            image_category=image_category,
-            session_id=session_id,
-            board_id=board_id,
-            metadata=extracted_metadata.invokeai_metadata,
-            workflow=extracted_metadata.invokeai_workflow,
-            graph=extracted_metadata.invokeai_graph,
-            resolved_inputs=extracted_metadata.invokeai_resolved_inputs,
-            is_intermediate=is_intermediate,
-            user_id=current_user.user_id,
-            project_id=project_id,
-        )
+        image_dto: Optional[ImageDTO] = None
+        # Precise storage keeps the exact pixels of a 16-bit PNG; edits (crop, resize) work on the 8-bit copy as before.
+        if (
+            not crop_visible
+            and not resize_to
+            and await asyncio.to_thread(services.images.is_precise_png_upload, contents)
+        ):
+            # The 8-bit copy is only needed if the precise save falls back; dropping it keeps both decodes from
+            # being held at once.
+            pil_image = None
+            image_dto = await asyncio.to_thread(services.images.create_from_precise_png, contents, **save_options)
+        if image_dto is None:
+            if pil_image is None:
+                pil_image = await asyncio.to_thread(_read_image)
+            image_dto = await asyncio.to_thread(services.images.create, image=pil_image, **save_options)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
@@ -458,6 +496,82 @@ def get_image_full(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@images_router.get(
+    "/i/{image_name}/export-formats",
+    operation_id="get_image_export_formats",
+    response_model=ImageExportFormats,
+    responses={404: {"description": "Image not found"}},
+)
+def get_image_export_formats(
+    current_user: CurrentUserOrDefault,
+    image_name: str = Path(description="The name of the image"),
+) -> ImageExportFormats:
+    """Lists the formats the image can be downloaded in besides its gallery file: `png16` for an image with a
+    precise asset, none for an ordinary image."""
+    _assert_image_read_access(image_name, current_user)
+    try:
+        formats = ApiDependencies.invoker.services.images.get_export_formats(image_name)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return ImageExportFormats(formats=formats)
+
+
+@images_router.get(
+    "/i/{image_name}/export",
+    operation_id="export_image",
+    response_class=Response,
+    responses={
+        200: {"description": "The image in the requested format", "content": {"image/png": {}}},
+        404: {"description": "Image not found"},
+        409: {
+            "description": "The image has no exportable precise asset, its pixels cannot be represented, or image "
+            "storage maintenance is active"
+        },
+        500: {"description": "The precise asset is corrupt or the export failed"},
+        503: {"description": "Another export is running; retry shortly"},
+    },
+)
+def export_image(
+    current_user: CurrentMediaUserOrDefault,
+    image_name: str = Path(description="The name of the image to export"),
+    format: ImageExportFormat = Query(description="The export format"),
+) -> Response:
+    """Downloads the image as a 16-bit PNG made from its precise asset (`format=png16`).
+
+    Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+    Returns 409 for an image without an exportable precise asset (the detail says why), for non-finite pixels, and
+    while image storage maintenance is active; 503 with `Retry-After` while another export runs.
+    """
+    _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
+
+    try:
+        export = ApiDependencies.invoker.services.images.export_png16(image_name)
+    except (ImageRecordNotFoundException, ImageFileNotFoundException):
+        raise HTTPException(status_code=404, detail="Image not found")
+    except (ImageExportUnavailableError, RasterConversionError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ImageExportBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "1"})
+    except (PreciseAssetError, PngCodecError):
+        # Already logged by the service with the image name.
+        raise HTTPException(status_code=500, detail="The image could not be exported")
+    # A plain Response hands uvicorn the whole body at once and `transport.write` returns immediately, so a background
+    # task would free the slot while the body only sits in the transport buffer. Streaming in chunks makes uvicorn
+    # await `drain()` between them: the task runs after the last chunk has been flushed to the socket buffer, at most
+    # one chunk plus the transport's high-water mark before the client has it all.
+    response = StreamingResponse(
+        _iter_chunks(export.content),
+        media_type="image/png",
+        headers={"Content-Length": str(len(export.content))},
+        background=BackgroundTask(export.release),
+    )
+    # Same policy as /full: the precise asset is immutable, so the file is cacheable like the gallery image.
+    response.headers["Cache-Control"] = _get_image_cache_control()
+    response.headers["Content-Disposition"] = f'attachment; filename="{PurePath(image_name).stem}-16bit.png"'
+    return response
 
 
 @images_router.get(
@@ -881,7 +995,6 @@ class ImagesDownloaded(BaseModel):
 )
 def download_images_from_list(
     current_user: CurrentUserOrDefault,
-    background_tasks: BackgroundTasks,
     image_names: Optional[list[ImageName]] = Body(
         default=None,
         description="The list of names of images to download",
@@ -890,6 +1003,12 @@ def download_images_from_list(
     ),
     board_id: Optional[str] = Body(
         default=None, description="The board from which image should be downloaded", embed=True
+    ),
+    export_format: Optional[ImageExportFormat] = Body(
+        default=None,
+        description="`png16` stores each image with an exportable precise asset as a 16-bit PNG; the other "
+        "images keep their gallery files. Omit for the gallery files.",
+        embed=True,
     ),
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
@@ -908,14 +1027,18 @@ def download_images_from_list(
 
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
-    background_tasks.add_task(
-        ApiDependencies.invoker.services.bulk_download.handler,
-        image_names,
-        board_id,
-        bulk_download_item_id,
-        current_user.user_id,
-        uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
-    )
+    try:
+        ApiDependencies.invoker.services.bulk_download.start_job(
+            image_names,
+            board_id,
+            bulk_download_item_id,
+            current_user.user_id,
+            export_format,
+            uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
+        )
+    except BulkDownloadBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "5"})
+
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
 
@@ -929,40 +1052,50 @@ def download_images_from_list(
             "description": "Return the complete bulk download item",
             "content": {"application/zip": {}},
         },
+        202: {"description": "The archive is still being built; retry after the `Retry-After` seconds"},
         404: {"description": "Image not found"},
+        500: {"description": "Building the archive failed; the detail says why (reported once)"},
     },
 )
 def get_bulk_download_item(
     current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
-) -> FileResponse:
-    """Gets a bulk download zip file.
+) -> Response:
+    """Gets a bulk download zip file, or answers 202 while it is being built.
 
     Requires authentication.  The caller must be the user who initiated the
     download (tracked by the bulk download service) or an admin.
     """
-    try:
-        # Verify the caller owns this download (or is an admin)
-        owner = ApiDependencies.invoker.services.bulk_download.get_owner(bulk_download_item_name)
-        if owner is not None and owner != current_user.user_id and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Not authorized to access this download")
+    bulk_download = ApiDependencies.invoker.services.bulk_download
+    # Verify the caller owns this download (or is an admin)
+    owner = bulk_download.get_owner(bulk_download_item_name)
+    if owner is not None and owner != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to access this download")
 
-        path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
-
-        response = FileResponse(
-            path,
-            media_type="application/zip",
-            filename=bulk_download_item_name,
-            content_disposition_type="inline",
-        )
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
-        return response
-    except HTTPException:
-        raise
-    except Exception:
+    status = bulk_download.get_status(bulk_download_item_name)
+    if status is BulkDownloadStatus.BUILDING:
+        return Response(status_code=202, headers={"Retry-After": "2"})
+    if status is BulkDownloadStatus.FAILED:
+        reason = bulk_download.pop_failure(bulk_download_item_name)
+        if reason is not None:
+            raise HTTPException(status_code=500, detail=reason)
+    if status is not BulkDownloadStatus.READY:
         raise HTTPException(status_code=404)
+
+    try:
+        path = bulk_download.get_path(bulk_download_item_name)
+    except BulkDownloadException:
+        raise HTTPException(status_code=404)
+    response = FileResponse(
+        path,
+        media_type="application/zip",
+        filename=bulk_download_item_name,
+        content_disposition_type="inline",
+    )
+    response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+    background_tasks.add_task(bulk_download.delete, bulk_download_item_name)
+    return response
 
 
 @images_router.get("/names", operation_id="get_image_names", deprecated=True)

@@ -52,9 +52,12 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => {
       const messages: Record<string, string> = {
-        'widgets.gallery.boardArchivePreparing': `Preparing an image archive of "${String(values?.name)}". ${String(
-          values?.count
-        )} video will be omitted.`,
+        'widgets.gallery.boardArchivePreparing': `Preparing an image archive of "${String(values?.name)}".`,
+        'widgets.gallery.boardArchivePreparingWithOmission': `Preparing an image archive of "${String(
+          values?.name
+        )}". ${String(values?.count)} video will be omitted.`,
+        'widgets.gallery.boardArchivePreparingPng16': 'Preparing 16-bit, no omission',
+        'widgets.gallery.boardArchivePreparingPng16WithOmission': `Preparing 16-bit, ${String(values?.count)} omitted`,
         'widgets.gallery.deleteBoardInProgress': `Deleting board "${String(values?.name)}" and its media…`,
         'widgets.gallery.deleteBoardMediaDeleted': `Deleted ${String(values?.media)}.`,
         'widgets.gallery.deleteBoardMediaFailed': `${String(values?.media)} could not be deleted.`,
@@ -894,7 +897,7 @@ describe('localized board labels', () => {
 
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'info',
-      message: 'Preparing an image archive of "Uncategorized". 0 video will be omitted.',
+      message: 'Preparing an image archive of "Uncategorized".',
       title: 'Preparing download',
     });
   });
@@ -949,6 +952,56 @@ describe('board image archive omission', () => {
       boardId: 'board-1',
       signal: expect.any(AbortSignal),
     });
+  });
+});
+
+describe('board 16-bit archive', () => {
+  it('forwards the export format and announces the 16-bit preparation', async () => {
+    mocks.downloadGalleryArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'board-1.zip' });
+
+    await act(async () => {
+      await actionsRef.current?.downloadBoard('board-1', { exportFormat: 'png16' });
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ title: 'Preparing download', message: 'Preparing 16-bit, 1 omitted' })
+    );
+    expect(mocks.downloadGalleryArchive).toHaveBeenCalledWith({
+      boardId: 'board-1',
+      exportFormat: 'png16',
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('leaves the omission sentence out of both preparing notices for a board without videos', async () => {
+    mocks.downloadGalleryArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'shared.zip' });
+
+    await act(async () => {
+      await actionsRef.current?.downloadBoard('shared-viewer');
+      await actionsRef.current?.downloadBoard('shared-viewer', { exportFormat: 'png16' });
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ message: 'Preparing an image archive of "Client references".' })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ message: 'Preparing 16-bit, no omission' })
+    );
+  });
+
+  it('says another 16-bit archive is being prepared when the server answers 503', async () => {
+    mocks.downloadGalleryArchive.mockRejectedValue(new ApiError(JSON.stringify({ detail: 'busy' }), 503));
+
+    await act(async () => {
+      await actionsRef.current?.downloadBoard('board-1', { exportFormat: 'png16' });
+    });
+
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'widgets.gallery.archiveBusy' })
+    );
   });
 });
 

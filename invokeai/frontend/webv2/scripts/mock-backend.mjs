@@ -13,6 +13,7 @@ import {
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
+  MOCK_BACKEND_PRECISE_EXPORT,
   MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
@@ -1590,7 +1591,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       if (method === 'GET' && path === '/api/v1/app/frontend_config') {
-        return json(200, { show_donation_link: true });
+        return json(200, { precise_image_storage: true, show_donation_link: true });
       }
 
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
@@ -3126,6 +3127,51 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         const imageName = decodeURIComponent(imageAssetMatch[1]);
 
         return state.images.has(imageName) ? writePng(response) : json(404, { detail: 'Image not found' });
+      }
+
+      const imageExportFormatsMatch = /^\/api\/v1\/images\/i\/([^/]+)\/export-formats$/.exec(path);
+      if (method === 'GET' && imageExportFormatsMatch) {
+        const imageName = decodeURIComponent(imageExportFormatsMatch[1]);
+
+        return state.images.has(imageName)
+          ? json(200, { formats: Object.values(MOCK_BACKEND_PRECISE_EXPORT).includes(imageName) ? ['png16'] : [] })
+          : json(404, { detail: 'Image not found' });
+      }
+
+      const imageExportMatch = /^\/api\/v1\/images\/i\/([^/]+)\/export$/.exec(path);
+      if (method === 'GET' && imageExportMatch) {
+        const imageName = decodeURIComponent(imageExportMatch[1]);
+
+        if (!state.images.has(imageName)) {
+          return json(404, { detail: 'Image not found' });
+        }
+        if (url.searchParams.get('format') !== 'png16') {
+          return json(422, { detail: 'Unsupported export format' });
+        }
+        if (imageName === MOCK_BACKEND_PRECISE_EXPORT.busy) {
+          return writeBinary(
+            response,
+            503,
+            Buffer.from(JSON.stringify({ detail: 'Another image export is already running' })),
+            {
+              'cache-control': 'no-store',
+              'content-type': 'application/json',
+              'retry-after': '2',
+            }
+          );
+        }
+        if (imageName === MOCK_BACKEND_PRECISE_EXPORT.unexportable) {
+          return json(409, { detail: 'The precise asset contains non-finite pixels' });
+        }
+        if (imageName !== MOCK_BACKEND_PRECISE_EXPORT.exportable) {
+          return json(409, { detail: 'The image has no precise asset' });
+        }
+
+        return writeBinary(response, 200, TINY_PNG, {
+          'cache-control': 'no-store',
+          'content-disposition': `attachment; filename="${imageName.replace(/\.[^.]+$/, '')}-16bit.png"`,
+          'content-type': 'image/png',
+        });
       }
 
       const imageWorkflowMatch = /^\/api\/v1\/images\/i\/([^/]+)\/workflow$/.exec(path);

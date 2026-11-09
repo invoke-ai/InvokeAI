@@ -6,7 +6,7 @@ lastUpdated: 2026-10-26
 
 InvokeAI can move existing images into the folder layout selected by [`image_subfolder_strategy`](/configuration/invokeai-yaml/#image-subfolder-strategy). This is useful after changing the image subfolder strategy from `flat` to `date`, `type`, or `hash`, or when reorganizing an older image library.
 
-This operation changes where image files and thumbnails are stored on disk. It does not change image names, boards, generation metadata, or gallery records.
+This operation changes where image files, thumbnails, and precise pixel files (`outputs/images/precise`) are stored on disk. It does not change image names, boards, generation metadata, or gallery records.
 
 ## Access
 
@@ -28,17 +28,21 @@ The UI shows the move or recovery state until the job is complete or requires ma
 
 ## Crash Recovery
 
-The move process is crash-recoverable. InvokeAI records each move job in its database before moving files, moves full-size images and thumbnails on disk, and updates `images.image_subfolder` only after the filesystem move succeeds.
+The move process is crash-recoverable. InvokeAI records each move job in its database before moving files, moves full-size images, thumbnails, and the precise pixel file of each image that has one on disk, and updates `images.image_subfolder` only after the filesystem move succeeds.
 
-If InvokeAI stops during a move, recovery resumes incomplete jobs. If recovery finds an ambiguous filesystem state, such as both the old and new full-size image files existing or neither file existing, it halts that item for manual repair instead of blindly updating the database. Other items in the same job are still finalized, and the maintenance lock is released when the job is recorded as failed.
+If InvokeAI stops during a move, recovery resumes incomplete jobs. If recovery finds an ambiguous filesystem state, such as both the old and new full-size image files, or both the old and new precise files, existing, or neither file existing, it halts that item for manual repair instead of blindly updating the database. Other items in the same job are still finalized, and the maintenance lock is released when the job is recorded as failed.
 
 Recovery finalizes jobs that were already recorded before the stop. Images that had not yet been planned into a move job are not moved by recovery itself. The Image storage setting reports how many images still need moving; run **Start Move** again to continue. While a job is interrupted, **Start Move** stays unavailable and the status asks you to run **Recover** first.
 
-Missing intermediate image files are treated as already cleaned up and do not halt the move. Missing non-intermediate image files, unreadable images, and truncated images are recorded as failed items. When the full-size file is still at its original path, recovery leaves it there so it can be repaired or removed safely. If a previous filesystem move already placed the full-size file at its destination, recovery keeps that destination and reconciles the database before recording the item as failed. After recovery releases the lock, back up the failed file and either replace it with a valid image or delete its image record from the gallery, then run **Start Move** again if images still need moving. Do not delete an active journal row or edit `images.image_subfolder` while maintenance is active.
+Missing intermediate image files are treated as already cleaned up and do not halt the move; their precise files are removed with them. Missing non-intermediate image files, missing precise files of images that have one, unreadable images, and truncated images are recorded as failed items. When the full-size file is still at its original path, recovery leaves it there so it can be repaired or removed safely. If a previous filesystem move already placed the full-size file at its destination, recovery keeps that destination and reconciles the database before recording the item as failed. For an image with a precise file, the database is repointed unless the precise file is still only at its original path. If the precise file is lost, the record follows the full-size image and the image stays visible, but reading its precise pixels fails with a missing-file error. After recovery releases the lock, back up the failed file and either replace it with a valid image or delete its image record from the gallery, then run **Start Move** again if images still need moving. Do not delete an active journal row or edit `images.image_subfolder` while maintenance is active.
 
 For the `date` strategy, existing images are moved according to their original image creation timestamp stored in the database, not according to the time the maintenance job is run.
 
-Empty source directories left behind by successful moves are removed when safe.
+Precise files move only for images that have a precise asset record. A precise file without a record is not part of any image: a move neither relocates nor blocks on it, and it stays for [gallery maintenance](#gallery-maintenance) to archive. Older InvokeAI versions do not move precise files; do not run a move or recovery with an older version on a library that has them.
+
+`outputs/images/precise` must stay on the same volume as `outputs/images`: moves and deletes rename files, and renaming across volumes fails. The move preflight only compares a precise file's old and new paths, so it does not detect a precise folder placed on another volume.
+
+Empty source directories left behind by successful moves, including empty precise directories, are removed when safe.
 
 ## Gallery maintenance
 
@@ -46,8 +50,8 @@ Gallery maintenance repairs mismatches between the gallery's records and the ima
 
 | Action | What it does |
 | --- | --- |
-| **Remove records for missing images** | Deletes gallery records whose image file is missing, with their image-search (semantic index) entries. Thumbnails left behind go to the archive. |
-| **Archive untracked files** | Moves image files that have no gallery record, and thumbnails without an image, to the archive. |
+| **Remove records for missing images** | Deletes gallery records whose image file is missing, with their image-search (semantic index) entries. Thumbnails and precise files left behind go to the archive. |
+| **Archive untracked files** | Moves image files that have no gallery record, and thumbnails without an image, to the archive. So do precise files that no image record or precise-asset entry names, precise files in a different subfolder than their record, and leftover `.tmp*` files from interrupted precise writes. A precise file that belongs to an existing image is never archived or adopted. |
 | **Regenerate missing thumbnails** | Creates missing thumbnails. Original images are unchanged. |
 
 Each action scans first and shows what it would change; nothing changes until you confirm, and the dialog waits until the action finishes. If the gallery changed since the scan, InvokeAI asks you to scan again. The actions cover images of every account, including images on archived boards and intermediates. They do not cover videos.
@@ -55,6 +59,16 @@ Each action scans first and shows what it would change; nothing changes until yo
 Before an action changes anything, it backs up the database, and the two archiving actions create an archive folder. The result shows both paths:
 
 - **Database backup:** `databases/backup/backup-<timestamp>-gallery-maintenance-<id>.db`. With a [MySQL or MariaDB database](/configuration/external-database/) no backup is made; back it up with the server's tools first.
-- **Archive** (**Remove records for missing images** and **Archive untracked files** only): a new folder per run, `outputs/images-archive/gallery-maintenance/<action>-<id>/`.
+- **Archive** (**Remove records for missing images** and **Archive untracked files** only): a new folder per run, `outputs/images-archive/gallery-maintenance/<action>-<id>/`. Its `images/`, `thumbnails/` and `precise/` folders mirror the gallery's subfolders.
 
 Keep both until you are sure you will not need the removed records or archived files. Maintenance does not import archived files back into the gallery.
+
+## Precise files in backups, deletes and recovery
+
+An image saved with [precise image storage](/configuration/invokeai-yaml/#precise-image-storage) has its exact pixels in `outputs/images/precise/`. Which images have such a file is recorded in the database, so the folder and the database belong together.
+
+- **Backup.** Back up `outputs/images/precise/` together with `outputs/images` and the database. A backup without the folder keeps every gallery image, but nodes that read an image's exact pixels fail for the images that had one, and so does their 16-bit download.
+- **Moves.** A move relocates the precise file of each image that has one, in the same step as its image and thumbnail, and keeps the folder on the same volume.
+- **Delete.** Deleting an image deletes its precise file with it. Deleting the folder yourself does not remove the records: the images stay in the Gallery without their exact pixels.
+- **Restoring an older database.** Precise files that no restored record names are not part of any image. Gallery maintenance archives them instead of deleting them.
+- **Turning the setting off.** Existing precise files and the images that own them keep working; only new precise saves stop.

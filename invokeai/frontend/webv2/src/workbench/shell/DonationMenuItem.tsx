@@ -1,18 +1,8 @@
 import { chakra, Icon, Menu } from '@chakra-ui/react';
-import { apiFetchJson } from '@platform/transport/http';
-import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
+import { type QueryClient, useQuery } from '@tanstack/react-query';
 import { HeartIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-interface FrontendConfig {
-  show_donation_link: boolean;
-}
-
-const frontendConfigQueryOptions = queryOptions({
-  queryKey: ['frontend-config'],
-  queryFn: ({ signal }) => apiFetchJson<FrontendConfig>('/api/v1/app/frontend_config', { signal }),
-  staleTime: Infinity,
-});
 
 /**
  * Menu triggers call this on hover and focus so the setting usually resolves before the menu opens, rather than

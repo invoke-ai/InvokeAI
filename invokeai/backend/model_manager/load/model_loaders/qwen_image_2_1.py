@@ -104,9 +104,9 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
             return AutoProcessor.from_pretrained(model_path / "processor", local_files_only=True)
 
         if submodel_type is SubModelType.VAE:
-            # The configured precision, except float16, which is unstable on this autoencoder: bfloat16 where the
-            # device has it, float32 otherwise.
-            dtype = self._torch_dtype_avoiding_float16()
+            # The autoencoder's dtype: float32 under `precise_image_storage`, else the configured precision except
+            # float16, which is unstable on this autoencoder. Every other submodel keeps its own dtype.
+            dtype = self._autoencoder_dtype()
         else:
             dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
 

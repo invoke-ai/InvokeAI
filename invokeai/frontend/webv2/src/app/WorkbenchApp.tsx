@@ -35,7 +35,9 @@ export const WorkbenchApp = () => {
   );
 
   // Preload widget chunks during hydration; the provider withholds the shell until hydration finishes.
-  useMountEffect(preloadBootWidgets);
+  useMountEffect(() => {
+    preloadBootWidgets();
+  });
 
   return (
     <WorkbenchProvider loadOptions={loadOptions}>

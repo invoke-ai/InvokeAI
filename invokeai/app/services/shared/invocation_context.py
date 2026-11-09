@@ -34,6 +34,9 @@ from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callback
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
+from invokeai.backend.image_util.raster.convert import pil_refusal, raster_to_pil
+from invokeai.backend.image_util.raster.descriptor import RasterConversionError
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
@@ -339,6 +342,71 @@ class ImagesInterface(InvocationContextInterface):
             The saved image DTO.
         """
 
+        return self._save_image(image, board_id, image_category, metadata)
+
+    @property
+    def precise_storage_enabled(self) -> bool:
+        """Whether `save_raster` stores rasters the gallery PNG cannot represent exactly (16-bit RGB/RGBA, float16,
+        float32) as precise images. A node that does not need exactness can check this and quantize explicitly
+        (`quantize_unit`) when it is False."""
+        return self._services.configuration.precise_image_storage
+
+    def save_raster(
+        self,
+        raster: RasterImage,
+        board_id: Optional[str] = None,
+        image_category: ImageCategory = ImageCategory.GENERAL,
+        metadata: Optional[MetadataField] = None,
+        display_image: Optional[Image] = None,
+    ) -> ImageDTO:
+        """Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled
+        exactly as in `save`.
+
+        A raster the gallery PNG represents exactly (uint8 sRGB L/LA/RGB/RGBA with straight alpha, uint16 L) is saved
+        as an ordinary image. Any other raster is saved as a precise image when `precise_storage_enabled` and the
+        raster is displayable (sRGB, unit range, L/LA/RGB/RGBA, no premultiplied alpha, finite, within the asset
+        bounds): its exact pixels are stored losslessly and `get_raster` returns them, while the gallery shows an
+        8-bit PNG made from them by display quantization. Otherwise `RasterConversionError` is raised (and
+        `PreciseAssetError` for an oversized raster); quantize explicitly first instead of relying on a silent
+        conversion here. Nothing is saved when the raster is refused.
+
+        Args:
+            raster: The raster to save.
+            board_id: See `save`.
+            image_category: See `save`.
+            metadata: See `save`.
+            display_image: The gallery PNG of a precise save, instead of the display quantization of `raster`, for a
+                node that must keep its legacy 8-bit output bit-identical. An 8-bit PIL image of the same size whose
+                mode equals the raster's channels (L/LA/RGB/RGBA); otherwise `RasterConversionError` is raised and
+                nothing is saved. Passing it for a raster the gallery PNG represents exactly is an error.
+
+        Returns:
+            The saved image DTO.
+        """
+
+        refusal = pil_refusal(raster)
+        if refusal is None:
+            if display_image is not None:
+                raise ValueError(
+                    "display_image applies only to precise saves; this raster is saved as an ordinary gallery PNG"
+                )
+            return self._save_image(raster_to_pil(raster), board_id, image_category, metadata)
+        if not self.precise_storage_enabled:
+            raise RasterConversionError(
+                f"{refusal}; the gallery stores only 8-bit sRGB L/LA/RGB/RGBA and 16-bit L unless precise image "
+                "storage (`precise_image_storage`) is enabled, so convert explicitly first (for example with "
+                "quantize_unit)"
+            )
+        return self._save_image(raster, board_id, image_category, metadata, display_image)
+
+    def _save_image(
+        self,
+        image: Image | RasterImage,
+        board_id: Optional[str],
+        image_category: ImageCategory,
+        metadata: Optional[MetadataField],
+        display_image: Optional[Image] = None,
+    ) -> ImageDTO:
         self._util.signal_progress("Saving image")
 
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
@@ -380,21 +448,23 @@ class ImagesInterface(InvocationContextInterface):
                 self._data.invocation
             ).model_dump_json()
 
-        return self._services.images.create(
-            image=image,
-            is_intermediate=self._data.invocation.is_intermediate,
-            image_category=image_category,
-            board_id=board_id_,
-            metadata=metadata_,
-            image_origin=ResourceOrigin.INTERNAL,
-            workflow=workflow_,
-            graph=graph_,
-            resolved_inputs=resolved_inputs,
-            session_id=self._data.queue_item.session_id,
-            node_id=self._data.invocation.id,
-            user_id=self._data.queue_item.user_id,
-            project_id=self._data.queue_item.project_id,
-        )
+        shared = {
+            "is_intermediate": self._data.invocation.is_intermediate,
+            "image_category": image_category,
+            "board_id": board_id_,
+            "metadata": metadata_,
+            "image_origin": ResourceOrigin.INTERNAL,
+            "workflow": workflow_,
+            "graph": graph_,
+            "resolved_inputs": resolved_inputs,
+            "session_id": self._data.queue_item.session_id,
+            "node_id": self._data.invocation.id,
+            "user_id": self._data.queue_item.user_id,
+            "project_id": self._data.queue_item.project_id,
+        }
+        if isinstance(image, RasterImage):
+            return self._services.images.create_from_raster(raster=image, display_image=display_image, **shared)
+        return self._services.images.create(image=image, **shared)
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
         """Gets an image as a PIL Image object. This method returns a copy of the image.
@@ -422,6 +492,36 @@ class ImagesInterface(InvocationContextInterface):
             # copy the image to prevent the user from modifying the original
             image = image.copy()
         return image
+
+    def get_raster(self, image_name: str) -> RasterImage:
+        """Gets an image's pixels as a raster that the caller owns.
+
+        Gallery PNGs arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes
+        straight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`
+        cannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first. An image with a precise
+        asset arrives with the stored precision and descriptor (e.g. float32, linear or premultiplied), which can
+        be anything the raster package represents.
+
+        Args:
+            image_name: The name of the image to get.
+
+        Returns:
+            The image as a RasterImage.
+        """
+        self._assert_read_access(image_name)
+        return self._services.images.get_raster(image_name)
+
+    def has_precise_asset(self, image_name: str) -> bool:
+        """Whether the image was saved with a precise asset, so `get_raster` returns more than its gallery PNG holds.
+
+        A node that must keep its 8-bit behavior for ordinary images can route on this instead of on the raster's
+        dtype: a PNG-backed image never has an asset, whatever its pixel format.
+
+        Args:
+            image_name: The name of the image to check.
+        """
+        self._assert_read_access(image_name)
+        return self._services.images.has_precise_asset(image_name)
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata, if it has any.

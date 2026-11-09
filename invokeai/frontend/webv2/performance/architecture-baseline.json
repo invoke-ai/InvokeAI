@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 816492,
+        "brotliBytes": 816373,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 816093,
+        "gzipBytes": 816172,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2106927,
-        "largestAssetRawBytes": 751079,
+        "initialRawBytes": 2107071,
+        "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 115509,
+        "ownedRawBytes": 115648,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -361,15 +361,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1272615,
+        "brotliBytes": 1273121,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1265631,
+        "gzipBytes": 1266379,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3516969,
-        "largestAssetRawBytes": 751079,
+        "initialRawBytes": 3519043,
+        "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 176678,
+        "ownedRawBytes": 176825,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -775,6 +775,7 @@
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
           "source:src/platform/runtime/appMetadata.ts",
+          "source:src/platform/runtime/frontendConfig.ts",
           "source:src/platform/search/dateTokens.ts",
           "source:src/platform/state/accountLifecycle.ts",
           "source:src/platform/state/compareAndSwapRollback.ts",
@@ -933,6 +934,7 @@
           "source:src/workbench/image-actions/GalleryBoardDestinationGroups.tsx",
           "source:src/workbench/image-actions/recallParametersBridge.ts",
           "source:src/workbench/image-actions/useFindGalleryItem.ts",
+          "source:src/workbench/image-actions/useImageExportFormats.ts",
           "source:src/workbench/invocation.ts",
           "source:src/workbench/invocationPreparation.ts",
           "source:src/workbench/invocationSubmit.ts",

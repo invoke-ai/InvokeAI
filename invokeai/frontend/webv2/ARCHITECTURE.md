@@ -29,7 +29,7 @@ Ownership follows invariants, not the first caller:
 | `platform/i18n`        | i18next bootstrap and supported-language metadata                                                                                                     | Persisted preference ownership                                  |
 | `platform/logging`     | Event contracts, recording filters, safe normalization, bounded in-memory history, subscriptions, console output, export envelope                     | Preference persistence, diagnostic presentation, event policy   |
 | `platform/ui`          | Chakra system/theme, reusable controls, dialog root and modal presence, toaster, brand mark                                                           | Workbench widgets or feature-specific views                     |
-| `platform/runtime`     | Domain-neutral build/runtime metadata                                                                                                                 | Route or feature policy                                         |
+| `platform/runtime`     | Domain-neutral build/runtime metadata and the server's deployment `frontend_config` read (one query key for every reader)                             | Route or feature policy                                         |
 | `workbench/components` | Workbench hydration and Queue progress presentation                                                                                                   | Reusable control or theme implementation                        |
 
 - `src/` root holds declaration files only. Runtime boot files live in App. Old root entry paths are gone; `index.html` names `src/app/main.tsx` directly.

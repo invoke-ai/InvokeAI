@@ -2645,18 +2645,20 @@ class TestBulkDownloadAccessControl:
 
     @staticmethod
     def _download_zip_names(
-        client: TestClient, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path, token: str, board_id: str
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        token: str,
+        board_id: str,
+        export_format: str | None = None,
     ) -> set[str]:
-        """Request a board download, run the queued job, fetch the ZIP as the caller and list its images."""
+        """Request a board download, wait for the service's job thread, fetch the ZIP as the caller and list its images."""
         import io
+        import time
         import zipfile
 
-        from fastapi import BackgroundTasks
-
-        queued: list[tuple[Any, tuple[Any, ...], dict[str, Any]]] = []
-        monkeypatch.setattr(
-            BackgroundTasks, "add_task", lambda _self, fn, *args, **kwargs: queued.append((fn, args, kwargs))
-        )
+        from invokeai.app.services.bulk_download.bulk_download_common import BulkDownloadStatus
 
         def image_path(image_name: str, thumbnail: bool = False) -> str:
             path = tmp_path / image_name
@@ -2665,12 +2667,19 @@ class TestBulkDownloadAccessControl:
 
         monkeypatch.setattr(mock_invoker.services.images, "get_path", image_path)
 
-        r = client.post("/api/v1/images/download", json={"board_id": board_id}, headers=_auth(token))
+        body: dict[str, Any] = {"board_id": board_id}
+        if export_format is not None:
+            body["export_format"] = export_format
+        r = client.post("/api/v1/images/download", json=body, headers=_auth(token))
         assert r.status_code == status.HTTP_202_ACCEPTED
-        fn, args, kwargs = queued.pop()
-        fn(*args, **kwargs)
+        item_name = r.json()["bulk_download_item_name"]
+        service = mock_invoker.services.bulk_download
+        deadline = time.monotonic() + 20
+        while service.get_status(item_name) is BulkDownloadStatus.BUILDING:
+            assert time.monotonic() < deadline, "the job did not finish"
+            time.sleep(0.01)
 
-        r = client.get(f"/api/v1/images/download/{r.json()['bulk_download_item_name']}", headers=_auth(token))
+        r = client.get(f"/api/v1/images/download/{item_name}", headers=_auth(token))
         assert r.status_code == status.HTTP_200_OK
         with zipfile.ZipFile(io.BytesIO(r.content)) as archive:
             return {Path(name).name for name in archive.namelist()}
@@ -2694,6 +2703,28 @@ class TestBulkDownloadAccessControl:
         names = self._download_zip_names(client, mock_invoker, monkeypatch, tmp_path, user2_token, "none")
 
         assert names == {"user2-uncategorized-dl"}
+
+    def test_uncategorized_png16_download_contains_only_callers_images(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Path,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """The png16 archive is built on the service's own thread; it must keep the caller's scope."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-uncategorized-png16", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-png16", user2.user_id)
+
+        names = self._download_zip_names(
+            client, mock_invoker, monkeypatch, tmp_path, user2_token, "none", export_format="png16"
+        )
+
+        assert names == {"user2-uncategorized-png16"}
 
     def test_admin_uncategorized_download_contains_every_users_images(
         self,

@@ -44,6 +44,7 @@ class GalleryMaintenanceResult(BaseModel):
     records_removed: int = Field(ge=0)
     images_archived: int = Field(ge=0)
     thumbnails_archived: int = Field(ge=0)
+    precise_archived: int = Field(default=0, ge=0)
     thumbnails_regenerated: int = Field(ge=0)
     archive_path: str | None = None
     backup_path: str | None = None

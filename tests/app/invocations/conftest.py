@@ -1,10 +1,33 @@
 """Shared fixtures for the VAE invocation tests."""
 
+import itertools
 from collections.abc import Callable
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
+import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from PIL import Image
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
+from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.shared.database.startup import init_database
+from invokeai.app.services.shared.invocation_context import ImagesInterface
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 
 
@@ -65,3 +88,100 @@ def _fixed_working_memory(reservation_bytes: int) -> WorkingMemoryEstimate:
 def fixed_working_memory() -> Callable[[int], WorkingMemoryEstimate]:
     """An estimate that reserves exactly the given bytes, for a node whose estimator a test patches out."""
     return _fixed_working_memory
+
+
+def _srgb_descriptor(channels: RasterChannels, **overrides) -> RasterDescriptor:
+    has_alpha = channels in (RasterChannels.LA, RasterChannels.RGBA)
+    fields = {
+        "channels": channels,
+        "color": ColorEncoding.SRGB,
+        "value_range": ValueRange.UNIT,
+        "alpha": AlphaMode.STRAIGHT if has_alpha else AlphaMode.NONE,
+        "channel_count": len(channels.value),
+    }
+    fields.update(overrides)
+    return RasterDescriptor(**fields)
+
+
+@pytest.fixture
+def srgb_descriptor() -> Callable[..., RasterDescriptor]:
+    """Builds the descriptor of a precise sRGB unit-range raster with the given channels (fields overridable)."""
+    return _srgb_descriptor
+
+
+@pytest.fixture
+def precise_world(tmp_path: Path, srgb_descriptor):
+    """Real image service, records and PNG storage behind a context whose model, tensor and config parts are small."""
+    config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
+    config._root = tmp_path
+    storage = DiskImageFileStorage(tmp_path / "images")
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    invoker.services.configuration.image_subfolder_strategy = "flat"
+    invoker.services.configuration.multiuser = False
+    invoker.services.configuration.precise_image_storage = True
+    storage.start(invoker)
+    db = init_database(config=config, logger=InvokeAILogger.get_logger(), image_files=storage)
+    counter = itertools.count()
+    invoker.services.names.create_image_name.side_effect = lambda: f"image-{next(counter)}.png"
+    invoker.services.database = db
+    invoker.services.image_records = ImageRecordStorage(db)
+    invoker.services.image_files = storage
+    invoker.services.board_image_records.get_board_for_image.return_value = None
+    invoker.services.urls.get_image_url.return_value = "url"
+    invoker.services.logger = MagicMock()
+    service = ImageService()
+    service.start(invoker)
+    invoker.services.images = service
+    data = SimpleNamespace(
+        queue_item=SimpleNamespace(
+            user_id=None,
+            project_id=None,
+            session_id=None,
+            session=SimpleNamespace(graph=None),
+            workflow=None,
+            root_item_id=None,
+            _workflow_json_loaded=False,
+            _workflow_json_snapshot=None,
+        ),
+        invocation=SimpleNamespace(is_intermediate=False, id="node"),
+    )
+    images = ImagesInterface(invoker.services, data, MagicMock())
+
+    saved_tensors: dict[str, torch.Tensor] = {}
+
+    def save_tensor(tensor: torch.Tensor) -> str:
+        name = f"tensor-{len(saved_tensors)}"
+        saved_tensors[name] = tensor
+        return name
+
+    vae_holder: dict[str, MagicMock] = {}
+    context = SimpleNamespace(
+        images=images,
+        tensors=SimpleNamespace(load=lambda name: saved_tensors[name].clone(), save=save_tensor),
+        models=SimpleNamespace(load=lambda _field: vae_holder["info"]),
+        util=MagicMock(),
+        config=SimpleNamespace(get=lambda: SimpleNamespace(force_tiled_decode=False)),
+    )
+
+    def store_png(array: np.ndarray, mode: str) -> str:
+        image = Image.fromarray(array[:, :, 0] if array.shape[2] == 1 else array, mode)
+        return service.create(image, ResourceOrigin.EXTERNAL, ImageCategory.GENERAL).image_name
+
+    return SimpleNamespace(
+        descriptor=srgb_descriptor,
+        stored_bytes=lambda image_name: storage.get_path(image_name).read_bytes(),
+        store_png=store_png,
+        store_precise=lambda array, channels: images.save_raster(
+            RasterImage.from_array(array, srgb_descriptor(channels))
+        ).image_name,
+        service=service,
+        database=db,
+        storage=storage,
+        images=images,
+        context=context,
+        configuration=invoker.services.configuration,
+        tensors=saved_tensors,
+        vae_holder=vae_holder,
+        use_vae=lambda info: vae_holder.__setitem__("info", info),
+    )

@@ -13,6 +13,11 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
 import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
 
+export interface GalleryArchiveOptions {
+  /** `png16` archives images that have precise data as 16-bit PNGs; the rest keep their gallery file. */
+  exportFormat?: 'png16';
+}
+
 export interface GalleryItemActions {
   /**
    * `returnFocus` names where keyboard focus goes when a confirmation dialog closes, resolved then: the deletion can
@@ -24,7 +29,7 @@ export interface GalleryItemActions {
     options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
   ): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
-  downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
+  downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[], options?: GalleryArchiveOptions): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
   openItemInNewTab(item: GalleryItem): void;
   openItemInPreview(item: GalleryItem): void;

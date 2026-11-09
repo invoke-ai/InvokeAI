@@ -17,13 +17,13 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import _vae_dtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
-    FLUX2_PIPELINE_VAE_DTYPE,
     FORCE_TILED_BASES,
     SDNQ_PIPELINE_VAE_DTYPE,
     VAE_WEIGHTS_ALLOWANCE_BYTES,
     VaeDtypes,
     build_plan,
     case_sides,
+    own_vae_dtype,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.flux import (
@@ -148,7 +148,9 @@ def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, esti
     assert all(bool(case.settings) == (base == BaseModelType.StableDiffusion1) for case in plan.cases)
 
 
-FP32_VAES = VaeDtypes(standalone_flux="fp32", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
+FP32_VAES = VaeDtypes(
+    standalone_flux="fp32", z_image_pipeline="bf16", flux2_pipeline="bf16", sdnq_quantized_vae=lambda config: False
+)
 """`precision: float32`: the standalone FLUX VAE loaders keep it; a Z-Image pipeline's own VAE still loads in bf16."""
 
 
@@ -239,6 +241,7 @@ def test_a_pipeline_decodes_in_the_dtype_its_own_vae_loads_in(pipeline, line) ->
     vaes = VaeDtypes(
         standalone_flux="fp32",
         z_image_pipeline="fp16",
+        flux2_pipeline="bf16",
         sdnq_quantized_vae=lambda config: config.key == "flux-sdnq-quantized-vae",
     )
 
@@ -279,7 +282,9 @@ def test_a_flux2_model_without_its_own_vae_decodes_with_its_component_source_vae
     """Generate gives a GGUF or checkpoint FLUX.2 model an installed FLUX.2 pipeline as its component source
     (`getAutoFlux2ComponentSourceModel`), and the FLUX.2 model loader node decodes with that pipeline's VAE. A standalone
     Qwen3 8B encoder is installed, as one that fits no pipeline needs."""
-    vaes = VaeDtypes(standalone_flux="fp16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
+    vaes = VaeDtypes(
+        standalone_flux="fp16", z_image_pipeline="bf16", flux2_pipeline="bf16", sdnq_quantized_vae=lambda config: False
+    )
 
     assert _lines_of(_plan(GGUF_KLEIN_9B, [*sources, QWEN3_8B], vae_dtypes=vaes)) == {(line, ())}
 
@@ -290,7 +295,9 @@ QWEN3_4B = _model("qwen3-4b", BaseModelType.Any, ModelType.Qwen3Encoder, variant
 GGUF_DEV = _model("dev-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Dev)
 SDNQ_DEV = _sdnq_pipeline("dev-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Dev)
 MISTRAL = _model("mistral", BaseModelType.Any, ModelType.MistralEncoder, variant=MistralVariantType.Mistral24B)
-FP16_VAES = VaeDtypes(standalone_flux="fp16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
+FP16_VAES = VaeDtypes(
+    standalone_flux="fp16", z_image_pipeline="bf16", flux2_pipeline="bf16", sdnq_quantized_vae=lambda config: False
+)
 """A standalone FLUX.2 VAE decodes in fp16, apart from a Diffusers pipeline's bf16 and an SDNQ pipeline's fp32."""
 
 
@@ -321,7 +328,7 @@ def test_a_diffusers_klein_pipeline_gives_a_dev_model_its_vae_beside_a_mistral_e
 
     plan = _plan(GGUF_DEV, [KLEIN_4B_SDNQ, klein, FLUX2_VAE, MISTRAL], vae_dtypes=FP16_VAES)
 
-    assert _lines_of(plan) == {(f"decode_{FLUX2_PIPELINE_VAE_DTYPE}", ())}
+    assert _lines_of(plan) == {("decode_bf16", ())}
 
 
 def test_an_sdnq_dev_model_decodes_with_a_standalone_vae_not_its_own() -> None:
@@ -330,7 +337,7 @@ def test_an_sdnq_dev_model_decodes_with_a_standalone_vae_not_its_own() -> None:
     dev = _model("dev-diffusers", BaseModelType.Flux2, format="diffusers", variant=Flux2VariantType.Dev)
 
     assert _lines_of(_plan(SDNQ_DEV, [FLUX2_VAE, MISTRAL], vae_dtypes=FP16_VAES)) == {("decode_fp16", ())}
-    assert _lines_of(_plan(SDNQ_DEV, [dev], vae_dtypes=FP16_VAES)) == {(f"decode_{FLUX2_PIPELINE_VAE_DTYPE}", ())}
+    assert _lines_of(_plan(SDNQ_DEV, [dev], vae_dtypes=FP16_VAES)) == {("decode_bf16", ())}
 
 
 @pytest.mark.parametrize(
@@ -913,10 +920,13 @@ def test_a_flux2_diffusers_pipelines_own_vae_loads_in_the_dtype_the_plan_sizes_f
     (tmp_path / "model_index.json").write_text(json.dumps({"vae": ["diffusers", "AutoencoderKLFlux2"]}))
     loader = Flux2DiffusersModel.__new__(Flux2DiffusersModel)
     loader._apply_fp8_layerwise_casting = lambda model, config, submodel_type: model
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
+    loader._torch_dtype = torch.float16
+    loader._torch_device = torch.device("cpu")
 
     vae = loader._load_model(SimpleNamespace(path=str(tmp_path), repo_variant=None), SubModelType.VAE)
 
-    assert _dtype_of(vae) == FLUX2_PIPELINE_VAE_DTYPE
+    assert _dtype_of(vae) == "bf16"
 
 
 @pytest.mark.parametrize("precision, expected", [("float32", "fp32"), ("bfloat16", "bf16"), ("auto", "bf16")])
@@ -931,7 +941,43 @@ def test_the_service_reads_a_standalone_flux_vaes_dtype_from_the_precision_setti
     # The bf16 probe on a card that has it; no CUDA device is needed for the answer.
     monkeypatch.setattr(torch, "empty", lambda *args, dtype, device: empty(0, dtype=dtype))
 
-    assert _vae_dtypes(GPU, Path("models")).standalone_flux == expected
+    assert _vae_dtypes(GPU, Path("models"), False).standalone_flux == expected
+
+
+@pytest.mark.parametrize("precision", ["auto", "bfloat16", "float32"])
+def test_the_service_sizes_every_covered_flux_vae_decode_in_float32_under_precise_storage(
+    monkeypatch: pytest.MonkeyPatch, precision: str
+):
+    """The loaders run these VAEs in float32 then, whatever the precision setting, and the Diffusers pipelines that
+    force bfloat16 on every submodel give their VAE the same: the plan must size that."""
+    monkeypatch.setattr(get_config(), "precision", precision)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA GeForce RTX 4090")
+    empty = torch.empty
+    monkeypatch.setattr(torch, "empty", lambda *args, dtype, device: empty(0, dtype=dtype))
+
+    vaes = _vae_dtypes(GPU, Path("models"), True)
+
+    assert (vaes.standalone_flux, vaes.z_image_pipeline, vaes.flux2_pipeline) == ("fp32", "fp32", "fp32")
+
+
+def test_a_diffusers_flux2_pipeline_and_a_z_image_pipeline_decode_in_the_dtype_their_vae_loads_in() -> None:
+    """Through `own_vae_dtype`: the pipelines' own VAEs, bf16 off and fp32 on, and Ideogram 4's stays as it is."""
+    klein = _model("klein-diffusers", BaseModelType.Flux2, format="diffusers", variant=Flux2VariantType.Klein4B)
+    z_image = _model("z-image", BaseModelType.ZImage, format="diffusers")
+    ideogram = _model("ideogram", BaseModelType.Ideogram4, format="diffusers")
+    off = VaeDtypes(
+        standalone_flux="bf16", z_image_pipeline="bf16", flux2_pipeline="bf16", sdnq_quantized_vae=lambda c: False
+    )
+    on = VaeDtypes(
+        standalone_flux="fp32", z_image_pipeline="fp32", flux2_pipeline="fp32", sdnq_quantized_vae=lambda c: False
+    )
+
+    assert [own_vae_dtype(model, off) for model in (klein, z_image, ideogram)] == ["bf16", "bf16", "bf16"]
+    assert [own_vae_dtype(model, on) for model in (klein, z_image, ideogram)] == ["fp32", "fp32", "bf16"]
+    for pipeline in (_model("klein", BaseModelType.Flux2, format="diffusers"), z_image):
+        assert _lines_of(_plan(pipeline, vae_dtypes=on)) == {("decode_fp32", ())}
+    assert _lines_of(_plan(z_image, vae_dtypes=on)) == {("decode_fp32", ())}
 
 
 def test_the_service_tells_an_sdnq_quantized_vae_folder_where_the_loader_looks(tmp_path: Path):
@@ -939,7 +985,7 @@ def test_the_service_tells_an_sdnq_quantized_vae_folder_where_the_loader_looks(t
     quantized.mkdir(parents=True)
     plain.mkdir(parents=True)
     (quantized / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}))
-    vaes = _vae_dtypes(torch.device("cpu"), tmp_path)
+    vaes = _vae_dtypes(torch.device("cpu"), tmp_path, False)
 
     assert vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq", submodels=None))
     assert not vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq-plain", submodels=None))

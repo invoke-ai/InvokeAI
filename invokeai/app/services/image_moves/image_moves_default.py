@@ -33,6 +33,24 @@ class PlannedImageMove:
     new_path: Path
     old_thumbnail_path: Path
     new_thumbnail_path: Path
+    # (old, new) paths of the precise file, only for an image with a precise asset row: then its file moves with it.
+    # A precise file without a row is not part of the image; it stays where it is for gallery maintenance to archive.
+    # Left out otherwise, as deriving a validated path costs on every planned move.
+    precise_paths: tuple[Path, Path] | None = None
+
+    @property
+    def has_precise(self) -> bool:
+        return self.precise_paths is not None
+
+    @property
+    def old_precise_path(self) -> Path:
+        assert self.precise_paths is not None
+        return self.precise_paths[0]
+
+    @property
+    def new_precise_path(self) -> Path:
+        assert self.precise_paths is not None
+        return self.precise_paths[1]
 
 
 @dataclass(frozen=True)
@@ -370,7 +388,7 @@ class ImageMoveService:
     def _plan_batch(
         self, last_image_name: str, limit: int, record_missing_errors: bool
     ) -> tuple[list[PlannedImageMove], int]:
-        moves: list[PlannedImageMove] = []
+        items: list[tuple[str, str, str, bool]] = []
         for image_name, subfolder, category, is_intermediate, created_at in self._queries.image_moves.placements_after(
             last_image_name, limit
         ):
@@ -381,7 +399,8 @@ class ImageMoveService:
                 created_at=created_at,
             )
             if new_subfolder != subfolder:
-                moves.append(self._planned_move(image_name, subfolder, new_subfolder, is_intermediate))
+                items.append((image_name, subfolder, new_subfolder, is_intermediate))
+        moves = self._planned_moves(items)
         errors = 0
         if record_missing_errors:
             moves, errors = self._record_missing_source_errors(moves)
@@ -402,6 +421,7 @@ class ImageMoveService:
     def preflight_moves(self, moves: Sequence[PlannedImageMove]) -> None:
         destinations: set[Path] = set()
         thumbnail_destinations: set[Path] = set()
+        precise_destinations: set[Path] = set()
         for move in moves:
             if not move.old_path.exists():
                 if not move.is_intermediate:
@@ -417,6 +437,16 @@ class ImageMoveService:
             if move.new_thumbnail_path in thumbnail_destinations:
                 raise ValueError(f"Duplicate destination thumbnail path: {move.new_thumbnail_path}")
             thumbnail_destinations.add(move.new_thumbnail_path)
+            if move.has_precise:
+                if move.new_precise_path.exists():
+                    raise FileExistsError(f"Destination precise asset already exists: {move.new_precise_path}")
+                if move.new_precise_path in precise_destinations:
+                    raise ValueError(f"Duplicate destination precise asset path: {move.new_precise_path}")
+                precise_destinations.add(move.new_precise_path)
+                if move.old_precise_path.exists():
+                    self._assert_same_filesystem(move.old_precise_path, move.new_precise_path)
+                elif not move.is_intermediate:
+                    raise FileNotFoundError(f"Source precise asset does not exist: {move.old_precise_path}")
             if self._queries.image_moves.has_active_job_for_image(move.image_name):
                 raise ValueError(f"Image {move.image_name} already has an active image move job")
             self._assert_same_filesystem(move.old_path, move.new_path)
@@ -429,10 +459,15 @@ class ImageMoveService:
         remaining_moves: list[PlannedImageMove] = []
         errors = 0
         for move in moves:
-            if move.old_path.exists() or move.is_intermediate:
+            if move.is_intermediate or (
+                move.old_path.exists() and (not move.has_precise or move.old_precise_path.exists())
+            ):
                 remaining_moves.append(move)
                 continue
-            message = f"Source image does not exist: {move.old_path}"
+            if not move.old_path.exists():
+                message = f"Source image does not exist: {move.old_path}"
+            else:
+                message = f"Source precise asset does not exist: {move.old_precise_path}"
             self.create_error_move_job(move, message)
             self._logger.error(message)
             errors += 1
@@ -482,9 +517,22 @@ class ImageMoveService:
                     new_path=new_path,
                     old_thumbnail_path=old_thumbnail_path,
                     new_thumbnail_path=new_thumbnail_path,
+                    precise_paths=item.precise_paths or (),
                 )
                 return
             raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
+
+        # Decided before anything moves, so that an ambiguous precise asset leaves the PNG where it is.
+        move_precise = False
+        if item.has_precise:
+            old_precise_path, new_precise_path = item.old_precise_path, item.new_precise_path
+            old_precise_exists = old_precise_path.exists()
+            new_precise_exists = new_precise_path.exists()
+            if old_precise_exists and new_precise_exists:
+                raise RuntimeError(f"Both old and new precise asset files exist for {item.image_name}")
+            if not old_precise_exists and not new_precise_exists and not item.is_intermediate:
+                raise RuntimeError(f"Neither old nor new precise asset file exists for {item.image_name}")
+            move_precise = old_precise_exists
 
         old_thumbnail_exists = old_thumbnail_path.exists()
         new_thumbnail_exists = new_thumbnail_path.exists()
@@ -501,15 +549,20 @@ class ImageMoveService:
             # images can be repaired or removed by the operator.
             self._regenerate_thumbnail(old_path, new_thumbnail_path)
 
-        if not old_exists and new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
-            self._regenerate_thumbnail(new_path, new_thumbnail_path)
-
         if old_exists:
             new_path.parent.mkdir(parents=True, exist_ok=True)
             os.replace(old_path, new_path)
             self._fsync_file(new_path)
             self._fsync_dir(new_path.parent)
             self._fsync_dir(old_path.parent)
+
+        if move_precise:
+            old_precise_path, new_precise_path = item.old_precise_path, item.new_precise_path
+            new_precise_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(old_precise_path, new_precise_path)
+            self._fsync_file(new_precise_path)
+            self._fsync_dir(new_precise_path.parent)
+            self._fsync_dir(old_precise_path.parent)
 
         old_thumbnail_exists = old_thumbnail_path.exists()
         new_thumbnail_exists = new_thumbnail_path.exists()
@@ -533,6 +586,10 @@ class ImageMoveService:
         new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
         if old_path.exists() or not new_path.exists():
             return
+        if item.has_precise and item.old_precise_path.exists():
+            # The precise file is still at the old path: repointing would strand it. A lost file is different: the
+            # record follows the PNG, and reading the precise raster fails explicitly.
+            return
         self._queries.image_moves.repoint_image(item.image_name, item.old_subfolder, item.new_subfolder)
 
     def cleanup_empty_source_dirs(self, job_id: int) -> None:
@@ -545,6 +602,8 @@ class ImageMoveService:
                 self.image_files.get_path(item.image_name, thumbnail=True, image_subfolder=item.old_subfolder).parent,
                 self.image_files.thumbnail_root,
             )
+            if item.has_precise:
+                self._remove_empty_parents(item.old_precise_path.parent, self.image_files.precise_root)
 
     def commit_database_updates(self, job_id: int) -> int:
         def commit(q: Queries) -> int:
@@ -603,15 +662,17 @@ class ImageMoveService:
         raise ValueError(f"Unknown image subfolder strategy: {strategy}")
 
     def _get_items(self, job_id: int, include_terminal: bool = True) -> list[PlannedImageMove]:
+        return self._planned_moves(self._queries.image_moves.items(job_id, unfinished_only=not include_terminal))
+
+    def _planned_moves(self, items: Sequence[tuple[str, str, str, bool]]) -> list[PlannedImageMove]:
+        with_precise = self._queries.image_precise_assets.names_with_assets([item[0] for item in items])
         return [
-            self._planned_move(image_name, old_subfolder, new_subfolder, is_intermediate)
-            for image_name, old_subfolder, new_subfolder, is_intermediate in self._queries.image_moves.items(
-                job_id, unfinished_only=not include_terminal
-            )
+            self._planned_move(image_name, old_subfolder, new_subfolder, is_intermediate, image_name in with_precise)
+            for image_name, old_subfolder, new_subfolder, is_intermediate in items
         ]
 
     def _planned_move(
-        self, image_name: str, old_subfolder: str, new_subfolder: str, is_intermediate: bool
+        self, image_name: str, old_subfolder: str, new_subfolder: str, is_intermediate: bool, has_precise: bool
     ) -> PlannedImageMove:
         return PlannedImageMove(
             image_name=image_name,
@@ -622,6 +683,14 @@ class ImageMoveService:
             new_path=self.image_files.get_path(image_name, image_subfolder=new_subfolder),
             old_thumbnail_path=self.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder),
             new_thumbnail_path=self.image_files.get_path(image_name, thumbnail=True, image_subfolder=new_subfolder),
+            precise_paths=(
+                (
+                    self.image_files.get_precise_path(image_name, old_subfolder),
+                    self.image_files.get_precise_path(image_name, new_subfolder),
+                )
+                if has_precise
+                else None
+            ),
         )
 
     def _regenerate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
@@ -652,8 +721,9 @@ class ImageMoveService:
         new_path: Path,
         old_thumbnail_path: Path,
         new_thumbnail_path: Path,
+        precise_paths: tuple[Path, ...],
     ) -> None:
-        for path in (old_thumbnail_path, new_thumbnail_path):
+        for path in (*precise_paths, old_thumbnail_path, new_thumbnail_path):
             if path.exists():
                 path.unlink()
                 self._fsync_dir(path.parent)
@@ -711,8 +781,14 @@ class ImageMoveService:
         if isinstance(error, UnreadableImageError):
             return True
         return isinstance(error, RuntimeError) and (
-            str(error).startswith("Both old and new image files exist")
-            or str(error).startswith("Neither old nor new image file exists")
+            str(error).startswith(
+                (
+                    "Both old and new image files exist",
+                    "Neither old nor new image file exists",
+                    "Both old and new precise asset files exist",
+                    "Neither old nor new precise asset file exists",
+                )
+            )
             or str(error).startswith("Image move job")
             and "has no items" in str(error)
         )

@@ -132,6 +132,7 @@ const result = (
     status: 'completed' | 'partial' | 'no_op' | 'failed';
     records_removed: number;
     images_archived: number;
+    precise_archived: number;
     thumbnails_archived: number;
     thumbnails_regenerated: number;
     failed_count: number;
@@ -146,6 +147,7 @@ const result = (
   failed_count: 0,
   records_removed: 0,
   images_archived: 0,
+  precise_archived: 0,
   thumbnails_archived: 0,
   thumbnails_regenerated: 0,
   archive_path: null,
@@ -583,6 +585,22 @@ describe('gallery maintenance in Data & workspace settings', () => {
     );
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
+  });
+
+  it('reports precise files archived by a run that archives nothing else', async () => {
+    const action = operations[1];
+    mocks.apiFetchJson
+      .mockResolvedValueOnce(preview(action.operation, action.fingerprint))
+      .mockResolvedValueOnce(result(action.operation, { precise_archived: 7 }));
+    await renderSettings();
+    await openAction(action);
+    await act(() => userEvent.click(getConfirmButton(action)!));
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+
+    // The i18n mock joins the interpolation values in order: examined, failed, images, precise, records, skipped, ...
+    expect(host.querySelector('[data-testid="gallery-maintenance-result"]')?.textContent).toContain(
+      'settings.galleryMaintenance.resultSummary 12 0 0 7 0 1 0 0'
+    );
   });
 
   it('refreshes mounted thumbnails after partial regeneration', async () => {

@@ -377,7 +377,7 @@ InvokeAI has had no security audit and has no login rate limiting or lockout. Pr
 
 The `databases` folder holds the accounts, the signing key and every record; `outputs` holds the image and video files.
 
-- **What to copy:** `databases/`, `outputs/` and `invokeai.yaml`. `models/` is optional, since models can be downloaded again.
+- **What to copy:** `databases/`, `outputs/` and `invokeai.yaml`. `models/` is optional, since models can be downloaded again. `outputs/images/precise/` holds the exact pixels of images saved with [precise image storage](/configuration/invokeai-yaml/#precise-image-storage); back it up and restore it together with `outputs/images` and the database.
 - **Stop InvokeAI first.** The database runs in write-ahead log mode, and a running server can hold recent changes in `invokeai.db-wal` beside the database file. Copy the whole folder, never the `.db` file alone while the server runs.
 - **Automatic backups.** Before every database update, such as an upgrade, InvokeAI saves `databases/invokeai_backup_<YYYYMMDD>-<HHMMSS>.db`. Gallery maintenance saves its own in `databases/backup/`. InvokeAI never deletes either.
 - **MySQL or MariaDB.** InvokeAI makes no backups of a server database. Use `mysqldump` or `mariadb-dump`.

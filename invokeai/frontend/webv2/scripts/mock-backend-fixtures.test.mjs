@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  MOCK_BACKEND_PRECISE_EXPORT,
   PROJECT_FILE_MEMBER_BOARD,
   assertMockBackendFixture,
   collectCanvasLeaves,
@@ -2403,6 +2404,36 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
   } finally {
     await backend.close();
   }
+});
+
+test('16-bit PNG export is listed only for the precise fixtures and fails as the real endpoint does', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const formatsOf = (imageName) => getJson(backend, `/api/v1/images/i/${imageName}/export-formats`);
+    const exportOf = (imageName) => fetch(`${backend.origin}/api/v1/images/i/${imageName}/export?format=png16`);
+
+    for (const imageName of Object.values(MOCK_BACKEND_PRECISE_EXPORT)) {
+      assert.deepEqual(await formatsOf(imageName), { formats: ['png16'] });
+    }
+    assert.deepEqual(await formatsOf('fixture-image-0001.png'), { formats: [] });
+
+    const download = await exportOf(MOCK_BACKEND_PRECISE_EXPORT.exportable);
+
+    assert.equal(download.status, 200);
+    assert.equal(download.headers.get('content-type'), 'image/png');
+    assert.equal(download.headers.get('content-disposition'), 'attachment; filename="fixture-image-0015-16bit.png"');
+    assert.ok((await download.arrayBuffer()).byteLength > 0);
+
+    const busy = await exportOf(MOCK_BACKEND_PRECISE_EXPORT.busy);
+
+    assert.equal(busy.status, 503);
+    assert.equal(busy.headers.get('retry-after'), '2');
+
+    const unexportable = await exportOf(MOCK_BACKEND_PRECISE_EXPORT.unexportable);
+
+    assert.equal(unexportable.status, 409);
+    assert.match((await unexportable.json()).detail, /non-finite/);
+    assert.equal((await exportOf('fixture-image-0001.png')).status, 409);
+  });
 });
 
 test('image PATCH adopts an intermediate as hidden durable Canvas pixels on every read', async () => {

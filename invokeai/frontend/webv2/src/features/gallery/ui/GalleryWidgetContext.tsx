@@ -13,7 +13,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import type { GalleryReadState, GalleryStateView } from './galleryStateView';
-import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
+import type {
+  GalleryArchiveOptions,
+  GalleryItemActions,
+  GalleryWidgetProps,
+  GalleryWidgetRuntime,
+} from './GalleryUiContext';
 import type { GalleryListingState, GallerySparseListing } from './useGalleryData';
 
 /**
@@ -28,7 +33,7 @@ export interface GalleryActions {
   /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
-  downloadBoard: (boardId: string) => Promise<void>;
+  downloadBoard: (boardId: string, options?: GalleryArchiveOptions) => Promise<void>;
   /** Where the board's media is still used; see `GalleryUiAdapter.getBoardMediaUsage`. */
   getBoardMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   /** Export the project that owns this board as a complete `.invk` archive. */

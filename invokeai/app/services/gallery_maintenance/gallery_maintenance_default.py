@@ -36,6 +36,28 @@ _MAX_RESULT_ERRORS = 20
 _MAX_ERROR_LENGTH = 300
 _OperationStatus = Literal["completed", "partial", "no_op", "failed"]
 _StatSignature = tuple[int, int, int, int, int, int]
+_PathKind = Literal["image", "thumbnail", "precise"]
+
+
+@dataclass
+class _Companion:
+    """A derived file (thumbnail or precise asset) archived before its record is deleted."""
+
+    kind: Literal["thumbnails", "precise"]
+    source: Path
+    archived: Path
+    signature: _StatSignature
+    archived_signature: _StatSignature | None = None
+    counted: bool = False
+
+
+@dataclass
+class _PendingRemoval:
+    image_name: str
+    original: Path
+    absent: list[Path]
+    thumbnail: Path
+    companions: list[_Companion]
 
 
 @dataclass(frozen=True)
@@ -54,6 +76,7 @@ class _ResultCounts:
     records_removed: int = 0
     images_archived: int = 0
     thumbnails_archived: int = 0
+    precise_archived: int = 0
     thumbnails_regenerated: int = 0
     errors: list[str] = field(default_factory=list)
     archive_path: str | None = None
@@ -64,7 +87,13 @@ class _ResultCounts:
             self.errors.append(description[:_MAX_ERROR_LENGTH])
 
     def result(self, operation: GalleryMaintenanceOperation) -> GalleryMaintenanceResult:
-        affected = self.records_removed + self.images_archived + self.thumbnails_archived + self.thumbnails_regenerated
+        affected = (
+            self.records_removed
+            + self.images_archived
+            + self.thumbnails_archived
+            + self.precise_archived
+            + self.thumbnails_regenerated
+        )
         if self.failed_count == 0 and self.skipped_count == 0 and affected == 0:
             status: _OperationStatus = "no_op"
         elif self.failed_count or self.skipped_count:
@@ -83,6 +112,7 @@ class _ResultCounts:
             records_removed=self.records_removed,
             images_archived=self.images_archived,
             thumbnails_archived=self.thumbnails_archived,
+            precise_archived=self.precise_archived,
             thumbnails_regenerated=self.thumbnails_regenerated,
             archive_path=self.archive_path,
             backup_path=self.backup_path,
@@ -204,6 +234,8 @@ class GalleryMaintenanceService:
                         subfolder TEXT NOT NULL,
                         original_signature TEXT,
                         thumbnail_signature TEXT,
+                        precise_signature TEXT,
+                        has_precise INTEGER NOT NULL DEFAULT 0,
                         action INTEGER NOT NULL DEFAULT 0,
                         duplicate INTEGER NOT NULL DEFAULT 0
                     );
@@ -228,7 +260,7 @@ class GalleryMaintenanceService:
         try:
             root_signatures = self._validate_storage_roots()
             roots = self._fingerprint_roots(operation)
-            self._feed(digest, "gallery-maintenance-v2", operation.value, *roots, *root_signatures)
+            self._feed(digest, "gallery-maintenance-v3", operation.value, *roots, *root_signatures)
             if operation is GalleryMaintenanceOperation.REMOVE_MISSING:
                 return self._scan_remove_missing(digest, inventory)
             if operation is GalleryMaintenanceOperation.ARCHIVE_UNTRACKED:
@@ -240,9 +272,10 @@ class GalleryMaintenanceService:
             self._logger.exception("Gallery maintenance scan failed for %s", operation.value)
             raise GalleryMaintenanceError("Could not safely inspect gallery storage.") from e
 
-    def _validate_storage_roots(self) -> tuple[str, str]:
+    def _validate_storage_roots(self) -> tuple[str, ...]:
         signatures: list[str] = []
-        for root in (self._services.image_files.image_root, self._services.image_files.thumbnail_root):
+        files = self._services.image_files
+        for root in (files.image_root, files.thumbnail_root, files.precise_root):
             try:
                 result = root.lstat()
                 if stat.S_ISLNK(result.st_mode) or not stat.S_ISDIR(result.st_mode):
@@ -257,11 +290,15 @@ class GalleryMaintenanceService:
                 self._logger.warning("Could not inspect gallery storage root (%s)", e.errno)
                 raise GalleryMaintenanceError("A required gallery storage root is unavailable.") from e
             signatures.append(json.dumps(self._signature(result), separators=(",", ":")))
-        return signatures[0], signatures[1]
+        return tuple(signatures)
 
     def _fingerprint_roots(self, operation: GalleryMaintenanceOperation) -> tuple[str, ...]:
         files = self._services.image_files
-        roots = [str(files.image_root.resolve()), str(files.thumbnail_root.resolve())]
+        roots = [
+            str(files.image_root.resolve()),
+            str(files.thumbnail_root.resolve()),
+            str(files.precise_root.resolve()),
+        ]
         if self._archives(operation):
             roots.append(str(self._archive_root.resolve()))
         return tuple(roots)
@@ -273,26 +310,39 @@ class GalleryMaintenanceService:
 
     def _scan_remove_missing(self, digest, inventory: sqlite3.Connection) -> _Scan:
         examined = affected = skipped = 0
-        for image_name, subfolder in self._services.image_records.iter_all_image_locations(_ENUMERATION_BATCH_SIZE):
-            examined += 1
-            self._feed(digest, "record", image_name, subfolder)
-            original = self._record_path(image_name, subfolder)
-            thumbnail = self._record_path(image_name, subfolder, thumbnail=True)
-            original_stat = self._stat(original)
-            thumbnail_stat = self._stat(thumbnail)
-            self._feed_stat(digest, "original", image_name, subfolder, original_stat)
-            self._feed_stat(digest, "thumbnail", image_name, subfolder, thumbnail_stat)
-            inventory.execute(
-                "INSERT INTO records(image_name, subfolder, original_signature, thumbnail_signature, action) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    image_name,
-                    subfolder,
-                    self._encode_signature(original_stat),
-                    self._encode_signature(thumbnail_stat),
-                    int(original_stat is None),
-                ),
+        locations = self._services.image_records.iter_all_image_locations(_ENUMERATION_BATCH_SIZE)
+        for page in self._batches(locations):
+            # One query per page; only records with a row get a precise path built and statted.
+            with_precise = self._services.database.queries.image_precise_assets.names_with_assets(
+                [image_name for image_name, _subfolder in page]
             )
+            for image_name, subfolder in page:
+                examined += 1
+                self._feed(digest, "record", image_name, subfolder)
+                original = self._record_path(image_name, subfolder)
+                thumbnail = self._record_path(image_name, subfolder, "thumbnail")
+                original_stat = self._stat(original)
+                thumbnail_stat = self._stat(thumbnail)
+                self._feed_stat(digest, "original", image_name, subfolder, original_stat)
+                self._feed_stat(digest, "thumbnail", image_name, subfolder, thumbnail_stat)
+                has_precise = image_name in with_precise
+                precise_stat = None
+                if has_precise:
+                    precise_stat = self._stat(self._record_path(image_name, subfolder, "precise"))
+                    self._feed_stat(digest, "precise", image_name, subfolder, precise_stat)
+                inventory.execute(
+                    "INSERT INTO records(image_name, subfolder, original_signature, thumbnail_signature, "
+                    "precise_signature, has_precise, action) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        image_name,
+                        subfolder,
+                        self._encode_signature(original_stat),
+                        self._encode_signature(thumbnail_stat),
+                        self._encode_signature(precise_stat),
+                        int(has_precise),
+                        int(original_stat is None),
+                    ),
+                )
 
         for paths in self._batches(self._services.image_files.iter_image_paths()):
             for path in paths:
@@ -402,8 +452,53 @@ class GalleryMaintenanceService:
                     ),
                 )
 
+        precise_root = self._services.image_files.precise_root
+        for kind, iterator in (
+            ("precise", self._services.image_files.iter_precise_paths()),
+            ("precise_staging", self._services.image_files.iter_precise_staging_paths()),
+        ):
+            for paths in self._batches(iterator):
+                tracked_paths = self._tracked_precise(paths) if kind == "precise" else set()
+                for path in paths:
+                    examined += 1
+                    subfolder = self._relative_parent(path, precise_root)
+                    relative = self._relative(path, precise_root)
+                    signature = self._stat(path)
+                    tracked = path in tracked_paths
+                    self._feed_stat(digest, kind + "-file", relative, signature, tracked)
+                    if tracked:
+                        continue
+                    affected += 1
+                    inventory.execute(
+                        "INSERT INTO files(kind, relative_path, base_name, subfolder, signature, action) "
+                        "VALUES (?, ?, ?, ?, ?, 1)",
+                        (kind, relative, path.name, subfolder, self._encode_signature(signature)),
+                    )
+
         inventory.commit()
         return _Scan(digest.hexdigest(), examined, affected, skipped)
+
+    def _tracked_precise(self, paths: list[Path]) -> set[Path]:
+        """The scanned precise files that belong to an image; anything else is never adopted.
+
+        A file belongs to an image only if the record exists, its row exists, and the file IS the record's derived
+        precise file (same file identity, so a differently cased directory on a case-insensitive filesystem still
+        counts). One record query and one row query per batch.
+        """
+        files = self._services.image_files
+        names = [f"{path.stem}.png" for path in paths]
+        locations = self._services.image_records.get_subfolders(names)
+        with_row = self._services.database.queries.image_precise_assets.names_with_assets(list(locations))
+        tracked: set[Path] = set()
+        for path, name in zip(paths, names, strict=True):
+            if name not in with_row:
+                continue
+            try:
+                if os.path.samefile(path, files.get_precise_path(name, locations[name])):
+                    tracked.add(path)
+            except (OSError, ValueError):
+                continue
+        return tracked
 
     def _scan_regenerate_thumbnails(self, digest, inventory: sqlite3.Connection) -> _Scan:
         examined = affected = skipped = 0
@@ -411,7 +506,7 @@ class GalleryMaintenanceService:
             examined += 1
             self._feed(digest, "record", image_name, subfolder)
             original = self._record_path(image_name, subfolder)
-            thumbnail = self._record_path(image_name, subfolder, thumbnail=True)
+            thumbnail = self._record_path(image_name, subfolder, "thumbnail")
             original_stat = self._stat(original)
             thumbnail_stat = self._stat(thumbnail)
             self._feed_stat(digest, "original", image_name, subfolder, original_stat)
@@ -442,8 +537,8 @@ class GalleryMaintenanceService:
             )
 
     @staticmethod
-    def _batches(paths: Iterator[Path]) -> Iterator[list[Path]]:
-        batch: list[Path] = []
+    def _batches[T](paths: Iterator[T]) -> Iterator[list[T]]:
+        batch: list[T] = []
         for path in paths:
             batch.append(path)
             if len(batch) == _ENUMERATION_BATCH_SIZE:
@@ -452,10 +547,15 @@ class GalleryMaintenanceService:
         if batch:
             yield batch
 
-    def _record_path(self, image_name: str, subfolder: str, thumbnail: bool = False) -> Path:
+    def _record_path(self, image_name: str, subfolder: str, kind: _PathKind = "image") -> Path:
         files = self._services.image_files
-        root = files.thumbnail_root if thumbnail else files.image_root
-        filename = get_thumbnail_name(image_name) if thumbnail else image_name
+        # Each root property resolves the path on disk, so only the one needed is read.
+        if kind == "thumbnail":
+            root, filename = files.thumbnail_root, get_thumbnail_name(image_name)
+        elif kind == "precise":
+            root, filename = files.precise_root, f"{Path(image_name).stem}.safetensors"
+        else:
+            root, filename = files.image_root, image_name
         relative = Path(subfolder) / filename
         if relative.is_absolute() or ".." in relative.parts:
             raise GalleryMaintenanceError("An image record contains an unsafe storage path.")
@@ -473,7 +573,10 @@ class GalleryMaintenanceService:
                 raise GalleryMaintenanceError("Gallery maintenance does not follow symbolic links.")
 
         try:
-            path = files.get_path(image_name, thumbnail=thumbnail, image_subfolder=subfolder)
+            if kind == "precise":
+                path = files.get_precise_path(image_name, subfolder)
+            else:
+                path = files.get_path(image_name, thumbnail=kind == "thumbnail", image_subfolder=subfolder)
         except (ValueError, OSError) as e:
             self._logger.error("Invalid recorded image path for %s", image_name)
             raise GalleryMaintenanceError("An image record contains an unsafe storage path.") from e
@@ -587,113 +690,127 @@ class GalleryMaintenanceService:
     def _remove_missing(self, inventory: sqlite3.Connection, counts: _ResultCounts) -> None:
         archive_run = Path(counts.archive_path) if counts.archive_path else None
         cursor = inventory.execute(
-            "SELECT image_name, subfolder, thumbnail_signature FROM records WHERE action = 1 ORDER BY image_name"
+            "SELECT image_name, subfolder, thumbnail_signature, precise_signature, has_precise FROM records "
+            "WHERE action = 1 ORDER BY image_name"
         )
         while page := cursor.fetchmany(_ENUMERATION_BATCH_SIZE):
             self._remove_missing_page(page, archive_run, counts)
 
+    @staticmethod
+    def _count_archived(counts: _ResultCounts, kind: Literal["thumbnails", "precise"], delta: int) -> None:
+        if kind == "thumbnails":
+            counts.thumbnails_archived += delta
+        else:
+            counts.precise_archived += delta
+
+    def _recover_companion(self, companion: _Companion, counts: _ResultCounts) -> None:
+        """After a failed archive step, put an archived companion back unless its source is already in place."""
+        try:
+            archived_signature = self._path_signature(companion.archived)
+            source_signature = self._path_signature(companion.source)
+        except OSError:
+            archived_signature = None
+            source_signature = None
+            counts.add_error(f"Could not confirm recovery of an archived {companion.kind} file.")
+        if archived_signature is not None and source_signature is None:
+            restored = self._restore_archived_file(companion.archived, companion.source, counts)
+            if restored:
+                if companion.counted:
+                    self._count_archived(counts, companion.kind, -1)
+            elif not companion.counted:
+                self._count_archived(counts, companion.kind, 1)
+        elif archived_signature is None and companion.counted:
+            self._count_archived(counts, companion.kind, -1)
+
+    def _restore_companions(self, companions: list[_Companion], counts: _ResultCounts) -> None:
+        for companion in reversed(companions):
+            self._restore_archived_file(companion.archived, companion.source, counts)
+            if companion.source.exists():
+                self._count_archived(counts, companion.kind, -1)
+
     def _remove_missing_page(
-        self, page: list[tuple[str, str, str | None]], archive_run: Path | None, counts: _ResultCounts
+        self, page: list[tuple[str, str, str | None, str | None, int]], archive_run: Path | None, counts: _ResultCounts
     ) -> None:
         files = self._services.image_files
         records = self._services.image_records
-        locations = records.get_subfolders([image_name for image_name, _subfolder, _thumb in page])
-        delete_items: list[tuple[str, str, Path, Path, _StatSignature | None, Path | None, _StatSignature | None]] = []
-        for image_name, subfolder, encoded_thumbnail_signature in page:
+        locations = records.get_subfolders([row[0] for row in page])
+        delete_items: list[_PendingRemoval] = []
+        for image_name, subfolder, encoded_thumbnail_signature, encoded_precise_signature, has_precise in page:
             if locations.get(image_name) != subfolder:
                 counts.skipped_count += 1
                 continue
             original = self._record_path(image_name, subfolder)
-            thumbnail = self._record_path(image_name, subfolder, thumbnail=True)
-            thumbnail_signature = self._decode_signature(encoded_thumbnail_signature)
-            archived_thumbnail: Path | None = None
-            archive_counted = False
+            thumbnail = self._record_path(image_name, subfolder, "thumbnail")
+            precise = self._record_path(image_name, subfolder, "precise")
+            companions: list[_Companion] = []
             try:
-                if self._stat(original) is not None or self._stat(thumbnail) != thumbnail_signature:
+                thumbnail_signature = self._decode_signature(encoded_thumbnail_signature)
+                precise_signature = self._decode_signature(encoded_precise_signature)
+                # Only a row makes the precise file part of the image; without one it is not this operation's.
+                if (
+                    self._stat(original) is not None
+                    or self._stat(thumbnail) != thumbnail_signature
+                    or (has_precise and self._stat(precise) != precise_signature)
+                ):
                     counts.skipped_count += 1
                     continue
-                archived_signature: _StatSignature | None = None
-                if thumbnail_signature is not None:
+                sources: list[tuple[Literal["thumbnails", "precise"], Path, _StatSignature | None]] = [
+                    ("thumbnails", thumbnail, thumbnail_signature)
+                ]
+                if has_precise:
+                    sources.append(("precise", precise, precise_signature))
+                for kind, source, signature in sources:
+                    if signature is None:
+                        continue
                     if archive_run is None:
                         raise GalleryMaintenanceError("Archive destination was not prepared.")
-                    archived_thumbnail = archive_run / "thumbnails" / Path(subfolder) / thumbnail.name
-                    self._archive_file(thumbnail, archived_thumbnail, thumbnail_signature)
-                    archived_signature = self._path_signature(archived_thumbnail)
-                    if archived_signature is None:
-                        raise OSError("Archived thumbnail disappeared before record removal")
-                    counts.thumbnails_archived += 1
-                    archive_counted = True
-                    files.evict_cache_paths([thumbnail])
-                delete_items.append(
-                    (
-                        image_name,
-                        subfolder,
-                        original,
-                        thumbnail,
-                        thumbnail_signature,
-                        archived_thumbnail,
-                        archived_signature,
-                    )
-                )
+                    companion = _Companion(kind, source, archive_run / kind / Path(subfolder) / source.name, signature)
+                    companions.append(companion)
+                    self._archive_file(source, companion.archived, signature)
+                    companion.archived_signature = self._path_signature(companion.archived)
+                    if companion.archived_signature is None:
+                        raise OSError("Archived file disappeared before record removal")
+                    self._count_archived(counts, kind, 1)
+                    companion.counted = True
+                    if kind == "thumbnails":
+                        files.evict_cache_paths([thumbnail])
+                # Files that were absent at preview must still be absent when the record is deleted.
+                absent = [thumbnail] if thumbnail_signature is None else []
+                if has_precise and precise_signature is None:
+                    absent.append(precise)
+                delete_items.append(_PendingRemoval(image_name, original, absent, thumbnail, companions))
             except Exception as e:
-                if archived_thumbnail is not None:
-                    try:
-                        archived_signature = self._path_signature(archived_thumbnail)
-                        source_signature = self._path_signature(thumbnail)
-                    except OSError:
-                        archived_signature = None
-                        source_signature = None
-                        counts.add_error("Could not confirm recovery of an archived thumbnail.")
-                    if archived_signature is not None and source_signature is None:
-                        restored = self._restore_archived_file(archived_thumbnail, thumbnail, counts)
-                        if restored:
-                            if archive_counted:
-                                counts.thumbnails_archived -= 1
-                        elif not archive_counted:
-                            counts.thumbnails_archived += 1
-                    elif archived_signature is None and archive_counted:
-                        counts.thumbnails_archived -= 1
+                for companion in companions:
+                    self._recover_companion(companion, counts)
                 self._record_item_failure(counts, "record", image_name, e)
 
         if not delete_items:
             return
 
-        still_current: list[tuple[str, str, Path, Path, _StatSignature | None, Path | None, _StatSignature | None]] = []
+        still_current: list[_PendingRemoval] = []
         for item in delete_items:
-            image_name, subfolder, original, thumbnail, thumbnail_signature, archived_thumbnail, archived_signature = (
-                item
-            )
             try:
-                thumbnail_unchanged = (
-                    self._path_signature(archived_thumbnail) == archived_signature
-                    if archived_thumbnail is not None
-                    else self._stat(thumbnail) is None
-                )
-                if self._stat(original) is None and thumbnail_unchanged:
+                if (
+                    self._stat(item.original) is None
+                    and all(self._stat(path) is None for path in item.absent)
+                    and all(self._path_signature(c.archived) == c.archived_signature for c in item.companions)
+                ):
                     still_current.append(item)
                 else:
                     counts.skipped_count += 1
-                    self._restore_archived_file(archived_thumbnail, thumbnail, counts)
-                    if archived_thumbnail is not None and thumbnail.exists():
-                        counts.thumbnails_archived -= 1
+                    self._restore_companions(item.companions, counts)
             except Exception as e:
-                self._record_item_failure(counts, "record", image_name, e)
-                self._restore_archived_file(archived_thumbnail, thumbnail, counts)
-                if archived_thumbnail is not None and thumbnail.exists():
-                    counts.thumbnails_archived -= 1
+                self._record_item_failure(counts, "record", item.image_name, e)
+                self._restore_companions(item.companions, counts)
 
         if not still_current:
             return
-        delete_names = [item[0] for item in still_current]
+        delete_names = [item.image_name for item in still_current]
         try:
             records.delete_many(delete_names)
         except Exception:
-            for _name, _subfolder, _original, source, _signature, archived, _archived_signature in reversed(
-                still_current
-            ):
-                self._restore_archived_file(archived, source, counts)
-                if archived is not None and source.exists():
-                    counts.thumbnails_archived -= 1
+            for item in reversed(still_current):
+                self._restore_companions(item.companions, counts)
             self._logger.exception("Failed to remove missing image records")
             counts.failed_count += len(delete_names)
             counts.add_error("Database record removal failed; remaining records were kept.")
@@ -702,9 +819,10 @@ class GalleryMaintenanceService:
         # delete_many owns one transaction and returns only after its commit; count committed
         # removals before cache, existence, or notification work can fail.
         counts.records_removed += len(delete_names)
-        for image_name, _subfolder, original, thumbnail, _signature, _archived, _archived_signature in still_current:
+        for item in still_current:
+            image_name = item.image_name
             try:
-                files.evict_cache_paths([original, thumbnail])
+                files.evict_cache_paths([item.original, item.thumbnail])
             except Exception:
                 self._logger.exception("Could not evict deleted image cache entries")
                 counts.failed_count += 1
@@ -729,31 +847,62 @@ class GalleryMaintenanceService:
         archive_run = Path(counts.archive_path) if counts.archive_path else None
         if archive_run is None:
             return
-        self._archive_snapshot_files(inventory, "image", archive_run, counts)
-        self._archive_snapshot_files(inventory, "thumbnail", archive_run, counts)
+        for kind in ("image", "thumbnail", "precise", "precise_staging"):
+            self._archive_snapshot_files(inventory, kind, archive_run, counts)
 
     def _archive_snapshot_files(
         self, inventory: sqlite3.Connection, kind: str, archive_run: Path, counts: _ResultCounts
     ) -> None:
         files = self._services.image_files
         records = self._services.image_records
-        root = files.image_root if kind == "image" else files.thumbnail_root
+        root = {
+            "image": files.image_root,
+            "thumbnail": files.thumbnail_root,
+            "precise": files.precise_root,
+            "precise_staging": files.precise_root,
+        }[kind]
+        destination_directory = {
+            "image": "images",
+            "thumbnail": "thumbnails",
+            "precise": "precise",
+            "precise_staging": "precise",
+        }[kind]
+
+        def record_name(base_name: str) -> str:
+            return base_name if kind == "image" else f"{Path(base_name).stem}.png"
+
+        def count_archived() -> None:
+            if kind == "image":
+                counts.images_archived += 1
+            elif kind == "thumbnail":
+                counts.thumbnails_archived += 1
+            else:
+                counts.precise_archived += 1
+
         cursor = inventory.execute(
             "SELECT relative_path, base_name, subfolder, signature FROM files "
             "WHERE kind = ? AND action = 1 ORDER BY relative_path",
             (kind,),
         )
         while page := cursor.fetchmany(_ENUMERATION_BATCH_SIZE):
-            locations = records.get_subfolders(
-                [base_name if kind == "image" else f"{Path(base_name).stem}.png" for _, base_name, _, _ in page]
+            locations = (
+                records.get_subfolders([record_name(base_name) for _, base_name, _, _ in page])
+                if kind in ("image", "thumbnail")
+                else {}
+            )
+            tracked_paths = (
+                self._tracked_precise([root / Path(relative_path) for relative_path, _, _, _ in page])
+                if kind == "precise"
+                else set()
             )
             for relative_path, base_name, subfolder, encoded_signature in page:
-                source_name = base_name if kind == "image" else f"{Path(base_name).stem}.png"
+                source_name = record_name(base_name)
                 path = root / Path(relative_path)
-                if locations.get(source_name) is not None:
-                    counts.skipped_count += 1
-                    continue
+                destination = archive_run / destination_directory / Path(subfolder) / path.name
                 try:
+                    if path in tracked_paths or locations.get(source_name) is not None:
+                        counts.skipped_count += 1
+                        continue
                     if kind == "thumbnail":
                         original = self._record_path(source_name, subfolder)
                         if self._stat(original) is not None:
@@ -765,27 +914,15 @@ class GalleryMaintenanceService:
                     if signature is None or current_signature != signature:
                         counts.skipped_count += 1
                         continue
-                    destination = archive_run / ("images" if kind == "image" else "thumbnails")
-                    destination = destination / Path(subfolder) / path.name
                     self._archive_file(path, destination, signature)
-                    if kind == "image":
-                        counts.images_archived += 1
-                    else:
-                        counts.thumbnails_archived += 1
-                    files.evict_cache_paths([path])
+                    count_archived()
+                    if kind in ("image", "thumbnail"):
+                        files.evict_cache_paths([path])
                 except Exception as e:
-                    expected = self._decode_signature(encoded_signature)
-                    if (
-                        self._path_signature(path) is None
-                        and self._path_signature(
-                            archive_run / ("images" if kind == "image" else "thumbnails") / Path(subfolder) / path.name
-                        )
-                        == expected
+                    if self._path_signature(path) is None and self._path_signature(destination) == (
+                        self._decode_signature(encoded_signature)
                     ):
-                        if kind == "image":
-                            counts.images_archived += 1
-                        else:
-                            counts.thumbnails_archived += 1
+                        count_archived()
                     self._record_item_failure(counts, kind, path.name, e)
 
     def _regenerate_thumbnails(self, inventory: sqlite3.Connection, counts: _ResultCounts) -> None:
@@ -798,7 +935,7 @@ class GalleryMaintenanceService:
             locations = records.get_subfolders([image_name for image_name, _subfolder, _signature in page])
             for image_name, subfolder, encoded_original_signature in page:
                 original = self._record_path(image_name, subfolder)
-                thumbnail = self._record_path(image_name, subfolder, thumbnail=True)
+                thumbnail = self._record_path(image_name, subfolder, "thumbnail")
                 generated_thumbnail_signature: _StatSignature | None = None
                 try:
                     expected_original = self._decode_signature(encoded_original_signature)
@@ -980,9 +1117,9 @@ class GalleryMaintenanceService:
                 self._archive_file(archived, original, signature)
             return original.exists()
         except Exception:
-            self._logger.exception("Failed to restore an archived thumbnail after database failure")
+            self._logger.exception("Failed to restore an archived file after database failure")
             counts.failed_count += 1
-            counts.add_error(f"Could not restore thumbnail {original.name}; it remains in the archive.")
+            counts.add_error(f"Could not restore {original.name}; it remains in the archive.")
             return False
 
     def _record_item_failure(self, counts: _ResultCounts, kind: str, relative_name: str, error: Exception) -> None:

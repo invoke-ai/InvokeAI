@@ -9,6 +9,7 @@ export {
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
+  galleryImageExportFormatsOptions,
   galleryImageMetadataOptions,
   galleryItemLocationOptions,
   galleryItemNamesOptions,

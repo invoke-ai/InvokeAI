@@ -59,6 +59,8 @@ def _build_decode_mocks(vae, latents: torch.Tensor, decoded: torch.Tensor, force
     image_dto.width = decoded.shape[-1]
     image_dto.height = decoded.shape[-2]
     context.images.save.return_value = image_dto
+    # Tiling is under test here, not the precise save (`test_flux_vae_precise.py`); a bare MagicMock reads as enabled.
+    context.images.precise_storage_enabled = False
     return vae_info, context, tiling_state
 
 

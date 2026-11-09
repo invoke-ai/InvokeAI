@@ -1,7 +1,9 @@
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Optional
 
+import numpy
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.fields import MetadataField
@@ -23,7 +25,14 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_base import ImageServiceABC
-from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
+from invokeai.app.services.images.images_common import (
+    ImageDTO,
+    ImageExport,
+    ImageExportBusyError,
+    ImageExportFormat,
+    ImageExportUnavailableError,
+    image_record_to_dto,
+)
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.bulk_media_delete import StagedMediaDeleteAdapter, delete_media_by_names
 from invokeai.app.services.shared.intermediate_delete import (
@@ -33,6 +42,108 @@ from invokeai.app.services.shared.intermediate_delete import (
     delete_journaled_intermediates,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
+from invokeai.backend.image_util.raster.convert import quantize_unit, raster_from_pil, raster_to_pil
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterConversionError,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.png_codec import (
+    PngCodecError,
+    decode_png,
+    encode_png,
+    png_descriptor_refusal,
+    png_ihdr,
+)
+from invokeai.backend.image_util.raster.precise_asset import (
+    PRECISE_ASSET_FORMAT,
+    PRECISE_ASSET_VERSION,
+    PreciseAssetError,
+    check_precise_asset_bounds,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
+
+_DISPLAY_CHANNELS = (RasterChannels.L, RasterChannels.LA, RasterChannels.RGB, RasterChannels.RGBA)
+_ICC_HEADER_BYTES = 128
+
+# One export at a time per process, and never a waiting thread: a second request is answered "busy". The claim is held
+# until the response has streamed the last chunk to the socket, so at most one export file is in memory. Peak memory of
+# one export: the exact raster (float32 assets: 4 bytes per sample, up to 4 GiB at the asset bound) is replaced by its uint16
+# quantization (2 bytes per sample; uint16 assets skip this copy), the PNG writer makes an OpenCV BGR(A) copy of that
+# (RGB and RGBA only, 2 bytes per sample), the encoder allocates its output buffer, and the final bytes are one more
+# copy of that buffer. Only the final bytes outlive the call; they stay alive until the claim is released.
+_EXPORT_SLOT = threading.Lock()
+
+
+class _ExportSlotClaim:
+    """Releases `_EXPORT_SLOT` once. A response whose client disconnected may never run its background task, so
+    dropping the claim releases it too."""
+
+    def __init__(self) -> None:
+        self._held = True
+        self._guard = threading.Lock()
+
+    def release(self) -> None:
+        with self._guard:
+            held, self._held = self._held, False
+        if held:
+            _EXPORT_SLOT.release()
+
+    def __del__(self) -> None:
+        self.release()
+
+
+def _require_matching_icc(raster: RasterImage) -> None:
+    """An ICC profile must describe the raster's channels: the color space is at bytes 16-20 of the profile header."""
+    profile = raster.descriptor.icc_profile
+    if profile is None:
+        return
+    expected = b"GRAY" if raster.descriptor.channels in (RasterChannels.L, RasterChannels.LA) else b"RGB "
+    if len(profile) < _ICC_HEADER_BYTES or profile[16:20] != expected:
+        raise RasterConversionError(
+            f"the ICC profile does not describe a {expected.decode().strip()} image "
+            f"({raster.descriptor.channels.value} raster)"
+        )
+
+
+def _require_displayable(raster: RasterImage) -> None:
+    """Refuses, before anything is persisted, a raster the PNG derivative cannot be made from or the asset cannot hold.
+
+    The derivative is a display quantization, which means something only for sRGB values in the unit range (finiteness is checked by the quantization itself).
+    """
+    descriptor = raster.descriptor
+    if (
+        descriptor.color is not ColorEncoding.SRGB
+        or descriptor.value_range is not ValueRange.UNIT
+        or descriptor.alpha is AlphaMode.PREMULTIPLIED
+        or descriptor.channels not in _DISPLAY_CHANNELS
+    ):
+        raise RasterConversionError(
+            f"no display policy for {descriptor.channels.value}/{descriptor.color.value}/"
+            f"{descriptor.value_range.value}/{descriptor.alpha.value} rasters yet; "
+            "only sRGB unit-range L/LA/RGB/RGBA with straight or no alpha can be stored precisely"
+        )
+    check_precise_asset_bounds(raster)
+    _require_matching_icc(raster)
+
+
+def _require_display_image(raster: RasterImage, display_image: PILImageType) -> None:
+    """A caller-supplied gallery PNG must be the raster's 8-bit display derivative: same channels and size. The raster
+    must be finite, since the quantization that would have rejected it is skipped."""
+    expected_mode = raster.descriptor.channels.value
+    if display_image.mode != expected_mode:
+        raise RasterConversionError(
+            f"display_image mode {display_image.mode} does not match the {expected_mode} raster; it must be 8-bit "
+            f"{expected_mode}"
+        )
+    if display_image.size != (raster.width, raster.height):
+        raise RasterConversionError(
+            f"display_image size {display_image.size} does not match the {raster.width}x{raster.height} raster"
+        )
+    if raster.dtype.kind == "f" and not numpy.isfinite(raster.view()).all():
+        raise RasterConversionError("cannot store non-finite values")
 
 
 class ImageService(ImageServiceABC):
@@ -78,6 +189,84 @@ class ImageService(ImageServiceABC):
         project_id: Optional[str] = None,
         resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
+        return self._create(
+            image,
+            None,
+            image_origin,
+            image_category,
+            node_id=node_id,
+            session_id=session_id,
+            board_id=board_id,
+            is_intermediate=is_intermediate,
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+            user_id=user_id,
+            project_id=project_id,
+            resolved_inputs=resolved_inputs,
+        )
+
+    def create_from_raster(
+        self,
+        raster: RasterImage,
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        node_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
+        is_intermediate: Optional[bool] = False,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
+        display_image: Optional[PILImageType] = None,
+    ) -> ImageDTO:
+        _require_displayable(raster)
+        if display_image is None:
+            # Pure CPU, so it runs before the mutation lock is taken. The raster is frozen and outlives the save, which
+            # only reads the derivative, so it can wrap the quantized pixels without a second copy.
+            derivative = raster_to_pil(quantize_unit(raster, numpy.uint8), share_pixels=True)
+        else:
+            _require_display_image(raster, display_image)
+            derivative = display_image
+        return self._create(
+            derivative,
+            raster,
+            image_origin,
+            image_category,
+            node_id=node_id,
+            session_id=session_id,
+            board_id=board_id,
+            is_intermediate=is_intermediate,
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+            user_id=user_id,
+            project_id=project_id,
+            resolved_inputs=resolved_inputs,
+        )
+
+    def _create(
+        self,
+        image: PILImageType,
+        raster: Optional[RasterImage],
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        node_id: Optional[str],
+        session_id: Optional[str],
+        board_id: Optional[str],
+        is_intermediate: Optional[bool],
+        metadata: Optional[str],
+        workflow: Optional[str],
+        graph: Optional[str],
+        user_id: Optional[str],
+        project_id: Optional[str],
+        resolved_inputs: Optional[str],
+    ) -> ImageDTO:
+        """Shared body of `create` and `create_from_raster`: `image` is the gallery PNG source, `raster` (precise saves
+        only) the exact pixels the image was derived from."""
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
 
@@ -128,6 +317,15 @@ class ImageService(ImageServiceABC):
                         )
                     except Exception as e:
                         self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
+                if raster is not None:
+                    # Staged and published under the lock, with the row inserted before it is released: a
+                    # concurrent maintenance run must never find the asset without its row.
+                    self.__invoker.services.image_files.save_precise(raster, image_name, image_subfolder)
+                    self.__invoker.services.database.queries.image_precise_assets.insert(
+                        image_name=image_name,
+                        asset_format=PRECISE_ASSET_FORMAT,
+                        format_version=PRECISE_ASSET_VERSION,
+                    )
                 self.__invoker.services.image_files.save(
                     image_name=image_name,
                     image=image,
@@ -151,6 +349,10 @@ class ImageService(ImageServiceABC):
             raise
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
+            if raster is not None:
+                # A precise save is one unit: a failure at any later step (row insert, size, DTO, notification)
+                # must not leave the record or its files behind.
+                self.__clean_up_failed_save(image_name, image_subfolder)
             raise e
 
     def _record_file_size(self, image_name: str, image_subfolder: str) -> None:
@@ -241,7 +443,8 @@ class ImageService(ImageServiceABC):
 
         New identity, same picture: the record is cloned and the file copied byte for byte, so
         embedded metadata, workflow and graph travel as file chunks rather than being re-derived.
-        The copy is never intermediate, and starring is not copied.
+        The copy is never intermediate, and starring is not copied. A source with a precise asset
+        gets its own asset file and row; the size recorded covers all of the copy's files.
 
         Board attachment is checked *before* the file is written, where the video twin writes first
         and withdraws on failure. The orders differ because `create` — which the video path reuses —
@@ -262,6 +465,8 @@ class ImageService(ImageServiceABC):
         try:
             record = self.__invoker.services.image_records.get(source_image_name)
             metadata = self.__invoker.services.image_records.get_metadata(source_image_name)
+            # The row, not a file probe, says whether the source has a precise asset.
+            source_asset = self.__invoker.services.database.queries.image_precise_assets.get(source_image_name)
 
             image_name = self.__invoker.services.names.create_image_name()
             strategy_name = self.__invoker.services.configuration.image_subfolder_strategy
@@ -269,7 +474,7 @@ class ImageService(ImageServiceABC):
             image_subfolder = strategy.get_subfolder(image_name, record.image_category, False)
 
             record_saved = False
-            file_copied = False
+            files_started = False
             try:
                 self.__invoker.services.image_records.save(
                     image_name=image_name,
@@ -294,13 +499,21 @@ class ImageService(ImageServiceABC):
                         board_id=board_id, image_name=image_name
                     )
 
+                # From here on any file under the new name may exist, so the unwind purges them all.
+                files_started = True
                 self.__invoker.services.image_files.copy(
                     source_image_name=source_image_name,
                     image_name=image_name,
                     source_subfolder=record.image_subfolder or "",
                     image_subfolder=image_subfolder,
+                    include_precise=source_asset is not None,
                 )
-                file_copied = True
+                if source_asset is not None:
+                    self.__invoker.services.database.queries.image_precise_assets.insert(
+                        image_name=image_name,
+                        asset_format=source_asset.asset_format,
+                        format_version=source_asset.format_version,
+                    )
                 self._record_file_size(image_name, image_subfolder)
 
                 image_dto = self.get_dto(image_name)
@@ -309,7 +522,7 @@ class ImageService(ImageServiceABC):
             except Exception:
                 # Unwind whatever exists, newest first. The board membership goes with the record
                 # via the FK.
-                if file_copied:
+                if files_started:
                     try:
                         self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
                     except Exception as cleanup_error:
@@ -358,6 +571,119 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image file")
             raise e
+
+    def _has_current_precise_asset(self, image_name: str) -> bool:
+        """Whether the association row names a precise asset this build reads; PreciseAssetError for another
+        format or version. The one row check behind `get_raster`, `get_export_formats` and the export."""
+        asset = self.__invoker.services.database.queries.image_precise_assets.get(image_name)
+        if asset is None:
+            return False
+        if (asset.asset_format, asset.format_version) != (PRECISE_ASSET_FORMAT, PRECISE_ASSET_VERSION):
+            self.__invoker.services.logger.error(
+                f"Precise asset of {image_name} has unsupported format {asset.asset_format!r}, "
+                f"version {asset.format_version}"
+            )
+            raise PreciseAssetError(
+                f"Unsupported precise asset for {image_name}: format {asset.asset_format!r}, "
+                f"version {asset.format_version}"
+            )
+        return True
+
+    def get_raster(self, image_name: str) -> RasterImage:
+        """The one place that decides where an image's pixels come from.
+
+        The record store's precise-asset row is the only authority: with a row the precise file is the source and any
+        failure surfaces (never a fallback to the PNG derivative); without one the gallery file is.
+        """
+        services = self.__invoker.services
+        record = self.get_record(image_name)
+        if not self._has_current_precise_asset(image_name):
+            return raster_from_pil(services.image_files.get(image_name, image_subfolder=record.image_subfolder))
+        try:
+            return services.image_files.read_precise(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError):
+            services.logger.error(f"Failed to read precise asset of {image_name}")
+            raise
+
+    def has_precise_asset(self, image_name: str) -> bool:
+        return self.__invoker.services.database.queries.image_precise_assets.get(image_name) is not None
+
+    def is_precise_png_upload(self, contents: bytes) -> bool:
+        services = self.__invoker.services
+        if not services.configuration.precise_image_storage:
+            return False
+        header = png_ihdr(contents)
+        if header is None or header.bit_depth != 16:
+            return False
+        if header.channels is RasterChannels.LA:
+            # The gallery stores it as 8-bit RGBA, and the PNG writer cannot encode LA, so no export could return it.
+            services.logger.warning("Storing the uploaded 16-bit gray+alpha PNG without precision")
+            return False
+        return header.channels in (RasterChannels.RGB, RasterChannels.RGBA)
+
+    def create_from_precise_png(self, contents: bytes, **save_options) -> Optional[ImageDTO]:
+        services = self.__invoker.services
+        try:
+            raster = decode_png(contents).raster
+            return self.create_from_raster(raster, **save_options)
+        except (PngCodecError, RasterConversionError, PreciseAssetError) as e:
+            # Refused before anything was persisted (limits, malformed file, ICC profile of another color space).
+            services.logger.warning(f"Storing the uploaded 16-bit PNG without precision: {e}")
+            return None
+
+    def get_export_formats(self, image_name: str) -> list[ImageExportFormat]:
+        record = self.get_record(image_name)
+        services = self.__invoker.services
+        # Lists only what `export_png16` can deliver. The pixels are quantized to uint16 first, so only the
+        # descriptor decides (the PNG writer has no gray+alpha). An asset that cannot be read lists nothing; the
+        # export itself reports why.
+        try:
+            if not self._has_current_precise_asset(image_name):
+                return []
+            descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError, OSError) as e:
+            services.logger.warning(f"Precise asset of {image_name} is unreadable, so it has no export formats: {e}")
+            return []
+        return [ImageExportFormat.PNG16] if png_descriptor_refusal(descriptor) is None else []
+
+    def export_png16(self, image_name: str) -> ImageExport:
+        record = self.get_record(image_name)
+        if not _EXPORT_SLOT.acquire(blocking=False):
+            raise ImageExportBusyError("Another image export is running")
+        claim = _ExportSlotClaim()
+        try:
+            content = self._encode_png16(image_name, record)
+        except BaseException:
+            claim.release()
+            raise
+        return ImageExport(content, claim.release)
+
+    def encode_png16(self, image_name: str) -> bytes:
+        return self._encode_png16(image_name, self.get_record(image_name))
+
+    def _encode_png16(self, image_name: str, record: ImageRecord) -> bytes:
+        services = self.__invoker.services
+        if not self._has_current_precise_asset(image_name):
+            raise ImageExportUnavailableError(f"{image_name} has no precise asset to export as a 16-bit PNG")
+        try:
+            descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError):
+            services.logger.error(f"Failed to read precise asset of {image_name}")
+            raise
+        refusal = png_descriptor_refusal(descriptor)
+        if refusal is not None:
+            raise ImageExportUnavailableError(refusal)
+        raster = self.get_raster(image_name)
+        if raster.dtype != numpy.uint16:
+            # Float assets: display quantization (clip to 0-1, round half to even). Non-finite values raise
+            # RasterConversionError. uint16 assets are encoded as they are, without a copy.
+            raster = quantize_unit(raster, numpy.uint16)
+        try:
+            text = services.image_files.read_png_text(image_name, record.image_subfolder)
+            return encode_png(raster, text, compress_level=1)
+        except Exception:
+            services.logger.error(f"Failed to encode the 16-bit PNG of {image_name}")
+            raise
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:

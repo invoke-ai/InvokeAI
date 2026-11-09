@@ -57,11 +57,17 @@ class FrontendConfig(BaseModel):
     """Presentation settings any signed-in user may read; never include private runtime configuration here."""
 
     show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+    precise_image_storage: bool = Field(
+        description="Whether precise image storage is on; the UI offers 16-bit bulk downloads only then"
+    )
 
 
 @app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
 def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
-    return FrontendConfig(show_donation_link=get_config().show_donation_link)
+    config = get_config()
+    return FrontendConfig(
+        show_donation_link=config.show_donation_link, precise_image_storage=config.precise_image_storage
+    )
 
 
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)

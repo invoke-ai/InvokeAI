@@ -23,6 +23,7 @@ The adaptation here has a few changes:
 - Remove `dni_weight` logic, which was only used when multiple models were used
 - Remove logic to fetch models from network
 - Add types, rename a few things
+- Add `upscale_rgb_unit`, a float entry/exit that skips the 8-bit rounding (InvokeAI precise image storage)
 """
 
 
@@ -270,3 +271,33 @@ class RealESRGAN:
             output = (output_img * 255.0).round().astype(np.uint8)
 
         return output
+
+    @torch.no_grad()
+    def upscale_rgb_unit(
+        self, rgb: npt.NDArray[np.float32], out: npt.NDArray[np.float32] | None = None
+    ) -> npt.NDArray[np.float32]:
+        """Upscales an RGB image given as float32 HxWx3 in the model's [0, 1] input range (no alpha handling).
+
+        Returns the model's float32 RGB output as is: neither clamped nor rounded. `upscale` clamps to [0, 1] and
+        rounds to 8/16 bits; a caller that wants either does it itself, so the unquantized output is available without
+        running the model twice.
+
+        With `out` (float32, HxWxC with C >= 3, the output size) the RGB output is copied straight from the model's
+        device into `out[:, :, :3]` and `out` is returned, so no host copy of the output besides it exists. Without it
+        the result is a transposed host view of the output tensor.
+        """
+        self.pre_process(rgb)
+        if self.tile_size > 0:
+            self.tile_process()
+        else:
+            self.process()
+        output = self.post_process().data.squeeze(0)
+        # Drop the instance's references so the caller's array is the only owner of the output buffer.
+        del self.img, self.output
+        if out is None:
+            return np.transpose(output.float().cpu().numpy(), (1, 2, 0))
+        # In row blocks: a permuted device-to-host copy stages a contiguous host temporary of its whole extent.
+        host = torch.from_numpy(out)
+        for top in range(0, host.shape[0], 256):
+            host[top : top + 256, :, :3].copy_(output[:, top : top + 256].permute(1, 2, 0))
+        return out

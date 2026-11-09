@@ -400,7 +400,9 @@ describe('Gallery listing failures', () => {
           )
         : browserFetch(input, init)
     );
-    const probedPaths = () => probes.mock.calls.map(([input]) => pathOf(String(input)));
+    // Only thumbnail reads are probes; the gallery's other requests (frontend config) go through the same spy.
+    const probedPaths = () =>
+      probes.mock.calls.map(([input]) => pathOf(String(input))).filter((path) => paths.includes(path));
     await thumbnailRouteCommands.startThumbnailRoute(paths, { failures: 1_000_000, status: 409 });
     transport.listItems.mockImplementation(() => page(moving));
     // Real time keeps flowing for Query and the image loads; the test jumps the clock through the move.
@@ -418,10 +420,10 @@ describe('Gallery listing failures', () => {
       // Through six minutes of move the probe keeps asking about one image for the whole grid every 15 to 30 s,
       // never one per tile.
       for (let interval = 1; interval <= 12; interval += 1) {
-        const before = probes.mock.calls.length;
+        const before = probedPaths().length;
         await act(() => vi.advanceTimersByTimeAsync(30_000));
-        expect(probes.mock.calls.length - before).toBeGreaterThanOrEqual(1);
-        expect(probes.mock.calls.length - before).toBeLessThanOrEqual(2);
+        expect(probedPaths().length - before).toBeGreaterThanOrEqual(1);
+        expect(probedPaths().length - before).toBeLessThanOrEqual(2);
       }
       expect(new Set(probedPaths()).size).toBe(1);
       expect(await imageRequests()).toHaveLength(6);
@@ -438,10 +440,10 @@ describe('Gallery listing failures', () => {
         .toEqual(moving.map(() => 64));
 
       // Each tile asked twice in all: the refused read and one reload. Nothing asks again afterwards.
-      const probeCount = probes.mock.calls.length;
+      const probeCount = probedPaths().length;
       await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
       expect(countByPath(await imageRequests())).toEqual(eachPath(2));
-      expect(probes.mock.calls.length).toBe(probeCount);
+      expect(probedPaths().length).toBe(probeCount);
     } finally {
       vi.useRealTimers();
       probes.mockRestore();

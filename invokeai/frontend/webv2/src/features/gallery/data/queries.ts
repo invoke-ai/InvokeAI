@@ -42,6 +42,7 @@ import {
   type GalleryItemLocation,
   type GalleryItemNames,
   fetchImageIndexAvailability,
+  getGalleryImageExportFormats,
   getGalleryImageMetadata,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
@@ -254,6 +255,9 @@ export const galleryKeys = {
   /** Whether an image embeds a workflow, for listings that do not say. */
   imageHasWorkflow: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  /** The formats an image can be exported in, read when its menu opens. */
+  imageExportFormats: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-export-formats', getAccountKey(owner), imageName] as const,
   /** A video's generation metadata: one entry shared by its menu, Preview Details, and recall commands. */
   videoMetadata: (owner: AccountScope, videoName: string) =>
     [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
@@ -317,6 +321,25 @@ export const galleryImageMetadataOptions = (owner: AccountScope, imageName: stri
   mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>
     getGalleryImageMetadata(imageName, signal)
   );
+
+/**
+ * The export formats an image offers. Read on every menu open (stale at once), since an image's precise asset can
+ * appear or go away; a failed read rejects and is read again by the next open.
+ */
+export const galleryImageExportFormatsOptions = (owner: AccountScope, imageName: string) =>
+  queryOptions({
+    queryFn: async ({ signal }) => {
+      const formats = await getGalleryImageExportFormats(imageName, AbortSignal.any([signal, owner.signal]));
+
+      assertAccountScopeCurrent(owner);
+
+      return formats;
+    },
+    queryKey: galleryKeys.imageExportFormats(owner, imageName),
+    retry: false,
+    // The app default would reuse an answer for seconds; each open asks again.
+    staleTime: 0,
+  });
 
 /** Read an image's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
 export const fetchGalleryImageMetadata = (

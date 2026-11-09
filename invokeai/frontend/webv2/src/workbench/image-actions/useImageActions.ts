@@ -1,5 +1,5 @@
 import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
-import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
+import type { GalleryArchiveOptions, GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { VideoConditioningRole } from '@features/video';
@@ -52,9 +52,9 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
-import { toaster } from '@platform/ui/toaster';
+import { createActionToast, toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -128,7 +128,9 @@ export interface ImageActions extends GalleryItemActions {
     metadata: GalleryImageMetadata | null
   ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
-  downloadImages: (imageNames: string[]) => Promise<void>;
+  downloadImages: (imageNames: string[], options?: GalleryArchiveOptions) => Promise<void>;
+  /** Saves the 16-bit PNG the server exports from the image's precise asset, not a copy of the gallery PNG. */
+  downloadImagePng16: (image: GalleryImage) => Promise<void>;
   /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
   generatePbrMaps: (image: GalleryImage) => Promise<void>;
   /** Opens the image's embedded workflow or generation graph in the workflow editor. */
@@ -1017,7 +1019,11 @@ export const useImageActions = ({
         }
       }
     };
-    const downloadItems = async (items: GalleryItemRef[], loadedItems: GalleryItem[] = []): Promise<void> => {
+    const downloadItems = async (
+      items: GalleryItemRef[],
+      loadedItems: GalleryItem[] = [],
+      options: GalleryArchiveOptions = {}
+    ): Promise<void> => {
       const owner = captureAccountScope();
       const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
@@ -1026,8 +1032,22 @@ export const useImageActions = ({
       let succeededCount = 0;
 
       if (imageNames.length > 0) {
+        // The archive is built on the server before it can be saved; a toast shows the wait and closes with the result.
+        const progressToast = createActionToast({
+          actions: [],
+          duration: Number.POSITIVE_INFINITY,
+          signal: owner.signal,
+          title: t(
+            options.exportFormat === 'png16'
+              ? 'widgets.gallery.itemActions.download.preparingPng16'
+              : 'widgets.gallery.itemActions.download.preparing'
+          ),
+          type: 'loading',
+        });
+
         try {
           const { blob, fileName } = await galleryTransfers.downloadArchive({
+            exportFormat: options.exportFormat,
             imageNames,
             signal: owner.signal,
           });
@@ -1035,12 +1055,22 @@ export const useImageActions = ({
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
           succeededCount += imageNames.length;
-        } catch {
+        } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
+          if (error instanceof ApiError && error.status === 503) {
+            recordError(new Error(t('widgets.gallery.archiveBusy')));
+            return;
+          }
+
           failedCount += imageNames.length;
+        } finally {
+          // Without an id, dismiss would close every toast.
+          if (progressToast) {
+            toaster.dismiss(progressToast);
+          }
         }
       }
 
@@ -1165,7 +1195,69 @@ export const useImageActions = ({
           recordError(error);
         }
       },
-      downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      downloadImages: (imageNames, options) =>
+        downloadItems(
+          imageNames.map((name) => ({ kind: 'image', name })),
+          [],
+          options
+        ),
+      downloadImagePng16: async (image) => {
+        const owner = captureAccountScope();
+
+        // Exports take seconds and nothing else shows them running. A toast only: the notification center keeps the
+        // result, not the wait. It closes with the account, and with the result below.
+        const progressToast = createActionToast({
+          actions: [],
+          duration: Number.POSITIVE_INFINITY,
+          signal: owner.signal,
+          title: t('widgets.gallery.itemActions.exportPng16.preparing'),
+          type: 'loading',
+        });
+        // Without an id, dismiss would close every toast.
+        const closeProgress = () => {
+          if (progressToast) {
+            toaster.dismiss(progressToast);
+          }
+        };
+
+        try {
+          const { blob, fileName } = await galleryTransfers.exportImage({
+            format: 'png16',
+            imageName: image.imageName,
+            signal: owner.signal,
+          });
+
+          assertAccountScopeCurrent(owner);
+          downloadBlob(blob, fileName);
+          closeProgress();
+          recordSuccess(t('widgets.gallery.itemActions.exportPng16.success'), fileName);
+        } catch (error: unknown) {
+          closeProgress();
+
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          // The server is single-flight and gives a reason when the image cannot be exported; retrying is the user's choice.
+          const status = error instanceof ApiError ? error.status : null;
+          const reason =
+            status === 503
+              ? t('widgets.gallery.itemActions.exportPng16.busy')
+              : status === 409
+                ? getApiErrorMessage(error, t('widgets.gallery.itemActions.exportPng16.unavailable'))
+                : status === 404
+                  ? t('widgets.gallery.itemActions.exportPng16.notFound')
+                  : status === 403
+                    ? t('widgets.gallery.itemActions.exportPng16.forbidden')
+                    : t('widgets.gallery.itemActions.exportPng16.failed');
+
+          notifications.add({
+            kind: 'error',
+            title: t('widgets.gallery.itemActions.exportPng16.failedTitle'),
+            message: reason,
+          });
+        }
+      },
       generatePbrMaps: async (image) => {
         const owner = captureAccountScope();
         const galleryValues = getLatestWidgetValues('gallery');

@@ -57,7 +57,6 @@ def _build_encode_mocks(vae, image: torch.Tensor, force_tiled_decode: bool = Fal
 
     context = MagicMock()
     context.models.load.return_value = vae_info
-    context.images.get_pil.return_value = MagicMock()
     # A bare MagicMock config would read as truthy and silently tile everything.
     context.config.get.return_value.force_tiled_decode = force_tiled_decode
     # `LatentsOutput.build` validates this as a string.
@@ -72,7 +71,7 @@ def _invoke(context, image: torch.Tensor, tiled: bool = False, tile_size: int = 
         tiled=tiled,
         tile_size=tile_size,
     )
-    with patch("invokeai.app.invocations.vae.flux_vae_encode.image_resized_to_grid_as_tensor", return_value=image[0]):
+    with patch("invokeai.app.invocations.vae.flux_vae_encode.load_image_as_grid_tensor", return_value=image[0]):
         return invocation.invoke(context)
 
 

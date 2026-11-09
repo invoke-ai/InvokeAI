@@ -10,6 +10,7 @@ import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAcces
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { galleryBoardMediaUsageQueryOptions } from '@features/gallery/data/queries';
+import { usePreciseImageStorage } from '@platform/runtime/frontendConfig';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
@@ -641,19 +642,38 @@ const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string | null; labe
 const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
+  const canExportPng16 = usePreciseImageStorage();
   const handleClick = useCallback(() => void actions.downloadBoard(board.id), [actions, board.id]);
+  const handlePng16Click = useCallback(
+    () => void actions.downloadBoard(board.id, { exportFormat: 'png16' }),
+    [actions, board.id]
+  );
 
   return (
-    <BoardMenuItem
-      icon={DownloadIcon}
-      label={
-        board.videoCount > 0
-          ? t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })
-          : t('widgets.gallery.downloadBoard')
-      }
-      value="download-board"
-      onClick={handleClick}
-    />
+    <>
+      <BoardMenuItem
+        icon={DownloadIcon}
+        label={
+          board.videoCount > 0
+            ? t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })
+            : t('widgets.gallery.downloadBoard')
+        }
+        value="download-board"
+        onClick={handleClick}
+      />
+      {canExportPng16 ? (
+        <BoardMenuItem
+          icon={FileDownIcon}
+          label={
+            board.videoCount > 0
+              ? t('widgets.gallery.downloadBoardPng16WithOmission', { count: board.videoCount })
+              : t('widgets.gallery.downloadBoardPng16')
+          }
+          value="download-board-png16"
+          onClick={handlePng16Click}
+        />
+      ) : null}
+    </>
   );
 };
 

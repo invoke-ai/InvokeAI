@@ -285,29 +285,40 @@ export const useGalleryActions = ({
           }
         }
       },
-      downloadBoard: async (boardId) => {
+      downloadBoard: async (boardId, options = {}) => {
         const owner = captureAccountScope();
 
         try {
           const board = getBoard(boardId);
           const videoCount = board?.videoCount ?? 0;
+          // The omission sentence appears only when videos are actually left out.
+          const preparingKey = `boardArchivePreparing${options.exportFormat === 'png16' ? 'Png16' : ''}${
+            videoCount > 0 ? 'WithOmission' : ''
+          }`;
 
           notifications.add({
             kind: 'info',
-            message: t('widgets.gallery.boardArchivePreparing', {
-              count: videoCount,
-              name: getBoardName(boardId),
-            }),
+            message: t(`widgets.gallery.${preparingKey}`, { count: videoCount, name: getBoardName(boardId) }),
             title: t('widgets.gallery.preparingDownload'),
           });
 
-          const { blob, fileName } = await downloadGalleryArchive({ boardId, signal: owner.signal });
+          const { blob, fileName } = await downloadGalleryArchive({
+            boardId,
+            exportFormat: options.exportFormat,
+            signal: owner.signal,
+          });
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
           recordSuccess(t('widgets.gallery.downloadReady'));
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          // Only the 16-bit archive answers 503: another one is being built.
+          if (error instanceof ApiError && error.status === 503) {
+            recordError(new Error(t('widgets.gallery.archiveBusy')));
             return;
           }
 

@@ -65,6 +65,7 @@ def _build_context(vae: AutoencoderKLWan, latents: torch.Tensor):
     image_dto.width = latents.shape[-1] * 8
     image_dto.height = latents.shape[-2] * 8
     context.images.save.return_value = image_dto
+    context.images.precise_storage_enabled = False
     return context
 
 
@@ -141,6 +142,7 @@ def _build_encode_context(vae: AutoencoderKLWan):
     context = MagicMock()
     context.models.load.return_value = vae_info
     context.images.get_pil.return_value = MagicMock()
+    context.images.has_precise_asset.return_value = False
     context.config.get.return_value.force_tiled_decode = False
     context.tensors.save.return_value = "test_latents"
     return vae_info, context
@@ -164,7 +166,7 @@ def _encode(context, vae, image: torch.Tensor, tiled: bool = False, tile_size: i
     )
     with (
         patch(
-            "invokeai.app.invocations.vae.anima_image_to_latents.image_resized_to_grid_as_tensor",
+            "invokeai.app.invocations.vae.precise_io.image_resized_to_grid_as_tensor",
             return_value=image[0],
         ),
         patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),

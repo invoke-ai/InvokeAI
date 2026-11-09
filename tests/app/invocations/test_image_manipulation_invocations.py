@@ -102,6 +102,9 @@ class _ImageStore:
         self.images = {"source": source.copy()}
         self.saved: list[Image.Image] = []
 
+    def has_precise_asset(self, image_name: str) -> bool:
+        return False  # plain PIL images only: the nodes take their PIL path
+
     def get_pil(self, image_name: str) -> Image.Image:
         return self.images[image_name].copy()
 

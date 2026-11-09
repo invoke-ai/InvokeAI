@@ -34,8 +34,22 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.boards import board_images
 from invokeai.app.services.shared.database.schema.image_index import image_embeddings, video_embeddings
 from invokeai.app.services.shared.database.schema.image_moves import image_subfolder_move_items
+from invokeai.app.services.shared.database.schema.image_precise_assets import image_precise_assets
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.util import no_replace
+from invokeai.backend.image_util.raster import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    RasterImage,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.precise_asset import (
+    PRECISE_ASSET_FORMAT,
+    PRECISE_ASSET_VERSION,
+    write_precise_asset,
+)
 
 
 class _ImageMutationGate:
@@ -358,7 +372,7 @@ def test_thumbnail_eviction_failure_restores_archived_thumbnail(maintenance, mon
     assert result.status == "failed"
 
 
-@pytest.mark.parametrize("root_name", ["image_root", "thumbnail_root"])
+@pytest.mark.parametrize("root_name", ["image_root", "thumbnail_root", "precise_root"])
 def test_preview_fails_when_required_storage_root_is_missing(maintenance, root_name: str) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "missing.png", "missing")
@@ -371,13 +385,17 @@ def test_preview_fails_when_required_storage_root_is_missing(maintenance, root_n
     assert records.exists("missing.png")
 
 
-def test_preview_fails_when_storage_root_cannot_be_scanned(maintenance, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("root_name", ["thumbnail_root", "precise_root"])
+def test_preview_fails_when_storage_root_cannot_be_scanned(
+    maintenance, monkeypatch: pytest.MonkeyPatch, root_name: str
+) -> None:
     service, _db, _records, files = maintenance
+    root = getattr(files, root_name)
     real_scandir = os.scandir
 
     def unavailable(path):
-        if not isinstance(path, int) and Path(path) == files.thumbnail_root:
-            raise PermissionError("unreadable thumbnail root")
+        if not isinstance(path, int) and Path(path) == root:
+            raise PermissionError("unreadable storage root")
         return real_scandir(path)
 
     monkeypatch.setattr(os, "scandir", unavailable)
@@ -907,3 +925,325 @@ def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, mo
             if kind == "fsync" and directory == created_directory.parent
         )
         assert mkdir_index < backup_index < parent_sync_index
+
+
+def _write_precise(
+    service: GalleryMaintenanceService,
+    files: DiskImageFileStorage,
+    image_name: str,
+    subfolder: str = "",
+    row: bool = True,
+) -> bytes:
+    """A precise fixture written directly (never through a production writer), with or without its row."""
+    path = files.get_precise_path(image_name, subfolder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    pixels = np.full((2, 3, 3), 0.5 + len(image_name) / 100, np.float32)
+    write_precise_asset(RasterImage.from_array(pixels, descriptor), path)
+    if row:
+        with service._invoker.services.database.queries.transaction() as q:
+            q.image_precise_assets.insert(
+                image_name=image_name, asset_format=PRECISE_ASSET_FORMAT, format_version=PRECISE_ASSET_VERSION
+            )
+    return path.read_bytes()
+
+
+def _archived_precise(result, subfolder: str, name: str) -> Path:
+    return Path(result.archive_path) / "precise" / subfolder / name
+
+
+def test_remove_missing_archives_the_precise_file_of_a_record_with_a_row(maintenance) -> None:
+    service, db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    precise_bytes = _write_precise(service, files, "gone.png", "nested")
+    _save_image_record(records, "no-row.png", "nested")
+    no_row_bytes = _write_precise(service, files, "no-row.png", "nested", row=False)
+
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    assert preview.affected_count == 2
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert result.records_removed == 2
+    assert result.precise_archived == 1
+    assert result.thumbnails_archived == 0
+    assert result.status == "completed"
+    assert not files.get_precise_path("gone.png", "nested").exists()
+    assert _archived_precise(result, "nested", "gone.safetensors").read_bytes() == precise_bytes
+    assert _count(db, image_precise_assets) == 0
+    # Without a row the file is not the image's: this operation leaves it for ARCHIVE_UNTRACKED.
+    assert files.get_precise_path("no-row.png", "nested").read_bytes() == no_row_bytes
+    assert not _archived_precise(result, "nested", "no-row.safetensors").exists()
+
+
+def test_remove_missing_keeps_records_whose_original_exists_next_to_a_precise_file(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "intact.png")
+    _write_png(files, "intact.png")
+    precise_bytes = _write_precise(service, files, "intact.png")
+
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert preview.affected_count == 0
+    assert result.status == "no_op"
+    assert files.get_precise_path("intact.png").read_bytes() == precise_bytes
+
+
+def test_remove_missing_skips_a_record_whose_precise_file_changes_after_preview(maintenance, monkeypatch) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "changing.png")
+    _write_precise(service, files, "changing.png")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    original_backup = service._create_backup
+
+    def change_precise() -> str | None:
+        backup_path = original_backup()
+        files.get_precise_path("changing.png").write_bytes(b"replaced after preview")
+        return backup_path
+
+    monkeypatch.setattr(service, "_create_backup", change_precise)
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert result.records_removed == 0
+    assert result.skipped_count == 1
+    assert records.exists("changing.png")
+    assert files.get_precise_path("changing.png").read_bytes() == b"replaced after preview"
+
+
+def test_delete_failure_restores_the_archived_precise_file_and_thumbnail(maintenance) -> None:
+    service, db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    precise_bytes = _write_precise(service, files, "gone.png", "nested")
+    thumbnail = files.get_path("gone.png", thumbnail=True, image_subfolder="nested")
+    thumbnail.parent.mkdir(parents=True)
+    thumbnail.write_bytes(b"thumbnail")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    records.delete_many = MagicMock(side_effect=OSError("database unavailable"))
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert files.get_precise_path("gone.png", "nested").read_bytes() == precise_bytes
+    assert thumbnail.read_bytes() == b"thumbnail"
+    assert not _archived_precise(result, "nested", "gone.safetensors").exists()
+    assert _count(db, image_precise_assets) == 1
+    assert result.records_removed == 0
+    assert result.precise_archived == 0
+    assert result.thumbnails_archived == 0
+    assert result.failed_count == 1
+    assert result.status == "failed"
+
+
+def test_eviction_failure_restores_the_precise_file_archived_with_a_thumbnail(maintenance, monkeypatch) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    precise_bytes = _write_precise(service, files, "gone.png", "nested")
+    thumbnail = files.get_path("gone.png", thumbnail=True, image_subfolder="nested")
+    thumbnail.parent.mkdir(parents=True)
+    thumbnail.write_bytes(b"thumbnail")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    monkeypatch.setattr(files, "evict_cache_paths", MagicMock(side_effect=OSError("cache eviction failed")))
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert records.exists("gone.png")
+    assert files.get_precise_path("gone.png", "nested").read_bytes() == precise_bytes
+    assert thumbnail.read_bytes() == b"thumbnail"
+    assert result.precise_archived == 0
+    assert result.thumbnails_archived == 0
+    assert result.records_removed == 0
+    assert result.status == "failed"
+
+
+def test_precise_archive_failure_keeps_the_record_and_restores_the_thumbnail(maintenance, monkeypatch) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    precise_bytes = _write_precise(service, files, "gone.png", "nested")
+    thumbnail = files.get_path("gone.png", thumbnail=True, image_subfolder="nested")
+    thumbnail.parent.mkdir(parents=True)
+    thumbnail.write_bytes(b"thumbnail")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    archive_file = service._archive_file
+
+    def fail_precise(source: Path, destination: Path, expected) -> None:
+        if "precise" in destination.parts:
+            raise OSError("injected precise archive failure")
+        archive_file(source, destination, expected)
+
+    monkeypatch.setattr(service, "_archive_file", fail_precise)
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert records.exists("gone.png")
+    assert files.get_precise_path("gone.png", "nested").read_bytes() == precise_bytes
+    assert thumbnail.read_bytes() == b"thumbnail"
+    assert result.thumbnails_archived == 0
+    assert result.precise_archived == 0
+    assert result.failed_count == 1
+
+
+def test_archive_untracked_archives_only_precise_files_without_a_row_or_record_location(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "tracked.png", "live")
+    tracked_bytes = _write_precise(service, files, "tracked.png", "live")
+    # The hard-kill leftover: the file was copied to its derived path but the row never arrived.
+    _save_image_record(records, "no-row.png", "live")
+    no_row_bytes = _write_precise(service, files, "no-row.png", "live", row=False)
+    _save_image_record(records, "moved.png", "live")
+    _write_precise(service, files, "moved.png", "live")
+    wrong_folder_bytes = _write_precise(service, files, "moved.png", "elsewhere", row=False)
+    no_record_bytes = _write_precise(service, files, "orphan.png", "deep/orphan", row=False)
+    staging = files.precise_root / "live" / ".tmpabc123"
+    staging.write_bytes(b"crashed safetensors write")
+
+    preview = service.preview(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED)
+    assert preview.affected_count == 4
+    result = service.execute(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED, preview.fingerprint)
+
+    assert result.precise_archived == 4
+    assert result.status == "completed"
+    assert files.get_precise_path("tracked.png", "live").read_bytes() == tracked_bytes
+    assert files.get_precise_path("moved.png", "live").is_file()
+    assert not files.get_precise_path("no-row.png", "live").exists()
+    assert not files.get_precise_path("moved.png", "elsewhere").exists()
+    assert not files.get_precise_path("orphan.png", "deep/orphan").exists()
+    assert not staging.exists()
+    assert _archived_precise(result, "live", "no-row.safetensors").read_bytes() == no_row_bytes
+    assert _archived_precise(result, "elsewhere", "moved.safetensors").read_bytes() == wrong_folder_bytes
+    assert _archived_precise(result, "deep/orphan", "orphan.safetensors").read_bytes() == no_record_bytes
+    assert _archived_precise(result, "live", ".tmpabc123").read_bytes() == b"crashed safetensors write"
+    # Nothing was adopted: the leftover still has no row.
+    assert service._invoker.services.database.queries.image_precise_assets.get("no-row.png") is None
+
+
+def test_execute_rejects_a_precise_row_added_after_preview(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "late-row.png")
+    _write_precise(service, files, "late-row.png", row=False)
+    preview = service.preview(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED)
+    assert preview.affected_count == 1
+    with service._invoker.services.database.queries.transaction() as q:
+        q.image_precise_assets.insert(
+            image_name="late-row.png", asset_format=PRECISE_ASSET_FORMAT, format_version=PRECISE_ASSET_VERSION
+        )
+
+    with pytest.raises(GalleryMaintenancePreviewChanged):
+        service.execute(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED, preview.fingerprint)
+
+    assert files.get_precise_path("late-row.png").is_file()
+
+
+def test_regenerate_thumbnails_leaves_precise_files_and_sizes_include_them(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "wide.png")
+    _write_png(files, "wide.png")
+    precise_bytes = _write_precise(service, files, "wide.png")
+    records.set_file_size_bytes("wide.png", 1)
+
+    preview = service.preview(GalleryMaintenanceOperation.REGENERATE_THUMBNAILS)
+    result = service.execute(GalleryMaintenanceOperation.REGENERATE_THUMBNAILS, preview.fingerprint)
+
+    assert result.thumbnails_regenerated == 1
+    assert result.precise_archived == 0
+    assert files.get_precise_path("wide.png").read_bytes() == precise_bytes
+    size = records.get("wide.png").file_size_bytes
+    assert size == files.get_file_size_bytes("wide.png")
+    assert size >= len(precise_bytes) + files.get_path("wide.png").stat().st_size
+
+
+def test_remove_missing_removes_a_record_whose_row_has_no_precise_file(maintenance) -> None:
+    service, db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    _write_precise(service, files, "gone.png", "nested")
+    files.get_precise_path("gone.png", "nested").unlink()
+
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert result.records_removed == 1
+    assert result.precise_archived == 0
+    assert result.status == "completed"
+    assert not records.exists("gone.png")
+    assert _count(db, image_precise_assets) == 0
+
+
+def _create_after_original_checks(service, files, target: Path, content: bytes, monkeypatch) -> None:
+    """Create `target` at the delete phase: after the scan and the per-record checks, before `delete_many`."""
+    original_stat = service._stat
+    calls = 0
+
+    def stat(path: Path):
+        nonlocal calls
+        result = original_stat(path)
+        if path == files.get_path("gone.png", image_subfolder="nested"):
+            calls += 1
+            if calls == 3:  # scan, per-record check, delete-phase check
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+        return result
+
+    monkeypatch.setattr(service, "_stat", stat)
+
+
+@pytest.mark.parametrize("kind", ["thumbnail", "precise"])
+def test_remove_missing_skips_a_record_whose_absent_file_appears_before_the_delete(
+    maintenance, monkeypatch, kind
+) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "gone.png", "nested")
+    if kind == "precise":
+        _write_precise(service, files, "gone.png", "nested")
+        files.get_precise_path("gone.png", "nested").unlink()
+        target = files.get_precise_path("gone.png", "nested")
+    else:
+        target = files.get_path("gone.png", thumbnail=True, image_subfolder="nested")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    _create_after_original_checks(service, files, target, b"appeared", monkeypatch)
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert result.records_removed == 0
+    assert result.skipped_count == 1
+    assert records.exists("gone.png")
+    assert target.read_bytes() == b"appeared"
+
+
+def test_execute_rejects_a_precise_file_changed_after_remove_missing_preview(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "gone.png")
+    _write_precise(service, files, "gone.png")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    files.get_precise_path("gone.png").write_bytes(b"changed after preview")
+
+    with pytest.raises(GalleryMaintenancePreviewChanged):
+        service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert records.exists("gone.png")
+
+
+def test_execute_rejects_a_precise_file_added_after_archive_untracked_preview(maintenance) -> None:
+    service, _db, _records, files = maintenance
+    preview = service.preview(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED)
+    added = _write_precise(service, files, "late.png", row=False)
+
+    with pytest.raises(GalleryMaintenancePreviewChanged):
+        service.execute(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED, preview.fingerprint)
+
+    assert files.get_precise_path("late.png").read_bytes() == added
+
+
+def test_archive_untracked_keeps_a_tracked_precise_file_in_a_differently_cased_directory(maintenance) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "live.png", "live")
+    precise_bytes = _write_precise(service, files, "live.png", "live")
+    renamed = files.precise_root / "Live"
+    (files.precise_root / "live").rename(renamed)
+    if (files.precise_root / "live").exists() is False:
+        pytest.skip("the filesystem is case-sensitive, so the directory name is part of the path")
+
+    preview = service.preview(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED)
+    result = service.execute(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED, preview.fingerprint)
+
+    assert preview.affected_count == 0
+    assert result.status == "no_op"
+    assert (renamed / "live.safetensors").read_bytes() == precise_bytes

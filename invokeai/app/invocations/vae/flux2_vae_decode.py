@@ -18,7 +18,9 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
@@ -56,8 +58,10 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
     )
 
-    def _vae_decode(self, context: InvocationContext, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
-        """Decode latents to image using FLUX.2 VAE.
+    def _vae_decode(
+        self, context: InvocationContext, vae_info: LoadedModel, latents: torch.Tensor
+    ) -> tuple[Image.Image, RasterImage | None]:
+        """The legacy 8-bit image and, when precise storage is on and the output is finite, the unclamped raster.
 
         Input latents should already be in the correct space after BN denormalization
         was applied in the denoiser. The VAE expects (B, 32, H, W) format.
@@ -120,13 +124,15 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 with scoped_vae_tiling(vae, 0):
                     decoded = decode()
 
+        raster = precise_signed_decode_raster(context, decoded)
+
         # Convert from [-1, 1] to [0, 1] then to [0, 255] PIL image
         img = (decoded / 2 + 0.5).clamp(0, 1)
         img = rearrange(img[0], "c h w -> h w c")
         img_np = (img * 255).byte().cpu().numpy()
         # Explicitly create RGB image (not grayscale)
         img_pil = Image.fromarray(img_np, mode="RGB")
-        return img_pil
+        return img_pil, raster
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -148,8 +154,8 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("Running VAE")
-        image = self._vae_decode(context=context, vae_info=vae_info, latents=latents)
+        image, raster = self._vae_decode(context=context, vae_info=vae_info, latents=latents)
 
         TorchDevice.empty_cache()
-        image_dto = context.images.save(image=image)
+        image_dto = save_decoded_image(context, image, raster)
         return ImageOutput.build(image_dto)

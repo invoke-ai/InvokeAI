@@ -238,7 +238,7 @@ class Flux3DiffusersModel(ModelLoader):
                 from diffusers import AutoencoderKLFlux2
 
                 return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                    model_path / "vae", torch_dtype=self._autoencoder_dtype(), local_files_only=True
                 )
             case SubModelType.TextEncoder:
                 encoder_path = model_path / "text_encoder"
