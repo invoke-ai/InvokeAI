@@ -1,10 +1,10 @@
 {
-  "alphaNotice": {
-    "body": "This is an alpha build of the new Invoke interface. Expect rough edges, missing features, and behavior that changes between releases.",
+  "betaNotice": {
+    "body": "This is a beta build of InvokeAI v7. Please be aware that beta software may contain bugs or exhibit unexpected behavior.",
     "dismiss": "Got it",
     "reportLink": "file an issue on GitHub",
     "reportPrefix": "When something breaks or looks wrong, please",
-    "title": "Alpha build"
+    "title": "Beta build"
   },
   "commandPalette": {
     "title": "Command palette",
