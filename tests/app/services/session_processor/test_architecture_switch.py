@@ -20,6 +20,10 @@ from invokeai.app.services.session_processor.session_processor_default import (
 )
 from invokeai.app.services.shared.graph_validation import Graph
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from tests.fixtures import model_offload
+from tests.fixtures.model_offload import assert_load_lock_idle
+
+offload_race = model_offload.offload_race
 
 
 def _model(key: str, base: BaseModelType, type: ModelType) -> ModelIdentifierField:
@@ -74,6 +78,16 @@ def test_a_switch_keeps_what_the_new_session_names_and_moves_the_rest() -> None:
 
     assert cache.kept == [{"sd2-main", "shared-vae"}]
     assert freed == 3 * 2**30
+
+
+def test_architecture_switch_retains_weights_during_concurrent_construction(offload_race) -> None:
+    def switch(cache):
+        offload = ArchitectureSwitchOffload()
+        assert offload.before_session(_graph(SD1), cache) == 0
+        return offload.before_session(_graph(SD2, SHARED_VAE), cache)
+
+    assert offload_race(switch, construction_first=True) == 16
+    assert offload_race(switch, construction_first=False) == 16
 
 
 def test_the_same_architecture_moves_nothing() -> None:
@@ -148,11 +162,13 @@ def test_a_failed_offload_is_logged_and_the_session_runs() -> None:
         def offload_models_from_vram_except(self, keep_model_keys) -> int:
             raise RuntimeError("CUDA error: an illegal memory access was encountered")
 
+    assert_load_lock_idle()
     runner, logger = _runner(SimpleNamespace(ram_cache=_Broken()))
     runner._on_before_run_session(_queue_item(_graph(SD1)))  # type: ignore[arg-type]
     runner._on_before_run_session(_queue_item(_graph(SD2)))  # type: ignore[arg-type]
 
     assert len(logger.warnings) == 1
+    assert_load_lock_idle()
 
 
 def test_the_setting_turns_it_off() -> None:

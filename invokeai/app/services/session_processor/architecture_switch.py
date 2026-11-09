@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.graph_validation import Graph
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -64,7 +64,8 @@ class ArchitectureSwitchOffload:
         previous, self._last_bases = self._last_bases, bases
         if previous is None or bases == previous:
             return 0
-        freed = cache.offload_models_from_vram_except({model.key for model in models})
+        with MODEL_LOAD_LOCK.read_lock():
+            freed = cache.offload_models_from_vram_except({model.key for model in models})
         if freed > 0:
             InvokeAILogger.get_logger(__name__).info(
                 f"Switched from {_names(previous)} to {_names(bases)} models on {cache.execution_device}: moved "

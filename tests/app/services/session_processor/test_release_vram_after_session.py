@@ -11,6 +11,10 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.backend.util.devices import TorchDevice
+from tests.fixtures import model_offload
+from tests.fixtures.model_offload import assert_load_lock_idle
+
+offload_race = model_offload.offload_race
 
 
 class _Logger:
@@ -92,9 +96,12 @@ def test_clear_vram_after_session_moves_every_model_to_ram_and_releases_the_memo
     """The setting for a session that runs fine once and runs out of memory the second time: every unlocked model
     leaves VRAM (staying cached in RAM) and the allocator hands its blocks back, even after a completed session."""
     calls: list[tuple[str, bool]] = []
-    monkeypatch.setattr(
-        TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(("empty", force)))
-    )
+
+    def empty_cache(cls, force=False):
+        assert_load_lock_idle()
+        calls.append(("empty", force))
+
+    monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(empty_cache))
     monkeypatch.setattr(
         TorchDevice, "flush_deferred_empty_cache", classmethod(lambda cls: calls.append(("flush", False)))
     )
@@ -107,6 +114,37 @@ def test_clear_vram_after_session_moves_every_model_to_ram_and_releases_the_memo
     # Forced: deferred behind a busy peer, the next session would budget against memory the allocator still holds.
     assert calls == [("empty", True)]
     assert logger.warnings == []
+
+
+def test_session_cleanup_retains_weights_during_concurrent_construction(offload_race) -> None:
+    def release(cache):
+        processor, logger = _processor(clear_vram_after_session=True, cache=cache)
+        result = processor._release_vram_after_session(_worker(canceled=False))  # type: ignore[arg-type]
+        assert logger.warnings == []
+        return result
+
+    assert offload_race(release, construction_first=True) is None
+    assert offload_race(release, construction_first=False) is None
+
+
+def test_failed_session_offload_releases_load_lock_and_logs_without_emptying_allocator(monkeypatch) -> None:
+    assert_load_lock_idle()
+
+    class BrokenCache:
+        def offload_models_from_vram_except(self, keep_model_keys):
+            assert tuple(keep_model_keys) == ()
+            raise RuntimeError("offload failed")
+
+    emptied = []
+    monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, **kwargs: emptied.append(True)))
+    processor, logger = _processor(clear_vram_after_session=True, cache=BrokenCache())
+
+    assert processor._release_vram_after_session(_worker(canceled=False)) is None  # type: ignore[arg-type]
+
+    assert_load_lock_idle()
+    assert len(logger.warnings) == 1
+    assert "cuda:0" in logger.warnings[0]
+    assert emptied == []
 
 
 def test_clear_vram_after_session_leaves_other_gpus_caches_alone(monkeypatch) -> None:
