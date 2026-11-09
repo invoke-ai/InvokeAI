@@ -105,6 +105,20 @@ const pickedGalleryItem = vi.hoisted(() => ({
   current: { kind: 'image', name: 'picked.gif', thumbnailUrl: '' } as Record<string, unknown>,
 }));
 
+/** Visibility is a multi-user notion; most cases here are an owner on a multi-user server. */
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
 // Node definitions are loaded, so a template's document compiles for the snapshot.
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -195,6 +209,12 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
   'workflowLibrary.visibilityUnknown': 'Visibility unknown',
   'workflowLibrary.retry': 'Retry',
+  'workflowLibrary.modelsToInstall_one': '{{count}} model to install',
+  'workflowLibrary.modelsToInstall_other': '{{count}} models to install',
+  'workflowLibrary.nodeCount_one': '{{count}} node',
+  'workflowLibrary.nodeCount_other': '{{count}} nodes',
+  'workflowLibrary.openedWhen': 'Opened {{when}}',
+  'workflowLibrary.readyToRun': 'Ready to run',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -207,7 +227,9 @@ const translate = (key: string, options?: Record<string, unknown>): string => {
   return interpolate(plural ?? TRANSLATIONS[key] ?? key, options);
 };
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { language: 'en', resolvedLanguage: 'en' }, t: translate }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -488,6 +510,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     onDuplicated = vi.fn((_workflowId: string) => {});
     onOpen = vi.fn();
     onPreview = vi.fn();
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
     accountLifecycle.invalidate();
 
     models.activeInstallSources.current = new Set();
@@ -953,15 +976,46 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item);
   });
 
-  it('swaps the primary action for an install when starter models can fill the gaps', async () => {
+  it('offers an install under the requirements when starter models can fill the gaps, keeping Open', async () => {
     await renderPanel(IMAGE_TO_VIDEO);
 
     expect(requirementStatuses()).toEqual(['installable', 'installable', 'installed']);
     // The rows say which state they are in, not just how they are styled.
     expect(document.querySelectorAll('[aria-label="Not installed"]')).toHaveLength(2);
     expect(document.querySelectorAll('[aria-label="Installed"]')).toHaveLength(1);
-    expect(buttonWithText('Install 2 models')).not.toBeUndefined();
-    expect(buttonWithText('Open')).toBeUndefined();
+    const install = buttonWithText('Install 2 models');
+    const requirements = document.querySelector('[data-requirement-status]')!;
+    expect(requirements.compareDocumentPosition(install!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(buttonWithText('Open')).not.toBeUndefined();
+  });
+
+  it('summarises the template on one line for the narrow layout’s sheet, with its own Open', async () => {
+    const summary = () => panel()!.querySelector<HTMLElement>('[data-detail-sheet-summary]')!;
+    const summaryFacts = () => summary().querySelectorAll('p')[1]?.textContent;
+
+    await renderPanel(IMAGE_TO_VIDEO);
+    expect(summary().textContent).toContain('Image to video');
+    expect(summaryFacts()).toBe('3 nodes · 2 models to install');
+
+    const openedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    await renderPanel({ ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, opened_at: openedAt } });
+    expect(summaryFacts()).toMatch(/^1 node · Ready to run · Opened \S/);
+
+    await act(async () => {
+      summary().querySelector<HTMLButtonElement>('[data-detail-sheet-open]')!.click();
+      await settleFrame();
+    });
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ workflow_id: TEXT_TO_IMAGE.item.workflow_id })
+    );
+  });
+
+  it('leaves visibility out of the rail on a single-user server', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    await renderPanel(TEXT_TO_IMAGE, NO_COPIES, true);
+
+    expect(document.querySelector('[data-workflow-visibility]')).toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
   });
 
   it('queues one install per source, deduped across requirements that share a dependency', async () => {
