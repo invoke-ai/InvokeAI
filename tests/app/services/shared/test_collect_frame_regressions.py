@@ -1719,12 +1719,15 @@ def test_if_selecting_nested_for_final_survives_reload(reload_after: int, compat
     )
 
 
-def _sibling_reiterate_into_if(computed_condition: bool) -> Graph:  # fuzz3-117
-    """`out` holds a nested per-item value and a sibling root value; an If after re-iterating it selects each item."""
-    condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=True)] if computed_condition else []
+def _sibling_reiterate_into_if(
+    computed_condition: bool, src: list[AnyValue] | None = None, levels: int = 2, condition: bool = True
+) -> Graph:  # fuzz3-117
+    """`out` holds a nested per-item value and a sibling root value; an If after re-iterating it selects each item
+    (`condition=True`) or the root `RR` value (`condition=False`)."""
+    condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=condition)] if computed_condition else []
     return _graph(
-        [[["c"]]],
-        2,
+        [[["c"]]] if src is None else src,
+        levels,
         [
             Marked(id="item", marker="a:"),
             Concat(id="sibling_src", first=["p"]),
@@ -1734,12 +1737,12 @@ def _sibling_reiterate_into_if(computed_condition: bool) -> Graph:  # fuzz3-117
             Iterate(id="rit"),
             Marked(id="re", marker="r"),
             Value(id="other", value="RR"),
-            If(id="if", condition=True),
+            If(id="if", condition=condition),
             Collect(id="out2"),
             *condition_node,
         ],
-        """
-        it1.item -> item.value
+        f"it{levels - 1}.item -> item.value"
+        + """
         item.value -> out.item
         sibling_src.collection -> sibling.collection
         sibling.item -> sibling_value.value
@@ -1854,3 +1857,27 @@ def test_if_after_reiterate_keeps_sibling_root_value_after_reload(
         _run_with_reload(_sibling_reiterate_into_if(computed_condition), compatibility_scheduler, 12, "out2")
         == expected
     )
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_if_after_sibling_reiterate_selects_root_value_once_per_item(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    """`out` holds `a:a`, `a:b` and `np`; an If that selects the root `RR` runs once per re-iterated item."""
+    graph = _sibling_reiterate_into_if(computed_condition, src=["a", "b"], levels=1, condition=False)
+
+    runs = _collect_runs(graph, compatibility_scheduler, "out2")["out2"]
+
+    assert runs == [((), ["RR", "RR", "RR"])]
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_if_after_three_level_sibling_reiterate_keeps_sibling_value_once(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    """One more Iterate level than the fuzz3-117 graph; the sibling value must not be read twice."""
+    graph = _sibling_reiterate_into_if(computed_condition, src=[[[["c"]]]], levels=3)
+
+    runs = _collect_runs(graph, compatibility_scheduler, "out2")["out2"]
+
+    assert runs == [((), ["rnp"]), ((0, 0), ["ra:['c']"])]
