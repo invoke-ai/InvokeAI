@@ -498,6 +498,38 @@ describe('buildRecallParametersSettings', () => {
     expect(untouched.values.referenceImages).toEqual(current.referenceImages);
   });
 
+  it('keeps recalled Qwen-Image-2.1 references whichever encoder is selected, leaving the tower check to validation', () => {
+    const qwen21 = makeModel('q21-main', 'qwen-image-2-1', 'main', { format: 'checkpoint' });
+    const q21Supported = [qwen21].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const values = getCurrentGenerateValues({
+      generateValues: { modelKey: qwen21.key },
+      supportedModels: q21Supported,
+    });
+
+    if (!values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const encoder = (format: string) => makeModel('enc', 'any', 'qwen3_vl_encoder', { format, variant: 'qwen3_vl_8b' });
+    const recall = (qwen3VLEncoderModel: ComponentModelConfig | null) =>
+      buildRecallParametersSettings({
+        currentValues: { ...values, qwen3VLEncoderModel },
+        models: [qwen21],
+        parameters: { reference_images: [{ image: image('edit.png') }] },
+        supportedModels: q21Supported,
+        vaeModels: [],
+      });
+
+    for (const selected of [encoder('checkpoint'), encoder('gguf_quantized'), null]) {
+      const result = recall(selected);
+
+      expect(result.values.referenceImages.map((reference) => reference.config.type)).toEqual([
+        'qwen_image_2_1_reference_image',
+      ]);
+      expect(result.skipped).toEqual([]);
+    }
+  });
+
   it('types recalled Krea-2 references as one set: a lone one is style, several or appended ones are edit', () => {
     const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
     const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];

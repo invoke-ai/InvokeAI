@@ -11,13 +11,13 @@ import { WhatsNewDialog } from './WhatsNewDialog';
 import * as store from './whatsNewStore';
 
 type Snapshot = {
-  preferences: { alphaNoticeAcknowledged: boolean; whatsNewSeenVersion: string | null };
+  preferences: { betaNoticeAcknowledged: boolean; whatsNewSeenVersion: string | null };
   status: 'idle' | 'ready';
 };
 
 const settings = vi.hoisted(() => ({
   snapshot: {
-    preferences: { alphaNoticeAcknowledged: true, whatsNewSeenVersion: null },
+    preferences: { betaNoticeAcknowledged: true, whatsNewSeenVersion: null },
     status: 'idle',
   } as Snapshot,
   listeners: new Set<() => void>(),
@@ -101,7 +101,7 @@ describe('WhatsNewDialog with a slow version read', () => {
   });
 
   it('does not reopen notes closed by hand when the version arrives late', async () => {
-    await setSnapshot(ready({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: '6.14.2' }));
+    await setSnapshot(ready({ betaNoticeAcknowledged: true, whatsNewSeenVersion: '6.14.2' }));
 
     // The boot read is still pending when the menu opens the notes.
     void store.loadAppVersion();
