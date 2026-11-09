@@ -1861,7 +1861,11 @@ describe('WorkflowLibraryDialog — This project', () => {
     });
   };
   const clickText = (text: string) => click(buttonWithText(text));
-  const selectCard = (workflowId: string) => click(card(workflowId));
+  // The grid can render its cards a frame after the dialog settles on a loaded CI worker.
+  const selectCard = async (workflowId: string) => {
+    await vi.waitFor(() => expect(card(workflowId)).not.toBeNull());
+    await click(card(workflowId));
+  };
 
   const menuItem = (value: string) => document.querySelector<HTMLElement>(`[data-menu-item="${value}"]`);
   const railMenuTrigger = () => rail()?.querySelector<HTMLElement>('[aria-label="More actions"]');

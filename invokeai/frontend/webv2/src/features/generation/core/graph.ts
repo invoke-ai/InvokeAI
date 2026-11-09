@@ -35,9 +35,11 @@ import {
   isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
+  isGgufQwen3Vl8bEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
+  isQwen3Vl8bVisionTower,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
@@ -979,6 +981,7 @@ const buildErnieImageGraph = (
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const useCfg = settings.cfgScale > 1;
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     id: 'model_loader',
     model,
@@ -988,6 +991,12 @@ const buildErnieImageGraph = (
     use_prompt_enhancer: false,
     vae_model: vaeModel ?? undefined,
   });
+  // ERNIE-Image LoRAs train the transformer only; the Ministral encoder field carries none.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'ernie_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'ernie_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'ernie_image_text_encoder' }) : null;
   const denoise = addNode(graph, {
@@ -1003,7 +1012,7 @@ const buildErnieImageGraph = (
   });
   const output = addImageOutputNode(graph, 'ernie_image_vae_decode', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'text_encoder', posCond, 'text_encoder');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
@@ -1601,6 +1610,11 @@ const buildQwenImage21Graph = (
   // requires both before this runs.
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
+  // The loader rejects a tower beside any other encoder, so a stale pick is never sent.
+  const qwen3VlVisionTowerModel =
+    qwen3VlEncoderModel && isGgufQwen3Vl8bEncoder(qwen3VlEncoderModel)
+      ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl8bVisionTower)
+      : null;
 
   const graph: BackendGraphContract = { edges: [], id: createId('qwen_image_2_1_graph'), nodes: {} };
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -1610,6 +1624,7 @@ const buildQwenImage21Graph = (
     id: 'model_loader',
     model,
     qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower_model: qwen3VlVisionTowerModel ?? undefined,
     type: 'qwen_image_2_1_model_loader',
     vae_model: vaeModel ?? undefined,
   });
@@ -1652,6 +1667,7 @@ const buildQwenImage21Graph = (
   // through it on the way to the decoder.
   addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
   addEdge(graph, denoise, 'metadata', output, 'metadata');
@@ -1954,6 +1970,7 @@ const buildIdeogram4Graph = (
   const graph: BackendGraphContract = { edges: [], id: createId('ideogram4_graph'), nodes: {} };
   // Ideogram 4 is positive-only: there is no negative conditioning input on its denoise node.
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     id: 'model_loader',
     model,
@@ -1962,6 +1979,12 @@ const buildIdeogram4Graph = (
     unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
     vae_model: vaeModel ?? undefined,
   });
+  // LoRAs ride on 'Transformer' only; the denoise node applies them to both branches.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'ideogram4_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const captionBuilder = addNode(graph, {
     color_palette: settings.ideogram4ColorPalette,
     id: 'caption_builder',
@@ -1981,7 +2004,7 @@ const buildIdeogram4Graph = (
   });
   const output = addImageOutputNode(graph, 'ideogram4_l2i', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   if (!isDiffusers) {
     // Wire the second branch only for standalone models; bundles already contain both.
     addEdge(graph, modelLoader, 'unconditional_transformer', denoise, 'unconditional_transformer');

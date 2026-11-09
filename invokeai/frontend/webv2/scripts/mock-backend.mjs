@@ -468,11 +468,11 @@ const createState = (profile, clock) => {
   return {
     boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
-    // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
+    // Dismiss the beta notice and What's New notes so journeys start on the requested page.
     clientState: new Map([
       [
         'webv2:workbench-settings',
-        JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
+        JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
       ],
     ]),
     externalProviders: createExternalProviderConfigs(fixture.models),

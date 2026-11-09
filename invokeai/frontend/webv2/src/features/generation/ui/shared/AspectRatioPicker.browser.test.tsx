@@ -8,6 +8,7 @@ import type {
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { calculateNewSize } from '@features/generation/core/settings';
+import { Field } from '@platform/ui/Field';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act, useState } from 'react';
@@ -534,5 +535,74 @@ describe('AspectRatioPicker saved ratios', () => {
     await userEvent.keyboard('{Escape}');
     await expect.poll(isOpen).toBe(false);
     await expect.element(trigger()).toHaveFocus();
+  });
+});
+
+describe('AspectRatioPicker built-ins only', () => {
+  const renderFixed = async ({
+    disabled = false,
+    lockedRatio = 16 / 9,
+    valueText,
+  }: { disabled?: boolean; lockedRatio?: number; valueText?: string } = {}) => {
+    host = document.createElement('div');
+    host.style.width = '280px';
+    document.body.append(host);
+    root = createRoot(host);
+    const onChange = vi.fn();
+
+    await act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <Field label="Video ratio">
+              <AspectRatioPicker
+                disabled={disabled}
+                lockedRatio={lockedRatio}
+                valueText={valueText}
+                onChange={onChange}
+              />
+            </Field>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+
+    return { onChange };
+  };
+  const fixedTrigger = () => page.getByRole('button', { name: /^Video ratio/ });
+
+  it('offers the built-in grid without Free or saved ratios, and chooses a ratio', async () => {
+    const { onChange } = await renderFixed();
+
+    await expect.element(fixedTrigger()).toHaveAccessibleName('Video ratio 16:9');
+    // The visible field label names the trigger and targets it.
+    const label = document.querySelector('label')!;
+    expect(fixedTrigger().element().getAttribute('aria-labelledby')?.split(' ')[0]).toBe(label.id);
+    expect(label.htmlFor).toBe(fixedTrigger().element().id);
+    await userEvent.click(fixedTrigger());
+    await expect.poll(isOpen).toBe(true);
+    await expect.element(page.getByRole('radio', { exact: true, name: '16:9' })).toBeChecked();
+    await expect.element(page.getByRole('radio', { exact: true, name: '16:9' })).toHaveFocus();
+    expect(page.getByRole('radio').elements()).toHaveLength(9);
+    expect(page.getByRole('radio', { exact: true, name: 'Free' }).elements()).toHaveLength(0);
+    expect(dialog()?.textContent).not.toContain('Your ratios');
+    expect(page.getByRole('button', { name: 'Add ratio' }).elements()).toHaveLength(0);
+
+    // Home lands on the first tile, 21:9, and Down moves a row of five: 21:9 sits above 3:4.
+    await userEvent.keyboard('{Home}{ArrowDown}');
+    await expect.element(page.getByRole('radio', { exact: true, name: '3:4' })).toHaveFocus();
+    await userEvent.keyboard('{End}{Enter}');
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(9 / 21);
+    await expect.poll(isOpen).toBe(false);
+  });
+
+  it('shows the override text on a disabled trigger that does not open', async () => {
+    await renderFixed({ disabled: true, valueText: 'From first frame' });
+
+    await expect.element(fixedTrigger()).toHaveAccessibleName('Video ratio From first frame');
+    await expect.element(fixedTrigger()).toBeDisabled();
+    await userEvent.click(fixedTrigger(), { force: true });
+    expect(isOpen()).toBe(false);
   });
 });

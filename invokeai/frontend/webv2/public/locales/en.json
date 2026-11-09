@@ -1,10 +1,10 @@
 {
-  "alphaNotice": {
-    "body": "This is an alpha build of the new Invoke interface. Expect rough edges, missing features, and behavior that changes between releases.",
+  "betaNotice": {
+    "body": "This is a beta build of InvokeAI v7. Please be aware that beta software may contain bugs or exhibit unexpected behavior.",
     "dismiss": "Got it",
     "reportLink": "file an issue on GitHub",
     "reportPrefix": "When something breaks or looks wrong, please",
-    "title": "Alpha build"
+    "title": "Beta build"
   },
   "commandPalette": {
     "title": "Command palette",
@@ -1797,6 +1797,8 @@
     "statusUnauthorized": "Unauthorized",
     "stopScan": "Stop",
     "scanFolderTooltip": "Scan this folder for model files",
+    "showStarterModel": "Show {{name}}",
+    "previewDecoderHint": "Optional live-preview decoder (needs tiny_autoencoder_previews):",
     "scanModelsFolder": "Scan models folder",
     "modelsFolderUnavailable": "Couldn't get the models folder location from the server. Check that the server is reachable, then retry.",
     "scanSummary_one": "{{count}} file in {{path}} · {{notInstalled}} not installed",
@@ -1979,6 +1981,12 @@
     "fieldInfo": "Field: {{name}} · Type: {{type}}",
     "fieldName": "Field: {{name}}",
     "fieldType": "Type: {{type}}",
+    "fileUnavailable": "This file is unavailable. It may have been deleted or access was revoked.",
+    "fileUpload": "Upload file",
+    "fileUploadDropHint": "Drop a file here, or choose one.",
+    "fileUploadFailed": "File upload failed",
+    "fileUploadRejected": "File type not supported",
+    "fileUploadRejectedDescription": "Choose a PDF, Markdown, text, CSV, JSON, or YAML file.",
     "required": "Required",
     "optional": "Optional",
     "inputModes": {
@@ -3425,7 +3433,8 @@
       "referenceImagePromptTagExplanation": "Write {{tag}} in the prompt to refer to this image.",
       "referenceImagePromptTagHint": "Write {{tag}} in the prompt to refer to this image. Click to copy.",
       "referenceImages": "Reference images",
-      "referenceImagesNeedFormat": "Reference images need a {{format}} {{base}} model.",
+      "referenceImagesNeedGgufVisionTower": "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.",
+      "referenceImagesNeedVisionTower": "Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.",
       "referenceImagesUnsupported": "Reference images are not supported by the selected model.",
       "removeConcept": "Remove concept",
       "removeConceptNamed": "Remove {{name}}",
@@ -3623,6 +3632,7 @@
         "qwen35EncoderModel": "Qwen3.5 encoder",
         "qwen3EncoderModel": "Qwen3 encoder",
         "qwen3VLEncoderModel": "Qwen3-VL encoder",
+        "qwen3VLVisionTowerModel": "Qwen3-VL vision tower",
         "qwenVLEncoderModel": "Qwen VL encoder",
         "referenceImages_one": "{{count}} reference image",
         "referenceImages_other": "{{count}} reference images",

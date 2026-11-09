@@ -22,6 +22,7 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'BooleanField',
   'ColorField',
   'EnumField',
+  'FileField',
   'FloatField',
   'FloatGeneratorField',
   'ImageField',
@@ -443,6 +444,8 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
         value === 'none' ||
         hasNonEmptyStringProp(value, 'board_id')
       );
+    case 'FileField':
+      return hasNonEmptyStringProp(value, 'file_id');
     case 'ImageField':
       return hasNonEmptyStringProp(value, 'image_name');
     case 'VideoField':
@@ -528,6 +531,7 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   ControlField: '#5eead4',
   DenoiseMaskField: '#93c5fd',
   EnumField: '#60a5fa',
+  FileField: '#22d3ee',
   FloatField: '#fb923c',
   ImageField: '#c4b5fd',
   IntegerField: '#f87171',

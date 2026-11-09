@@ -147,6 +147,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
+  qwen3VLVisionTowerModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
   animaInpaintAdapterEnabled: true,
@@ -357,11 +358,19 @@ describe('image recall', () => {
     expect(result?.fields).toContain('referenceImages');
   });
 
-  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
-  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
-    const recall = (model: MainModelConfig) =>
+  // The base decides what recall keeps; an encoder without a vision tower is flagged by validation, never recalled away.
+  it('recalls Qwen-Image-2.1 reference images whichever encoder sits in the slot', () => {
+    const encoder = (format: string) => ({
+      base: 'any',
+      format,
+      key: 'enc',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    });
+    const recall = (model: MainModelConfig, qwen3VLEncoderModel: ReturnType<typeof encoder> | null = null) =>
       buildImageRecallSettings({
-        currentValues: createValues({ model, modelKey: model.key }),
+        currentValues: createValues({ model, modelKey: model.key, qwen3VLEncoderModel }),
         image,
         kind: 'all',
         metadata: {
@@ -381,10 +390,7 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
-    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
-
-    expect(diffusers?.values.referenceImages).toEqual([
+    const kept = [
       {
         config: {
           image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
@@ -393,10 +399,28 @@ describe('image recall', () => {
         id: 'edit-1',
         isEnabled: true,
       },
-    ]);
-    expect(diffusers?.fields).toContain('referenceImages');
-    expect(gguf?.values.referenceImages).toEqual([]);
-    expect(gguf?.fields).not.toContain('referenceImages');
+    ];
+    const diffusers: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'q21',
+      name: 'Q21',
+      type: 'main',
+    };
+    const int8: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'q21-int8',
+      name: 'Int8',
+      type: 'main',
+    };
+
+    expect(recall(diffusers)?.values.referenceImages).toEqual(kept);
+    expect(recall(diffusers)?.fields).toContain('referenceImages');
+    expect(recall(int8, encoder('checkpoint'))?.values.referenceImages).toEqual(kept);
+    // A stale GGUF encoder left over from another model must not cost the recorded references.
+    expect(recall(diffusers, encoder('gguf_quantized'))?.values.referenceImages).toEqual(kept);
+    expect(recall(int8, null)?.values.referenceImages).toEqual(kept);
   });
 
   it('preserves canonical original and crop provenance from legacy metadata', () => {
@@ -861,6 +885,54 @@ describe('image recall', () => {
       getImageRecallCapabilities({ ...recallInput, metadata: { qwen3_vl_encoder: krea2Metadata.qwen3_vl_encoder } })
         .remix
     ).toBe(true);
+  });
+
+  it('remixes a Qwen-Image-2.1 image with its GGUF encoder and vision tower, judging the tower beside the recalled encoder', () => {
+    const qwen21: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'q21',
+      name: 'Q21',
+      type: 'main',
+    };
+    const ggufEncoder: ComponentModelConfig = { ...ideogram4Qwen3VL, format: 'gguf_quantized', key: 'gguf-enc' };
+    const tower = (variant: string): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const recall = (metadata: Record<string, unknown>, current: Partial<GenerateWidgetValues> = {}) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model: qwen21, modelKey: qwen21.key, ...current }),
+        image,
+        kind: 'remix',
+        metadata: { model: { key: qwen21.key }, ...metadata },
+        models: [ggufEncoder, tower('qwen3_vl_8b'), tower('qwen3_vl_4b')],
+        supportedModels: [qwen21],
+        vaeModels: [],
+      })?.values;
+    const recorded = { qwen3_vl_encoder: { key: 'gguf-enc' }, qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_8b' } };
+
+    expect(recall(recorded)).toMatchObject({
+      qwen3VLEncoderModel: { key: 'gguf-enc' },
+      qwen3VLVisionTowerModel: { key: 'mmproj-qwen3_vl_8b' },
+    });
+    // A tower the loader would reject is not restored.
+    expect(
+      recall({ ...recorded, qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_4b' } })?.qwen3VLVisionTowerModel
+    ).toBeNull();
+    // ... and the pick already in the slot stays when the recorded one is skipped.
+    const currentTower = tower('qwen3_vl_8b');
+
+    expect(
+      recall(
+        { qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_4b' } },
+        { qwen3VLEncoderModel: ggufEncoder, qwen3VLVisionTowerModel: currentTower }
+      )?.qwen3VLVisionTowerModel
+    ).toMatchObject({ key: currentTower.key });
   });
 
   it('keeps a fitting pick when the recorded component does not fit the current model', () => {

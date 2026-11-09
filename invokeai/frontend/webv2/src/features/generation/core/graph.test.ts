@@ -1205,6 +1205,27 @@ describe('compileGenerateGraph', () => {
       expect(latentImages).toEqual(['a.png', 'b.png']);
     });
 
+    it('wires the references of a single-file model, whose standalone encoder reads them', () => {
+      const checkpoint: MainModelConfig = { ...qwenImage21Model, format: 'checkpoint', key: 'qwen21-int8' };
+      const encoder = {
+        base: 'any',
+        format: 'checkpoint',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+      const graph = compile(checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        referenceImages: references('a.png', 'b.png'),
+        vae: { base: 'qwen-image-2-1', key: 'qwen21-vae', name: 'Qwen-Image-2.1 VAE', type: 'vae' },
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: { key: 'qwen3-vl-8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    });
+
     it('applies LoRAs to the transformer through its own collection loader', () => {
       const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
       const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
@@ -1633,6 +1654,49 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     });
   });
 
+  it('routes the Ideogram 4 transformer through its LoRAs and records only those it applied', () => {
+    const ideogramLora: LoraModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram-lora',
+      name: 'Ideogram LoRA',
+      type: 'lora',
+    };
+    // Same `layers.N` container, different family: it must not reach the Ideogram 4 loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    for (const [model, extra] of [
+      [ideogram4Model, {}],
+      [
+        ideogram4Conditional,
+        {
+          ideogram4UnconditionalModel: ideogram4Unconditional,
+          qwen3VLEncoderModel: qwen3Vl8bEncoder,
+          vae: ideogram4Vae,
+        },
+      ],
+    ] as const) {
+      const graph = compile(model, {
+        ...extra,
+        loras: [
+          { isEnabled: true, model: ideogramLora, weight: 0.8 },
+          { isEnabled: true, model: zImageLora, weight: 1 },
+        ],
+      });
+      const loraLoader = getNodeByType(graph, 'ideogram4_lora_collection_loader');
+
+      expect(loraLoader).toBeDefined();
+      expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+      // The node applies the 'Transformer' LoRAs to both branches; the second input stays a plain model.
+      if (model.format !== 'diffusers') {
+        expect(getEdge(graph, 'denoise_latents', 'unconditional_transformer')?.source.node_id).toBe('model_loader');
+      }
+      expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+        { model: { base: 'ideogram-4', key: 'ideogram-lora', name: 'Ideogram LoRA', type: 'lora' }, weight: 0.8 },
+      ]);
+    }
+  });
+
   it('drops a component selection that does not suit the Ideogram 4 model about to run', () => {
     // Filter stale optional encoder overrides for bundled models.
     const graph = compile(ideogram4Model, { qwen3VLEncoderModel: qwen3VlEncoder });
@@ -1763,6 +1827,74 @@ describe('Qwen-Image-2.1 graphs', () => {
     const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
 
     expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
+  });
+
+  describe('Vision Tower', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'gguf_quantized' };
+    const checkpointEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'checkpoint' };
+    const tower = (variant: string): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const referenceImages: GenerateReferenceImage[] = [
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'a.png', width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'a.png',
+        isEnabled: true,
+      },
+    ];
+
+    it('sends the tower with a GGUF 8B encoder, and the references ride on the unchanged encoder edge', () => {
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_8b'),
+        referenceImages,
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'mmproj-qwen3_vl_8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_8b' },
+      });
+    });
+
+    it('refuses references beside a GGUF encoder without a tower, and sends no 4B tower', () => {
+      expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: ggufEncoder, referenceImages, vae: qwen21Vae })).toThrow(
+        "Reference images need this encoder's Vision Tower"
+      );
+
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_4b'),
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
+
+    it('never sends a stale tower beside a non-GGUF encoder or a Diffusers main', () => {
+      const stale = tower('qwen3_vl_8b');
+      const withSafetensors = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: checkpointEncoder,
+        qwen3VLVisionTowerModel: stale,
+        referenceImages,
+        vae: qwen21Vae,
+      });
+      const diffusers = compile(qwen21Diffusers, { qwen3VLVisionTowerModel: stale });
+
+      expect(withSafetensors.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+      expect(getEdge(withSafetensors, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(diffusers.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
   });
 });
 
@@ -1900,6 +2032,32 @@ describe('ERNIE-Image graphs', () => {
     const graph = compile(ernieModel, { mistralEncoderModel: mistralEncoder });
 
     expect(graph.nodes.model_loader?.text_encoder_model).toBeUndefined();
+  });
+
+  it('routes the transformer through ERNIE-Image LoRAs and records only those it applied', () => {
+    const ernieLora: LoraModelConfig = { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' };
+    // Same `layers.N` container, different family: it must not reach the ERNIE-Image loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(ernieModel, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: ernieLora, weight: 0.7 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'ernie_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // The Ministral encoder carries no LoRA layers, so both prompts keep reading it from the model loader.
+    expect(getEdge(graph, 'pos_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' }, weight: 0.7 },
+    ]);
   });
 
   it('builds the rest of the graph out of the one bundled pipeline', () => {
