@@ -38,10 +38,13 @@ export const WORKFLOW_LIBRARY_PANES_CSS: SystemStyleObject = {
   [WORKFLOW_LIBRARY_WIDE]: {
     display: 'contents',
     '& > :first-child': { gridArea: 'panes', mb: '3', minH: '0' },
+    // Per side, not the shorthand: `borderWidth: 0` after `borderStartWidth` would reset the start border too.
     '& > :last-child': {
+      borderBottomWidth: '0',
+      borderEndWidth: '0',
       borderRadius: '0',
       borderStartWidth: '1px',
-      borderWidth: '0',
+      borderTopWidth: '0',
       gridArea: 'detail',
       minH: '0',
     },
