@@ -429,7 +429,7 @@ def unpack_ggml_at_load(
     its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
     the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
-    replaces and, for a quantized tensor, the temporaries of one row slice (see `_unpack`).
+    replaces and, for a quantized tensor, the temporaries of one row slice (see `unpack_ggml_tensor`).
     """
     linear_params = {
         f"{module_name}.{param_name}"
@@ -453,11 +453,11 @@ def unpack_ggml_at_load(
         for key, value in sd.items()
         if key not in unpacked
     )
-    in_flight = max((_in_flight_bytes(sd[key]) for key in keys), default=0)
+    in_flight = max((sd[key].quantized_data.nbytes + ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
     reserve(kept + sum(unpacked.values()) + in_flight)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
-        sd[key] = _unpack(sd[key])
+        sd[key] = unpack_ggml_tensor(sd[key])
     return len(keys)
 
 
@@ -468,17 +468,19 @@ def _row_slices(value: GGMLTensor) -> tuple[torch.Tensor, int, int]:
     return rows, per_row, max(1, _UNPACK_CHUNK_ELEMENTS // per_row)
 
 
-def _in_flight_bytes(value: GGMLTensor) -> int:
-    """What replacing `value` holds beside its result: the packed original, released only once the result
-    lands, and for a quantized tensor the decode temporaries of one slice."""
-    packed = value.quantized_data.nbytes
+def ggml_unpack_temp_bytes(value: GGMLTensor) -> int:
+    """Decode temporaries beside the output and packed original, bounded to one row slice.
+
+    Callers budget the original separately: a state dict can release it as its replacement lands,
+    whereas materializing a model parameter can leave its checkpoint alias alive.
+    """
     if value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES:
-        return packed
+        return 0
     rows, per_row, step = _row_slices(value)
-    return packed + HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
+    return HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
 
 
-def _unpack(value: GGMLTensor) -> torch.Tensor:
+def unpack_ggml_tensor(value: GGMLTensor) -> torch.Tensor:
     """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode.
 
     A quantized tensor is decoded a slice of rows at a time into its preallocated result. GGML blocks

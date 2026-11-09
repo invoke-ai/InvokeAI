@@ -7,6 +7,7 @@ wrappers the loader has to cope with. See ``qwen3vl_gguf_fixture`` for what is a
 
 from unittest.mock import call, create_autospec
 
+import gguf
 import pytest
 import torch
 import transformers.configuration_utils
@@ -122,22 +123,19 @@ def test_a_krea2_shaped_forward_produces_hidden_states(loaded_encoder) -> None:
 
 
 def test_the_embedding_materialization_is_reserved(monkeypatch, tmp_path) -> None:
-    """The framework reserves the GGUF's file size, which does not cover unpacking a tensor on top
-    of it — 0.78 GB for the 4B, 1.24 GB for the 8B, and several times that at the peak. Unreserved,
-    that is what pushes a tight machine into swap.
-
-    The expected figure is computed from the *dequantized* shape on purpose: `Tensor.numel()` is not
-    overridden on a GGMLTensor and reports the packed element count instead — a different number
-    either way, and for a 4-bit quant roughly half of what is about to be allocated. The multiplier
-    is imported rather than restated: what this test owns is that the loader reserves against the
-    right *tensor*, while `test_quantized_embedding.py` owns the multiplier's value.
-    """
+    """Budget the live checkpoint, model-owned buffers, output and one slice of temporaries."""
     ram_cache = create_autospec(ModelCache, instance=True)
 
     encoder = load_tiny_gguf_encoder(monkeypatch, tmp_path, ram_cache=ram_cache)
 
     embed_weight = encoder.language_model.embed_tokens.weight
-    expected = PEAK_COPIES * embed_weight.shape.numel() * torch.float32.itemsize
+    reader = gguf.GGUFReader(tmp_path / "qwen3vl_tiny.gguf")
+    packed_bytes = sum(int(t.n_bytes) for t in reader.tensors)
+    del reader
+    buffer_bytes = sum(b.untyped_storage().nbytes() for b in encoder.buffers() if not b.is_meta)
+    # This tiny embedding fits in one slice. The whole tensor's logical size, not its packed
+    # element count, gives both the output and the decode allowance.
+    expected = packed_bytes + buffer_bytes + (1 + PEAK_COPIES) * embed_weight.shape.numel() * torch.float32.itemsize
     assert ram_cache.make_room.call_args_list == [call(expected)]
 
 
