@@ -273,7 +273,8 @@ class WanModelLoaderInvocation(BaseInvocation):
         # Tokenizer + text encoder: standalone override > main (if Diffusers) > component source.
         if self.wan_t5_encoder_model is not None:
             t5_config = context.models.get_config(self.wan_t5_encoder_model)
-            if t5_config.type != ModelType.WanT5Encoder or t5_config.format != ModelFormat.WanT5Encoder:
+            # Either format of the type -- the diffusers folder or one GGUF file -- has a loader for both submodels.
+            if t5_config.type != ModelType.WanT5Encoder:
                 raise ValueError("The Wan T5 Encoder must resolve to a standalone Wan T5 encoder model.")
             tokenizer = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})

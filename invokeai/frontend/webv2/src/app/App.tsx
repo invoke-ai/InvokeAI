@@ -13,21 +13,21 @@ import { I18nController } from './I18nController';
 import { router } from './router';
 import { ThemeController } from './ThemeController';
 
-const AlphaNoticeDialog = lazy(() =>
-  import('@workbench/shell/AlphaNoticeDialog').then((module) => ({ default: module.AlphaNoticeDialog }))
+const BetaNoticeDialog = lazy(() =>
+  import('@workbench/shell/BetaNoticeDialog').then((module) => ({ default: module.BetaNoticeDialog }))
 );
 
-/** Load the alpha notice only for accounts that have not dismissed it. */
-const AlphaNoticeGate = () => {
+/** Load the beta notice only for accounts that have not dismissed it. */
+const BetaNoticeGate = () => {
   const isDue = useWorkbenchSettingsSelector(
-    (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.alphaNoticeAcknowledged
+    (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.betaNoticeAcknowledged
   );
   // Stays mounted through the close animation instead of vanishing on dismissal.
   const dialog = useExitPresence(isDue);
 
   return dialog.isMounted ? (
     <Suspense fallback={null}>
-      <AlphaNoticeDialog onExitComplete={dialog.release} />
+      <BetaNoticeDialog onExitComplete={dialog.release} />
     </Suspense>
   ) : null;
 };
@@ -55,7 +55,7 @@ export const App = () => (
       <ThemeController />
       <I18nController />
       <AppToaster />
-      <AlphaNoticeGate />
+      <BetaNoticeGate />
       <WhatsNewGate />
       <FeatureHintsAdapterProvider>
         <RouterProvider router={router} />

@@ -11,10 +11,12 @@ from invokeai.app.invocations.model import WanT5EncoderField
 from invokeai.app.invocations.primitives import WanConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 # Wan models are trained with 512-token text sequences (matches the
 # upstream config.json's ``text_len: 512`` and the WanPipeline.__call__
@@ -85,7 +87,12 @@ class WanTextEncoderInvocation(BaseInvocation):
             )
 
         text_encoder_info = context.models.load(self.wan_t5_encoder.text_encoder)
-        with text_encoder_info.model_on_device() as (_, text_encoder):
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for the folder build.
+        dequant_bytes = peak_dequant_transient_bytes(
+            text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
+        )
+        with text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (_, text_encoder):
             assert isinstance(text_encoder, UMT5EncoderModel)
             device = get_effective_device(text_encoder)
 

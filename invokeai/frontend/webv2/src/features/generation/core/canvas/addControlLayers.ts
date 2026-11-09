@@ -10,9 +10,6 @@ import type { ControlAdapterKind } from './controlValidation';
 
 import { createControlValidationSequence } from './controlValidation';
 
-/** The deterministic denoise node id every canvas base graph uses. */
-export const CONTROL_DENOISE_NODE_ID = 'denoise_latents';
-
 const LLLITE_COLLECTOR_NODE_ID = 'control_lllite_collector';
 
 /** The control-adapter kinds a control layer can carry. */
@@ -83,6 +80,8 @@ const feedImage = (
 export interface AddControlLayersOptions {
   /** The main model base — selects the adapter nodes and support. */
   base: SupportedGenerateBase;
+  /** The family's base denoise, which every control adapter feeds. */
+  denoise: BackendInvocationContract;
   /**
    * The main model variant (a FLUX `dev_fill` blocks Control LoRA; a Qwen-Image `edit` blocks its control; FLUX.2's
    * control needs `dev`).
@@ -159,11 +158,7 @@ const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_co
 
 /** Validate defensively through the shared policy before graph wiring. */
 export const addControlLayers = (graph: BackendGraphContract, options: AddControlLayersOptions): void => {
-  const { base, inpaint, layers, modelVariant } = options;
-  const denoise = graph.nodes[CONTROL_DENOISE_NODE_ID];
-  if (!denoise) {
-    throw new Error('addControlLayers: base graph is missing the denoise node.');
-  }
+  const { base, denoise, inpaint, layers, modelVariant } = options;
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;

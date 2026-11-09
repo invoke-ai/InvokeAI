@@ -11,7 +11,6 @@ import {
   bboxHandleAt,
   bboxHandlePoint,
   bboxTargetAt,
-  constrainBboxToRatio,
   isInsideRect,
   moveBbox,
   resizeBbox,
@@ -406,17 +405,6 @@ describe('moveBbox', () => {
   });
   it('does not snap an unchanged axis from an off-grid origin', () => {
     expect(moveBbox(rect(10, 11, 100, 100), 5, 0, 8, true)).toEqual(rect(16, 11, 100, 100));
-  });
-});
-
-describe('constrainBboxToRatio', () => {
-  it('re-fits to the ratio around the center and snaps the width', () => {
-    const out = constrainBboxToRatio(rect(0, 0, 100, 100), 2, 8);
-    expect(out.width / out.height).toBeCloseTo(2, 5);
-    expect(out.width % 8).toBe(0);
-    // Center preserved.
-    expect(out.x + out.width / 2).toBeCloseTo(50, 5);
-    expect(out.y + out.height / 2).toBeCloseTo(50, 5);
   });
 });
 

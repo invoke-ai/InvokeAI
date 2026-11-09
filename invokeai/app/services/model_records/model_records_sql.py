@@ -166,6 +166,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # 2. Apply the changes to the dict
                 # 3. Attempt to create a new model config from the updated dict
 
+                original = record
+
                 # 1. Convert the existing record to a dict
                 record_as_dict = record.model_dump()
 
@@ -191,6 +193,19 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                         if stale_field not in changes.model_fields_set:
                             fallback_dict.pop(stale_field, None)
                     record = _construct_config_for_type(fallback_dict, changes.type)
+
+                # Validation ignores keys the resulting class has no field for, so without this check a change it
+                # cannot store would be dropped while the update reports success. None clears a value, and a field
+                # of the original class may be dropped by a class change; neither is refused.
+                unstorable = sorted(
+                    field_name
+                    for field_name in changes.model_fields_set
+                    if getattr(changes, field_name) is not None
+                    and field_name not in type(original).model_fields
+                    and field_name not in type(record).model_fields
+                )
+                if unstorable:
+                    raise ValueError(f"Model '{original.name}' does not support {', '.join(unstorable)}")
             else:
                 # We are not allowing the model config class to change, so we can just update the existing instance in
                 # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
