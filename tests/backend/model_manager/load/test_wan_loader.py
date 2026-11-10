@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load.model_loaders.wan import (
 )
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SubModelType, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from tests.fixtures.safetensors_files import overwrite_payloads
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, overwrite_payloads
 
 
 def test_converts_text_and_time_embedders():
@@ -395,6 +395,7 @@ class TestDiffusersFolderLoad:
             overwrite_payloads(file)
         return {name for name, value in model.state_dict().items() if not torch.equal(value, loaded[name])}
 
+    @needs_mapping_that_shows_file_writes
     @pytest.mark.parametrize("repo_variant", [None, ModelRepoVariant.FP16], ids=["default", "fp16-variant-fallback"])
     def test_an_fp32_folder_leaves_nothing_reading_the_file(
         self, tmp_path: Path, repo_variant: ModelRepoVariant | None
@@ -415,6 +416,7 @@ class TestDiffusersFolderLoad:
             assert value.dtype == expected, name
         assert self._tensors_reading_the_file(tmp_path, model) == set()
 
+    @needs_mapping_that_shows_file_writes
     @pytest.mark.parametrize("norms_on_disk", ["bf16", "fp32"])
     def test_a_bf16_folder_keeps_its_weights_on_the_mapping(self, tmp_path: Path, norms_on_disk: str) -> None:
         """A bf16 file needs no cast: its weights stay on the file's pages, as upstream loads them, with no second copy.

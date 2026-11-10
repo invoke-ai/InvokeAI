@@ -31,7 +31,7 @@ from tests.fixtures.quantized_payloads import (
     quantize_convrot,
     quantize_scaled_fp8,
 )
-from tests.fixtures.safetensors_files import overwrite_payloads
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, overwrite_payloads
 
 # A structurally faithful but tiny Wan transformer. attention_head_dim must stay
 # at 128 — the loader derives num_attention_heads as inner_dim // 128, matching
@@ -518,6 +518,7 @@ class TestHeaderFirstRead:
         assert reserves == [("reserve", sum(v.nbytes for k, v in sd.items() if not k.endswith(".comfy_quant")))]
         assert len(events[first_reserve + 1 :]) == len(sd) - len(BLOCK_LAYERS)
 
+    @needs_mapping_that_shows_file_writes
     def test_a_bf16_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
         """bf16 on disk is the case where the cast is a no-op: a mapped tensor would come through it still mapped."""
         reference = _tiny_model().to(torch.bfloat16)
@@ -534,6 +535,7 @@ class TestHeaderFirstRead:
         for key, value in reference.state_dict().items():
             assert torch.equal(model.state_dict()[key], value), key
 
+    @needs_mapping_that_shows_file_writes
     def test_an_int8_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
         """The int8 codes are kept as stored, so they are never copied by a cast either."""
         _, sd = _int8_checkpoint(BLOCK_LAYERS)
