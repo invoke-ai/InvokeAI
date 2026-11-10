@@ -80,6 +80,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.selectCanvasTab',
   'app.selectUpscalingTab',
   'app.selectWorkflowsTab',
+  'app.switchWorkflowView',
   'app.selectModelsTab',
   'app.selectQueueTab',
   'app.openWidgets',
@@ -289,6 +290,61 @@ export const useRegisterFirstPartyCommands = () => {
     }
   };
 
+  const switchWorkflowView = () => {
+    const project = queries.getSnapshot().activeProject;
+    const target = getFocusTarget();
+    const graphRegions = ['center', 'bottom'] as const;
+    const isWorkflow = (instanceId: string) => project.widgetInstances[instanceId]?.typeId === 'workflow';
+    const hasWorkflow = (region: 'center' | 'bottom' | 'left') =>
+      project.widgetRegions[region].instanceIds.some(isWorkflow);
+    const visibleWorkflow = (region: 'center' | 'bottom' | 'left') => {
+      const { activeInstanceId, instanceIds, isCollapsed } = project.widgetRegions[region];
+      const panelOpen = region === 'center' || project.layout.panels[region === 'left' ? 'isLeftOpen' : 'isBottomOpen'];
+
+      return panelOpen && !isCollapsed && instanceIds.includes(activeInstanceId) && isWorkflow(activeInstanceId)
+        ? activeInstanceId
+        : null;
+    };
+    const fromGraph =
+      target?.kind === 'floating'
+        ? isWorkflow(target.instanceId)
+        : (target?.region === 'center' || target?.region === 'bottom') && visibleWorkflow(target.region) !== null;
+    const floatingWorkflow = Object.keys(project.floatingWidgets ?? {}).find(isWorkflow);
+    const region = fromGraph ? 'left' : (graphRegions.find(visibleWorkflow) ?? graphRegions.find(hasWorkflow));
+
+    if (!region && floatingWorkflow) {
+      widgets.revealFloating(floatingWorkflow);
+      focus.focusFloating(floatingWorkflow);
+      return;
+    }
+
+    const destination = region ?? 'center';
+    const visibleInstance = visibleWorkflow(destination);
+
+    if (visibleInstance) {
+      focus.focusRegion(destination, undefined, visibleInstance);
+      return;
+    }
+
+    // Opening an unplaced view could dock the graph's floating window.
+    if (floatingWorkflow && !hasWorkflow(destination)) {
+      return;
+    }
+
+    const opened = openWidgetPlacement({
+      getWidgetsForRegion,
+      options: { preferredRegions: [destination] },
+      projectId: project.id,
+      typeId: 'workflow',
+      widgets,
+    });
+
+    if (opened.ok) {
+      const { activeInstanceId } = queries.getSnapshot().activeProject.widgetRegions[destination];
+      focus.focusRegion(destination, undefined, activeInstanceId);
+    }
+  };
+
   useMountEffect(() =>
     commandApi.register({
       handler: toggleCommandPalette,
@@ -424,6 +480,11 @@ export const useRegisterFirstPartyCommands = () => {
           }),
         id: 'app.selectWorkflowsTab',
         title: 'Open Workflow editor',
+      }),
+      commandApi.register({
+        handler: switchWorkflowView,
+        id: 'app.switchWorkflowView',
+        title: 'Switch workflow view',
       }),
       commandApi.register({
         handler: () => openModelManager({ projectId: queries.getSnapshot().activeProject.id }),

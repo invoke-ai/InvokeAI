@@ -229,6 +229,7 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.selectQueueTab': 'Navigation',
   'app.selectUpscalingTab': 'Navigation',
   'app.selectWorkflowsTab': 'Navigation',
+  'app.switchWorkflowView': 'Workflows',
   'app.toggleLeftPanel': 'Layout',
   'app.togglePanels': 'Layout',
   'app.togglePreview': 'Layout',

@@ -271,6 +271,63 @@ it('respects modal suspension and custom bindings', async () => {
   await expectFocusedRegion('center');
 });
 
+it('moves focus between the workflow graph and a collapsed workflow panel, preserving both views', async () => {
+  await act(() => {
+    runtime.store.commands.layout.applyPreset('automate');
+    runtime.store.commands.widgets.patchValues('workflow', { editTab: 'json', panelMode: 'edit' });
+    runtime.store.commands.layout.setRegionCollapsed('left', true);
+  });
+  const before = project();
+  expect(before.widgetRegions.left.isCollapsed).toBe(true);
+  await focusRegion('center');
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project().widgetRegions.left).toEqual({ ...before.widgetRegions.left, isCollapsed: false });
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('center');
+  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  expect(project().widgetInstances).toBe(before.widgetInstances);
+  expect(project().workflows).toBe(before.workflows);
+});
+
+it('reopens a bottom workflow graph using the remapped shortcut only from workflow surfaces', async () => {
+  await act(() => {
+    runtime.store.commands.widgets.open({ region: 'bottom', widgetId: 'workflow' });
+    runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+    runtime.store.commands.layout.setRegionCollapsed('bottom', true);
+  });
+  const before = project();
+  expect(before.widgetRegions.bottom.isCollapsed).toBe(true);
+
+  await focusRegion('right');
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('right');
+  expect(project()).toBe(before);
+
+  const workflowId = before.widgetRegions.left.activeInstanceId;
+  const textarea = host.querySelector<HTMLTextAreaElement>(`[aria-label="${workflowId} text"]`)!;
+  await act(() => textarea.focus());
+  await press('{Shift>}Z{/Shift}');
+  expect(textarea.value).toBe('Z');
+  expect(document.activeElement).toBe(textarea);
+  expect(project()).toBe(before);
+
+  await focusRegion('left');
+  await act(() => patchWorkbenchPreferences({ customHotkeys: { 'app.switchWorkflowView': ['shift+j'] } }));
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project()).toBe(before);
+
+  await press('{Shift>}J{/Shift}');
+  await expectFocusedRegion('bottom');
+  expect(project().widgetRegions.bottom).toEqual({ ...before.widgetRegions.bottom, isCollapsed: false });
+  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  await press('{Shift>}J{/Shift}');
+  await expectFocusedRegion('left');
+});
+
 it('does not cycle a floating window and can move from it to a docked region', async () => {
   const window = host.querySelector<HTMLElement>('[data-floating-window]')!;
   await act(() => window.focus());

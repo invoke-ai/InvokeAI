@@ -148,6 +148,10 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectCanvasTab', ['2'], { title: 'Open Canvas' }),
   hotkey('app', 'selectUpscalingTab', ['3'], { title: 'Open Upscale' }),
   hotkey('app', 'selectWorkflowsTab', ['4'], { title: 'Open Workflow editor' }),
+  hotkey('app', 'switchWorkflowView', ['shift+z'], {
+    scope: categoryScopes.workflows,
+    title: 'Switch workflow view',
+  }),
   hotkey('app', 'selectModelsTab', ['5'], { title: 'Open Model Manager' }),
   hotkey('app', 'selectQueueTab', ['6'], { title: 'Open Queue' }),
   hotkey('app', 'openWidgets', [], { title: 'Show widgets' }),
