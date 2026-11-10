@@ -217,9 +217,6 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         type: 'addCanvasLayer', layer, anchor: ctx.captureInsertionAnchor('vector', current.layer.id),
       }, { type: 'removeCanvasLayers', ids: [layer.id] });
     } else {
-      if (ctx.appendVectorEditPath?.(current.layer.id, path)) {
-        return;
-      }
       ctx.commitStructural('Add vector path', {
         type: 'updateCanvasLayerConfig', id: current.layer.id,
         config: { layerType: 'vector', paths: [...current.layer.paths, path] },

@@ -201,6 +201,10 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
+    if (engine?.interaction.get('vectorEditSession')) {
+      engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
+      return;
+    }
     const nudged = engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
     // A nudge with nothing eligible selected is an expected no-op; only a broken commit is news.
     if (nudged?.status === 'postcondition-failed') {

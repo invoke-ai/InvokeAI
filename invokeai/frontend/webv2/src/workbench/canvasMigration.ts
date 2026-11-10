@@ -267,6 +267,9 @@ const zCanvasLayer = z.discriminatedUnion('type', [
       })
     ),
     type: z.literal('vector'),
+    guideColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i).optional().catch(undefined),
+    traceTaperEnds: z.boolean().optional().catch(undefined),
+    traceTaper: z.number().int().min(1).max(500).optional().catch(undefined),
   }),
   zLayerBase.extend({
     // A pre-stack adjustments OBJECT is dropped rather than failing the document.

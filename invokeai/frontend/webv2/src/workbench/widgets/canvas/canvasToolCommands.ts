@@ -11,7 +11,7 @@ import type { ElementType } from 'react';
 
 import { mergeDownEligibility } from '@workbench/canvas-engine/api';
 import { reportLayerOperation, type LayerOperationRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
-import { CircleIcon, PenLineIcon, PentagonIcon, SquareIcon, StarIcon, TriangleIcon } from 'lucide-react';
+import { CircleIcon, PenLineIcon, VectorPolygonIcon, SquareIcon, StarIcon, TriangleIcon } from 'lucide-react';
 
 /** One hotkey row: its command id, title key and default keys. */
 export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKeys: readonly string[]];
@@ -55,6 +55,7 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
   ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
+  ['canvas.tool.spline', 'widgets.canvas.commands.selectSplineTool', []],
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
   // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
   ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],
@@ -78,7 +79,7 @@ export const CANVAS_HISTORY_HOTKEYS = [
 export const SHAPE_KIND_PRESENTATION: Record<ShapeToolKind, { icon: ElementType; labelKey: string }> = {
   ellipse: { icon: CircleIcon, labelKey: 'widgets.canvas.toolOptions.shapeEllipse' },
   freehand: { icon: PenLineIcon, labelKey: 'widgets.canvas.toolOptions.shapeFreehand' },
-  polygon: { icon: PentagonIcon, labelKey: 'widgets.canvas.toolOptions.shapePolygon' },
+  polygon: { icon: VectorPolygonIcon, labelKey: 'widgets.canvas.toolOptions.shapePolygon' },
   rect: { icon: SquareIcon, labelKey: 'widgets.canvas.toolOptions.shapeRect' },
   star: { icon: StarIcon, labelKey: 'widgets.canvas.toolOptions.shapeStar' },
   triangle: { icon: TriangleIcon, labelKey: 'widgets.canvas.toolOptions.shapeTriangle' },
@@ -207,6 +208,9 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       return;
     case 'canvas.tool.text':
       engine.tools.setTool('text');
+      return;
+    case 'canvas.tool.spline':
+      engine.tools.setTool('spline');
       return;
     case 'canvas.tool.gradient':
       engine.tools.setTool('gradient');

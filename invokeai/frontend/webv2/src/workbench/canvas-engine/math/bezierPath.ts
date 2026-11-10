@@ -819,3 +819,35 @@ export const getBezierPathHitSamplesPerSegment = (stageScale: number): number =>
   const normalizedScale = Math.max(1, stageScale);
   return Math.ceil(DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT * Math.sqrt(normalizedScale));
 };
+
+export const approximateBezierPath = (
+  points: RenderableBezierPoint[],
+  isClosed: boolean,
+  samplesPerSegment = DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT
+): Vec2[] => {
+  const firstPoint = points[0];
+  if (!firstPoint) {
+    return [];
+  }
+
+  if (points.length === 1) {
+    return [firstPoint.anchor];
+  }
+
+  const approximatedPoints: Vec2[] = [firstPoint.anchor];
+  const segmentCount = isClosed ? points.length : points.length - 1;
+
+  for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+    const from = points[segmentIndex];
+    const to = points[(segmentIndex + 1) % points.length];
+    if (!from || !to) {
+      continue;
+    }
+
+    for (let sampleIndex = 1; sampleIndex <= samplesPerSegment; sampleIndex += 1) {
+      approximatedPoints.push(evaluateBezierSegment(from, to, sampleIndex / samplesPerSegment));
+    }
+  }
+
+  return approximatedPoints;
+};

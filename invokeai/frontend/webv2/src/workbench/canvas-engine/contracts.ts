@@ -362,9 +362,15 @@ export interface CanvasBezierPathContract {
 }
 
 /** Editable guide geometry; no raster source and no contribution to image generation. */
+export const DEFAULT_VECTOR_GUIDE_COLOR = '#5aafff';
+
 export interface CanvasVectorLayerContract extends CanvasLayerBaseContract {
   type: 'vector';
   paths: CanvasBezierPathContract[];
+  /** Display-only guide color; absent uses DEFAULT_VECTOR_GUIDE_COLOR. */
+  guideColor?: string;
+  traceTaperEnds?: boolean;
+  traceTaper?: number;
   isHidden?: boolean;
 }
 

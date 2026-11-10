@@ -4,15 +4,21 @@ import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contract
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { Mat2d, PointerInput, ToolId, Vec2 } from '@workbench/canvas-engine/types';
-import type { VectorEditDestination, VectorEditSession, VectorPointRef } from '@workbench/canvas-engine/vectorEditState';
+import type { VectorEditSession, VectorPointRef } from '@workbench/canvas-engine/vectorEditState';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
+import { createVectorLayer, nextVectorLayerName } from '@workbench/canvas-engine/document/layerFactories';
+import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { findNearestBezierPathSegment, getBezierPathHitSamplesPerSegment, getBezierPointPullHandleType, setBezierPointHandle, setBezierPointType, smoothBezierPathPoints, splitBezierSegmentAt } from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, getScale, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { vectorHandleLayout } from '@workbench/canvas-engine/math/vectorHandleLayout';
 import { canJoinVectorPathEndpoints, canSplitVectorPathAtPoints, deleteVectorPathPoints, joinVectorPathEndpoints, splitVectorPathAtPoints } from '@workbench/canvas-engine/math/vectorPathTopology';
+import { getBezierPathBounds } from '@workbench/canvas-engine/math/bezierPath';
+import { applyMove, applyRotate, applyScale, layerTransformMatrix, resizeCursorForHandle, transformTargetAt } from '@workbench/canvas-engine/transform/transformMath';
+import type { LayerTransform, TransformTarget } from '@workbench/canvas-engine/transform/transformMath';
 
 
 interface Options {
@@ -21,20 +27,20 @@ interface Options {
   canEdit(): boolean;
   isGestureActive(): boolean;
   getToolId(): ToolId;
-  setTool(id: ToolId): void;
-  dispatch(mutation: CanvasProjectMutation): void;
   commit(label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation): StructuralCommitResult;
   invalidate(): void;
   createId(): string;
+  captureInsertionAnchor(layerId: string): CanvasNodeInsertionAnchor;
   viewport: Viewport;
 }
 
 type Snapshot = Pick<VectorEditSession, 'paths' | 'activePathId' | 'selectedPoints'>;
 type Drag = {
   before: Snapshot;
+  cancelBefore?: Snapshot;
   start: Vec2;
   screen: Vec2;
-  kind: 'anchor' | 'pull' | 'maybe-pull' | 'inHandle' | 'outHandle' | 'rect';
+  kind: 'anchor' | 'path' | 'pull' | 'maybe-pull' | 'inHandle' | 'outHandle' | 'rect';
   ref?: VectorPointRef;
   additive?: boolean;
   missing?: 'inHandle' | 'outHandle';
@@ -48,141 +54,124 @@ const HANDLE_HIT_RADIUS_PX = 12;
 const snapshot = (state: VectorEditSession): Snapshot => ({ paths: state.paths, activePathId: state.activePathId, selectedPoints: state.selectedPoints });
 const samePaths = (a: CanvasBezierPathContract[], b: CanvasBezierPathContract[]): boolean => a === b || JSON.stringify(a) === JSON.stringify(b);
 
-/** Draft geometry, point interaction and bounded local history belong to one engine's Edit session. */
+/** Owns point selection and gesture previews; completed changes commit directly to document history. */
 export class VectorEditingController implements Tool {
-  readonly id = 'move';
+  readonly id = 'spline';
   private base: CanvasVectorLayerContract | null = null;
-  private previousTool: ToolId = 'move';
-  private history: Snapshot[] = [];
-  private historyIndex = 0;
   private drag: Drag | null = null;
+  private hoverPath = false;
+  private transformOrigin: CanvasBezierPathContract | null = null;
+  private transformDrag: { target: TransformTarget; start: Vec2; transform: LayerTransform; before: Snapshot } | null = null;
+  private transformCursor: string | null = null;
 
   constructor(private readonly options: Options) {}
 
   hasSession = (): boolean => this.options.session.get() !== null;
+  private availability(state: VectorEditSession): Pick<VectorEditSession, 'canSplit' | 'canJoin'> {
+    return {
+      canSplit: canSplitVectorPathAtPoints(state.paths, state.selectedPoints),
+      canJoin: !!this.base && canJoinVectorPathEndpoints(state.paths, state.selectedPoints,
+        32 / (this.options.viewport.getZoom() * getScale(this.matrix()))),
+    };
+  }
+  refreshAvailability = (): void => {
+    const state = this.options.session.get();
+    if (!state || !this.base) { return; }
+    const next = this.availability(state);
+    if (next.canSplit !== state.canSplit || next.canJoin !== state.canJoin) { this.publish(next); }
+  };
   private publish(patch: Partial<VectorEditSession>): void {
     const state = this.options.session.get();
     if (!state) { return; }
-    this.options.session.set({ ...state, ...patch, canUndo: this.historyIndex > 0, canRedo: this.historyIndex < this.history.length - 1 });
+    const next = { ...state, ...patch };
+    this.options.session.set({ ...next, ...this.availability(next) });
     this.options.invalidate();
   }
 
-  private record(): void {
+  private record(keepTransform = false): void {
+    if (!keepTransform && this.options.session.get()?.pathTransform) {
+      this.transformOrigin = null;
+      this.publish({ pathTransform: null });
+    }
     const state = this.options.session.get();
-    if (!state || samePaths(this.history[this.historyIndex]!.paths, state.paths)) { return; }
-    this.history = [...this.history.slice(0, this.historyIndex + 1), snapshot(state)].slice(-64);
-    this.historyIndex = this.history.length - 1;
-    this.publish({});
+    const base = this.base;
+    if (!state || !base || samePaths(base.paths, state.paths)) { return; }
+    this.base = { ...base, paths: state.paths };
+    const result = this.options.commit('Edit vector paths', {
+      type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: state.paths },
+    }, { type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: base.paths } });
+    if (result.status !== 'committed') {
+      this.base = base;
+      this.transformOrigin = null;
+      this.transformCursor = null;
+      this.publish({ paths: base.paths, selectedPoints: [], selectionRect: null, pathTransform: null });
+    }
   }
 
   private ready(): boolean {
-    return this.hasSession() && !this.options.session.get()!.pendingExit && this.options.canEdit();
+    return this.hasSession() && this.options.canEdit();
   }
   private actionReady(): boolean { return this.ready() && !this.options.isGestureActive(); }
   private matrix(): Mat2d { return lookupDocumentLeaf(this.options.getDocument()!, this.base!.id)!.worldTransform; }
   private screenMatrix(): Mat2d { return multiply(this.options.viewport.viewMatrix(1), this.matrix()); }
 
   begin = (layerId: string): boolean => {
-    if (this.hasSession() || !this.options.canEdit() || this.options.isGestureActive()) { return false; }
+    if (this.options.session.get()?.layerId === layerId) { return true; }
+    this.discard();
+    if (this.options.isGestureActive()) { return false; }
     const doc = this.options.getDocument();
     const leaf = doc ? lookupDocumentLeaf(doc, layerId) : null;
-    if (!leaf || leaf.layer.type !== 'vector' || leaf.documentHidden || leafEditRefusal(leaf) || leaf.layer.paths.length === 0 || !invert(leaf.worldTransform)) { return false; }
+    if (!leaf || leaf.layer.type !== 'vector' || leaf.documentHidden || leafEditRefusal(leaf) || !invert(leaf.worldTransform)) { return false; }
     this.base = leaf.layer;
-    this.previousTool = this.options.getToolId();
     const state: VectorEditSession = {
-      layerId, paths: leaf.layer.paths, activePathId: leaf.layer.paths[0]!.id, selectedPoints: [],
-      selectionRect: null, canUndo: false, canRedo: false, pendingExit: null,
+      layerId, paths: leaf.layer.paths, activePathId: leaf.layer.paths[0]?.id ?? null, selectedPoints: [],
+      selectionRect: null, pathTransform: null,
+      canSplit: false, canJoin: false,
     };
-    this.history = [snapshot(state)];
-    this.historyIndex = 0;
     this.options.session.set(state);
-    this.options.setTool('move');
     this.options.invalidate();
     return true;
   };
 
-  private close(restoreTool: boolean): void {
+  discard = (): void => {
     this.base = null;
     this.drag = null;
-    this.history = [];
+    this.hoverPath = false;
+    this.transformOrigin = null;
+    this.transformDrag = null;
+    this.transformCursor = null;
     this.options.session.set(null);
     this.options.invalidate();
-    if (restoreTool) { this.options.setTool(this.previousTool); }
-  }
-  cancel = (): void => this.close(true);
-  discard = (): void => this.close(false);
-  apply = (): StructuralCommitResult | null => {
-    const state = this.options.session.get();
-    const base = this.base;
-    if (!state || !base) { return null; }
-    if (!this.options.canEdit() || this.options.isGestureActive()) { return { status: 'busy' }; }
-    const doc = this.options.getDocument();
-    const leaf = doc ? lookupDocumentLeaf(doc, base.id) : null;
-    if (!leaf || leaf.layer.type !== 'vector' || leaf.layer.paths !== base.paths || leaf.layer.transform !== base.transform || leaf.documentHidden || leafEditRefusal(leaf)) { return { status: 'stale' }; }
-    if (samePaths(base.paths, state.paths)) { this.close(true); return null; }
-    // Keep the draft recoverable on refusal; the mirror must not treat our own successful write as an external edit.
-    this.base = { ...base, paths: state.paths };
-    const result = this.options.commit('Edit vector paths', {
-      type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: state.paths },
-    }, { type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: base.paths } });
-    if (result.status === 'committed') { this.close(true); } else { this.base = base; }
-    return result;
   };
 
-  reset = (): void => {
-    if (!this.actionReady() || !this.base) { return; }
-    this.publish({ paths: this.base.paths, activePathId: this.base.paths[0]?.id ?? null, selectedPoints: [], selectionRect: null });
-    this.record();
+  onActivate = (): void => {
+    const id = this.options.getDocument()?.selectedLayerId;
+    if (id) { this.begin(id); }
   };
-  undo = (): boolean => this.replay(-1);
-  redo = (): boolean => this.replay(1);
-  private replay(offset: number): boolean {
-    const next = this.historyIndex + offset;
-    if (!this.actionReady() || next < 0 || next >= this.history.length) { return false; }
-    this.historyIndex = next;
-    this.publish({ ...this.history[next]!, selectionRect: null });
-    return true;
-  }
 
-  requestExit = (destination: VectorEditDestination): void => {
-    if (this.hasSession() && !this.options.session.get()!.pendingExit) { this.publish({ pendingExit: destination }); }
-  };
-  resolveExit = (decision: 'apply' | 'discard' | 'cancel'): StructuralCommitResult | null => {
-    const state = this.options.session.get();
-    const destination = state?.pendingExit;
-    if (!state || !destination) { return null; }
-    if (decision === 'cancel') {
-      if (destination.kind === 'layer') { this.options.dispatch({ type: 'setCanvasSelectedLayer', id: state.layerId }); }
-      this.publish({ pendingExit: null });
-      return null;
-    }
-    if (decision === 'apply') {
-      const result = this.apply();
-      if (result && result.status !== 'committed') { return result; }
-    } else { this.close(true); }
-    if (destination.kind === 'tool') { this.options.setTool(destination.toolId); }
-    return null;
-  };
   onDocumentChanged = (): void => {
-    const state = this.options.session.get();
-    if (!state || !this.base) { return; }
     const doc = this.options.getDocument();
-    const leaf = doc ? lookupDocumentLeaf(doc, state.layerId) : null;
-    if (!leaf || leaf.layer.type !== 'vector' || leaf.layer.paths !== this.base.paths || leaf.layer.transform !== this.base.transform || leaf.documentHidden || leafEditRefusal(leaf)) {
-      this.close(false);
-    } else if (doc!.selectedLayerId !== state.layerId) {
-      this.requestExit({ kind: 'layer', layerId: doc!.selectedLayerId });
-    }
-  };
-
-  append = (layerId: string, path: CanvasBezierPathContract): boolean => {
     const state = this.options.session.get();
-    if (!state || state.layerId !== layerId) { return false; }
-    if (this.ready()) {
-      this.publish({ paths: [...state.paths, path], activePathId: path.id, selectedPoints: [] });
-      this.record();
+    const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+    if (!leaf || leaf.layer.type !== 'vector' || leaf.documentHidden || leafEditRefusal(leaf)) {
+      if (state) { this.discard(); }
+      return;
     }
-    return true;
+    if (!state) {
+      if (this.options.getToolId() === 'spline') { this.begin(leaf.id); }
+      return;
+    }
+    if (state.layerId !== leaf.id) { this.begin(leaf.id); return; }
+    if (leaf.layer.paths !== this.base?.paths || leaf.layer.transform !== this.base?.transform) {
+      this.drag = null;
+      this.transformDrag = null;
+      this.transformOrigin = null;
+      this.transformCursor = null;
+      this.base = leaf.layer;
+      const paths = leaf.layer.paths;
+      this.publish({ paths, activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : paths[0]?.id ?? null,
+        selectedPoints: state.selectedPoints.filter((ref) => !!paths.find((path) => path.id === ref.pathId)?.points[ref.pointIndex]), selectionRect: null, pathTransform: null });
+    }
   };
 
   private mapPoints(paths: CanvasBezierPathContract[], refs: VectorPointRef[], edit: (point: CanvasBezierPointContract, ref: VectorPointRef) => void): CanvasBezierPathContract[] {
@@ -200,6 +189,22 @@ export class VectorEditingController implements Tool {
       return { ...path, points };
     });
   }
+  /** Arrow deltas are document pixels, independent of the layer's scale and rotation. */
+  nudge = (dx: number, dy: number): void => {
+    if (!this.actionReady() || !Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) { return; }
+    const state = this.options.session.get()!;
+    if (state.selectedPoints.length === 0) { return; }
+    const inverse = invert(this.matrix());
+    if (!inverse) { return; }
+    const x = inverse.a * dx + inverse.c * dy;
+    const y = inverse.b * dx + inverse.d * dy;
+    this.publish({ paths: this.mapPoints(state.paths, state.selectedPoints, (point) => {
+      point.anchor = { x: point.anchor.x + x, y: point.anchor.y + y };
+      if (point.inHandle) { point.inHandle = { x: point.inHandle.x + x, y: point.inHandle.y + y }; }
+      if (point.outHandle) { point.outHandle = { x: point.outHandle.x + x, y: point.outHandle.y + y }; }
+    }) });
+    this.record();
+  };
   setPointType = (type: CanvasBezierPointContract['type']): void => {
     if (!this.actionReady()) { return; }
     const state = this.options.session.get()!;
@@ -225,6 +230,34 @@ export class VectorEditingController implements Tool {
       : state.paths.filter((path) => path.id !== state.activePathId);
     this.publish({ paths, selectedPoints: [], activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : paths[0]?.id ?? null });
     this.record();
+  };
+  extractPath = (): void => {
+    if (!this.actionReady() || !this.base) { return; }
+    const state = this.options.session.get()!;
+    const base = this.base;
+    const path = state.paths.find((candidate) => candidate.id === state.activePathId);
+    const doc = this.options.getDocument();
+    const leaf = doc ? lookupDocumentLeaf(doc, base.id) : null;
+    if (!path || !doc || !leaf || leaf.layer.type !== 'vector' || leaf.layer.paths !== base.paths ||
+      leaf.layer.transform !== base.transform || leaf.documentHidden || leafEditRefusal(leaf)) { return; }
+    const layer = createVectorLayer({
+      id: this.options.createId(),
+      name: nextVectorLayerName(getDocumentIndex(doc).nodes.map((entry) => entry.node.name)),
+    });
+    layer.paths = [{ ...structuredClone(path), id: this.options.createId() }];
+    layer.transform = { ...base.transform };
+    layer.opacity = leaf.layer.opacity;
+    layer.blendMode = leaf.layer.blendMode;
+    layer.guideColor = leaf.layer.guideColor;
+    layer.traceTaperEnds = leaf.layer.traceTaperEnds;
+    layer.traceTaper = leaf.layer.traceTaper;
+    // Export the active draft version without committing or changing the source draft.
+    this.options.commit('Extract vector path', {
+      type: 'applyCanvasLayerStackMutation',
+      enabledUpdates: [],
+      add: [{ anchor: this.options.captureInsertionAnchor(base.id), nodes: [layer] }],
+      selectedLayerId: doc.selectedLayerId,
+    }, { type: 'removeCanvasLayers', ids: [layer.id] });
   };
   copyPath = (): void => {
     if (!this.actionReady()) { return; }
@@ -275,8 +308,59 @@ export class VectorEditingController implements Tool {
     this.record();
   };
 
-  cursor = (): string => this.ready() ? 'crosshair' : 'not-allowed';
-  private nearSegment(path: CanvasBezierPathContract, input: PointerInput) {
+  transformPath = (): void => {
+    if (!this.actionReady()) { return; }
+    const state = this.options.session.get()!;
+    const path = state.paths.find((candidate) => candidate.id === state.activePathId);
+    if (!path || path.points.length < 2) { return; }
+    const bounds = getBezierPathBounds(path.points, path.isClosed);
+    this.transformOrigin = path;
+    this.transformCursor = null;
+    this.hoverPath = false;
+    this.publish({ selectedPoints: [], pathTransform: {
+      pathId: path.id, rect: { ...bounds, width: Math.max(1, bounds.width), height: Math.max(1, bounds.height) },
+      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    } });
+  };
+  private transformTarget(input: PointerInput): TransformTarget | null {
+    const frame = this.options.session.get()?.pathTransform;
+    if (!frame) { return null; }
+    const matrix = this.matrix();
+    return transformTargetAt({ point: input.screenPoint, rect: frame.rect, transform: frame.transform,
+      toScreen: (point) => this.options.viewport.documentToScreen(applyToPoint(matrix, point)) });
+  }
+  private cursorForTransform(target: TransformTarget | null): string | null {
+    const frame = this.options.session.get()?.pathTransform;
+    if (!target || !frame) { return null; }
+    return target.kind === 'scale'
+      ? resizeCursorForHandle({ ...frame.transform, rotation: frame.transform.rotation + (this.base?.transform.rotation ?? 0) }, target.handle)
+      : target.kind === 'rotate' ? 'grab' : 'move';
+  }
+  cursor = (): string => this.transformCursor ?? (this.drag?.kind === 'path' || this.hoverPath ? 'move' : 'crosshair');
+  private updateHover(ctx: ToolContext, input: PointerInput): void {
+    const state = this.options.session.get();
+    let movable = false;
+    if (state && this.ready() && !input.modifiers.shift) {
+      const matrix = this.screenMatrix();
+      const overAnchor = state.paths.some((path) => path.points.some((point) =>
+        distance(applyToPoint(matrix, point.anchor), input.screenPoint) <= ANCHOR_HIT_RADIUS_PX));
+      const overHandle = state.selectedPoints.some((ref) => {
+        const path = state.paths.find((path) => path.id === ref.pathId);
+        if (!path?.points[ref.pointIndex]) { return false; }
+        const handles = vectorHandleLayout(path, ref.pointIndex, matrix);
+        return [handles.inHandle, handles.outHandle].some((point) => !!point && distance(point, input.screenPoint) <= HANDLE_HIT_RADIUS_PX);
+      });
+      movable = !overAnchor && !overHandle && state.paths.some((path) => {
+        const hit = this.nearSegment(path, input);
+        return !!hit && hit.distance <= 10;
+      });
+    }
+    if (movable !== this.hoverPath) {
+      this.hoverPath = movable;
+      ctx.updateCursor();
+    }
+  }
+  private nearSegment(path: CanvasBezierPathContract, input: Pick<PointerInput, 'screenPoint'>) {
     const matrix = this.screenMatrix();
     const projected = path.points.map((point) => ({
       anchor: applyToPoint(matrix, point.anchor),
@@ -285,13 +369,67 @@ export class VectorEditingController implements Tool {
     }));
     return findNearestBezierPathSegment(projected, path.isClosed, input.screenPoint, getBezierPathHitSamplesPerSegment(this.options.viewport.getZoom() * getScale(this.matrix())));
   }
+  targetContextMenu = (screenPoint: Vec2): boolean => {
+    if (!this.actionReady()) { return false; }
+    const state = this.options.session.get()!;
+    const matrix = this.screenMatrix();
+    let anchorHit: VectorPointRef | null = null;
+    let pathHit: string | null = null;
+    let anchorDistance = ANCHOR_HIT_RADIUS_PX;
+    let pathDistance = 10;
+    const paths = [...state.paths.filter((path) => path.id === state.activePathId), ...state.paths.filter((path) => path.id !== state.activePathId)];
+    for (const path of paths) {
+      path.points.forEach((point, pointIndex) => {
+        const d = distance(applyToPoint(matrix, point.anchor), screenPoint);
+        if (d <= anchorDistance && (!anchorHit || d < anchorDistance)) {
+          anchorHit = { pathId: path.id, pointIndex }; anchorDistance = d;
+        }
+      });
+      const hit = this.nearSegment(path, { screenPoint });
+      if (hit && hit.distance <= pathDistance && (!pathHit || hit.distance < pathDistance)) {
+        pathHit = path.id; pathDistance = hit.distance;
+      }
+    }
+    const ref = anchorHit as VectorPointRef | null;
+    const pathId = ref?.pathId ?? pathHit;
+    if (!pathId) { return false; }
+    if (state.pathTransform && state.pathTransform.pathId !== pathId) {
+      this.transformOrigin = null;
+      this.transformCursor = null;
+      this.publish({ pathTransform: null });
+    }
+    const selectedPoints = ref
+      ? state.selectedPoints.some((selected) => sameRef(selected, ref)) ? state.selectedPoints : [ref]
+      : pathId === state.activePathId ? state.selectedPoints : [];
+    this.publish({ activePathId: pathId, selectedPoints });
+    return true;
+  };
+  deletePath = (): void => {
+    if (!this.actionReady()) { return; }
+    const state = this.options.session.get()!;
+    const paths = state.paths.filter((path) => path.id !== state.activePathId);
+    this.publish({ paths, activePathId: paths[0]?.id ?? null, selectedPoints: state.selectedPoints.filter((ref) => ref.pathId !== state.activePathId) });
+    this.record();
+  };
   onPointerDown = (_ctx: ToolContext, input: PointerInput): void => {
     if (!this.ready() || (input.buttons & 1) === 0) { return; }
     const state = this.options.session.get()!;
     const inverse = invert(this.matrix())!;
     const local = applyToPoint(inverse, input.documentPoint);
     const matrix = this.screenMatrix();
+    if (state.pathTransform) {
+      const target = this.transformTarget(input);
+      if (target && this.transformOrigin) {
+        this.transformDrag = { target, start: local, transform: state.pathTransform.transform, before: snapshot(state) };
+        this.transformCursor = this.cursorForTransform(target);
+        return;
+      }
+      this.transformOrigin = null;
+      this.transformCursor = null;
+      this.publish({ pathTransform: null });
+    }
     const begin = (kind: Drag['kind'], refs: VectorPointRef[], ref?: VectorPointRef, missing?: Drag['missing']) => {
+      this.hoverPath = kind === 'path';
       const activePathId = ref?.pathId ?? state.activePathId;
       this.publish({ selectedPoints: refs, activePathId });
       this.drag = { kind, before: snapshot(this.options.session.get()!), start: local, screen: input.screenPoint, ref, missing };
@@ -343,23 +481,51 @@ export class VectorEditingController implements Tool {
         const ref = { pathId: active.id, pointIndex: hit.segmentIndex + 1 };
         points.splice(ref.pointIndex, 0, split.insertPoint);
         this.publish({ paths: state.paths.map((path) => path.id === active.id ? { ...path, points } : path), selectedPoints: [ref] });
-        this.record();
-        this.drag = { kind: 'anchor', before: snapshot(this.options.session.get()!), start: local, screen: input.screenPoint, ref };
+        this.drag = { kind: 'anchor', before: snapshot(this.options.session.get()!), cancelBefore: snapshot(state), start: local, screen: input.screenPoint, ref };
         return;
       }
     }
     for (const path of ordered) {
       const hit = this.nearSegment(path, input);
-      if (hit && hit.distance <= 10) { this.publish({ activePathId: path.id, selectedPoints: [] }); return; }
+      if (hit && hit.distance <= 10) {
+        begin('path', [], { pathId: path.id, pointIndex: 0 });
+        return;
+      }
     }
     const additive = input.modifiers.ctrl || input.modifiers.meta;
+    this.hoverPath = false;
     this.drag = { kind: 'rect', before: snapshot(state), start: input.documentPoint, screen: input.screenPoint, additive };
     this.publish({ selectedPoints: additive ? state.selectedPoints : [], selectionRect: { ...input.documentPoint, width: 0, height: 0 } });
   };
 
-  onPointerMove = (_ctx: ToolContext, input: PointerInput): void => {
+  onPointerMove = (ctx: ToolContext, input: PointerInput): void => {
+    const frame = this.options.session.get()?.pathTransform;
+    if (frame && this.ready()) {
+      const gesture = this.transformDrag;
+      if (!gesture || !this.transformOrigin) {
+        const cursor = this.cursorForTransform(this.transformTarget(input));
+        if (cursor !== this.transformCursor) { this.transformCursor = cursor; ctx.updateCursor(); }
+        return;
+      }
+      const pointer = applyToPoint(invert(this.matrix())!, input.documentPoint);
+      const args = { rect: frame.rect, start: gesture.transform, startPointerDoc: gesture.start, pointerDoc: pointer, shift: input.modifiers.shift };
+      const transform = gesture.target.kind === 'move'
+        ? applyMove(gesture.transform, { x: pointer.x - gesture.start.x, y: pointer.y - gesture.start.y }, input.modifiers.shift, 0)
+        : gesture.target.kind === 'scale'
+          ? applyScale({ ...args, handle: gesture.target.handle, alt: input.modifiers.alt, grid: 0 })
+          : applyRotate(args);
+      const matrix = layerTransformMatrix(transform);
+      const path = { ...this.transformOrigin, points: this.transformOrigin.points.map((point) => ({ ...point,
+        anchor: applyToPoint(matrix, point.anchor),
+        inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
+        outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
+      })) };
+      this.publish({ paths: gesture.before.paths.map((candidate) => candidate.id === path.id ? path : candidate), pathTransform: { ...frame, transform } });
+      return;
+    }
     const drag = this.drag;
-    if (!drag || !this.ready()) { return; }
+    if (!drag) { this.updateHover(ctx, input); return; }
+    if (!this.ready()) { return; }
     if (drag.kind === 'rect') {
       const x = Math.min(drag.screen.x, input.screenPoint.x), y = Math.min(drag.screen.y, input.screenPoint.y);
       const width = Math.abs(input.screenPoint.x - drag.screen.x), height = Math.abs(input.screenPoint.y - drag.screen.y);
@@ -383,9 +549,12 @@ export class VectorEditingController implements Tool {
       const dot = (local.x - point.anchor.x) * (handle.x - point.anchor.x) + (local.y - point.anchor.y) * (handle.y - point.anchor.y);
       drag.kind = dot < 0 ? drag.missing! : 'anchor';
     }
-    if (drag.kind === 'anchor') {
+    if (drag.kind === 'anchor' || drag.kind === 'path') {
       const dx = local.x - drag.start.x, dy = local.y - drag.start.y;
-      this.publish({ paths: this.mapPoints(drag.before.paths, drag.before.selectedPoints, (copy) => {
+      const refs = drag.kind === 'path'
+        ? path.points.map((_, pointIndex) => ({ pathId: path.id, pointIndex }))
+        : drag.before.selectedPoints;
+      this.publish({ paths: this.mapPoints(drag.before.paths, refs, (copy) => {
         copy.anchor = { x: copy.anchor.x + dx, y: copy.anchor.y + dy };
         if (copy.inHandle) { copy.inHandle = { x: copy.inHandle.x + dx, y: copy.inHandle.y + dy }; }
         if (copy.outHandle) { copy.outHandle = { x: copy.outHandle.x + dx, y: copy.outHandle.y + dy }; }
@@ -399,12 +568,26 @@ export class VectorEditingController implements Tool {
     }
   };
   onPointerUp = (): void => {
+    if (this.transformDrag) { this.transformDrag = null; this.record(true); return; }
     if (!this.drag) { return; }
     this.drag = null; this.publish({ selectionRect: null }); this.record();
   };
   onPointerCancel = (): void => {
-    if (this.drag) { const before = this.drag.before; this.drag = null; this.publish({ ...before, selectionRect: null }); }
+    if (this.transformDrag) {
+      const gesture = this.transformDrag;
+      this.transformDrag = null;
+      const frame = this.options.session.get()?.pathTransform;
+      this.publish({ ...gesture.before, ...(frame ? { pathTransform: { ...frame, transform: gesture.transform } } : {}) });
+    }
+    if (this.drag) { const before = this.drag.cancelBefore ?? this.drag.before; this.drag = null; this.publish({ ...before, selectionRect: null }); }
   };
-  onDeactivate = (): void => this.onPointerCancel();
-  onKeyCommand = (_ctx: ToolContext, command: 'apply' | 'cancel'): boolean => { if (!this.hasSession()) { return false; } if (command === 'apply') { this.apply(); } else { this.cancel(); } return true; };
+  onDeactivate = (_ctx: ToolContext, options?: { temporary?: boolean }): void => { this.onPointerCancel(); if (!options?.temporary) { this.discard(); } };
+  onKeyCommand = (_ctx: ToolContext, command: 'apply' | 'cancel'): boolean => {
+    if (!this.hasSession() || command !== 'cancel') { return false; }
+    this.onPointerCancel();
+    this.transformOrigin = null;
+    this.transformCursor = null;
+    this.publish({ selectedPoints: [], selectionRect: null, pathTransform: null });
+    return true;
+  };
 }

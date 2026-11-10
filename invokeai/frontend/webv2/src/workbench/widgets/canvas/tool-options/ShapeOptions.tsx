@@ -39,14 +39,14 @@ const FALLBACK_COLOR = '#000000';
 const formatPx = (value: number): string => `${value}px`;
 
 /** Where Place on = Selected layer sends the next shape, given the selection. */
-type SelectedPlacement = 'none' | 'layer' | 'mask' | 'new-layer';
+type SelectedPlacement = 'none' | 'layer' | 'mask' | 'vector' | 'new-layer';
 
 const setShapeOptions = (engine: ToolFormProps['engine'], patch: Partial<ShapeToolOptions>): void => {
   engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
 };
 
 /** Settings for the next shape: what it is and where it lands. They never touch a selected layer. */
-const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
+const ShapeToolSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const options = useShapeOptions(engine);
   const placement = useActiveProjectSelector((project): SelectedPlacement => {
@@ -54,6 +54,9 @@ const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
     const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
     if (!layer) {
       return 'none';
+    }
+    if (layer.type === 'vector') {
+      return 'vector';
     }
     if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
       return 'mask';
@@ -64,13 +67,15 @@ const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
     () =>
       SHAPE_KIND_ORDER.map((value) => ({
         icon: SHAPE_KIND_PRESENTATION[value].icon,
-        label: t(SHAPE_KIND_PRESENTATION[value].labelKey),
+        label: t(placement === 'vector' && value === 'polygon'
+          ? 'widgets.canvas.toolOptions.vectorShapePolyline'
+          : SHAPE_KIND_PRESENTATION[value].labelKey),
         value,
       })),
-    [t]
+    [placement, t]
   );
   const onKindChange = useCallback((kind: ShapeToolKind) => setShapeOptions(engine, { kind }), [engine]);
-  const canPlaceSelected = placement === 'layer' || placement === 'mask';
+  const canPlaceSelected = placement === 'layer' || placement === 'mask' || placement === 'vector';
   const targetOptions = useMemo(
     () => [
       {
@@ -87,6 +92,8 @@ const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
     [engine]
   );
   const hintId = useId();
+  const polylineHintId = useId();
+  const showPolylineHint = placement === 'vector' && options.kind === 'polygon';
   const hintKey = !canPlaceSelected
     ? 'widgets.canvas.toolOptions.shapeTargetFallbackHint'
     : options.target === 'selected' && placement === 'mask'
@@ -95,6 +102,7 @@ const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
   return (
     <>
       <PropertySegmentedRow
+        describedBy={showPolylineHint ? polylineHintId : undefined}
         label={t('widgets.properties.rows.kind')}
         options={kindOptions}
         value={options.kind}
@@ -107,6 +115,11 @@ const RasterShapeToolSettings = ({ engine }: ToolFormProps) => {
         value={canPlaceSelected ? options.target : 'new'}
         onValueChange={onTargetChange}
       />
+      {showPolylineHint ? (
+        <Text color="fg.muted" fontSize="xs" id={polylineHintId}>
+          {t('widgets.canvas.toolOptions.vectorPolylineHint')}
+        </Text>
+      ) : null}
       {hintKey ? (
         <Text color="fg.muted" fontSize="xs" id={hintId}>
           {t(hintKey)}
@@ -296,59 +309,11 @@ const ShapeAppearanceControls = ({
   );
 };
 
-const VectorShapeSettings = ({ engine, layerName }: ToolFormProps & { layerName: string }) => {
-  const { t } = useTranslation();
-  const options = useShapeOptions(engine);
-  const kind = options.kind;
-  const setOptions = useCallback((patch: Partial<ShapeToolOptions>) => {
-    engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
-  }, [engine]);
-  const kindOptions = useMemo(() => [
-    { label: t('widgets.canvas.toolOptions.shapeRect'), value: 'rect' as const },
-    { label: t('widgets.canvas.toolOptions.shapeEllipse'), value: 'ellipse' as const },
-    { label: t('widgets.canvas.toolOptions.shapeTriangle'), value: 'triangle' as const },
-    { label: t('widgets.canvas.toolOptions.shapeStar'), value: 'star' as const },
-    { label: t('widgets.canvas.toolOptions.vectorShapePolyline'), value: 'polygon' as const },
-    { label: t('widgets.canvas.toolOptions.shapeFreehand'), value: 'freehand' as const },
-  ], [t]);
-  const targetOptions = useMemo(() => [
-    { label: t('widgets.canvas.toolOptions.shapeTargetSelected'), value: 'selected' as const },
-    { label: t('widgets.canvas.toolOptions.shapeTargetNew'), value: 'new' as const },
-  ], [t]);
-  return (
-    <>
-      <EditTargetChip layerName={options.target === 'selected' ? layerName : null} />
-      <PropertySegmentedRow
-        label={t('widgets.properties.rows.kind')}
-        options={kindOptions}
-        value={kind}
-        onValueChange={(next) => setOptions({ kind: next })}
-      />
-      <PropertySegmentedRow
-        label={t('widgets.canvas.toolOptions.shapeTarget')}
-        options={targetOptions}
-        value={options.target}
-        onValueChange={(next) => setOptions({ target: next })}
-      />
-      {kind === 'polygon' ? (
-        <Text color="fg.muted" fontSize="sm">
-          {t('widgets.canvas.toolOptions.vectorPolylineHint')}
-        </Text>
-      ) : null}
-    </>
-  );
-};
-
 const useSelectedVectorName = () => useActiveProjectSelector((project) => {
   const { document } = project.canvas;
   const layer = getDocumentLayer(document, document.selectedLayerId);
   return layer?.type === 'vector' ? layer.name : null;
 });
-
-const ShapeToolSettings = (props: ToolFormProps) => {
-  const name = useSelectedVectorName();
-  return name !== null ? <VectorShapeSettings {...props} layerName={name} /> : <RasterShapeToolSettings {...props} />;
-};
 
 const ShapeAppearanceSettings = (props: ToolFormProps) => {
   const name = useSelectedVectorName();

@@ -1,21 +1,20 @@
 import type { CanvasBezierPathContract } from './contracts';
-import type { Rect, ToolId } from './types';
+import type { Rect } from './types';
+import type { LayerTransform } from './transform/transformMath';
 
 export interface VectorPointRef {
   pathId: string;
   pointIndex: number;
 }
 
-export type VectorEditDestination = { kind: 'tool'; toolId: ToolId } | { kind: 'layer'; layerId: string | null };
-
-/** Engine-local draft: the persisted layer is unchanged until Apply. */
+/** Point-tool selection and in-flight gesture preview; completed edits are persisted immediately. */
 export interface VectorEditSession {
   layerId: string;
   paths: CanvasBezierPathContract[];
   activePathId: string | null;
   selectedPoints: VectorPointRef[];
+  canSplit: boolean;
+  canJoin: boolean;
+  pathTransform: { pathId: string; rect: Rect; transform: LayerTransform } | null;
   selectionRect: Rect | null;
-  canUndo: boolean;
-  canRedo: boolean;
-  pendingExit: VectorEditDestination | null;
 }

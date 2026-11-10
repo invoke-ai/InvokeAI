@@ -347,7 +347,11 @@ const hasReadablePixels = (context: LayerContextActionState): boolean =>
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
   isLayerMutable(context) && hasReadablePixels(context);
 const hasTransformablePixels = (context: LayerContextActionState): boolean =>
-  context.layer.isEnabled && hasMutablePixels(context);
+  context.layer.type === 'vector'
+    ? context.layer.isEnabled && isLayerMutable(context) && context.hasEngine &&
+      !(layerEntry(context)?.ancestorsEnabled === false) &&
+      context.layer.paths.some((path) => path.points.length >= 2)
+    : context.layer.isEnabled && hasMutablePixels(context);
 const hasDocumentContent = (context: LayerContextActionState): boolean => {
   const contentRect = getSourceContentRect(context.layer, context.document);
   return contentRect.width > 0 && contentRect.height > 0;
@@ -528,7 +532,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
     order: 10,
     section: 'primary',
-    supportedLayerTypes: ['raster', 'control'],
+    supportedLayerTypes: ['raster', 'control', 'vector'],
   },
   {
     defaultLabel: 'Rename',

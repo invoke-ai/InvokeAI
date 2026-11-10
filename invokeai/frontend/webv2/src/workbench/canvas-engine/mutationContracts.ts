@@ -47,7 +47,7 @@ export const LOCK_EXEMPT_PATCH_KEYS: readonly (keyof CanvasLayerBasePatch)[] = [
 ];
 
 export type CanvasLayerConfigPatch =
-  | { layerType: 'vector'; paths: CanvasBezierPathContract[] }
+  | { layerType: 'vector'; paths?: CanvasBezierPathContract[]; guideColor?: string; traceTaperEnds?: boolean; traceTaper?: number }
   | {
       layerType: 'raster';
       adjustments?: CanvasAdjustmentsContract;

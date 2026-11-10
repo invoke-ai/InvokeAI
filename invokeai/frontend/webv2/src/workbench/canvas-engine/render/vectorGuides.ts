@@ -2,6 +2,7 @@ import type { CanvasBezierPathContract, CanvasBezierPointContract } from '@workb
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { DEFAULT_VECTOR_GUIDE_COLOR } from '@workbench/canvas-engine/contracts';
 
 import type { RasterSurface } from './raster';
 
@@ -11,6 +12,7 @@ export interface VectorGuideLayer {
   paths: readonly CanvasBezierPathContract[];
   matrix: Mat2d;
   opacity: number;
+  guideColor?: string;
   /** Undefined outside Edit; null means Edit has no active path. */
   editActivePathId?: string | null;
 }
@@ -25,7 +27,7 @@ export interface VectorShapePreview {
   closeArmed: boolean;
 }
 
-const GUIDE_COLOR = 'rgba(90, 175, 255, 1)';
+const GUIDE_COLOR = DEFAULT_VECTOR_GUIDE_COLOR;
 
 /** Project controls before stroking so nonuniform layer scaling preserves the 1.5 CSS-px guide. */
 const strokePath = (
@@ -73,7 +75,7 @@ export const drawVectorGuides = (
     ctx.globalAlpha = layer.opacity;
     const matrix = multiply(view, layer.matrix);
     const editing = layer.editActivePathId !== undefined;
-    ctx.strokeStyle = GUIDE_COLOR;
+    ctx.strokeStyle = layer.guideColor ?? GUIDE_COLOR;
     ctx.lineWidth = 1.5;
     for (const path of layer.paths) {
       if (editing && path.id === layer.editActivePathId) { continue; }

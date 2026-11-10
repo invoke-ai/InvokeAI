@@ -85,6 +85,7 @@ import type {
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { LayerCacheReadiness } from '@workbench/canvas-engine/controllers/editSteps';
+import { traceVectorLayer as traceVectorLayerCommand } from '@workbench/canvas-engine/controllers/vectorTraceController';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
@@ -444,7 +445,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['view', createViewTool()],
     ['brush', createBrushTool()],
     ['eraser', createEraserTool()],
-    ['move', createMoveTool(() => vectorEditor)],
+    ['move', createMoveTool()],
+    ['spline', {
+      id: 'spline',
+      usesAltKey: true,
+      cursor: () => vectorEditor.cursor(),
+      onActivate: () => vectorEditor.onActivate(),
+      onDeactivate: (ctx, options) => vectorEditor.onDeactivate(ctx, options),
+      onPointerDown: (ctx, input) => vectorEditor.onPointerDown(ctx, input),
+      onPointerMove: (ctx, input) => vectorEditor.onPointerMove(ctx, input),
+      onPointerUp: () => vectorEditor.onPointerUp(),
+      onPointerCancel: () => vectorEditor.onPointerCancel(),
+      onKeyCommand: (ctx, command) => vectorEditor.onKeyCommand(ctx, command),
+    }],
     ['transform', createTransformTool()],
     ['bbox', createBboxTool()],
     ['colorPicker', createColorPickerTool()],
@@ -682,8 +695,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       structuralController.endPreview();
     },
     canEdit: () => canEditDocument(),
-    canRedoStore: { set: (value) => stores.canRedo.set(stores.vectorEditSession.get()?.canRedo ?? value) },
-    canUndoStore: { set: (value) => stores.canUndo.set(stores.vectorEditSession.get()?.canUndo ?? value) },
+    canRedoStore: { set: (value) => stores.canRedo.set(value) },
+    canUndoStore: { set: (value) => stores.canUndo.set(value) },
     isGestureActive: () => pipeline.isGestureActive(),
     reportFailure: (label, error) =>
       opts.reportError({
@@ -1117,8 +1130,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
 
   const toolContext: ToolContext = {
-    appendVectorEditPath: (layerId, path) => vectorEditor.append(layerId, path),
-    applyVectorEdit: () => { vectorEditor.apply(); },
     applyTransform: () => applyTransform(),
     backend,
     captureInsertionAnchor,
@@ -1364,20 +1375,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const canEditDocument = (owner?: symbol): boolean => mutationContext.canEdit(owner);
 
   const vectorEditor = new VectorEditingController({
+    captureInsertionAnchor: (layerId) => captureInsertionAnchor('vector', layerId),
     session: {
       get: () => stores.vectorEditSession.get(),
       set: (value) => {
         stores.vectorEditSession.set(value);
-        stores.canUndo.set(value?.canUndo ?? history.canUndo());
-        stores.canRedo.set(value?.canRedo ?? history.canRedo());
+        stores.canUndo.set(history.canUndo());
+        stores.canRedo.set(history.canRedo());
       },
     },
     getDocument: () => mirror.getDocument(),
     canEdit: () => canEditDocument(),
     isGestureActive: () => pipeline.isGestureActive(),
     getToolId: () => interactionController.getActiveToolId(),
-    setTool: (id) => setTool(id),
-    dispatch: (mutation) => { dispatchCanvasMutation(mutation, 'system'); },
     commit: (label, forward, inverse) => commitToolStructural(label, forward, inverse),
     invalidate: () => scheduler.invalidate({ overlay: true }),
     createId: createLayerId,
@@ -1933,6 +1943,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const unsubscribeViewport = viewport.subscribe(() => {
     stores.zoom.set(viewport.getZoom());
+    vectorEditor.refreshAvailability();
     if (!suppressViewportInvalidate) {
       scheduler.invalidate({ view: true });
     }
@@ -1988,10 +1999,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const interactionController = new InteractionController({
     beforeSwitch: (from, to, switchOptions) => {
-      if (vectorEditor.hasSession() && !switchOptions?.temporary && to !== 'move' && to !== 'shape') {
-        vectorEditor.requestExit({ kind: 'tool', toolId: to });
-        return false;
-      }
       // A REAL tool switch banks a float — the pixels are already cut, and
       // carrying them into an unrelated tool would strand them. A temporary
       // modifier-hold switch (space → view to pan) must not: the user has not
@@ -2036,9 +2043,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     if (vectorEditor.hasSession()) {
-      if (!gestureWasActive || interactionController.getActiveToolId() !== 'shape') {
-        vectorEditor.cancel();
-      }
+      vectorEditor.onKeyCommand(toolContext, 'cancel');
       return;
     }
     if (colorSamples.onEscape()) {
@@ -2827,9 +2832,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     mirror.getDocument() !== null;
 
   const replayHistory = async (direction: 'undo' | 'redo'): Promise<CanvasHistoryReplayStatus> => {
-    if (vectorEditor.hasSession()) {
-      return (direction === 'undo' ? vectorEditor.undo() : vectorEditor.redo()) ? 'applied' : 'empty';
-    }
     const result = await (direction === 'undo' ? historyController.undo() : historyController.redo());
     return result.status;
   };
@@ -3079,38 +3081,27 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const layersCapability: CanvasEngineLayerCapability = {
     ...layerController.layers,
+    traceVectorLayer: (layerId, pathId) => {
+      const document = mirror.getDocument();
+      if (!document) { return false; }
+      return traceVectorLayerCommand({ document, layerId, pathId, ctx: mutationContext, backend,
+        width: stores.brushOptions.get().size, color: stores.brushOptions.get().color,
+        id: createLayerId(), anchor: captureInsertionAnchor('raster') });
+    },
     vectorEdit: {
-      begin: (layerId) => {
-        if (stores.textEditSession.get() || stores.transformSession.get() || floatingSelection.has()) { return false; }
-        tools.get('shape')?.onPointerCancel?.(toolContext);
-        return vectorEditor.begin(layerId);
-      },
-      apply: () => {
-        pipeline.endForToolSwitch();
-        tools.get('shape')?.onPointerCancel?.(toolContext);
-        return vectorEditor.apply();
-      },
-      cancel: () => {
-        pipeline.endForToolSwitch();
-        tools.get('shape')?.onPointerCancel?.(toolContext);
-        vectorEditor.cancel();
-      },
-      reset: () => {
-        pipeline.endForToolSwitch();
-        tools.get('shape')?.onPointerCancel?.(toolContext);
-        vectorEditor.reset();
-      },
-      undo: vectorEditor.undo,
-      redo: vectorEditor.redo,
       setPointType: vectorEditor.setPointType,
+      targetContextMenu: vectorEditor.targetContextMenu,
+      deletePath: vectorEditor.deletePath,
+      nudge: vectorEditor.nudge,
       smooth: vectorEditor.smooth,
       deleteSelection: vectorEditor.deleteSelection,
       copyPath: vectorEditor.copyPath,
+      extractPath: vectorEditor.extractPath,
+      transformPath: vectorEditor.transformPath,
       split: vectorEditor.split,
       join: vectorEditor.join,
       canSplit: vectorEditor.canSplit,
       canJoin: vectorEditor.canJoin,
-      resolveExit: vectorEditor.resolveExit,
     },
     applyTransform,
     beginTransform: (layerId) => editingController.transform.request(layerId),

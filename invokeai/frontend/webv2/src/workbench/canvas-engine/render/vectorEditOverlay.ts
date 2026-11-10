@@ -16,6 +16,7 @@ export interface VectorEditOverlay {
 export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, overlay: VectorEditOverlay | null): void => {
   if (!overlay) { return; }
   const { session } = overlay;
+  if (session.pathTransform) { return; }
   const matrix = multiply(view, overlay.matrix);
   const selected = new Set(session.selectedPoints.map((ref) => `${ref.pathId}:${ref.pointIndex}`));
   const active = session.selectedPoints.at(-1);

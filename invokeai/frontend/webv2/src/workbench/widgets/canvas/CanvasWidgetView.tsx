@@ -49,6 +49,7 @@ import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
+import { VectorPathContextMenu, type VectorPathMenuTarget } from './VectorPathContextMenu';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
@@ -131,6 +132,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   // Right-click on the canvas surface targets the selected layer (the panel is
   // the sole authority; the stack is never hit-tested) and opens either the
   // shared per-layer menu or the global menu at the pointer.
+  const [vectorMenuTarget, setVectorMenuTarget] = useState<VectorPathMenuTarget | null>(null);
+  const closeVectorMenu = useCallback(() => setVectorMenuTarget(null), []);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable
@@ -275,6 +278,16 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         return;
       }
       event.preventDefault();
+      setVectorMenuTarget(null);
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (engine?.layers.vectorEdit.targetContextMenu({ x: event.clientX - bounds.left, y: event.clientY - bounds.top })) {
+        const edit = engine.interaction.get('vectorEditSession');
+        if (edit?.activePathId) {
+          setContextMenuTarget(null);
+          setVectorMenuTarget({ x: event.clientX, y: event.clientY, layerId: edit.layerId, pathId: edit.activePathId });
+          return;
+        }
+      }
       setContextMenuTarget(resolution.target);
     },
     [canvas.document.selectedLayerId, engine]
@@ -610,6 +623,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         {engine ? (
           <>
             <ToolStrip engine={engine} />
+            <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
             <ControlLayerCanvasOverlay engine={engine} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}

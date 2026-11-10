@@ -756,12 +756,11 @@ export type BeginTransformResult =
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
 export interface CanvasVectorEditCapability {
-  begin(layerId: string): boolean;
-  apply(): StructuralCommitResult | null;
-  cancel(): void;
-  reset(): void;
-  undo(): boolean;
-  redo(): boolean;
+  transformPath(): void;
+  extractPath(): void;
+  targetContextMenu(screenPoint: Vec2): boolean;
+  deletePath(): void;
+  nudge(dx: number, dy: number): void;
   setPointType(type: 'corner' | 'smooth' | 'symmetric'): void;
   smooth(selectedOnly: boolean): void;
   deleteSelection(): void;
@@ -770,10 +769,11 @@ export interface CanvasVectorEditCapability {
   join(): void;
   canSplit(): boolean;
   canJoin(): boolean;
-  resolveExit(decision: 'apply' | 'discard' | 'cancel'): StructuralCommitResult | null;
 }
 
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
+  /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */
+  traceVectorLayer(layerId: string, pathId?: string): boolean;
   readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
   /**

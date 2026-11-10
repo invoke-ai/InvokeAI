@@ -85,7 +85,7 @@ const CUTOUT_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' he
 </svg>`;
 
 type Session =
-  | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean; editsSelected: boolean }
+  | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; lastDoc: Vec2; spaceHeld: boolean; moved: boolean; editsSelected: boolean }
   | {
       kind: 'polyline';
       session: PolylineSession;
@@ -450,6 +450,7 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
   return {
     cursor: (ctx) => {
       if (selectsVector(ctx)) { return vectorTool.cursor!(ctx); }
+      if (session?.kind === 'drag' && session.spaceHeld) { return 'move'; }
       if (session?.kind === 'polyline' && session.session.closeArmed) {
         return 'pointer';
       }
@@ -462,7 +463,13 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     id: 'shape',
     hasSession: () => session !== null || vectorTool.hasSession(),
     onDocumentChanged: (ctx) => vectorTool.onDocumentChanged?.(ctx),
-    onModifierKey: (ctx, code, pressed) => selectsVector(ctx) ? vectorTool.onModifierKey!(ctx, code, pressed) : false,
+    onModifierKey: (ctx, code, pressed) => {
+      if (selectsVector(ctx)) { return vectorTool.onModifierKey!(ctx, code, pressed); }
+      if (code !== 'Space' || session?.kind !== 'drag') { return false; }
+      session.spaceHeld = pressed;
+      ctx.updateCursor();
+      return true;
+    },
     usesAltKey: true,
     onDeactivate: (ctx, opts) => {
       vectorTool.onDeactivate?.(ctx, opts);
@@ -474,7 +481,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     },
     onKeyCommand: (ctx, command) => {
       if (vectorTool.hasSession()) { return vectorTool.onKeyCommand?.(ctx, command) ?? false; }
-      if (!session && command === 'apply' && selectsVector(ctx)) { ctx.applyVectorEdit?.(); return true; }
       if (!session) {
         return false;
       }
@@ -527,6 +533,8 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
               moved: false,
               startDoc: input.documentPoint,
               startScreen: input.screenPoint,
+              lastDoc: input.documentPoint,
+              spaceHeld: false,
             };
       noteSelectedLayerEdit(ctx, session, input.modifiers);
     },
@@ -556,6 +564,13 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
         ctx.invalidate({ overlay: true });
         return;
       }
+      if (session.spaceHeld) {
+        session.startDoc = {
+          x: session.startDoc.x + input.documentPoint.x - session.lastDoc.x,
+          y: session.startDoc.y + input.documentPoint.y - session.lastDoc.y,
+        };
+      }
+      session.lastDoc = input.documentPoint;
       if (!session.moved) {
         const dxs = input.screenPoint.x - session.startScreen.x;
         const dys = input.screenPoint.y - session.startScreen.y;
@@ -591,6 +606,12 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       if (!session.moved) {
         reset(ctx);
         return;
+      }
+      if (session.spaceHeld) {
+        session.startDoc = {
+          x: session.startDoc.x + input.documentPoint.x - session.lastDoc.x,
+          y: session.startDoc.y + input.documentPoint.y - session.lastDoc.y,
+        };
       }
       commit(ctx, boxShape(ctx, dragRect(session.startDoc, input.documentPoint, constraintsOf(input.modifiers))), mode);
     },

@@ -7,6 +7,7 @@
  */
 export * from './capabilities';
 export { CONTROL_TYPES } from './contracts';
+export { DEFAULT_VECTOR_GUIDE_COLOR } from './contracts';
 export {
   controlDetectionInputKey,
   getControlDetectionInput,

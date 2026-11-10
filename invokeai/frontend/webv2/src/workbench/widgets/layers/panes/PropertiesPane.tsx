@@ -10,7 +10,6 @@ import {
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { VectorEditExitDialog } from '@workbench/widgets/layers/VectorLayerSettings';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { LayerSection } from './LayerSection';
@@ -65,7 +64,6 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
 
   return (
     <Stack ref={root} gap="0">
-      <VectorEditExitDialog engine={engine} />
       {running ? (
         <PropertiesSection
           subtitle={t(OPERATION_TITLE_KEYS[running.kind])}

@@ -1,93 +1,95 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { Flex, Portal, Stack, Text } from '@chakra-ui/react';
+import { Flex, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
-import { Dialog } from '@platform/ui/Dialog';
-import { useVectorEditSession } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useState } from 'react';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { ColorPicker } from '@platform/ui/ColorPicker';
+import { DEFAULT_VECTOR_GUIDE_COLOR } from '@workbench/canvas-engine/api';
+import { PropertyControlRow, PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
+import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
+import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Engine = Pick<CanvasEngineHandle, 'layers' | 'interaction'>;
+type Engine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'tools' | 'interaction'>;
 
+/** Layer appearance lives here; point commands belong to the Spline tool form. */
 export const VectorLayerSettings = ({ engine, layer }: {
   engine: Engine | null;
   layer: Extract<CanvasLayerContract, { type: 'vector' }>;
 }) => {
   const { t } = useTranslation();
-  const session = useVectorEditSession(engine);
-  const [error, setError] = useState(false);
-  const editing = session?.layerId === layer.id ? session : null;
-  const api = engine?.layers.vectorEdit;
-  const label = (key: string) => t(`widgets.layers.vector.${key}`);
-  const selected = editing && editing.selectedPoints.length > 0;
-  const active = editing?.paths.find((path) => path.id === editing.activePathId);
+  const { preview, commit } = useStructuralPreview(engine);
+  const sampleColor = useColorSampler(engine);
+  const color = layer.guideColor ?? DEFAULT_VECTOR_GUIDE_COLOR;
+  const onChange = useCallback((guideColor: string) => {
+    preview({ type: 'updateCanvasLayerConfig', id: layer.id, config: { layerType: 'vector', guideColor } });
+  }, [preview, layer.id]);
+  const onChangeEnd = useCallback((guideColor: string) => {
+    const config = { layerType: 'vector', guideColor } as const;
+    commit(t('widgets.layers.vector.guideColor'), (model, baseline) => {
+      if (model.document.selectedLayerId !== layer.id) { return { status: 'unchanged' }; }
+      return model.prepare({ id: layer.id, type: 'patch-config', config, before: baselineConfig(baseline, config) });
+    });
+  }, [commit, layer.id, t]);
   return (
     <Stack gap="2">
-      <Text color="fg.muted" fontSize="sm">{t('widgets.layers.summary.vectorPaths', { count: editing?.paths.length ?? layer.paths.length })}</Text>
-      {!editing ? (
-        <Button disabled={!api || !!session || layer.paths.length === 0} onClick={() => setError(!api?.begin(layer.id))} size="sm">{label('edit')}</Button>
-      ) : (
-        <>
-          <Flex gap="2" wrap="wrap">
-            <Button onClick={() => { const result = api?.apply(); setError(!!result && result.status !== 'committed'); }} size="sm">{label('apply')}</Button>
-            <Button onClick={() => api?.cancel()} size="sm" variant="outline">{label('cancel')}</Button>
-            <Button onClick={() => api?.reset()} size="sm" variant="outline">{label('reset')}</Button>
-          </Flex>
-          <Flex gap="2">
-            <Button disabled={!editing.canUndo} onClick={() => api?.undo()} size="xs" variant="outline">{label('undo')}</Button>
-            <Button disabled={!editing.canRedo} onClick={() => api?.redo()} size="xs" variant="outline">{label('redo')}</Button>
-          </Flex>
-          <Text color="fg.muted" fontSize="sm">{label('hint')}</Text>
-          <Flex gap="1" wrap="wrap">
-            {(['corner', 'smooth', 'symmetric'] as const).map((type) => (
-              <Button key={type} disabled={!selected} onClick={() => api?.setPointType(type)} size="xs" variant="outline">{label(type)}</Button>
-            ))}
-          </Flex>
-          <Flex gap="1" wrap="wrap">
-            <Button disabled={!active} onClick={() => api?.smooth(false)} size="xs" variant="outline">{label('smoothPath')}</Button>
-            <Button disabled={!selected} onClick={() => api?.smooth(true)} size="xs" variant="outline">{label('smoothPoints')}</Button>
-            <Button disabled={!api?.canSplit()} onClick={() => api?.split()} size="xs" variant="outline">{label('split')}</Button>
-            <Button disabled={!api?.canJoin()} onClick={() => api?.join()} size="xs" variant="outline">{label('join')}</Button>
-            <Button disabled={!active} onClick={() => api?.copyPath()} size="xs" variant="outline">{label('copy')}</Button>
-            <Button disabled={!selected && !active} onClick={() => api?.deleteSelection()} size="xs" variant="outline">{label('delete')}</Button>
-          </Flex>
-        </>
-      )}
-      {error ? <Text color="fg.error" fontSize="sm">{label('unavailable')}</Text> : null}
+      <Text color="fg.muted" fontSize="sm">{t('widgets.layers.summary.vectorPaths', { count: layer.paths.length })}</Text>
+      <PropertyControlRow label={t('widgets.layers.vector.guideColor')}>
+        <ColorPicker aria-label={t('widgets.layers.vector.guideColor')}
+          disabled={!engine || layer.isLocked || !layer.isEnabled} value={color}
+          onSampleColor={sampleColor} onValueChange={onChange} onValueChangeEnd={onChangeEnd} />
+        <Button size="xs" variant="outline" disabled={!engine || layer.isLocked || !layer.isEnabled || color === DEFAULT_VECTOR_GUIDE_COLOR}
+          onClick={() => onChangeEnd(DEFAULT_VECTOR_GUIDE_COLOR)}>{t('widgets.layers.vector.reset')}</Button>
+      </PropertyControlRow>
+      {engine ? <VectorTraceSettings engine={engine} layer={layer} /> : null}
     </Stack>
   );
 };
 
-/** Mounted independently of the selected layer so a selection change cannot hide the exit decision. */
-export const VectorEditExitDialog = ({ engine }: { engine: Engine }) => {
+const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract<CanvasLayerContract, { type: 'vector' }> }) => {
   const { t } = useTranslation();
-  const session = useVectorEditSession(engine);
-  const [error, setError] = useState(false);
+  const brush = useBrushOptions(engine);
+  const colorCommands = useActiveColorCommands();
+  const sampleColor = useColorSampler(engine);
+  const [failed, setFailed] = useState(false);
+  const { preview, commit } = useStructuralPreview(engine);
+  const taperEnds = layer.traceTaperEnds ?? false;
+  const taper = layer.traceTaper ?? 100;
   const label = (key: string) => t(`widgets.layers.vector.${key}`);
-  const resolve = (decision: 'apply' | 'discard' | 'cancel') => {
-    const result = engine.layers.vectorEdit.resolveExit(decision);
-    setError(!!result && result.status !== 'committed');
+  const clampTaper = (value: number) => Math.round(Math.min(500, Math.max(1, Number.isFinite(value) ? value : taper)));
+  const commitSettings = (patch: { traceTaperEnds?: boolean; traceTaper?: number }) => {
+    const config = { layerType: 'vector', ...patch } as const;
+    commit(label('traceTitle'), (model, baseline) => {
+      if (model.document.selectedLayerId !== layer.id) { return { status: 'unchanged' }; }
+      return model.prepare({ id: layer.id, type: 'patch-config', config, before: baselineConfig(baseline, config) });
+    });
   };
+  const trace = () => setFailed(!engine.layers.traceVectorLayer(layer.id));
+  const disabled = !layer.isEnabled || layer.isLocked || layer.isHidden === true;
   return (
-    <Dialog.Root open={!!session?.pendingExit} onOpenChange={({ open }) => { if (!open) { resolve('cancel'); } }}>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content>
-            <Dialog.Header><Dialog.Title>{label('exitTitle')}</Dialog.Title></Dialog.Header>
-            <Dialog.Body>
-              <Text>{label('exitBody')}</Text>
-              {error ? <Text color="fg.error">{label('unavailable')}</Text> : null}
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Button onClick={() => resolve('cancel')} variant="outline">{label('cancel')}</Button>
-              <Button onClick={() => resolve('discard')} variant="outline">{label('discard')}</Button>
-              <Button onClick={() => resolve('apply')}>{label('apply')}</Button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+    <Stack borderTopWidth="1px" borderColor="border.subtle" gap="2" mt="2" pt="3">
+      <Flex align="center" gap="2" w="full">
+        <Text color="fg.muted" fontWeight="600">{label('traceTitle')}</Text>
+        <Flex flexShrink="0" ms="auto">
+          <ColorPicker aria-label={label('traceColor')} disabled={disabled} value={brush.color}
+            onSampleColor={sampleColor} onValueChange={colorCommands.applySampledColor} onValueChangeEnd={colorCommands.applySampledColor} />
+        </Flex>
+      </Flex>
+      <ScrubberField label={label('strokeWidth')} disabled={disabled} value={brush.size} min={1} max={600} step={1}
+        defaultValue={50} formatValue={(value) => `${value}px`}
+        onChange={(size) => engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), size: Math.round(size) })} />
+      <PropertySwitchRow label={label('taperEnds')} disabled={disabled} checked={taperEnds}
+        onCheckedChange={(traceTaperEnds) => commitSettings({ traceTaperEnds })} />
+      <ScrubberField label={label('taper')} disabled={disabled || !taperEnds} value={taper} min={1} max={500} step={10}
+        defaultValue={100} marks={[1, 100, 250, 500]} formatValue={(value) => `${value}%`}
+        onChange={(value) => preview({ id: layer.id, type: 'updateCanvasLayerConfig', config: { layerType: 'vector', traceTaper: clampTaper(value) } })}
+        onChangeEnd={(value) => commitSettings({ traceTaper: clampTaper(value) })} />
+      <Button size="sm" disabled={disabled || !layer.paths.some((path) => path.points.length >= 2)} onClick={trace}>{label('traceAll')}</Button>
+      {failed ? <Text color="fg.error" fontSize="sm">{label('traceFailed')}</Text> : null}
+    </Stack>
   );
 };

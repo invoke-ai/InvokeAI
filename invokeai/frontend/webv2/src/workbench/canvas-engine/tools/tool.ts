@@ -9,7 +9,7 @@ import type {
   ColorSamplePhase,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/capabilities';
-import type { CanvasBezierPathContract, CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
@@ -93,8 +93,6 @@ export interface PaintLineEnds {
 
 /** Everything a tool is allowed to reach, injected by the engine. */
 export interface ToolContext {
-  appendVectorEditPath?(layerId: string, path: CanvasBezierPathContract): boolean;
-  applyVectorEdit?(): void;
   /** The pan/zoom viewport. */
   viewport: Viewport;
   /** The current mirrored document, or `null` when none is available. */

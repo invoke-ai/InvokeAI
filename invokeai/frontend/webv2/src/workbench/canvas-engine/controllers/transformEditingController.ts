@@ -111,7 +111,7 @@ export class TransformEditingController {
     const document = this.deps.getDocument();
     const leaf = lookupDocumentLeaf(document, layerId);
     const layer = leaf?.layer;
-    if (!document || !layer || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
+    if (!document || !layer || !this.deps.canEdit() || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
       return;
     }
     this.clearOverride();
@@ -279,7 +279,7 @@ export class TransformEditingController {
       !document ||
       !layer ||
       !size ||
-      !isRenderableLayer(layer) ||
+      (layer.type !== 'vector' && !isRenderableLayer(layer)) ||
       !isLeafEditable(lookupDocumentLeaf(document, session.layerId)) ||
       unchanged(session.transform, session.startTransform)
     ) {
@@ -288,6 +288,7 @@ export class TransformEditingController {
     }
     const source = layer.type === 'raster' || layer.type === 'control' ? layer.source : null;
     if (
+      layer.type === 'vector' ||
       source?.type === 'image' ||
       source?.type === 'shape' ||
       source?.type === 'gradient' ||

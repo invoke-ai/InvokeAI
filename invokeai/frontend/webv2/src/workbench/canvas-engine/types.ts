@@ -44,6 +44,7 @@ export type ToolId =
   | 'lasso'
   | 'marquee'
   | 'move'
+  | 'spline'
   | 'transform'
   | 'bbox'
   | 'view'

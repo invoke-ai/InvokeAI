@@ -6,6 +6,7 @@ import { gradientForm } from '@workbench/widgets/canvas/tool-options/GradientOpt
 import { brushForm, eraserForm } from '@workbench/widgets/canvas/tool-options/paintForm';
 import { selectObjectOperationForm } from '@workbench/widgets/canvas/tool-options/SamOptions';
 import { lassoForm, marqueeForm } from '@workbench/widgets/canvas/tool-options/selectionForm';
+import { splineForm } from '@workbench/widgets/canvas/tool-options/SplineOptions';
 import { shapeForm } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
 import { textForm } from '@workbench/widgets/canvas/tool-options/textForm';
 
@@ -22,6 +23,7 @@ export const TOOL_PRESENTATION_ADAPTERS: Readonly<Record<ToolId, ToolPropertyFor
   move: moveForm,
   sam: { groups: [], id: 'sam' },
   shape: shapeForm,
+  spline: splineForm,
   text: textForm,
   transform: transformForm,
   view: { groups: [], id: 'view' },

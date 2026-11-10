@@ -605,7 +605,13 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
     return layer;
   }
   if (layer.type === 'vector' && config.layerType === 'vector') {
-    return { ...layer, paths: config.paths };
+    return {
+      ...layer,
+      ...(Object.hasOwn(config, 'paths') ? { paths: config.paths ?? layer.paths } : {}),
+      ...(Object.hasOwn(config, 'guideColor') ? { guideColor: config.guideColor } : {}),
+      ...(Object.hasOwn(config, 'traceTaperEnds') ? { traceTaperEnds: config.traceTaperEnds } : {}),
+      ...(Object.hasOwn(config, 'traceTaper') ? { traceTaper: config.traceTaper } : {}),
+    };
   }
   if (layer.type === 'group' && config.layerType === 'group') {
     return {

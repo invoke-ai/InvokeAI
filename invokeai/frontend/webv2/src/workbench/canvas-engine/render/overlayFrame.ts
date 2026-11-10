@@ -110,6 +110,20 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
 
   /** The transform-tool frame (rotated bounds + handles + rotation nub), or `null`. */
   const transformFrame = (doc: CanvasDocumentContractV3): TransformFrameOverlay | null => {
+    if (getActiveToolId() === 'spline') {
+      const edit = stores.vectorEditSession.get();
+      const frame = edit?.pathTransform;
+      const leaf = edit ? lookupDocumentLeaf(doc, edit.layerId) : null;
+      if (!frame || !leaf) { return null; }
+      const geometry = transformOverlayGeometry(frame.transform, frame.rect);
+      const toDocument = leaf.worldTransform;
+      return {
+        center: applyToPoint(toDocument, geometry.center),
+        corners: geometry.corners.map((point) => applyToPoint(toDocument, point)),
+        handles: geometry.handles.map((point) => applyToPoint(toDocument, point)),
+        rotationAnchor: applyToPoint(toDocument, geometry.rotationAnchor),
+      };
+    }
     if (getActiveToolId() !== 'transform') {
       return null;
     }
@@ -165,6 +179,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
           paths: edit?.layerId === leaf.id ? edit.paths : leaf.layer.paths,
           matrix,
           opacity: leaf.layer.opacity,
+          guideColor: leaf.layer.guideColor,
           ...(edit?.layerId === leaf.id ? { editActivePathId: edit.activePathId } : {}),
         });
       }
