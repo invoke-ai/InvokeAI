@@ -1,92 +1,82 @@
-# AGENTS.md
+# Working on InvokeAI
 
-## Temporary Development Instructions
-### Vector Layers & Splines Port to InvokeAI v7
+## Communication
 
-These instructions are temporary and apply only to the initial development and manual testing phase of the Vector Layers & Splines port.
+- Updates: plain, short, outcome first. Name blockers and evidence. Separate verified results, assumptions, unavailable checks.
+- Ask only when repo or request cannot settle a decision safely. Continue authorized work without re-asking.
 
-The primary goal is to establish working functionality in the v7 Canvas architecture with minimal development overhead.
+## Find the right owner
 
-## 1. Direct Implementation
+Before editing, read every `AGENTS.md` along each target path. Scoped rules add to this file. Policy lives in `AGENTS.md` files and the `.agents/` file they link.
 
-- The main agent is explicitly authorized to inspect, create, modify, and delete project files directly.
-- Do not spawn, delegate to, or request assistance from subagents.
-- Do not perform mandatory independent reviews or delegate implementation tasks.
-- Handle investigation, implementation, and debugging within the main agent session.
-- Keep reasoning and progress reports concise to minimize unnecessary token consumption.
+| Area | Guidance and source of truth |
+| --- | --- |
+| Active frontend | [webv2/AGENTS.md](invokeai/frontend/webv2/AGENTS.md), its `ARCHITECTURE.md`, executable architecture policy |
+| API, services, invocations | [app/AGENTS.md](invokeai/app/AGENTS.md) |
+| Inference, model management | [backend/AGENTS.md](invokeai/backend/AGENTS.md) |
+| Python tests | [tests/AGENTS.md](tests/AGENTS.md), plus guidance for the code under test |
+| Legacy frontend | [webv1/AGENTS.md](invokeai/frontend/webv1/AGENTS.md) |
+| Shared generated API contracts | [api/AGENTS.md](invokeai/frontend/api/AGENTS.md) |
+| CI, contribution tooling | [.github/AGENTS.md](.github/AGENTS.md) |
+| Documentation | `docs/README.md`, `docs/package.json`. Keep product docs current. |
 
-## 2. Automated Validation
+Frontend work targets **webv2**, served by default. `--webv2` is a compatibility alias; `--web-legacy` selects legacy web. UI investigations: verify build and launch target first. `frontend/api` owns generated OpenAPI/type artifacts.
 
-Do not automatically run:
+Before these steps, read:
 
-- Unit, integration, or end-to-end tests.
-- TypeScript or Python type checks.
-- ESLint, Ruff, or other linters.
-- Formatting checks.
-- Frontend or backend builds.
-- Architecture or performance checks.
-- Automated code reviews.
+- Delegating work or running a milestone review: [.agents/coordination.md](.agents/coordination.md).
+- Running Python tests: [tests/AGENTS.md](tests/AGENTS.md).
+- Committing or opening a PR: [.github/AGENTS.md](.github/AGENTS.md).
 
-These operations may only be performed when explicitly requested by the user.
+## Engineering standard
 
-Do not run automated validation simply because a file was modified or an implementation milestone was reached.
+- Before designing: read implementations, callers, contracts, tests. Define observable outcome and validation. Reproduce bugs where feasible. Fix root causes. Rethink designs that pile up patches.
+- Keep ownership and interfaces clear. Cover edge cases, failures, data lifecycles, operational limits.
+- Every function, dependency, fallback, test earns its place. Abstractions must translate contracts, isolate dependencies, own lifecycles, prevent drift, or simplify callers. No pass-through wrappers, speculative extensibility, redundant validation/config, or abstraction justified only by similar-looking code.
+- Remove obsolete code, tests, scaffolding. Preserve unrelated work. Comment only non-obvious intent, constraints, trade-offs.
+- Test meaningful behavior through its owning interface. Expected values independent; tests catch plausible regressions. No trivial constant/type/re-export assertions, incidental snapshots, duplicate coverage, mock choreography. Prefer real lightweight dependencies and isolated fixtures. Use doubles for expensive or external systems. Optimize test value, not count.
+- Dependency and lockfile changes only on purpose. Never weaken assertions, gates, architecture policy, or performance budgets to pass. Explain existing failures and verification limits.
+- Keep architecture and reference docs matching the code. State current invariants, not migration history. Write paths from a stated root. Give the reason for a non-obvious rule.
+- Repo guidance beats external skill, plugin, workflow defaults: test boundaries follow existing owner interfaces and tests; reviews use the tiers below over the full task-owned diff, uncommitted files included; notes go in `.scratch/agents/<task>/`; commands use package-owned scripts and pnpm. No personal paths, no generic ceremony.
+- Any webv2 UI change: verify changed interactions in the browser. Automated checks alone do not prove visual quality.
 
-## 3. Implementation Strategy
+## Performance
 
-- Focus on functional compatibility with the InvokeAI v7 Canvas architecture.
-- Use the existing v6 Vector Layers & Splines implementation in the local Git branch `feat(canvas)--Splines-tool` as the behavioral reference.
-- Use [the rough integration plan](.scratch/agents/splines-port/PLAN.md) as a starting point; adapt it to the current v7 architecture and implementation findings.
-- Track agreed requirements in [DECISIONS.md](.scratch/agents/splines-port/DECISIONS.md) and update it as decisions are made or revised in chat. These agreements take precedence over the rough integration plan; keep open questions distinct from confirmed requirements.
-- Port functionality incrementally in logical, manageable stages.
-- Preserve existing behavior wherever practical.
-- Adapt implementation details when required by architectural differences between v6 and v7.
-- Avoid unrelated refactoring, cleanup, or architectural changes.
-- Do not introduce temporary workarounds without explaining their limitations.
-- Prefer simple, maintainable solutions over unnecessary abstractions.
+- Check affected hot paths and immediate callers for repeated work, renders/subscriptions, waterfalls, queries, serialization/copies, unbounded collections, retained resources. Do clear, low-risk improvements in scope; larger ones only when the task needs them. Note unrelated opportunities briefly; do not expand scope.
+- Correctness and clarity first. Measure nontrivial optimizations and performance claims (existing budgets, representative fixtures, query counts, profiling, focused benchmarks); report material before/after and limits. Caching, memoization, concurrency, batching need understood invalidation, lifetimes, ordering, cost. No invented optimizations or benchmarks for a checklist.
 
-## 4. Manual Testing Workflow
+## Delegation
 
-The user is responsible for functional testing during this phase.
+Main agent may edit directly only when the whole task qualifies for self-review; otherwise delegate implementation. Harness without subagents: edit locally.
 
-After completing a meaningful implementation milestone:
+Main agent owns machine-wide resources: dependency installs, generated API contracts, full suites and release gates, GPU/generation work, fixed-port servers, shared browser sessions. One webv2 performance gate per machine: it measures timing and binds fixed ports. Implementers run focused checks only, use spare ports, clean up temporary output, and never stash, reset, or check out in shared worktrees.
 
-1. Stop making changes.
-2. Briefly summarize what was implemented or modified.
-3. Identify the functionality that requires manual verification.
-4. Wait for user feedback before proceeding to the next milestone.
+## Review and readiness
 
-When the user reports a problem, investigate and fix it directly without automatically initiating automated validation or review.
+Milestone = one coherent, commit-ready unit. Run relevant checks and self-review every change. Pick review depth by the whole task's behavior, blast radius, failure consequences. Not by file/line count or directory alone. Never split risky work to dodge review.
 
-## 5. Communication
+| Review depth | When |
+| --- | --- |
+| **Self-review; no independent reviewer** | Local, low-risk, easy to verify: copy, docs, styling, input minimum without shared validation, persistence, or API contract changes |
+| **One independent reviewer** | Substantive feature, fix, refactor; bounded impact; no high-risk trigger |
+| **Three independent reviewers** | Behavior changes touching authentication/authorization, account isolation, persisted-data compatibility/migrations, destructive operations, concurrency/resource lifecycles, shared API compatibility, inference numerics/device/memory, or substantial cross-owner architecture |
 
-- Keep responses concise and technically focused.
-- Avoid repeating information already established in the conversation.
-- Report actual implementation results rather than speculative success claims.
-- Clearly identify incomplete functionality, known limitations, and unresolved issues.
-- Do not generate lengthy implementation plans unless explicitly requested.
-- Do not request confirmation for routine implementation details within an already approved task.
+- Reviewers did not implement the change. Self-review is never independent, including review by an implementing agent. Required independent review unavailable: self-review the matching focuses and tell the user. Ordinary low-risk self-review needs no disclaimer.
+- Never declare ready with material findings or unexplained failing gates. Report resolved findings, passed/failed/unavailable checks, remaining limits. PRs omit subagent counts, tiers, process narration.
+- Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
 
-## 6. Finalization and Restoration
+## Commands and environments
 
-These temporary instructions must not remain in the final pull request.
+- **pnpm 10** only, never npm/yarn. Package-owned lockfiles. Run pnpm from the package directory: Corepack picks pnpm's version from the current directory, so `pnpm -C <package>` from the root can get the wrong one. Node version from `.nvmrc`. Read package scripts; do not assume the root Makefile covers webv2.
+- Keep the existing Python/accelerator environment and `uv.lock`. Fresh test setup: `uv sync --locked --extra test`. Do not routinely replace accelerator backends.
+- Once test dependencies exist, install hooks per checkout: `uv run --no-sync pre-commit install`. Committed config does not install hooks.
+- Root Python checks: `uv tool run ruff@0.11.2 check <paths>`, `uv tool run ruff@0.11.2 format --check <paths>`. 120 columns, absolute imports, configured vendored-code exclusions.
+- Focused tests: `uv run --no-sync pytest <test-paths>`. Never start a suite during a generation.
+- Pick checks by behavior. Run required milestone gates before review. Rerun unchanged checks only with a reason.
+- Family E2E runs (`scripts/family_e2e`) after changes to what a model computes or how it loads: model-manager loading, probing, configs; quantization; attention; model cache, working memory; invocations that run models; webv2 graph builders. None for docs-, test- or UI-only changes. Offer a run of the affected families, never start one unasked. Offer only where a manifest is set up; otherwise name the missing run under open limits in the final report. Procedure: `docs/src/content/docs/development/Guides/family-e2e.mdx`.
 
-When the user indicates that the port is functionally complete and ready for final validation:
+## Scratch files and repository hygiene
 
-1. Remind the user that this temporary `AGENTS.md` must be restored from `main`.
-2. Recommend the following command:
-
-   `git restore --source=main -- AGENTS.md`
-
-3. Do not restore the file automatically without explicit user approval.
-4. After restoration, follow the original repository instructions for final validation, testing, and review.
-5. Ensure that temporary changes to `AGENTS.md` are excluded from the final pull request.
-
-**Important:** Do not interpret ordinary implementation milestones as authorization to end temporary development mode. Only the user decides when the port is ready for finalization.
-
-## 7. Instruction Priority
-
-For this temporary porting phase, the rules in this file supersede the repository's normal delegation and automated-validation workflow wherever those rules conflict.
-
-Higher-priority system and developer instructions remain applicable.
-
-The temporary restrictions on subagents and automated validation remain in effect until the user explicitly authorizes a change or approves restoration of the original `AGENTS.md`.
+- Never commit plans, work logs, investigation notes, review transcripts, handoffs, under any filename. Optional scratch: `.scratch/agents/<task>/`. Never relabel scratch as durable docs.
+- Version durable docs of implemented architecture, decisions, APIs, setup.
+- Check staged diffs and new files for planning material. Ignore rules neither untrack files nor block force-adds. Never force-add planning artifacts. Never add `package-lock.json`/`yarn.lock`.
