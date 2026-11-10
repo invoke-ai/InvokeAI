@@ -7,6 +7,7 @@ import {
   getEffectiveWorkflowFieldDescription,
   getFieldRecordId,
   getWorkflowFieldInvalidReason,
+  getWorkflowFieldIssue,
   isDirectInputField,
   isLoraFieldCollectionEntry,
   isLoraFieldWeightValid,
@@ -92,6 +93,22 @@ describe('workflow field validation', () => {
     expect(
       getWorkflowFieldInvalidReason({ isConnected: false, template: input({ input: 'connection' }), value: 'value' })
     ).toBe('Required connection.');
+  });
+
+  it('names what a blocking field lacks, so callers can say what to do about it', () => {
+    const integer = input({ minimum: 1, type: single('IntegerField') });
+
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: undefined })?.kind).toBe(
+      'missingValue'
+    );
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: 0 })).toEqual({
+      kind: 'invalidValue',
+      reason: 'Invalid value.',
+    });
+    expect(
+      getWorkflowFieldIssue({ isConnected: false, template: input({ input: 'connection' }), value: undefined })?.kind
+    ).toBe('missingConnection');
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: 3 })).toBeNull();
   });
 
   it('accepts persisted values for unsupported direct controls', () => {

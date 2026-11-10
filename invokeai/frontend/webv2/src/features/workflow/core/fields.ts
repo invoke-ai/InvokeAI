@@ -465,7 +465,22 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
 
 const isEmptyOptionalValue = (value: unknown): boolean => value === undefined || value === null || value === '';
 
-export const getWorkflowFieldInvalidReason = ({
+/** What a field that blocks a run lacks: a value, a connection, or a value it accepts. */
+export type WorkflowFieldIssueKind = 'invalidValue' | 'missingConnection' | 'missingValue';
+
+export interface WorkflowFieldIssue {
+  kind: WorkflowFieldIssueKind;
+  /** The field's own wording of the problem. */
+  reason: string;
+}
+
+const MISSING_CONNECTION: WorkflowFieldIssue = { kind: 'missingConnection', reason: 'Required connection.' };
+const MISSING_VALUE: WorkflowFieldIssue = { kind: 'missingValue', reason: 'Required value.' };
+
+const toInvalidValueIssue = (reason: string | null): WorkflowFieldIssue | null =>
+  reason === null ? null : { kind: 'invalidValue', reason };
+
+export const getWorkflowFieldIssue = ({
   isConnected,
   template,
   value,
@@ -473,7 +488,7 @@ export const getWorkflowFieldInvalidReason = ({
   isConnected: boolean;
   template: FieldInputTemplate;
   value: unknown;
-}): string | null => {
+}): WorkflowFieldIssue | null => {
   if (isConnected) {
     return null;
   }
@@ -484,11 +499,11 @@ export const getWorkflowFieldInvalidReason = ({
 
   // An editable list reports which count or entry rule it breaks; the generic reasons cannot say.
   if (template.type.cardinality === 'COLLECTION' && Array.isArray(value) && isDirectInputField(template)) {
-    return getCollectionInvalidReason(template, value);
+    return toInvalidValueIssue(getCollectionInvalidReason(template, value));
   }
 
   if (template.type.name === 'LoRAField' && isDirectInputField(template) && !isEmptyOptionalValue(value)) {
-    return getLoraCollectionInvalidReason(toLoraFieldCollectionList(value));
+    return toInvalidValueIssue(getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)));
   }
 
   if (
@@ -498,15 +513,17 @@ export const getWorkflowFieldInvalidReason = ({
   ) {
     const generator = parseWorkflowGeneratorValue(template.type.name, value);
 
-    return generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator);
+    return toInvalidValueIssue(generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator));
   }
 
   if (!template.required) {
-    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value) ? 'Invalid value.' : null;
+    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value)
+      ? toInvalidValueIssue('Invalid value.')
+      : null;
   }
 
   if (template.input === 'connection') {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
   if (isWorkflowFieldValueValid(template, value)) {
@@ -514,11 +531,14 @@ export const getWorkflowFieldInvalidReason = ({
   }
 
   if (!isDirectInputField(template)) {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
-  return isEmptyOptionalValue(value) ? 'Required value.' : 'Invalid value.';
+  return isEmptyOptionalValue(value) ? MISSING_VALUE : toInvalidValueIssue('Invalid value.');
 };
+
+export const getWorkflowFieldInvalidReason = (field: Parameters<typeof getWorkflowFieldIssue>[0]): string | null =>
+  getWorkflowFieldIssue(field)?.reason ?? null;
 
 // Raw hex (not Chakra tokens) because xyflow handles are styled inline.
 const FIELD_TYPE_COLORS: Record<string, string> = {

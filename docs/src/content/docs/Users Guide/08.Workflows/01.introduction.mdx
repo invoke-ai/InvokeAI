@@ -133,13 +133,13 @@ In summary, the **Image Compositor**'s settings are:
 
 A workflow with a dozen nodes is not the most convenient thing to use day to day. The **form** in the Workflow panel on the left gathers the settings you actually change into one simple panel, like the Generate panel.
 
-To add a setting to the form, click the **pin** icon at the right end of its row in the node (**Add to form**). Only settings with their own control can be pinned; connected inputs cannot.
+To add a setting to the form, point at its row in the node (or move keyboard focus into it) and click the **+** button at the right end of the row (**Add to form**). Only settings with their own control can go in the form; connected inputs cannot.
 
 <Steps>
 
 1. The SDXL workflow already puts its **Positive Prompt**, **Negative Prompt**, **Model**, VAE and board settings in the form.
 
-2. In **Image Compositor**, pin **Image Background**, **Threshold**, **X Offset** and **Y Offset**. The pins turn blue, and the settings appear at the end of the form.
+2. In **Image Compositor**, add **Image Background**, **Threshold**, **X Offset** and **Y Offset** to the form. Their names turn blue with a link mark, and the settings appear at the end of the form.
 
 3. In the Workflow panel, click **Edit**, then **Form**. Each setting is a card:
    * Drag a card's title bar to reorder it.
@@ -151,7 +151,7 @@ To add a setting to the form, click the **pin** icon at the right end of its row
 
 </Steps>
 
-<Image src={formEdit} alt="The Workflow panel in Edit mode, with the Form tab listing the pinned settings as cards and the Node Inspector below." width={380} />
+<Image src={formEdit} alt="The Workflow panel in Edit mode, with the Form tab listing the settings added to the form as cards and the Node Inspector below." width={380} />
 
 In **View**, the form works like any generation panel: change the prompt or the background and press **Invoke**. The form is part of the workflow, so it is saved with it, exported with it, and shown to anyone who opens your workflow.
 

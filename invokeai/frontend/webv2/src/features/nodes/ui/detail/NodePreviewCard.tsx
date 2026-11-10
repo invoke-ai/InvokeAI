@@ -13,7 +13,7 @@ import {
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
   WorkflowNodeHandleDot,
-  WorkflowNodeInfoIcon,
+  WorkflowNodeInfoButton,
 } from '@features/workflow/preview';
 import { getFieldTypeLabel } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
@@ -112,10 +112,10 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
 
   return (
     <Box w="full" {...getWorkflowNodeShellProps({ selected: false })}>
-      <Flex {...getWorkflowNodeHeaderProps()}>
-        <MiddleTruncate fontWeight="700" minW="0" text={template.title} />
+      <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: true })}>
+        <MiddleTruncate fontWeight="600" minW="0" text={template.title} />
         <Box flex="1" />
-        <WorkflowNodeInfoIcon
+        <WorkflowNodeInfoButton
           content={<NodeInfoTooltip template={template} />}
           label={t('nodes.nodeDetailsAria', { title: template.title })}
         />

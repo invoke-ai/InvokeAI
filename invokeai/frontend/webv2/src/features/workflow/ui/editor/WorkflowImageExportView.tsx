@@ -15,15 +15,21 @@ export const WorkflowImageExportView = ({
     () => props.nodes?.map((node) => (node.selected ? { ...node, selected: false } : node)),
     [props.nodes]
   );
+  // Every node draws open here, so every edge draws as itself: none hidden behind a collapsed edge, none merged.
   const edges = useMemo(
     () =>
-      props.edges?.map((edge) => ({
-        ...edge,
-        animated: undefined,
-        className: undefined,
-        selected: false,
-        style: undefined,
-      })),
+      props.edges?.map(({ data, hidden: _hidden, ...edge }) => {
+        const { collapsedEdgeIds: _collapsedEdgeIds, ...edgeData } = data ?? {};
+
+        return {
+          ...edge,
+          animated: undefined,
+          className: undefined,
+          data: data ? (edgeData as typeof data) : data,
+          selected: false,
+          style: undefined,
+        };
+      }),
     [props.edges]
   );
 

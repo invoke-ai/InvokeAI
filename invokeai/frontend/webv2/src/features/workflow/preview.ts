@@ -7,5 +7,5 @@ export {
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
   WorkflowNodeHandleDot,
-  WorkflowNodeInfoIcon,
+  WorkflowNodeInfoButton,
 } from './ui/nodeChrome';

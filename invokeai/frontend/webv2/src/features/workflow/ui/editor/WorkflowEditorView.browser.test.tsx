@@ -12,7 +12,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 import '@xyflow/react/dist/style.css';
 
 import { clearWorkflowClipboard, copyNodesToClipboard } from './clipboard';
@@ -77,6 +77,16 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   useInvocationTemplatesSelector: (selector: (snapshot: unknown) => unknown) => selector(templatesSnapshot),
 }));
 
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    mouseDragPath: (points: readonly { x: number; y: number }[], frameWidth: number) => Promise<void>;
+  }
+}
+
+const exportMocks = vi.hoisted(() => ({ rasterize: vi.fn() }));
+vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
+vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const i18n = createInstance();
@@ -139,7 +149,10 @@ const createProjectStore = (graph: ProjectGraphState) => {
 
 const createAdapter = (
   project: ReturnType<typeof createProjectStore>,
-  { showMinimap = false }: { showMinimap?: boolean } = {}
+  {
+    nodeExecution,
+    showMinimap = false,
+  }: { nodeExecution?: WorkflowUiAdapter['nodeExecution']; showMinimap?: boolean } = {}
 ): WorkflowUiAdapter => {
   const subscribe = () => () => {};
 
@@ -159,7 +172,7 @@ const createAdapter = (
       undo: vi.fn(),
     },
     getProjectGraph: () => project.getSnapshot().projectGraph,
-    nodeExecution: { get: () => null, getOrigin: () => null, subscribe, subscribeOrigin: subscribe },
+    nodeExecution: nodeExecution ?? { get: () => null, getOrigin: () => null, subscribe, subscribeOrigin: subscribe },
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
     openAddModels: vi.fn(),
     performance: {
@@ -204,7 +217,7 @@ const runtime = {
 const renderEditor = async (
   root: Root,
   project: ReturnType<typeof createProjectStore>,
-  options?: { showMinimap?: boolean }
+  options?: Parameters<typeof createAdapter>[1]
 ) => {
   const adapter = createAdapter(project, options);
 
@@ -583,5 +596,258 @@ describe('WorkflowEditorView paste', () => {
 
     const action = pasted();
     expect(action?.edges).toEqual([expect.objectContaining({ source: 'outside', target: action?.nodes[0]?.id })]);
+  });
+});
+
+describe('WorkflowEditorView edges and minimap', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    clearWorkflowViewports();
+  });
+
+  const edge = (id: string, source: string, target: string) => ({
+    id,
+    source,
+    sourceHandle: 'value',
+    target,
+    targetHandle: 'a',
+    type: 'default' as const,
+  });
+  const collapsed = (node: WorkflowInvocationNode): WorkflowInvocationNode => ({
+    ...node,
+    data: { ...node.data, isOpen: false },
+  });
+  const edgeElement = (id: string) => host.querySelector<SVGGElement>(`.react-flow__edge[data-id="${id}"]`);
+  const edgeOpacity = (id: string) =>
+    getComputedStyle(edgeElement(id)!.querySelector<SVGPathElement>('.react-flow__edge-path')!).opacity;
+  const editor = () => host.querySelector<HTMLElement>('.react-flow')!.parentElement!;
+
+  it('keeps a selected node’s edges at full strength and dims the rest to a quarter', async () => {
+    const graph = {
+      ...createProjectGraph('emphasis'),
+      edges: [edge('ab', 'a', 'b'), edge('cd', 'c', 'd')],
+      nodes: [addNode('a', 0, 0), addNode('b', 400, 0), addNode('c', 0, 300), addNode('d', 400, 300)],
+    };
+    await renderEditor(root, createProjectStore(graph));
+    await expect.poll(() => edgeElement('cd')).not.toBeNull();
+    const restingOpacity = edgeOpacity('cd');
+
+    await act(() => userEvent.click(host.querySelector<HTMLElement>('.react-flow__node[data-id="a"]')!));
+    await expect.poll(() => editor().hasAttribute('data-node-selected')).toBe(true);
+    expect(edgeElement('ab')!.classList.contains('workflow-selected-node-edge')).toBe(true);
+    await expect.poll(() => edgeOpacity('cd')).toBe('0.25');
+    await expect.poll(() => edgeOpacity('ab')).toBe('1');
+
+    await act(() =>
+      userEvent.click(host.querySelector<HTMLElement>('.react-flow__pane')!, { position: { x: 460, y: 500 } })
+    );
+    await expect.poll(() => editor().hasAttribute('data-node-selected')).toBe(false);
+    await expect.poll(() => edgeOpacity('cd')).toBe(restingOpacity);
+    expect(restingOpacity).not.toBe('0.25');
+  });
+
+  it('exports edges at the same strength whether or not a node is selected in the editor', async () => {
+    const graph = {
+      ...createProjectGraph('emphasis-export'),
+      edges: [edge('ab', 'a', 'b'), edge('cd', 'c', 'd')],
+      nodes: [addNode('a', 0, 0), addNode('b', 400, 0), addNode('c', 0, 300), addNode('d', 400, 300)],
+    };
+    await renderEditor(root, createProjectStore(graph));
+    await expect.poll(() => edgeElement('cd')).not.toBeNull();
+    const exportedOpacities = async () => {
+      let opacities: string[] = [];
+      exportMocks.rasterize.mockReset();
+      exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
+        opacities = [...clone.querySelectorAll<SVGPathElement>('.react-flow__edge .react-flow__edge-path')].map(
+          (path) => getComputedStyle(path).opacity
+        );
+        return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+      });
+      await act(() =>
+        userEvent.click(host.querySelector<HTMLElement>('button[aria-label="widgets.workflow.exportAsPng"]')!)
+      );
+      await expect.poll(() => exportMocks.rasterize.mock.calls.length).toBe(1);
+      await expect
+        .poll(() => host.querySelector('button[aria-label="widgets.workflow.exportAsPng"]:disabled'))
+        .toBeNull();
+      return opacities;
+    };
+
+    const unselected = await exportedOpacities();
+    expect(unselected).toHaveLength(2);
+    await act(() => userEvent.click(host.querySelector<HTMLElement>('.react-flow__node[data-id="a"]')!));
+    await expect.poll(() => editor().hasAttribute('data-node-selected')).toBe(true);
+
+    expect(await exportedOpacities()).toEqual(unselected);
+  });
+
+  it('selects and deletes every edge a collapsed edge stands for, and draws them again when they return', async () => {
+    const graph = {
+      ...createProjectGraph('collapsed-edges'),
+      edges: [edge('e1', 'a', 'b'), edge('e2', 'a', 'b')],
+      nodes: [collapsed(addNode('a', 0, 0)), collapsed(addNode('b', 400, 160))],
+    };
+    const project = createProjectStore(graph);
+    const adapter = await renderEditor(root, project);
+    const drawn = () =>
+      [...host.querySelectorAll('.react-flow__edge')].map((element) => element.getAttribute('data-id'));
+    await expect.poll(drawn).toEqual(['e1']);
+    const selectMergedEdge = async () => {
+      await act(() =>
+        userEvent.click(edgeElement('e1')!.querySelector('.react-flow__edge-interaction')!, { force: true })
+      );
+      await expect.poll(() => edgeElement('e1')!.classList.contains('selected')).toBe(true);
+    };
+
+    // Its ends cannot be dragged: a reconnection would move one of the edges it stands for.
+    expect(edgeElement('e1')!.querySelector('.react-flow__edgeupdater')).toBeNull();
+
+    // The Delete command (palette or hotkey) and the Delete key delete the same set.
+    await selectMergedEdge();
+    await act(() => commandHandlers.get('workflows.deleteSelection')!());
+    expect(adapter.commands.editGraph).toHaveBeenCalledWith({ edgeIds: ['e1', 'e2'], type: 'removeEdges' });
+    vi.mocked(adapter.commands.editGraph).mockClear();
+    await act(() => userEvent.keyboard('{Delete}'));
+    expect(adapter.commands.editGraph).toHaveBeenCalledWith({ edgeIds: ['e1', 'e2'], type: 'removeEdges' });
+
+    // Undo hands the editor the same edges again: they draw as one collapsed edge with its count.
+    await act(() => project.setGraph({ ...graph, edges: [] }));
+    await expect.poll(drawn).toEqual([]);
+    await act(() => project.setGraph(graph));
+    await expect.poll(drawn).toEqual(['e1']);
+    expect(host.querySelector('[data-collapsed-edge-count]')?.getAttribute('data-collapsed-edge-count')).toBe('2');
+  });
+
+  it('keeps a merged line selected when it is clicked again, so Delete still removes every edge it stands for', async () => {
+    const graph = {
+      ...createProjectGraph('collapsed-reclick'),
+      edges: [edge('e1', 'a', 'b'), edge('e2', 'a', 'b')],
+      nodes: [collapsed(addNode('a', 0, 0)), collapsed(addNode('b', 400, 160))],
+    };
+    const adapter = await renderEditor(root, createProjectStore(graph));
+    await expect.poll(() => edgeElement('e1')).not.toBeNull();
+    const clickMergedLine = () =>
+      act(() => userEvent.click(edgeElement('e1')!.querySelector('.react-flow__edge-interaction')!, { force: true }));
+
+    await clickMergedLine();
+    await clickMergedLine();
+    await expect.poll(() => edgeElement('e1')!.classList.contains('selected')).toBe(true);
+    await act(() => userEvent.keyboard('{Delete}'));
+
+    expect(adapter.commands.editGraph).toHaveBeenCalledWith({ edgeIds: ['e1', 'e2'], type: 'removeEdges' });
+  });
+
+  it('leaves a merged line’s edges agreeing after a box selection, so deleting takes all or none of them', async () => {
+    const graph = {
+      ...createProjectGraph('collapsed-box'),
+      edges: [edge('e1', 'a', 'b'), edge('e2', 'a', 'b'), edge('cd', 'c', 'd')],
+      nodes: [
+        collapsed(addNode('a', 0, 0)),
+        collapsed(addNode('b', 400, 160)),
+        addNode('c', 0, 320),
+        addNode('d', 400, 480),
+      ],
+    };
+    const adapter = await renderEditor(root, createProjectStore(graph));
+    await expect.poll(() => edgeElement('cd')).not.toBeNull();
+    const flowRect = host.querySelector<HTMLElement>('.react-flow')!.getBoundingClientRect();
+
+    // Shift-drag across the whole graph box-selects every node. (The selection's own rectangle then covers the
+    // merged line, so it takes no click until the selection is cleared; the click case is in flowAdapters.test.)
+    await userEvent.keyboard('{Shift>}');
+    await commands.mouseDragPath(
+      [
+        { x: flowRect.left + 2, y: flowRect.top + 2 },
+        { x: flowRect.left + 40, y: flowRect.top + 40 },
+        { x: flowRect.right - 2, y: flowRect.bottom - 2 },
+      ],
+      window.innerWidth
+    );
+    await userEvent.keyboard('{/Shift}');
+    await expect
+      .poll(() => host.querySelector('.react-flow__node[data-id="a"]')!.classList.contains('selected'))
+      .toBe(true);
+
+    await act(() => commandHandlers.get('workflows.deleteSelection')!());
+    const removedEdges = vi
+      .mocked(adapter.commands.editGraph)
+      .mock.calls.flatMap(([action]) => (action.type === 'removeEdges' ? action.edgeIds : []));
+    expect(removedEdges.includes('e1')).toBe(removedEdges.includes('e2'));
+  });
+
+  it('lets only the open end of an edge from a collapsed node be dragged', async () => {
+    const graph = {
+      ...createProjectGraph('collapsed-to-open'),
+      edges: [edge('ac', 'a', 'c')],
+      nodes: [collapsed(addNode('a', 0, 0)), addNode('c', 400, 160)],
+    };
+    await renderEditor(root, createProjectStore(graph));
+    await expect.poll(() => edgeElement('ac')).not.toBeNull();
+
+    expect(edgeElement('ac')!.querySelector('.react-flow__edgeupdater-source')).toBeNull();
+    expect(edgeElement('ac')!.querySelector('.react-flow__edgeupdater-target')).not.toBeNull();
+  });
+
+  it('tints invalid and failed nodes in the error tone and the running node in the accent tone on the minimap', async () => {
+    const graph = {
+      ...createProjectGraph('minimap-states'),
+      nodes: [
+        addNode('idle', 0, 0),
+        { ...addNode('unknown', 300, 0), data: { ...addNode('unknown', 300, 0).data, type: 'not_installed' } },
+        addNode('running', 0, 300),
+        addNode('failed', 300, 300),
+      ],
+    };
+    const runState = (status: 'failed' | 'running') => ({
+      error: null,
+      latestOutput: null,
+      outputImageName: null,
+      progress: null,
+      progressMessage: null,
+      status,
+    });
+    // Stable snapshots, as the real port keeps them between changes.
+    const origin = { projectId: PROJECT_ID, workflowId: graph.id };
+    const states: Record<string, ReturnType<typeof runState>> = {
+      failed: runState('failed'),
+      running: runState('running'),
+    };
+    const subscribe = () => () => {};
+    await renderEditor(root, createProjectStore(graph), {
+      nodeExecution: {
+        get: (nodeId) => states[nodeId] ?? null,
+        getOrigin: () => origin,
+        subscribe,
+        subscribeOrigin: subscribe,
+      },
+      showMinimap: true,
+    });
+
+    const minimapNodes = () => [...host.querySelectorAll<SVGRectElement>('.react-flow__minimap-node')];
+    await expect.poll(() => minimapNodes().length).toBe(4);
+    const classes = minimapNodes().map((rect) =>
+      rect.classList.contains('workflow-minimap-error')
+        ? 'error'
+        : rect.classList.contains('workflow-minimap-running')
+          ? 'running'
+          : 'plain'
+    );
+    expect(classes).toEqual(['plain', 'error', 'running', 'error']);
+    const fills = minimapNodes().map((rect) => getComputedStyle(rect).fill);
+    expect(fills[1]).not.toBe(fills[0]);
+    expect(fills[2]).not.toBe(fills[0]);
+    expect(fills[2]).not.toBe(fills[1]);
+    expect(fills[3]).toBe(fills[1]);
   });
 });
