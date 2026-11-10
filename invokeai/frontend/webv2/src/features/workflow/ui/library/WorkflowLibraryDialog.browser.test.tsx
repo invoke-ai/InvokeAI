@@ -3242,6 +3242,16 @@ describe('WorkflowLibraryDialog', () => {
       // No model picked, and none this server could use: the rail's wording and warning tone.
       expect(value('Model')?.dataset.inputValue).toBe('missing');
       expect(value('Model')?.textContent).toBe('FLUX checkpoint · Not installed');
+      // The border is the theme's warning colour in its own right, not a fallback to the text colour: it holds when
+      // the text is recoloured (as it is for a model that cannot be installed).
+      const warningProbe = document.createElement('span');
+      warningProbe.style.color = 'var(--chakra-colors-fg\\.warning)';
+      document.body.append(warningProbe);
+      const warningColor = getComputedStyle(warningProbe).color;
+      warningProbe.remove();
+      value('Model')!.style.color = 'rgb(1, 2, 3)';
+      expect(getComputedStyle(value('Model')!).borderColor).toBe(warningColor);
+      value('Model')!.style.removeProperty('color');
 
       // An input's node opens selected in the graph; a folded helper's opens with every node shown.
       await act(() => userEvent.click(inputRow('Steps')!.querySelector('button')!));

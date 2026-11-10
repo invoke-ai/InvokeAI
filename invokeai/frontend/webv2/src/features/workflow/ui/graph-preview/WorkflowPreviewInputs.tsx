@@ -38,7 +38,8 @@ const VALUE_CSS: SystemStyleObject = {
   whiteSpace: 'pre-wrap',
 };
 const EMPTY_VALUE_CSS: SystemStyleObject = { ...VALUE_CSS, borderStyle: 'dashed', color: 'fg.muted' };
-const NEEDS_VALUE_CSS: SystemStyleObject = { ...VALUE_CSS, borderColor: 'border.warning' };
+// The theme has no `border.warning`; warning borders use the warning foreground.
+const NEEDS_VALUE_CSS: SystemStyleObject = { ...VALUE_CSS, borderColor: 'fg.warning' };
 /** About four lines of value; a longer text scrolls inside its box rather than being cut. */
 const TEXT_VALUE_CSS: SystemStyleObject = { ...VALUE_CSS, maxH: '6.5rem', overflowY: 'auto' };
 
