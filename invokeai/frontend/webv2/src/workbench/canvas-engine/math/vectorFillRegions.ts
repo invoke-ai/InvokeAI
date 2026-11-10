@@ -11,20 +11,32 @@ const EPSILON = 1e-7;
 /** Experimental planar-face extraction. Input is sampled in layer coordinates, independent of zoom.
  * Only actual crossings connect paths; gaps and collinear overlaps are not repaired.
  */
-export const findVectorFillRegions = (paths: readonly (readonly Vec2[])[]): Vec2[][] => {
+export const VECTOR_FILL_LIMITS = { segments: 24_000, comparisons: 2_000_000, edges: 120_000 } as const;
+export class VectorFillLimitError extends Error {
+  constructor() { super('Vector fill geometry exceeds the supported work budget'); this.name = 'VectorFillLimitError'; }
+}
+type Limits = { segments: number; comparisons: number; edges: number };
+
+function* regionSteps(paths: readonly (readonly Vec2[])[], limits: Limits): Generator<void, Vec2[][]> {
+  let work = 0;
+  yield;
   const segments: Segment[] = [];
   for (const points of paths) {
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1]!, b = points[i]!;
       if (Math.hypot(b.x - a.x, b.y - a.y) <= EPSILON) { continue; }
+      if (segments.length >= limits.segments) { throw new VectorFillLimitError(); }
       segments.push({ a, b, cuts: [0, 1], minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x),
         minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) });
     }
   }
   segments.sort((a, b) => a.minX - b.minX);
+  let comparisons = 0;
   for (let i = 0; i < segments.length; i++) {
     const a = segments[i]!, r = subtract(a.b, a.a);
     for (let j = i + 1; j < segments.length; j++) {
+      if (++comparisons > limits.comparisons) { throw new VectorFillLimitError(); }
+      if (++work % 8192 === 0) { yield; }
       const b = segments[j]!;
       if (b.minX > a.maxX + EPSILON) { break; }
       if (b.minY > a.maxY + EPSILON || b.maxY < a.minY - EPSILON) { continue; }
@@ -59,6 +71,8 @@ export const findVectorFillRegions = (paths: readonly (readonly Vec2[])[]): Vec2
       const from = vertex(at(cuts[i - 1]!)), to = vertex(at(cuts[i]!));
       const key = `${Math.min(from, to)}:${Math.max(from, to)}`;
       if (from === to || connections.has(key)) { continue; }
+      if (edges.length + 2 > limits.edges) { throw new VectorFillLimitError(); }
+      if (++work % 8192 === 0) { yield; }
       connections.add(key);
       const id = edges.length;
       edges.push({ from, to, reverse: id + 1, visited: false }, { from: to, to: from, reverse: id, visited: false });
@@ -80,6 +94,7 @@ export const findVectorFillRegions = (paths: readonly (readonly Vec2[])[]): Vec2
     do {
       const edge = edges[current]!;
       if (edge.visited) { break; }
+      if (++work % 8192 === 0) { yield; }
       edge.visited = true;
       points.push(vertices[edge.from]!.point);
       const outgoing = vertices[edge.to]!.outgoing;
@@ -92,4 +107,29 @@ export const findVectorFillRegions = (paths: readonly (readonly Vec2[])[]): Vec2
     if (area > EPSILON) { regions.push(points); }
   }
   return regions;
+}
+
+/** Synchronous pure entry for small geometry and deterministic callers. */
+export const findVectorFillRegions = (paths: readonly (readonly Vec2[])[]): Vec2[][] => {
+  const steps = regionSteps(paths, VECTOR_FILL_LIMITS);
+  let step = steps.next();
+  while (!step.done) { step = steps.next(); }
+  return step.value;
+};
+
+/** Yield bounded chunks to the browser so edits and Escape/Cancel can interrupt region discovery. */
+export const findVectorFillRegionsAsync = async (
+  paths: readonly (readonly Vec2[])[],
+  options: { signal?: AbortSignal; yieldControl?: () => Promise<void>; limits?: Limits } = {}
+): Promise<Vec2[][]> => {
+  const steps = regionSteps(paths, options.limits ?? VECTOR_FILL_LIMITS);
+  const yieldControl = options.yieldControl ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  try {
+    while (true) {
+      options.signal?.throwIfAborted();
+      const step = steps.next();
+      if (step.done) { return step.value; }
+      await yieldControl();
+    }
+  } finally { steps.return([]); }
 };

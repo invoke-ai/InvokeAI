@@ -20827,3 +20827,41 @@ describe('edit feedback on the surface', () => {
     });
   });
 });
+
+
+it('reactivates Spline Edit on the same selected vector after engine cooldown', async () => {
+  const vector = { id: 'v', name: 'Vector', type: 'vector' as const, isEnabled: true, isLocked: false,
+    opacity: 1, blendMode: 'normal' as const, transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }, paths: [] };
+  const doc = { ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' };
+  const { store } = createFakeStore(doc);
+  const engine = createCanvasEngine({ backend: createTestStubRasterBackend(), imageResolver: () => Promise.resolve(new Blob()), projectId: 'p1', store });
+  try {
+    engine.tools.setTool('spline'); expect(engine.interaction.get('vectorEditSession')?.layerId).toBe('v');
+    await engine.lifecycle.beginCooldown(); expect(engine.interaction.get('vectorEditSession')).toBeNull();
+    engine.lifecycle.activate();
+    expect(engine.interaction.get('activeTool')).toBe('spline');
+    expect(engine.interaction.get('vectorEditSession')).toMatchObject({ layerId: 'v', activePathId: null, selectedPoints: [] });
+  } finally { engine.lifecycle.dispose(); }
+});
+
+
+it('aborts pending vector region work on Escape and document changes without creating raster output', async () => {
+  const vector = { id: 'v', name: 'Vector', type: 'vector' as const, isEnabled: true, isLocked: false,
+    opacity: 1, blendMode: 'normal' as const, fillEnabled: true, strokeEnabled: false,
+    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    paths: [{ id: 'p', name: null, isClosed: true, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }]
+      .map((anchor) => ({ anchor, inHandle: null, outHandle: null, type: 'corner' as const })) }] };
+  const doc = { ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' };
+  const h = createReactiveStore(doc);
+  const engine = createCanvasEngine({ backend: createTestStubRasterBackend(), imageResolver: () => Promise.resolve(new Blob()), projectId: 'p1', store: h.store });
+  try {
+    engine.tools.setTool('spline');
+    const first = engine.layers.traceFillVectorLayer('v');
+    engine.tools.handleEscapePriority({ gestureWasActive: false });
+    expect(await first).toEqual({ status: 'aborted' });
+    const second = engine.layers.traceFillVectorLayer('v');
+    h.setDocument({ ...doc, selectedLayerId: null });
+    expect(await second).toEqual({ status: 'aborted' });
+    expect(h.store.dispatch).not.toHaveBeenCalled();
+  } finally { engine.lifecycle.dispose(); }
+});

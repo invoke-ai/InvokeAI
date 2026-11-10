@@ -734,6 +734,7 @@ describe('runUtilityGraph — timeout + cancellation', () => {
       cancel,
       createId: () => UTIL_ID,
       enqueue: () => Promise.resolve({ enqueued: 3, itemIds: [11, 12, 13] }),
+      readItemStatus: () => Promise.resolve({ status: 'pending' }),
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
       timeoutMs: 1000,

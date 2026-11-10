@@ -103,7 +103,8 @@ export const canSplitVectorPathAtPoints = (
 export const canJoinVectorPathEndpoints = (
   paths: CanvasBezierPathContract[],
   pointRefs: VectorPathPointRef[],
-  weldRadius: number
+  weldRadius: number,
+  project: (point: Vec2) => Vec2 = (point) => point
 ): boolean => {
   if (pointRefs.length !== 2) {
     return false;
@@ -134,8 +135,8 @@ export const canJoinVectorPathEndpoints = (
   if (!firstPoint || !secondPoint) {
     return false;
   }
-  const shouldWeld =
-    Math.hypot(firstPoint.anchor.x - secondPoint.anchor.x, firstPoint.anchor.y - secondPoint.anchor.y) <= weldRadius;
+  const first = project(firstPoint.anchor), second = project(secondPoint.anchor);
+  const shouldWeld = Math.hypot(first.x - second.x, first.y - second.y) <= weldRadius;
   return !shouldWeld || firstPath.points.length >= 4;
 };
 

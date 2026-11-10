@@ -1,3 +1,4 @@
+import { addedVectorLayerMutations } from '../controllers/editSteps';
 import type { CanvasBezierPointContract, CanvasVectorLayerContract, ParametricShapeKind } from '@workbench/canvas-engine/contracts';
 import type { ShapeToolOptions } from '@workbench/canvas-engine/engineStores';
 import type { Mat2d, PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
@@ -28,6 +29,7 @@ type Session = {
   closeArmed: boolean;
   spaceHeld: boolean;
   finish?: boolean;
+  pending?: { points: CanvasBezierPointContract[]; isClosed: boolean };
 };
 
 export interface VectorShapeTool extends Tool {
@@ -146,7 +148,9 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     const current = session;
     let points: CanvasBezierPointContract[];
     let isClosed = false;
-    if (isBoxKind(current.kind)) {
+    if (current.pending) {
+      points = current.pending.points; isClosed = current.pending.isClosed;
+    } else if (isBoxKind(current.kind)) {
       const rect = dragRect(current);
       points = rect.width > 0 && rect.height > 0
         ? boxPoints(current.kind, rect)
@@ -193,9 +197,8 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     }
     const current = session;
     const doc = ctx.getDocument()!;
-    reset(ctx);
     if (points.length < (isClosed ? 3 : 2)) {
-      return;
+      reset(ctx); return;
     }
     const toLocal = current.target === 'selected' ? current.toLocal : null;
     const path = {
@@ -207,17 +210,17 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         outHandle: point.outHandle ? applyToPoint(toLocal, point.outHandle) : null,
       })) : points,
     };
+    let result: ReturnType<ToolContext['commitStructural']>;
     if (current.target === 'new') {
       const layer = createVectorLayer({
         id: ctx.createLayerId(),
         name: nextVectorLayerName(getDocumentIndex(doc).nodes.map((entry) => entry.node.name)),
       });
       layer.paths = [path];
-      ctx.commitStructural('Add vector shape', {
-        type: 'addCanvasLayer', layer, anchor: ctx.captureInsertionAnchor('vector', current.layer.id),
-      }, { type: 'removeCanvasLayers', ids: [layer.id] });
+      const mutations = addedVectorLayerMutations(layer, ctx.captureInsertionAnchor('vector', current.layer.id), doc.selectedLayerId);
+      result = ctx.commitStructural('Add vector shape', mutations.forward, mutations.inverse);
     } else {
-      ctx.commitStructural('Add vector path', {
+      result = ctx.commitStructural('Add vector path', {
         type: 'updateCanvasLayerConfig', id: current.layer.id,
         config: { layerType: 'vector', paths: [...current.layer.paths, path] },
       }, {
@@ -225,6 +228,12 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         config: { layerType: 'vector', paths: current.layer.paths },
       });
     }
+    if (result.status === 'committed') { reset(ctx); return; }
+    const status = result.status;
+    ctx.reportEditRefusal?.(status === 'busy' || status === 'gesture-active' || status === 'over-budget' || status === 'not-ready' ? status : 'not-ready');
+    // Keep the geometry and let Enter retry; a fresh press explicitly starts another shape.
+    current.pending = { points, isClosed };
+    if (session === current) { requestPreview(ctx); }
   };
 
   return {
@@ -273,7 +282,9 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       if (!session) { return false; }
       if (command === 'cancel') {
         reset(ctx);
-      } else if (isCurrent(ctx) && session?.kind === 'polygon') {
+      } else if (isCurrent(ctx) && session?.pending) {
+        commit(ctx, session.pending.points, session.pending.isClosed);
+      } else if (session?.kind === 'polygon') {
         commit(ctx, anchorsToBezierPoints(session.points), false);
       }
       return true;
@@ -285,6 +296,7 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       if (session && !isCurrent(ctx)) {
         return;
       }
+      if (session?.pending) { reset(ctx); }
       if (!session) {
         const doc = ctx.getDocument()!;
         const layer = lookupDocumentLeaf(doc, doc.selectedLayerId!)!.layer as CanvasVectorLayerContract;
@@ -330,6 +342,7 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         return;
       }
       const current = session;
+      if (current.pending) { return; }
       if (current.spaceHeld) {
         if (isBoxKind(current.kind)) {
           const input = snapInput(rawInput, current);

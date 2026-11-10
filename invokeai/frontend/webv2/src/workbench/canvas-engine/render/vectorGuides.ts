@@ -65,6 +65,7 @@ export const drawVectorGuides = (
   layers: readonly VectorGuideLayer[],
   preview: VectorShapePreview | null
 ): void => {
+  if (layers.length === 0 && !preview) { return; }
   ctx.save();
   ctx.setLineDash([]);
   ctx.strokeStyle = GUIDE_COLOR;

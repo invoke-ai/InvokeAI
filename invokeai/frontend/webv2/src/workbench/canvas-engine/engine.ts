@@ -1374,6 +1374,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const canEditDocument = (owner?: symbol): boolean => mutationContext.canEdit(owner);
 
+  let vectorTraceAbort: AbortController | null = null;
   const vectorEditor = new VectorEditingController({
     captureInsertionAnchor: (layerId) => captureInsertionAnchor('vector', layerId),
     session: {
@@ -1391,6 +1392,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     commit: (label, forward, inverse) => commitToolStructural(label, forward, inverse),
     invalidate: () => scheduler.invalidate({ overlay: true }),
     createId: createLayerId,
+    reportRefusal: reportEditRefusal,
     viewport,
   });
 
@@ -1682,6 +1684,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let toolsReady = false;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => {
+      vectorTraceAbort?.abort();
       editingController.transform.onDocumentChanged();
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
       // A tool's cursor reads the selected layer (not-allowed over a locked or hidden one), which this may change.
@@ -2038,6 +2041,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * with pipeline wiring and node tests.
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
+    if (vectorTraceAbort) { vectorTraceAbort.abort(); return; }
     if (tools.get('shape')?.hasSession?.()) {
       tools.get('shape')?.onKeyCommand?.(toolContext, 'cancel');
       return;
@@ -2162,6 +2166,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lifecycleGeneration += 1;
     lifecycleState = 'active';
     editingController.activate();
+    vectorEditor.onDocumentChanged();
     cooldownPromise = null;
   };
 
@@ -2180,6 +2185,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lifecycleGeneration += 1;
     const generation = lifecycleGeneration;
     lifecycleState = 'cooling';
+    vectorTraceAbort?.abort();
     vectorEditor.discard();
     editingController.cooldown();
     clearStagedPreview();
@@ -2724,6 +2730,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => generatedResultController.dispose());
     cleanup.run(() => stagedResultController.dispose());
     cleanup.run(() => editingController.dispose());
+    cleanup.run(() => vectorTraceAbort?.abort());
     cleanup.run(() => vectorEditor.discard());
     cleanup.run(() => layerController.dispose());
     cleanup.run(() => layerMutationController.dispose());
@@ -3079,27 +3086,28 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     requestColorSample: () => colorSamples.requestSample(),
     setColorSampleRouter: (router) => colorSamples.setRouter(router),
   };
+  const runVectorTrace = async (layerId: string, mode: 'trace' | 'fill' | 'appearance', pathId?: string) => {
+    vectorTraceAbort?.abort();
+    const controller = new AbortController();
+    vectorTraceAbort = controller;
+    const document = mirror.getDocument();
+    const brush = stores.brushOptions.get();
+    try {
+      if (!document) { return { status: 'not-ready' as const }; }
+      return await traceVectorLayerCommand({ document, layerId, pathId,
+        appearance: mode === 'appearance', fillOnly: mode === 'fill', ctx: mutationContext, backend,
+        width: brush.size, color: brush.color,
+        id: createLayerId(), anchor: captureInsertionAnchor('raster'), signal: controller.signal,
+        isCurrent: () => !disposed && mirror.getDocument() === document &&
+          stores.brushOptions.get().size === brush.size && stores.brushOptions.get().color === brush.color });
+    } finally { if (vectorTraceAbort === controller) { vectorTraceAbort = null; } }
+  };
   const layersCapability: CanvasEngineLayerCapability = {
     ...layerController.layers,
-    traceVectorLayer: (layerId, pathId) => {
-      const document = mirror.getDocument();
-      if (!document) { return false; }
-      return traceVectorLayerCommand({ document, layerId, pathId, ctx: mutationContext, backend,
-        width: stores.brushOptions.get().size, color: stores.brushOptions.get().color,
-        id: createLayerId(), anchor: captureInsertionAnchor('raster') });
-    },
-    fillVectorPath: (layerId, pathId) => {
-      const document = mirror.getDocument();
-      if (!document) { return false; }
-      return traceVectorLayerCommand({ document, layerId, pathId, fillOnly: true, ctx: mutationContext, backend,
-        width: 1, color: '#ffffff', id: createLayerId(), anchor: captureInsertionAnchor('raster') });
-    },
-    traceFillVectorLayer: (layerId) => {
-      const document = mirror.getDocument();
-      if (!document) { return false; }
-      return traceVectorLayerCommand({ document, layerId, appearance: true, ctx: mutationContext, backend,
-        width: stores.brushOptions.get().size, color: stores.brushOptions.get().color, id: createLayerId(), anchor: captureInsertionAnchor('raster') });
-    },
+    traceVectorLayer: (layerId, pathId) => runVectorTrace(layerId, 'trace', pathId),
+    fillVectorPath: (layerId, pathId) => runVectorTrace(layerId, 'fill', pathId),
+    traceFillVectorLayer: (layerId) => runVectorTrace(layerId, 'appearance'),
+    cancelVectorTrace: () => vectorTraceAbort?.abort(),
     vectorEdit: {
       setPointType: vectorEditor.setPointType,
       targetContextMenu: vectorEditor.targetContextMenu,

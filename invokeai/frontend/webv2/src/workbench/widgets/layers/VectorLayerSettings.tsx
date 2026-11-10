@@ -1,3 +1,4 @@
+import { vectorTraceErrorKey } from '@workbench/widgets/canvas/vectorTraceFeedback';
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
@@ -47,7 +48,7 @@ export const VectorLayerSettings = ({ engine, layer }: {
         <Button size="xs" variant="outline" disabled={!engine || layer.isLocked || !layer.isEnabled || color === DEFAULT_VECTOR_GUIDE_COLOR}
           onClick={() => onChangeEnd(DEFAULT_VECTOR_GUIDE_COLOR)}>{t('widgets.layers.vector.reset')}</Button>
       </PropertyControlRow>
-      {engine ? <VectorTraceSettings engine={engine} layer={layer} /> : null}
+      {engine ? <VectorTraceSettings key={layer.id} engine={engine} layer={layer} /> : null}
     </Stack>
   );
 };
@@ -57,7 +58,8 @@ const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract
   const brush = useBrushOptions(engine);
   const colorCommands = useActiveColorCommands();
   const sampleColor = useColorSampler(engine);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const { preview, commit } = useStructuralPreview(engine);
   const taperEnds = layer.traceTaperEnds ?? false;
   const taper = layer.traceTaper ?? 100;
@@ -70,7 +72,12 @@ const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract
       return model.prepare({ id: layer.id, type: 'patch-config', config, before: baselineConfig(baseline, config) });
     });
   };
-  const trace = () => setFailed(!engine.layers.traceFillVectorLayer(layer.id));
+  const trace = async () => {
+    if (running) { engine.layers.cancelVectorTrace(); return; }
+    setFailure(null); setRunning(true);
+    try { setFailure(vectorTraceErrorKey(await engine.layers.traceFillVectorLayer(layer.id))); }
+    finally { setRunning(false); }
+  };
   const disabled = !layer.isEnabled || layer.isLocked || layer.isHidden === true;
   return (
     <Stack borderTopWidth="1px" borderColor="border.subtle" gap="2" mt="2" pt="3">
@@ -98,8 +105,8 @@ const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract
         defaultValue={100} marks={[1, 100, 250, 500]} formatValue={(value) => `${value}%`}
         onChange={(value) => preview({ id: layer.id, type: 'updateCanvasLayerConfig', config: { layerType: 'vector', traceTaper: clampTaper(value) } })}
         onChangeEnd={(value) => commitSettings({ traceTaper: clampTaper(value) })} />
-      <Button size="sm" disabled={disabled || !layer.paths.some((path) => (layer.strokeEnabled !== false && path.points.length >= 2) || (layer.fillEnabled && path.points.length >= 2))} onClick={trace}>{label('traceFill')}</Button>
-      {failed ? <Text color="fg.error" fontSize="sm">{label('traceFailed')}</Text> : null}
+      <Button size="sm" disabled={!running && (disabled || !layer.paths.some((path) => (layer.strokeEnabled !== false && path.points.length >= 2) || (layer.fillEnabled && path.points.length >= 2)))} onClick={() => void trace()}>{running ? t('common.cancel') : label('traceFill')}</Button>
+      {failure ? <Text color="fg.error" fontSize="sm">{label(failure)}</Text> : null}
     </Stack>
   );
 };

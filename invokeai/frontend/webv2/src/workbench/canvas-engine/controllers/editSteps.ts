@@ -336,3 +336,15 @@ export const publishAddedRasterLayer = (
       ctx.applyStep({ accepted: removed, mutation: inverse, rollback: { mutation: forward, restored: added } }),
   });
 };
+
+/** Structural pair for a newly created vector layer. Callers choose whether insertion selects it. */
+export const addedVectorLayerMutations = (
+  layer: Extract<CanvasLayerContract, { type: 'vector' }>,
+  anchor: CanvasNodeInsertionAnchor,
+  selectedBefore: string | null,
+  selectNew = true
+): { forward: CanvasProjectMutation; inverse: CanvasProjectMutation } => ({
+  forward: { type: 'applyCanvasLayerStackMutation', enabledUpdates: [], add: [{ anchor, nodes: [layer] }],
+    selectedLayerId: selectNew ? layer.id : selectedBefore },
+  inverse: { type: 'applyCanvasLayerStackMutation', enabledUpdates: [], removeIds: [layer.id], selectedLayerId: selectedBefore },
+});

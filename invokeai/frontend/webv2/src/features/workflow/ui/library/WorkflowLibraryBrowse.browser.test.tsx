@@ -448,9 +448,7 @@ it.each([
   'returns to the measured deep row at %ix%i (%i columns) through the real browse owner',
   async (width, height, columns) => {
     // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
-    const freshAt = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
-    onTestFinished(() => clock.mockRestore());
+    // Let animation/scroll deadlines advance; this journey completes inside the cache freshness window.
     await open();
     const scroll = viewport()!;
     for (let top = 0; top <= 39600; top += 1200) {
@@ -490,7 +488,8 @@ it.each([
     await waitFor(() => expect(card(0)).not.toBeNull());
     expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
   },
-  30000
+  // The journey performs 34 real scroll/layout cycles before checking restoration.
+  60000
 );
 
 it.each(['finish', 'retry', 'wheel', 'pointer', 'key', 'filter', 'rapid return', 'account', 'unmount'])(

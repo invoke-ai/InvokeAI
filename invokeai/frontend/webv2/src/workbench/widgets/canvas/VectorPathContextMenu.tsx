@@ -1,3 +1,4 @@
+import { vectorTraceErrorKey } from './vectorTraceFeedback';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Menu, Portal } from '@chakra-ui/react';
@@ -43,13 +44,15 @@ export const VectorPathContextMenu = ({ engine, target, onClose }: {
           <MenuActionItem value="transform-path" icon={ScanIcon} label={label('transformPath')} onSelect={run(api.transformPath)} />
           <MenuActionItem value="trace-path" icon={WavesIcon} label={label('tracePath')}
             disabled={!session.paths.some((path) => path.id === target.pathId && path.points.length >= 2)}
-            onSelect={run(() => {
-              if (!engine.layers.traceVectorLayer(target.layerId, target.pathId)) { notify.error(label('traceFailed')); }
+            onSelect={run(async () => {
+              const errorKey = vectorTraceErrorKey(await engine.layers.traceVectorLayer(target.layerId, target.pathId));
+              if (errorKey) { notify.error(label(errorKey)); }
             })} />
           <MenuActionItem value="fill-path" icon={PaintBucketIcon} label={label('fillPath')}
             disabled={!session.paths.some((path) => path.id === target.pathId && path.isClosed && path.points.length >= 3)}
-            onSelect={run(() => {
-              if (!engine.layers.fillVectorPath(target.layerId, target.pathId)) { notify.error(label('fillFailed')); }
+            onSelect={run(async () => {
+              const errorKey = vectorTraceErrorKey(await engine.layers.fillVectorPath(target.layerId, target.pathId));
+              if (errorKey) { notify.error(label(errorKey)); }
             })} />
           <MenuActionItem value="extract-path" icon={SquareArrowOutUpRightIcon} label={label('extractPath')} onSelect={run(api.extractPath)} />
           <MenuActionItem value="copy-path" icon={CopyIcon} label={label('copy')} onSelect={run(api.copyPath)} />

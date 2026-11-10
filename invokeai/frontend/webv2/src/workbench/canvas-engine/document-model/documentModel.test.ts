@@ -820,7 +820,7 @@ describe('createDocumentModel', () => {
         model.prepare({ config: { adjustments: stack, layerType: 'raster' }, id: 'G', type: 'patch-config' })
       ).toEqual({
         actual: 'group',
-        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
         status: 'wrong-type',
       });
 
@@ -1128,7 +1128,7 @@ describe('createDocumentModel', () => {
       [
         'a config patch on a group',
         { config: { layerType: 'raster', isTransparencyLocked: true }, id: 'G', type: 'patch-config' },
-        { actual: 'group', expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'], status: 'wrong-type' },
+        { actual: 'group', expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'], status: 'wrong-type' },
       ],
       [
         'a source patch on a mask',

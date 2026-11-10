@@ -1,4 +1,6 @@
-import type { StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
+import { VectorHitTestCache } from '../math/vectorHitTest';
+import { addedVectorLayerMutations } from './editSteps';
+import type { CanvasEditRefusal, StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
 import type { CanvasBezierPathContract, CanvasBezierPointContract, CanvasVectorLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
@@ -12,7 +14,7 @@ import { getDocumentIndex } from '@workbench/canvas-engine/document/documentInde
 import { createVectorLayer, nextVectorLayerName } from '@workbench/canvas-engine/document/layerFactories';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
-import { findNearestBezierPathSegment, getBezierPathHitSamplesPerSegment, getBezierPointPullHandleType, setBezierPointHandle, setBezierPointType, smoothBezierPathPoints, splitBezierSegmentAt } from '@workbench/canvas-engine/math/bezierPath';
+import { transformBezierPath, getBezierPointPullHandleType, setBezierPointHandle, setBezierPointType, smoothBezierPathPoints, splitBezierSegmentAt } from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, getScale, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { vectorHandleLayout } from '@workbench/canvas-engine/math/vectorHandleLayout';
 import { canJoinVectorPathEndpoints, canSplitVectorPathAtPoints, deleteVectorPathPoints, joinVectorPathEndpoints, splitVectorPathAtPoints } from '@workbench/canvas-engine/math/vectorPathTopology';
@@ -29,6 +31,7 @@ interface Options {
   getToolId(): ToolId;
   commit(label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation): StructuralCommitResult;
   invalidate(): void;
+  reportRefusal?(refusal: CanvasEditRefusal): void;
   createId(): string;
   captureInsertionAnchor(layerId: string): CanvasNodeInsertionAnchor;
   viewport: Viewport;
@@ -58,6 +61,7 @@ const samePaths = (a: CanvasBezierPathContract[], b: CanvasBezierPathContract[])
 export class VectorEditingController implements Tool {
   readonly id = 'spline';
   private base: CanvasVectorLayerContract | null = null;
+  private readonly hits = new VectorHitTestCache();
   private drag: Drag | null = null;
   private hoverPath = false;
   private transformOrigin: CanvasBezierPathContract | null = null;
@@ -70,9 +74,18 @@ export class VectorEditingController implements Tool {
   private availability(state: VectorEditSession): Pick<VectorEditSession, 'canSplit' | 'canJoin'> {
     return {
       canSplit: canSplitVectorPathAtPoints(state.paths, state.selectedPoints),
-      canJoin: !!this.base && canJoinVectorPathEndpoints(state.paths, state.selectedPoints,
-        32 / (this.options.viewport.getZoom() * getScale(this.matrix()))),
+      canJoin: this.canJoinState(state),
     };
+  }
+  private canJoinState(state: VectorEditSession): boolean {
+    if (!this.base) { return false; }
+    const matrix = this.screenMatrix();
+    return canJoinVectorPathEndpoints(state.paths, state.selectedPoints, 32, (point) => applyToPoint(matrix, point));
+  }
+  private reportRefusal(result: StructuralCommitResult): void {
+    const { status } = result;
+    if (status === 'committed') { return; }
+    this.options.reportRefusal?.(status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget' ? status : 'not-ready');
   }
   refreshAvailability = (): void => {
     const state = this.options.session.get();
@@ -101,6 +114,7 @@ export class VectorEditingController implements Tool {
       type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: state.paths },
     }, { type: 'updateCanvasLayerConfig', id: base.id, config: { layerType: 'vector', paths: base.paths } });
     if (result.status !== 'committed') {
+      this.reportRefusal(result);
       this.base = base;
       this.transformOrigin = null;
       this.transformCursor = null;
@@ -135,6 +149,7 @@ export class VectorEditingController implements Tool {
 
   discard = (): void => {
     this.base = null;
+    this.hits.clear();
     this.drag = null;
     this.hoverPath = false;
     this.transformOrigin = null;
@@ -204,11 +219,7 @@ export class VectorEditingController implements Tool {
       if (!origin || origin.id !== frame.pathId) { return; }
       const transform = { ...frame.transform, x: frame.transform.x + x, y: frame.transform.y + y };
       const matrix = layerTransformMatrix(transform);
-      const path = { ...origin, points: origin.points.map((point) => ({ ...point,
-        anchor: applyToPoint(matrix, point.anchor),
-        inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
-        outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
-      })) };
+      const path = transformBezierPath(origin, matrix);
       this.publish({ paths: state.paths.map((candidate) => candidate.id === frame.pathId ? path : candidate),
         pathTransform: { ...frame, transform } });
       this.record(true);
@@ -274,12 +285,8 @@ export class VectorEditingController implements Tool {
     layer.traceTaperEnds = leaf.layer.traceTaperEnds;
     layer.traceTaper = leaf.layer.traceTaper;
     // Export the active draft version without committing or changing the source draft.
-    this.options.commit('Extract vector path', {
-      type: 'applyCanvasLayerStackMutation',
-      enabledUpdates: [],
-      add: [{ anchor: this.options.captureInsertionAnchor(base.id), nodes: [layer] }],
-      selectedLayerId: doc.selectedLayerId,
-    }, { type: 'removeCanvasLayers', ids: [layer.id] });
+    const mutations = addedVectorLayerMutations(layer, this.options.captureInsertionAnchor(base.id), doc.selectedLayerId, false);
+    this.reportRefusal(this.options.commit('Extract vector path', mutations.forward, mutations.inverse));
   };
   copyPath = (): void => {
     if (!this.actionReady()) { return; }
@@ -297,7 +304,7 @@ export class VectorEditingController implements Tool {
   };
   canJoin = (): boolean => {
     const state = this.options.session.get();
-    return !!state && !!this.base && canJoinVectorPathEndpoints(state.paths, state.selectedPoints, 32 / (this.options.viewport.getZoom() * getScale(this.matrix())));
+    return !!state && this.canJoinState(state);
   };
   split = (): void => {
     if (!this.actionReady()) { return; }
@@ -316,8 +323,7 @@ export class VectorEditingController implements Tool {
   join = (): void => {
     if (!this.actionReady()) { return; }
     const state = this.options.session.get()!;
-    const radius = 32 / (this.options.viewport.getZoom() * getScale(this.matrix()));
-    if (!canJoinVectorPathEndpoints(state.paths, state.selectedPoints, radius)) { return; }
+    if (!this.canJoinState(state)) { return; }
     const [from, to] = state.selectedPoints as [VectorPointRef, VectorPointRef];
     const a = state.paths.find((path) => path.id === from.pathId)!;
     const b = state.paths.find((path) => path.id === to.pathId)!;
@@ -364,8 +370,8 @@ export class VectorEditingController implements Tool {
     let movable = false;
     if (state && this.ready() && !input.modifiers.shift) {
       const matrix = this.screenMatrix();
-      const overAnchor = state.paths.some((path) => path.points.some((point) =>
-        distance(applyToPoint(matrix, point.anchor), input.screenPoint) <= ANCHOR_HIT_RADIUS_PX));
+      const scale = this.options.viewport.getZoom() * getScale(this.matrix());
+      const overAnchor = state.paths.some((path) => this.hits.hitAnchor(path, matrix, input.screenPoint, scale, ANCHOR_HIT_RADIUS_PX));
       const overHandle = state.selectedPoints.some((ref) => {
         const path = state.paths.find((path) => path.id === ref.pathId);
         if (!path?.points[ref.pointIndex]) { return false; }
@@ -384,12 +390,7 @@ export class VectorEditingController implements Tool {
   }
   private nearSegment(path: CanvasBezierPathContract, input: Pick<PointerInput, 'screenPoint'>) {
     const matrix = this.screenMatrix();
-    const projected = path.points.map((point) => ({
-      anchor: applyToPoint(matrix, point.anchor),
-      inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
-      outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
-    }));
-    return findNearestBezierPathSegment(projected, path.isClosed, input.screenPoint, getBezierPathHitSamplesPerSegment(this.options.viewport.getZoom() * getScale(this.matrix())));
+    return this.hits.find(path, matrix, input.screenPoint, this.options.viewport.getZoom() * getScale(this.matrix()));
   }
   targetContextMenu = (screenPoint: Vec2): boolean => {
     if (!this.actionReady()) { return false; }
@@ -537,11 +538,7 @@ export class VectorEditingController implements Tool {
           ? applyScale({ ...args, handle: gesture.target.handle, alt: input.modifiers.alt, grid: 0 })
           : applyRotate(args);
       const matrix = layerTransformMatrix(transform);
-      const path = { ...this.transformOrigin, points: this.transformOrigin.points.map((point) => ({ ...point,
-        anchor: applyToPoint(matrix, point.anchor),
-        inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
-        outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
-      })) };
+      const path = transformBezierPath(this.transformOrigin, matrix);
       this.publish({ paths: gesture.before.paths.map((candidate) => candidate.id === path.id ? path : candidate), pathTransform: { ...frame, transform } });
       return;
     }

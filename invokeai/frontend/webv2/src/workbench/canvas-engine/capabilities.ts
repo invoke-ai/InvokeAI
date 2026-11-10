@@ -771,11 +771,14 @@ export interface CanvasVectorEditCapability {
   canJoin(): boolean;
 }
 
+export type VectorTraceResult = { status: 'committed' | 'empty' | 'aborted' | 'stale' | 'too-complex' | 'busy' | 'gesture-active' | 'not-ready' | 'over-budget' | 'failed' };
+
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */
-  traceVectorLayer(layerId: string, pathId?: string): boolean;
-  traceFillVectorLayer(layerId: string): boolean;
-  fillVectorPath(layerId: string, pathId: string): boolean;
+  traceVectorLayer(layerId: string, pathId?: string): Promise<VectorTraceResult>;
+  traceFillVectorLayer(layerId: string): Promise<VectorTraceResult>;
+  fillVectorPath(layerId: string, pathId: string): Promise<VectorTraceResult>;
+  cancelVectorTrace(): void;
   readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
   /**

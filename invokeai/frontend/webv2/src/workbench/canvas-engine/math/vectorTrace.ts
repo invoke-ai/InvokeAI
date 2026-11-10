@@ -1,3 +1,4 @@
+import { polygonBounds } from '../freehand';
 import type { Vec2 } from '../types';
 
 /** v6 taper profile: smoothstep pressure over up to half the path at either end. */
@@ -14,12 +15,8 @@ export const buildTaperedTracePoints = (coordinates: Vec2[], strokeWidth: number
   });
 };
 
-/** Konva.Line's open tension-0.3 geometry, used by the v6 brush-line renderer. */
-export const buildTraceLinePath = (points: Vec2[]): Path2D => {
-  const path = new Path2D();
-  const first = points[0];
-  if (!first) { return path; }
-  path.moveTo(first.x, first.y);
+/** Shared tension geometry for drawing and conservative convex-hull raster bounds. */
+const traceLineControls = (points: Vec2[]) => {
   const controls: { before: Vec2; point: Vec2; after: Vec2 }[] = [];
   for (let i = 1; i < points.length - 1; i++) {
     const a = points[i - 1]!, b = points[i]!, c = points[i + 1]!;
@@ -29,6 +26,20 @@ export const buildTraceLinePath = (points: Vec2[]): Path2D => {
     controls.push({ before: { x: b.x - fa * (c.x - a.x), y: b.y - fa * (c.y - a.y) }, point: b,
       after: { x: b.x + fb * (c.x - a.x), y: b.y + fb * (c.y - a.y) } });
   }
+  return controls;
+};
+
+export const getTraceLineBounds = (points: Vec2[]) => polygonBounds([
+  ...points, ...traceLineControls(points).flatMap((control) => [control.before, control.after]),
+]);
+
+/** Konva.Line's open tension-0.3 geometry, used by the v6 brush-line renderer. */
+export const buildTraceLinePath = (points: Vec2[], createPath: (data?: string) => Path2D = () => new Path2D()): Path2D => {
+  const path = createPath();
+  const first = points[0];
+  if (!first) { return path; }
+  path.moveTo(first.x, first.y);
+  const controls = traceLineControls(points);
   const head = controls[0];
   if (!head) {
     for (const point of points.slice(1)) { path.lineTo(point.x, point.y); }
@@ -45,12 +56,12 @@ export const buildTraceLinePath = (points: Vec2[]): Path2D => {
 };
 
 /** Same Q/T outline as v6 getSvgPathFromStroke (including its two-decimal coordinates). */
-export const buildTraceOutlinePath = (points: number[][]): Path2D => {
-  if (points.length < 4) { return new Path2D(); }
+export const buildTraceOutlinePath = (points: number[][], createPath: (data?: string) => Path2D = (data) => data ? new Path2D(data) : new Path2D()): Path2D => {
+  if (points.length < 4) { return createPath(); }
   const value = (n: number) => n.toFixed(2);
   const midpoint = (a: number[], b: number[]) => `${value((a[0]! + b[0]!) / 2)},${value((a[1]! + b[1]!) / 2)}`;
   const a = points[0]!, b = points[1]!, c = points[2]!;
   let data = `M${value(a[0]!)},${value(a[1]!)} Q${value(b[0]!)},${value(b[1]!)} ${midpoint(b, c)} T`;
   for (let i = 2; i < points.length - 1; i++) { data += `${midpoint(points[i]!, points[i + 1]!)} `; }
-  return new Path2D(`${data}Z`);
+  return createPath(`${data}Z`);
 };

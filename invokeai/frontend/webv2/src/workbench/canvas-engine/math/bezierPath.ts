@@ -1,6 +1,7 @@
 /** Bezier geometry and editing math adapted from v6 feat(canvas)--Splines-tool (c4c0594261). */
-import type { CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
-import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+import { applyToPoint } from './mat2d';
+import type { CanvasBezierPathContract, CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
+import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 type RenderableBezierPoint = Pick<CanvasBezierPointContract, 'anchor' | 'inHandle' | 'outHandle'>;
 
@@ -817,7 +818,7 @@ export const findNearestBezierPathSegment = (
 
 export const getBezierPathHitSamplesPerSegment = (stageScale: number): number => {
   const normalizedScale = Math.max(1, stageScale);
-  return Math.ceil(DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT * Math.sqrt(normalizedScale));
+  return Math.min(128, Math.ceil(DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT * Math.sqrt(normalizedScale)));
 };
 
 export const approximateBezierPath = (
@@ -851,3 +852,12 @@ export const approximateBezierPath = (
 
   return approximatedPoints;
 };
+
+/** Preserve path identity fields while applying one affine transform to anchors and handles. */
+export const transformBezierPath = (path: CanvasBezierPathContract, matrix: Mat2d): CanvasBezierPathContract => ({
+  ...path, points: path.points.map((point) => ({ ...point,
+    anchor: applyToPoint(matrix, point.anchor),
+    inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
+    outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
+  })),
+});
