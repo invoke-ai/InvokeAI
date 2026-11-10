@@ -1,7 +1,7 @@
 ---
 title: Qwen Image
 description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF and fp8 installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
-lastUpdated: 2026-11-02
+lastUpdated: 2026-11-10
 sidebar:
   order: 9
 ---
@@ -174,8 +174,9 @@ file installs as a FLUX LoRA, the spelling OneTrainer uses for FLUX. A learned `
 layer is applied. In the plain dotted layout (`transformer_blocks.` or `transformer.transformer_blocks.`) and
 in the Kohya layout (`lora_unet_transformer_blocks_`), LoHA files and LoKR files with factorized matrices
 (`lokr_w1_a`, `lokr_w2_a`) are recognized under that condition too, while LoRAs and LoKR files with whole matrices
-(`lokr_w1`, `lokr_w2`) are recognized as before. A LoHA that also carries DoRA magnitudes
-(`dora_scale`) is recognized but cannot be applied yet. A raw PEFT adapter's strength is set in
+(`lokr_w1`, `lokr_w2`) are recognized as before. A LoHA or LoKR that also carries DoRA magnitudes
+(`dora_scale`) applies without them, as a plain LoHA or LoKR, so it can look different from the trainer's samples.
+A raw PEFT adapter's strength is set in
 its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
 with rsLoRA, applies at a different strength.
 

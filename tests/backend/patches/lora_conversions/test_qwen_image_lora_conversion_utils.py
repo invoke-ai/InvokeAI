@@ -9,6 +9,8 @@ from diffusers.models.transformers.transformer_qwenimage import QwenImageTransfo
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
     QWEN_IMAGE_LORA_QWEN_VL_PREFIX,
@@ -234,13 +236,13 @@ def test_lycoris_prefixed_lokr_converts_to_transformer_modules(tiny_transformer)
 
 
 def test_lora_transformer_prefixed_loha_converts_to_transformer_modules(tiny_transformer):
-    """ai-toolkit's `lora_transformer_transformer_blocks_` spelling, with its modulation layers, maps too."""
-    state_dict = keys_to_mock_state_dict(
-        {k: v for k, v in aitoolkit_loha_state_dict_keys.items() if not k.endswith((".dora_scale", ".scalar"))}
-    )
-    model = lora_model_from_qwen_image_state_dict(state_dict)
+    """ai-toolkit's `lora_transformer_transformer_blocks_` spelling, with its modulation layers, maps too. The file
+    carries DoRA magnitudes (`dora_scale`) beside every LoHa factor, so this also covers that they don't turn a
+    layer into a DoRA layer that has no `lora_up.weight` to read."""
+    model = lora_model_from_qwen_image_state_dict(keys_to_mock_state_dict(aitoolkit_loha_state_dict_keys))
 
     assert set(model.layers) == _layer_keys(*_ATTENTION_MODULES, *_MLP_MODULES, "img_mod.1", "txt_mod.1")
+    assert all(isinstance(layer, LoHALayer) for layer in model.layers.values())
     _assert_layers_address_the_transformer(model, tiny_transformer)
 
 
@@ -269,6 +271,40 @@ def test_dotted_loha_groups_by_full_module_path():
     model = lora_model_from_qwen_image_state_dict(state_dict)
 
     assert set(model.layers) == _layer_keys("attn.to_q", "attn.to_out.0")
+
+
+@pytest.mark.parametrize("factors", ["loha", "lokr"])
+def test_dotted_lycoris_dora_magnitude_is_skipped(factors: str):
+    """A dotted LoHa or LoKr with `dora_scale` applies as the plain LoHa or LoKr: the magnitude is not supported on
+    these layers, and dispatching it as DoRA failed at generation with `KeyError('lora_up.weight')`."""
+    generator = torch.Generator().manual_seed(3)
+    prefix = "transformer.transformer_blocks.0.attn.to_q"
+    if factors == "loha":
+        layer_class = LoHALayer
+        state_dict = {
+            f"{prefix}.hada_w1_a": torch.randn(16, 4, generator=generator),
+            f"{prefix}.hada_w1_b": torch.randn(4, 16, generator=generator),
+            f"{prefix}.hada_w2_a": torch.randn(16, 4, generator=generator),
+            f"{prefix}.hada_w2_b": torch.randn(4, 16, generator=generator),
+        }
+        expected = (state_dict[f"{prefix}.hada_w1_a"] @ state_dict[f"{prefix}.hada_w1_b"]) * (
+            state_dict[f"{prefix}.hada_w2_a"] @ state_dict[f"{prefix}.hada_w2_b"]
+        )
+    else:
+        layer_class = LoKRLayer
+        state_dict = {
+            f"{prefix}.lokr_w1": torch.randn(4, 4, generator=generator),
+            f"{prefix}.lokr_w2": torch.randn(4, 4, generator=generator),
+        }
+        expected = torch.kron(state_dict[f"{prefix}.lokr_w1"], state_dict[f"{prefix}.lokr_w2"])
+    state_dict[f"{prefix}.dora_scale"] = torch.full((1, 16), 3.0)
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+
+    (layer,) = model.layers.values()
+    assert isinstance(layer, layer_class)
+    delta = layer.get_parameters({"weight": torch.zeros(16, 16)}, weight=1.0)["weight"]
+    assert torch.allclose(delta, expected, atol=1e-4)
 
 
 @pytest.mark.parametrize(
