@@ -2143,6 +2143,48 @@ describe('WorkflowLibraryDialog', () => {
     expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
   });
 
+  it.each(['classic', 'light'])(
+    'steps the opaque Preview and More quick actions on hover, and More while its menu is open (%s)',
+    async (theme) => {
+      // The default theme is the root's; others are named by its data-theme.
+      if (theme !== 'classic') {
+        document.documentElement.dataset.theme = theme;
+        onTestFinished(() => {
+          delete document.documentElement.dataset.theme;
+        });
+      }
+      await openWith(LOADED_SNAPSHOT);
+      const preview = () => quickAction('wf-landscape', 'preview')!;
+      const more = document.querySelector<HTMLElement>('[data-workflow-card-menu="wf-landscape"]')!;
+
+      // Over the card, the actions show on their panel fill.
+      await act(() => userEvent.hover(card('wf-landscape')!));
+      await vi.waitFor(() => expect(getComputedStyle(preview()).opacity).toBe('1'));
+      await act(() => settleAnimations(preview()));
+      const rest = getComputedStyle(preview()).backgroundColor;
+      expect(getComputedStyle(more).backgroundColor).toBe(rest);
+
+      await act(() => userEvent.hover(preview()));
+      await vi.waitFor(() => expect(getComputedStyle(preview()).backgroundColor).not.toBe(rest));
+
+      await act(() => userEvent.hover(more));
+      await vi.waitFor(() => expect(getComputedStyle(more).backgroundColor).not.toBe(rest));
+
+      await pressTileMenuButton(more);
+      await vi.waitFor(() => expect(more.getAttribute('aria-expanded')).toBe('true'));
+      // With the pointer on the open menu, not the button, the button still shows the state.
+      const menu = await vi.waitFor(() => {
+        const element = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+        expect(element).not.toBeNull();
+        return element!;
+      });
+      await act(() => settleAnimations(menu));
+      await act(() => userEvent.hover(menu));
+      expect(more.matches(':hover')).toBe(false);
+      await vi.waitFor(() => expect(getComputedStyle(more).backgroundColor).not.toBe(rest));
+    }
+  );
+
   it('opens from the Open quick action without taking focus, asking first when the project holds a copy', async () => {
     await openWith(LOADED_SNAPSHOT);
 

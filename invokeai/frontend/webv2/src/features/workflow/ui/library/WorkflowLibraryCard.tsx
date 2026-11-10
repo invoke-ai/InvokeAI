@@ -101,6 +101,12 @@ export const keepCardMenuOpenForRetarget = (event: {
   }
 };
 
+/**
+ * Preview and More sit on an opaque panel fill so they read over any thumbnail. That fill replaces the outline recipe's
+ * translucent hover and expanded tint, so they lay the same tint over the panel (`bg.muted` equals `bg.panel`).
+ */
+const QUICK_ACTION_INTERACTION = { bg: 'color-mix(in oklab, {colors.gray.hoverTint} 10%, {colors.bg.panel})' } as const;
+
 const NAME_FONT_SIZE = { large: 'lg', small: 'md' } as const;
 const QUICK_ACTION_SIZE = { large: 'sm', small: 'xs' } as const;
 
@@ -279,6 +285,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
               aria-hidden
               aria-label={t('workflowLibrary.previewGraph')}
               bg="bg.panel"
+              _hover={QUICK_ACTION_INTERACTION}
               data-card-action={'preview' satisfies WorkflowCardQuickAction}
               data-card-quick-action
               data-pointer-only
@@ -300,6 +307,8 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
             aria-haspopup="menu"
             aria-label={t('workflowLibrary.moreActions')}
             bg="bg.panel"
+            _expanded={QUICK_ACTION_INTERACTION}
+            _hover={QUICK_ACTION_INTERACTION}
             data-card-quick-action
             data-workflow-card-menu={workflowId}
             id={getWorkflowLibraryCardMenuId(workflowId)}
