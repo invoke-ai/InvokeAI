@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
+import { inspect } from 'node:util';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
 import { startAssetFaultProxy } from './asset-fault-proxy.mjs';
+import { observeBrowserDiagnostics, waitForRenderedMedia, withBrowserNavigation } from './browser-validation.mjs';
 import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -95,13 +97,15 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
   const page = await context.newPage();
   const pageErrors = [];
   const consoleErrors = [];
-
-  page.on('pageerror', (error) => pageErrors.push(error));
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      consoleErrors.push(message.text());
-    }
+  await observeBrowserDiagnostics(page, {
+    onError: (event) => {
+      pageErrors.push(new Error(JSON.stringify(event)));
+      if (event.kind === 'console') {
+        consoleErrors.push(event.message);
+      }
+    },
   });
+
   await page.goto(`${origin}${path}`, { waitUntil: 'domcontentloaded' });
 
   return { consoleErrors, context, page, pageErrors };
@@ -135,6 +139,7 @@ const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'La
 const waitForWorkbench = async (page) => {
   await page.getByRole('main', { exact: true, name: 'Fixture Project 001' }).waitFor();
   await presetStrip(page).waitFor();
+  await waitForRenderedMedia(page);
 };
 
 /** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
@@ -235,6 +240,7 @@ const surfaces = [
     ready: async (page) => {
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       // The Layers panel's Properties pane is the canvas's settings surface; the journey must scan it, not a fallback.
       await page.getByRole('tab', { exact: true, name: 'Properties', selected: true }).waitFor();
       await page.getByRole('tabpanel').getByRole('group', { exact: true, name: 'Layer' }).waitFor();
@@ -251,9 +257,10 @@ const surfaces = [
         body: JSON.stringify({ set: 'control-sdxl' }),
       });
       assert.ok(seeded.ok, `Could not seed control models: ${String(seeded.status)}.`);
-      await page.reload({ waitUntil: 'domcontentloaded' });
+      await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
       // (Fixture Model 006) through the Generate panel's model picker.
       await page.getByText('Fixture Model 001', { exact: true }).click();
@@ -383,6 +390,7 @@ const runShortcutGuideJourney = async (browser) => {
       await waitForWorkbench(page);
       await page.waitForFunction((theme) => document.documentElement.dataset.theme === theme, themeId);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       const viewTool = page
         .getByRole('toolbar', { exact: true, name: 'Tools' })
         .getByRole('button', { exact: true, name: 'View' });
@@ -613,10 +621,10 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    // The representative queue is populated; measure the hydrated counter rather than its transient idle state.
+    // The representative fixture has exactly 167 pending outputs; connection state may change its label.
     await page
       .locator('header')
-      .getByRole('button', { name: /^[1-9]\d* (images? remaining|items? waiting for the connection)\. Open queue$/ })
+      .getByRole('button', { name: /^167 (?:images remaining|items waiting for the connection)\. Open queue$/ })
       .waitFor();
 
     for (const width of [1_024, 900]) {
@@ -1129,6 +1137,7 @@ const runKeepAliveStateJourney = async (browser) => {
     await waitForSettledDocument(page);
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
 
     const zoomTrigger = page.getByRole('button', { name: /^Zoom \d+%$/ });
     await zoomTrigger.click();
@@ -1140,6 +1149,7 @@ const runKeepAliveStateJourney = async (browser) => {
     await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
     await waitForSettledDocument(page);
 
     assert.equal(
@@ -1190,6 +1200,7 @@ const runLayersPanesJourney = async (browser) => {
   try {
     await waitForWorkbench(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
     const propertiesTab = page.getByRole('tab', { exact: true, name: 'Properties' });
     await propertiesTab.waitFor();
 
@@ -1491,6 +1502,15 @@ const runSettingsJourney = async (browser) => {
       throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
     }
     return { id, status: 'passed' };
+  } catch (error) {
+    const directory = resolve(root, 'artifacts/accessibility');
+    await mkdir(directory, { recursive: true })
+      .then(async () => {
+        await writeFile(resolve(directory, `${id}.txt`), `${inspect(error, { depth: null, colors: false })}\n`);
+        await page.screenshot({ path: resolve(directory, `${id}.png`) });
+      })
+      .catch((artifactError) => process.stderr.write(`Could not capture ${id}: ${String(artifactError)}\n`));
+    throw error;
   } finally {
     await context.close();
   }
@@ -1884,9 +1904,14 @@ try {
   }
   process.stdout.write(`${JSON.stringify({ profile: 'representative', reports }, null, 2)}\n`);
 } catch (error) {
-  throw new Error(
-    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}${previewError ? `\n${previewError}` : ''}`
-  );
+  const failure = `${inspect(error, { depth: null, colors: false })}${previewError ? `\n${previewError}` : ''}`;
+  const directory = resolve(root, 'artifacts/accessibility');
+  await mkdir(directory, { recursive: true })
+    .then(() => writeFile(resolve(directory, 'failure.txt'), `${failure}\n`))
+    .catch((artifactError) =>
+      process.stderr.write(`Could not capture accessibility failure: ${String(artifactError)}\n`)
+    );
+  throw new Error(failure);
 } finally {
   await browser?.close();
 
