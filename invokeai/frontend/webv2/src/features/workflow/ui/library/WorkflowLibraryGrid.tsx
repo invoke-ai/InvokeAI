@@ -362,6 +362,12 @@ export const WorkflowLibraryGrid = ({
       measureElement(element);
     }
   }, [measureElement, elementsCache, instance, rowHeight]);
+  // Measure the mounted width before the first paint rather than waiting for the observer's first report: Chromium can
+  // hold back a report that misses its frame's resize-observer depth limit until some later rendering update, and
+  // until the width is known the grid demands nothing (a returning grid would sit on placeholders).
+  useLayoutEffect(() => {
+    setWidth(viewportRef.current?.clientWidth ?? 0);
+  }, []);
   useMountEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) {

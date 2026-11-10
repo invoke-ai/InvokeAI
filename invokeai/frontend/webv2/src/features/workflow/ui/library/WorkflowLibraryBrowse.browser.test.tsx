@@ -888,6 +888,32 @@ it('returns detail selection to the first resident entry when the previous choic
   expect(transport.list.mock.calls).toHaveLength(requests);
 });
 
+// Chromium may hold back a resize report that misses its frame's depth limit until some later rendering update.
+it('restores a returning grid whose resize observer never reports', async () => {
+  await open();
+  const scroll = viewport()!;
+  await scrollTo(scroll, 39600);
+  await settle();
+  const before = firstVisibleRow(scroll);
+  await act(() => userEvent.click(tagCheckbox('fixture1000')));
+  await settle();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+  );
+  onTestFinished(() => {
+    vi.unstubAllGlobals();
+  });
+
+  await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.clearTags', exact: true })));
+
+  await waitFor(() => expect(firstVisibleRow(viewport()!).id).toBe(before.id));
+});
+
 describe('list layout', () => {
   /** A comfortable list row's pitch: its 52px item and the 2px gap. */
   const ROW_PX = 54;
