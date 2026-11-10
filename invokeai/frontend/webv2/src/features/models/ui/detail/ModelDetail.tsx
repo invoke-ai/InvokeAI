@@ -8,7 +8,7 @@ import {
   supportsExternalModelSettings,
   type ExternalModelSettingsModel,
 } from '@features/models/core/externalModelFields';
-import { isLinkableType } from '@features/models/core/relationships';
+import { isLinkableModel } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import {
   getModelSourceHref,
@@ -52,7 +52,7 @@ import { WorkingMemorySection } from './WorkingMemorySection';
 
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
-type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'> & {
+type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'roles' | 'type'> & {
   hasCpuOnlySetting: boolean;
   hasTriggerPhrases: boolean;
 };
@@ -101,6 +101,7 @@ const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDeta
         hasCpuOnlySetting: supportsCpuOnlySetting(model),
         hasTriggerPhrases: model.trigger_phrases !== undefined && model.type !== 'control_lora',
         key: model.key,
+        roles: model.roles,
         type: model.type,
       }
     : null;
@@ -240,7 +241,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {isLinkableType(model.type) ? (
+      {isLinkableModel(model) ? (
         <>
           <Separator borderColor="border.subtle" />
           <RelatedModelsSectionContainer modelKey={model.key} />
@@ -504,9 +505,15 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
     (snapshot) => {
       const candidate = snapshot.modelsByKey.get(modelKey);
 
-      return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
+      return candidate
+        ? { base: candidate.base, key: candidate.key, roles: candidate.roles, type: candidate.type }
+        : null;
     },
-    (left, right) => left?.key === right?.key && left?.base === right?.base && left?.type === right?.type
+    (left, right) =>
+      left?.key === right?.key &&
+      left?.base === right?.base &&
+      left?.type === right?.type &&
+      left?.roles === right?.roles
   );
   const handleSectionError = useCallback(
     (message: string) => notify.error(t('models.modelManager'), message),

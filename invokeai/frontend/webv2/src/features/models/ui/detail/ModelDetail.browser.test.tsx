@@ -131,6 +131,21 @@ describe('ModelDetail', () => {
     expect(alsoUsableAs()).toBeUndefined();
   });
 
+  it('offers Related Models to a Text LLM only when it serves as a linkable type', async () => {
+    const encoderLlm = config('encoder-llm', 'text_llm', {
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+    });
+    const plainLlm = config('plain-llm', 'text_llm', { roles: [] });
+    setModelsSnapshotForTests({ models: [encoderLlm, plainLlm], status: 'loaded' });
+    const hasRelated = () => host.querySelector('[data-section="related-models"]') !== null;
+
+    await renderDetail(encoderLlm.key);
+    expect(hasRelated()).toBe(true);
+
+    await renderDetail(plainLlm.key);
+    expect(hasRelated()).toBe(false);
+  });
+
   it('offers Run on CPU exactly when the config carries cpu_only', async () => {
     setModelsSnapshotForTests({ models: [GEMMA4_ENCODER, QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY], status: 'loaded' });
     // A checkbox named by its label, not merely the label text somewhere on the page.
