@@ -30,6 +30,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import (
 )
 from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import (
+    drop_qwen3vl_unloaded_keys,
     drop_qwen3vl_visual_tower,
     drop_qwen3vl_visual_tower_keys,
 )
@@ -78,11 +79,34 @@ def test_non_string_keys_survive() -> None:
     assert drop_qwen3vl_visual_tower_keys({0: "t"}) == {0: "t"}
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "model.visual.blocks.0.attn.qkv.weight",
+        "lm_head.weight",
+        "lm_head.weight_scale",
+        # The remap routes these to `language_model.lm_head`, as it does a bare `lm_head`.
+        "model.lm_head.weight",
+        "model.lm_head.comfy_quant",
+        "model.language_model.lm_head.weight",
+    ],
+)
+def test_the_tower_and_every_lm_head_spelling_are_dropped(key: str) -> None:
+    assert drop_qwen3vl_unloaded_keys({key: "t", "model.embed_tokens.weight": "e"}) == {
+        "model.embed_tokens.weight": "e"
+    }
+
+
+@pytest.mark.parametrize("key", ["model.layers.0.self_attn.q_proj.weight", "model.norm.weight", "lm_head_bias", 0])
+def test_what_the_single_file_loader_reads_survives(key) -> None:
+    assert drop_qwen3vl_unloaded_keys({key: "t"}) == {key: "t"}
+
+
 def test_a_model_without_a_tower_is_refused_rather_than_given_a_dead_attribute(tmp_path: Path) -> None:
     """`setattr` would happily invent `visual` on anything. On the `from_pretrained` paths nothing
     else would notice a renamed tower: it would load, a dead stub would sit beside it, and the
     encoder would keep every byte this is meant to save."""
-    with pytest.raises(RuntimeError, match="no Qwen3-VL visual tower"):
+    with pytest.raises(RuntimeError, match="no Qwen-VL visual tower"):
         drop_qwen3vl_visual_tower(torch.nn.Module())
 
 

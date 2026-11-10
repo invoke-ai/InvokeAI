@@ -1,11 +1,11 @@
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type {
-  ProjectSettings,
   ProjectSortId,
   ProjectsViewId,
+  ScopedDefaults,
+  StoredAspectRatioPreset,
   StoredGeneratePreset,
   StoredRebalancePreset,
-  ViewerAutoSwitchMode,
   WorkbenchPreferences,
   WorkflowLibrarySortId,
 } from '@workbench/settings/contracts';
@@ -26,6 +26,7 @@ import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+import { getLayeredKeys } from '@workbench/settings/projectSettings';
 
 export { WORKBENCH_LANGUAGES } from '@platform/i18n/languages';
 
@@ -37,18 +38,12 @@ export const DEVELOPER_LOG_LEVELS: readonly LogLevel[] = LOG_LEVELS;
 
 export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
-export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
-  antialiasProgressImages: false,
-  useCpuNoise: true,
-  useNsfwChecker: false,
-  useWatermark: false,
-  // New projects; a stored project without the field reads as `off` (see normalizeProjectSettings).
-  viewerAutoSwitch: 'progress',
-};
-
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
-  alphaNoticeAcknowledged: false,
+  betaNoticeAcknowledged: false,
+  antialiasProgressImages: false,
+  aspectRatioPresets: [],
   autoSwitchInvocationRoute: true,
+  canvasToolMemory: {},
   confirmImageDeletion: true,
   controlModelMemory: {},
   customHotkeys: {},
@@ -60,7 +55,9 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   exportIncludesWorkspace: true,
+  galleryDestinationNoticeShown: false,
   generatePresets: [],
+  generatePresetsIncludePrompts: true,
   generateSectionsOpen: {},
   highContrast: false,
   installInPlace: true,
@@ -74,9 +71,11 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
+  scopedDefaults: {},
   selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
+  startupDestination: 'launchpad',
   themeId: DEFAULT_THEME_ID,
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
@@ -275,6 +274,102 @@ const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sk
 const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
 const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
 
+const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStoredAspectRatioPreset = (entry: unknown): entry is StoredAspectRatioPreset => {
+  if (!isPlainRecord(entry)) {
+    return false;
+  }
+
+  const { height, id, label, width } = entry;
+
+  return (
+    typeof id === 'string' &&
+    id !== '' &&
+    typeof label === 'string' &&
+    label.trim() !== '' &&
+    typeof width === 'number' &&
+    Number.isFinite(width) &&
+    typeof height === 'number' &&
+    Number.isFinite(height)
+  );
+};
+
+/**
+ * Shape-only, like {@link normalizeRebalancePresets}: generation drops ratios it cannot use when reading them, so a
+ * newer build's wider rules survive this one's writes. An already-valid list comes back as is, keeping its identity
+ * across unrelated preference patches.
+ */
+const normalizeAspectRatioPresetRecords = (values: unknown): StoredAspectRatioPreset[] => {
+  if (!Array.isArray(values)) {
+    return DEFAULT_PREFERENCES.aspectRatioPresets;
+  }
+
+  const seen = new Set<string>();
+  const kept = values.filter((entry): entry is StoredAspectRatioPreset => {
+    if (!isStoredAspectRatioPreset(entry) || seen.has(entry.id)) {
+      return false;
+    }
+
+    seen.add(entry.id);
+    return true;
+  });
+
+  return kept.length === values.length ? (values as StoredAspectRatioPreset[]) : kept;
+};
+
+/** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
+const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
+
+/**
+ * Keeps only the known tools' plain records, so the synced blob cannot grow with stray keys. An already-valid record
+ * comes back as is, keeping its identity across unrelated preference patches.
+ */
+const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string, unknown>> => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.canvasToolMemory;
+  }
+  const keys = Object.keys(value);
+  if (keys.every((key) => (CANVAS_TOOL_MEMORY_KEYS as readonly string[]).includes(key) && isPlainRecord(value[key]))) {
+    return value;
+  }
+  return Object.fromEntries(
+    CANVAS_TOOL_MEMORY_KEYS.flatMap((key) => (isPlainRecord(value[key]) ? [[key, value[key]]] : []))
+  );
+};
+
+/**
+ * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped,
+ * so nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as
+ * is, so resolved widget values keep their identity across unrelated preference patches.
+ */
+const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.scopedDefaults;
+  }
+  let changed = false;
+  const kept: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const [ownerId, record] of Object.entries(value)) {
+    const layered = getLayeredKeys(ownerId);
+    if (!layered || !isPlainRecord(record)) {
+      changed = true;
+      continue;
+    }
+    const entries = Object.entries(record);
+    const layeredEntries = entries.filter(([key]) => Object.hasOwn(layered, key));
+    if (layeredEntries.length !== entries.length) {
+      changed = true;
+    }
+    if (layeredEntries.length > 0) {
+      kept[ownerId] = layeredEntries.length === entries.length ? record : Object.fromEntries(layeredEntries);
+    } else if (entries.length > 0) {
+      changed = true;
+    }
+  }
+  return changed ? kept : (value as ScopedDefaults);
+};
+
 /**
  * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
  * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
@@ -299,28 +394,12 @@ const normalizeControlModelMemory = (values: unknown): Record<string, string> =>
   return kept.length === entries.length ? (values as Record<string, string>) : Object.fromEntries(kept);
 };
 
-export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
-  value === 'off' || value === 'latest' || value === 'progress';
-
-export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
-  antialiasProgressImages:
-    typeof settings?.antialiasProgressImages === 'boolean'
-      ? settings.antialiasProgressImages
-      : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
-  useNsfwChecker:
-    typeof settings?.useNsfwChecker === 'boolean' ? settings.useNsfwChecker : DEFAULT_PROJECT_SETTINGS.useNsfwChecker,
-  useWatermark:
-    typeof settings?.useWatermark === 'boolean' ? settings.useWatermark : DEFAULT_PROJECT_SETTINGS.useWatermark,
-  // Absent means a project saved before the mode existed, whatever its old progress toggle said: it starts `off`.
-  viewerAutoSwitch: isViewerAutoSwitchMode(settings?.viewerAutoSwitch) ? settings.viewerAutoSwitch : 'off',
-});
-
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
   | 'launchpadProjectsSort'
   | 'launchpadProjectsView'
   | 'queueJobsScope'
+  | 'startupDestination'
   | 'workflowEdgeStyle'
   | 'workflowLibrarySort'
   | 'workflowLibraryThumbnailFit'
@@ -328,16 +407,22 @@ type WorkbenchPreferencesInput = Omit<
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
+  startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
   workflowLibrarySort?: unknown;
   workflowLibraryThumbnailFit?: unknown;
+  /** Pre-beta name of `betaNoticeAcknowledged`; accounts that dismissed the alpha notice skip the beta one. */
+  alphaNoticeAcknowledged?: unknown;
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
+  antialiasProgressImages: preferences?.antialiasProgressImages === true,
+  aspectRatioPresets: normalizeAspectRatioPresetRecords(preferences?.aspectRatioPresets),
   autoSwitchInvocationRoute:
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'
       ? preferences.autoSwitchInvocationRoute
       : DEFAULT_PREFERENCES.autoSwitchInvocationRoute,
+  canvasToolMemory: normalizeCanvasToolMemoryRecord(preferences?.canvasToolMemory),
   confirmImageDeletion:
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
@@ -373,6 +458,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.exportIncludesWorkspace
       : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
+  generatePresetsIncludePrompts: preferences?.generatePresetsIncludePrompts !== false,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   installInPlace:
     typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
@@ -404,12 +490,14 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
         : DEFAULT_PREFERENCES.queueJobsScope,
   highContrast:
     typeof preferences?.highContrast === 'boolean' ? preferences.highContrast : DEFAULT_PREFERENCES.highContrast,
-  alphaNoticeAcknowledged:
-    typeof preferences?.alphaNoticeAcknowledged === 'boolean'
-      ? preferences.alphaNoticeAcknowledged
-      : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
+  betaNoticeAcknowledged:
+    typeof preferences?.betaNoticeAcknowledged === 'boolean'
+      ? preferences.betaNoticeAcknowledged
+      : preferences?.alphaNoticeAcknowledged === true || DEFAULT_PREFERENCES.betaNoticeAcknowledged,
+  galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+  scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
   selectObjectAutoProcess:
     typeof preferences?.selectObjectAutoProcess === 'boolean'
       ? preferences.selectObjectAutoProcess
@@ -422,6 +510,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
+  startupDestination:
+    preferences?.startupDestination === 'launchpad' || preferences?.startupDestination === 'recentProject'
+      ? preferences.startupDestination
+      : DEFAULT_PREFERENCES.startupDestination,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
   whatsNewSeenVersion:
     typeof preferences?.whatsNewSeenVersion === 'string'
@@ -672,6 +764,9 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
   });
 };
 
+export const getWorkbenchSettingsSnapshot = store.getSnapshot;
+export const subscribeWorkbenchSettings = store.subscribe;
+
 export const useWorkbenchSettings = (): WorkbenchSettingsSnapshot => store.useSnapshot();
 
 export const useWorkbenchPreferences = (): WorkbenchPreferences =>
@@ -690,6 +785,9 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 ): Selected => useWorkbenchSettingsSelector((snapshot) => selector(snapshot.preferences), isEqual);
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
+
+/** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
+export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
 
 /** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {
@@ -747,6 +845,31 @@ export const patchControlModelMemory = (key: string, modelKey: string | null): P
     controlModelMemory[key] = modelKey;
   }
   return patchWorkbenchPreferences({ controlModelMemory });
+};
+
+/** Sets the user's defaults for `values`' keys under `ownerId`, keeping the owner's other defaults. */
+export const patchScopedDefault = (ownerId: string, values: Readonly<Record<string, unknown>>): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  return patchWorkbenchPreferences({
+    scopedDefaults: { ...scopedDefaults, [ownerId]: { ...scopedDefaults[ownerId], ...values } },
+  });
+};
+
+/** Forgets the user's defaults for `keys` under `ownerId`; an owner left with none is dropped. */
+export const clearScopedDefault = (ownerId: string, keys: readonly string[]): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  const current = scopedDefaults[ownerId];
+  if (!current || !keys.some((key) => Object.hasOwn(current, key))) {
+    return Promise.resolve();
+  }
+  const owner = { ...current };
+  for (const key of keys) {
+    delete owner[key];
+  }
+  const { [ownerId]: _cleared, ...others } = scopedDefaults;
+  return patchWorkbenchPreferences({
+    scopedDefaults: Object.keys(owner).length > 0 ? { ...others, [ownerId]: owner } : others,
+  });
 };
 
 export const clearWorkbenchSettings = async (): Promise<void> => {

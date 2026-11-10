@@ -15,7 +15,9 @@ import type {
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
   CanvasRegionalLayoutContract,
+  CanvasSnapshotKind,
   CanvasStagingAreaContractV2,
+  CanvasStagingCandidateContract,
 } from './contracts';
 import type { CanvasNodeInsertion, CanvasNodeInsertionAnchor, CanvasNodeMove } from './document/insertionAnchors';
 import type { ReorderSiblingsCommand } from './document/layerStacks';
@@ -103,6 +105,17 @@ export type CanvasProjectMutation =
   | { type: 'cycleStagedImage'; direction: -1 | 1 }
   | { type: 'discardSelectedStagedImage' }
   | { type: 'discardAllStagedImages' }
+  | {
+      /**
+       * Puts discarded candidates back (the Undo of a discard, or of the results an accept set aside) in the order
+       * `previous` held them, after any still staged; a candidate already staged is kept once. Ignored once the
+       * canvas was replaced (`documentRevision` moved on).
+       */
+      type: 'restoreStagedImages';
+      images: readonly CanvasStagingCandidateContract[];
+      previous: readonly CanvasStagingCandidateContract[];
+      documentRevision: number;
+    }
   | { type: 'toggleCanvasStagingVisibility' }
   | { type: 'toggleCanvasStagingThumbnailsVisibility' }
   | { type: 'clearCanvasStaging' }
@@ -164,8 +177,24 @@ export type CanvasProjectMutation =
   /** Replaces text sources while preserving the document revision for one undoable font recovery edit. */
   | { type: 'replaceCanvasFontReferences'; document: CanvasDocumentContractV3 }
   | { type: 'replaceCanvasDocument'; document: CanvasDocumentContractV3 }
-  | { type: 'saveCanvasSnapshot'; id: string; name: string; createdAt: string }
-  | { type: 'restoreCanvasSnapshot'; snapshotId: string }
+  | {
+      /** Keeps the newest `MAX_CANVAS_SNAPSHOTS` restore points; `includeStaging` keeps the staged results too. */
+      type: 'saveCanvasSnapshot';
+      id: string;
+      name: string;
+      createdAt: string;
+      kind?: CanvasSnapshotKind;
+      includeStaging?: boolean;
+    }
+  | {
+      type: 'restoreCanvasSnapshot';
+      snapshotId: string;
+      /**
+       * Takes the restored point's place with a point of the canvas it replaces, so restoring stays undoable without
+       * pushing an older point out. A Discard all point re-stages its results and is used up instead.
+       */
+      keepCurrentAs?: { id: string; name: string; createdAt: string };
+    }
   | { type: 'deleteCanvasSnapshot'; snapshotId: string }
   | { type: 'setCanvasStagingAutoSwitch'; mode: CanvasStagingAreaContractV2['autoSwitchMode'] };
 

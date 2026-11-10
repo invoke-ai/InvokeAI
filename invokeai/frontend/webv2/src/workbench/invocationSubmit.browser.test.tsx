@@ -108,6 +108,7 @@ const submitGenerate = () => {
     commands,
     formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
     formatUpscaleMetadataFailure: (name) => name,
+    scopedDefaults: {},
     models: undefined,
     owner: captureAccountScope(),
     prepareCanvasInvocation: vi.fn(),
@@ -156,6 +157,7 @@ describe('board-listing reads before a submission', () => {
     // Nothing was awaited: the run was dispatched with the listing still unanswered.
     await submission;
     expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(dispatched.mock.calls[0]?.[0].runtime.boardDestinationIds).toContain('own');
     expect(server.listingReads()).toHaveLength(ageMs > 0 ? 1 : 0);
 
     // The stale listing's one background read lands for the next run; the fresh listing is left alone.
@@ -176,6 +178,7 @@ describe('board-listing reads before a submission', () => {
     server.release();
     await submission;
     expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(dispatched.mock.calls[0]?.[0].runtime.boardDestinationIds).not.toContain('own');
     expect(server.listingReads()).toHaveLength(1);
   });
 });

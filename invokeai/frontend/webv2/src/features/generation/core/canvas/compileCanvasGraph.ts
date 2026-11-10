@@ -6,6 +6,7 @@
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { FamilyGraph, FamilyLatentSpace } from '@features/generation/core/familyGraph';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import {
@@ -17,7 +18,7 @@ import {
   isExternalGenerationMode,
   isExternalTextOnlyCanvasModel,
 } from '@features/generation/core/externalProvider';
-import { buildExternalGraph, findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
+import { buildExternalGraph, getFamilyGraphBuilder } from '@features/generation/core/graph';
 import {
   addEdge,
   addNode,
@@ -45,38 +46,18 @@ import type {
 import { addControlLayers, getOrAddLliteCollector } from './addControlLayers';
 import {
   addRegionalGuidance,
+  getEffectiveLayoutKind,
   getLayoutPromptRejectionReason,
   getLayoutRegionIssue,
+  getRegionalGuidanceSupport,
   isLayoutRegionalGuidanceBase,
   isRegionalGuidanceSupportedForBase,
+  type LayoutRegionalGuidanceBase,
   type RegionalGuidanceInput,
   type RegionalLayoutKind,
 } from './addRegionalGuidance';
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
-
-/** Map bases to encode nodes; SD families share i2l. */
-const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
-  'sd-1': 'i2l',
-  'sd-2': 'i2l',
-  sdxl: 'i2l',
-  'sd-3': 'sd3_i2l',
-  flux: 'flux_vae_encode',
-  flux2: 'flux2_vae_encode',
-  // FLUX.3 encodes with the FLUX.2 VAE.
-  flux3: 'flux2_vae_encode',
-  cogview4: 'cogview4_i2l',
-  'qwen-image': 'qwen_image_i2l',
-  'z-image': 'z_image_i2l',
-  // Krea-2 shares the Qwen-Image VAE, so it encodes with that family's node too.
-  'krea-2': 'qwen_image_i2l',
-  'qwen-image-2-1': 'qwen_image_2_1_i2l',
-  anima: 'anima_i2l',
-  // MOSS-Image denoises in the FLUX.2 VAE's raw latent layout, so it encodes with that family's node.
-  'moss-image': 'flux2_vae_encode',
-  wan: 'wan_i2l',
-  // Ideogram lacks an encode node; reject these modes with an actionable error.
-};
 
 /**
  * SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in
@@ -215,7 +196,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     reasons.push('Canvas inpainting requires an inpaint mask.');
   }
 
-  // The layout node refuses regions around a blank prompt. A mask with pixels in the bbox has an area to place.
+  // A layout is built around the global prompt, so regions around a blank one are refused. A mask with pixels in the
+  // bbox has an area to place.
   const layoutPromptReason = getLayoutPromptRejectionReason({
     base: model.base,
     prompt: getEffectivePrompts(settings).positivePrompt,
@@ -236,37 +218,6 @@ const withProcessingDimensions = (settings: GenerateSettings, processingSize: Ca
   height: processingSize.height,
   width: processingSize.width,
 });
-
-/** Locates the node + field feeding a decode/denoise input edge (e.g. `canvas_output.vae`). */
-const findEdgeSource = (
-  graph: BackendGraphContract,
-  destNodeId: string,
-  destField: string
-): { node: BackendInvocationContract; field: string } | null => {
-  const edge = graph.edges.find(
-    (candidate) => candidate.destination.node_id === destNodeId && candidate.destination.field === destField
-  );
-  const node = edge ? graph.nodes[edge.source.node_id] : undefined;
-  return edge && node ? { field: edge.source.field, node } : null;
-};
-
-/** Resolves the VAE source the base graph decodes with, for the encode side (throws if absent). */
-const requireVaeSource = (graph: BackendGraphContract): { node: BackendInvocationContract; field: string } => {
-  const source = findVaeSource(graph);
-  if (!source) {
-    throw new Error('Canvas generation could not resolve a VAE source in the base graph.');
-  }
-  return source;
-};
-
-/** The size the base graph denoises at: the `noise` node carries it for SD families, the denoise node elsewhere. */
-const getDenoiseSize = (graph: BackendGraphContract, denoise: BackendInvocationContract): CanvasSize => {
-  const { height, width } = graph.nodes.noise ?? denoise;
-  if (typeof width !== 'number' || typeof height !== 'number') {
-    throw new TypeError('Canvas generation could not read the denoise size from the base graph.');
-  }
-  return { height, width };
-};
 
 const findMetadataNode = (graph: BackendGraphContract): BackendInvocationContract | undefined =>
   Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
@@ -375,6 +326,61 @@ const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileC
   }
 };
 
+/** Record only the resolved inputs handed to the graph, beside the independently versioned authored document. */
+const recordCanvasInputs = (graph: BackendGraphContract, input: CompileCanvasGraphInput): void => {
+  const metadata = findMetadataNode(graph);
+  if (!metadata) {
+    return;
+  }
+  if (input.canvasMetadata) {
+    metadata.canvas_v3_metadata = input.canvasMetadata;
+  }
+  const controls = input.controlLayers ?? [];
+  const recordedControls = controls.map((control) => ({
+    begin_step_percent: control.beginEndStepPct[0],
+    end_step_percent: control.beginEndStepPct[1],
+    control_mode: control.controlMode,
+    image: { image_name: control.imageName, width: input.bbox.width, height: input.bbox.height },
+    position: { x: input.bbox.x, y: input.bbox.y },
+    layer_id: control.id,
+    model: control.model,
+    type: control.kind,
+    weight: control.weight,
+    ...(control.instantxControlMode === null || control.instantxControlMode === undefined
+      ? {}
+      : { instantx_control_mode: control.instantxControlMode }),
+  }));
+  metadata.control_layers = recordedControls;
+  metadata.controlnets = recordedControls
+    .filter((control) => control.type === 'controlnet')
+    .map((control) => ({
+      image: control.image,
+      control_model: control.model,
+      control_weight: control.weight,
+      begin_step_percent: control.begin_step_percent,
+      end_step_percent: control.end_step_percent,
+      control_mode: control.control_mode ?? 'balanced',
+    }));
+  metadata.t2iAdapters = recordedControls
+    .filter((control) => control.type === 't2i_adapter')
+    .map((control) => ({
+      image: control.image,
+      t2i_adapter_model: control.model,
+      weight: control.weight,
+      begin_step_percent: control.begin_step_percent,
+      end_step_percent: control.end_step_percent,
+    }));
+  const layoutRegions = graph.nodes.layout_prompt?.regions ?? graph.nodes.caption_builder?.regions;
+  if (Array.isArray(layoutRegions) && layoutRegions.length > 0) {
+    metadata.regions = layoutRegions;
+  } else if (!['moss-image', 'ideogram-4', 'flux3'].includes(input.model.base)) {
+    const regions = (input.regionalGuidance ?? []).filter((region) => graph.nodes[`rg_mask_to_tensor_${region.id}`]);
+    if (regions.length) {
+      metadata.regions = regions.map(({ layout: _layout, ...region }) => region);
+    }
+  }
+};
+
 /** Sets the metadata `generation_mode` variant + strength (legacy parity). */
 const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: number): void => {
   const metadata = findMetadataNode(graph);
@@ -386,22 +392,26 @@ const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: nu
   }
 };
 
-/** The SD `i2l` node carries fp32; every other family's encode node does not. */
-const isSdI2l = (i2lType: string): boolean => i2lType === 'i2l';
-
-/** Adds the base-appropriate image-to-latents encode node fed by `imageName`. */
+/** Adds the family's image-to-latents encode node fed by `imageName`. */
 const addEncodeNode = (
   graph: BackendGraphContract,
-  i2lType: string,
+  latents: FamilyLatentSpace,
   settings: GenerateSettings,
   imageName: string | null
 ): BackendInvocationContract =>
   addNode(graph, {
     id: 'canvas_i2l',
     ...(imageName ? { image: { image_name: imageName } } : {}),
-    type: i2lType,
-    ...(isSdI2l(i2lType) ? { fp32: settings.vaePrecision === 'fp32' } : {}),
+    type: latents.encodeType,
+    ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
+    ...(latents.encodeType === 'i2l' ? { color_compensation: settings.colorCompensation ? 'SDXL' : 'None' } : {}),
   });
+
+/** Encodes with the VAE the family decodes with and feeds the latents to its denoise. */
+const connectEncode = (family: FamilyGraph, latents: FamilyLatentSpace, encode: BackendInvocationContract): void => {
+  addEdge(family.graph, latents.vae.node, latents.vae.field, encode, 'vae');
+  addEdge(family.graph, encode, 'latents', family.denoise, 'latents');
+};
 
 const addInputResizeNode = (
   graph: BackendGraphContract,
@@ -418,50 +428,38 @@ const addInputResizeNode = (
     width: processingSize.width,
   });
 
-/** Resolves the encode node type for a supported base (throws otherwise). */
-const requireI2lType = (model: GenerateModelConfig): string => {
-  const i2lType = CANVAS_I2L_NODE_TYPES[model.base as SupportedGenerateBase];
-  if (!i2lType) {
+/** The family's latent space, for the image modes that encode into it (throws when the family has none). */
+const requireLatents = (family: FamilyGraph, model: GenerateModelConfig): FamilyLatentSpace => {
+  if (!family.latents) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
   }
-  return i2lType;
-};
-
-/** Resolves the base graph's denoise node (throws if absent). */
-const requireDenoise = (graph: BackendGraphContract): BackendInvocationContract => {
-  const denoise = graph.nodes.denoise_latents;
-  if (!denoise) {
-    throw new Error('Canvas generation could not find the denoise node in the base graph.');
-  }
-  return denoise;
+  return family.latents;
 };
 
 /** Grafts the image-to-latents encode path onto a freshly built base graph (img2img). */
 const graftImageToImage = (
-  graph: BackendGraphContract,
+  family: FamilyGraph,
   model: GenerateModelConfig,
   settings: GenerateSettings,
   compositeImageName: string,
   strength: number,
   bbox: CompileCanvasGraphInput['bbox']
 ): void => {
-  const i2lType = requireI2lType(model);
-  const denoise = requireDenoise(graph);
-  const vaeSource = requireVaeSource(graph);
+  const { graph } = family;
+  const latents = requireLatents(family, model);
   // The source image is encoded at the size the graph denoises at. That is the processing size, except under
   // native PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
-  const encodeSize = getDenoiseSize(graph, denoise);
+  const encodeSize = family.denoiseSize;
   const needsResize = !sizesMatch(bbox, encodeSize);
-  const encode = addEncodeNode(graph, i2lType, settings, needsResize ? null : compositeImageName);
+  const encode = addEncodeNode(graph, latents, settings, needsResize ? null : compositeImageName);
 
   if (needsResize) {
     const resize = addInputResizeNode(graph, 'canvas_resize_initial_to_processing', compositeImageName, encodeSize);
     addEdge(graph, resize, 'image', encode, 'image');
   }
 
-  addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
-  addEdge(graph, encode, 'latents', denoise, 'latents');
-  setCanvasDenoisingRange(denoise, model, settings, strength);
+  connectEncode(family, latents, encode);
+  setCanvasDenoisingRange(family.denoise, model, settings, strength);
 
   setMetadataMode(graph, 'img2img', strength);
 };
@@ -550,13 +548,11 @@ const addAnimaInpaintAdapter = (
  * inpaint-conditioned adapters read.
  */
 const graftMaskTail = (
-  graph: BackendGraphContract,
+  family: FamilyGraph,
   args: {
     model: GenerateModelConfig;
     settings: GenerateSettings;
-    i2lType: string;
-    denoise: BackendInvocationContract;
-    vaeSource: { node: BackendInvocationContract; field: string };
+    latents: FamilyLatentSpace;
     initialImageName: string;
     compositing: CanvasCompositingSettings;
     destination: CompileCanvasGraphInput['destination'];
@@ -570,7 +566,8 @@ const graftMaskTail = (
     adapterImageEdge?: { node: BackendInvocationContract; field: string };
   }
 ): CanvasInpaintSources => {
-  const { compositing, denoise, destination, i2lType, initialImageName, model, settings, vaeSource } = args;
+  const { compositing, destination, initialImageName, latents, model, settings } = args;
+  const { denoise, graph } = family;
   const needsResize = !sizesMatch(args.bbox, args.processingSize);
 
   // The base decoder, until the composited output below takes over canvas_output from it.
@@ -582,7 +579,7 @@ const graftMaskTail = (
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
     edge_radius: compositing.coherenceEdgeSize,
-    fp32: isSdI2l(i2lType) ? settings.vaePrecision === 'fp32' : false,
+    fp32: latents.fp32 ?? false,
     id: 'create_gradient_mask',
     ...(args.gradientImageEdge ? {} : { image: { image_name: initialImageName } }),
     minimum_denoise: compositing.coherenceMinDenoise,
@@ -596,11 +593,10 @@ const graftMaskTail = (
   if (args.gradientImageEdge) {
     addEdge(graph, args.gradientImageEdge.node, args.gradientImageEdge.field, gradientMask, 'image');
   }
-  addEdge(graph, vaeSource.node, vaeSource.field, gradientMask, 'vae');
+  addEdge(graph, latents.vae.node, latents.vae.field, gradientMask, 'vae');
   // The optional UNet edge only applies to SD-family models (legacy `isMainModelWithoutUnet`).
-  const unetSource = findEdgeSource(graph, 'denoise_latents', 'unet');
-  if (unetSource) {
-    addEdge(graph, unetSource.node, unetSource.field, gradientMask, 'unet');
+  if (latents.unet) {
+    addEdge(graph, latents.unet.node, latents.unet.field, gradientMask, 'unet');
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
@@ -702,15 +698,14 @@ const addNoiseBeforeEncode = (
 
 /** Grafts the inpaint pipeline (content covers the bbox, an inpaint mask restricts it). */
 const graftInpaint = (
-  graph: BackendGraphContract,
+  family: FamilyGraph,
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
 ): CanvasInpaintSources => {
   const { model } = input;
-  const i2lType = requireI2lType(model);
-  const denoise = requireDenoise(graph);
-  const vaeSource = requireVaeSource(graph);
+  const { denoise, graph } = family;
+  const latents = requireLatents(family, model);
   const initialImageName = input.compositeImageName as string;
   const maskImageName = input.maskImageName as string;
   const strength = input.strength;
@@ -729,7 +724,7 @@ const graftInpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, i2lType, input.settings, null);
+  const encode = addEncodeNode(graph, latents, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(
     graph,
     initialImageName,
@@ -742,25 +737,22 @@ const graftInpaint = (
   } else if (noiseResult.imageField) {
     encode.image = noiseResult.imageField;
   }
-  addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
-  addEdge(graph, encode, 'latents', denoise, 'latents');
+  connectEncode(family, latents, encode);
 
-  const inpaint = graftMaskTail(graph, {
+  const inpaint = graftMaskTail(family, {
     ...(initialResize ? { adapterImageEdge: { field: 'image', node: initialResize } } : {}),
     bbox: input.bbox,
     compositing,
-    denoise,
     destination: input.destination,
     ...(initialResize ? { gradientImageEdge: { field: 'image', node: initialResize } } : {}),
     ...(maskResize
       ? { gradientMaskEdge: { field: 'image', node: maskResize } }
       : { gradientMaskImage: { image_name: maskImageName } }),
-    i2lType,
     initialImageName,
+    latents,
     model,
     processingSize,
     settings: input.settings,
-    vaeSource,
   });
 
   setMetadataMode(graph, 'inpaint', strength);
@@ -769,15 +761,14 @@ const graftInpaint = (
 
 /** Grafts the outpaint pipeline (bbox extends past content / has transparent holes). */
 const graftOutpaint = (
-  graph: BackendGraphContract,
+  family: FamilyGraph,
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
 ): CanvasInpaintSources => {
   const { model } = input;
-  const i2lType = requireI2lType(model);
-  const denoise = requireDenoise(graph);
-  const vaeSource = requireVaeSource(graph);
+  const { denoise, graph } = family;
+  const latents = requireLatents(family, model);
   const initialImageName = input.compositeImageName as string;
   const strength = input.strength;
   const needsResize = !sizesMatch(input.bbox, processingSize);
@@ -833,28 +824,25 @@ const graftOutpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, i2lType, input.settings, null);
+  const encode = addEncodeNode(graph, latents, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(graph, initialImageName, input.noiseMaskImageName, infill, noiseMaskResize);
   if (noiseResult.edgeFrom) {
     addEdge(graph, noiseResult.edgeFrom, 'image', encode, 'image');
   }
-  addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
-  addEdge(graph, encode, 'latents', denoise, 'latents');
+  connectEncode(family, latents, encode);
 
-  const inpaint = graftMaskTail(graph, {
+  const inpaint = graftMaskTail(family, {
     adapterImageEdge: { field: 'image', node: infill },
     bbox: input.bbox,
     compositing,
-    denoise,
     destination: input.destination,
     ...(needsResize ? { gradientImageEdge: { field: 'image', node: infill } } : {}),
     gradientMaskEdge,
-    i2lType,
     initialImageName,
+    latents,
     model,
     processingSize,
     settings: input.settings,
-    vaeSource,
   });
 
   setMetadataMode(graph, 'outpaint', strength);
@@ -873,6 +861,8 @@ interface LayoutRegionElement {
 interface AddLayoutRegionsOptions {
   /** The generation bbox the regions' mask bounds are measured in. */
   bbox: Pick<Rect, 'width' | 'height'>;
+  /** The roles the base distinguishes. */
+  layoutKinds: readonly RegionalLayoutKind[];
   regions: readonly RegionalGuidanceInput[];
 }
 
@@ -881,11 +871,12 @@ const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0
 
 const toLayoutElement = (
   region: RegionalGuidanceInput,
+  layoutKinds: readonly RegionalLayoutKind[],
   scale: { x: number; y: number },
   size: { width: number; height: number }
 ): LayoutRegionElement | null => {
   const caption = region.positivePrompt;
-  if (caption === null || getLayoutRegionIssue(region) !== null) {
+  if (caption === null || getLayoutRegionIssue(region, layoutKinds) !== null) {
     return null;
   }
   const bounds = region.maskBounds;
@@ -897,7 +888,7 @@ const toLayoutElement = (
   if (x2 <= x1 || y2 <= y1) {
     return null;
   }
-  const kind = region.layout?.kind ?? 'object';
+  const kind = getEffectiveLayoutKind(layoutKinds, region.layout);
   return {
     bbox: [x1, y1, x2, y2],
     caption,
@@ -908,45 +899,124 @@ const toLayoutElement = (
 
 /**
  * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
- * (which PiD can shrink below the processing size) and clamped to it. A `layout_prompt` node between the global prompt
- * and the positive encoder assembles them at run time, so batch prompt variation still flows through
- * `positive_prompt`; core metadata records the assembled prompt. Regions the layout cannot place are left out, and
- * without any the graph stays untouched.
+ * (which PiD can shrink below the processing size) and clamped to it. The base graph's `layout_prompt` node assembles
+ * them with the global prompt at run time; regions the layout cannot place are left out.
  */
-const addLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
-  const posCond = graph.nodes.pos_cond;
-  if (!posCond) {
-    throw new Error('addLayoutRegions: base graph is missing the positive conditioning node.');
+const addMossImageLayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
+  const { layoutPrompt } = family;
+  if (!layoutPrompt) {
+    throw new Error('addMossImageLayoutRegions: base graph is missing the layout prompt node.');
   }
-  const size = getDenoiseSize(graph, requireDenoise(graph));
+  const size = family.denoiseSize;
   const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
-  const elements = options.regions.flatMap((region) => toLayoutElement(region, scale, size) ?? []);
-  if (elements.length === 0) {
+  // The frame and the boxes come from one size, so they cannot drift apart.
+  layoutPrompt.width = size.width;
+  layoutPrompt.height = size.height;
+  layoutPrompt.regions = options.regions.flatMap(
+    (region) => toLayoutElement(region, options.layoutKinds, scale, size) ?? []
+  );
+};
+
+/** A box `[y_min, x_min, y_max, x_max]` on the grid Ideogram 4 and FLUX.3 share. */
+type GridBox = [number, number, number, number];
+
+/** Grid boxes are whole numbers from 0 to 1000 across the image, origin top-left. */
+const GRID_COORD_MAX = 1000;
+
+const toGridCoord = (pixels: number, extent: number): number =>
+  clamp(Math.round((pixels / extent) * GRID_COORD_MAX), GRID_COORD_MAX);
+
+/** A mask's bounds on the grid over the bbox, or null when the mask misses the bbox or rounds to a line. */
+const toGridBox = (bounds: Rect, bbox: Pick<Rect, 'width' | 'height'>): GridBox | null => {
+  const yMin = toGridCoord(bounds.y, bbox.height);
+  const xMin = toGridCoord(bounds.x, bbox.width);
+  const yMax = toGridCoord(bounds.y + bounds.height, bbox.height);
+  const xMax = toGridCoord(bounds.x + bounds.width, bbox.width);
+  return yMax > yMin && xMax > xMin ? [yMin, xMin, yMax, xMax] : null;
+};
+
+/** One element of the `ideogram4_caption_builder` node's `regions` input. */
+interface Ideogram4RegionElement {
+  prompt: string;
+  bbox: GridBox;
+}
+
+const toIdeogram4Region = (
+  region: RegionalGuidanceInput,
+  options: AddLayoutRegionsOptions
+): Ideogram4RegionElement | null => {
+  const prompt = region.positivePrompt;
+  if (prompt === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  return bbox ? { bbox, prompt } : null;
+};
+
+/**
+ * Ideogram 4 regions: each becomes an object element of the structured caption, boxed around its mask. The output is
+ * the bbox, resized, so boxes are normalized to the bbox rather than the denoise size. The base graph's
+ * `caption_builder` assembles the caption around the global prompt at run time, so batch prompt variation still flows
+ * through `positive_prompt`, and core metadata already records its output. Regions the caption cannot place are left
+ * out, and without any the graph stays untouched.
+ */
+const addIdeogram4Regions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
+  const captionBuilder = family.layoutPrompt;
+  if (!captionBuilder) {
+    throw new Error('addIdeogram4Regions: base graph is missing the caption builder node.');
+  }
+  const regions = options.regions.flatMap((region) => toIdeogram4Region(region, options) ?? []);
+  if (regions.length > 0) {
+    captionBuilder.regions = regions;
+  }
+};
+
+/** One element of the `flux3_layout_prompt` node's `regions` input. */
+interface Flux3RegionElement {
+  desc: string;
+  bbox: GridBox;
+}
+
+const toFlux3Region = (region: RegionalGuidanceInput, options: AddLayoutRegionsOptions): Flux3RegionElement | null => {
+  const desc = region.positivePrompt;
+  if (desc === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  // FLUX.3 reads a box with no coordinate above 1 as 0–1 fractions, so the node refuses [0, 0, 1, 1].
+  return bbox && Math.max(...bbox) > 1 ? { bbox, desc } : null;
+};
+
+/**
+ * FLUX.3 regions: each becomes a row of the box table that ends the caption, boxed around its mask and normalized to
+ * the bbox like Ideogram 4's. The base graph's `layout_prompt` appends them at run time, as object rows or, when the
+ * builder wired reference images, as edit rows for the output; core metadata then records the caption encoded. Regions
+ * the table cannot place are left out, and without any the graph stays untouched.
+ */
+const addFlux3LayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
+  const { graph, layoutPrompt } = family;
+  if (!layoutPrompt) {
+    throw new Error('addFlux3LayoutRegions: base graph is missing the layout prompt node.');
+  }
+  const regions = options.regions.flatMap((region) => toFlux3Region(region, options) ?? []);
+  if (regions.length === 0) {
     return;
   }
-  const promptEdge = graph.edges.find(
-    (edge) =>
-      edge.source.node_id === 'positive_prompt' &&
-      edge.destination.node_id === posCond.id &&
-      edge.destination.field === 'prompt'
-  );
-  if (!promptEdge) {
-    throw new Error('addLayoutRegions: the positive prompt does not feed the positive conditioning.');
-  }
-
-  const layoutPrompt = addNode(graph, {
-    height: size.height,
-    id: 'layout_prompt',
-    regions: elements,
-    type: 'moss_image_layout_prompt',
-    width: size.width,
-  });
-  promptEdge.destination = { field: 'prompt', node_id: layoutPrompt.id };
-  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
+  layoutPrompt.regions = regions;
   const metadata = findMetadataNode(graph);
   if (metadata) {
-    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+    addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
   }
+};
+
+/** Each layout base places its regions through its own prompt node. */
+const LAYOUT_REGION_GRAFTS: Record<
+  LayoutRegionalGuidanceBase,
+  (family: FamilyGraph, options: AddLayoutRegionsOptions) => void
+> = {
+  flux3: addFlux3LayoutRegions,
+  'ideogram-4': addIdeogram4Regions,
+  'moss-image': addMossImageLayoutRegions,
 };
 
 /** Throw the first validation reason. */
@@ -991,6 +1061,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     }
     restoreExternalCanvasOutputToBbox(backendGraph, { bbox, destination, mode }, processingSize);
     setCanvasMetadataDimensions(backendGraph, bbox);
+    recordCanvasInputs(backendGraph, input);
 
     return {
       backendGraph,
@@ -1002,23 +1073,24 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     };
   }
 
-  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+  const builder = getFamilyGraphBuilder(model.base);
 
   if (!builder) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
   }
 
-  const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
+  const family = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
+  const backendGraph = family.graph;
   const { compositing } = input;
 
   // Validation above guarantees the composite/mask images required per mode.
   let inpaint: CanvasInpaintSources | undefined;
   if (mode === 'img2img') {
-    graftImageToImage(backendGraph, model, settings, compositeImageName as string, strength, bbox);
+    graftImageToImage(family, model, settings, compositeImageName as string, strength, bbox);
   } else if (mode === 'inpaint') {
-    inpaint = graftInpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftInpaint(family, input, compositing, processingSize);
   } else if (mode === 'outpaint') {
-    inpaint = graftOutpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftOutpaint(family, input, compositing, processingSize);
   }
 
   // Every mode accepts already-resolved, separately uploaded control inputs; inpaint and outpaint also hand the
@@ -1026,6 +1098,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   if (input.controlLayers && input.controlLayers.length > 0) {
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,
+      denoise: family.denoise,
       inpaint,
       layers: input.controlLayers,
       modelVariant: model.variant ?? undefined,
@@ -1035,12 +1108,19 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // Regional masks and models must already be validated. Layout bases read only each mask's bounds.
   const regions = input.regionalGuidance ?? [];
   const regionalBase = model.base;
-  if (regions.length > 0 && isRegionalGuidanceSupportedForBase(regionalBase)) {
+  // The support row answers the layout roles; the base guards narrow the base to the graph tables' keys.
+  const regionalSupport = getRegionalGuidanceSupport(regionalBase);
+  if (regions.length > 0 && regionalSupport && isRegionalGuidanceSupportedForBase(regionalBase)) {
     if (isLayoutRegionalGuidanceBase(regionalBase)) {
-      addLayoutRegions(backendGraph, { bbox, regions });
+      LAYOUT_REGION_GRAFTS[regionalBase](family, { bbox, layoutKinds: regionalSupport.layoutKinds, regions });
     } else {
+      if (!family.conditioning) {
+        throw new Error(`Regional guidance has no global conditioning to join in the ${model.name} graph.`);
+      }
       addRegionalGuidance(backendGraph, {
         base: regionalBase,
+        conditioning: family.conditioning,
+        denoise: family.denoise,
         modelVariant: model.variant,
         regions,
         ...(regionalBase === 'krea-2'
@@ -1076,6 +1156,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // After every mode has settled its final image node, so the filters see the composited/resized result.
   addOutputPostprocessors(backendGraph, runtimeProjectSettings, outputIsIntermediate);
   setCanvasMetadataDimensions(backendGraph, bbox);
+  recordCanvasInputs(backendGraph, input);
 
   return {
     backendGraph,

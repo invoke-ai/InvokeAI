@@ -2,7 +2,7 @@
 title: Prompt Tools
 sidebar:
   order: 4
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 The prompt toolbar holds tools that help you write prompts. **Expand Prompt** and **Image to Prompt** use local language models to write or rewrite a prompt for you; if no compatible model is installed, the tool's popover says so and offers an **Open Model Manager** button. **Prompt triggers** insert the trigger phrases, embeddings and wildcards your models need.
@@ -22,11 +22,11 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 ### System prompts
 
-InvokeAI ships with a **Default** system prompt and several tuned for particular model families, such as FLUX.2, Z-Image, Qwen Image and Krea-2. To add your own, click the gear button next to the System prompt selector (**Manage system prompts**) and choose **New**. A system prompt has a **Name**, the **Instructions** given to the language model, and an optional **Max output length** in tokens (300 by default).
+InvokeAI ships with a **Default** system prompt and several tuned for particular model families, such as FLUX.2, Z-Image, Qwen Image, Krea-2 and MOSS-Image. To add your own, click the gear button next to the System prompt selector (**Manage system prompts**) and choose **New**. A system prompt has a **Name**, the **Instructions** given to the language model, and an optional **Max output length** in tokens (300 by default).
 
 You can duplicate, edit and delete your own system prompts. Shared system prompts, including the built-in ones, are marked **Shared**. On a multi-user installation only administrators can edit them, and changes apply to every user.
 
-**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 checkpoints (`Gemma4ForConditionalGeneration`), which can also read an image. Recommended options:
+**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 (`Gemma4ForConditionalGeneration`) and Qwen3.5 vision-language models (`Qwen3_5ForConditionalGeneration`), which can also read an image. The FLUX.3 prompt upsampler is one of these, as a folder or as ComfyUI's single file; see [Model Format Support](/users-guide/models/model-format-support/#text-llms). Recommended options:
 
 | Model | Size | HuggingFace ID |
 |-------|------|----------------|
@@ -36,16 +36,33 @@ You can duplicate, edit and delete your own system prompts. Shared system prompt
 
 Install by pasting the HuggingFace ID into the Model Manager. The model is automatically detected as a **Text LLM** type.
 
+### The FLUX.3 prompt upsampler
+
+Black Forest Labs' [prompt upsampler for FLUX.3](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) is a Text LLM. Install **FLUX.3 Prompt Upsampler** (~17.5 GiB) or **FLUX.3 Prompt Upsampler (int8)** (~9.1 GiB) from the starter models and pick it in Expand Prompt. It rewrites your text prompt: in the Generate panel, Expand Prompt sends it no reference images. Where Expand Prompt does send an image, such as the Video panel's first frame, it reads that image like any Text LLM that can. The [FLUX.3 page](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) lists how fast each build ran and how much VRAM it took on an RTX 4090.
+
+Expand Prompt sends the model the system prompt you pick. The upsampler was trained with Black Forest Labs' four system prompts, published in its [`system_prompts.json`](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup/raw/3f3edb52b2c55de0d49feab28598b68f7f8e4830/system_prompts.json); `t2i` is the one for rewriting a text-to-image prompt. To use it:
+
+1. Open **Manage system prompts** next to the System prompt selector and choose **New**.
+2. Paste the text of the `t2i` entry as the **Instructions**. The file is JSON, so undo its escapes as you paste: each `\n` becomes a line break and each `\"` a plain `"`.
+3. Set **Max output length** to about 1024 tokens, so a long caption is not cut off.
+4. Choose this system prompt whenever you expand a prompt with the upsampler.
+
+Expand Prompt samples its rewrite, so repeated expansions differ; Black Forest Labs' own pipeline decodes greedily.
+
 ### Prompt enhancement for LTX-2.5
 
 LTX-2.5 was trained on long, single-paragraph audio-visual captions, and its own text encoder is not trained to write them. Lightricks pairs the model with a small dedicated enhancer, and InvokeAI offers the same pairing through Expand Prompt:
 
-* Install **LTX-2.5 Prompt Enhancer (Gemma-4 E2B)** from the starter models (`google/gemma-4-E2B-it`, ~10 GB). It is optional and not part of the LTX-2.5 bundle.
+* Install **LTX-2.5 Prompt Enhancer (Gemma-4 E2B)** from the starter models (`google/gemma-4-E2B-it`, ~10 GB). It is optional and not part of the LTX 2.5 bundle.
 * Two system prompts ship with InvokeAI: **LTX-2.5 Text-to-Video** and **LTX-2.5 Image-to-Video**, the release's own texts.
 
-In the Video panel with an LTX-2 model selected, Expand Prompt preselects the enhancer — when it was installed from the starter models or as `google/gemma-4-E2B-it`; otherwise the popover points you to the starter models — and the matching system prompt. With a **first frame** set it shows the frame with **Describe from the first frame** ticked and uses the Image-to-Video prompt, so the caption begins from what the image shows. Untick it, or pick a model that cannot read images (the popover says so), and it uses the Text-to-Video prompt instead. Any model or system prompt you choose in the popover overrides the suggestion.
+In the Video panel with an LTX-2 model selected, Expand Prompt preselects the matching system prompt. For the model, a pick in the open popover comes first, then the model saved for the project, then the enhancer when it was installed from the starter models or as `google/gemma-4-E2B-it`, then the first available model. When the enhancer is installed but another model is selected, the popover shows **Recommended for this model** with a **Use it** button, which saves it like any other pick; when it is not installed, the popover points you to the starter models. With a **first frame** set it shows the frame with **Describe from the first frame** ticked and uses the Image-to-Video prompt, so the caption begins from what the image shows. Untick it, or pick a model that cannot read images (the popover says so), and it uses the Text-to-Video prompt instead. A model or system prompt you pick in the open popover overrides the suggestion.
 
 The rewritten prompt replaces yours in the prompt box, where you can edit it before pressing Invoke; the prompt that is generated and recorded is exactly what the box holds.
+
+### Prompt enhancement for MOSS-Image
+
+The **MOSS-Image Prompt Enhancer** system prompt, derived from OpenMOSS's prompt-enhancer skill, has the language model write either a detailed caption or, for posters and other images with placed text, a layout draft that MOSS-Image compiles into its JSON layout at generation time. With a MOSS-Image model selected, Expand Prompt in the Generate panel (whose prompt the Canvas also uses) preselects this system prompt and the **Gemma 4 E4B (Prompt Enhancer)** starter model (`google/gemma-4-E4B-it`, ~16 GB), following the same rule as for LTX-2 above. Small models such as Qwen2.5 1.5B are not recommended for this system prompt. See [MOSS-Image](/users-guide/models/local-models/moss-image/#prompt-enhancer) for caption versus layout, image size and canvas regions.
 
 ### Reasoning ("thinking") models
 

@@ -124,6 +124,8 @@ export interface QueueResultImage {
   imageUrl: string;
   isIntermediate?: boolean;
   queuedAt: string;
+  /** Retained across result flattening so Canvas delivery acknowledges the item that produced each image. */
+  sourceBackendItemId?: number;
   sourceQueueItemId: string;
   thumbnailUrl: string;
   width: number;
@@ -187,6 +189,8 @@ export interface QueueItemReadModel {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userId?: string;
+  /** The name of the workflow submitted with the item; absent for Generate runs, which submit none. */
+  workflowName?: string | null;
 }
 
 /**

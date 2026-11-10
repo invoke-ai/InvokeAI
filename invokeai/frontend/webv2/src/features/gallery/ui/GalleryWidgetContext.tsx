@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryGeneralAccess, GalleryView } from '@features/gallery/core/types';
@@ -21,11 +22,15 @@ import type { GalleryListingState, GallerySparseListing } from './useGalleryData
  */
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
+  /** Drops the whole selection, the item Preview shows included. */
+  clearSelection: () => void;
   /** In the given project, or in the Library for null. */
   /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
+  /** Where the board's media is still used; see `GalleryUiAdapter.getBoardMediaUsage`. */
+  getBoardMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   /** Export the project that owns this board as a complete `.invk` archive. */
   exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;
@@ -83,8 +88,6 @@ export interface GalleryWidgetContextValue {
    */
   filter: GalleryItemsFilter;
   itemActions: GalleryItemActions;
-  /** The infinite window is full and the board holds images it cannot reach. */
-  isWindowTruncated: boolean;
   /** How the listing behind `gallery.items` stands for the current scope, and its recovery. */
   listing: GalleryListingState;
   /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */

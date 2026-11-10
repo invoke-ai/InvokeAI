@@ -252,3 +252,44 @@ def test_the_field_publishes_its_bounds_where_the_editors_read_them() -> None:
 
     assert "anyOf" not in prop
     assert (prop["minimum"], prop["maximum"]) == (0, EXPAND_PROMPT_MAX_TOKENS_MAX)
+
+
+def test_preset_node_cache_hit_does_not_bypass_the_access_check_for_another_user() -> None:
+    # Alice may use her private prompt and warms the shared invocation cache; Bob enqueues the
+    # byte-identical node. The cache must not hand him alice's output without the check running.
+    from types import SimpleNamespace
+
+    from invokeai.app.invocations.baseinvocation import services_for_queue_user
+    from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(node_cache_size=5, multiuser=True),
+        invocation_cache=MemoryInvocationCache(max_cache_size=5),
+        intermediates=MagicMock(),
+        logger=MagicMock(),
+    )
+    context = _make_context(
+        prompt_record_content="alice's secret instruction",
+        multiuser=True,
+        record_user_id="alice",
+        record_is_public=False,
+        queue_user_id="alice",
+    )
+    context._skip_invocation_cache = False  # a MagicMock attribute would be truthy and bypass the cache
+
+    def run() -> str:
+        return (
+            _make_invocation(prompt_id="alice-private")
+            .invoke_internal_with_effects(context, services_for_queue_user(services, context._data.queue_item.user_id))
+            .output.value
+        )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="alice's expansion") as mock_run:
+        assert run() == "alice's expansion"
+        assert run() == "alice's expansion"  # same user, same inputs: served from the cache
+        assert mock_run.call_count == 1
+
+        context._data.queue_item.user_id = "bob"
+        with pytest.raises(ValueError, match="not accessible to this user"):
+            run()
+        assert mock_run.call_count == 1

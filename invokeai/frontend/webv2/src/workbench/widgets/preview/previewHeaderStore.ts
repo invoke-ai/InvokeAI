@@ -1,8 +1,10 @@
 import type { GalleryItem } from '@features/gallery';
-import type { ImageActions } from '@workbench/image-actions';
+import type { ImageActions, ImageContextMenuVariant } from '@workbench/image-actions';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+
+import type { PreviewDensity } from './previewDensity';
 
 /** The loupe's commands, published once per selection; the readout lives in `previewStageStore`. */
 export interface PreviewZoomCommands {
@@ -36,7 +38,7 @@ export const getActualZoomLimits = (fitRatio: number): { max: number; min: numbe
   min: Math.min(fitRatio, 1),
 });
 
-/** Where the selection sits in its board, for the Details popover's header line. */
+/** Where the selection sits in its board, for the Details panel's header line. */
 export interface PreviewItemPosition {
   boardItemCount: number;
   isLoadingBoard: boolean;
@@ -56,8 +58,11 @@ export interface PreviewHeaderContext {
   copyCurrentVideoFrame: (() => void) | null;
   isVideoFrameCopyAvailable: boolean;
   itemName: string | null;
-  /** Open the view's shared image context menu from header actions at viewport coordinates. */
-  openItemMenu: ((x: number, y: number) => void) | null;
+  /**
+   * Open the view's shared image context menu from header actions at viewport coordinates; `housekeeping` leaves out
+   * what the header's Edit and Use menus already offer.
+   */
+  openItemMenu: ((x: number, y: number, variant: ImageContextMenuVariant) => void) | null;
   position: PreviewItemPosition | null;
   /** Null unless the selection is an image the loupe can zoom. */
   zoom: PreviewZoomCommands | null;
@@ -95,17 +100,22 @@ export const usePreviewHeaderContext = (): PreviewHeaderContext => store.useSele
 
 /** Publish hot-path zoom readouts directly so wheel ticks update only the zoom menu. */
 export interface PreviewStageContext {
-  /** The media stage; the Details popover keeps within it, off the filmstrip. */
+  /** The view's measured density, so the header sizes its controls by width; null until the view has measured. */
+  density: PreviewDensity | null;
+  /** The media stage; the Details panel is pinned inside it, off the filmstrip. */
   stageElement: HTMLElement | null;
   zoom: PreviewZoomReadout | null;
 }
 
-const emptyStage: PreviewStageContext = { stageElement: null, zoom: null };
+const emptyStage: PreviewStageContext = { density: null, stageElement: null, zoom: null };
 const stageStore = createExternalStore<PreviewStageContext>(emptyStage);
 
 export const previewStageStore = {
   clear(): void {
     stageStore.patchSnapshot(emptyStage);
+  },
+  setDensity(density: PreviewDensity | null): void {
+    stageStore.patchSnapshot({ density });
   },
   setStageElement(stageElement: HTMLElement | null): void {
     stageStore.patchSnapshot({ stageElement });

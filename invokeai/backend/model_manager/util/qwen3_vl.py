@@ -1,6 +1,7 @@
 """Shared helpers for loading Qwen3-VL encoder checkpoints.
 
-Used by Krea-2, Ideogram 4 and MiniMax H3. The visual-tower helpers live here rather than beside
+Used by Krea-2, Ideogram 4 and MiniMax H3, and the tower drop also by Qwen-Image's Qwen2.5-VL GGUF encoder,
+whose module tree keeps the tower under the same attribute. The visual-tower helpers live here rather than beside
 one family's loader because three loaders in two files drop the tower, and because what counts as
 the tower has to agree with the key mapping that sits next to it -- two definitions would drift.
 MiniMax H3 deliberately does not use them: it runs the tower for its reference images.
@@ -75,6 +76,9 @@ def drop_qwen3vl_visual_tower(model: torch.nn.Module, *, required: bool = True) 
     legitimately meets rather than a sign the architecture moved underneath us. Such a build fails
     later and on its own terms, when the caption encoder reaches for ``language_model``.
 
+    Qwen-Image's GGUF encoder drops the Qwen2.5-VL tower through this too (pass ``model.model``): transformers keeps
+    it under the same ``visual`` attribute, and llama.cpp keeps its weights in a separate ``mmproj`` file.
+
     MiniMax H3 genuinely runs this tower for its reference images, and loads through its own loaders in
     ``model_loaders/minimax_h3.py``; nothing here is reachable from them.
 
@@ -87,7 +91,7 @@ def drop_qwen3vl_visual_tower(model: torch.nn.Module, *, required: bool = True) 
     if not isinstance(existing, torch.nn.Module) or isinstance(existing, torch.nn.Identity):
         if required:
             raise RuntimeError(
-                f"{type(model).__name__} has no Qwen3-VL visual tower to drop. The architecture has "
+                f"{type(model).__name__} has no Qwen-VL visual tower to drop. The architecture has "
                 "changed shape; the tower would otherwise stay resident with nothing reporting it."
             )
         return False
@@ -204,3 +208,27 @@ def attach_qwen3vl_visual_tower(model: torch.nn.Module, tower: torch.nn.Module) 
     finally:
         model.visual = existing
         model.rope_deltas = prior_rope_deltas
+
+
+def drop_qwen3vl_unloaded_keys(sd: dict[str, Any]) -> dict[str, Any]:
+    """Keep only what the single-file encoder loader reads: drop the visual tower and the LM head.
+
+    ``Qwen3VLModel`` has no LM head, so a non-strict load would discard it anyway -- but only after the
+    side-channel handling had folded and reserved for it: on the 8B fp8 builds a 151936x4096 bf16 copy.
+    Identification judges a file's quantization by the same view, so it refuses nothing the loader would
+    never read.
+    """
+    return {k: v for k, v in sd.items() if not _is_qwen3vl_unloaded_key(k)}
+
+
+def _is_qwen3vl_unloaded_key(key: Any) -> bool:
+    """Whether a checkpoint key belongs to the visual tower or the LM head, sidecars included.
+
+    The head is matched where the remap sends it, like the tower: a top-level ``lm_head.*`` and a ``model.lm_head.*``
+    both land on ``language_model.lm_head``, which names no module. Left in, an nvfp4 head fails the install that
+    way, and a scaled fp8 one is folded and reserved for, then discarded.
+    """
+    if not isinstance(key, str):
+        return False
+    target = qwen3vl_target_key(key)
+    return target.startswith("visual.") or target.startswith("language_model.lm_head.")

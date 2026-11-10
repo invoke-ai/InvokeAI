@@ -23,6 +23,12 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader, _model
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.int8_convrot import (
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+)
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys, reject_incomplete_load
@@ -68,7 +74,9 @@ def load_qwen3_5_text_encoder(
 ) -> "Qwen35Encoder":
     """Build a `Qwen35Encoder` from the language-model tensors of a safetensors file or of a model's shards.
 
-    Nothing else is read, so a multimodal export's vision tower never reaches RAM.
+    Nothing else is read, so a multimodal export's vision tower, an LM head and a multi-token-prediction
+    head never reach RAM. A ComfyUI `int8_tensorwise` build keeps its marked Linears int8, dequantizing
+    per forward; the embedding, which is not a Linear, is widened on load.
 
     Args:
         loader: The calling loader; the load reserves room in its RAM cache.
@@ -90,10 +98,6 @@ def load_qwen3_5_text_encoder(
         with safe_open(path, framework="pt", device="cpu") as f:
             keys_by_file[path] = list(f.keys())
     all_keys = dict.fromkeys(key for keys in keys_by_file.values() for key in keys)
-    # Anima-3.8B's encoder ships raw fp8 projections (no scale), which the cast below handles
-    # exactly. A scaled, int8 or nvfp4 build would load *wrong* here rather than fail, so refuse it
-    # until one exists to support.
-    reject_quantized_side_channel(all_keys, what)
     prefix = qwen3_5_key_prefix(all_keys)
     if prefix is None:
         raise ValueError(f"{what} is not a Qwen3.5 language model checkpoint.")
@@ -122,17 +126,40 @@ def load_qwen3_5_text_encoder(
 
     model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
     skip_patterns = _model_declared_skip_patterns(model)
-    reserve_for_load(
-        loader.ram_cache.make_room,
-        sd,
-        model_dtype,
-        keep_fp8=keep_fp8,
-        model=model,
-        skip_patterns=skip_patterns,
-        fp8_layers={},
-        nvfp4_payloads={},
-    )
-    kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+    markers = extract_int8_convrot_markers(sd)
+    # Outside the int8 branch, so an int8 weight whose marker is missing is refused, not cast as codes.
+    reject_unmarked_int8_weights(sd, markers, "Qwen3.5", model)
+    kept = 0
+    if markers:
+        sd = drop_unconsumed_quantization_sidecars(sd)
+        int8_layers = install_int8_convrot_layers(
+            model,
+            sd,
+            markers,
+            model_dtype,
+            architecture="Qwen3.5",
+            reserve=loader.ram_cache.make_room,
+            skip_patterns=skip_patterns,
+        )
+        loader._logger.info(
+            f"{what}: kept {len(int8_layers)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, "
+            "dequantized per forward); the embedding is widened on load."
+        )
+    else:
+        # Anima-3.8B's encoder ships raw fp8 projections (no scale), which the cast below handles
+        # exactly. A scaled or nvfp4 build would load *wrong* here rather than fail, so refuse it.
+        reject_quantized_side_channel(sd, what)
+        reserve_for_load(
+            loader.ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers={},
+            nvfp4_payloads={},
+        )
+        kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
     result = model.load_state_dict(sd, strict=False, assign=True)
     log_unexpected_keys(what, result.unexpected_keys)

@@ -103,6 +103,7 @@ class ModelType(str, Enum):
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
+    Qwen3VLVisionTower = "qwen3_vl_vision_tower"
     Qwen35Encoder = "qwen3_5_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
@@ -190,7 +191,7 @@ class Flux2VariantType(str, Enum):
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
     Dev = "dev"
-    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.2 text encoder (guidance-distilled)."""
 
 
 class Flux3VariantType(str, Enum):
@@ -292,6 +293,19 @@ class WanLoRAVariantType(str, Enum):
     """Targets the Wan 2.2 TI2V-5B main (inner_dim=3072)."""
 
 
+class SD3VariantType(str, Enum):
+    """SD 3 transformer sizes, which decide the LoRAs that fit a model.
+
+    The values carry the family name because variant values share one namespace and `large` is already a CLIP variant.
+    """
+
+    Medium = "sd3_medium"
+    """SD 3 Medium and SD 3.5 Medium (24 blocks, 1536 wide; 3.5 Medium adds dual attention to its first 13)."""
+
+    Large = "sd3_large"
+    """SD 3.5 Large and Large Turbo (38 blocks, 2432 wide)."""
+
+
 class Qwen3VariantType(str, Enum):
     """Qwen3 text encoder variants based on model size."""
 
@@ -384,7 +398,7 @@ class MistralVariantType(str, Enum):
     """Mistral text encoder variants used by FLUX.2 [dev] and ERNIE-Image."""
 
     Cow = "cow_mistral3_small"
-    """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120).
+    """The "cow-mistral3-small" build: the first 30 of Mistral Small 3's 40 layers (hidden_size=5120).
     Hidden states are sampled at indices (10, 20, 30) which on a 30-layer model
     hit 1/3, 2/3, and the final layer. ComfyUI's reference implementation
     drops the final RMSNorm for this variant (``final_norm=False``), so the
@@ -392,12 +406,11 @@ class MistralVariantType(str, Enum):
 
     Mistral24B = "mistral3_24b"
     """The 40-layer Mistral Small 3 (24B, hidden_size=5120) text encoder BFL
-    ships in the canonical ``black-forest-labs/FLUX.2-dev/text_encoder``. Same
-    extraction indices (10, 20, 30), final RMSNorm kept enabled. Architecturally
-    identical to upstream ``mistralai/Mistral-Small-3.1/3.2`` — installing one
-    of those instead of BFL's release will load fine but produces visibly
-    weaker prompt adherence than the cow distillation, so the cow variants
-    remain the recommended default."""
+    ships in ``black-forest-labs/FLUX.2-dev/text_encoder``. Same extraction
+    indices (10, 20, 30), final RMSNorm kept enabled. Its weights are bit-identical
+    in BF16 to upstream ``mistralai/Mistral-Small-3.2-24B-Instruct-2506``, so
+    upstream builds of that model, GGUFs included, are the same encoder. Mistral
+    Small 3.0 and 3.1 have the same shape but different weights."""
 
     Ministral3B = "ministral3_3b"
     """The 26-layer Ministral 3B (hidden_size=3072) ERNIE-Image encodes its
@@ -515,6 +528,7 @@ AnyVariant: TypeAlias = Union[
     QwenImageVariantType,
     WanVariantType,
     WanLoRAVariantType,
+    SD3VariantType,
     Qwen3VariantType,
     Qwen3VLVariantType,
     Qwen35VariantType,
@@ -536,6 +550,7 @@ variant_type_adapter = TypeAdapter[
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
     | Qwen35VariantType
@@ -556,6 +571,7 @@ variant_type_adapter = TypeAdapter[
     | QwenImageVariantType
     | WanVariantType
     | WanLoRAVariantType
+    | SD3VariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
     | Qwen35VariantType

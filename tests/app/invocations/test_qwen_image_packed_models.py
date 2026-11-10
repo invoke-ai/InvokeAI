@@ -136,7 +136,7 @@ def test_the_text_encoder_reserves_the_dequant_transient_of_a_packed_encoder(mon
     context = MagicMock()
     context.models.load.return_value = loaded
     node = QwenImageTextEncoderInvocation.model_construct(
-        qwen_vl_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace())
+        qwen_vl_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace(), loras=[])
     )
 
     _, _, cleanup = node._load_cached_encoder(context)

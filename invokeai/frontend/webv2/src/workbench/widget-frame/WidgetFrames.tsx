@@ -34,11 +34,13 @@ import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 export const WidgetPanelFrame = ({
   children,
   instanceId,
+  label,
   region,
   typeId,
 }: {
   children: ReactNode;
   instanceId?: WidgetInstanceId;
+  label?: string;
   region: Exclude<WidgetRegion, 'center'>;
   typeId?: WidgetTypeId;
 }) => {
@@ -122,6 +124,8 @@ export const WidgetPanelFrame = ({
   return (
     // Side widths shrink to protect center space and opposite rails; bottom height stays fixed.
     <Flex
+      role="group"
+      aria-label={label ?? t('widgets.panelLabel', { region })}
       direction={isBottom ? 'column' : 'row'}
       flexShrink={isBottom ? 0 : 1}
       h={isBottom ? `${displaySizePx}px` : 'full'}
@@ -238,6 +242,12 @@ export const WidgetHeaderActionsGroup = ({
   );
 };
 
+/**
+ * The header row is the inline-size container its label and actions query, so a widget can fit them to the row's
+ * width, as Gallery does on narrow rails; the hoisted center chrome is a container of its own.
+ */
+const WIDGET_HEADER_CSS = { containerType: 'inline-size' } as const;
+
 export const WidgetHeader = ({
   actions,
   HeaderLabel,
@@ -261,7 +271,7 @@ export const WidgetHeader = ({
   const label = resolveWidgetInstanceLabel(instance, manifest, t);
 
   return (
-    <PanelHeader>
+    <PanelHeader css={WIDGET_HEADER_CSS}>
       <HStack flex="1" gap="1.5" minW="0">
         <WidgetIdentityIcon icon={manifest.icon} />
         {HeaderLabel && !instance.title ? (

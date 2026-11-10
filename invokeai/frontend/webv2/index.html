@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#16181d" />
-    <title>Invoke V7 Workbench</title>
+    <title>Invoke Workbench</title>
     <link rel="icon" href="./invoke-icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <script>
@@ -42,8 +42,10 @@
           }
           var language = localStorage.getItem('invokeai:v7:webv2:language');
           if (language) {
-            root.setAttribute('lang', language);
-            var direction = language === 'ar' || language === 'he' ? 'rtl' : 'ltr';
+            var ready = __READY_CONTENT_LANGUAGES__;
+            var effective = ready.includes(language) || ready.includes(language.split('-')[0]) ? language : 'en';
+            root.setAttribute('lang', effective);
+            var direction = effective === 'ar' || effective === 'he' ? 'rtl' : 'ltr';
             root.setAttribute('dir', direction);
           }
         } catch (error) {

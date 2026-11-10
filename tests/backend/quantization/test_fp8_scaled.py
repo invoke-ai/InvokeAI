@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 import torch
 
+from invokeai.backend.quantization import fp8_scaled
 from invokeai.backend.quantization.block_scale_tiles import unblock_scale_grid
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
@@ -860,6 +861,107 @@ class TestE5m2ScaleRecovery:
         assert kept == {}
         assert sd["lin.weight"].dtype is torch.bfloat16
         assert torch.allclose(sd["lin.weight"].float(), torch.full((4, 4), 0.5))
+
+
+class TestFoldInSlabs:
+    """A tensor larger than a slab is folded a slab of rows at a time, and must come out as the whole fold would.
+
+    The expectations are the definition -- float32 product, one rounding to the target dtype -- with each weight
+    element's scale picked out by index rather than by the expansion the fold uses. The slab is shrunk so a 39-row
+    weight splits into slabs of two rows and an odd one at the end: the boundaries a row-indexing mistake would
+    show at, and, against three-row scale blocks, slabs that start inside a block.
+    """
+
+    @staticmethod
+    def _codes(shape: tuple[int, ...], contiguous: bool) -> torch.Tensor:
+        if contiguous:
+            return torch.randn(shape).to(FP8_DTYPE)
+        if len(shape) == 1:
+            return torch.randn(2 * shape[0]).to(FP8_DTYPE)[::2]
+        # A transposed buffer, so each slab is a strided row slice.
+        return torch.randn(shape[::-1]).to(FP8_DTYPE).permute(*reversed(range(len(shape))))
+
+    @staticmethod
+    def _per_element(scale: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+        """Each weight element's scale: along every axis the scale has, element ``i`` reads block ``i // size``."""
+        for dim in range(scale.dim()):
+            scale = scale.index_select(dim, torch.arange(shape[dim]) // (shape[dim] // scale.shape[dim]))
+        return scale.reshape(*scale.shape, *[1] * (len(shape) - scale.dim()))
+
+    @pytest.mark.parametrize(
+        ("shape", "scale_shape"),
+        [
+            pytest.param((39, 48), (), id="per_tensor"),
+            pytest.param((39, 48), (39,), id="per_row"),
+            pytest.param((39, 48), (39, 3), id="column_blocks"),
+            pytest.param((39, 48), (13, 3), id="row_and_column_blocks"),
+            pytest.param((39, 48), (1, 3), id="one_scale_row"),
+            pytest.param((300,), (300,), id="1d"),
+            pytest.param((39, 4, 2, 3), (39,), id="4d_per_row"),
+            pytest.param((39, 4, 2, 3), (13, 2, 2, 3), id="4d_blocks"),
+        ],
+    )
+    @pytest.mark.parametrize("contiguous", [True, False], ids=["contiguous", "strided"])
+    def test_slabs_fold_exactly_as_the_whole(
+        self, monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], scale_shape: tuple[int, ...], contiguous: bool
+    ) -> None:
+        monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", 100)
+        torch.manual_seed(0)
+        codes = self._codes(shape, contiguous)
+        scale = torch.rand(scale_shape) + 0.5
+        sd = {"lin.weight": codes}
+
+        dequantize_fp8_scaled(sd, {"lin": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16)
+
+        expected = (codes.float() * self._per_element(scale, codes.shape)).to(torch.bfloat16)
+        assert torch.equal(sd["lin.weight"], expected)
+
+    def test_an_mxfp8_layer_folds_exactly_as_the_whole(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Through the real decode: slabs of seven rows run across the 32-row tiles the grid is stored in."""
+        monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", 7 * 128)
+        torch.manual_seed(0)
+        sd, decoded = mxfp8_tensors("lin", torch.randint(124, 131, (128, 4)))
+        sd["lin.weight"] = codes = torch.randn(128, 4 * MX_BLOCK_SIZE).to(FP8_DTYPE)
+
+        dequantize_fp8_scaled(sd, extract_fp8_scaled_layers(sd, layer_hints={"lin": mxfp8_marker()}), torch.bfloat16)
+
+        expected = (codes.float() * self._per_element(decoded, codes.shape)).to(torch.bfloat16)
+        assert torch.equal(sd["lin.weight"], expected)
+
+    @pytest.mark.parametrize(
+        "scale",
+        [
+            pytest.param(torch.tensor(0.37), id="per_tensor"),
+            pytest.param(torch.rand(256) + 0.5, id="per_row"),
+            pytest.param(torch.rand(16, 4) + 0.5, id="row_and_column_blocks"),
+        ],
+    )
+    def test_nothing_the_size_of_the_weight_is_held_in_float32(
+        self, monkeypatch: pytest.MonkeyPatch, scale: torch.Tensor
+    ) -> None:
+        """The point of the slabs: the largest allocation is the result itself.
+
+        Folded whole, the weight's float32 copy and product are each twice the size of the bf16 result; so is a
+        block-wise scale expanded whole before the slabs start, which bounded nothing for those layouts. Measured
+        with the profiler's per-op allocation record, which sees every one of them.
+        """
+        from torch.profiler import ProfilerActivity, profile
+
+        monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", 8 * 512)
+        sd = {"lin.weight": torch.randn(256, 512).to(FP8_DTYPE)}
+        result_bytes = 256 * 512 * torch.bfloat16.itemsize
+
+        with profile(activities=[ProfilerActivity.CPU], profile_memory=True) as profiler:
+            dequantize_fp8_scaled(sd, {"lin": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16)
+
+        assert max(event.cpu_memory_usage for event in profiler.events()) == result_bytes
+
+    def test_a_block_scale_that_does_not_tile_the_rows_names_the_layer(self) -> None:
+        # Left to the multiply: "The size of tensor a (39) must match the size of tensor b (36)", naming nothing.
+        sd = {"blocks.0.lin.weight": torch.randn(39, 48).to(FP8_DTYPE)}
+
+        with pytest.raises(ValueError, match=r"blocks\.0\.lin: a \(12, 3\) block-wise weight_scale"):
+            dequantize_fp8_scaled(sd, {"blocks.0.lin": Fp8ScaledLayer(weight_scale=torch.ones(12, 3))})
 
 
 class TestBlockWiseScale:

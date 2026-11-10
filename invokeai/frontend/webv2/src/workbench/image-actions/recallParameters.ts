@@ -10,6 +10,7 @@ import type {
   IPAdapterMethod,
   VaeModelConfig,
 } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import {
   cloneGenerateWidgetValues,
@@ -20,7 +21,7 @@ import {
   getDefaultLoraWeight,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
-  getMaxReferenceImages,
+  getReferenceImageLimit,
   getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
@@ -30,7 +31,7 @@ import {
   isMainModelConfig,
   isRefinerModel,
   isRefinerSupported,
-  isReferenceImageSupported,
+  takesReferenceImages,
   isVaeCompatibleWithGenerateModel,
   MAX_REFINER_AESTHETIC_SCORE,
   MAX_REFINER_START,
@@ -79,7 +80,8 @@ export type RecallParameterField =
   | 'clipSkip'
   | 'loras'
   | 'referenceImages'
-  | 'refiner';
+  | 'refiner'
+  | 'canvas';
 
 export type RecallParameterSkipReason = 'unsupported' | 'unresolved' | 'incompatible' | 'invalid' | 'limit';
 
@@ -127,6 +129,8 @@ export const isRecallParametersAvailable = (parameters: Record<string, unknown>)
 
 const HANDLED_KEYS = new Set([
   'append',
+  'control_layers',
+  'denoise_strength',
   'cfg_rescale_multiplier',
   'cfg_scale',
   'clip_skip',
@@ -600,7 +604,8 @@ export const buildRecallParametersSettings = ({
       recalledImages.push(image);
     }
 
-    const isSupported = isReferenceImageSupported(values.model);
+    // The base alone decides: an encoder without a vision tower is flagged by validation, not recalled away.
+    const isSupported = takesReferenceImages(values.model);
 
     if (recalled.length + recalledImages.length > 0 && !isSupported) {
       if (ipAdapters?.length) {
@@ -619,7 +624,7 @@ export const buildRecallParametersSettings = ({
       : kept;
     const addedImages = isSupported ? recalledImages : [];
     const recalledCount = withAdapters.length + addedImages.length - kept.length;
-    const limit = getMaxReferenceImages(values.model);
+    const limit = getReferenceImageLimit(values.model);
 
     if (withAdapters.length + addedImages.length > limit) {
       skip('reference_images', 'limit', String(limit));
@@ -644,19 +649,17 @@ export const buildRecallParametersSettings = ({
   return { fields: [...fields], retainedReferenceImages, skipped, values };
 };
 
-const SKIP_REASON_LABELS: Record<RecallParameterSkipReason, string> = {
-  incompatible: 'incompatible with the current model',
-  invalid: 'invalid value',
-  limit: 'over the reference image limit',
-  unresolved: 'not found',
-  unsupported: 'not supported by the Generate panel',
-};
-
 /** One line naming every parameter that was not applied and why, for the notice. */
-export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[]): string =>
+export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[], t: TFunction): string =>
   skipped
-    .map(({ detail, key, reason }) => `${key}: ${SKIP_REASON_LABELS[reason]}${detail ? ` (${detail})` : ''}`)
+    .map(({ detail, key, reason: skipReason }) => {
+      const reason = t(`widgets.gallery.itemActions.recall.parameters.skipReasons.${skipReason}`);
+
+      return detail
+        ? t('widgets.gallery.itemActions.recall.parameters.skippedWithDetail', { detail, key, reason })
+        : t('widgets.gallery.itemActions.recall.parameters.skipped', { key, reason });
+    })
     .join('; ');
 
-export const getRecallParametersMessage = (fields: readonly RecallParameterField[]): string =>
-  `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
+export const getRecallParametersMessage = (fields: readonly RecallParameterField[], t: TFunction): string =>
+  t('widgets.gallery.itemActions.recall.fieldsApplied', { count: fields.length });

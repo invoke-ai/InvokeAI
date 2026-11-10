@@ -40,6 +40,9 @@ register(
         # flow map was not told about, so there is no choice to offer.
         scheduler_set=None,
         max_reference_images=10,
+        # Regions are not masked: each becomes a box in the table that ends the caption (`flux3_layout_prompt`),
+        # which has no negative counterpart, so `regional_negative` keeps its False default.
+        supports_regional_guidance=True,
     ),
     VaeFacet(
         frozenset(

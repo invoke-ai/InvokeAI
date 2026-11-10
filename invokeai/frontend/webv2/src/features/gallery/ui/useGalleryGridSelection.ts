@@ -40,8 +40,11 @@ const getGalleryItemRange = (
  * the captured context.
  */
 export const useGalleryGridSelection = ({
+  getItemReturnFocus,
   getSelectionPage,
 }: {
+  /** Where focus returns from a dialog the item's context menu opens; see `GalleryItemContextMenuTarget`. */
+  getItemReturnFocus?: (item: GalleryItem) => () => HTMLElement | null;
   /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
   getSelectionPage?: (item: GalleryItem) => number | undefined;
 } = {}) => {
@@ -277,21 +280,27 @@ export const useGalleryGridSelection = ({
     [actions, selectItemRange, toggleItem]
   );
 
-  /** Falls back to the primary selection so hotkeys work before a multi-select. */
-  const actionSelectionRefs = useMemo(
-    () =>
-      selectedItemRefs.length > 0
-        ? selectedItemRefs
-        : gallery.selectedItemKey
-          ? [parseGalleryItemKey(gallery.selectedItemKey)]
-          : [],
-    [gallery.selectedItemKey, selectedItemRefs]
-  );
+  /**
+   * Falls back to the primary selection so hotkeys work before a multi-select, but only while a loaded page lists it:
+   * the item Preview keeps showing after a board or filter switch is not this view's to delete or star.
+   */
+  const actionSelectionRefs = useMemo(() => {
+    if (selectedItemRefs.length > 0) {
+      return selectedItemRefs;
+    }
+
+    const primaryKey = gallery.selectedItemKey;
+
+    return primaryKey && loadedItems.some((item) => toGalleryItemKey(item) === primaryKey)
+      ? [parseGalleryItemKey(primaryKey)]
+      : [];
+  }, [gallery.selectedItemKey, loadedItems, selectedItemRefs]);
   const shouldStarSelection = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
 
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
       const itemKey = toGalleryItemKey(item);
+      const returnFocus = getItemReturnFocus?.(item);
 
       if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
         const selectionItems = [
@@ -306,15 +315,17 @@ export const useGalleryGridSelection = ({
           allStarred: !shouldStarSelection,
           itemRefs: selectedItemRefs,
           items: selectionItems,
+          listingBoardId: gallery.listingBoardId,
+          returnFocus,
           x,
           y,
         });
         return;
       }
 
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], returnFocus, x, y });
     },
-    [loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
+    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
   );
 
   const getDragItems = useCallback(

@@ -48,7 +48,6 @@ const menuItemValueAt = (event: ReactPointerEvent): string | null =>
  */
 export const ToolFamilyButton = ({
   currentId,
-  disabled = false,
   icon,
   isActive,
   items,
@@ -58,7 +57,6 @@ export const ToolFamilyButton = ({
 }: {
   /** The subtool the slot currently stands for (checked in the menu). */
   currentId: string;
-  disabled?: boolean;
   icon: React.ElementType;
   isActive: boolean;
   items: readonly ToolFlyoutItem[];
@@ -84,7 +82,7 @@ export const ToolFamilyButton = ({
   }, []);
   useMountEffect(() => clearHoldTimer);
 
-  // Choosing an entry closes the menu itself; a locked slot's entries are disabled and never report a choice.
+  // Choosing an entry closes the menu itself.
   const onValueChange = useCallback((details: { value: string }) => onSelectSubtool(details.value), [onSelectSubtool]);
   const openFromKeyboard = useCallback(() => {
     menu.setOpen(true);
@@ -96,7 +94,7 @@ export const ToolFamilyButton = ({
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (disabled || event.button !== 0) {
+      if (event.button !== 0) {
         return;
       }
       openedByHold.current = false;
@@ -114,13 +112,10 @@ export const ToolFamilyButton = ({
         menu.setOpen(true);
       }, HOLD_OPEN_MS);
     },
-    [clearHoldTimer, disabled, menu]
+    [clearHoldTimer, menu]
   );
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (disabled) {
-        return;
-      }
       if (holdTimer.current !== null) {
         clearHoldTimer();
         // Short press: an ordinary click on the slot — but only released over
@@ -147,7 +142,7 @@ export const ToolFamilyButton = ({
         }
       }
     },
-    [clearHoldTimer, disabled, menu, onActivate, onSelectSubtool]
+    [clearHoldTimer, menu, onActivate, onSelectSubtool]
   );
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -180,20 +175,18 @@ export const ToolFamilyButton = ({
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       // Pointer clicks are resolved on release above; a click with no pointer
       // detail is Enter or Space on the focused slot.
-      if (event.detail === 0 && !disabled) {
+      if (event.detail === 0) {
         onActivate();
       }
     },
-    [disabled, onActivate]
+    [onActivate]
   );
   const onContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      if (!disabled) {
-        menu.setOpen(true);
-      }
+      menu.setOpen(true);
     },
-    [disabled, menu]
+    [menu]
   );
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -216,9 +209,6 @@ export const ToolFamilyButton = ({
       }
       // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured
       // here: the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
-      if (disabled) {
-        return;
-      }
       const item = items.find((candidate) =>
         candidate.hotkeys?.some((hotkey) => isHotkeyPress(event.nativeEvent, hotkey))
       );
@@ -230,7 +220,7 @@ export const ToolFamilyButton = ({
         menu.setOpen(false);
       }
     },
-    [disabled, items, menu, onSelectSubtool]
+    [items, menu, onSelectSubtool]
   );
 
   // The title names the slot with the current subtool's first effective binding; its help line follows.
@@ -257,17 +247,15 @@ export const ToolFamilyButton = ({
 
   return (
     <Menu.RootProvider lazyMount unmountOnExit value={menuMachine}>
-      {/* Forcing `open={false}` (not `disabled`) suppresses the tooltip while
-          the menu is open: the disabled path unwraps the trigger and remounts
-          the button, dropping pointer capture mid-hold. */}
-      <Tooltip content={tooltip} ids={ids} open={menu.open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
+      {/* No tooltip while the menu is open. The root stays mounted: unwrapping the trigger would remount the button
+          and drop its pointer capture mid-hold. */}
+      <Tooltip content={tooltip} disabled={menu.open} ids={ids} keepsRootWhenDisabled positioning={TOOLTIP_POSITIONING}>
         <IconButton
           aria-controls={menu.open ? menu.getContentProps().id : undefined}
           aria-expanded={menu.open}
           aria-haspopup="menu"
           aria-label={label}
           aria-pressed={isActive}
-          disabled={disabled}
           variant={isActive ? 'solid' : 'ghost'}
           onClick={onClick}
           onContextMenu={onContextMenu}
@@ -298,7 +286,7 @@ export const ToolFamilyButton = ({
           <MenuContent aria-label={label} minW="10rem" onKeyDown={onMenuKeyDown}>
             <Menu.RadioItemGroup value={currentId} onValueChange={onValueChange}>
               {items.map((item) => (
-                <Menu.RadioItem key={item.id} disabled={disabled} value={item.id}>
+                <Menu.RadioItem key={item.id} value={item.id}>
                   <Menu.ItemIndicator />
                   <Icon as={item.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
                   <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>

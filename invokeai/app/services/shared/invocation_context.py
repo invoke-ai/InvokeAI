@@ -2,7 +2,7 @@ from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import IO, TYPE_CHECKING, Any, Callable, Optional, Union
 
 from dynamicprompts.wildcards import WildcardManager
 from PIL.Image import Image
@@ -22,6 +22,7 @@ from invokeai.app.services.board_access.board_access_common import (
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.files.files_common import FileDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
@@ -44,6 +45,7 @@ from invokeai.backend.util.devices import TorchDevice
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
     from invokeai.app.services.shared.execution_engine.child import ChildExecutionCapability
 
@@ -254,6 +256,47 @@ class LoggerInterface(InvocationContextInterface):
         self._services.logger.error(message)
 
 
+class FilesInterface(InvocationContextInterface):
+    def get_dto(self, file_id: str) -> FileDTO:
+        """Gets metadata for a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The file DTO.
+        """
+        return self._get_files_service().get_dto(file_id, user_id=self._data.queue_item.user_id)
+
+    def get_path(self, file_id: str) -> Path:
+        """Gets the server-side path to a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The path to the managed file on the InvokeAI server.
+        """
+        return self._get_files_service().get_path(file_id, user_id=self._data.queue_item.user_id)
+
+    def open(self, file_id: str, mode: str = "rb") -> IO[Any]:
+        """Opens a managed file for reading.
+
+        Args:
+            file_id: The managed file ID.
+            mode: The read mode to use. Supported values are "rb" and "r".
+
+        Returns:
+            A readable file object.
+        """
+        return self._get_files_service().open(file_id, mode=mode, user_id=self._data.queue_item.user_id)
+
+    def _get_files_service(self) -> "FileServiceBase":
+        if self._services.files is None:
+            raise RuntimeError("The managed files service is not available.")
+        return self._services.files
+
+
 class ImagesInterface(InvocationContextInterface):
     def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
         super().__init__(services, data)
@@ -373,6 +416,8 @@ class ImagesInterface(InvocationContextInterface):
                 self._services.logger.warning(
                     f"Could not convert image from {image.mode} to {mode}. Using original mode instead."
                 )
+                # the service hands out its cached object: the fallback must not return it
+                image = image.copy()
         else:
             # copy the image to prevent the user from modifying the original
             image = image.copy()
@@ -1069,6 +1114,7 @@ class InvocationContext:
         config (ConfigInterface): The app config.
         util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.
         boards (BoardsInterface): Methods to interact with boards.
+        files (FilesInterface): Methods to read managed files uploaded for node inputs.
         wildcards (WildcardsInterface): Access to the queueing user's wildcards.
     """
 
@@ -1083,6 +1129,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
+        files: FilesInterface,
         wildcards: WildcardsInterface,
         data: InvocationContextData,
         services: InvocationServices,
@@ -1106,6 +1153,8 @@ class InvocationContext:
         """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
         """Methods to interact with boards."""
+        self.files = files
+        """Methods to read managed files uploaded for node inputs."""
         self.wildcards = wildcards
         """Access to the queueing user's wildcards."""
         self._data = data
@@ -1149,6 +1198,7 @@ def build_invocation_context(
     images = ImagesInterface(services=services, data=data, util=util)
     videos = VideosInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
+    files = FilesInterface(services=services, data=data)
     wildcards = WildcardsInterface(services=services, data=data)
 
     if execution_effects is None:
@@ -1166,6 +1216,7 @@ def build_invocation_context(
         conditioning=conditioning,
         services=services,
         boards=boards,
+        files=files,
         wildcards=wildcards,
         execution_effects=execution_effects,
     )

@@ -295,6 +295,28 @@
     },
     {
       "category": "PATHS",
+      "default": 52428800,
+      "description": "Maximum size in bytes of one managed file upload.",
+      "env_var": "INVOKEAI_MAX_FILE_UPLOAD_SIZE_BYTES",
+      "literal_values": [],
+      "name": "max_file_upload_size_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": 5368709120,
+      "description": "Maximum total size in bytes of all managed files.",
+      "env_var": "INVOKEAI_MAX_FILE_LIBRARY_BYTES",
+      "literal_values": [],
+      "name": "max_file_library_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "flat",
       "description": "Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.",
       "env_var": "INVOKEAI_IMAGE_SUBFOLDER_STRATEGY",
@@ -327,6 +349,17 @@
       "env_var": "INVOKEAI_STYLE_PRESETS_DIR",
       "literal_values": [],
       "name": "style_presets_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "prompt_files",
+      "description": "Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.",
+      "env_var": "INVOKEAI_PROMPT_FILES_DIR",
+      "literal_values": [],
+      "name": "prompt_files_dir",
       "required": false,
       "type": "<class 'pathlib.Path'>",
       "validation": {}
@@ -772,7 +805,7 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.",
+      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.",
       "env_var": "INVOKEAI_TINY_AUTOENCODER_PREVIEWS",
       "literal_values": [],
       "name": "tiny_autoencoder_previews",

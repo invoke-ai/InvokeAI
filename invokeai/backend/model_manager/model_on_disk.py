@@ -119,6 +119,7 @@ class ModelOnDisk:
         # This prevents redundant computations during matching and parsing
         self._state_dict_cache: dict[Path, Any] = {}
         self._metadata_cache: dict[Path, Any] = {}
+        self._metadata_errors: dict[Path, str] = {}
 
     def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
@@ -134,7 +135,13 @@ class ModelOnDisk:
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
-    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+    def metadata(self, path: Optional[Path] = None) -> dict[str, Any]:
+        """The file's metadata: safetensors' string map, or a GGUF's scalar fields.
+
+        GGUF values keep their type -- strings, numbers, booleans -- because llama.cpp records hyperparameters
+        as numbers. Array fields (the tokenizer vocabulary, for one) are left out: nothing identifies by them,
+        and they are most of a header's size.
+        """
         path = path or self.path
         if path in self._metadata_cache:
             return self._metadata_cache[path]
@@ -142,21 +149,31 @@ class ModelOnDisk:
             if path.suffix == ".gguf":
                 with WrappedGGUFReader(path) as reader:
                     metadata = {
-                        name: value
+                        name: field.contents()
                         for name, field in reader.fields.items()
-                        if field.types
-                        and field.types[0] == GGUFValueType.STRING
-                        and isinstance(value := field.contents(), str)
+                        if field.types and field.types[0] != GGUFValueType.ARRAY
                     }
             else:
                 with safe_open(path, framework="pt", device="cpu") as f:
                     metadata = f.metadata()
                     assert isinstance(metadata, dict)
-        except Exception:
+        except Exception as e:
             metadata = {}
+            # The message only: a stored exception would pin the traceback frames.
+            self._metadata_errors[path] = f"{type(e).__name__}: {e}"
 
         self._metadata_cache[path] = metadata
         return metadata
+
+    def metadata_read_error(self, path: Optional[Path] = None) -> Optional[str]:
+        """Why `metadata()` could not read the file, or None if it could.
+
+        `metadata()` returns `{}` for an unreadable file, which is indistinguishable from a readable one
+        without metadata; this tells the two apart without a second parse.
+        """
+        path = path or self.path
+        self.metadata(path)
+        return self._metadata_errors.get(path)
 
     def repo_variant(self) -> Optional[ModelRepoVariant]:
         if self.path.is_file():
@@ -211,8 +228,8 @@ class ModelOnDisk:
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
                 # Shapes and quantization types from the header, like the safetensors branch: the tensor data
-                # is never read. Whether a Q8_CR file's quantization is supported is decided from its metadata
-                # by `ModelConfigFactory`, once, not per candidate.
+                # is never read. Whether a Q8_CR or Q4_CR file's quantization is supported is decided from its
+                # metadata by `ModelConfigFactory`, once, not per candidate.
                 checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):

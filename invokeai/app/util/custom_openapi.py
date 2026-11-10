@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     InvocationRegistry,
     UIConfigBase,
 )
-from invokeai.app.invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
+from invokeai.app.invocations.fields import FileField, InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
@@ -179,6 +179,7 @@ def get_openapi_func(
             OutputFieldJSONSchemaExtra,
             ModelIdentifierField,
             ProgressImage,
+            FileField,
         ]
 
         additional_schemas = models_json_schema(

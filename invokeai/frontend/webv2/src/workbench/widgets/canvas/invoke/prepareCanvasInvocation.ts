@@ -44,7 +44,7 @@ import {
   registerAccountOwnedResource,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
-import { getCanvasEngine, getCanvasOperations } from '@workbench/canvas-operations/api';
+import { getCanvasEngine, getCanvasOperations, recordCanvasMetadata } from '@workbench/canvas-operations/api';
 import { createControlLayerCheckContext, createControlLayerSequence } from '@workbench/controlLayerChecks';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import {
@@ -259,7 +259,8 @@ export const resolveRegionalReferenceImages = (
  * prompt/reference/layout metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
-  model: GenerateModelConfig
+  model: GenerateModelConfig,
+  cfgScale: number
 ): {
   shouldComposite(layer: CanvasRegionalGuidanceLayerContract): boolean;
   toGraphInputs(
@@ -275,6 +276,7 @@ const createRegionalGuidanceCollector = (
       }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({
+        cfgScale,
         hasContent: true,
         layerName: layer.name,
         layout: layer.layout,
@@ -346,7 +348,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     await deps.flushPendingUploads();
 
     const controls = createControlLayerCollector(model, deps.models, deps.controlModelMemory);
-    const regions = createRegionalGuidanceCollector(model);
+    const regions = createRegionalGuidanceCollector(model, settings.cfgScale);
     const composed = await deps.composeForGeneration({
       // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
       // structurally identical to canvas-operations' `GenerationModeFacts` /
@@ -374,7 +376,9 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
                 ? `“${composed.layerName}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.`
                 : composed.status === 'not-ready'
                   ? 'Some layers are still loading. Wait a moment, then invoke again.'
-                  : `The canvas could not be captured for generation (${composed.status}).`
+                  : composed.status === 'over-budget'
+                    ? 'Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.'
+                    : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }
@@ -382,11 +386,17 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     // The other half of the mode-union drift guard (see `detectMode` above).
     const mode: CanvasCompileMode = composites.mode;
 
+    const controlLayers = controls.toGraphInputs(composites.controlImages);
     const compiled = compileCanvasGraph({
+      canvasMetadata: recordCanvasMetadata(composites.canvas.document, {
+        controls: controlLayers,
+        models: deps.models,
+        settings: { strength: deps.strength, compositing: deps.compositing, scaling: deps.scaling },
+      }),
       bbox: composites.bbox,
       compositeImageName: composites.baseImageName,
       compositing: deps.compositing,
-      controlLayers: controls.toGraphInputs(composites.controlImages),
+      controlLayers,
       destination: deps.destination,
       maskImageName: composites.maskImageName,
       mode,

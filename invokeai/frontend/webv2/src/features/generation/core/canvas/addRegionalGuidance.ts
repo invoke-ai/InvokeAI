@@ -1,23 +1,21 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { FamilyConditioning } from '@features/generation/core/familyGraph';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
-import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
+import {
+  getArchitectureFeatures,
+  getArchitectureGenerationConfig,
+} from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
+import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
 
 import type { Rect } from './types';
-
-/** The deterministic denoise node id every canvas base graph uses. */
-const DENOISE_NODE_ID = 'denoise_latents';
-/** The deterministic global positive/negative conditioning + collector node ids. */
-const POS_COND_ID = 'pos_cond';
-const NEG_COND_ID = 'neg_cond';
-const POS_COND_COLLECT_ID = 'pos_cond_collect';
-const NEG_COND_COLLECT_ID = 'neg_cond_collect';
 
 /** The bases whose text encoder accepts a region mask and whose denoiser accepts a conditioning list. */
 export type MaskRegionalGuidanceBase = 'sd-1' | 'sd-2' | 'sdxl' | 'flux' | 'flux2' | 'krea-2' | 'z-image' | 'anima';
 /** The bases that read regions as boxes of a structured layout prompt; a mask contributes only its bounds. */
-export type LayoutRegionalGuidanceBase = 'moss-image';
+export type LayoutRegionalGuidanceBase = 'moss-image' | 'ideogram-4' | 'flux3';
 export type RegionalGuidanceBase = MaskRegionalGuidanceBase | LayoutRegionalGuidanceBase;
 
 /** How a base consumes a region: as masked conditioning, or as a layout box around the mask. */
@@ -35,14 +33,27 @@ export interface RegionalGuidanceSupport {
   negativePrompt: boolean;
   /** The positive prompt can be re-encoded over the inverted mask as a negative. */
   autoNegative: boolean;
+  /**
+   * The base reads negatives only while CFG Scale is above 1 (backend `negative_prompt.usage` is `cfg-gated`), so
+   * regional negatives and auto-negatives apply only then. See {@link areRegionalNegativesActive}.
+   */
+  negativesNeedCfg: boolean;
   /** Mask-scoped reference images, or `null` when the denoiser has no regional image path. */
   referenceImages: RegionalReferenceImageKind | null;
+  /** The roles a layout prompt distinguishes; empty for mask bases. */
+  layoutKinds: readonly RegionalLayoutKind[];
 }
 
 type MaskSupportRow = Pick<RegionalGuidanceSupport, 'label' | 'referenceImages'> & { mode: 'masks' };
-type LayoutSupportRow = { label: string; mode: 'layout'; referenceImages: null };
+type LayoutSupportRow = Pick<RegionalGuidanceSupport, 'label' | 'layoutKinds'> & {
+  mode: 'layout';
+  referenceImages: null;
+};
 
-/** Graph code owns node mapping and each base's mode; the backend owns regional-negative support. */
+/**
+ * Graph code owns node mapping and each base's mode; the backend owns regional-negative support and whether negatives
+ * need CFG above 1.
+ */
 const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow> &
   Record<LayoutRegionalGuidanceBase, LayoutSupportRow> = {
   'sd-1': { label: 'SD 1.x', mode: 'masks', referenceImages: 'ip_adapter' },
@@ -53,7 +64,16 @@ const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow
   'krea-2': { label: 'Krea-2', mode: 'masks', referenceImages: null },
   'z-image': { label: 'Z-Image', mode: 'masks', referenceImages: null },
   anima: { label: 'Anima', mode: 'masks', referenceImages: null },
-  'moss-image': { label: 'MOSS-Image', mode: 'layout', referenceImages: null },
+  'moss-image': {
+    label: 'MOSS-Image',
+    layoutKinds: ['object', 'character', 'text'],
+    mode: 'layout',
+    referenceImages: null,
+  },
+  // The structured caption has only `obj` elements.
+  'ideogram-4': { label: 'Ideogram 4', layoutKinds: ['object'], mode: 'layout', referenceImages: null },
+  // Regions become rows of the box table, one kind per graph: objects, or targets of an edit with reference images.
+  flux3: { label: 'FLUX.3', layoutKinds: ['object'], mode: 'layout', referenceImages: null },
 };
 
 /** Frontend graph keys are narrower than backend capability answers. */
@@ -72,10 +92,21 @@ export const getRegionalGuidanceSupport = (base: string | null): RegionalGuidanc
   }
 
   const row = REGIONAL_GUIDANCE_SUPPORT[base];
-  const negative = row.mode === 'masks' && (getArchitectureFeatures(base)?.regional_negative ?? false);
+  if (row.mode === 'layout') {
+    return { ...row, autoNegative: false, negativePrompt: false, negativesNeedCfg: false };
+  }
+  const negative = getArchitectureFeatures(base)?.regional_negative ?? false;
 
-  return { ...row, autoNegative: negative, negativePrompt: negative };
+  const negativesNeedCfg = getArchitectureGenerationConfig(base)?.negativePrompt.usage === 'cfg-gated';
+
+  return { ...row, autoNegative: negative, layoutKinds: [], negativePrompt: negative, negativesNeedCfg };
 };
+
+/** Whether regional negatives and auto-negatives reach the graph at this CFG Scale. */
+export const areRegionalNegativesActive = (
+  support: Pick<RegionalGuidanceSupport, 'negativePrompt' | 'negativesNeedCfg'>,
+  cfgScale: number
+): boolean => support.negativePrompt && (!support.negativesNeedCfg || cfgScale > 1);
 
 /** A region's role in a layout prompt; the canvas persists a subset of these and Canvas checks it does. */
 export type RegionalLayoutKind = 'object' | 'character' | 'text';
@@ -86,21 +117,30 @@ export interface RegionalLayout {
   text?: string;
 }
 
+/**
+ * The role a layout base places a region as: its stored role when the base distinguishes it, otherwise an object. The
+ * stored role stays on the layer, so switching back to a base that has it restores it.
+ */
+export const getEffectiveLayoutKind = (
+  layoutKinds: readonly RegionalLayoutKind[],
+  layout: RegionalLayout | undefined
+): RegionalLayoutKind => (layout && layoutKinds.includes(layout.kind) ? layout.kind : 'object');
+
 /** What keeps a layout base from placing a region. */
 export type LayoutRegionIssue = 'missing_prompt' | 'missing_text';
 
 /**
- * Why a layout base leaves a region out, or null when it can place it: every layout element needs a caption, and a
- * text element its visible text. Whitespace alone counts as missing.
+ * Why a layout base with these roles leaves a region out, or null when it can place it: every layout element needs a
+ * caption, and a text element its visible text. Whitespace alone counts as missing.
  */
-export const getLayoutRegionIssue = (region: {
-  positivePrompt: string | null;
-  layout?: RegionalLayout;
-}): LayoutRegionIssue | null => {
+export const getLayoutRegionIssue = (
+  region: { positivePrompt: string | null; layout?: RegionalLayout },
+  layoutKinds: readonly RegionalLayoutKind[]
+): LayoutRegionIssue | null => {
   if (!region.positivePrompt?.trim()) {
     return 'missing_prompt';
   }
-  if (region.layout?.kind === 'text' && !region.layout.text?.trim()) {
+  if (getEffectiveLayoutKind(layoutKinds, region.layout) === 'text' && !region.layout?.text?.trim()) {
     return 'missing_text';
   }
   return null;
@@ -120,11 +160,72 @@ export const getLayoutPromptRejectionReason = (params: {
   if (
     support?.mode !== 'layout' ||
     params.prompt.trim().length > 0 ||
-    !params.regions.some((region) => getLayoutRegionIssue(region) === null)
+    !params.regions.some((region) => getLayoutRegionIssue(region, support.layoutKinds) === null)
   ) {
     return null;
   }
   return `${support.label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
+};
+
+const LOOKS_LIKE_LAYOUT_DRAFT = /"bbox_coord_space"\s*:\s*"abs"/;
+const LAYOUT_DRAFT_FIX = 'Run Expand Prompt again or fix it.';
+
+const getDraftRejectionReason = (prompt: string): string | null => {
+  const body = unwrapPromptFence(prompt);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body.trimStart().startsWith('{') && LOOKS_LIKE_LAYOUT_DRAFT.test(body)
+      ? `The prompt looks like a MOSS-Image layout draft but is not valid JSON. ${LAYOUT_DRAFT_FIX}`
+      : null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const draft = parsed as Record<string, unknown>;
+  if (draft.bbox_coord_space !== 'abs') {
+    return null;
+  }
+  if (draft.bbox_format !== 'xyxy') {
+    return `The MOSS-Image layout draft in the prompt uses a bbox_format other than xyxy. ${LAYOUT_DRAFT_FIX}`;
+  }
+  const summary =
+    typeof draft.summary === 'object' && draft.summary !== null ? (draft.summary as Record<string, unknown>) : null;
+  if (
+    typeof summary?.caption !== 'string' ||
+    !summary.caption.trim() ||
+    !Array.isArray(draft.items) ||
+    draft.items.length === 0 ||
+    typeof draft.width !== 'number' ||
+    typeof draft.height !== 'number'
+  ) {
+    return `The MOSS-Image layout draft in the prompt needs a summary with a caption, at least one item, and a numeric width and height. ${LAYOUT_DRAFT_FIX}`;
+  }
+  return null;
+};
+
+/**
+ * Why a MOSS-Image prompt holding a layout draft (as Expand Prompt writes it: a JSON object with
+ * `bbox_coord_space: "abs"`, optionally in a ``` fence) cannot be compiled, or null. Plain text and compiled layouts
+ * (`abs_centralized`) pass. Only the shape the layout node needs to start is checked; the backend validates the boxes.
+ * Both the authored prompt and the one the template makes of it are checked: template text around a broken draft
+ * would hide it, and a template that is itself a draft can break around authored text (an unescaped quote).
+ */
+export const getLayoutDraftRejectionReason = (params: {
+  base: string;
+  positivePrompt: string;
+  promptTemplate?: PromptTemplateSnapshot | null;
+}): string | null => {
+  // Only MOSS-Image compiles drafts; other layout bases (Ideogram 4) take `{` prompts verbatim.
+  if (params.base !== 'moss-image') {
+    return null;
+  }
+  const effectivePrompt = getEffectivePositivePrompt(params.positivePrompt, params.promptTemplate ?? null);
+  return (
+    getDraftRejectionReason(params.positivePrompt) ??
+    (effectivePrompt === params.positivePrompt ? null : getDraftRejectionReason(effectivePrompt))
+  );
 };
 
 /** A resolved reference-image (component) model identifier — the backend model field shape. */
@@ -182,6 +283,10 @@ export interface RegionalGuidanceInput {
 /** Options for {@link addRegionalGuidance}. */
 export interface AddRegionalGuidanceOptions {
   base: MaskRegionalGuidanceBase;
+  /** The family's global conditioning the regions copy encoders from and join. */
+  conditioning: FamilyConditioning;
+  /** The family's base denoise, which regional reference images feed. */
+  denoise: BackendInvocationContract;
   modelVariant?: string | null;
   regions: readonly RegionalGuidanceInput[];
   /** Applies model-specific transforms before a regional positive conditioning is collected. */
@@ -255,23 +360,14 @@ const copyEncoderEdges = (
   }
 };
 
-/** Resolves (or lazily creates) the collector feeding `denoise.<field>`, with a stable fallback id. */
-const resolveDenoiseCollector = (
+/** Creates a collector feeding `denoise.<field>`, for when the builder wired none. */
+const addDenoiseCollector = (
   graph: BackendGraphContract,
   denoise: BackendInvocationContract,
   denoiseField: string,
-  fallbackId: string
+  id: string
 ): BackendInvocationContract => {
-  const existing = graph.edges.find(
-    (edge) => edge.destination.node_id === denoise.id && edge.destination.field === denoiseField
-  );
-  if (existing) {
-    const node = graph.nodes[existing.source.node_id];
-    if (node) {
-      return node;
-    }
-  }
-  const collector = addNode(graph, { id: fallbackId, type: 'collect' });
+  const collector = addNode(graph, { id, type: 'collect' });
   addEdge(graph, collector, 'collection', denoise, denoiseField);
   return collector;
 };
@@ -295,23 +391,14 @@ const addRegionalConditioning = (
 
 /** Masked conditioning for mask bases. Inputs must be prevalidated and gated by regional support. */
 export const addRegionalGuidance = (graph: BackendGraphContract, options: AddRegionalGuidanceOptions): void => {
-  const { base, modelVariant, regions, transformRegionalPositiveConditioning } = options;
-  const denoise = graph.nodes[DENOISE_NODE_ID];
-  if (!denoise) {
-    throw new Error('addRegionalGuidance: base graph is missing the denoise node.');
-  }
-  const posCondCollect = graph.nodes[POS_COND_COLLECT_ID];
-  if (!posCondCollect) {
-    throw new Error('addRegionalGuidance: base graph is missing the positive conditioning collector.');
-  }
-  const negCondCollect = graph.nodes[NEG_COND_COLLECT_ID] ?? null;
+  const { base, conditioning, denoise, modelVariant, regions, transformRegionalPositiveConditioning } = options;
+  const { negative, positive, positiveCollector } = conditioning;
   const support = getRegionalGuidanceSupport(base);
   if (!support) {
     throw new Error(`addRegionalGuidance: ${base} has no regional guidance path.`);
   }
 
-  let ipAdapterCollector: BackendInvocationContract | null = null;
-  let fluxReduxCollector: BackendInvocationContract | null = null;
+  let { fluxReduxCollector, ipAdapterCollector } = conditioning;
 
   for (const region of regions) {
     const maskToTensor = addNode(graph, {
@@ -328,29 +415,29 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
         modelVariant,
         `rg_pos_cond_${region.id}`,
         region.positivePrompt,
-        POS_COND_ID
+        positive.id
       );
       addEdge(graph, maskToTensor, 'mask', posCond, 'mask');
       const conditioningSource = transformRegionalPositiveConditioning?.(posCond, region.id) ?? posCond;
-      addEdge(graph, conditioningSource, 'conditioning', posCondCollect, 'item');
+      addEdge(graph, conditioningSource, 'conditioning', positiveCollector, 'item');
     }
 
     // Negative prompt → negative collector.
-    if (region.negativePrompt && support.negativePrompt && negCondCollect) {
+    if (region.negativePrompt && support.negativePrompt && negative) {
       const negCond = addRegionalConditioning(
         graph,
         base,
         modelVariant,
         `rg_neg_cond_${region.id}`,
         region.negativePrompt,
-        NEG_COND_ID
+        negative.node.id
       );
       addEdge(graph, maskToTensor, 'mask', negCond, 'mask');
-      addEdge(graph, negCond, 'conditioning', negCondCollect, 'item');
+      addEdge(graph, negCond, 'conditioning', negative.collector, 'item');
     }
 
     // Auto-negative encodes positive text over the inverted region mask.
-    if (region.autoNegative && region.positivePrompt && support.autoNegative && negCondCollect) {
+    if (region.autoNegative && region.positivePrompt && support.autoNegative && negative) {
       const invert = addNode(graph, { id: `rg_invert_mask_${region.id}`, type: 'invert_tensor_mask' });
       addEdge(graph, maskToTensor, 'mask', invert, 'mask');
       const inverted = addRegionalConditioning(
@@ -359,18 +446,16 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
         modelVariant,
         `rg_pos_cond_inverted_${region.id}`,
         region.positivePrompt,
-        POS_COND_ID
+        positive.id
       );
       addEdge(graph, invert, 'mask', inverted, 'mask');
-      addEdge(graph, inverted, 'conditioning', negCondCollect, 'item');
+      addEdge(graph, inverted, 'conditioning', negative.collector, 'item');
     }
 
     // Reference images (mask-scoped): ip_adapter on SD, flux_redux on FLUX.
     for (const ref of region.referenceImages) {
       if (ref.type === 'ip_adapter' && support.referenceImages === 'ip_adapter') {
-        if (!ipAdapterCollector) {
-          ipAdapterCollector = resolveDenoiseCollector(graph, denoise, 'ip_adapter', 'regional_ip_adapter_collector');
-        }
+        ipAdapterCollector ??= addDenoiseCollector(graph, denoise, 'ip_adapter', 'regional_ip_adapter_collector');
         const node = addNode(graph, {
           begin_step_percent: ref.beginEndStepPct[0],
           clip_vision_model: ref.clipVisionModel,
@@ -385,14 +470,12 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
         addEdge(graph, maskToTensor, 'mask', node, 'mask');
         addEdge(graph, node, 'ip_adapter', ipAdapterCollector, 'item');
       } else if (ref.type === 'flux_redux' && support.referenceImages === 'flux_redux') {
-        if (!fluxReduxCollector) {
-          fluxReduxCollector = resolveDenoiseCollector(
-            graph,
-            denoise,
-            'redux_conditioning',
-            'regional_flux_redux_collector'
-          );
-        }
+        fluxReduxCollector ??= addDenoiseCollector(
+          graph,
+          denoise,
+          'redux_conditioning',
+          'regional_flux_redux_collector'
+        );
         const node = addNode(graph, {
           downsampling_factor: ref.settings.downsampling_factor,
           id: `flux_redux_${ref.id}`,
@@ -410,18 +493,20 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
 
 /**
  * Omit unsupported content without erasing stored values. Count resolved references; auto-negative requires
- * positive text. Layout bases need a caption, and a text region its visible text.
+ * positive text, and negatives count only at a CFG Scale the base reads them at. Layout bases need a caption, and a
+ * text region its visible text.
  */
 export const getRegionalGuidanceRejectionReason = (params: {
   layerName: string;
   mainBase: string;
+  cfgScale: number;
   hasContent: boolean;
   positivePrompt: string | null;
   negativePrompt: string | null;
   referenceImageCount: number;
   layout?: RegionalLayout;
 }): string | null => {
-  const { hasContent, layerName, mainBase, negativePrompt, positivePrompt, referenceImageCount } = params;
+  const { cfgScale, hasContent, layerName, mainBase, negativePrompt, positivePrompt, referenceImageCount } = params;
 
   const support = getRegionalGuidanceSupport(mainBase);
   if (!support) {
@@ -431,7 +516,7 @@ export const getRegionalGuidanceRejectionReason = (params: {
     return `Regional guidance "${layerName}" has no masked region.`;
   }
   if (support.mode === 'layout') {
-    switch (getLayoutRegionIssue(params)) {
+    switch (getLayoutRegionIssue(params, support.layoutKinds)) {
       case 'missing_prompt':
         return `Regional guidance "${layerName}" has no prompt to place in the ${support.label} layout.`;
       case 'missing_text':
@@ -442,7 +527,7 @@ export const getRegionalGuidanceRejectionReason = (params: {
   }
   const contributes =
     Boolean(positivePrompt) ||
-    (Boolean(negativePrompt) && support.negativePrompt) ||
+    (Boolean(negativePrompt) && areRegionalNegativesActive(support, cfgScale)) ||
     (referenceImageCount > 0 && support.referenceImages !== null);
   if (!contributes) {
     return `Regional guidance "${layerName}" has no prompt or reference image ${support.label} can use.`;

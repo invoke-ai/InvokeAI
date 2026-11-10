@@ -91,7 +91,7 @@ export interface GenerationCompositeHost {
   captureRasterSnapshot(
     snapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
-    options: { signal: AbortSignal }
+    options: { signal: AbortSignal; region: Rect }
   ): Promise<CaptureRasterSnapshotResult>;
   /** The engine's composite executor deps (backend, upload, reserve, ...). */
   getCompositeExecutorDeps(): GenerationCompositeExecutorDeps;
@@ -175,6 +175,7 @@ export const composeForGeneration = async (
 
   const capture = await host.captureRasterSnapshot(documentSnapshot, [...requiredLayerIds], {
     signal: options.signal,
+    region: bbox,
   });
   if (capture.status !== 'ok') {
     return capture;
@@ -221,7 +222,7 @@ export const composeForGeneration = async (
     // edges do not overlap and need no base upload.
     const actualLayerRects = new Map<string, Rect>();
     for (const [layerId, detached] of rasterSnapshot.layerSurfaces) {
-      actualLayerRects.set(layerId, detached.rect);
+      actualLayerRects.set(layerId, detached.sourceRect ?? detached.rect);
     }
     const contentBounds = computeCompositeContentBounds(plan, actualLayerRects);
 

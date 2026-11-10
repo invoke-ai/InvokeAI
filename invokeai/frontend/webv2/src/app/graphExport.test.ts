@@ -180,7 +180,7 @@ describe('graph export', () => {
     ).cases;
 
     expect(errorOf(unsupported)).toBe('reference_images: z-image-gguf name takes no reference images.');
-    expect(errorOf(tooMany)).toBe('Generate supports at most 5 reference images for sdxl name.');
+    expect(errorOf(tooMany)).toBe('sdxl name supports at most 5 reference images. Turn off or remove the extra ones.');
   });
 
   it('sends img2img through Canvas with the uploaded image and strength', () => {
@@ -224,6 +224,28 @@ describe('graph export', () => {
       qwen3EncoderModel: 'qwen3-4b-gguf',
       vae: 'flux-vae',
     });
+  });
+
+  it('opens the Qwen-Image-2.1 Vision Tower slot from a GGUF encoder pick, whatever order the picks are listed in', () => {
+    const qwen21Models = [
+      ...MODELS,
+      model('q21-gguf', 'qwen-image-2-1', 'main', { format: 'gguf_quantized', variant: 'qwen_image_21_base' }),
+      model('q21-encoder', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
+      model('q21-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
+      model('q21-vae', 'qwen-image-2-1', 'vae', { format: 'checkpoint' }),
+    ];
+    const picks = { qwen3VLEncoderModel: 'q21-encoder', qwen3VLVisionTowerModel: 'q21-mmproj', vae: 'q21-vae' };
+    const towerFirst = { qwen3VLVisionTowerModel: 'q21-mmproj', qwen3VLEncoderModel: 'q21-encoder', vae: 'q21-vae' };
+
+    for (const components of [picks, towerFirst]) {
+      const { batch, components: used } = exportOne(
+        sdxlCase('q21', { components, model_key: 'q21-gguf' }),
+        qwen21Models
+      );
+
+      expect(used).toEqual(picks);
+      expect(batch.graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'q21-mmproj' } });
+    }
   });
 
   // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
@@ -278,6 +300,17 @@ describe('graph export', () => {
     expect(graph.nodes.denoise_latents).toMatchObject({ cfg_scale: 3.5, scheduler: 'dpmpp_2m' });
     expect(errorOf(badPid)).toMatch(/^settings\.pidMode: Generate does not keep "sideways"/);
     expect(errorOf(badScheduler)).toMatch(/^settings\.scheduler: .* Options: .*euler_a/);
+  });
+
+  it('rejects a prompt with dynamic syntax while dynamic prompts are on, and sends it as typed when they are off', () => {
+    const prompt = 'a {red|green} lighthouse';
+    const [expanding] = exportGraphs(request([sdxlCase('on', { positive_prompt: prompt })])).cases;
+    const { batch } = exportOne(
+      sdxlCase('off', { positive_prompt: prompt, settings: { dynamicPromptsEnabled: false } })
+    );
+
+    expect(errorOf(expanding)).toMatch(/^positive_prompt has dynamic prompt syntax/);
+    expect(batch.data[0]).toContainEqual({ field_name: 'value', items: [prompt], node_path: 'positive_prompt' });
   });
 
   it('reports unknown names per case, with the valid choices, and still exports the other cases', () => {

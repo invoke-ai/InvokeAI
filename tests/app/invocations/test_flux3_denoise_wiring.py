@@ -24,7 +24,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize
 from invokeai.backend.flux2.sampling_utils import pack_flux2, unpack_flux2
 from invokeai.backend.flux3.sampling import get_schedule_flux3, redensify_schedule_flux3
-from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelFormat, ModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
@@ -64,12 +64,17 @@ def _drive(
         info.model_on_device.return_value.__enter__.return_value = (None, model)
         return info
 
-    transformer = SimpleNamespace(config=SimpleNamespace(flow_map=variant is Flux3VariantType.Klein))
+    # A module without weights, so the working-memory estimate walks an empty tree; its config is the released
+    # geometry's, which the estimate prices on.
+    transformer = torch.nn.Module()
+    transformer.config = SimpleNamespace(
+        flow_map=variant is Flux3VariantType.Klein, num_attention_heads=24, attention_head_dim=128
+    )
     vae_info, transformer_info = model_info(MagicMock()), model_info(transformer)
 
     context = MagicMock()
     context.models.get_config.return_value = SimpleNamespace(
-        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant
+        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant, format=ModelFormat.Checkpoint
     )
     context.models.load.side_effect = lambda key: vae_info if key == "vae" else transformer_info
     context.conditioning.load.side_effect = lambda name: ConditioningFieldData(
@@ -109,7 +114,6 @@ def _drive(
         patch.object(flux3_denoise.TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
         patch.object(flux3_denoise, "read_vae_bn_stats", return_value=(BN_MEAN, BN_STD)),
         patch.object(flux3_denoise, "get_noise_flux3", return_value=noise),
-        patch.object(flux3_denoise, "peak_dequant_transient_bytes", return_value=0),
         patch.object(flux3_denoise, "denoise", recording_denoise),
         patch.object(flux3_denoise, "RectifiedFlowInpaintExtension", _RecordingInpaintExtension),
     ):

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from contextlib import ExitStack
 from typing import Callable, Optional
 
@@ -22,6 +23,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.sampling_utils import pack_flux2, unpack_flux2
 from invokeai.backend.flux3.denoise import denoise
+from invokeai.backend.flux3.denoise_working_memory import estimate_flux3_denoise_working_memory
 from invokeai.backend.flux3.ref_images import FLUX3_MAX_REFERENCE_IMAGES, encode_flux3_references
 from invokeai.backend.flux3.sampling import (
     get_noise_flux3,
@@ -31,19 +33,16 @@ from invokeai.backend.flux3.sampling import (
     text_position_ids,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import FLUX3_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Flux3ConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
-
-FLUX3_ATTENTION_HEAD_DIM = 128
-FLUX3_ATTENTION_HEADS = 24
-# Peak activation bytes per attended token (image + reference + text) in bf16, at driver level: one Klein forward
-# on an RTX 4090 measured 0.286 MB/token from 1 to 4 MP without references and up to 0.320 with six 1 MP
-# references (the allocator peak is about half of that). ROCm is unmeasured; FLUX.2 Klein 4B ran ~8 % higher there.
-FLUX3_BYTES_PER_TOKEN = int(0.33 * 1024**2)
 
 
 @invocation(
@@ -121,6 +120,7 @@ class Flux3DenoiseInvocation(BaseInvocation):
         transformer_config = context.models.get_config(self.transformer.transformer)
         if transformer_config.base is not BaseModelType.Flux3 or transformer_config.type is not ModelType.Main:
             raise ValueError(f"'{transformer_config.name}' is not a FLUX.3 transformer.")
+        self._require_flux3_loras(context)
 
         references = self._reference_fields()
         if len(references) > FLUX3_MAX_REFERENCE_IMAGES:
@@ -211,21 +211,39 @@ class Flux3DenoiseInvocation(BaseInvocation):
         ref_tokens = ref_tokens.expand(batch_size, -1, -1) if ref_tokens is not None else None
         packed_h, packed_w = self.height // 16, self.width // 16
 
-        working_memory = self._estimate_working_memory(
-            num_tokens=packed_h * packed_w
-            + (ref_tokens.shape[1] if ref_tokens is not None else 0)
-            + max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
-            batch_size=batch_size,
-            device=device,
-            dtype=compute_dtype,
-        )
-
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
-            # A GGUF build dequantizes each linear per forward, a transient its resident size does not cover.
-            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, compute_dtype)
-            (_, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=working_memory + dequant_bytes)
+            loras = self._active_loras(context)
+            self._refuse_dora_on_quantized_layers(loras, transformer_info.model)
+            # Ask the model cache to keep free what one transformer forward needs. Reference images are the dominant
+            # term: their tokens join the attended sequence, so ten 1 MP references add ten times the tokens of a
+            # 1 MP image. Priced on the unlocked model, whose GGUF or fp8-stored layers add a transient per forward,
+            # before the VRAM lock the reservation applies to. CFG runs its two forwards one after the other, so only
+            # the longer caption counts.
+            working_memory = estimate_flux3_denoise_working_memory(
+                transformer_info.model,
+                image_seq_len=packed_h * packed_w,
+                ref_image_seq_len=ref_tokens.shape[1] if ref_tokens is not None else 0,
+                text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+                batch_size=batch_size,
+                loras=[patch for _, patch in loras],
+                model_format=transformer_config.format,
+                device=device,
+                dtype=compute_dtype,
+            )
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_memory=working_memory)
+            )
+            # GGUF, int8 and nvfp4 weights cannot take an update in place: those LoRAs run as sidecars.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=FLUX3_LORA_TRANSFORMER_PREFIX,
+                    dtype=compute_dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=requires_sidecar_patching(transformer, transformer_config.format),
+                )
             )
             x = denoise(
                 model=transformer,
@@ -258,6 +276,57 @@ class Flux3DenoiseInvocation(BaseInvocation):
             return self.kontext_conditioning
         return [self.kontext_conditioning]
 
+    def _require_flux3_loras(self, context: InvocationContext) -> None:
+        """Refuse, before anything loads, a LoRA that is not a FLUX.3 one: one applied by another family's loader node
+        would be converted for that family's transformer, whose layers this one does not have."""
+        for lora in self.transformer.loras:
+            config = context.models.get_config(lora.lora)
+            if config.type is not ModelType.LoRA:
+                raise ValueError(f"'{config.name}' is a {config.type.value} model, not a LoRA.")
+            if config.base is not BaseModelType.Flux3:
+                raise ValueError(
+                    f"LoRA '{config.name}' is for {config.base.value} models, not FLUX.3. Apply FLUX.3 LoRAs with "
+                    "Apply LoRA - FLUX.3."
+                )
+
+    def _active_loras(self, context: InvocationContext) -> list[tuple[str, ModelPatchRaw]]:
+        """The name and patch of each LoRA the patcher applies: those at a weight other than 0."""
+        return [
+            (lora.lora.name, context.models.load(lora.lora).model)
+            for lora in self.transformer.loras
+            if lora.weight != 0
+        ]
+
+    @staticmethod
+    def _refuse_dora_on_quantized_layers(loras: list[tuple[str, ModelPatchRaw]], transformer: torch.nn.Module) -> None:
+        """Fail before loading the transformer onto the device, not at the first step: a DoRA layer normalizes the
+        updated weight, which a Linear keeping its weight quantized in buffers never forms (`DoRALayer.get_parameters`
+        raises on the shape it hands over instead)."""
+        # Reached once quantized FLUX.3 builds, whose Linears are `DequantizingLinear`s, load.
+        if not loras:
+            return
+        modules = dict(transformer.named_modules())
+        for name, patch in loras:
+            for key, layer in patch.layers.items():
+                # A layer on BFL's output modulation comes wrapped, to swap its halves.
+                if isinstance(layer, SwappedHalvesLayerPatch):
+                    layer = layer.layer
+                module = modules.get(key.removeprefix(FLUX3_LORA_TRANSFORMER_PREFIX))
+                if isinstance(layer, DoRALayer) and isinstance(module, DequantizingLinear):
+                    raise ValueError(
+                        f"LoRA '{name}' has DoRA layers, which do not run on this transformer's quantized layers. Use "
+                        "it with an unquantized or GGUF build of the transformer."
+                    )
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
+
     @staticmethod
     def _load_conditioning(
         context: InvocationContext, field: Flux3ConditioningField, device: torch.device, dtype: torch.dtype
@@ -279,28 +348,6 @@ class Flux3DenoiseInvocation(BaseInvocation):
             antialias=False,
         )
         return mask.to(device=latents.device, dtype=latents.dtype).expand_as(latents)
-
-    @staticmethod
-    def _estimate_working_memory(num_tokens: int, batch_size: int, device: torch.device, dtype: torch.dtype) -> int:
-        """Peak transformer activation memory, so the model cache keeps that much VRAM free.
-
-        Attention runs through SDPA without materializing the score matrix, so activations grow linearly with
-        the attended sequence -- image, reference and text tokens alike. References are the dominant term: ten
-        1 MP references add ten times the tokens of a 1 MP image. CFG runs its two forwards one after the
-        other, so it does not double the peak. The fixed base covers allocator slack and transient casts.
-        """
-        estimated = num_tokens * batch_size * FLUX3_BYTES_PER_TOKEN + int(1.0 * 1024**3)
-        estimated += sdpa_score_matrix_bytes(
-            device=device,
-            dtype=dtype,
-            num_heads=FLUX3_ATTENTION_HEADS * batch_size,
-            head_dim=FLUX3_ATTENTION_HEAD_DIM,
-            seq_len=num_tokens,
-            has_attn_mask=False,
-            # diffusers' FLUX.3 transformer attends through `dispatch_attention_fn`.
-            via_diffusers_dispatch=True,
-        )
-        return estimated
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

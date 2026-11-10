@@ -1,0 +1,17 @@
+title: Adapters Linked Nodes
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/adapters-linked-nodes
+summary: Chain ControlNet, IP-Adapter and T2I-Adapter inputs without a Collect node.
+description: >-
+  The adapters link to each other instead of going through a `collect` node, so they can be used inside an `iterate`
+  node without collecting on every iteration.
+
+  The nodes inherit from the core nodes, so changes to the core nodes carry over to them.
+categories: [control]
+nodes:
+  - name: ControlNet-Linked
+    description: Collects ControlNet info to pass to other nodes.
+  - name: IP-Adapter-Linked
+    description: Collects IP-Adapter info to pass to other nodes.
+  - name: T2I-Adapter-Linked
+    description: Collects T2I-Adapter info to pass to other nodes.

@@ -21,6 +21,8 @@ import {
 } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
 import {
+  areRegionalNegativesActive,
+  getEffectiveLayoutKind,
   getLayoutRegionIssue,
   getRegionalGuidanceSupport,
   supportsPromptAttentionSyntax,
@@ -46,7 +48,7 @@ import { PaletteIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useSelectedModelBase } from './useSelectedModelBase';
+import { useSelectedCfgScale, useSelectedModelBase } from './useSelectedModelBase';
 
 /** The regional-guidance fields patchable via `updateCanvasLayerConfig`. */
 interface RegionalConfigPatch {
@@ -85,6 +87,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
   const base = useSelectedModelBase();
+  const cfgScale = useSelectedCfgScale();
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
@@ -113,6 +116,11 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   // no model/policy is known.
   const showNegativeControls = !hasCapabilities || support?.negativePrompt !== false;
   const unsupportedModel = hasCapabilities && base !== null && support === null;
+  // Controls stay editable so values carry over; the hint says why they do nothing at this CFG Scale.
+  const negativesIgnoredAtCfg =
+    support !== null && cfgScale !== null && support.negativePrompt && !areRegionalNegativesActive(support, cfgScale);
+  const negativeFieldId = useId();
+  const negativeHelpId = negativesIgnoredAtCfg ? `${negativeFieldId}-help` : undefined;
 
   // A previewed fill records from where its preview started; any other change from the live layer.
   const commitConfig = useCallback(
@@ -167,14 +175,19 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     [commitConfig, t]
   );
 
-  // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches.
+  // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches, and a
+  // base without it places the region as an object. A base with only one role offers no choice.
   const isLayout = support?.mode === 'layout';
+  const layoutKinds = isLayout ? support.layoutKinds : [];
+  const showLayoutKinds = layoutKinds.length > 1;
   const layoutKind = layer.layout?.kind ?? 'object';
+  const effectiveLayoutKind = getEffectiveLayoutKind(layoutKinds, layer.layout);
   const storedVisibleText = layer.layout?.text;
   // Null while not editing, so undo and edits from elsewhere show through.
   const [visibleTextDraft, setVisibleTextDraft] = useState<string | null>(null);
   const visibleText = visibleTextDraft ?? storedVisibleText ?? '';
   const layoutKindFieldId = useId();
+  const promptFieldId = useId();
   const promptIssueId = useId();
   const visibleTextIssueId = useId();
 
@@ -235,10 +248,17 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   // Generation skips a region the layout cannot place. The warning sits under the missing value and describes its
   // control; a status region that exists before any warning announces each change.
-  const layoutIssue =
-    isLayout && support
-      ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt })
-      : null;
+  const layoutIssue = isLayout
+    ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt }, layoutKinds)
+    : null;
+  // The prompt field explains the box on every layout base; the region type's help explains only the roles.
+  const promptHelp = isLayout
+    ? t('widgets.layers.regionalGuidance.layoutBoxHelp', { model: support.label })
+    : undefined;
+  const promptDescription =
+    [promptHelp ? `${promptFieldId}-help` : null, layoutIssue === 'missing_prompt' ? promptIssueId : null]
+      .filter(Boolean)
+      .join(' ') || undefined;
   const layoutIssueMessage = layoutIssue
     ? t(
         layoutIssue === 'missing_prompt'
@@ -304,9 +324,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {t('widgets.layers.regionalGuidance.unsupportedModel')}
         </Text>
       ) : null}
-      {isLayout && support ? (
+      {isLayout && showLayoutKinds ? (
         <Field
-          helpText={t('widgets.layers.regionalGuidance.layoutKindHelp', { model: support.label })}
+          helpText={t('widgets.layers.regionalGuidance.layoutKindHelp')}
           id={layoutKindFieldId}
           label={t('widgets.layers.regionalGuidance.layoutKind')}
         >
@@ -319,9 +339,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           />
         </Field>
       ) : null}
-      <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
+      <Field helpText={promptHelp} id={promptFieldId} label={t('widgets.layers.regionalGuidance.positivePrompt')}>
         <PromptTextarea
-          aria-describedby={layoutIssue === 'missing_prompt' ? promptIssueId : undefined}
+          aria-describedby={promptDescription}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
           attentionSyntax={attentionSyntax}
           defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
@@ -340,7 +360,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {layoutIssueMessage}
         </Text>
       ) : null}
-      {isLayout && layoutKind === 'text' ? (
+      {isLayout && effectiveLayoutKind === 'text' ? (
         <Field label={t('widgets.layers.regionalGuidance.visibleText')}>
           <Textarea
             aria-describedby={layoutIssue === 'missing_text' ? visibleTextIssueId : undefined}
@@ -361,8 +381,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       ) : null}
       {isLayout ? <VisuallyHidden role="status">{layoutIssueMessage}</VisuallyHidden> : null}
       {showNegativeControls && (
-        <Field label={t('widgets.layers.regionalGuidance.negativePrompt')}>
+        <Field
+          helpText={negativesIgnoredAtCfg ? t('widgets.layers.regionalGuidance.negativesNeedCfg') : undefined}
+          id={negativeFieldId}
+          label={t('widgets.layers.regionalGuidance.negativePrompt')}
+        >
           <PromptTextarea
+            aria-describedby={negativeHelpId}
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
             attentionSyntax={attentionSyntax}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
@@ -379,7 +404,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       )}
       {showNegativeControls && (
         <Switch.Root checked={layer.autoNegative} onCheckedChange={handleAutoNegative}>
-          <Switch.HiddenInput />
+          <Switch.HiddenInput aria-describedby={negativeHelpId} />
           <Switch.Control>
             <Switch.Thumb />
           </Switch.Control>

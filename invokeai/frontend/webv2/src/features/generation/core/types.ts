@@ -218,6 +218,11 @@ export interface GenerateSettings {
   promptTemplate: PromptTemplateSnapshot | null;
   /** Show the merged prompt read-only instead of the authored text. */
   promptTemplateViewMode: boolean;
+  /**
+   * Expand dynamic prompt syntax (`{a|b}`, `__wildcards__`, `#` comments) on the backend before generating. Off keeps
+   * the prompt exactly as typed. Projects saved before the toggle read as on.
+   */
+  dynamicPromptsEnabled: boolean;
   /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */
@@ -243,8 +248,10 @@ export interface GenerateSettings {
   hiDiffusionEnabled: boolean;
   hiDiffusionRauNetEnabled: boolean;
   hiDiffusionWindowAttentionEnabled: boolean;
-  hiDiffusionT1Ratio: number;
-  hiDiffusionT2Ratio: number;
+  hiDiffusionT1Ratio: number | null;
+  hiDiffusionT2Ratio: number | null;
+  /** Manual slider positions retained while the active ratios use automatic presets. */
+  hiDiffusionManualRatios?: { t1: number; t2: number };
   seed: number;
   seedMode: SeedMode;
   seamlessXAxis: boolean;
@@ -264,6 +271,8 @@ export interface GenerateSettings {
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** The mmproj file that lets a GGUF Qwen3-VL 8B encoder read Qwen-Image-2.1 reference images. */
+  qwen3VLVisionTowerModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
   /**
@@ -354,6 +363,17 @@ export interface GenerateSettings {
   /** Fraction of the schedule at which the base model hands its latents to the refiner. */
   refinerStart: number;
 }
+
+/** The dynamic prompts fields every surface whose prompt expands persists (Generate, Video). */
+export type DynamicPromptsSettings = Pick<
+  GenerateSettings,
+  | 'dynamicPromptsCombinatorial'
+  | 'dynamicPromptsEnabled'
+  | 'dynamicPromptsMaxPrompts'
+  | 'dynamicPromptsResample'
+  | 'dynamicPromptsSampleSeed'
+  | 'dynamicPromptsSeedBehaviour'
+>;
 
 export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
 export type OpenAIImageBackground = 'auto' | 'transparent' | 'opaque';

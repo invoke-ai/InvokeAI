@@ -44,6 +44,8 @@ export interface WorkbenchPersistencePort {
    * asynchronous save finishes.
    */
   journalBeforeUnload(state: WorkbenchState): UnloadJournalOutcome;
+  /** Whether unloading now would lose unsaved changes local recovery cannot hold, as of the last journal. */
+  hasChangesUnloadWouldLose(): boolean;
   loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null>;
   saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult>;
 }
@@ -55,6 +57,9 @@ export interface PersistenceClock {
 
 /** Signals the moments a page may stop running script without further notice. */
 export interface PageLifecyclePort {
+  /** Checkpoints before unload; a true answer has the browser offer to stay, with its own wording. */
+  subscribeBeforeUnload(shouldPrompt: () => boolean): () => void;
+  /** Checkpoints on hidden/pagehide; the callback must tolerate repeated signals. */
   subscribeHidden(listener: () => void): () => void;
 }
 
@@ -101,8 +106,19 @@ const browserClock: PersistenceClock = {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
 };
 
-/** `pagehide` and becoming hidden; hidden is often the last event a backgrounded or discarded page receives. */
+/** Checkpoint before WebKit starts tearing IndexedDB down; hidden still covers pages that are later discarded. */
 export const browserPageLifecycle: PageLifecyclePort = {
+  subscribeBeforeUnload: (shouldPrompt) => {
+    const listener = (event: BeforeUnloadEvent): void => {
+      if (shouldPrompt()) {
+        event.preventDefault();
+        // Browsers that predate `preventDefault` for this event prompt on any assigned value; the text is their own.
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', listener);
+    return () => window.removeEventListener('beforeunload', listener);
+  },
   subscribeHidden: (listener) => {
     const onVisibilityChange = (): void => {
       if (document.visibilityState === 'hidden') {
@@ -180,6 +196,9 @@ export const createWorkbenchPersistenceRuntime = ({
   let previousExitWait: Promise<void> | null = null;
   let unsubscribeAggregate: (() => void) | null = null;
   let unsubscribePage: (() => void) | null = null;
+  let unsubscribeBeforeUnload: (() => void) | null = null;
+  /** The last journal failed unexpectedly, so nothing tells what it holds. */
+  let hasJournalFailed = false;
   let unsubscribeSessionReopened: (() => void) | null = null;
 
   const isStopped = (): boolean => disposed || exiting;
@@ -420,13 +439,36 @@ export const createWorkbenchPersistenceRuntime = ({
           name: 'persistence.unload-journal-oversized',
         });
       }
+      hasJournalFailed = false;
     } catch (error) {
       logger.warn({
         error,
         message: 'Unsaved changes could not be journaled for recovery before the page was hidden.',
         name: 'persistence.unload-journal-unavailable',
       });
+      hasJournalFailed = true;
     }
+  };
+
+  /**
+   * Answers from the checkpoint's journal, without serializing again. An ordinary edit the journal holds never prompts.
+   */
+  const wouldUnloadLoseChanges = (): boolean => {
+    if (disposed || !hasLoaded || persistence.hasClosedSession()) {
+      return false;
+    }
+    return (
+      aggregate.getPersistedRevision() !== lastSavedRevision &&
+      (hasJournalFailed || persistence.hasChangesUnloadWouldLose())
+    );
+  };
+
+  const promptBeforeUnload = (): boolean => {
+    if (isStopped() || !hasLoaded || persistence.hasClosedSession()) {
+      return false;
+    }
+    saveBeforeHidden();
+    return wouldUnloadLoseChanges();
   };
 
   /** Best effort only: a hidden page may be frozen or discarded before the request completes. */
@@ -565,6 +607,8 @@ export const createWorkbenchPersistenceRuntime = ({
     unsubscribeAggregate = null;
     unsubscribePage?.();
     unsubscribePage = null;
+    unsubscribeBeforeUnload?.();
+    unsubscribeBeforeUnload = null;
     unsubscribeSessionReopened?.();
     unsubscribeSessionReopened = null;
     snapshot = { error: null, phase: 'disposed' };
@@ -698,6 +742,14 @@ export const createWorkbenchPersistenceRuntime = ({
           journalBeforeUnload();
         }
       }) ?? null;
+    unsubscribeBeforeUnload =
+      page?.subscribeBeforeUnload(() => {
+        if (isSuperseded) {
+          return false;
+        }
+        journalBeforeUnload();
+        return wouldUnloadLoseChanges();
+      }) ?? null;
     const settled = checkpoint(beforeCapture, () => isSuperseded).finally(() => {
       unsubscribeExitPage?.();
       dispose();
@@ -706,6 +758,9 @@ export const createWorkbenchPersistenceRuntime = ({
       settled,
       supersede: () => {
         isSuperseded = true;
+        // A superseded checkpoint gave its unsaved revision up already; the newer editor guards its own.
+        unsubscribeBeforeUnload?.();
+        unsubscribeBeforeUnload = null;
       },
     };
     return exitHandle;
@@ -733,6 +788,7 @@ export const createWorkbenchPersistenceRuntime = ({
       signal?.addEventListener('abort', dispose, { once: true });
       unsubscribeAggregate = aggregate.subscribe(onAggregateChange);
       unsubscribePage = page?.subscribeHidden(saveBeforeHidden) ?? null;
+      unsubscribeBeforeUnload = page?.subscribeBeforeUnload(promptBeforeUnload) ?? null;
       unsubscribeSessionReopened = persistence.subscribeSessionReopened(onSessionReopened);
       void load();
     },

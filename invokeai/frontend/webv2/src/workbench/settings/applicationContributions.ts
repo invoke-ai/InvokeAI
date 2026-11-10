@@ -1,7 +1,7 @@
 import type { SettingDefinition, SettingsContribution, SettingsText } from '@platform/ui/settings/contracts';
 
 import { intermediatesSettingsContribution } from '@features/intermediates/settingsContribution';
-import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { getWorkbenchLanguageAvailability, WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
 
 const text =
   (key: string, fallback?: string): SettingsText =>
@@ -19,7 +19,7 @@ const custom = (
   id: string,
   label: string,
   scope: SettingDefinition['scope'] = 'preference',
-  options: { fill?: boolean } = {}
+  options: { fill?: boolean; framed?: boolean } = {}
 ): SettingDefinition => ({
   id,
   label: text(`${id}.label`, label),
@@ -42,7 +42,16 @@ export const appearanceSettings = section('appearance', 'Appearance', [
     label: text('language.label', 'Language'),
     kind: 'select',
     scope: 'preference',
-    options: WORKBENCH_LANGUAGE_OPTIONS,
+    description: text('language.description'),
+    options: WORKBENCH_LANGUAGE_OPTIONS.map((option): { value: string; label: SettingsText } => ({
+      value: option.value,
+      label: (t) => {
+        const availability = getWorkbenchLanguageAvailability(option.value);
+        return availability === 'available'
+          ? option.label
+          : t(`settings.catalog.language.${availability}`, { label: option.label });
+      },
+    })),
   },
   preference('reduceMotion', 'Reduce motion', 'animation'),
   preference('highContrast', 'High contrast', 'accessibility a11y readability'),
@@ -63,9 +72,21 @@ export const appearanceSettings = section('appearance', 'Appearance', [
   },
 ]);
 export const behaviorSettings = section('behavior', 'Behavior', [
-  preference('autoSwitchInvocationRoute', 'Auto-switch Invoke route'),
+  {
+    id: 'startupDestination',
+    label: text('startupDestination.label', 'On startup, open'),
+    description: text('startupDestination.description'),
+    keywords: 'launch start open resume recent project launchpad home',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'launchpad', label: text('options.launchpad', 'Launchpad') },
+      { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
+    ],
+  },
+  preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
-  preference('enableModelDescriptions', 'Show model descriptions', 'models'),
+  preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),
   preference('preferNumericAttentionStyle', 'Prefer numeric attention style', 'generate prompt editor'),
   preference('showPromptSyntaxHighlighting', 'Highlight prompt syntax', 'generate prompt editor'),
@@ -73,28 +94,11 @@ export const behaviorSettings = section('behavior', 'Behavior', [
 export const hotkeysSettings = section('hotkeys', 'Keyboard shortcuts', [
   custom('hotkeys', 'Keyboard shortcuts', 'preference', { fill: true }),
 ]);
-export const projectSettings = section('project', 'Project', [
-  {
-    ...preference('useCpuNoise', 'Use CPU noise'),
-    scope: 'project',
-  },
-  {
-    ...preference('useNsfwChecker', 'NSFW checker', 'safety blur'),
-    scope: 'project',
-  },
-  {
-    ...preference('useWatermark', 'Invisible watermark', 'output'),
-    scope: 'project',
-  },
-]);
 export const galleryPreferenceSettings = section('gallery', 'Gallery', [
   preference('confirmImageDeletion', 'Confirm image deletion', 'delete safety'),
 ]);
-export const previewProjectSettings = section('preview', 'Preview', [
-  {
-    ...preference('antialiasProgressImages', 'Antialias progress images'),
-    scope: 'project',
-  },
+export const previewPreferenceSettings = section('preview', 'Preview', [
+  preference('antialiasProgressImages', 'Antialias progress images'),
 ]);
 export const workflowSettings = section('workflow', 'Workflow', [
   {
@@ -158,16 +162,19 @@ export const serverSettings = section('server', 'Server', [
 ]);
 export const workspaceSettings = section('workspace', 'Data & workspace', [
   custom('workspaceActions', 'Data & workspace', 'none'),
+  {
+    ...custom('clearSavedData', 'Clear saved data', 'none', { framed: true }),
+    keywords: 'delete reset erase wipe projects',
+  },
 ]);
-export const aboutSettings = section('about', 'About', [custom('about', 'About InvokeAI', 'none')]);
+export const aboutSettings = section('about', 'About', [custom('about', 'About Invoke', 'none')]);
 
 export const applicationSettingsContributions = [
   appearanceSettings,
   behaviorSettings,
   hotkeysSettings,
-  projectSettings,
   galleryPreferenceSettings,
-  previewProjectSettings,
+  previewPreferenceSettings,
   imageMapVocabularySettings,
   developerSettings,
   serverSettings,

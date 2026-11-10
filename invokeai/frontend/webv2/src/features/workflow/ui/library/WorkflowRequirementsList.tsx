@@ -17,6 +17,7 @@ import {
 } from '@features/models';
 import { getAddModelsSearchTerm, resolveWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, DownloadIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -165,20 +166,17 @@ const RequirementRow = ({
       </DataList.ItemLabel>
       <DataList.ItemValue color={presentation.color} fontSize="xs" minW="0">
         {canFindModel ? (
-          <Text asChild cursor="pointer" textAlign="start" truncate _hover={REQUIREMENT_LINK_HOVER}>
-            <button
-              data-requirement-link={searchTerm}
-              title={t('workflowLibrary.findModel', { name: label })}
-              type="button"
-              onClick={handleFindModel}
-            >
-              {label}
-            </button>
-          </Text>
+          <Tooltip content={t('workflowLibrary.findModel', { name: label })}>
+            <Text asChild cursor="pointer" textAlign="start" truncate _hover={REQUIREMENT_LINK_HOVER}>
+              <button data-requirement-link={searchTerm} type="button" onClick={handleFindModel}>
+                {label}
+              </button>
+            </Text>
+          </Tooltip>
         ) : (
-          <Text truncate title={label}>
-            {label}
-          </Text>
+          <Tooltip content={label}>
+            <Text truncate>{label}</Text>
+          </Tooltip>
         )}
       </DataList.ItemValue>
     </DataList.Item>

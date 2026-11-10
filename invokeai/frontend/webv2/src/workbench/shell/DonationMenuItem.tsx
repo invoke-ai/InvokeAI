@@ -21,8 +21,13 @@ const frontendConfigQueryOptions = queryOptions({
 export const prefetchDonationMenuItem = (queryClient: QueryClient) =>
   queryClient.prefetchQuery(frontendConfigQueryOptions);
 
+export interface DonationMenuItemProps {
+  /** Leads with its own separator where the link forms a group of one, so a hidden link leaves no separator behind. */
+  separated?: boolean;
+}
+
 /** Both menus share the server's visibility policy and the same external destination. */
-export const DonationMenuItem = () => {
+export const DonationMenuItem = ({ separated = false }: DonationMenuItemProps) => {
   const { t } = useTranslation();
   const { data } = useQuery(frontendConfigQueryOptions);
 
@@ -32,11 +37,14 @@ export const DonationMenuItem = () => {
   }
 
   return (
-    <Menu.Item asChild value="donate">
-      <chakra.a href="https://github.com/sponsors/invoke-ai" rel="noreferrer" target="_blank">
-        <Icon as={HeartIcon} boxSize="3.5" />
-        <Menu.ItemText>{t('common.donateToInvokeAI')}</Menu.ItemText>
-      </chakra.a>
-    </Menu.Item>
+    <>
+      {separated ? <Menu.Separator /> : null}
+      <Menu.Item asChild value="donate">
+        <chakra.a href="https://github.com/sponsors/invoke-ai" rel="noreferrer" target="_blank">
+          <Icon as={HeartIcon} boxSize="3.5" />
+          <Menu.ItemText>{t('common.donateToInvokeAI')}</Menu.ItemText>
+        </chakra.a>
+      </Menu.Item>
+    </>
   );
 };

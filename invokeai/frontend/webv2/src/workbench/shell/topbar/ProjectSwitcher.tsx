@@ -3,14 +3,15 @@ import type { DeleteProjectBoards } from '@workbench/projects/api';
 import type { ProjectSummary } from '@workbench/projects/library';
 import type { MouseEvent } from 'react';
 
-import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
-import { MenuContent } from '@platform/ui/Menu';
+import { MenuContent, MenuHeadingGroup, MenuItem } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { toaster } from '@platform/ui/toaster';
@@ -21,7 +22,7 @@ import { refreshProjectLibrary, renameLibraryProject, useProjectLibrarySelector 
 import { useProjectSyncAttention } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useExportOpenProject } from '@workbench/projects/useProjectFileActions';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useNotify } from '@workbench/useNotify';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -30,9 +31,9 @@ import {
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
-  ChevronDownIcon,
+  CopyIcon,
   FileDownIcon,
-  FolderCogIcon,
+  FolderIcon,
   FolderOpenIcon,
   PencilIcon,
   PlusIcon,
@@ -44,7 +45,8 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
-import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+import { HIDE_BELOW_PROJECT_NAME_WIDTH, SHOW_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 // The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
 // file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
@@ -72,7 +74,7 @@ export const ProjectSwitcher = () => {
   const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject, openProject } = useProjectActions();
   const startExport = useExportOpenProject();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const notify = useNotify();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useCallback(() => triggerRef.current, []);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
@@ -148,7 +150,12 @@ export const ProjectSwitcher = () => {
     setHasRequestedDelete(true);
     setDeleteTarget({ id: activeProjectId, name: activeProjectName });
   }, [activeProjectId, activeProjectName]);
-  const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
+  const copyActiveProjectId = useCallback(() => {
+    copyText(activeProjectId).then(
+      () => notify.success(t('topbar.project.idCopied')),
+      () => notify.error(t('common.couldNotCopy'), t('common.clipboardBlocked'))
+    );
+  }, [activeProjectId, notify, t]);
   const exportActiveProject = useCallback(() => {
     flushGenerateDrafts();
 
@@ -199,53 +206,52 @@ export const ProjectSwitcher = () => {
                 : 'topbar.projectSwitcher.trigger',
               { name: activeProjectName }
             )}
+            className="group"
             size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
+            <Icon as={FolderIcon} boxSize="4" css={SHOW_BELOW_PROJECT_NAME_WIDTH} flexShrink={0} />
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
             {hasProjectNeedingAttention ? (
               <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} />
             ) : null}
-            <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+            <TopbarMenuChevron />
           </Button>
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
             <MenuContent maxW="22rem" minW="18rem">
-              <Stack gap="0" px="3" py="2">
-                <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
-                  {t('projects.projectDetails')}
-                </Text>
-                <MiddleTruncate fontWeight="700" text={activeProjectName} />
-              </Stack>
-              <Menu.Separator />
-              <Menu.Item value="rename-project" onClick={renameActiveProject}>
-                <Icon as={PencilIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('projects.renameWithEllipsis')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item value="project-details" onClick={showActiveProjectDetails}>
-                <Icon as={FolderCogIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('common.details')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item value="export-project" onClick={exportActiveProject}>
-                <Icon as={FileDownIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('common.export')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item value="close-project" onClick={closeActiveProject}>
-                <Icon as={XIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('common.close')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item data-danger="" value="delete-project" onClick={deleteActiveProject}>
-                <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText>{t('projects.deleteProjectWithEllipsis')}</Menu.ItemText>
-              </Menu.Item>
+              <MenuHeadingGroup label={activeProjectName}>
+                <Menu.Item value="rename-project" onClick={renameActiveProject}>
+                  <Icon as={PencilIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('projects.renameWithEllipsis')}</Menu.ItemText>
+                </Menu.Item>
+                <MenuItem
+                  unavailableReason={canCopyText() ? undefined : t('common.copyUnavailable')}
+                  value="copy-project-id"
+                  onClick={copyActiveProjectId}
+                >
+                  <Icon as={CopyIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.project.copyId')}</Menu.ItemText>
+                </MenuItem>
+                <Menu.Item value="export-project" onClick={exportActiveProject}>
+                  <Icon as={FileDownIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('common.export')}</Menu.ItemText>
+                </Menu.Item>
+                <Menu.Item value="close-project" onClick={closeActiveProject}>
+                  <Icon as={XIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('common.close')}</Menu.ItemText>
+                </Menu.Item>
+                <Menu.Item data-danger="" value="delete-project" onClick={deleteActiveProject}>
+                  <Icon as={Trash2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('projects.deleteProjectWithEllipsis')}</Menu.ItemText>
+                </Menu.Item>
+              </MenuHeadingGroup>
 
               <Menu.Separator />
               <Menu.RadioItemGroup value={activeProjectId} onValueChange={selectOpenProject}>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
-                  {t('projects.openProjects')}
-                </Menu.ItemGroupLabel>
+                <Menu.ItemGroupLabel>{t('projects.openProjects')}</Menu.ItemGroupLabel>
                 {openProjectSummaries.map((project) => (
                   <OpenProjectRow
                     key={project.id}
@@ -261,9 +267,7 @@ export const ProjectSwitcher = () => {
                 <>
                   <Menu.Separator />
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
-                      {t('common.recent')}
-                    </Menu.ItemGroupLabel>
+                    <Menu.ItemGroupLabel>{t('common.recent')}</Menu.ItemGroupLabel>
                     {recentSummaries.map((summary) => (
                       <RecentProjectRow key={summary.id} summary={summary} onOpen={openProject} />
                     ))}
