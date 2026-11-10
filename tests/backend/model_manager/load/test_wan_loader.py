@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import gguf
 import pytest
-import safetensors.torch
 import torch
 
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
@@ -19,6 +18,7 @@ from invokeai.backend.model_manager.load.model_loaders.wan import (
 )
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SubModelType, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.fixtures.safetensors_files import overwrite_payloads
 
 
 def test_converts_text_and_time_embedders():
@@ -344,13 +344,13 @@ def test_gguf_loader_rejects_missing_model_parameter() -> None:
 
 
 class TestDiffusersFolderLoad:
-    """`WanDiffusersModel` against a real tiny transformer folder written at the fp32 Wan ships."""
+    """`WanDiffusersModel` against real tiny transformer folders, read through diffusers' own memory mapping."""
 
     @staticmethod
-    def _folder(tmp_path: Path) -> Path:
+    def _model():
         from diffusers import WanTransformer3DModel
 
-        model = WanTransformer3DModel(
+        return WanTransformer3DModel(
             patch_size=(1, 2, 2),
             in_channels=16,
             out_channels=16,
@@ -360,68 +360,80 @@ class TestDiffusersFolderLoad:
             ffn_dim=64,
             text_dim=32,
         )
-        model.save_pretrained(tmp_path / "transformer")
-        return tmp_path
 
     @staticmethod
-    def _loader(load_class: object) -> WanDiffusersModel:
-        loader = object.__new__(WanDiffusersModel)
-        loader.get_hf_load_class = lambda *_args, **_kwargs: load_class
-        loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
-        return loader
-
-    @staticmethod
-    def _load_trapping_mmap(config: object) -> tuple[object, list[str]]:
-        """Load through the real class with the mmap reader trapped and the in-memory reader spied on."""
-        from diffusers import WanTransformer3DModel
-
-        read_into_memory: list[str] = []
-        real_load = safetensors.torch.load
-
-        def mapped(*_args, **_kwargs):
-            raise AssertionError("the shard was memory-mapped; fp32-kept tensors would pin it")
-
-        def load(data, *args, **kwargs):
-            read_into_memory.append("read")
-            return real_load(data, *args, **kwargs)
-
-        loader = TestDiffusersFolderLoad._loader(WanTransformer3DModel)
-        with patch("safetensors.torch.load_file", mapped), patch("safetensors.torch.load", load):
-            return loader._load_model(config, SubModelType.Transformer), read_into_memory
-
-    def test_fp32_shards_are_read_into_memory_not_mapped(self, tmp_path: Path) -> None:
-        from diffusers import WanTransformer3DModel
-
-        config = SimpleNamespace(path=str(self._folder(tmp_path)), repo_variant=None)
-
-        model, read_into_memory = self._load_trapping_mmap(config)
-
-        assert read_into_memory
-        keep_fp32 = WanTransformer3DModel._keep_in_fp32_modules
-        for name, param in model.state_dict().items():
-            expected = torch.float32 if any(part in name for part in keep_fp32) else torch.bfloat16
-            assert param.dtype == expected, name
-
-    def test_the_variant_fallback_also_avoids_mmap(self, tmp_path: Path) -> None:
-        """The folder has no fp16 files, so the first attempt fails and the retry does the loading."""
+    def _config(root: Path, repo_variant: ModelRepoVariant | None = None) -> Diffusers_Config_Base:
         config = MagicMock(spec=Diffusers_Config_Base)
-        config.path = str(self._folder(tmp_path))
-        config.repo_variant = ModelRepoVariant.FP16
+        config.path = str(root)
+        config.repo_variant = repo_variant
+        return config
 
-        _, read_into_memory = self._load_trapping_mmap(config)
+    @staticmethod
+    def _load(config: Diffusers_Config_Base) -> tuple[torch.nn.Module, dict[str, int]]:
+        """The loaded model, and where each of its tensors lived when `from_pretrained` handed it over."""
+        from diffusers import WanTransformer3DModel
 
-        assert read_into_memory
+        as_loaded: dict[str, int] = {}
 
-    def test_a_non_diffusers_class_does_not_receive_disable_mmap(self, tmp_path: Path) -> None:
-        received: list[dict] = []
-
-        class TransformersLike:
+        class Recorded(WanTransformer3DModel):
             @classmethod
-            def from_pretrained(cls, _path, **kwargs):
-                received.append(kwargs)
-                return object()
+            def from_pretrained(cls, *args, **kwargs):
+                model = WanTransformer3DModel.from_pretrained(*args, **kwargs)
+                as_loaded.update({name: value.data_ptr() for name, value in model.state_dict().items()})
+                return model
 
-        config = SimpleNamespace(path=str(tmp_path), repo_variant=None)
-        self._loader(TransformersLike)._load_model(config, SubModelType.Transformer)
+        loader = object.__new__(WanDiffusersModel)
+        loader.get_hf_load_class = lambda *_args, **_kwargs: Recorded
+        loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+        return loader._load_model(config, SubModelType.Transformer), as_loaded
 
-        assert "disable_mmap" not in received[0]
+    @staticmethod
+    def _tensors_reading_the_file(root: Path, model: torch.nn.Module) -> set[str]:
+        """The state dict entries that change when the folder's weight files are rewritten underneath them."""
+        loaded = {name: value.clone() for name, value in model.state_dict().items()}
+        for file in (root / "transformer").glob("*.safetensors"):
+            overwrite_payloads(file)
+        return {name for name, value in model.state_dict().items() if not torch.equal(value, loaded[name])}
+
+    @pytest.mark.parametrize("repo_variant", [None, ModelRepoVariant.FP16], ids=["default", "fp16-variant-fallback"])
+    def test_an_fp32_folder_leaves_nothing_reading_the_file(
+        self, tmp_path: Path, repo_variant: ModelRepoVariant | None
+    ) -> None:
+        """Wan ships fp32. Everything is cast to bf16 except `_keep_in_fp32_modules`, whose cast is a no-op: left as
+        they come out of `from_pretrained`, those tensors are views of the mapping and hold every shard mapped.
+
+        The fp16 variant is absent, so with it requested the fallback does the loading."""
+        from diffusers import WanTransformer3DModel
+
+        self._model().save_pretrained(tmp_path / "transformer")
+
+        model, _ = self._load(self._config(tmp_path, repo_variant))
+
+        keep_fp32 = set(WanTransformer3DModel._keep_in_fp32_modules)
+        for name, value in model.state_dict().items():
+            expected = torch.float32 if keep_fp32 & set(name.split(".")) else torch.bfloat16
+            assert value.dtype == expected, name
+        assert self._tensors_reading_the_file(tmp_path, model) == set()
+
+    @pytest.mark.parametrize("norms_on_disk", ["bf16", "fp32"])
+    def test_a_bf16_folder_keeps_its_weights_on_the_mapping(self, tmp_path: Path, norms_on_disk: str) -> None:
+        """A bf16 file needs no cast: its weights stay on the file's pages, as upstream loads them, with no second copy.
+        Only what is kept in fp32 gets memory of its own -- cast from a bf16 norm, or copied off an fp32 one, the way
+        `save_pretrained` writes a model loaded in bf16."""
+        from diffusers import WanTransformer3DModel
+
+        if norms_on_disk == "bf16":
+            self._model().to(torch.bfloat16).save_pretrained(tmp_path / "transformer")
+        else:
+            self._model().save_pretrained(tmp_path / "fp32")
+            mixed = WanTransformer3DModel.from_pretrained(tmp_path / "fp32", torch_dtype=torch.bfloat16)
+            mixed.save_pretrained(tmp_path / "transformer")
+
+        model, as_loaded = self._load(self._config(tmp_path))
+
+        bf16 = {name for name, value in model.state_dict().items() if value.dtype == torch.bfloat16}
+        assert bf16 and len(bf16) < len(model.state_dict())
+        assert self._tensors_reading_the_file(tmp_path, model) == bf16
+        # Upcast from a bf16 norm, the fp32 tensors already have memory of their own and are not copied again.
+        copied = {name for name, value in model.state_dict().items() if value.data_ptr() != as_loaded[name]}
+        assert copied == (set() if norms_on_disk == "bf16" else set(model.state_dict()) - bf16)

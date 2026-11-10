@@ -1,10 +1,12 @@
-"""``ModelOnDisk.metadata`` for GGUF files, which identification reads instead of reopening the file."""
+"""The header readers identification and loaders use instead of reading a model's tensors."""
 
+import json
 from pathlib import Path
 
 import gguf
+import pytest
 
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, safetensors_meta_state_dict
 
 
 def test_gguf_metadata_keeps_scalar_fields_with_their_types_and_leaves_arrays_out(tmp_path: Path) -> None:
@@ -29,3 +31,14 @@ def test_gguf_metadata_keeps_scalar_fields_with_their_types_and_leaves_arrays_ou
     assert metadata["t5encoder.block_count"] == 24 and type(metadata["t5encoder.block_count"]) is int
     assert metadata["tokenizer.ggml.add_eos_token"] is True
     assert "tokenizer.ggml.tokens" not in metadata
+
+
+def test_a_safetensors_dtype_without_a_torch_dtype_is_refused_by_name(tmp_path: Path) -> None:
+    """A sub-byte format's header counts 4-bit elements, so there is no meta tensor to build for it. The refusal has to
+    name the tensor and the dtype, not surface as a bare ``KeyError`` out of a loader."""
+    header = json.dumps({"layer.weight": {"dtype": "F4", "shape": [4], "data_offsets": [0, 2]}}).encode()
+    path = tmp_path / "packed.safetensors"
+    path.write_bytes(len(header).to_bytes(8, "little") + header + bytes(2))
+
+    with pytest.raises(ValueError, match=r"'layer\.weight' as F4"):
+        safetensors_meta_state_dict(path)

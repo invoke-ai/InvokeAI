@@ -7,6 +7,8 @@ expectation.
 """
 
 import json
+import weakref
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -16,7 +18,6 @@ import safetensors.torch
 import torch
 from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.load.model_loaders import wan as wan_loader
 from invokeai.backend.model_manager.load.model_loaders.wan import (
     _WAN_NATIVE_TO_DIFFUSERS_RENAMES,
     WanCheckpointModel,
@@ -30,6 +31,7 @@ from tests.fixtures.quantized_payloads import (
     quantize_convrot,
     quantize_scaled_fp8,
 )
+from tests.fixtures.safetensors_files import overwrite_payloads
 
 # A structurally faithful but tiny Wan transformer. attention_head_dim must stay
 # at 128 — the loader derives num_attention_heads as inner_dim // 128, matching
@@ -382,57 +384,105 @@ class TestSubmodelGuard:
             _make_loader()._load_model(MagicMock(), SubModelType.Transformer)
 
 
-class TestReservationAndReadBackend:
-    """The cache is asked for the post-cast size before the fold or the cast widens anything, and the
-    file is read without a file-wide mmap that would stay mapped through both."""
+class TestHeaderFirstRead:
+    """What the header settles before any payload is read, and what the loaded model still holds of the file."""
 
     @staticmethod
-    def _load_recording(path: Path) -> tuple[list[int], list[set[torch.dtype]], list[str]]:
-        reserved: list[int] = []
-        dtypes_at_fold: list[set[torch.dtype]] = []
-        backends: list[str] = []
-        real_fold = wan_loader._dequantize_comfyui_fp8
-        real_load_file = safetensors.torch.load_file
+    def _load_recording(path: Path) -> tuple[torch.nn.Module, list[tuple], list[int]]:
+        """Load through the real reader, logging each payload it hands out and each reservation, in order.
 
-        def fold(sd, *args, **kwargs):
-            dtypes_at_fold.append({t.dtype for t in sd.values()})
-            assert reserved, "the fold ran before the cache was asked for room"
-            return real_fold(sd, *args, **kwargs)
+        Also returns, per read, how many earlier payloads that are not bf16 were still alive: source tensors that a
+        conversion on arrival has already replaced by then.
+        """
+        events: list[tuple] = []
+        alive_at_read: list[int] = []
+        sources: list[weakref.ref] = []
+        real_safe_open = safetensors.safe_open
 
-        def load_file(filename, *args, **kwargs):
-            backends.append(kwargs.get("backend"))
-            return real_load_file(filename, *args, **kwargs)
+        def handed_out(key: str, tensor: torch.Tensor) -> torch.Tensor:
+            events.append(("read", key))
+            alive = [ref() for ref in sources]
+            alive_at_read.append(sum(1 for t in alive if t is not None and t.dtype != torch.bfloat16))
+            del alive
+            sources.append(weakref.ref(tensor))
+            return tensor
 
-        config = MagicMock()
-        config.path = str(path)
+        class Handle:
+            def __init__(self, handle) -> None:
+                self._handle = handle
+
+            def __getattr__(self, name: str):
+                return getattr(self._handle, name)
+
+            def get_tensor(self, key: str) -> torch.Tensor:
+                return handed_out(key, self._handle.get_tensor(key))
+
+            def get_tensors(self) -> dict[str, torch.Tensor]:
+                # What `load_file` reads through: the whole file.
+                return {key: handed_out(key, tensor) for key, tensor in self._handle.get_tensors().items()}
+
+        @contextmanager
+        def safe_open(*args, **kwargs):
+            with real_safe_open(*args, **kwargs) as handle:
+                yield Handle(handle)
+
         loader = _make_loader()
-        loader._ram_cache.make_room.side_effect = reserved.append
-        with (
-            patch.object(wan_loader, "_dequantize_comfyui_fp8", fold),
-            patch.object(safetensors.torch, "load_file", load_file),
-            patch.object(wan_loader.TorchDevice, "choose_torch_device"),
-            patch.object(wan_loader.TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16),
-        ):
-            model = loader._load_from_singlefile(config)
-        assert all(p.dtype == torch.bfloat16 for p in model.state_dict().values())
-        return reserved, dtypes_at_fold, backends
+        loader._ram_cache.make_room.side_effect = lambda size: events.append(("reserve", size))
+        dtype = torch.float32 if "int8" in path.name else torch.bfloat16
+        with patch.object(safetensors, "safe_open", safe_open), patch.object(safetensors.torch, "safe_open", safe_open):
+            model = _load(path, loader=loader, dtype=dtype)
+        return model, events, alive_at_read
 
-    def test_fp16_file_reserves_its_bf16_size_before_the_cast(self, tmp_path: Path) -> None:
+    @staticmethod
+    def _load_mapped(path: Path, dtype: torch.dtype) -> torch.nn.Module:
+        """The same load with the reader on safetensors' default mmap backend: the control for the overwrite probe."""
+        real_safe_open = safetensors.safe_open
+
+        def mapped(*args, backend: str = "mmap", **kwargs):
+            return real_safe_open(*args, **kwargs)
+
+        with patch.object(safetensors, "safe_open", mapped):
+            return _load(path, dtype=dtype)
+
+    @staticmethod
+    def _all_in_one(tmp_path: Path) -> tuple[torch.nn.Module, Path]:
+        """An fp16 transformer under ComfyUI's prefix, bundled with a VAE and a text encoder."""
         reference = _tiny_model()
-        path = tmp_path / "wan2.2-t2v-a14b-high_noise.safetensors"
-        sd = {k: v.half() for k, v in reference.state_dict().items()}
-        # Bundled components the loader drops first; reserving for them would inflate the number.
-        sd["vae.decoder.weight"] = torch.zeros(64, 64, dtype=torch.float16)
-        sd["text_encoders.umt5.weight"] = torch.zeros(64, 64, dtype=torch.float16)
+        sd = {f"model.diffusion_model.{k}": v.half() for k, v in reference.state_dict().items()}
+        sd["vae.decoder.conv_in.weight"] = torch.ones(64, 64, dtype=torch.float16)
+        sd["text_encoders.umt5xxl.transformer.shared.weight"] = torch.ones(64, 64, dtype=torch.float16)
+        path = tmp_path / "wan2.2_t2v_high_noise_14B_aio.safetensors"
         save_file(sd, path)
+        return reference, path
 
-        reserved, dtypes_at_fold, backends = self._load_recording(path)
+    def test_bundled_components_are_never_read(self, tmp_path: Path) -> None:
+        reference, path = self._all_in_one(tmp_path)
 
-        assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
-        assert dtypes_at_fold == [{torch.float16}]
-        assert backends == ["pread"]
+        _, events, _ = self._load_recording(path)
 
-    def test_scaled_fp8_file_reserves_the_folded_size_not_the_scales(self, tmp_path: Path) -> None:
+        read = [key for kind, key in events if kind == "read"]
+        assert sorted(read) == sorted(f"model.diffusion_model.{k}" for k in reference.state_dict())
+
+    def test_room_for_the_cast_size_is_made_before_the_first_read(self, tmp_path: Path) -> None:
+        reference, path = self._all_in_one(tmp_path)
+
+        model, events, _ = self._load_recording(path)
+
+        bf16_size = sum(v.numel() for v in reference.state_dict().values()) * 2
+        assert events[0] == ("reserve", bf16_size)
+        assert [event for event in events if event[0] == "reserve"] == [("reserve", bf16_size)]
+        assert all(t.dtype == torch.bfloat16 for t in model.state_dict().values())
+
+    def test_each_tensor_is_cast_before_the_next_is_read(self, tmp_path: Path) -> None:
+        """The peak stays the finished state dict plus the tensor in flight, never the whole fp16 source."""
+        _, path = self._all_in_one(tmp_path)
+
+        _, _, alive_at_read = self._load_recording(path)
+
+        assert len(alive_at_read) > 2
+        assert max(alive_at_read) == 0
+
+    def test_scaled_fp8_room_is_the_folded_size_and_its_metadata_is_never_read(self, tmp_path: Path) -> None:
         reference = _tiny_model()
         sd = {k: v.clone() for k, v in reference.state_dict().items()}
         target = "blocks.0.attn1.to_q.weight"
@@ -443,10 +493,76 @@ class TestReservationAndReadBackend:
         path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
         save_file(sd, path)
 
-        reserved, dtypes_at_fold, _ = self._load_recording(path)
+        model, events, alive_at_read = self._load_recording(path)
 
-        assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
-        assert torch.float8_e4m3fn in dtypes_at_fold[0]
+        assert events[0] == ("reserve", sum(v.numel() for v in reference.state_dict().values()) * 2)
+        read = {key for kind, key in events if kind == "read"}
+        assert read == set(reference.state_dict()) | {"blocks.0.attn1.to_q.scale_weight"}
+        # Only the fp8 weight is still alive while its scale is read; it is folded right after.
+        assert max(alive_at_read) == 1
+        folded = model.state_dict()[target]
+        assert folded.dtype == torch.bfloat16
+        assert torch.equal(folded.float(), torch.full_like(folded.float(), 2.0))
+
+    def test_an_int8_checkpoint_reserves_before_any_weight_is_read(self, tmp_path: Path) -> None:
+        """Only the markers are read first. The reservation is every payload at its stored width: dense float32 at
+        the float32 compute dtype, the codes one byte each, the scales float32."""
+        _, sd = _int8_checkpoint(BLOCK_LAYERS)
+        path = _write(tmp_path, sd)
+
+        _, events, _ = self._load_recording(path)
+
+        reserves = [event for event in events if event[0] == "reserve"]
+        first_reserve = events.index(reserves[0])
+        assert all(key.endswith(".comfy_quant") for _, key in events[:first_reserve])
+        assert reserves == [("reserve", sum(v.nbytes for k, v in sd.items() if not k.endswith(".comfy_quant")))]
+        assert len(events[first_reserve + 1 :]) == len(sd) - len(BLOCK_LAYERS)
+
+    def test_a_bf16_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
+        """bf16 on disk is the case where the cast is a no-op: a mapped tensor would come through it still mapped."""
+        reference = _tiny_model().to(torch.bfloat16)
+        path = tmp_path / "wan22-t2v-a14b-high_noise.safetensors"
+        save_file(reference.state_dict(), path)
+        mapped = self._load_mapped(path, torch.bfloat16)
+
+        model = _load(path)
+        overwrite_payloads(path)
+
+        assert any(not torch.equal(mapped.state_dict()[k], v) for k, v in reference.state_dict().items()), (
+            "the probe sees no change through mmap either, so it cannot tell a copy from a view"
+        )
+        for key, value in reference.state_dict().items():
+            assert torch.equal(model.state_dict()[key], value), key
+
+    def test_an_int8_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
+        """The int8 codes are kept as stored, so they are never copied by a cast either."""
+        _, sd = _int8_checkpoint(BLOCK_LAYERS)
+        path = _write(tmp_path, sd)
+        mapped = self._load_mapped(path, torch.float32)
+        mapped_before = {key: value.clone() for key, value in mapped.state_dict().items()}
+
+        model = _load(path, dtype=torch.float32)
+        loaded = {key: value.clone() for key, value in model.state_dict().items()}
+        overwrite_payloads(path)
+
+        assert any(not torch.equal(v, mapped_before[k]) for k, v in mapped.state_dict().items()), (
+            "the probe sees no change through mmap either, so it cannot tell a copy from a view"
+        )
+        for key, value in model.state_dict().items():
+            assert torch.equal(value, loaded[key]), key
+
+    def test_an_mx_exponent_grid_is_refused_by_name(self, tmp_path: Path) -> None:
+        """An E8M0 grid has to reach the MXFP8 refusal; a header dtype the reader cannot map would stop it short."""
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+        target = "blocks.0.attn1.to_q"
+        sd[f"{target}.weight"] = sd[f"{target}.weight"].to(torch.float8_e4m3fn)
+        sd[f"{target}.weight_scale"] = torch.full((128, 4), 1.0).to(torch.float8_e8m0fnu)
+        path = tmp_path / "Wan2.2-A14B-HighNoise-mxfp8.safetensors"
+        save_file(sd, path)
+
+        with pytest.raises(NotImplementedError, match="MXFP8"):
+            _load(path)
 
 
 # --- ComfyUI int8_tensorwise (convrot) -------------------------------------------------------------------------
