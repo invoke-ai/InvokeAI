@@ -117,7 +117,11 @@ def _copy_middleware(middleware: Any) -> Any:
     return clone
 
 
-def _clone_lifespan_context(context: Any, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]) -> Any:
+def _clone_lifespan_context(
+    context: Any,
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
+) -> Any:
     if isinstance(context, _DefaultLifespan):
         return _DefaultLifespan(_clone_router(context._router, routers, routes))
 
@@ -140,20 +144,24 @@ def _clone_lifespan_context(context: Any, routers: dict[int, APIRouter], routes:
 
 def _clone_callbacks(
     callbacks: list[BaseRoute] | None,
-    routers: dict[int, APIRouter],
-    routes: dict[int, BaseRoute],
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
 ) -> list[BaseRoute] | None:
     return [_clone_route(callback, routers, routes) for callback in callbacks] if callbacks is not None else None
 
 
-def _clone_router(router: APIRouter, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]) -> APIRouter:
+def _clone_router(
+    router: APIRouter,
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
+) -> APIRouter:
     existing = routers.get(id(router))
     if existing is not None:
-        return existing
+        return existing[1]
 
     # Rebind FastAPI's default lifecycle handlers to captured routers while keeping custom lifespan callables shared.
     clone = copy.copy(router)
-    routers[id(router)] = clone
+    routers[id(router)] = (router, clone)
     # A shallow copy retains the original bound method, so bind it to the captured router.
     clone.app = MethodType(router.app.__func__, clone)
     if getattr(router.default, "__self__", None) is router:
@@ -180,17 +188,21 @@ def _clone_router(router: APIRouter, routers: dict[int, APIRouter], routes: dict
     return clone
 
 
-def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]) -> BaseRoute:
+def _clone_route(
+    route: BaseRoute,
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
+) -> BaseRoute:
     existing = routes.get(id(route))
     if existing is not None:
-        return existing
+        return existing[1]
 
     if isinstance(route, _IncludedRouter):
         router = _clone_router(route.original_router, routers, routes)
         context = copy.copy(route.include_context)
         context.included_router = router
         clone = _IncludedRouter(original_router=router, include_context=context)
-        routes[id(route)] = clone
+        routes[id(route)] = (route, clone)
         for attr in (
             "tags",
             "dependencies",
@@ -203,7 +215,7 @@ def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[i
         context.callbacks = _clone_callbacks(route.include_context.callbacks, routers, routes) or []
     elif isinstance(route, _FrontendRouteGroup):
         clone = copy.copy(route)
-        routes[id(route)] = clone
+        routes[id(route)] = (route, clone)
         clone.routes = []
         for child in route.routes:
             child_clone = copy.copy(child)
@@ -214,7 +226,7 @@ def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[i
         clone.dependant = _copy_config(route.dependant)
     else:
         clone = copy.copy(route)
-        routes[id(route)] = clone
+        routes[id(route)] = (route, clone)
         if hasattr(route, "param_convertors"):
             clone.param_convertors = dict(route.param_convertors)
         if isinstance(route, APIRoute):
@@ -245,7 +257,7 @@ def _clone_route(route: BaseRoute, routers: dict[int, APIRouter], routes: dict[i
                 clone.methods = set(route.methods)
         if isinstance(route, Mount):
             clone.app = _snapshot_asgi_app(route.app)
-    routes[id(route)] = clone
+    routes[id(route)] = (route, clone)
     return clone
 
 
@@ -318,8 +330,8 @@ def _rebuild_websocket_handler(route: APIWebSocketRoute, dependency_overrides_pr
 
 def _snapshot_effective_context(
     context: _EffectiveRouteContext,
-    routers: dict[int, APIRouter],
-    routes: dict[int, BaseRoute],
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
     dependency_overrides_provider: Any,
 ) -> _EffectiveRouteContext:
     clone = copy.copy(context)
@@ -347,8 +359,8 @@ def _snapshot_effective_context(
 
 def _snapshot_included_router_contexts(
     included: _IncludedRouter,
-    routers: dict[int, APIRouter],
-    routes: dict[int, BaseRoute],
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
     seen: set[int] | None = None,
 ) -> None:
     if seen is None:
@@ -372,7 +384,11 @@ def _snapshot_included_router_contexts(
         )
 
 
-def _snapshot_included_routes(router: APIRouter, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]) -> None:
+def _snapshot_included_routes(
+    router: APIRouter,
+    routers: dict[int, tuple[APIRouter, APIRouter]],
+    routes: dict[int, tuple[BaseRoute, BaseRoute]],
+) -> None:
     seen: set[int] = set()
     for route in (*router.routes, *router._low_priority_routes):
         if isinstance(route, _IncludedRouter):
@@ -381,8 +397,9 @@ def _snapshot_included_routes(router: APIRouter, routers: dict[int, APIRouter], 
 
 def snapshot_core_routes(app: FastAPI) -> list[BaseRoute]:
     """Copy route nodes and included-router links without following app or router back-references."""
-    routers: dict[int, APIRouter] = {}
-    routes: dict[int, BaseRoute] = {}
+    # Retain each source with its clone so Python cannot reuse its id during this snapshot.
+    routers: dict[int, tuple[APIRouter, APIRouter]] = {}
+    routes: dict[int, tuple[BaseRoute, BaseRoute]] = {}
     router = _clone_router(app.router, routers, routes)
     webhooks = _clone_router(app.webhooks, routers, routes)
     core_app = copy.copy(app)

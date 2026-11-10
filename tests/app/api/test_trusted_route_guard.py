@@ -535,6 +535,93 @@ def test_trusted_guard_preserves_api_resolution_and_ui_fallback() -> None:
     asyncio.run(exercise())
 
 
+def test_trusted_nested_websocket_routes_keep_their_prefix_clone(monkeypatch) -> None:
+    import weakref
+
+    from fastapi import WebSocket
+    from fastapi.routing import APIWebSocketRoute
+
+    import invokeai.app.api.trusted_routes as trusted_routes
+
+    app = FastAPI()
+    for prefix, value in (("/route-a/nested", "socket a"), ("/route-b/nested", "socket b")):
+        router = APIRouter()
+
+        @router.websocket("/socket")
+        async def socket_route(websocket: WebSocket, value: str = value) -> None:
+            await websocket.accept()
+            await websocket.send_text(value)
+            await websocket.close()
+
+        app.include_router(router, prefix=prefix)
+
+    # Reuse synthetic ids only after weakly referenced source routes are collected.
+    original_id = id
+
+    slots: list[tuple[int, weakref.ReferenceType[APIWebSocketRoute]]] = []
+    next_id = 1 << 100
+
+    def route_id(value: object) -> int:
+        nonlocal next_id
+        if isinstance(value, APIWebSocketRoute) and value.path != "/socket":
+            for index, (slot_id, reference) in enumerate(slots):
+                if reference() is value:
+                    return slot_id
+                if reference() is None:
+                    slots[index] = (slot_id, weakref.ref(value))
+                    return slot_id
+            slots.append((next_id, weakref.ref(value)))
+            next_id += 1
+            return slots[-1][0]
+        return original_id(value)
+
+    monkeypatch.setattr(
+        trusted_routes,
+        "id",
+        route_id,
+        raising=False,
+    )
+    guarded = trusted_routes.TrustedRouteGuard(app=app, routes=trusted_routes.snapshot_core_routes(app), frontend=None)
+
+    async def exercise(path: str) -> list[dict]:
+        messages: list[dict] = []
+
+        async def receive() -> dict[str, str]:
+            return {"type": "websocket.connect"}
+
+        async def send(message: dict) -> None:
+            messages.append(message)
+
+        scope = {
+            "type": "websocket",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "scheme": "ws",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+            "root_path": "",
+            "path": path,
+            "raw_path": path.encode(),
+            "query_string": b"",
+            "headers": [],
+            "subprotocols": [],
+            "state": {},
+        }
+        await guarded(scope, receive, send)
+        return messages
+
+    async def exercise_both() -> None:
+        for path, expected in (
+            ("/route-a/nested/socket", "socket a"),
+            ("/route-b/nested/socket", "socket b"),
+        ):
+            messages = await exercise(path)
+            assert any(message["type"] == "websocket.accept" for message in messages)
+            assert [message["text"] for message in messages if message["type"] == "websocket.send"] == [expected]
+
+    asyncio.run(exercise_both())
+
+
 def test_trusted_direct_route_detaches_dependant_graph() -> None:
     from fastapi.routing import APIRoute
 
