@@ -413,6 +413,73 @@ def test_trusted_direct_websocket_route_rebinds_dependency_handler() -> None:
     asyncio.run(exercise())
 
 
+def test_trusted_included_websocket_route_keeps_captured_dependency_override() -> None:
+    from fastapi import WebSocket
+
+    from invokeai.app.api.trusted_routes import TrustedRouteGuard, snapshot_core_routes
+
+    app = FastAPI()
+    router = APIRouter()
+
+    async def dependency() -> str:
+        return "default"
+
+    async def override() -> str:
+        return "captured override"
+
+    @router.websocket("/socket")
+    async def socket_route(websocket: WebSocket, value: str = Depends(dependency)) -> None:
+        await websocket.accept()
+        await websocket.send_text(value)
+        await websocket.close()
+
+    app.dependency_overrides[dependency] = override
+    app.include_router(router, prefix="/api")
+    guarded = TrustedRouteGuard(app=app, routes=snapshot_core_routes(app), frontend=None)
+
+    async def late_override() -> str:
+        return "late override"
+
+    app.dependency_overrides[dependency] = late_override
+
+    async def exercise(target) -> list[dict]:
+        messages: list[dict] = []
+
+        async def receive() -> dict[str, str]:
+            return {"type": "websocket.connect"}
+
+        async def send(message: dict) -> None:
+            messages.append(message)
+
+        scope = {
+            "type": "websocket",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "scheme": "ws",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+            "root_path": "",
+            "path": "/api/socket",
+            "raw_path": b"/api/socket",
+            "query_string": b"",
+            "headers": [],
+            "subprotocols": [],
+            "state": {},
+        }
+        await target(scope, receive, send)
+        return messages
+
+    async def exercise_both() -> None:
+        original_messages = await exercise(app)
+        guarded_messages = await exercise(guarded)
+        original_values = [message["text"] for message in original_messages if message["type"] == "websocket.send"]
+        guarded_values = [message["text"] for message in guarded_messages if message["type"] == "websocket.send"]
+        assert original_values == ["late override"]
+        assert guarded_values == ["captured override"]
+
+    asyncio.run(exercise_both())
+
+
 def test_trusted_guard_preserves_api_resolution_and_ui_fallback() -> None:
     from invokeai.app.api.trusted_routes import TrustedRouteGuard, snapshot_core_routes
 

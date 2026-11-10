@@ -317,7 +317,10 @@ def _rebuild_websocket_handler(route: APIWebSocketRoute, dependency_overrides_pr
 
 
 def _snapshot_effective_context(
-    context: _EffectiveRouteContext, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]
+    context: _EffectiveRouteContext,
+    routers: dict[int, APIRouter],
+    routes: dict[int, BaseRoute],
+    dependency_overrides_provider: Any,
 ) -> _EffectiveRouteContext:
     clone = copy.copy(context)
     copied: dict[int, Any] = {}
@@ -333,7 +336,12 @@ def _snapshot_effective_context(
     if context.starlette_route is not None:
         clone.starlette_route = _clone_route(context.starlette_route, routers, routes)
         if isinstance(clone.starlette_route, APIWebSocketRoute):
-            _rebuild_websocket_handler(clone.starlette_route, clone.dependency_overrides_provider)
+            _rebuild_websocket_handler(
+                clone.starlette_route,
+                clone.dependency_overrides_provider
+                if clone.dependency_overrides_provider is not None
+                else dependency_overrides_provider,
+            )
     return clone
 
 
@@ -353,11 +361,15 @@ def _snapshot_included_router_contexts(
         if isinstance(candidate, _IncludedRouter):
             _snapshot_included_router_contexts(candidate, routers, routes, seen)
         else:
-            candidates[index] = _snapshot_effective_context(candidate, routers, routes)
+            candidates[index] = _snapshot_effective_context(
+                candidate, routers, routes, included.include_context.dependency_overrides_provider
+            )
 
     low_priority = included.effective_low_priority_routes()
     for index, context in enumerate(low_priority):
-        low_priority[index] = _snapshot_effective_context(context, routers, routes)
+        low_priority[index] = _snapshot_effective_context(
+            context, routers, routes, included.include_context.dependency_overrides_provider
+        )
 
 
 def _snapshot_included_routes(router: APIRouter, routers: dict[int, APIRouter], routes: dict[int, BaseRoute]) -> None:
