@@ -7,6 +7,7 @@ encoder runs on: float32 on the CPU (bf16 GEMM faults on part of the Windows fle
 Forwards run in float32: CPU bf16 matmuls fault on part of the hosted Windows fleet.
 """
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -22,8 +23,9 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 
-def _write_bf16_folder(root: Path) -> T5EncoderModel:
-    """A tiny T5 v1.1 saved in bf16 under ``root/text_encoder_2``; returns the model as stored (bf16 values)."""
+def _write_bf16_folder(root: Path, max_shard_size: str | None = None) -> T5EncoderModel:
+    """A tiny T5 v1.1 saved in bf16 under ``root/text_encoder_2``, split into shards of at most ``max_shard_size``
+    when given; returns the model as stored (bf16 values)."""
     torch.manual_seed(0)
     config = T5Config(
         vocab_size=32,
@@ -41,7 +43,8 @@ def _write_bf16_folder(root: Path) -> T5EncoderModel:
     with torch.no_grad():
         for param in model.parameters():
             param.copy_(torch.randn_like(param) * 0.5)
-    model.to(torch.bfloat16).save_pretrained(root / "text_encoder_2")
+    shard_kwargs = {} if max_shard_size is None else {"max_shard_size": max_shard_size}
+    model.to(torch.bfloat16).save_pretrained(root / "text_encoder_2", **shard_kwargs)
     return model
 
 
@@ -165,13 +168,18 @@ def test_device_caches_do_not_share_weights_of_different_dtypes(
     assert dtypes == {"cpu": torch.float32, "cuda": torch.float16}
 
 
-def test_a_cold_cpu_load_makes_room_for_the_float32_encoder_not_the_bf16_folder(tmp_path: Path) -> None:
+@pytest.mark.parametrize("sharded", [False, True], ids=["single_file", "sharded"])
+def test_a_cold_cpu_load_makes_room_for_the_float32_encoder_not_the_bf16_folder(tmp_path: Path, sharded: bool) -> None:
     # The folder stores bf16 but the CPU builds float32, twice the folder: reserving the folder's size would let a
-    # cold load overshoot the RAM budget by about a file.
+    # cold load overshoot the RAM budget by about a file. Real FLUX.1/SD3 folders shard the encoder, so the size has
+    # to come from every shard the index names.
     from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 
-    _write_bf16_folder(tmp_path)
+    _write_bf16_folder(tmp_path, max_shard_size="4KB" if sharded else None)
+    if sharded:
+        index = json.loads((tmp_path / "text_encoder_2" / "model.safetensors.index.json").read_text(encoding="utf-8"))
+        assert len(set(index["weight_map"].values())) > 1
     config = _config(Path("."))
     config.path = "."  # relative to the loader's `models_path`
     store = SharedCpuWeightsStore()
