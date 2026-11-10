@@ -266,6 +266,10 @@ describe('architecture policy, read from the backend capability table', () => {
       getGenerationValidationIssues(klein, settings).filter(
         (issue) => issue.target.field === 'flux3PromptUpsamplerModel'
       );
+    const notInstalled = (settings: GenerateSettings, installed: readonly unknown[]) =>
+      getGenerationModelAvailabilityIssues(klein, settings, installed as never).filter(
+        (issue) => issue.id === 'components:notInstalled:flux3PromptUpsamplerModel'
+      );
 
     it('always has a slot, required once the switch is on, and then only for a model that reads images', () => {
       const off = createSettings(klein);
@@ -290,6 +294,22 @@ describe('architecture policy, read from the backend capability table', () => {
       expect(issues({ ...on, flux3PromptUpsamplerEnabled: false })).toEqual([]);
     });
 
+    it('asks for an uninstalled pick only while the switch is on', () => {
+      const on = createSettings(klein, { flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: llm() });
+
+      expect(notInstalled(on, [klein])).toEqual([
+        expect.objectContaining({
+          fix: { key: 'flux3PromptUpsamplerModel', kind: 'clearModel' },
+          id: 'components:notInstalled:flux3PromptUpsamplerModel',
+          message: 'Prompt upsampler "FLUX.3 Prompt Upsampler" is not installed. Choose another, or clear it.',
+          target: { section: 'components' },
+        }),
+      ]);
+      expect(notInstalled(on, [klein, llm()])).toEqual([]);
+      // Off, nothing loads the pick, so it may stay uninstalled; turning the switch on asks for it again.
+      expect(notInstalled({ ...on, flux3PromptUpsamplerEnabled: false }, [klein])).toEqual([]);
+    });
+
     it('lists only Text LLMs that read images', () => {
       const on = createSettings(klein, { flux3PromptUpsamplerEnabled: true });
       const slot = slotFor(on)!;
@@ -309,15 +329,10 @@ describe('architecture policy, read from the backend capability table', () => {
       const flux = createModel('flux');
       const away = getGenerateModelSelectionResult({ currentValues: settings, model: flux, models: [] });
 
-      // A family without the slot clears the pick and reports it, like any other component...
+      // A family without the slot clears the pick and reports it, like any other component, so a pick that is no
+      // longer installed cannot block another family.
       expect(away.settings).toMatchObject({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: null });
       expect(away.changes).toContainEqual({ kind: 'removed', subject: 'flux3PromptUpsamplerModel' });
-      // ...so a pick that is no longer installed cannot block another family.
-      expect(
-        getGenerationModelAvailabilityIssues(flux, away.settings, [flux]).filter(
-          (issue) => issue.target.field === 'flux3PromptUpsamplerModel'
-        )
-      ).toEqual([]);
       // Within FLUX.3 the pick stays, with the switch off too.
       const off = { ...settings, flux3PromptUpsamplerEnabled: false };
 
@@ -1023,6 +1038,24 @@ describe('component policies', () => {
     const model = createModel('cogview4');
 
     expect(getComponentSectionPolicy(model, createSettings(model)).slots).toEqual([]);
+  });
+
+  it('asks for uninstalled PiD components only while PiD is on', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+      pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+      pidMode: 'fit',
+    });
+    const ids = (values: GenerateSettings) =>
+      getGenerationModelAvailabilityIssues(sdxl, values, [sdxl as never]).map(({ id }) => id);
+
+    expect(ids(settings)).toEqual([
+      'components:notInstalled:pidDecoderModel',
+      'components:notInstalled:gemma2EncoderModel',
+    ]);
+    // Off, nothing loads the picks, so they may stay uninstalled until PiD is turned on again.
+    expect(ids({ ...settings, pidMode: 'off' })).toEqual([]);
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
@@ -2500,6 +2533,25 @@ describe('Anima inpaint adapter slot', () => {
       getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
         .animaInpaintAdapterModel
     ).toBe(inpaintAdapter);
+  });
+});
+
+describe('Anima inpaint adapter availability', () => {
+  it('asks for an uninstalled adapter only while the adapter is enabled', () => {
+    const anima = createModel('anima');
+    const adapter: ComponentModelConfig = {
+      base: 'anima',
+      cond_in_channels: 4,
+      key: 'anima-inpaint',
+      name: 'Anima LLLite Inpainting',
+      type: 'controlnet',
+    };
+    const settings = createSettings(anima, { animaInpaintAdapterEnabled: true, animaInpaintAdapterModel: adapter });
+    const ids = (values: GenerateSettings) =>
+      getGenerationModelAvailabilityIssues(anima, values, [anima as never]).map(({ id }) => id);
+
+    expect(ids(settings)).toEqual(['components:notInstalled:animaInpaintAdapterModel']);
+    expect(ids({ ...settings, animaInpaintAdapterEnabled: false })).toEqual([]);
   });
 });
 

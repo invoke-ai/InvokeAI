@@ -701,7 +701,11 @@ export type GenerateComponentValueKey =
 /** The settings component slot rules read beyond the selected components themselves. */
 export type ComponentPolicySettings = Pick<
   GenerateSettings,
-  'componentSourceModel' | 'flux3PromptUpsamplerEnabled' | 'pidMode' | 'qwen3VLEncoderModel'
+  | 'animaInpaintAdapterEnabled'
+  | 'componentSourceModel'
+  | 'flux3PromptUpsamplerEnabled'
+  | 'pidMode'
+  | 'qwen3VLEncoderModel'
 >;
 
 export interface ComponentPolicyContext {
@@ -721,6 +725,12 @@ export interface ComponentSlotPolicy {
   defaultOpen?: boolean;
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
+  /**
+   * Whether a generation may load the selection. A slot behind a switch keeps its selection while the switch is off,
+   * and nothing loads it then, so a kept selection that is no longer installed does not block Invoke. Absent, a set
+   * selection is always in use.
+   */
+  inUse?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
   /**
    * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
@@ -880,7 +890,10 @@ const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
     helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
     placeholder: 'None',
     filter: wrapFilter(isAnimaInpaintAdapter),
+    inUse: (ctx) => ctx.settings.animaInpaintAdapterEnabled,
   });
+
+const isFlux3PromptUpsamplerOn = (ctx: ComponentPolicyContext): boolean => ctx.settings.flux3PromptUpsamplerEnabled;
 
 /** Exposed before the switch is on, like PiD's; required only while it is. The node reads images, so the model must see them. */
 const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
@@ -893,9 +906,12 @@ const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
     helpText:
       'The FLUX.3 Prompt Upsampler starter model (bf16 or int8), used while Prompt upsampler is on. Other Text LLMs that read images run, but are not trained for its instructions.',
     filter: (candidate) => isVisionTextLlm(candidate),
-    required: (ctx) => ctx.settings.flux3PromptUpsamplerEnabled,
+    required: isFlux3PromptUpsamplerOn,
+    inUse: isFlux3PromptUpsamplerOn,
     missingMessage: 'Generate needs a Prompt Upsampler model while Prompt upsampler is on.',
   });
+
+const isPidOn = (ctx: ComponentPolicyContext): boolean => getIsPidActive(ctx.settings.pidMode, ctx.model.base);
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
 const pidDecoderSlot = (): ComponentSlotPolicy =>
@@ -907,7 +923,8 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     helpText: 'Required while PiD is on. Must match the main model’s base.',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a PiD decoder while PiD is on.',
   });
 
@@ -919,7 +936,8 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a Gemma-2 encoder while PiD is on.',
   });
 
@@ -2293,7 +2311,10 @@ const referenceImageTarget = (referenceImageId: string): GenerationIssue['target
   section: 'guidance',
 });
 
-/** Installed-model checks: the main model, its components, concepts and enabled references must all be installed. */
+/**
+ * Installed-model checks: the main model, the components the generation can load, concepts and enabled references must
+ * all be installed.
+ */
 export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -2313,10 +2334,20 @@ export const getGenerationModelAvailabilityIssues = (
     );
   }
 
+  const componentContext = getComponentPolicyContext(model, settings);
+  const slotsByKey = new Map(
+    getComponentSectionPolicy(model, settings).slots.map((slotPolicy) => [slotPolicy.key, slotPolicy])
+  );
+
   for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
-    if (value && !hasModelKey(models, value.key, value.type)) {
+    // A selection nothing loads (its switch is off) may stay uninstalled; turning the switch on asks for it again.
+    if (!value || slotsByKey.get(key)?.inUse?.(componentContext) === false) {
+      continue;
+    }
+
+    if (!hasModelKey(models, value.key, value.type)) {
       issues.push(
         issue(
           `components:notInstalled:${key}`,
