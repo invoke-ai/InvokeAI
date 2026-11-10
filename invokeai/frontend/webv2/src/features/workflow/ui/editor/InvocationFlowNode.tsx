@@ -15,6 +15,8 @@ import {
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
   WORKFLOW_NODE_FIELD_CONTROL_ATTRIBUTE,
+  WORKFLOW_NODE_LABEL_TEXT_CSS,
+  WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS,
   WORKFLOW_NODE_FIELD_ROW_ATTRIBUTE,
   WorkflowNodeHeaderButton,
   WorkflowNodeInfoButton,
@@ -51,6 +53,7 @@ import {
   isWorkflowFieldValueDefault,
   type WorkflowNodeUpdateStatus,
 } from '@features/workflow/utility';
+import { createDeferredModule } from '@platform/react/deferredModule';
 import { Tooltip } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -69,17 +72,7 @@ import {
   ZapIcon,
   type LucideIcon,
 } from 'lucide-react';
-import {
-  Component,
-  lazy,
-  memo,
-  Suspense,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { memo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
@@ -93,6 +86,17 @@ const NODE_WIDTH = '18rem';
 const ROW_PADDING_X = 12;
 /** A field port's centre, on its row's label line. */
 const PORT_TOP = `calc(${WORKFLOW_NODE_DENSITY.labelLine} / 2)`;
+/**
+ * An export's output title wraps instead of truncating, so it is not one line to centre on the port. Its first line's
+ * letters are put there instead: the trimmed box starts at their x-height, `ex` is that height, and the padding sets
+ * their middle on the port's centre.
+ */
+const EXPORT_OUTPUT_TITLE_CSS = {
+  '@supports (text-box: trim-start ex alphabetic)': {
+    pt: `calc(${PORT_TOP} - 0.5ex)`,
+    textBox: 'trim-start ex alphabetic',
+  },
+} as const;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 export const CONTENT_VISIBILITY_ZOOM = 0.4;
 
@@ -262,62 +266,18 @@ const NodeShell = ({
 );
 
 // The panel bodies load on first open; hovering or focusing a header button starts the load, so the panel is usually
-// ready by the time its tooltip opens. A failed load is forgotten, so the next attempt imports again.
-let loadedNodePanels: typeof NodePanelsModule | null = null;
-let nodePanelsModule: Promise<typeof NodePanelsModule> | null = null;
-const loadNodePanels = (): Promise<typeof NodePanelsModule> =>
-  (nodePanelsModule ??= import('./NodePanels').then(
-    (module) => (loadedNodePanels = module),
-    (error: unknown) => {
-      nodePanelsModule = null;
-      throw error;
-    }
-  ));
-const preloadNodePanels = () => void loadNodePanels().catch(() => {});
+// ready by the time its tooltip opens. Tooltips mount their content per open, so a failed load is tried again on the
+// next one; while loading, and if it fails, a panel shows its button's own label, so the state stays readable.
+const nodePanels = createDeferredModule(() => import('./NodePanels'));
+const preloadNodePanels = nodePanels.preload;
 
-type RenderNodePanel = (module: typeof NodePanelsModule) => ReactNode;
-
-/** A panel whose body failed to load says what its button says rather than taking the editor down. */
-class NodePanelBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
-
-/**
- * A header panel's body. Once the module has loaded it renders directly. Before that, each mount owns its own lazy
- * load (tooltips mount their content per open), so a load that failed is tried again on the next open, where a
- * module-level `lazy` would keep its first failure for the page's lifetime. While loading, and if it fails, the panel
- * shows the button's own label, so the state stays readable.
- */
-const DeferredNodePanel = ({ label, render }: { label: string; render: RenderNodePanel }) => {
-  const [LazyPanel] = useState(() =>
-    loadedNodePanels
-      ? null
-      : lazy(() =>
-          loadNodePanels().then((module) => ({
-            default: ({ renderPanel }: { renderPanel: RenderNodePanel }) => renderPanel(module),
-          }))
-        )
-  );
-  const fallback = <Text>{label}</Text>;
-
-  return (
-    <NodePanelBoundary fallback={fallback}>
-      {LazyPanel ? (
-        <Suspense fallback={fallback}>
-          <LazyPanel renderPanel={render} />
-        </Suspense>
-      ) : (
-        render(loadedNodePanels!)
-      )}
-    </NodePanelBoundary>
-  );
-};
+const DeferredNodePanel = ({
+  label,
+  render,
+}: {
+  label: string;
+  render: (module: typeof NodePanelsModule) => ReactNode;
+}) => <nodePanels.Deferred fallback={<Text>{label}</Text>} render={render} />;
 
 /** The header's one status slot, hidden while there is nothing to report. */
 const NodeStatusButton = ({
@@ -377,8 +337,8 @@ const NodeStatusButton = ({
 /** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
 /**
  * The rename input a double-click opens, for node titles and field labels alike. It lies over its label on the same
- * line, a little wider and taller than it, in the larger input text and on its own surface (so a tinted header does
- * not tint it). The label keeps its place underneath, so nothing around it moves when the input opens or closes.
+ * line, a little wider and taller than it, in the label's own text size and on its own surface (so a tinted header
+ * does not tint it). The label keeps its place underneath, so nothing around it moves when the input opens or closes.
  */
 const INLINE_RENAME_FIELD_PROPS = {
   left: '-6px',
@@ -389,7 +349,7 @@ const INLINE_RENAME_FIELD_PROPS = {
   w: 'calc(100% + 12px)',
   zIndex: 1,
 } as const;
-const INLINE_RENAME_INPUT_PROPS = { bg: 'bg', color: 'fg', fontSize: 'lg', fontWeight: '400', px: '1.5' } as const;
+const INLINE_RENAME_INPUT_PROPS = { bg: 'bg', color: 'fg', fontWeight: '400', px: '1.5' } as const;
 
 const INLINE_RENAME_HIDDEN_LABEL_CSS = { '& > :first-child': { visibility: 'hidden' } } as const;
 
@@ -410,11 +370,14 @@ const InlineRename = ({ children, editor }: { children: ReactNode; editor: React
 /** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
 const InlineLabelInput = ({
   ariaLabel,
+  fontSize,
   initialValue,
   onCommit,
   onEnd,
 }: {
   ariaLabel: string;
+  /** The text size of the label it replaces: the header's `md` for a node title, `sm` for a field label. */
+  fontSize: 'md' | 'sm';
   initialValue: string;
   onCommit: (value: string) => void;
   onEnd: () => void;
@@ -430,6 +393,7 @@ const InlineLabelInput = ({
         aria-label={ariaLabel}
         className="nodrag"
         {...INLINE_RENAME_INPUT_PROPS}
+        fontSize={fontSize}
         value={draft}
         onBlur={() => {
           if (!isCancelled.current && draft.trim() !== initialValue) {
@@ -478,6 +442,7 @@ const NodeTitle = ({
   if (isWorkflowImageExport) {
     return (
       <MiddleTruncate
+        {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
         data-workflow-export-node-title="true"
         data-workflow-export-static-node-content="true"
         fontWeight="600"
@@ -493,6 +458,7 @@ const NodeTitle = ({
         isEditing ? (
           <InlineLabelInput
             ariaLabel={t('nodes.nodeLabel')}
+            fontSize="md"
             // Start from the displayed title, including the template fallback for unset labels.
             initialValue={title}
             onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
@@ -502,6 +468,7 @@ const NodeTitle = ({
       }
     >
       <MiddleTruncate
+        {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
         fontWeight="600"
         minW="0"
         text={title}
@@ -604,7 +571,13 @@ const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
   const groupId = getWorkflowBatchGroupId(node);
 
   return (
-    <Text color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'} flexShrink={0} fontSize="xs" fontWeight="600">
+    <Text
+      color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'}
+      css={WORKFLOW_NODE_LABEL_TEXT_CSS}
+      flexShrink={0}
+      fontSize="xs"
+      fontWeight="600"
+    >
       ({groupId === 'None' ? t('nodes.noBatchGroup') : groupId})
     </Text>
   );
@@ -874,11 +847,12 @@ const InputFieldRow = ({
       fontSize="sm"
       fontWeight={showsControl ? '600' : '400'}
       gap="1"
+      h={WORKFLOW_NODE_DENSITY.labelLine}
       lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
       minW="0"
       onDoubleClick={isWorkflowImageExport ? undefined : () => setIsEditingLabel(true)}
     >
-      <Text as="span" minW="0" truncate>
+      <Text as="span" css={WORKFLOW_NODE_LABEL_TEXT_CSS}>
         {label}
         {template.required ? (
           <Text as="span" color="fg.error">
@@ -950,6 +924,7 @@ const InputFieldRow = ({
                 isEditingLabel ? (
                   <InlineLabelInput
                     ariaLabel={t('nodes.fieldLabel')}
+                    fontSize="sm"
                     initialValue={label}
                     // The template title is the unset label, so renaming back to it follows template changes again.
                     onCommit={(next) =>
@@ -1071,9 +1046,10 @@ const OutputFieldRow = ({
             <SkeletonBar w="40%" />
           </Flex>
         ) : isWorkflowImageExport ? (
-          <Box flexShrink={0} maxW="full" textAlign="end">
+          <Box alignSelf="flex-start" flexShrink={0} maxW="full" textAlign="end">
             <Text
               color="fg.muted"
+              css={EXPORT_OUTPUT_TITLE_CSS}
               data-workflow-export-output-title="true"
               fontSize="xs"
               lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
@@ -1091,12 +1067,10 @@ const OutputFieldRow = ({
               <Tooltip content={value.full} positioning={{ placement: 'top-end' }}>
                 <Text
                   color="fg.subtle"
+                  css={WORKFLOW_NODE_LABEL_TEXT_CSS}
                   fontSize="xs"
                   lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
                   minW="0"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
                 >
                   {value.short}
                 </Text>
@@ -1107,6 +1081,7 @@ const OutputFieldRow = ({
                 <MiddleTruncate
                   as="span"
                   color="fg.muted"
+                  {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
                   data-node-output-field-title="true"
                   fontSize="xs"
                   justifyContent="flex-end"
@@ -1355,7 +1330,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         })}
       >
         {templateView ? <NodeClassificationIcon classification={templateView.template.classification} isPlain /> : null}
-        <MiddleTruncate fontWeight="600" minW="0" text={title} />
+        <MiddleTruncate {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS} fontWeight="600" minW="0" text={title} />
         <BatchGroupSuffix node={node} />
         <Box flex="1" />
         {templateView ? (
@@ -1490,7 +1465,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <NodeClassificationIcon classification={template.classification} />
         ) : null}
         {isZoomedOut ? (
-          <MiddleTruncate fontWeight="600" minW="0" text={title} />
+          <MiddleTruncate {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS} fontWeight="600" minW="0" text={title} />
         ) : (
           <>
             <NodeTitle isWorkflowImageExport={isWorkflowImageExport} node={node} title={title} />

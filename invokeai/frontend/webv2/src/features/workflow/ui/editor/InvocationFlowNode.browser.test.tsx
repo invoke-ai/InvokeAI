@@ -687,7 +687,17 @@ describe('InvocationFlowNode chrome and export', () => {
     for (const title of titles) {
       expect(getComputedStyle(title).whiteSpace).toBe('nowrap');
       expect(title.textContent?.length).toBeGreaterThan(100);
-      expect(title.scrollHeight).toBeLessThanOrEqual(title.clientHeight);
+      // One line: every fragment of its text shares a top. (Its box is trimmed to the letters, so its ink overflows.)
+      const lineTops = new Set<number>();
+      const walker = document.createTreeWalker(title, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        for (const rect of range.getClientRects()) {
+          lineTops.add(Math.round(rect.top));
+        }
+      }
+      expect(lineTops.size).toBe(1);
     }
     const truncatedHead = invocationTitle!.firstElementChild as HTMLElement;
     expect(getComputedStyle(truncatedHead).textOverflow).toBe('ellipsis');
@@ -2563,7 +2573,34 @@ describe('InvocationFlowNode header, states and field rows', () => {
     expect(restingBorder).not.toBe(themeColor('accent.solid'));
   });
 
-  it('opens rename inputs over their label, in larger text, without moving anything around them', async () => {
+  it('keeps the space where a node title or an output title is split, as an untrimmed label draws it', async () => {
+    const splitTemplate = {
+      ...stateTemplate,
+      outputs: { value: { ...stateTemplate.outputs.value!, title: 'Image to Latents' } },
+      title: 'Latents to Image',
+    };
+    await render(
+      toFlowNodes({ ...projectGraph, nodes: [stateNode('split-node', 20, 1)] }, [], { preview: splitTemplate })
+    );
+
+    for (const text of ['Latents to Image', 'Image to Latents']) {
+      const label = node('split-node').querySelector<HTMLElement>(`[data-full-text="${text}"]`)!;
+      const [head, tail] = [...label.children] as HTMLElement[];
+      expect(getComputedStyle(head!).whiteSpace).toBe('pre');
+      // The same label untrimmed, beside it in the same font: its spans hold their own white-space.
+      const reference = label.cloneNode(true) as HTMLElement;
+      reference.style.cssText = 'position: absolute; visibility: hidden; overflow: visible';
+      for (const span of reference.children as HTMLCollectionOf<HTMLElement>) {
+        span.style.cssText = 'text-box: normal; white-space: pre; flex-shrink: 0';
+      }
+      label.parentElement!.append(reference);
+      const width = [...reference.children].reduce((sum, span) => sum + span.getBoundingClientRect().width, 0);
+      reference.remove();
+      expect(head!.getBoundingClientRect().width + tail!.getBoundingClientRect().width).toBeCloseTo(width, 0);
+    }
+  });
+
+  it('opens rename inputs over their label without moving anything around them', async () => {
     await render(rowNodes(4));
     const nodeRect = () => node('row-node').getBoundingClientRect();
     const buttonRects = () =>
@@ -2576,7 +2613,8 @@ describe('InvocationFlowNode header, states and field rows', () => {
     await act(() => userEvent.dblClick(header('row-node').querySelector<HTMLElement>('[title]')!));
     const titleInput = host.querySelector<HTMLInputElement>('input[aria-label="Node label"]')!;
     expect(document.activeElement).toBe(titleInput);
-    expect(parseFloat(getComputedStyle(titleInput).fontSize)).toBeGreaterThan(titleFontSize);
+    // Each rename input keeps the text size of the label it replaces.
+    expect(parseFloat(getComputedStyle(titleInput).fontSize)).toBe(titleFontSize);
     expect(nodeRect().height).toBe(before.node);
     expect(buttonRects()).toEqual(before.buttons);
     // Its own surface, not the header's tint.
@@ -2585,7 +2623,7 @@ describe('InvocationFlowNode header, states and field rows', () => {
 
     await act(() => userEvent.dblClick(fieldTitle('A')));
     const labelInput = host.querySelector<HTMLInputElement>('input[aria-label="Field label"]')!;
-    expect(parseFloat(getComputedStyle(labelInput).fontSize)).toBeGreaterThan(labelFontSize);
+    expect(parseFloat(getComputedStyle(labelInput).fontSize)).toBe(labelFontSize);
     expect(labelInput.getBoundingClientRect().right).toBeLessThan(nodeRect().right);
     expect(rowRect().height).toBe(before.row);
     expect(nodeRect().height).toBe(before.node);
@@ -2937,7 +2975,25 @@ describe('InvocationFlowNode collapsed ports', () => {
     expect(host.querySelector('[data-collapsed-edge-count]')).toBeNull();
   });
 
-  it('centres each port on its label’s line, edges on the ports, and a collapsed node’s merged ports on its title', async () => {
+  /**
+   * The middle of a label's lowercase letters, which is what a reader lines a port up with, from the font itself: a 1ex
+   * inline box standing on the label's baseline spans exactly its x-height.
+   */
+  const letterBodyCentre = (label: HTMLElement) => {
+    const text = [label, ...label.querySelectorAll<HTMLElement>('*')]
+      .reverse()
+      .find((element) =>
+        [...element.childNodes].some((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      )!;
+    const probe = document.createElement('span');
+    probe.style.cssText = 'display: inline-block; height: 1ex; vertical-align: baseline; width: 0';
+    text.append(probe);
+    const box = probe.getBoundingClientRect();
+    probe.remove();
+    return box.top + box.height / 2;
+  };
+
+  it('centres each port on its label’s letters, edges on the ports, and a collapsed node’s merged ports on its title', async () => {
     await render(graphWith(true));
     await vi.waitFor(() => expect(drawnEdgeIds()).toContain('ac'));
 
@@ -2954,13 +3010,7 @@ describe('InvocationFlowNode collapsed ports', () => {
       },
     ];
     for (const { handle, label } of rows) {
-      const line = handle.parentElement!.getBoundingClientRect();
-      expect(
-        Math.abs(centre(handle.getBoundingClientRect()).y - centre(label.getBoundingClientRect()).y)
-      ).toBeLessThanOrEqual(0.5);
-      // The label's line box is the port's whole line, so it starts on the line's own pixel rather than between two.
-      expect(Number.parseFloat(getComputedStyle(label).lineHeight)).toBe(line.height);
-      expect(label.getBoundingClientRect().height).toBe(line.height);
+      expect(Math.abs(centre(handle.getBoundingClientRect()).y - letterBodyCentre(label))).toBeLessThanOrEqual(0.5);
     }
 
     const path = host.querySelector<SVGPathElement>('.react-flow__edge[data-id="ac"] .react-flow__edge-path')!;
@@ -2976,9 +3026,7 @@ describe('InvocationFlowNode collapsed ports', () => {
     )!;
     for (const side of ['left', 'right']) {
       const port = node('a').querySelector<HTMLElement>(`[data-collapsed-port="${side}"]`)!;
-      expect(
-        Math.abs(centre(port.getBoundingClientRect()).y - centre(title.getBoundingClientRect()).y)
-      ).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(centre(port.getBoundingClientRect()).y - letterBodyCentre(title))).toBeLessThanOrEqual(0.5);
     }
   });
 

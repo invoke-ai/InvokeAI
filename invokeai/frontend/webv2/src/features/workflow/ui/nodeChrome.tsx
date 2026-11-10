@@ -35,14 +35,46 @@ export const WORKFLOW_NODE_DENSITY = {
   /** A header's inset from the border to text at its start or end. */
   headerTextInset: '2.5',
   /**
-   * A field row's label line: the label's line height and the height of the line that holds it and its port, which is
-   * centred on it. The browser lays text out on whole pixels in the node's own coordinates, before the flow's zoom, so
-   * a shorter line box centred in a taller line starts between pixels and its glyphs round up to a pixel away from the
-   * port; zoomed in, that pixel grows.
+   * A field row's label line: the height of the line that holds the label and its port, which is centred on it, and
+   * the label's line height. The browser lays text out on whole pixels in the node's own coordinates, before the flow's
+   * zoom, so a shorter line box centred in a taller line starts between pixels and its glyphs round a pixel away from
+   * the port; zoomed in, that pixel grows.
    */
   labelLine: '20px',
   rowPaddingX: '3',
   rowPaddingY: '0.5',
+} as const;
+
+/**
+ * A label's text box, trimmed to its letters' body: from the x-height to the baseline. Centred in its line, it puts the
+ * port and any icon beside it on the lowercase letters people read, where the full line box would leave them about a
+ * pixel high, because the font's ascent above the letters is larger than its descent below them. Overflow is clipped
+ * only horizontally, for an ellipsis, so ascenders and descenders still draw. A browser without `text-box` keeps the
+ * line box.
+ */
+const WORKFLOW_NODE_LABEL_TEXT_BOX_CSS = {
+  // A clipped box is not a scroll container, so it shrinks below its text's width only with a zero minimum.
+  minW: '0',
+  // Horizontal, then vertical.
+  overflow: 'clip visible',
+  textBox: 'trim-both ex alphabetic',
+} as const;
+
+/** A one-line label: the trimmed box, ending in an ellipsis when it is cut short. */
+export const WORKFLOW_NODE_LABEL_TEXT_CSS = {
+  ...WORKFLOW_NODE_LABEL_TEXT_BOX_CSS,
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const;
+
+/**
+ * The same for a `MiddleTruncate` label, whose text sits in the spans inside its root. Only the box is trimmed there:
+ * the spans keep the component's own white-space and ellipsis, which hold the space at the head and tail's split. The
+ * root's overflow is a prop, since it overrides the component's own.
+ */
+export const WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS = {
+  css: { '& > span': WORKFLOW_NODE_LABEL_TEXT_BOX_CSS },
+  overflow: 'clip visible',
 } as const;
 
 /** Independent facts about a node; `getWorkflowNodeAppearance` composes them, so no state overwrites another. */
@@ -272,6 +304,7 @@ export const WorkflowNodeHandleDot = ({ side, type }: { side: 'left' | 'right'; 
       borderWidth={visual.isFilled ? '0' : `${HANDLE_BORDER_WIDTH}px`}
       boxShadow={`0 0 0 ${HANDLE_RING_WIDTH}px {colors.${WORKFLOW_NODE_SURFACE_TOKEN}}`}
       boxSize={`${WORKFLOW_NODE_HANDLE_SIZE}px`}
+      data-node-port-dot={side}
       position="absolute"
       top="50%"
       transform={`translate(${side === 'left' ? '-50%' : '50%'}, -50%)${visual.isDiamond ? ` ${WORKFLOW_NODE_DIAMOND_ROTATION}` : ''}`}

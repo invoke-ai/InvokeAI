@@ -12,6 +12,8 @@ import {
   getWorkflowNodeHeaderProps,
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
+  WORKFLOW_NODE_LABEL_TEXT_CSS,
+  WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS,
   WorkflowNodeHandleDot,
   WorkflowNodeInfoButton,
 } from '@features/workflow/preview';
@@ -56,12 +58,13 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
       content={<FieldTooltip description={template.description} direction="output" template={template} />}
       positioning={{ placement: 'top-end' }}
     >
-      <Flex justify="flex-end">
+      <Flex align="center" h={WORKFLOW_NODE_DENSITY.labelLine} justify="flex-end">
         <MiddleTruncate
           color="fg.muted"
+          {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
           fontSize="xs"
           justifyContent="flex-end"
-          lineHeight="shorter"
+          lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
           maxW="full"
           text={template.title}
         />
@@ -77,14 +80,22 @@ const InputRow = ({ template }: { template: FieldInputTemplate }) => (
       content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
     >
-      <Text color="fg" fontSize="xs" lineHeight="shorter" minW="0" truncate>
-        {template.title}
-        {template.required ? (
-          <Text as="span" color="fg.error">
-            {' *'}
-          </Text>
-        ) : null}
-      </Text>
+      <Flex align="center" h={WORKFLOW_NODE_DENSITY.labelLine}>
+        <Text
+          color="fg"
+          css={WORKFLOW_NODE_LABEL_TEXT_CSS}
+          fontSize="xs"
+          lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
+          minW="0"
+        >
+          {template.title}
+          {template.required ? (
+            <Text as="span" color="fg.error">
+              {' *'}
+            </Text>
+          ) : null}
+        </Text>
+      </Flex>
     </Tooltip>
     {template.input !== 'direct' ? <WorkflowNodeHandleDot side="left" type={template.type} /> : null}
   </Box>
@@ -113,7 +124,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
   return (
     <Box w="full" {...getWorkflowNodeShellProps({ selected: false })}>
       <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: true })}>
-        <MiddleTruncate fontWeight="600" minW="0" text={template.title} />
+        <MiddleTruncate {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS} fontWeight="600" minW="0" text={template.title} />
         <Box flex="1" />
         <WorkflowNodeInfoButton
           content={<NodeInfoTooltip template={template} />}
