@@ -167,9 +167,10 @@ includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use *
 **Apply LoRA Collection - Anima**.
 
 Diffusers LoRAs of other transformers that use the same layer names (for example LTX-2, CogView4, PixArt, Sana)
-are not recognized as Anima, because their attention widths do not match Anima's. LTX-Video is the exception: its
-self-attention is as wide as Anima's, so only its cross-attention tells them apart. An LTX-Video LoRA that trains
-the cross-attention is refused; one that trains only the self-attention installs as Anima.
+are not recognized as Anima, because their attention widths do not match Anima's; they install as unknown models.
+LTX-Video is the exception: its attention layers are as wide as Anima's, except the cross-attention key and value
+layers (`attn2.to_k`, `attn2.to_v`), which read a wider text embedding. An LTX-Video LoRA that trains those layers is
+not recognized as Anima; one without them installs as Anima.
 
 ## Character reference (IP-Adapter)
 
