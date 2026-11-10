@@ -88,6 +88,7 @@ const mocks = vi.hoisted(() => ({
   reportError: vi.fn(),
   revealLayerProperties: vi.fn(),
   sendGalleryImageAsControl: vi.fn(),
+  saveImageToGallery: vi.fn(),
   requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
   resolveMediaUsage: vi.fn<(...args: unknown[]) => Promise<GalleryMediaUsageReport>>(),
@@ -97,6 +98,7 @@ const mocks = vi.hoisted(() => ({
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
 vi.mock('@features/gallery', () => ({
+  galleryDurability: { save: (...args: unknown[]) => mocks.saveImageToGallery(...args) },
   galleryImages: {
     metadata: (...args: unknown[]) => mocks.imageMetadata(...args),
     resolve: (...args: unknown[]) => mocks.imageResolve(...args),
@@ -483,6 +485,59 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('moving an upload to Media', () => {
+  const upload: GalleryImage = {
+    boardId: 'board-1',
+    height: 512,
+    imageCategory: 'user',
+    imageName: 'upload.png',
+    imageUrl: '/upload.png',
+    queuedAt: '2026-06-15T00:00:00Z',
+    sourceQueueItemId: 'backend-gallery',
+    starred: true,
+    thumbnailUrl: '/thumb-upload.png',
+    width: 512,
+  };
+
+  it('updates the same image, refreshes Gallery, and drops only that item from the Uploads selection', async () => {
+    const project = makeMockProject('project-1', {
+      galleryView: 'assets',
+      selectedImageName: 'image:upload.png',
+      selectedImageNames: ['image:upload.png', 'image:another.png'],
+    });
+    mocks.getSnapshot.mockReturnValue({ activeProject: project, projects: [project] });
+    mocks.saveImageToGallery.mockResolvedValueOnce({ ...upload, imageCategory: 'general' });
+
+    await act(() => actionsRef.current!.moveUploadToMedia(upload));
+
+    expect(mocks.saveImageToGallery).toHaveBeenCalledExactlyOnceWith('upload.png', expect.any(AbortSignal));
+    expect(mocks.invalidateGallery).toHaveBeenCalledExactlyOnceWith(expect.any(QueryClient), expect.anything());
+    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledExactlyOnceWith(
+      'gallery',
+      { selectedImageNames: ['image:another.png'] },
+      'project-1',
+      'system'
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.moveToMedia.success' })
+    );
+  });
+
+  it('reports the owner restriction and retains the selection when the server refuses the edit', async () => {
+    mocks.saveImageToGallery.mockRejectedValueOnce(new ApiError('Not authorized to access this image', 403));
+
+    await act(() => actionsRef.current!.moveUploadToMedia(upload));
+
+    expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'error',
+      message: 'widgets.gallery.itemActions.moveToMedia.permissionDenied',
+      title: 'widgets.gallery.itemActions.moveToMedia.failure',
+    });
+  });
 });
 
 describe('canvas destinations', () => {

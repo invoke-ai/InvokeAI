@@ -27,6 +27,7 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 const NO_BOARDS: [] = [];
 const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
 const GENERATE_PBR_MAPS = 'widgets.gallery.itemActions.pbrMaps.label';
+const MOVE_TO_MEDIA = 'widgets.gallery.itemActions.moveToMedia.label';
 
 const findGalleryItem = vi.fn();
 
@@ -129,6 +130,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
   moveImagesToBoard: vi.fn(() => Promise.resolve()),
+  moveUploadToMedia: vi.fn(() => Promise.resolve()),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
   openImageInPreview: vi.fn(),
@@ -340,6 +342,114 @@ describe('ImageContextMenu deletion delegation', () => {
     expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'right-clicked.png' }], {
       returnFocus,
     });
+  });
+});
+
+describe('ImageContextMenu Move to Media', () => {
+  const upload = { ...item('image', 'upload.png'), category: 'user' as const };
+  const open = (
+    actions: ImageActions,
+    items: GalleryItem[],
+    listingView?: GalleryItemContextMenuTarget['listingView']
+  ) =>
+    renderItemMenu(actions, {
+      itemRefs: items.map(({ kind, name }) => ({ kind, name })),
+      items,
+      listingView,
+      x: 20,
+      y: 20,
+    });
+
+  it('moves the right-clicked uploaded image on the same board', async () => {
+    const actions = createActions(vi.fn());
+    await open(actions, [{ ...upload, boardId: 'board-1' }], 'assets');
+
+    await interact(() => getMenuItem(MOVE_TO_MEDIA).click());
+
+    expect(actions.moveUploadToMedia).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ boardId: 'board-1', imageCategory: 'user', imageName: 'upload.png' })
+    );
+  });
+
+  it('returns keyboard focus to the upload while the move is still pending', async () => {
+    let completeMove: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => {
+      completeMove = resolve;
+    });
+    const moveUploadToMedia = vi.fn(() => pending);
+    const actions = { ...createActions(vi.fn()), moveUploadToMedia };
+    const returnFocus = () => host?.querySelector<HTMLElement>('button[data-test-upload]') ?? null;
+    const target: GalleryItemContextMenuTarget = {
+      itemRefs: [{ kind: upload.kind, name: upload.name }],
+      items: [upload],
+      listingView: 'assets',
+      returnFocus,
+      x: 20,
+      y: 20,
+    };
+    const FocusHarness = () => {
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <button data-test-upload type="button" onContextMenu={() => setIsOpen(true)}>
+            Upload thumbnail
+          </button>
+          <ImageContextMenu
+            actions={actions}
+            boards={NO_BOARDS}
+            target={isOpen ? target : null}
+            onClose={() => setIsOpen(false)}
+          />
+        </>
+      );
+    };
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() => {
+      root?.render(
+        <QueryClientProvider client={queryClient}>
+          <ChakraProvider value={system}>
+            <FocusHarness />
+          </ChakraProvider>
+        </QueryClientProvider>
+      );
+    });
+
+    const thumbnail = returnFocus()!;
+    await interact(() => {
+      thumbnail.focus();
+      thumbnail.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    });
+    const moveItem = getMenuItem(MOVE_TO_MEDIA);
+    const menu = moveItem.closest<HTMLElement>('[role="menu"]')!;
+    await settleUntil(() => document.activeElement === menu, 'the context menu to have focus');
+    await userEvent.keyboard('{End}{ArrowUp}{ArrowUp}');
+    await settleUntil(() => moveItem.hasAttribute('data-highlighted'), 'Move to Media to be highlighted');
+
+    try {
+      await userEvent.keyboard('{Enter}');
+      await settleUntil(() => !menu.isConnected, 'the context menu to close');
+
+      expect(moveUploadToMedia).toHaveBeenCalledOnce();
+      expect(document.activeElement).toBe(thumbnail);
+    } finally {
+      completeMove();
+    }
+  });
+
+  it.each([
+    ['an image outside the Gallery grid', [upload], undefined],
+    ['a generated image in Media', [item('image', 'generated.png')], 'images'],
+    ['a control image in Uploads', [{ ...upload, category: 'control' }], 'assets'],
+    ['a video in Uploads', [{ ...item('video', 'upload.mp4'), category: 'user' }], 'assets'],
+    ['several uploaded images', [upload, { ...upload, name: 'second.png' }], 'assets'],
+  ] as const)('does not offer the action for %s', async (_name, items, listingView) => {
+    await open(createActions(vi.fn()), [...items], listingView);
+
+    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain(MOVE_TO_MEDIA);
   });
 });
 

@@ -6023,6 +6023,12 @@
           "success_one": "Moved {{count}} item to {{board}}.",
           "success_other": "Moved {{count}} items to {{board}}."
         },
+        "moveToMedia": {
+          "failure": "Could not move image to Media",
+          "label": "Move to Media",
+          "permissionDenied": "Only the image owner or an administrator can move it to Media.",
+          "success": "Image moved to Media"
+        },
         "recall": {
           "appliedFields": "Applied {{fields, list}}.",
           "cannotRecallImage": "Cannot recall image data",

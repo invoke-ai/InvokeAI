@@ -1077,10 +1077,11 @@ export const makeImageCanvasAsset = async (imageName: string): Promise<void> => 
 };
 
 /** Promote an image into the gallery and return its updated {@link GalleryImage}. */
-export const saveImageToGallery = async (imageName: string): Promise<GalleryImage> => {
+export const saveImageToGallery = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
   const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
     body: JSON.stringify(imageSaveToGalleryChanges()),
     method: 'PATCH',
+    signal,
   });
 
   return mapImage(body);
