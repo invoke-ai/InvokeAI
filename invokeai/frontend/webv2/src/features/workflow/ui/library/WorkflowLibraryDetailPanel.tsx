@@ -637,7 +637,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>
-                    <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                    <MenuContent minW="min(13rem, var(--available-width))" maxW="var(--available-width)">
                       {actionItems}
                     </MenuContent>
                   </Menu.Positioner>

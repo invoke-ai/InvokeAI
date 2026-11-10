@@ -111,7 +111,7 @@ export const WorkflowCardContextMenu = ({ anchor, children, target, onClose }: W
         <Menu.Positioner>
           <MenuContent
             data-workflow-context-menu
-            minW="min(16rem, var(--available-width))"
+            minW="min(13rem, var(--available-width))"
             maxW="var(--available-width)"
           >
             {children}

@@ -380,7 +380,7 @@ export const WorkflowDetailSheet = ({
             </Menu.Trigger>
             <Portal>
               <Menu.Positioner>
-                <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                <MenuContent minW="min(13rem, var(--available-width))" maxW="var(--available-width)">
                   {actions}
                 </MenuContent>
               </Menu.Positioner>

@@ -11,7 +11,6 @@ import {
   type WorkflowRecordDTO,
 } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -22,7 +21,7 @@ import {
 import { requestWorkflowPublication } from '@features/workflow/ui/workflowUiStore';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { MenuContent } from '@platform/ui/Menu';
+import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
@@ -352,29 +351,20 @@ const useProjectWorkflowActions = ({
 
   const actionItems = (
     <>
+      <MenuActionItem icon={WorkflowIcon} label={t('workflowLibrary.open')} value="open" onSelect={open} />
       <MenuActionItem
-        hint={t('workflowLibrary.openProjectWorkflowHint')}
-        icon={WorkflowIcon}
-        label={t('workflowLibrary.open')}
-        value="open"
-        onSelect={open}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.renameProjectWorkflowHint')}
         icon={PencilIcon}
         label={t('workflowLibrary.renameWithEllipsis')}
         value="rename"
         onSelect={handleRename}
       />
       <MenuActionItem
-        hint={t('workflowLibrary.duplicateProjectWorkflowHint')}
         icon={CopyIcon}
         label={t('workflowLibrary.duplicate')}
         value="duplicate"
         onSelect={handleDuplicate}
       />
       <MenuActionItem
-        hint={t('workflowLibrary.saveToLibraryHint')}
         icon={BookmarkIcon}
         label={t('workflowLibrary.saveToLibraryWithEllipsis')}
         value="save-to-library"
@@ -382,7 +372,6 @@ const useProjectWorkflowActions = ({
       />
       {canUpdateSource ? (
         <MenuActionItem
-          hint={t('workflowLibrary.updateTemplateHint')}
           icon={RefreshCwIcon}
           label={t('workflowLibrary.updateTemplate')}
           value="update-template"
@@ -390,7 +379,6 @@ const useProjectWorkflowActions = ({
         />
       ) : null}
       <MenuActionItem
-        hint={t('workflowLibrary.removeHint')}
         icon={Trash2Icon}
         label={t('workflowLibrary.removeWithEllipsis')}
         tone="danger"
@@ -811,7 +799,7 @@ const ProjectWorkflowDetailPanel = ({
               </Menu.Trigger>
               <Portal>
                 <Menu.Positioner>
-                  <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                  <MenuContent minW="min(13rem, var(--available-width))" maxW="var(--available-width)">
                     {actionItems}
                   </MenuContent>
                 </Menu.Positioner>

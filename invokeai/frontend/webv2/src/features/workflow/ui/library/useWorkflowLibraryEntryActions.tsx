@@ -12,7 +12,6 @@ import {
   invalidateWorkflowLibraryCache,
   updateLibraryWorkflow,
 } from '@features/workflow/queries';
-import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useWorkflowGraphPreview, useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson } from '@features/workflow/utility';
 import { downloadText } from '@platform/browser/downloadBlob';
@@ -23,6 +22,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { MenuActionItem } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { CopyIcon, DownloadIcon, GitForkIcon, PencilIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -313,30 +313,21 @@ export const useWorkflowLibraryEntryActions = ({
   const canWrite = item !== null && !isReadOnly;
   const actionItems = (
     <>
+      <MenuActionItem icon={WorkflowIcon} label={openLabel} value="open" onSelect={open} />
       <MenuActionItem
-        hint={hasCopies ? t('workflowLibrary.openExistingCopiesHint') : t('workflowLibrary.openHint')}
-        icon={WorkflowIcon}
-        label={openLabel}
-        value="open"
-        onSelect={open}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.duplicateHint')}
         icon={CopyIcon}
-        isDisabled={item !== null && duplicateGuard.pendingIds.has(item.workflow_id)}
+        disabled={item !== null && duplicateGuard.pendingIds.has(item.workflow_id)}
         label={t('workflowLibrary.duplicate')}
         value="duplicate"
         onSelect={handleDuplicate}
       />
       <MenuActionItem
-        hint={t('workflowLibrary.forkIntoProjectHint')}
         icon={GitForkIcon}
         label={t('workflowLibrary.forkIntoProject')}
         value="fork-into-project"
         onSelect={handleFork}
       />
       <MenuActionItem
-        hint={t('workflowLibrary.downloadJsonHint')}
         icon={DownloadIcon}
         label={t('workflowLibrary.downloadJson')}
         value="download-json"
@@ -344,7 +335,6 @@ export const useWorkflowLibraryEntryActions = ({
       />
       {canWrite ? (
         <MenuActionItem
-          hint={t('workflowLibrary.renameTemplateHint')}
           icon={PencilIcon}
           label={t('workflowLibrary.renameWithEllipsis')}
           value="rename"
@@ -353,7 +343,6 @@ export const useWorkflowLibraryEntryActions = ({
       ) : null}
       {canWrite ? (
         <MenuActionItem
-          hint={t('workflowLibrary.deleteHint')}
           icon={Trash2Icon}
           label={t('workflowLibrary.delete')}
           tone="danger"
