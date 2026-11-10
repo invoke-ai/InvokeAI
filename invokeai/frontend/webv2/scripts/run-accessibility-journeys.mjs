@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
+import { inspect } from 'node:util';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
+import { startAssetFaultProxy } from './asset-fault-proxy.mjs';
+import { observeBrowserDiagnostics, waitForRenderedMedia, withBrowserNavigation } from './browser-validation.mjs';
 import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -80,9 +83,7 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(
-          JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })
-        ),
+        body: JSON.stringify(JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })),
       }
     );
     assert.ok(response.ok, `Could not set ${themeId} accessibility fixture theme.`);
@@ -96,13 +97,15 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
   const page = await context.newPage();
   const pageErrors = [];
   const consoleErrors = [];
-
-  page.on('pageerror', (error) => pageErrors.push(error));
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      consoleErrors.push(message.text());
-    }
+  await observeBrowserDiagnostics(page, {
+    onError: (event) => {
+      pageErrors.push(new Error(JSON.stringify(event)));
+      if (event.kind === 'console') {
+        consoleErrors.push(event.message);
+      }
+    },
   });
+
   await page.goto(`${origin}${path}`, { waitUntil: 'domcontentloaded' });
 
   return { consoleErrors, context, page, pageErrors };
@@ -136,6 +139,7 @@ const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'La
 const waitForWorkbench = async (page) => {
   await page.getByRole('main', { exact: true, name: 'Fixture Project 001' }).waitFor();
   await presetStrip(page).waitFor();
+  await waitForRenderedMedia(page);
 };
 
 /** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
@@ -236,6 +240,7 @@ const surfaces = [
     ready: async (page) => {
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       // The Layers panel's Properties pane is the canvas's settings surface; the journey must scan it, not a fallback.
       await page.getByRole('tab', { exact: true, name: 'Properties', selected: true }).waitFor();
       await page.getByRole('tabpanel').getByRole('group', { exact: true, name: 'Layer' }).waitFor();
@@ -252,9 +257,10 @@ const surfaces = [
         body: JSON.stringify({ set: 'control-sdxl' }),
       });
       assert.ok(seeded.ok, `Could not seed control models: ${String(seeded.status)}.`);
-      await page.reload({ waitUntil: 'domcontentloaded' });
+      await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
       // (Fixture Model 006) through the Generate panel's model picker.
       await page.getByText('Fixture Model 001', { exact: true }).click();
@@ -384,6 +390,7 @@ const runShortcutGuideJourney = async (browser) => {
       await waitForWorkbench(page);
       await page.waitForFunction((theme) => document.documentElement.dataset.theme === theme, themeId);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
       const viewTool = page
         .getByRole('toolbar', { exact: true, name: 'Tools' })
         .getByRole('button', { exact: true, name: 'View' });
@@ -614,10 +621,10 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    // The representative queue is populated; measure the hydrated counter rather than its transient idle state.
+    // The representative fixture has exactly 167 pending outputs; connection state may change its label.
     await page
       .locator('header')
-      .getByRole('button', { name: /^[1-9]\d* (images? remaining|items? waiting for the connection)\. Open queue$/ })
+      .getByRole('button', { name: /^167 (?:images remaining|items waiting for the connection)\. Open queue$/ })
       .waitFor();
 
     for (const width of [1_024, 900]) {
@@ -1133,6 +1140,7 @@ const runKeepAliveStateJourney = async (browser) => {
     await waitForSettledDocument(page);
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
 
     const zoomTrigger = page.getByRole('button', { name: /^Zoom \d+%$/ });
     await zoomTrigger.click();
@@ -1144,6 +1152,7 @@ const runKeepAliveStateJourney = async (browser) => {
     await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
     await waitForSettledDocument(page);
 
     assert.equal(
@@ -1194,6 +1203,7 @@ const runLayersPanesJourney = async (browser) => {
   try {
     await waitForWorkbench(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForRenderedMedia(page, { canvas: true });
     const propertiesTab = page.getByRole('tab', { exact: true, name: 'Properties' });
     await propertiesTab.waitFor();
 
@@ -1495,6 +1505,330 @@ const runSettingsJourney = async (browser) => {
       throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
     }
     return { id, status: 'passed' };
+  } catch (error) {
+    const directory = resolve(root, 'artifacts/accessibility');
+    await mkdir(directory, { recursive: true })
+      .then(async () => {
+        await writeFile(resolve(directory, `${id}.txt`), `${inspect(error, { depth: null, colors: false })}\n`);
+        await page.screenshot({ path: resolve(directory, `${id}.png`) });
+      })
+      .catch((artifactError) => process.stderr.write(`Could not capture ${id}: ${String(artifactError)}\n`));
+    throw error;
+  } finally {
+    await context.close();
+  }
+};
+
+/** Browser history can leave a modal section; authorized work must settle while its Activity is hidden. */
+const runHiddenMaintenanceJourney = async (browser) => {
+  const id = 'launchpad-hidden-maintenance';
+  for (const outcome of ['success', 'error']) {
+    const { context, page } = await openRepresentativePage(browser, '/#/');
+    let finish = () => {};
+    let started = () => {};
+    const executing = new Promise((resolveStarted) => {
+      started = resolveStarted;
+    });
+    const pending = new Promise((resolvePending) => {
+      finish = resolvePending;
+    });
+    let previews = 0;
+    let mutations = 0;
+    await page.route('**/api/v1/app/gallery/maintenance/preview', (route) => {
+      previews += 1;
+      return route.fulfill({
+        status: 200,
+        json: {
+          operation: 'archive_untracked',
+          fingerprint: 'a'.repeat(64),
+          examined_count: 12,
+          affected_count: 2,
+          skipped_count: 0,
+          error_count: 0,
+          errors: [],
+          archive_path: '/fixture/gallery-archive',
+        },
+      });
+    });
+    await page.route('**/api/v1/app/gallery/maintenance/archive-untracked', async (route) => {
+      mutations += 1;
+      started();
+      await pending;
+      await route.fulfill(
+        outcome === 'error'
+          ? { status: 500, json: { detail: 'Fixture maintenance failure' } }
+          : {
+              status: 200,
+              json: {
+                operation: 'archive_untracked',
+                status: 'completed',
+                examined_count: 12,
+                skipped_count: 0,
+                failed_count: 0,
+                records_removed: 0,
+                images_archived: 2,
+                thumbnails_archived: 0,
+                thumbnails_regenerated: 0,
+                archive_path: '/fixture/gallery-archive',
+                backup_path: '/fixture/gallery-backup.sqlite',
+                errors: [],
+              },
+            }
+      );
+    });
+    try {
+      await waitForHome(page);
+      await page.evaluate(() => {
+        location.hash = '/preferences/workspace';
+      });
+      const action = page.getByRole('button', { name: 'Archive untracked files', exact: true });
+      await action.click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Archive untracked files', exact: true }).click();
+      await executing;
+      await page.goBack();
+      await waitForHome(page);
+      const settled = page.waitForResponse((response) =>
+        response.url().endsWith('/api/v1/app/gallery/maintenance/archive-untracked')
+      );
+      finish();
+      await (await settled).finished();
+      await page.goForward();
+      await page
+        .getByText(outcome === 'success' ? 'Gallery maintenance completed.' : 'Fixture maintenance failure', {
+          exact: true,
+        })
+        .waitFor();
+      await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
+      assert.equal(await action.isEnabled(), true, 'Hidden completion must release the running state.');
+      assert.equal(previews, 1);
+      assert.equal(mutations, 1, 'History navigation must never repeat destructive execution.');
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:${outcome}`);
+    } finally {
+      finish();
+      await context.close();
+    }
+  }
+  return {
+    id,
+    status: 'passed',
+    hiddenOutcomes: ['success', 'error'],
+    navigation: 'browser Back/Forward while modal',
+    mutationsPerOperation: 1,
+  };
+};
+
+/** Fault the actual first-party production module request; Retry never silently reloads the editor. */
+const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = false) => {
+  const id = activeWorker
+    ? 'workbench-native-import-active-worker-recovery'
+    : failures === 1
+      ? 'workbench-native-import-recovery'
+      : 'workbench-native-import-repeated-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/workbench/widgets/preview/implementation.ts'].file;
+  const proxy = activeWorker ? await startAssetFaultProxy(origin, chunk, failures) : null;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    ...(activeWorker ? {} : { serviceWorkers: 'block' }),
+  });
+  const page = await context.newPage();
+  let remainingFailures = failures;
+  const requests = proxy?.requests ?? [];
+  const workerResponses = [];
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === `/${chunk}`) {
+      workerResponses.push({ status: response.status(), fromServiceWorker: response.fromServiceWorker() });
+    }
+  });
+  if (!activeWorker) {
+    await page.route(`**/${chunk}`, async (route) => {
+      const blocked = remainingFailures-- > 0;
+      requests.push(blocked ? 503 : 200);
+      if (blocked) {
+        await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+      } else {
+        await route.continue();
+      }
+    });
+  }
+  try {
+    if (activeWorker) {
+      await page.goto(proxy.origin);
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+          await new Promise((resolveController) => {
+            navigator.serviceWorker.addEventListener('controllerchange', resolveController, { once: true });
+          });
+        }
+      });
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      assert.equal(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).pathname), '/sw.js');
+      assert.deepEqual(requests, [], 'The lazy target must not already be cached before the fault.');
+    }
+    await page.goto(`${proxy?.origin ?? origin}${representativeProjectPath}`);
+    await waitForWorkbench(page);
+    let canvasUndoName;
+    if (failures > 1) {
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await page.getByRole('button', { name: 'Add layer', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Raster layer', exact: true }).click();
+      const undo = page.getByRole('button', { name: /^Undo: / });
+      await undo.waitFor();
+      canvasUndoName = await undo.getAttribute('aria-label');
+      assert.equal(await undo.isEnabled(), true);
+    }
+    await selectLayoutPreset(page, 'Compose', 'Preview');
+    const card = centerRegion(page).locator('[data-testid="widget-failure"]');
+    await card.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+    assert.deepEqual(requests, [503]);
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const output = resolve(root, 'artifacts/accessibility');
+    await mkdir(output, { recursive: true });
+    await page.screenshot({ path: resolve(output, `${id}-failed.png`) });
+    const before = await page.evaluate(() => performance.timeOrigin);
+    const draft = 'Native import recovery keeps this held prompt';
+    const prompt = page.getByLabel('Positive prompt', { exact: true });
+    await prompt.fill(draft);
+    const unsaved = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+      response.json()
+    );
+    assert.equal(JSON.stringify(unsaved).includes(draft), false, 'The field must not already be saved before Retry.');
+    const retry = card.getByRole('button', { name: 'Retry', exact: true });
+    await retry.focus();
+    await retry.press('Enter');
+    if (failures > 1) {
+      const reload = card.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.waitFor();
+      assert.equal(
+        await page.evaluate(() => performance.timeOrigin),
+        before,
+        'Ordinary Retry must keep the document and its undo histories.'
+      );
+      await reload.click();
+      const dialog = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+      await dialog.waitFor();
+      assert.match(await dialog.textContent(), /ALL open projects.*Canvas undo and per-workflow edit histories/);
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:confirmation`);
+      await page.screenshot({ path: resolve(output, `${id}-confirmation.png`) });
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(await page.evaluate(() => performance.timeOrigin), before);
+      assert.equal(await prompt.inputValue(), draft);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      const retainedUndo = page.getByRole('button', { name: canvasUndoName, exact: true });
+      assert.equal(await retainedUndo.isEnabled(), true, 'Cancel must retain real Canvas undo, across layout hiding.');
+      await selectLayoutPreset(page, 'Compose', 'Preview');
+      // A new held draft proves confirmation saves the current editor, not just the earlier Retry's checkpoint.
+      await prompt.fill(`${draft} after cancel`);
+      const beforeConfirm = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+        response.json()
+      );
+      assert.equal(JSON.stringify(beforeConfirm).includes(`${draft} after cancel`), false);
+      await reload.click();
+      await dialog.getByRole('button', { name: 'Reload editor', exact: true }).click();
+      await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    }
+    await waitForWorkbench(page);
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await page
+      .locator('[data-hotkey-widget-region="center"][data-hotkey-widget-type-id="preview"]')
+      .getByRole('button', { name: /^Auto-switch:/ })
+      .waitFor();
+    await centerRegion(page).locator('[data-widget-loading]').waitFor({ state: 'detached' });
+    await centerRegion(page).locator('[data-testid="widget-failure"]').waitFor({ state: 'detached' });
+    await page.getByLabel('Positive prompt', { exact: true }).waitFor();
+    assert.equal(
+      await page.getByLabel('Positive prompt', { exact: true }).inputValue(),
+      failures > 1 ? `${draft} after cancel` : draft
+    );
+    assert.deepEqual(requests, [...Array(failures).fill(503), 200]);
+    if (activeWorker) {
+      assert.deepEqual(
+        workerResponses,
+        requests.map((status) => ({ status, fromServiceWorker: true }))
+      );
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      await page.waitForFunction(
+        async (asset) => !!(await caches.match(new URL(asset, location.origin).href, { cacheName: 'invokeai-assets' })),
+        chunk
+      );
+    }
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    await page.screenshot({ path: resolve(output, `${id}-recovered.png`) });
+    return {
+      id,
+      status: 'passed',
+      requests,
+      chromiumVersion: browser.version(),
+      freshDocument: await page.evaluate((previous) => performance.timeOrigin > previous, before),
+      draftInitiallyUnsaved: true,
+      promptPreserved: true,
+      ...(failures > 1 ? { canvasUndoRetainedOnCancel: true } : {}),
+      ...(activeWorker ? { workerResponses, workerActiveBeforeFault: true, recoveredAssetCached: true } : {}),
+    };
+  } finally {
+    await context.close();
+    await proxy?.close();
+  }
+};
+
+const runNativeUsersRecoveryJourney = async (browser) => {
+  const id = 'launchpad-users-native-import-recovery';
+  await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
+  await fetch(`${backendOrigin}/__faults`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ intermediatesCaller: 'multiuser-admin' }),
+  });
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+  const chunk = manifest['src/features/identity/ui/UsersPage.tsx'].file;
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  let blocked = true;
+  const requests = [];
+  await page.route('**/api/v1/auth/users', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  await page.route(`**/${chunk}`, async (route) => {
+    requests.push(blocked ? 503 : 200);
+    if (blocked) {
+      await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+    } else {
+      await route.continue();
+    }
+  });
+  try {
+    await page.goto(origin);
+    await page.getByLabel('Email', { exact: true }).fill('fixture-admin@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('link', { name: 'Users', exact: true }).waitFor();
+    assert.deepEqual(requests, [], 'Home must not request user management.');
+    await page.getByRole('link', { name: 'Users', exact: true }).click();
+    await page.getByText('Unable to load users', { exact: true }).waitFor();
+    await assertNoAxeViolations(page, `${id}:failed`);
+    const before = await page.evaluate(() => performance.timeOrigin);
+    blocked = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).press('Enter');
+    await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
+    await page.getByText('0 accounts in this workspace.', { exact: true }).waitFor();
+    assert.deepEqual(requests, [503, 200]);
+    await page.getByRole('button', { name: 'Add user', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:recovered`);
+    return { id, status: 'passed', requests, coldHomeManagementRequests: 0, freshDocument: true };
   } finally {
     await context.close();
   }
@@ -1553,14 +1887,34 @@ try {
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));
   }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 1));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-repeated-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-active-worker-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2, true));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-users-native-import-recovery') {
+    reports.push(await runNativeUsersRecoveryJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'launchpad-hidden-maintenance') {
+    reports.push(await runHiddenMaintenanceJourney(browser));
+  }
   if (reports.length === 0) {
     throw new Error(`Unknown accessibility journey ${JSON.stringify(requestedJourney)}.`);
   }
   process.stdout.write(`${JSON.stringify({ profile: 'representative', reports }, null, 2)}\n`);
 } catch (error) {
-  throw new Error(
-    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}${previewError ? `\n${previewError}` : ''}`
-  );
+  const failure = `${inspect(error, { depth: null, colors: false })}${previewError ? `\n${previewError}` : ''}`;
+  const directory = resolve(root, 'artifacts/accessibility');
+  await mkdir(directory, { recursive: true })
+    .then(() => writeFile(resolve(directory, 'failure.txt'), `${failure}\n`))
+    .catch((artifactError) =>
+      process.stderr.write(`Could not capture accessibility failure: ${String(artifactError)}\n`)
+    );
+  throw new Error(failure);
 } finally {
   await browser?.close();
 

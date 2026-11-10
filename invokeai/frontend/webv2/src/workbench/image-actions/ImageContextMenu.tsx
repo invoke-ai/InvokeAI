@@ -124,7 +124,7 @@ export const ImageContextMenu = ({
   actions,
   boards,
   previewVideoActions,
-  returnFocus,
+  returnFocus: hostReturnFocus,
   target,
   variant = 'full',
   onClose,
@@ -134,8 +134,8 @@ export const ImageContextMenu = ({
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
   /**
-   * Where focus goes when a deletion confirmation the menu opened closes. Without it the dialog returns focus to what
-   * had it as it opened, which the deletion may have removed.
+   * Where focus goes when a deletion confirmation the menu opened closes, unless the target names its own. Without
+   * either the dialog returns focus to what had it as it opened, which the deletion may have removed.
    */
   returnFocus?: () => HTMLElement | null;
   target: ImageContextMenuTarget | null;
@@ -149,6 +149,7 @@ export const ImageContextMenu = ({
     () => (itemTarget && isCompleteImageTarget ? { images, x: itemTarget.x, y: itemTarget.y } : null),
     [images, isCompleteImageTarget, itemTarget]
   );
+  const returnFocus = itemTarget?.returnFocus ?? hostReturnFocus;
   const requestDeletion = useCallback(
     (itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs, { returnFocus }),
     [actions, returnFocus]

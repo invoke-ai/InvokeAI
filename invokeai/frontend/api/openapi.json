@@ -1704,6 +1704,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -1740,6 +1746,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -1771,6 +1780,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -1819,6 +1831,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -2285,6 +2300,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -2321,6 +2342,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -2352,6 +2376,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -2400,6 +2427,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -2866,6 +2896,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -2902,6 +2938,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -2933,6 +2972,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -2981,6 +3023,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -3491,6 +3536,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -3527,6 +3578,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -3558,6 +3612,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -3606,6 +3663,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -4143,6 +4203,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -4179,6 +4245,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -4210,6 +4279,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -4258,6 +4330,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -5670,6 +5745,12 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                     },
                     {
@@ -5706,6 +5787,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -5737,6 +5821,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -5785,6 +5872,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -6621,6 +6711,144 @@
           },
           "503": {
             "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/files/upload": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload File",
+        "description": "Uploads a managed file for node inputs.",
+        "operationId": "upload_file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The file was uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is too large or managed file storage is full"
+          },
+          "415": {
+            "description": "The file type is not supported"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/files/i/{file_id}": {
+      "get": {
+        "tags": ["files"],
+        "summary": "Get File Dto",
+        "description": "Gets metadata for a managed file.",
+        "operationId": "get_file_dto",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["files"],
+        "summary": "Delete File",
+        "description": "Deletes a managed file.",
+        "operationId": "delete_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -11579,6 +11807,52 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/gallery/usage": {
+      "post": {
+        "tags": ["gallery"],
+        "summary": "Get Gallery Media Usage",
+        "description": "Reports what still uses media before it is deleted: the caller's saved documents and active queue work by\nname, other accounts' as counts. Deleting stays a separate request; this only reads.",
+        "operationId": "get_gallery_media_usage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMediaUsageRequest",
+                "description": "The media to check"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMediaUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/gallery/maintenance/preview": {
@@ -21454,6 +21728,12 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
           },
           {
@@ -21490,6 +21770,9 @@
             "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
           },
           {
@@ -21521,6 +21804,9 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -21569,6 +21855,9 @@
           },
           {
             "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -22047,17 +22336,11 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
-          "reference_images_require_format": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Images Require Format",
-            "description": "If set, reference images are only accepted for models of this format."
+          "reference_images_require_vision_tower": {
+            "type": "boolean",
+            "title": "Reference Images Require Vision Tower",
+            "description": "If true, reference images are read by the Qwen3-VL vision tower: the effective encoder (the model's own or a standalone one) must carry one.",
+            "default": false
           },
           "supports_regional_guidance": {
             "type": "boolean",
@@ -23872,6 +24155,18 @@
         "required": ["is_public"],
         "title": "Body_update_workflow_is_public"
       },
+      "Body_upload_file": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": ["file"],
+        "title": "Body_upload_file"
+      },
       "Body_upload_font": {
         "properties": {
           "file": {
@@ -23907,8 +24202,8 @@
               }
             ],
             "title": "Resize To",
-            "description": "Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216",
-            "examples": ["\"[1024,1024]\""]
+            "description": "Dimensions to resize the image to, as a stringified JSON object with positive integer width and height. Max total pixel count: 16777216",
+            "examples": ["{\"width\": 1024, \"height\": 1024}"]
           },
           "metadata": {
             "anyOf": [
@@ -35428,10 +35723,272 @@
         "tags": ["latents", "denoise", "ernie-image"],
         "title": "Denoise - ERNIE-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "ErnieImageLoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to an ERNIE-Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["ernie-image"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ernie_image_lora_collection_loader",
+            "default": "ernie_image_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ernie-image"],
+        "title": "Apply LoRA Collection - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+        }
+      },
+      "ErnieImageLoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "ERNIE-Image LoRA collection loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_lora_collection_loader_output",
+            "default": "ernie_image_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "ErnieImageLoRACollectionLoaderOutput",
+        "type": "object"
+      },
+      "ErnieImageLoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to an ERNIE-Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["ernie-image"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ernie_image_lora_loader",
+            "default": "ernie_image_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ernie-image"],
+        "title": "Apply LoRA - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+        }
+      },
+      "ErnieImageLoRALoaderOutput": {
+        "class": "output",
+        "description": "ERNIE-Image LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_lora_loader_output",
+            "default": "ernie_image_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "ErnieImageLoRALoaderOutput",
+        "type": "object"
       },
       "ErnieImageModelLoaderInvocation": {
         "category": "model",
@@ -37751,6 +38308,53 @@
         "enum": ["input", "output", "internal", "node_attribute"],
         "title": "FieldKind",
         "type": "string"
+      },
+      "FileDTO": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "title": "File Id",
+            "description": "The managed file ID."
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name",
+            "description": "The original file name."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "The uploaded file content type."
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "description": "The size of the file in bytes."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the file was uploaded."
+          }
+        },
+        "type": "object",
+        "required": ["file_id", "file_name", "content_type", "size_bytes", "created_at"],
+        "title": "FileDTO"
+      },
+      "FileField": {
+        "description": "A managed file primitive field",
+        "properties": {
+          "file_id": {
+            "description": "The id of the managed file",
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": ["file_id"],
+        "title": "FileField",
+        "type": "object"
       },
       "FloatBatchInvocation": {
         "category": "batch",
@@ -45457,6 +46061,263 @@
         ],
         "title": "GalleryMaintenanceResult"
       },
+      "GalleryMediaUsage": {
+        "properties": {
+          "checked_image_count": {
+            "type": "integer",
+            "title": "Checked Image Count",
+            "description": "Images checked: the requested ones the caller may delete, or the images the board's deletion would delete."
+          },
+          "checked_video_count": {
+            "type": "integer",
+            "title": "Checked Video Count",
+            "description": "Videos checked: the requested ones the caller may delete, or the videos the board's deletion would delete."
+          },
+          "in_use_image_count": {
+            "type": "integer",
+            "title": "In Use Image Count",
+            "description": "Distinct checked images that anything below names."
+          },
+          "in_use_video_count": {
+            "type": "integer",
+            "title": "In Use Video Count",
+            "description": "Distinct checked videos that anything below names."
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/GalleryMediaUsageDocument"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "The caller's own documents naming checked media, by kind, then name, then id; at most 100."
+          },
+          "documents_total": {
+            "type": "integer",
+            "title": "Documents Total",
+            "description": "How many of the caller's documents name checked media."
+          },
+          "queue": {
+            "$ref": "#/components/schemas/GalleryMediaUsageQueue",
+            "description": "The caller's own active queue work naming checked media."
+          },
+          "other_accounts": {
+            "$ref": "#/components/schemas/GalleryMediaUsageOthers",
+            "description": "Other accounts' documents and queue work naming checked media, as counts only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_image_count",
+          "checked_video_count",
+          "in_use_image_count",
+          "in_use_video_count",
+          "documents",
+          "documents_total",
+          "queue",
+          "other_accounts"
+        ],
+        "title": "GalleryMediaUsage",
+        "description": "What still uses media a deletion would remove. Saved documents count conservatively: anything they name,\nhistory included."
+      },
+      "GalleryMediaUsageDocument": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["project", "workflow", "legacy_editor", "quarantined_project"],
+            "title": "Kind",
+            "description": "'project': a project's content and the caller's own workspace in it. 'workflow': a library workflow. 'legacy_editor': the legacy editor's saved state, all of it as one entry. 'quarantined_project': a project kept for repair."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The project or workflow id; 'legacy_editor' for the legacy editor's state."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The document's name; null for the legacy editor or a missing document."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images the document names, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos the document names, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images the document names, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos the document names, past the list's cap too."
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "For a project: its content revision when the names were read, as the project read reports it (`revision`). Null for other kinds, and for a project the caller does not own."
+          },
+          "workspace_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Revision",
+            "description": "For a project: the caller's workspace revision when the names were read, as the project read reports it (`workspace.revision`); null while the caller has no workspace in it. Null for other kinds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "image_names",
+          "video_names",
+          "image_count",
+          "video_count",
+          "revision",
+          "workspace_revision"
+        ],
+        "title": "GalleryMediaUsageDocument",
+        "description": "One of the caller's saved documents that names checked media."
+      },
+      "GalleryMediaUsageOthers": {
+        "properties": {
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count",
+            "description": "Other accounts' documents naming checked media."
+          },
+          "queue_item_count": {
+            "type": "integer",
+            "title": "Queue Item Count",
+            "description": "Other accounts' active queue items naming checked media."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "Distinct checked images other accounts' documents or queue work name."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "Distinct checked videos other accounts' documents or queue work name."
+          }
+        },
+        "type": "object",
+        "required": ["document_count", "queue_item_count", "image_count", "video_count"],
+        "title": "GalleryMediaUsageOthers",
+        "description": "Other accounts' documents and queue work that name checked media, without identifying them."
+      },
+      "GalleryMediaUsageQueue": {
+        "properties": {
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "The caller's active queue items (pending, in progress or waiting, and the completed children of an active root) whose sessions name checked media."
+          },
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Names",
+            "description": "The checked images those items name, sorted; at most 1000."
+          },
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Video Names",
+            "description": "The checked videos those items name, sorted; at most 1000."
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "How many checked images those items name, past the list's cap too."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "How many checked videos those items name, past the list's cap too."
+          }
+        },
+        "type": "object",
+        "required": ["item_count", "image_names", "video_names", "image_count", "video_count"],
+        "title": "GalleryMediaUsageQueue",
+        "description": "The caller's active queue work that names checked media."
+      },
+      "GalleryMediaUsageRequest": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "Images to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /images/delete` skips them."
+          },
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "Videos to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /videos/delete` skips them."
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "Check the images and videos `DELETE /boards/{board_id}?include_images=true` would delete, under the same access rules. Not combined with names."
+          }
+        },
+        "type": "object",
+        "title": "GalleryMediaUsageRequest",
+        "description": "The media to check: named images and videos, or every item on one board."
+      },
       "GeminiImageGenerationInvocation": {
         "category": "image",
         "class": "invocation",
@@ -46792,6 +47653,12 @@
                   "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
                 },
                 {
@@ -46985,6 +47852,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
@@ -47833,6 +48706,12 @@
                   "$ref": "#/components/schemas/ErnieImageConditioningOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+                },
+                {
                   "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
                 },
                 {
@@ -47924,6 +48803,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
@@ -50704,7 +51589,7 @@
         "tags": ["image", "ideogram4"],
         "title": "Denoise - Ideogram 4",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -50818,6 +51703,268 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "Ideogram4LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to an Ideogram 4 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["ideogram-4"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ideogram4_lora_collection_loader",
+            "default": "ideogram4_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ideogram-4"],
+        "title": "Apply LoRA Collection - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+        }
+      },
+      "Ideogram4LoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "Ideogram 4 LoRA collection loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_lora_collection_loader_output",
+            "default": "ideogram4_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "Ideogram4LoRACollectionLoaderOutput",
+        "type": "object"
+      },
+      "Ideogram4LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to an Ideogram 4 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["ideogram-4"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ideogram4_lora_loader",
+            "default": "ideogram4_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ideogram-4"],
+        "title": "Apply LoRA - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
+        }
+      },
+      "Ideogram4LoRALoaderOutput": {
+        "class": "output",
+        "description": "Ideogram 4 LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_lora_loader_output",
+            "default": "ideogram4_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "Ideogram4LoRALoaderOutput",
+        "type": "object"
       },
       "Ideogram4ModelLoaderInvocation": {
         "category": "model",
@@ -57265,6 +58412,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -57458,6 +58611,12 @@
               },
               {
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
@@ -58302,6 +59461,12 @@
                 "$ref": "#/components/schemas/ErnieImageConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
               },
               {
@@ -58393,6 +59558,12 @@
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
@@ -58973,6 +60144,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -59166,6 +60343,12 @@
               },
               {
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
@@ -60160,6 +61343,12 @@
           "ernie_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "ernie_image_lora_collection_loader": {
+            "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+          },
+          "ernie_image_lora_loader": {
+            "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+          },
           "ernie_image_model_loader": {
             "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
           },
@@ -60357,6 +61546,12 @@
           },
           "ideogram4_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
+          },
+          "ideogram4_lora_collection_loader": {
+            "$ref": "#/components/schemas/Ideogram4LoRACollectionLoaderOutput"
+          },
+          "ideogram4_lora_loader": {
+            "$ref": "#/components/schemas/Ideogram4LoRALoaderOutput"
           },
           "ideogram4_model_loader": {
             "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
@@ -61149,6 +62344,8 @@
           "dw_openpose_detection",
           "dynamic_prompt",
           "ernie_image_denoise",
+          "ernie_image_lora_collection_loader",
+          "ernie_image_lora_loader",
           "ernie_image_model_loader",
           "ernie_image_prompt_enhancer",
           "ernie_image_text_encoder",
@@ -61215,6 +62412,8 @@
           "ideogram4_caption_builder",
           "ideogram4_denoise",
           "ideogram4_l2i",
+          "ideogram4_lora_collection_loader",
+          "ideogram4_lora_loader",
           "ideogram4_model_loader",
           "ideogram4_text_encoder",
           "if",
@@ -61724,6 +62923,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -61917,6 +63122,12 @@
               },
               {
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
@@ -63029,6 +64240,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -63222,6 +64439,12 @@
               },
               {
                 "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
@@ -64232,6 +65455,22 @@
             "title": "Max Font Library Bytes",
             "description": "Maximum total size of uploaded custom fonts in bytes per account or shared library.",
             "default": 1073741824
+          },
+          "max_file_upload_size_bytes": {
+            "type": "integer",
+            "maximum": 1073741824.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Upload Size Bytes",
+            "description": "Maximum size in bytes of one managed file upload.",
+            "default": 52428800
+          },
+          "max_file_library_bytes": {
+            "type": "integer",
+            "maximum": 17179869184.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Library Bytes",
+            "description": "Maximum total size in bytes of all managed files.",
+            "default": 5368709120
           },
           "image_subfolder_strategy": {
             "type": "string",
@@ -72284,6 +73523,158 @@
         "title": "LoRA_Diffusers_Flux3_Config",
         "description": "Model config for a FLUX.3 Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a\nrepository-id install of a diffusers trainer's output leaves it. The file is held to what\n`LoRA_LyCORIS_Flux3_Config` holds a single file to."
       },
+      "LoRA_Diffusers_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_Diffusers_Ideogram4_Config",
+        "description": "Model config for an Ideogram 4 LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a\nrepository-id install of a diffusers trainer's output leaves it. The file is held to what\n`LoRA_LyCORIS_Ideogram4_Config` holds a single file to."
+      },
       "LoRA_Diffusers_SD1_Config": {
         "properties": {
           "key": {
@@ -73215,6 +74606,158 @@
         "title": "LoRA_LyCORIS_Anima_Config",
         "description": "Model config for Anima LoRA models in LyCORIS format."
       },
+      "LoRA_LyCORIS_ErnieImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "ernie-image",
+            "title": "Base",
+            "default": "ernie-image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_ErnieImage_Config",
+        "description": "Model config for ERNIE-Image LoRA models (single file; PEFT, kohya-style or LyCORIS tensors).\n\nERNIE-Image LoRAs name the transformer's own modules behind a container prefix. `layers.N.self_attention.*` and\n`layers.N.mlp.linear_fc2` exist in no other supported transformer, which is what makes the match exclusive;\n`mlp.gate_proj` / `up_proj` are shared with LLM layers and only count once those identified the file. See\n`ernie_image_lora_constants`."
+      },
       "LoRA_LyCORIS_FLUX_Config": {
         "properties": {
           "key": {
@@ -73680,6 +75223,158 @@
         ],
         "title": "LoRA_LyCORIS_Flux3_Config",
         "description": "Model config for FLUX.3 Image LoRA files: diffusers/PEFT, Black Forest Labs' native names (ai-toolkit, ComfyUI)\nand raw PEFT, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers\nheader or one describing a PEFT LoRA (`peft_scale`). LyCORIS here is the single-file format: LyCORIS's own\nflattened key names (`lycoris_...`) are none of these layouts and are not recognized.\n\nNo variant: Klein and Klein Base share the transformer, so a LoRA trained on either runs on both."
+      },
+      "LoRA_LyCORIS_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_Ideogram4_Config",
+        "description": "Model config for Ideogram 4 LoRA models (single file; PEFT, kohya-style or LoKR tensors).\n\nIdeogram 4 LoRAs name the vendored transformer's modules (fused `attention.qkv`, `attention.o`,\n`feed_forward.w1..3`, `adaln_modulation`) or diffusers' split ones behind a container prefix. Z-Image uses the\nsame block names, so the match also needs a patched weight at one of Ideogram 4's widths; see\n`ideogram4_lora_constants`."
       },
       "LoRA_LyCORIS_Krea2_Config": {
         "properties": {
@@ -78585,7 +80280,7 @@
           "variant"
         ],
         "title": "Main_Checkpoint_QwenImage_Config",
-        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.\nThe loader keeps scaled fp8 weights when fp8 compute is available or the\n`default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),\nand dequantizes them to bf16 at load time otherwise."
+        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled, nvfp4 and int8_tensorwise(+convrot)\ncheckpoints. The loader keeps scaled fp8 weights when fp8 compute is available or the\n`default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),\nand dequantizes them to bf16 at load time otherwise. An int8 weight whose marker is missing or\nnames another format is refused at install, as the loader would refuse it."
       },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
@@ -79450,7 +81145,7 @@
           "expert"
         ],
         "title": "Main_Checkpoint_Wan_Config",
-        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized. The loader normalises all of those.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
+        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized, or ComfyUI ``int8_tensorwise`` (convrot) quantized, which stays int8 in memory. The loader\nnormalises all of those. An int8 weight without a decodable ``int8_tensorwise`` marker (a bare\n``{\"convrot\": true}``, int4) is refused at install.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
       },
       "Main_Checkpoint_ZImage_Config": {
         "properties": {
@@ -92921,6 +94616,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
               },
               {
@@ -92957,6 +94658,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -92988,6 +94692,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -93036,6 +94743,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -93748,6 +95458,12 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                   },
                   {
@@ -93784,6 +95500,9 @@
                     "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                   },
                   {
@@ -93815,6 +95534,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -93863,6 +95585,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -94505,6 +96230,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
               },
               {
@@ -94541,6 +96272,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -94572,6 +96306,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -94620,6 +96357,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -95073,6 +96813,12 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
               },
               {
@@ -95109,6 +96855,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -95140,6 +96889,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -95188,6 +96940,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -95773,6 +97528,7 @@
           "qwen3_encoder",
           "qwen_vl_encoder",
           "qwen3_vl_encoder",
+          "qwen3_vl_vision_tower",
           "qwen3_5_encoder",
           "mistral_encoder",
           "wan_t5_encoder",
@@ -96129,6 +97885,12 @@
                   "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
                 },
                 {
@@ -96165,6 +97927,9 @@
                   "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                 },
                 {
@@ -96196,6 +97961,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
@@ -96244,6 +98012,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -101857,7 +103628,7 @@
         "description": "Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.\n\nUsed for SDNQ bundles where the text_encoder is a folder containing\nquantization_config.json and safetensors files with SDNQ keys."
       },
       "Qwen3VLEncoderField": {
-        "description": "Field for the Qwen3-VL text encoder used by Krea-2 models.",
+        "description": "Field for the Qwen3-VL text encoder used by Krea-2 and Qwen-Image-2.1 models.",
         "properties": {
           "tokenizer": {
             "$ref": "#/components/schemas/ModelIdentifierField",
@@ -101866,6 +103637,18 @@
           "text_encoder": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load text_encoder submodel"
+          },
+          "vision_tower": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)"
           },
           "loras": {
             "description": "LoRAs to apply on model loading",
@@ -102335,7 +104118,7 @@
           "cpu_only"
         ],
         "title": "Qwen3VLEncoder_GGUF_Config",
-        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.\nOnly the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,\nso a GGUF encoder encodes text only.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
+        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower. Only the language tower is accepted here, so a\nGGUF encoder encodes text only; the ``mmproj`` file installs as a ``Qwen3VLVisionTower_GGUF_Config``,\nwhich an edit that reads reference images takes beside the encoder.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
@@ -102483,6 +104266,160 @@
         "enum": ["qwen3_vl_4b", "qwen3_vl_8b"],
         "title": "Qwen3VLVariantType",
         "description": "Qwen3-VL (vision-language) text encoder variants, by language-model width.\n\nSeparate from `Qwen3VariantType`: those are the text-only Qwen3 encoders (Z-Image, FLUX.2\nKlein). The VL models carry a visual tower and are not interchangeable with them, and the two\nfamilies do not even share widths at the same parameter count."
+      },
+      "Qwen3VLVisionTower_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_vision_tower",
+            "title": "Type",
+            "default": "qwen3_vl_vision_tower"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VLVariantType",
+            "description": "Which Qwen3-VL this tower belongs to. It pairs only with the encoder of the same variant."
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only. Set it like the encoder's: they must share a device"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "variant",
+          "cpu_only"
+        ],
+        "title": "Qwen3VLVisionTower_GGUF_Config",
+        "description": "Configuration for the vision tower of a llama.cpp Qwen3-VL (``mmproj-*.gguf``).\n\nllama.cpp keeps the tower out of the language-tower GGUF, so a GGUF encoder cannot read reference images\nby itself. This file is that tower; the loader renames it into the HuggingFace ``Qwen3VLVisionModel`` the\nother encoders' towers are, so it stands in for the tower they would bring.\n\nIdentified by its ``clip`` architecture, ``mmproj`` type and the ``qwen3vl_merger`` projector, which is\nwhat tells it from another model's vision tower; the variant is the width that projector emits."
       },
       "Qwen3VariantType": {
         "type": "string",
@@ -103363,6 +105300,25 @@
             "ui_model_base": ["any"],
             "ui_model_type": ["qwen3_vl_encoder"]
           },
+          "qwen3_vl_vision_tower_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL 8B vision tower (the llama.cpp mmproj file). Lets a GGUF encoder read reference images.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Vision Tower",
+            "ui_model_base": ["any"],
+            "ui_model_type": ["qwen3_vl_vision_tower"]
+          },
           "type": {
             "const": "qwen_image_2_1_model_loader",
             "default": "qwen_image_2_1_model_loader",
@@ -103375,7 +105331,7 @@
         "tags": ["model", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Main Model - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
         }
@@ -103483,7 +105439,7 @@
           },
           "reference_images": {
             "default": [],
-            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs an encoder with a vision tower: a Diffusers Qwen-Image-2.1 model's own, a standalone non-GGUF Qwen3-VL 8B encoder, or a GGUF encoder with its vision tower model.",
             "field_kind": "input",
             "input": "any",
             "items": {
@@ -104456,7 +106412,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Applies a collection of LoRAs to a Qwen Image transformer.",
+        "description": "Applies a collection of LoRAs to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -104525,6 +106481,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_collection_loader",
             "default": "qwen_image_lora_collection_loader",
@@ -104537,7 +106510,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -104546,7 +106519,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA model to a Qwen Image transformer.",
+        "description": "Apply a LoRA model to a Qwen Image transformer and/or Qwen2.5-VL text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -104618,6 +106591,23 @@
             "orig_required": false,
             "title": "Transformer"
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen VL Encoder"
+          },
           "type": {
             "const": "qwen_image_lora_loader",
             "default": "qwen_image_lora_loader",
@@ -104630,7 +106620,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -104654,6 +106644,21 @@
             "title": "Transformer",
             "ui_hidden": false
           },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "output",
+            "title": "Qwen VL Encoder",
+            "ui_hidden": false
+          },
           "type": {
             "const": "qwen_image_lora_loader_output",
             "default": "qwen_image_lora_loader_output",
@@ -104662,7 +106667,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "type", "type"],
+        "required": ["output_meta", "transformer", "qwen_vl_encoder", "type", "type"],
         "title": "QwenImageLoRALoaderOutput",
         "type": "object"
       },
@@ -105122,6 +107127,14 @@
           "text_encoder": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load text_encoder submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
           }
         },
         "required": ["tokenizer", "text_encoder"],
@@ -111908,6 +113921,15 @@
             "title": "Previous Sources",
             "default": []
           },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -112113,6 +114135,15 @@
             },
             "type": "array",
             "title": "Previous Sources",
+            "default": []
+          },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
             "default": []
           }
         },
@@ -114607,7 +116638,7 @@
           "cpu_only"
         ],
         "title": "T5Encoder_GGUF_Config",
-        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."
+        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``). UMT5 files in\nthe same naming belong to ``WanT5Encoder_GGUF_Config``."
       },
       "T5Encoder_SDNQ_Config": {
         "properties": {
@@ -124449,6 +126480,155 @@
         "required": ["tokenizer", "text_encoder"],
         "title": "WanT5EncoderField",
         "type": "object"
+      },
+      "WanT5Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "wan_t5_encoder",
+            "title": "Type",
+            "default": "wan_t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "WanT5Encoder_GGUF_Config",
+        "description": "UMT5-XXL encoder in one llama.cpp ``t5encoder`` GGUF file, e.g. ``city96/umt5-xxl-encoder-gguf``.\n\nThe naming is the one FLUX's T5 v1.1 GGUFs use (see ``util/llamacpp_t5.py``); a relative attention\nbias in blocks past the first is what makes the file UMT5. Once it is UMT5, a file the loader would\nfail on is refused at install rather than at the first prompt: an encoder-decoder conversion,\nmissing tensors, or missing tokenizer metadata (a GGUF ships no tokenizer files beside it). Only the\ntokenizer's scalar fields are checked here; its vocabulary arrays, which ``ModelOnDisk.metadata``\nleaves out, are checked when the tokenizer is loaded."
       },
       "WanT5Encoder_WanT5Encoder_Config": {
         "properties": {
