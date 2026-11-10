@@ -1605,28 +1605,46 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
   });
 
-  it('omits unset Ideogram 4 overrides so the sampler preset keeps deciding', () => {
-    const graph = compile(ideogram4Model);
+  it.each([
+    ['V4_QUALITY_48', 48],
+    ['V4_DEFAULT_20', 20],
+    ['V4_TURBO_12', 12],
+  ] as const)('records Ideogram 4 preset %s without sending unset overrides', (preset, steps) => {
+    const graph = compile(ideogram4Model, { cfgScale: 0, ideogram4SamplerPreset: preset, steps: 99 });
 
-    expect(graph.nodes.denoise_latents).toMatchObject({ sampler_preset: 'V4_QUALITY_48' });
+    expect(graph.nodes.denoise_latents).toMatchObject({ sampler_preset: preset });
     expect(graph.nodes.denoise_latents).not.toHaveProperty('steps');
     expect(graph.nodes.denoise_latents).not.toHaveProperty('guidance_scale');
     expect(graph.nodes.denoise_latents).not.toHaveProperty('mu');
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 7,
+      ideogram4_guidance_scale: null,
+      ideogram4_sampler_preset: preset,
+      ideogram4_steps: null,
+      steps,
+    });
   });
 
-  it('sends Ideogram 4 overrides once set', () => {
+  it('sends and records explicit Ideogram 4 overrides', () => {
     const graph = compile(ideogram4Model, {
       ideogram4GuidanceScale: 6,
       ideogram4Mu: 1.5,
       ideogram4SamplerPreset: 'V4_TURBO_12',
-      ideogram4Steps: 12,
+      ideogram4Steps: 18,
     });
 
     expect(graph.nodes.denoise_latents).toMatchObject({
       guidance_scale: 6,
       mu: 1.5,
       sampler_preset: 'V4_TURBO_12',
-      steps: 12,
+      steps: 18,
+    });
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 6,
+      ideogram4_guidance_scale: 6,
+      ideogram4_mu: 1.5,
+      ideogram4_steps: 18,
+      steps: 18,
     });
   });
 

@@ -218,7 +218,7 @@
       "core_metadata_0_i": {
         "is_intermediate": true,
         "use_cache": true,
-        "cfg_scale": 1,
+        "cfg_scale": 7,
         "cfg_rescale_multiplier": 0,
         "generation_mode": "ideogram4_txt2img",
         "height": 1024,
