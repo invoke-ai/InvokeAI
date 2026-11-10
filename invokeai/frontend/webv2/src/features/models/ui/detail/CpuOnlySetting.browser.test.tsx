@@ -37,6 +37,8 @@ const vae = {
   type: 'vae',
 } as ModelConfig;
 
+const taesdxl = { cpu_only: null, key: 'taesdxl', name: 'TAESDXL', type: 'tiny_autoencoder' } as const;
+
 const deferred = <T,>() => {
   let reject!: (reason?: unknown) => void;
   let resolve!: (value: T) => void;
@@ -158,6 +160,22 @@ describe('CpuOnlySetting', () => {
     const help = document.getElementById(input.getAttribute('aria-describedby') ?? '');
 
     expect(help?.textContent).toBe('models.runVaeOnCpuHelp');
+  });
+
+  it('labels the switch of a tiny autoencoder for previews', async () => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <CpuOnlySetting model={taesdxl} onError={onError} onSaved={onSaved} />
+        </ChakraProvider>
+      );
+    });
+
+    const input = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(input.labels?.[0]?.textContent).toBe('models.runTaeOnCpu');
+    expect(document.getElementById(input.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'models.runTaeOnCpuHelp'
+    );
   });
 
   it('does not commit a late response from account A into account B', async () => {

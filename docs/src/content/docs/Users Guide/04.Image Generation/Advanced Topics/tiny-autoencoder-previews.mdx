@@ -1,6 +1,6 @@
 ---
 title: Tiny AutoEncoder Previews
-lastUpdated: 2026-10-28
+lastUpdated: 2026-11-10
 sidebar:
   order: 13
 ---
@@ -10,8 +10,8 @@ import { Steps, Aside } from '@astrojs/starlight/components'
 While a model denoises, InvokeAI shows a preview of the image after each step. By default the preview is a linear
 projection of the latents: one pixel per latent, upscaled, so it is blurry and its colours are approximate. A
 **Tiny AutoEncoder** (TAE) is a small decoder by [madebyollin](https://github.com/madebyollin/taesd) (MIT license)
-that turns the same latents into a preview close to the final image, in a few tens of milliseconds on an RTX 4090. It needs a GPU:
-on CPU-only installs it is not recommended (see [Cost and fallback](#cost-and-fallback)).
+that turns the same latents into a preview close to the final image, in a few tens of milliseconds on an RTX 4090. It is meant for
+a GPU; decoding on the CPU is possible but slower (see [Running the decoder on the CPU](#running-the-decoder-on-the-cpu)).
 
 TAE previews change only what you see while a generation runs. The finished image is decoded by the model's VAE as
 always and is identical with the setting on or off.
@@ -79,8 +79,8 @@ Measured on an RTX 4090 in fp16, decoding one latent at the cap:
 | TAELTX2.3 | 1024 pixels | about 29 ms | about 0.27 GB |
 
 A Wan 2.2 video preview, which decodes two latent frames, takes under about 32 ms. InvokeAI reserves up to 617 MiB
-of VRAM for it from 832×480 to 1280×720 and 1093 MiB at 1024×1024; on an RTX 4090 it used up to 599 and 1064 MiB. Without a GPU a preview takes about 2 seconds, so TAE
-previews are not recommended on CPU-only installs.
+of VRAM for it from 832×480 to 1280×720 and 1093 MiB at 1024×1024; on an RTX 4090 it used up to 599 and 1064 MiB. On a CPU a preview takes
+from about 0.3 to 1.1 seconds for one frame (see [Running the decoder on the CPU](#running-the-decoder-on-the-cpu)).
 
 InvokeAI spaces TAE preview frames so that previews cost at most about a tenth of the denoising time. On fast models
 the preview therefore updates a few times per second rather than after every step. In practice the cost is lower: on
@@ -92,9 +92,40 @@ InvokeAI falls back to the linear preview by itself, and the generation always c
 - **No matching TAE installed:** linear previews. The server log says once which starter model to install, and
   under which family the starter list shows it.
 - **The TAE does not fit in VRAM** next to the running model: linear previews for that generation, noted once in
-  the server log. This is the case whenever the main model is only partially loaded into VRAM, as on low-VRAM cards.
+  the server log (`Tiny AutoEncoder '...' does not fit in VRAM next to the running model`). This is the case whenever
+  the main model is only partially loaded into VRAM, as on low-VRAM cards. To get TAE previews there anyway, run the
+  decoder on the CPU.
 - **Loading or decoding the TAE fails:** a warning with the error in the server log, once per kind of failure,
   then linear previews for the rest of that generation.
+
+## Running the decoder on the CPU
+
+The switch only matters while `tiny_autoencoder_previews` is on. If the log line above appears, or your GPU is busy
+enough that you would rather keep its memory for the model, open the TAE in **Model Manager** and switch on
+**Decode previews on CPU**. The setting is saved at once. The decoder then lives in system RAM, never needs VRAM, and
+decodes in float32 on the CPU, so it also works while the generation model fills the GPU. The change applies from the
+next generation.
+
+Decoding on a CPU costs more time, so InvokeAI limits the work:
+
+- The preview is decoded at no more than 512 pixels on its long edge, whatever the TAE's usual cap, and shown at full
+  size.
+- Measured on a Ryzen 9 7900 (8 threads, float32): TAESDXL and TAEF2 take about 0.3 to 0.4 s per frame at 512 pixels
+  (1.7 s at 1024 pixels, which is why the cap exists). TAEW2.1 takes about 0.8 to 1.1 s for a single frame (Anima,
+  Qwen-Image, Krea-2); a Wan two-frame window takes about 1.9 s at 1024×1024 and about 1.0 s at 832×480. TAEW2.2 and
+  TAELTX2.3 were not measured on a CPU. Slower CPUs take longer.
+- Frames are still spaced by their measured cost, so with a CPU decoder previews update less often: a frame costing
+  0.4 s is followed by roughly 8 s without a new one. The last (100%) frame is always decoded, whatever the spacing.
+  Each frame is decoded between two denoise steps, so the GPU waits for it: on an RTX 4090 with the model only partly
+  in VRAM (1024×1024, 30 steps), a CPU decoder added about 7% (SDXL, a frame every 5 s) and 9% (Anima, a frame every
+  12 s) to the denoise compared with linear previews.
+- With several GPUs, a CPU decode competes with the other generation threads' CPU work.
+- A CPU decode needs transient RAM that the model cache does not count: about 0.3 GB for TAESDXL at 512 pixels and
+  about 1.2 GB for a TAEW2.1 two-frame window. If PyTorch reports that the allocation failed, previews fall back to
+  linear for the rest of that generation; on a Linux host that overcommits memory, the system's out-of-memory killer
+  may end the process instead.
+
+CPU-only installs decode on the CPU in any case and are subject to the same 512-pixel cap.
 
 <Aside type="note">
 If more than one installed TAE fits a family, InvokeAI uses the one that is alphabetically first by name.

@@ -609,6 +609,24 @@ def test_reidentify_keeps_the_base_of_a_tiny_autoencoder_starter(harness: _Harne
     assert harness.manager.reidentify_model(KEY).base is starter.base
 
 
+def test_a_tiny_autoencoders_cpu_only_switch_is_stored_and_drops_its_cached_instances(harness: _Harness) -> None:
+    """Toggling "Decode previews on CPU" must reach the next preview: the cached decoder was built for the old device and dtype."""
+    path = harness.models_path / KEY / "taesdxl.safetensors"
+    _write_tae(path, TAESD, combined=False)
+    harness.store.add_model(_identify(path, {"key": KEY}))
+    harness.cache_model()
+
+    updated = harness.manager.update_model_record(KEY, ModelRecordChanges(cpu_only=True))
+
+    assert updated.cpu_only is True and harness.store.get_model(KEY).cpu_only is True
+    assert not harness.is_cached()
+
+    harness.cache_model()
+    harness.manager.update_model_record(KEY, ModelRecordChanges(cpu_only=None))
+    assert harness.store.get_model(KEY).cpu_only is None
+    assert not harness.is_cached()
+
+
 def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harness: _Harness) -> None:
     keys = dict(clip_g_comfy_keys.state_dict_keys)
     del keys["text_projection.weight"]
