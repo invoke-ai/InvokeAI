@@ -19,11 +19,14 @@ import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 /** The Invoke card: what runs, where it goes, and each issue in the way with its fixes. Loads on first hover or focus. */
 export const InvokePopoverBody = ({
   frontShortcut,
+  isRouteFixed,
   onJump,
   shortcutParts,
   state,
 }: {
   frontShortcut: string | null;
+  /** The host fixes the route: it reads as text, with nothing to switch or lock. */
+  isRouteFixed: boolean;
   /** An action that leads elsewhere closes the list, leaving focus where the action put it. */
   onJump: () => void;
   shortcutParts: string[] | null;
@@ -74,7 +77,7 @@ export const InvokePopoverBody = ({
           </Kbd>
         ) : null}
       </HStack>
-      <InvokeRoute state={state} />
+      {isRouteFixed ? <FixedRoute state={state} /> : <InvokeRoute state={state} />}
       <Text color="fg.muted" fontSize="xs">
         {summary}
       </Text>
@@ -192,6 +195,27 @@ const InvokeRoute = ({ state }: { state: InvocationState }) => {
             onChange={handleDestinationChange}
           />
         )}
+      </Stack>
+    </Stack>
+  );
+};
+
+/** The route as text: where Invoke runs from and where its results go, set by the host rather than here. */
+const FixedRoute = ({ state }: { state: InvocationState }) => {
+  const { t } = useTranslation();
+  const { invocation } = state;
+
+  return (
+    <Stack data-invoke-route="" data-invoke-route-fixed="" gap="2.5">
+      <Stack align="start" gap="1">
+        <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.source')}</Text>
+        <Text {...ROUTE_VALUE_PROPS}>{t(ROUTE_LABEL_KEYS[invocation.sourceId])}</Text>
+      </Stack>
+      <Stack align="start" gap="1">
+        <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.destination')}</Text>
+        <Text {...ROUTE_VALUE_PROPS}>
+          {t(ROUTE_LABEL_KEYS[invocation.sourceId === 'video' ? 'gallery' : invocation.destination])}
+        </Text>
       </Stack>
     </Stack>
   );
