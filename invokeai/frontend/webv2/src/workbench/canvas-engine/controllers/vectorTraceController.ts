@@ -6,6 +6,7 @@ import type { CanvasMutationContext } from './mutationContext';
 import { lookupDocumentLeaf } from '../document-model/documentModel';
 import { approximateBezierPath } from '../math/bezierPath';
 import { buildTaperedTracePoints, buildTraceLinePath, buildTraceOutlinePath } from '../math/vectorTrace';
+import { findVectorFillRegions } from '../math/vectorFillRegions';
 import { polygonBounds } from '../freehand';
 import { roundOut } from '../math/rect';
 import { getStroke } from 'perfect-freehand';
@@ -35,10 +36,15 @@ export const traceVectorLayer = (o: Options): boolean => {
   if (!fill && !stroke) { return false; }
   const width = Math.max(1, Math.min(600, Math.round(o.width)));
   const paths = o.pathId === undefined ? layer.paths : layer.paths.filter((path) => path.id === o.pathId);
-  const traces = paths.filter((path) => stroke || (fill && path.isClosed)).map((path) => ({ coordinates: approximateBezierPath(path.points, path.isClosed), closed: path.isClosed }))
-    .filter((trace) => trace.coordinates.length >= (stroke ? 2 : 3));
-  if (traces.length === 0) { return false; }
-  const bounds = polygonBounds(traces.flatMap((trace) => trace.coordinates));
+  const traces = paths.map((path) => ({ coordinates: approximateBezierPath(path.points, path.isClosed), closed: path.isClosed }))
+    .filter((trace) => trace.coordinates.length >= 2);
+  // The layer action discovers regions across all paths. Context-menu Fill Path keeps its closed-path contract.
+  const regions = !fill ? [] : o.fillOnly
+    ? traces.filter((trace) => trace.closed && trace.coordinates.length >= 3).map((trace) => trace.coordinates)
+    : findVectorFillRegions(traces.map((trace) => trace.coordinates));
+  const outputPoints = [...(stroke ? traces.flatMap((trace) => trace.coordinates) : []), ...regions.flat()];
+  if (outputPoints.length === 0) { return false; }
+  const bounds = polygonBounds(outputPoints);
   const padding = stroke ? width / 2 + 2 : 2;
   const rect = roundOut({ x: bounds.x - padding, y: bounds.y - padding, width: bounds.width + padding * 2, height: bounds.height + padding * 2 });
   const txn = o.ctx.begin({ historyBytes: addedLayerHistoryBytes(rect) });
@@ -52,16 +58,19 @@ export const traceVectorLayer = (o: Options): boolean => {
     draw.strokeStyle = o.color;
     draw.lineWidth = width;
     draw.lineCap = 'round'; draw.lineJoin = 'round';
-    for (const trace of traces) {
-      if (fill && trace.closed) {
-        draw.beginPath();
-        draw.moveTo(trace.coordinates[0]!.x, trace.coordinates[0]!.y);
-        for (const point of trace.coordinates.slice(1)) { draw.lineTo(point.x, point.y); }
-        draw.closePath();
-        draw.fillStyle = layer.fillColor ?? '#ffffff';
-        draw.fill();
-        draw.fillStyle = o.color;
+    if (regions.length > 0) {
+      // One fill avoids double-compositing shared boundaries and overlapping closed contours.
+      const regionPath = new Path2D();
+      for (const region of regions) {
+        regionPath.moveTo(region[0]!.x, region[0]!.y);
+        for (const point of region.slice(1)) { regionPath.lineTo(point.x, point.y); }
+        regionPath.closePath();
       }
+      draw.fillStyle = layer.fillColor ?? '#ffffff';
+      draw.fill(regionPath);
+      draw.fillStyle = o.color;
+    }
+    for (const trace of traces) {
       if (!stroke) { continue; }
       draw.beginPath();
       if (layer.traceTaperEnds && !trace.closed) {

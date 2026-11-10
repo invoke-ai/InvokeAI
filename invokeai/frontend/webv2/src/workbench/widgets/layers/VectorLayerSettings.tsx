@@ -98,7 +98,7 @@ const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract
         defaultValue={100} marks={[1, 100, 250, 500]} formatValue={(value) => `${value}%`}
         onChange={(value) => preview({ id: layer.id, type: 'updateCanvasLayerConfig', config: { layerType: 'vector', traceTaper: clampTaper(value) } })}
         onChangeEnd={(value) => commitSettings({ traceTaper: clampTaper(value) })} />
-      <Button size="sm" disabled={disabled || !layer.paths.some((path) => (layer.strokeEnabled !== false && path.points.length >= 2) || (layer.fillEnabled && path.isClosed && path.points.length >= 3))} onClick={trace}>{label('traceFill')}</Button>
+      <Button size="sm" disabled={disabled || !layer.paths.some((path) => (layer.strokeEnabled !== false && path.points.length >= 2) || (layer.fillEnabled && path.points.length >= 2))} onClick={trace}>{label('traceFill')}</Button>
       {failed ? <Text color="fg.error" fontSize="sm">{label('traceFailed')}</Text> : null}
     </Stack>
   );

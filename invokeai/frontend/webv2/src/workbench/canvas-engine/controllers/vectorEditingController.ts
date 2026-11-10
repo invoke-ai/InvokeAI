@@ -124,7 +124,7 @@ export class VectorEditingController implements Tool {
     if (!leaf || leaf.layer.type !== 'vector' || leaf.documentHidden || leafEditRefusal(leaf) || !invert(leaf.worldTransform)) { return false; }
     this.base = leaf.layer;
     const state: VectorEditSession = {
-      layerId, paths: leaf.layer.paths, activePathId: leaf.layer.paths[0]?.id ?? null, selectedPoints: [],
+      layerId, paths: leaf.layer.paths, activePathId: null, selectedPoints: [],
       selectionRect: null, pathTransform: null,
       canSplit: false, canJoin: false,
     };
@@ -169,7 +169,7 @@ export class VectorEditingController implements Tool {
       this.transformCursor = null;
       this.base = leaf.layer;
       const paths = leaf.layer.paths;
-      this.publish({ paths, activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : paths[0]?.id ?? null,
+      this.publish({ paths, activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : null,
         selectedPoints: state.selectedPoints.filter((ref) => !!paths.find((path) => path.id === ref.pathId)?.points[ref.pointIndex]), selectionRect: null, pathTransform: null });
     }
   };
@@ -193,12 +193,31 @@ export class VectorEditingController implements Tool {
   nudge = (dx: number, dy: number): void => {
     if (!this.actionReady() || !Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) { return; }
     const state = this.options.session.get()!;
-    if (state.selectedPoints.length === 0) { return; }
+    if (!state.pathTransform && state.selectedPoints.length === 0 && state.activePathId === null) { return; }
     const inverse = invert(this.matrix());
     if (!inverse) { return; }
     const x = inverse.a * dx + inverse.c * dy;
     const y = inverse.b * dx + inverse.d * dy;
-    this.publish({ paths: this.mapPoints(state.paths, state.selectedPoints, (point) => {
+    if (state.pathTransform) {
+      const frame = state.pathTransform;
+      const origin = this.transformOrigin;
+      if (!origin || origin.id !== frame.pathId) { return; }
+      const transform = { ...frame.transform, x: frame.transform.x + x, y: frame.transform.y + y };
+      const matrix = layerTransformMatrix(transform);
+      const path = { ...origin, points: origin.points.map((point) => ({ ...point,
+        anchor: applyToPoint(matrix, point.anchor),
+        inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
+        outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,
+      })) };
+      this.publish({ paths: state.paths.map((candidate) => candidate.id === frame.pathId ? path : candidate),
+        pathTransform: { ...frame, transform } });
+      this.record(true);
+      return;
+    }
+    const refs = state.selectedPoints.length > 0 ? state.selectedPoints
+      : (state.paths.find((path) => path.id === state.activePathId)?.points ?? [])
+        .map((_, pointIndex) => ({ pathId: state.activePathId!, pointIndex }));
+    this.publish({ paths: this.mapPoints(state.paths, refs, (point) => {
       point.anchor = { x: point.anchor.x + x, y: point.anchor.y + y };
       if (point.inHandle) { point.inHandle = { x: point.inHandle.x + x, y: point.inHandle.y + y }; }
       if (point.outHandle) { point.outHandle = { x: point.outHandle.x + x, y: point.outHandle.y + y }; }
@@ -228,7 +247,7 @@ export class VectorEditingController implements Tool {
     const paths = state.selectedPoints.length > 0
       ? deleteVectorPathPoints(state.paths, state.selectedPoints).paths
       : state.paths.filter((path) => path.id !== state.activePathId);
-    this.publish({ paths, selectedPoints: [], activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : paths[0]?.id ?? null });
+    this.publish({ paths, selectedPoints: [], activePathId: paths.some((path) => path.id === state.activePathId) ? state.activePathId : null });
     this.record();
   };
   extractPath = (): void => {
@@ -498,7 +517,7 @@ export class VectorEditingController implements Tool {
     const additive = input.modifiers.ctrl || input.modifiers.meta;
     this.hoverPath = false;
     this.drag = { kind: 'rect', before: snapshot(state), start: input.documentPoint, screen: input.screenPoint, additive };
-    this.publish({ selectedPoints: additive ? state.selectedPoints : [], selectionRect: { ...input.documentPoint, width: 0, height: 0 } });
+    this.publish({ activePathId: additive ? state.activePathId : null, selectedPoints: additive ? state.selectedPoints : [], selectionRect: { ...input.documentPoint, width: 0, height: 0 } });
   };
 
   onPointerMove = (ctx: ToolContext, input: PointerInput): void => {
@@ -538,7 +557,7 @@ export class VectorEditingController implements Tool {
         return p.x >= x && p.x <= x + width && p.y >= y && p.y <= y + height ? [{ pathId: path.id, pointIndex }] : [];
       }));
       const selectedPoints = drag.additive ? [...drag.before.selectedPoints, ...refs.filter((ref) => !drag.before.selectedPoints.some((old) => sameRef(old, ref)))] : refs;
-      this.publish({ selectedPoints, activePathId: selectedPoints.at(-1)?.pathId ?? drag.before.activePathId,
+      this.publish({ selectedPoints, activePathId: selectedPoints.at(-1)?.pathId ?? (drag.additive ? drag.before.activePathId : null),
         selectionRect: { x: Math.min(drag.start.x, input.documentPoint.x), y: Math.min(drag.start.y, input.documentPoint.y), width: Math.abs(input.documentPoint.x - drag.start.x), height: Math.abs(input.documentPoint.y - drag.start.y) } });
       return;
     }
@@ -590,7 +609,7 @@ export class VectorEditingController implements Tool {
     this.onPointerCancel();
     this.transformOrigin = null;
     this.transformCursor = null;
-    this.publish({ selectedPoints: [], selectionRect: null, pathTransform: null });
+    this.publish({ activePathId: null, selectedPoints: [], selectionRect: null, pathTransform: null });
     return true;
   };
 }

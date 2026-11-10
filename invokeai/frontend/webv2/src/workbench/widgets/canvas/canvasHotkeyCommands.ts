@@ -201,7 +201,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
-    if (engine?.interaction.get('vectorEditSession')) {
+    const vectorSession = engine?.interaction.get('vectorEditSession');
+    if (engine && vectorSession && (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)) {
       engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
       return;
     }
