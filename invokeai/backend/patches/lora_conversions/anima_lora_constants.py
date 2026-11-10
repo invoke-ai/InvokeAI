@@ -35,9 +35,19 @@ _PEFT_ANIMA_RE = re.compile(
 # module uses ``blocks.N.self_attn`` / ``cross_attn``. These names are distinct from Qwen-Image's
 # ``transformer_blocks.N.attn`` and Wan's ``blocks.N.attn1`` layouts. ``ff.net`` is not a signature because FLUX
 # uses the same path; it is converted only after another layer has identified the file as Anima.
-_DIFFUSERS_ANIMA_RE = re.compile(
-    r"^(?:transformer\.|base_model\.model\.(?:transformer\.)?)?transformer_blocks\.\d+\.(?:attn1|attn2)\."
+_DIFFUSERS_PREFIX = r"(?:transformer\.|base_model\.model\.(?:transformer\.)?)?"
+_DIFFUSERS_ANIMA_RE = re.compile(rf"^{_DIFFUSERS_PREFIX}transformer_blocks\.\d+\.(?:attn1|attn2)\.")
+
+# The attention projections of that layout whose input width is checked against Anima's. Other transformers use the
+# same names, so the names alone do not make a LoRA Anima's. Group 1 is the attention, group 2 the projection.
+DIFFUSERS_ANIMA_PROJECTION_RE = re.compile(
+    rf"^{_DIFFUSERS_PREFIX}transformer_blocks\.\d+\.(attn1|attn2)\.(to_q|to_k|to_v|to_out\.0)\."
 )
+
+# Input widths of the projections above; the same in every Anima variant (base, 2.9B, 3.8B). `attn2.to_k` and
+# `attn2.to_v` read the text context, every other projection the hidden state.
+ANIMA_HIDDEN_SIZE = 2048
+ANIMA_CROSS_ATTENTION_CONTEXT_SIZE = 1024
 
 
 # Subcomponents *uniquely* identifying Anima/Cosmos DiT: the DiT block MLP (``mlp.layer_0`` / ``mlp_layer1``)

@@ -166,6 +166,9 @@ Anima LoRAs in Kohya / LyCORIS and Diffusers PEFT formats are supported. They ap
 includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use **Apply LoRA - Anima** or
 **Apply LoRA Collection - Anima**.
 
+Diffusers LoRAs of other transformers that use the same layer names (for example LTX-2, LTX-Video, CogView4,
+PixArt, Sana) are not recognized as Anima, because their attention widths do not match Anima's.
+
 ## Character reference (IP-Adapter)
 
 The **Anima IP-Adapter (Character Reference)** starter model, by LuciferTC (~500 MB), carries a character

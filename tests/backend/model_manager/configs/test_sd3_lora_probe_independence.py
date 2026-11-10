@@ -158,11 +158,8 @@ def test_a_qwen_image_lora_is_still_claimed_by_qwen_image_alone(family: str) -> 
 
 @pytest.mark.parametrize("spelling", ["diffusers", "kohya"])
 def test_a_cogview4_lora_is_no_longer_taken_for_qwen_image(spelling: str) -> None:
-    """CogView4 keeps its blocks under `transformer_blocks.N.attn1`; neither Qwen-Image nor SD 3 may claim it.
-
-    Except Anima for the diffusers spelling: diffusers' Cosmos layout uses the same `transformer_blocks.N.attn1` names.
-    That match is a known misidentification that predates SD 3 support and is outside it.
-    """
+    """CogView4 keeps its blocks under `transformer_blocks.N.attn1`; no LoRA probe may claim it. Anima's diffusers
+    layout uses the same names, but its attention is 2048 wide and CogView4's 4096."""
     keys: dict[str, list[int]] = {}
     for proj in ("to_q", "to_k", "to_v", "to_out.0"):
         layer = (
@@ -174,8 +171,7 @@ def test_a_cogview4_lora_is_no_longer_taken_for_qwen_image(spelling: str) -> Non
         keys[f"{layer}.{down}.weight"] = [16, 4096]
         keys[f"{layer}.{up}.weight"] = [4096, 16]
 
-    expected = ["LoRA_LyCORIS_Anima_Config"] if spelling == "diffusers" else []
-    assert _accepting_lora_configs(_state_dict(keys), f"cogview4-{spelling}") == expected
+    assert _accepting_lora_configs(_state_dict(keys), f"cogview4-{spelling}") == []
 
 
 def _clip_layers(prefix_l: str, prefix_g: str) -> dict[str, list[int]]:

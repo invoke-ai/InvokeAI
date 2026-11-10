@@ -21,7 +21,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_LTX2_Config
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_LTX2_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 
@@ -173,6 +173,17 @@ def test_another_familys_lora_is_rejected_by_the_ltx2_probe(name: str, keys) -> 
     """``wan-diffusers`` is the one that matters: it shares ``transformer_blocks.N.attn1`` with
     LTX-2, so only the absent audio tower separates them."""
     matched, _ = _probe(LoRA_LyCORIS_LTX2_Config, keys(), name=name)
+
+    assert not matched
+
+
+@pytest.mark.parametrize("prefix", ["", "transformer.", "base_model.model.", "base_model.model.transformer."])
+def test_a_video_only_ltx2_lora_is_rejected_by_the_anima_probe(prefix: str) -> None:
+    """Without the audio tower nothing in the key names tells it from Anima's diffusers layout; the 4096-wide
+    attention does."""
+    video_tower = {k: v for k, v in _ltx2_distilled_keys(prefix).items() if ".attn1." in k}
+
+    matched, _ = _probe(LoRA_LyCORIS_Anima_Config, video_tower)
 
     assert not matched
 

@@ -44,6 +44,9 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
+    ANIMA_CROSS_ATTENTION_CONTEXT_SIZE,
+    ANIMA_HIDDEN_SIZE,
+    DIFFUSERS_ANIMA_PROJECTION_RE,
     has_cosmos_dit_kohya_keys,
     has_cosmos_dit_kohya_keys_strict,
     has_cosmos_dit_peft_keys,
@@ -1108,29 +1111,44 @@ _QWEN_IMAGE_ONLY_MODULE = re.compile(r"transformer_blocks[._]\d+[._](?:img_mod|t
 _INPUT_WIDTH_PARAMS = (".lora_A.weight", ".lora_down.weight", ".hada_w1_b", ".hada_w2_b", ".diff")
 
 
-def _block_attention_in_features(state_dict: dict[str | int, Any]) -> tuple[set[int], set[int]]:
-    """The input widths of the block-attention projections a LoRA targets: those its layers state directly, and
-    those of its LoKR layers.
+def _attention_in_features(
+    state_dict: dict[str | int, Any], projection: re.Pattern[str] = _BLOCK_ATTENTION_PROJECTION
+) -> tuple[dict[str, int], dict[str, int]]:
+    """The input width of each attention projection a LoRA targets (those whose key `projection` finds), by layer
+    path: the widths its layers state directly, and those of its LoKR layers.
 
     A low-rank, LoHA or full layer carries the width on one of its matrices; a LoKR weight is the Kronecker product
     of two factors, so its input width is the product of theirs (each given whole, or as the second matrix of a
-    pair).
+    pair). A layer that carries no width (a lone DoRA magnitude, half a pair) is absent.
     """
-    direct: set[int] = set()
-    factored: set[int] = set()
+    direct: dict[str, int] = {}
     lokr: dict[str, dict[str, int]] = {}
     for key, value in state_dict.items():
-        if not isinstance(key, str) or _BLOCK_ATTENTION_PROJECTION.search(key) is None:
+        if not isinstance(key, str) or projection.search(key) is None:
             continue
         shape = getattr(value, "shape", ())
         if len(shape) != 2:
             continue
-        if key.endswith(_INPUT_WIDTH_PARAMS):
-            direct.add(shape[1])
+        if suffix := next((s for s in _INPUT_WIDTH_PARAMS if key.endswith(s)), None):
+            direct[key[: -len(suffix)]] = shape[1]
         elif factor := _LOKR_FACTOR.search(key):
             lokr.setdefault(key[: factor.start()], {})[factor.group(1)] = shape[1]
-    factored.update(f["lokr_w1"] * f["lokr_w2"] for f in lokr.values() if len(f) == 2)
+    factored = {layer: f["lokr_w1"] * f["lokr_w2"] for layer, f in lokr.items() if len(f) == 2}
     return direct, factored
+
+
+def _anima_width_violation(state_dict: dict[str | int, Any]) -> str | None:
+    """Why a diffusers-layout LoRA cannot be Anima's, or None: an attention projection whose input width is not
+    Anima's. Other transformers share these layer names (LTX-2, LTX-Video, CogView4, PixArt, Sana, ...)."""
+    direct, factored = _attention_in_features(state_dict, DIFFUSERS_ANIMA_PROJECTION_RE)
+    for layer, width in {**direct, **factored}.items():
+        match = DIFFUSERS_ANIMA_PROJECTION_RE.match(f"{layer}.")
+        assert match is not None
+        reads_context = match.group(1) == "attn2" and match.group(2) in ("to_k", "to_v")
+        expected = ANIMA_CROSS_ATTENTION_CONTEXT_SIZE if reads_context else ANIMA_HIDDEN_SIZE
+        if width != expected:
+            return f"{layer} reads {width} features; Anima's reads {expected}"
+    return None
 
 
 def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1148,10 +1166,10 @@ def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     """
     if any(isinstance(key, str) and any(m in key for m in _QWEN_IMAGE21_MLP_MARKERS) for key in state_dict):
         return True
-    direct, factored = _block_attention_in_features(state_dict)
-    if _QWEN_IMAGE21_HIDDEN_SIZE in direct:
+    direct, factored = _attention_in_features(state_dict)
+    if _QWEN_IMAGE21_HIDDEN_SIZE in direct.values():
         return True
-    return _QWEN_IMAGE21_HIDDEN_SIZE in factored and not any(
+    return _QWEN_IMAGE21_HIDDEN_SIZE in factored.values() and not any(
         isinstance(key, str) and _QWEN_IMAGE_ONLY_MODULE.search(key) for key in state_dict
     )
 
@@ -1476,9 +1494,11 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        # Diffusers' Cosmos layout (`transformer_blocks.N.attn1` / `attn2`) is also SD 3.5 Medium's; the width tells them
-        # apart.
+        # Diffusers' Cosmos layout (`transformer_blocks.N.attn1` / `attn2`) is shared with other transformers; the
+        # projections' widths tell them apart.
         if has_cosmos_keys and has_lora_suffix and not has_ltx2_lora_keys(str_keys) and not is_sd3_lora(state_dict):
+            if violation := _anima_width_violation(state_dict):
+                raise NotAMatchError(f"model does not match Anima LoRA heuristics: {violation}")
             return
 
         raise NotAMatchError("model does not match Anima LoRA heuristics")
@@ -1499,6 +1519,8 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             and not has_ltx2_lora_keys(str_keys)
             and not is_sd3_lora(state_dict)
         ):
+            if violation := _anima_width_violation(state_dict):
+                raise NotAMatchError(f"model does not look like an Anima LoRA: {violation}")
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
