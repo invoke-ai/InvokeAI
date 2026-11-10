@@ -226,6 +226,7 @@ describe('feature public-interface registry', () => {
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/paletteSearch')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/gallery/paletteSearch')).toEqual([]);
     expect(checkDependency('workbench/settings/ImageStorageSettings.tsx', '@features/gallery/storage')).toEqual([]);
+    expect(checkDependency('workbench/image-actions/mediaUsageReport.ts', '@features/gallery/mediaUsage')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/queue/queries')).toEqual([]);
     expect(checkDependency('workbench/palette/WorkbenchCommandPaletteDialog.tsx', '@features/queue/queries')).toEqual(
       []

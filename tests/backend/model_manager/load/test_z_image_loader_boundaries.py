@@ -170,7 +170,7 @@ def test_an_int8_weight_without_a_per_tensor_marker_is_refused(monkeypatch, tmp_
             },
         )
 
-    with pytest.raises(ValueError, match=r"int8 weight\(s\) with no `comfy_quant` marker"):
+    with pytest.raises(ValueError, match=r"int8 weight\(s\) with no readable int8_tensorwise marker"):
         run.load(config)
 
 
