@@ -29,7 +29,12 @@ import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetsDialog } from '@workbench/shell/widgetsDialogStore';
-import { cycleRegionWidget, openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
+import {
+  cycleRegionWidget,
+  getOpenableWidgetPlacement,
+  openWidgetPlacement,
+  toggleCenterPreview,
+} from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -328,6 +333,27 @@ export const useRegisterFirstPartyCommands = () => {
 
     // Opening an unplaced view could dock the graph's floating window.
     if (floatingWorkflow && !hasWorkflow(destination)) {
+      return;
+    }
+
+    // The Workflow preset uses a separate graph instance so opening the center leaves the form active.
+    if (!region && hasWorkflow('left')) {
+      const leftInstanceId = project.widgetRegions.left.activeInstanceId;
+      const graphInstanceId = ['workflow:center', 'workflow:bottom', 'workflow'].find(
+        (id) => id !== leftInstanceId && isWorkflow(id)
+      );
+
+      if (
+        graphInstanceId &&
+        getOpenableWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['center'] },
+          typeId: 'workflow',
+        })
+      ) {
+        widgets.toggle({ projectId: project.id, region: 'center', widgetId: graphInstanceId });
+        focus.focusRegion('center', undefined, graphInstanceId);
+      }
       return;
     }
 
