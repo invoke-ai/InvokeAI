@@ -8,10 +8,10 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
-import { AlphaNoticeDialog } from './AlphaNoticeDialog';
+import { BetaNoticeDialog } from './BetaNoticeDialog';
 
 const settings = vi.hoisted(() => ({
-  snapshot: { preferences: { alphaNoticeAcknowledged: false }, status: 'idle' as 'idle' | 'ready' },
+  snapshot: { preferences: { betaNoticeAcknowledged: false }, status: 'idle' as 'idle' | 'ready' },
   listeners: new Set<() => void>(),
   patchWorkbenchPreferences: vi.fn(),
 }));
@@ -47,13 +47,13 @@ const setSnapshot = (next: typeof settings.snapshot) =>
     settings.listeners.forEach((listener) => listener());
   });
 
-describe('AlphaNoticeDialog', () => {
+describe('BetaNoticeDialog', () => {
   let host: HTMLDivElement;
   let root: Root;
 
   beforeEach(async () => {
     settings.patchWorkbenchPreferences.mockReset();
-    settings.snapshot = { preferences: { alphaNoticeAcknowledged: false }, status: 'idle' };
+    settings.snapshot = { preferences: { betaNoticeAcknowledged: false }, status: 'idle' };
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -61,7 +61,7 @@ describe('AlphaNoticeDialog', () => {
       root.render(
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
-            <AlphaNoticeDialog />
+            <BetaNoticeDialog />
           </I18nextProvider>
         </ChakraProvider>
       )
@@ -77,25 +77,25 @@ describe('AlphaNoticeDialog', () => {
     // Not before the account's preferences are known: an acknowledged account must not see it flash.
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 
-    await setSnapshot({ preferences: { alphaNoticeAcknowledged: false }, status: 'ready' });
-    await expect.element(page.getByRole('alertdialog', { name: i18n.t('alphaNotice.title') })).toBeVisible();
-    await expect.element(page.getByRole('button', { name: i18n.t('alphaNotice.dismiss') })).toHaveFocus();
+    await setSnapshot({ preferences: { betaNoticeAcknowledged: false }, status: 'ready' });
+    await expect.element(page.getByRole('alertdialog', { name: i18n.t('betaNotice.title') })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: i18n.t('betaNotice.dismiss') })).toHaveFocus();
     expect(isModalPresent()).toBe(true);
-    expect(page.getByRole('link', { name: i18n.t('alphaNotice.reportLink') }).element()).toHaveAttribute(
+    expect(page.getByRole('link', { name: i18n.t('betaNotice.reportLink') }).element()).toHaveAttribute(
       'rel',
       'noreferrer'
     );
 
-    await page.getByRole('button', { name: i18n.t('alphaNotice.dismiss') }).click();
-    expect(settings.patchWorkbenchPreferences).toHaveBeenCalledExactlyOnceWith({ alphaNoticeAcknowledged: true });
+    await page.getByRole('button', { name: i18n.t('betaNotice.dismiss') }).click();
+    expect(settings.patchWorkbenchPreferences).toHaveBeenCalledExactlyOnceWith({ betaNoticeAcknowledged: true });
 
-    await setSnapshot({ preferences: { alphaNoticeAcknowledged: true }, status: 'ready' });
+    await setSnapshot({ preferences: { betaNoticeAcknowledged: true }, status: 'ready' });
     await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
     expect(isModalPresent()).toBe(false);
   });
 
   it('stays closed for an account that already acknowledged it', async () => {
-    await setSnapshot({ preferences: { alphaNoticeAcknowledged: true }, status: 'ready' });
+    await setSnapshot({ preferences: { betaNoticeAcknowledged: true }, status: 'ready' });
 
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
     expect(isModalPresent()).toBe(false);

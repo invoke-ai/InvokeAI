@@ -55,6 +55,8 @@ The **Wan 2.2** starter bundle (~56 GB) installs the UMT5-XXL text encoder, both
 
 Higher-quality Q8_0 quantizations and full Diffusers builds are available a-la-carte in the starter models list.
 
+The UMT5-XXL encoder also comes as a GGUF file: **Wan T5 Encoder (UMT5-XXL, GGUF Q8_0)** in the starter models (~6 GB, about half the Diffusers encoder), or any other quantization from [city96's `umt5-xxl-encoder-gguf`](https://huggingface.co/city96/umt5-xxl-encoder-gguf). It carries its own tokenizer; select it in the **Wan T5 Encoder** slot. Lower quantizations change the text conditioning: among the quantized builds, Q8_0 stays closest to the Diffusers encoder, while Q4_K_M deviates by about 21 % (relative L2 error, worst-token cosine 0.40). A UMT5 GGUF installed by an older InvokeAI is listed as a FLUX/SD 3 T5 encoder: use **Re-identify model** in the Model Manager to make it a Wan T5 encoder.
+
 :::tip
 **On a 12 GB VRAM card**: use TI2V-5B — it covers both text-to-video and image-to-video and fits comfortably. The bundle includes it; to skip the A14B downloads, install the **Wan 2.2 TI2V-5B (Q4_K_M)** starter model on its own, which brings its VAE and the UMT5-XXL encoder. The A14B variants will technically run via aggressive offloading but are slow and prone to OOM.
 :::

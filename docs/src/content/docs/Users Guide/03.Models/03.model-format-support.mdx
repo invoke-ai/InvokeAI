@@ -84,7 +84,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 | Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✓ (LTX-2.5 conversions) | ✗ |
-| UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 
 The single-file T5-XXL builds are ComfyUI's `t5xxl_fp16`, `t5xxl_fp8_e4m3fn` and `t5xxl_fp8_e4m3fn_scaled`. The
 fp8 builds keep their weights in fp8 on a GPU that can hold them, about 4.9 GB instead of about 9.5 GB. Prefer
@@ -174,7 +174,7 @@ and nothing else. Each one is a single file, a `.safetensors`, `.pth` or `.pt`.
 | TAESDXL | `taesdxl_decoder.safetensors` | SDXL | SDXL, SDXL Refiner |
 | TAESD3 | `diffusion_pytorch_model.safetensors` from `madebyollin/taesd3` | SD 3 | SD 3 |
 | TAEF1 | `diffusion_pytorch_model.safetensors` from `madebyollin/taef1` | FLUX.1 | FLUX.1, Z-Image |
-| TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, FLUX.3, ERNIE-Image |
+| TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, FLUX.3, ERNIE-Image, Ideogram 4, MOSS-Image |
 | TAEQI2.1 | `taeqi2_1.safetensors` | Qwen-Image-2.1 | Qwen-Image-2.1 |
 | TAEW2.1 | `taew2_1.safetensors` | Wan 2.2 | Wan 2.2 A14B, Qwen-Image, Krea-2, Anima |
 | TAEW2.2 | `taew2_2.safetensors` | Wan 2.2 | Wan 2.2 TI2V-5B |
@@ -215,9 +215,10 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
+| ERNIE-Image | ✓ (ai-toolkit/ComfyUI, diffusers/PEFT; LoKR and LoHA too, DoRA is refused) | ✗ | |
 | SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused) | ✗ | |
 | Ideogram 4 | ✓ (ai-toolkit/ComfyUI, kohya and diffusers files and Diffusers folders, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
-| CogView4, ERNIE-Image, MOSS-Image | ✗ | ✗ | |
+| CogView4, MOSS-Image | ✗ | ✗ | |
 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.

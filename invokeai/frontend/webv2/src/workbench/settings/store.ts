@@ -39,7 +39,7 @@ export const DEVELOPER_LOG_LEVELS: readonly LogLevel[] = LOG_LEVELS;
 export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
-  alphaNoticeAcknowledged: false,
+  betaNoticeAcknowledged: false,
   antialiasProgressImages: false,
   aspectRatioPresets: [],
   autoSwitchInvocationRoute: true,
@@ -411,6 +411,8 @@ type WorkbenchPreferencesInput = Omit<
   workflowEdgeStyle?: unknown;
   workflowLibrarySort?: unknown;
   workflowLibraryThumbnailFit?: unknown;
+  /** Pre-beta name of `betaNoticeAcknowledged`; accounts that dismissed the alpha notice skip the beta one. */
+  alphaNoticeAcknowledged?: unknown;
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
@@ -488,10 +490,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
         : DEFAULT_PREFERENCES.queueJobsScope,
   highContrast:
     typeof preferences?.highContrast === 'boolean' ? preferences.highContrast : DEFAULT_PREFERENCES.highContrast,
-  alphaNoticeAcknowledged:
-    typeof preferences?.alphaNoticeAcknowledged === 'boolean'
-      ? preferences.alphaNoticeAcknowledged
-      : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
+  betaNoticeAcknowledged:
+    typeof preferences?.betaNoticeAcknowledged === 'boolean'
+      ? preferences.betaNoticeAcknowledged
+      : preferences?.alphaNoticeAcknowledged === true || DEFAULT_PREFERENCES.betaNoticeAcknowledged,
   galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.fonts.fonts_default import FontService
     from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
@@ -117,6 +118,7 @@ class InvocationServices:
         image_index: "ImageIndexServiceBase",
         intermediates: "IntermediatesServiceBase",
         image_moves: "ImageMoveService | None" = None,
+        files: "FileServiceBase | None" = None,
         progress_previews: "ProgressPreviewsBase | None" = None,
         fonts: "FontService | None" = None,
         gallery_maintenance: "GalleryMaintenanceService | None" = None,
@@ -164,6 +166,7 @@ class InvocationServices:
         self.client_state_persistence = client_state_persistence
         self.project_records = project_records
         self.users = users
+        self.files = files
         self.videos = videos
         self.video_files = video_files
         self.video_records = video_records
