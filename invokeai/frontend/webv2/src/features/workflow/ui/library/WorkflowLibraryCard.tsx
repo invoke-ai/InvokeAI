@@ -295,16 +295,15 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
           </Button>
         ) : null}
         {isPointerArmed && canPreview ? (
-          <Tooltip content={t('workflowLibrary.previewGraph')}>
+          <Tooltip content={t('workflowLibrary.preview.actionHint')}>
             <IconButton
               aria-hidden
-              aria-label={t('workflowLibrary.previewGraph')}
+              aria-label={t('workflowLibrary.preview.action')}
               bg="bg.panel"
               _hover={QUICK_ACTION_INTERACTION}
               data-card-action={'preview' satisfies WorkflowCardQuickAction}
               data-card-quick-action
               data-pointer-only
-              disabled={ready === null}
               size={quickActionSize}
               tabIndex={-1}
               variant="outline"

@@ -137,12 +137,8 @@ vi.mock('@features/identity', async (original) => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'en', resolvedLanguage: 'en' },
-    t: (key: string, values?: { count?: number; source?: string }) =>
-      key === 'workflowLibrary.nodeCount'
-        ? `${values?.count} nodes`
-        : key === 'graphPreview.compiledFrom'
-          ? `Compiled from ${values?.source}`
-          : key,
+    t: (key: string, values?: { count?: number }) =>
+      key === 'workflowLibrary.nodeCount' ? `${values?.count} nodes` : key,
   }),
 }));
 
@@ -195,8 +191,6 @@ const adapter = {
 const galleryHost = { galleryValues: {}, notifications: { add: vi.fn(), reportError: vi.fn() }, projectName: '' };
 const previewAdapter = {
   openDocumentInNewProject: vi.fn(),
-  getRoute: () => null,
-  invoke: () => Promise.resolve(false),
   focusSource: vi.fn(),
   openWorkflowEditor: vi.fn(),
 };
@@ -406,13 +400,15 @@ it.each(['coalesced', 'superseded', 'canceled intent', 'wheel intent'])(
 const detail = () => document.querySelector<HTMLElement>('[data-workflow-detail="wf-0"]')!;
 const previewButton = () =>
   Array.from(detail().querySelectorAll('button')).find(
-    (button) => button.textContent === 'workflowLibrary.previewGraph'
+    (button) => button.textContent === 'workflowLibrary.preview.action'
   )!;
+/** The rail counts nodes once the selected document has been read. */
+const isDocumentReady = () => /\d+ nodes/.test(detail().textContent ?? '');
 
 it('uses the newer selected metadata and document when the resident list arrives later', async () => {
   count = 1;
   await open();
-  await waitFor(() => expect(previewButton().disabled).toBe(false));
+  await waitFor(() => expect(isDocumentReady()).toBe(true));
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -447,22 +443,23 @@ it('uses the newer selected metadata and document when the resident list arrives
     expect(card(0)?.textContent).toContain('Older resident refresh');
     expect(detail().textContent).toContain('Fresh selection');
     expect(detail().textContent).toContain('Fresh description');
-    expect(previewButton().disabled).toBe(false);
+    expect(isDocumentReady()).toBe(true);
   });
+  // The preview draws the selected copy's document, not the older resident one.
   await act(() => userEvent.click(previewButton()));
-  await waitFor(() => expect(document.body.textContent).toContain('Compiled from Fresh selection'));
-  await waitFor(() => expect(document.querySelectorAll('.react-flow__node')).toHaveLength(2));
-  await act(() => userEvent.click(page.getByRole('tab', { name: 'common.json', exact: true })));
-  await waitFor(() => {
-    expect(document.body.textContent).toContain('fresh-node-0');
-    expect(document.body.textContent).toContain('fresh-node-1');
-  });
+  const stage = () => document.querySelector<HTMLElement>('[data-preview-stage]');
+  await waitFor(() =>
+    expect([...stage()!.querySelectorAll<HTMLElement>('.react-flow__node')].map((node) => node.dataset.id)).toEqual([
+      'fresh-node-0',
+      'fresh-node-1',
+    ])
+  );
 });
 
 it('shows the selected transient error over equal-revision resident pending state and recovers', async () => {
   count = 1;
   await open();
-  await waitFor(() => expect(previewButton().disabled).toBe(false));
+  await waitFor(() => expect(isDocumentReady()).toBe(true));
   transport.list.mockImplementation(async (params: ListWorkflowsParams) => {
     const result = await list(params);
     return { ...result, items: result.items.map((entry) => ({ ...entry, name: 'Refreshed resident' })) };
@@ -474,7 +471,7 @@ it('shows the selected transient error over equal-revision resident pending stat
     expect(card(0)?.textContent).toContain('Refreshed resident');
     expect(detail().textContent).toContain('selected record offline');
     expect(detail().textContent).toContain('Workflow 0');
-    expect(previewButton().disabled).toBe(true);
+    expect(isDocumentReady()).toBe(false);
   });
   transport.record.mockResolvedValue({
     ...item(0),
@@ -488,7 +485,7 @@ it('shows the selected transient error over equal-revision resident pending stat
   await waitFor(() => {
     expect(detail().textContent).not.toContain('selected record offline');
     expect(detail().textContent).toContain('Workflow 0');
-    expect(previewButton().disabled).toBe(false);
+    expect(isDocumentReady()).toBe(true);
   });
 });
 

@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource, DeferredGraphPreviewSnapshot, loadGraphPreview } from './libraryPreviewSource';
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
+import { WorkflowPreviewThumbnailButton } from './WorkflowDetailOverview';
 import { getWorkflowSilhouetteImage } from './workflowSilhouette';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
@@ -94,8 +95,11 @@ export const WorkflowLibraryThumbnail = ({
   canEdit,
   item,
   workflowDocument,
+  onPreview,
 }: {
   canEdit: boolean;
+  /** Makes the thumbnail the way into the preview. */
+  onPreview?: () => void;
   /** The template's parsed workflow once its row has loaded; the snapshot renders its graph. */
   workflowDocument: ProjectGraphState | null;
   item: WorkflowLibraryListItem;
@@ -296,9 +300,12 @@ export const WorkflowLibraryThumbnail = ({
   );
 
   return (
-    <Stack gap="1" minW="0">
+    <Stack data-thumbnail-kind={showThumbnail ? 'image' : 'silhouette'} gap="1" minW="0">
       <Box aria-busy={isBusy || undefined} css={WELL_CSS}>
         {wellContent}
+        {onPreview ? (
+          <WorkflowPreviewThumbnailButton name={item.name || t('workflowLibrary.untitled')} onPreview={onPreview} />
+        ) : null}
         {/* Bundled defaults keep their shipped image; the account's own templates choose theirs from the gallery. */}
         {isEditable ? (
           <HStack

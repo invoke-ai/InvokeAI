@@ -17,6 +17,7 @@ import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowPublicationHost } from './WorkflowPublicationHost';
@@ -51,9 +52,12 @@ vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...api,
 }));
 
+// One snapshot, as the real store hands out until the templates change.
+const TEMPLATES_SNAPSHOT = vi.hoisted(() => ({ error: null, status: 'loaded' as const, templates: {} }));
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useInvocationTemplatesSnapshot: () => ({ error: null, status: 'loaded', templates: {} }),
+  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
 }));
 
 const TRANSLATIONS: Record<string, string> = {
@@ -158,8 +162,6 @@ const BUNDLED: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId
 const OTHER: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-2'), name: 'Beta' } };
 const GRAPH_PREVIEW: WorkflowGraphPreviewPort = {
   focusSource: vi.fn(),
-  getRoute: () => null,
-  invoke: () => Promise.resolve(false),
   openDocumentInNewProject: vi.fn(),
   openWorkflowEditor: vi.fn(),
 };
@@ -647,6 +649,37 @@ describe('WorkflowPublicationHost', () => {
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Updated "Alpha" in the library.');
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('opens the graph preview over the review under StrictMode and returns to the review, which stays open', async () => {
+    await loadGraphPreview();
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ revision: 5 }));
+    await renderHost([LINKED_UNKNOWN]);
+    await request('update-source');
+    await click(choice('review'));
+
+    const preview = () =>
+      document.querySelector<HTMLElement>('[data-graph-preview-stage]')?.closest<HTMLElement>('[role="dialog"]') ??
+      null;
+    const openPreview = async () => {
+      await click(buttonWithText(reviewDialog(), 'workflowLibrary.previewGraph'));
+      await vi.waitFor(() => expect(preview()?.dataset.state).toBe('open'));
+      await vi.waitFor(() => expect(preview()?.contains(document.activeElement)).toBe(true));
+    };
+    const expectBackInReview = async () => {
+      await vi.waitFor(() => expect(preview()).toBeNull());
+      expect(reviewDialog()).not.toBeNull();
+      await vi.waitFor(() => expect(reviewDialog()?.contains(document.activeElement)).toBe(true));
+    };
+
+    await openPreview();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await flush();
+    await expectBackInReview();
+
+    await openPreview();
+    await click(preview()?.querySelector<HTMLButtonElement>('[data-scope="dialog"][data-part="close-trigger"]'));
+    await expectBackInReview();
   });
 
   it('dates the revision against the arriving review record instead of the loading view mount', async () => {

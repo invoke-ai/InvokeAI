@@ -1,23 +1,27 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 import type { WorkflowLibraryLayout } from '@features/workflow/ui/WorkflowUiContext';
 import type { WorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 
 import { HStack, type SystemStyleObject, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
 import {
+  getWorkflowLibraryBrowseSnapshot,
+  loadWorkflowLibraryRange,
   selectWorkflowLibraryEntry,
   setWorkflowLibrarySelectedDemand,
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { memo, useMemo } from 'react';
+import { memo, type RefObject, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
 import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
+import type { WorkflowLibraryPreviewStageHandle, WorkflowLibraryPreviewStatus } from './WorkflowLibraryPreviewStage';
 
 import { useWorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import { WORKFLOW_DETAIL_PANES_CSS } from './WorkflowDetailSheet';
@@ -25,6 +29,7 @@ import { WorkflowLibraryContextMenu } from './WorkflowLibraryContextMenu';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryList } from './WorkflowLibraryList';
+import { WorkflowLibraryPreviewStage } from './WorkflowLibraryPreviewStage';
 import { WORKFLOW_LIBRARY_WIDE } from './WorkflowLibraryRail';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
 
@@ -150,10 +155,31 @@ export interface WorkflowLibraryBrowsePanesProps {
   onDeleted: (workflowId: string) => void;
   onOpen: (workflowId: string) => void;
   onOpenItem: (item: WorkflowLibraryListItem) => void;
-  onCardPreview: (workflowId: string) => void;
-  onPreview: (entry: WorkflowLibraryEntry) => void;
+  /** Enters preview mode on a workflow, selecting it; on a given view, else the one last shown. */
+  onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   onSelect: (workflowId: string) => void;
+  preview: WorkflowLibraryPanesPreview;
+  /** The stage's handle, through which the dialog's Escape reaches it. */
+  previewStageRef: RefObject<WorkflowLibraryPreviewStageHandle | null>;
 }
+
+/** Preview mode, which the shell owns: the stage replaces the collection while the detail rail stays. */
+export interface WorkflowLibraryPanesPreview {
+  isActive: boolean;
+  /** The place the stage's back button returns to. */
+  placeLabel: string;
+  onLeave: (workflowId: string | null) => void;
+  view: WorkflowPreviewView;
+  onViewChange: (view: WorkflowPreviewView) => void;
+}
+
+/** What the stage shows for an entry: its enriched document, or why there is none yet. */
+const getLibraryPreviewStatus = (entry: WorkflowLibraryEntry | null): WorkflowLibraryPreviewStatus =>
+  entry?.enrichment.status === 'ready'
+    ? { document: entry.enrichment.document, kind: 'ready' }
+    : entry?.enrichment.status === 'error'
+      ? { kind: 'error', message: entry.enrichment.message }
+      : { kind: 'pending' };
 
 export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePanes({
   contextMenuAnchor,
@@ -167,7 +193,8 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
   tab,
   tagsText,
   trailingField,
-  onCardPreview,
+  preview,
+  previewStageRef,
   onClose,
   onContextMenu,
   onContextMenuClose,
@@ -180,6 +207,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
   const { entries, error, filter, selectedEntry, startIndex, status, total, viewKey } =
     useWorkflowLibraryBrowseSelector(selectPanes);
   const authSession = useAuthSession();
+  const { t } = useTranslation();
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
 
   // Derive a fallback selection when filtering/deletion removes the selected row.
@@ -199,6 +227,52 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
   const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
   const duplicateGuard = useWorkflowLibraryDuplicateGuard();
 
+  // The selection's server position, while its page is resident; a pinned selection outside the window has none.
+  const residentIndex = entries.findIndex((entry) => entry.item.workflow_id === activeWorkflowId);
+  const position = residentIndex >= 0 ? startIndex + residentIndex : null;
+  const previewStatus = useMemo(() => getLibraryPreviewStatus(activeEntry), [activeEntry]);
+  const stepPreview = useCallback(
+    (delta: -1 | 1, isCurrent: () => boolean) => {
+      const target = position === null ? -1 : position + delta;
+
+      if (target < 0 || target >= total) {
+        return;
+      }
+
+      const resident = entries[target - startIndex];
+
+      if (resident) {
+        onSelect(resident.item.workflow_id);
+        return;
+      }
+
+      // Past the resident window: read that position as scrolling to it would, then select what arrived there.
+      void loadWorkflowLibraryRange(target, target).then((ready) => {
+        const snapshot = getWorkflowLibraryBrowseSnapshot();
+        const loaded = snapshot.entries[target - (snapshot.startIndex ?? 0)];
+
+        if (ready && loaded && isCurrent()) {
+          onSelect(loaded.item.workflow_id);
+        }
+      });
+    },
+    [entries, onSelect, position, startIndex, total]
+  );
+
+  const stepper = useMemo(
+    () =>
+      preview.isActive
+        ? {
+            canStepNext: position !== null && position < total - 1,
+            canStepPrevious: position !== null && position > 0,
+            onStep: stepPreview,
+            position,
+            total,
+          }
+        : null,
+    [position, preview.isActive, stepPreview, total]
+  );
+
   return (
     <>
       <WorkflowLibraryResultLine count={status === 'loaded' ? total : null} tagsText={tagsText} />
@@ -214,6 +288,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             emptyMessage={emptyMessage}
             entries={entries}
             error={error}
+            isHidden={preview.isActive}
             missingCounts={missingCounts}
             openMenuAnchor={contextMenuAnchor}
             showVisibilityStatus={authSession.multiuserEnabled}
@@ -221,7 +296,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             status={status}
             onContextMenu={onContextMenu}
             onOpen={onOpen}
-            onPreview={onCardPreview}
+            onPreview={onPreview}
             onSelect={onSelect}
             trailingField={trailingField}
           />
@@ -233,6 +308,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             emptyMessage={emptyMessage}
             entries={entries}
             error={error}
+            isHidden={preview.isActive}
             missingCounts={missingCounts}
             openMenuAnchor={contextMenuAnchor}
             showVisibilityStatus={authSession.multiuserEnabled}
@@ -240,10 +316,22 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             status={status}
             onContextMenu={onContextMenu}
             onOpen={onOpen}
-            onPreview={onCardPreview}
+            onPreview={onPreview}
             onSelect={onSelect}
           />
         )}
+        {preview.isActive ? (
+          <WorkflowLibraryPreviewStage
+            ref={previewStageRef}
+            name={activeEntry?.item.name || t('workflowLibrary.untitled')}
+            placeLabel={preview.placeLabel}
+            status={previewStatus}
+            workflowId={activeWorkflowId}
+            view={preview.view}
+            onLeave={preview.onLeave}
+            onViewChange={preview.onViewChange}
+          />
+        ) : null}
         <WorkflowLibraryDetailPanel
           entry={activeEntry}
           canChangeVisibility={activeAccess.canChangeVisibility}
@@ -255,6 +343,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
           onDuplicated={onSelect}
           onOpen={onOpenItem}
           onPreview={onPreview}
+          stepper={stepper}
         />
       </HStack>
       <WorkflowLibraryContextMenu

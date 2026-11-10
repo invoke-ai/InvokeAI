@@ -577,7 +577,6 @@ export const WorkflowPublicationHost = () => {
         <Suspense fallback={null}>
           <DeferredGraphPreviewDialog
             graphId={activeStage.record.workflow_id}
-            hideInvoke
             isOpen={activeStage.isPreviewOpen}
             source={reviewPreviewSource}
             sourceLabel={activeStage.record.name || t('workflowLibrary.untitled')}

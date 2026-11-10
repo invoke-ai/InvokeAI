@@ -1,81 +1,25 @@
-import type { ModelConfig, StarterModel } from '@features/models';
-import type {
-  ModelRequirementStatus,
-  ResolvedModelRequirement,
-  WorkflowModelRequirement,
-} from '@features/workflow/core/modelRequirements';
+import type { ResolvedModelRequirement, WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
 import type { InvocationTemplates } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
-import type { ElementType } from 'react';
+import type { ModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
 
 import { DataList, Icon, Skeleton, Spinner, Stack, Text } from '@chakra-ui/react';
-import {
-  ensureModelsLoaded,
-  ensureStartersLoaded,
-  useActiveInstallSources,
-  useModelsSelector,
-  useStartersSelector,
-} from '@features/models';
 import { getAddModelsSearchTerm, resolveWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { REQUIREMENT_STATUS_PRESENTATION, useModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { CheckIcon, DownloadIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Highlight installable requirements only; other missing states have no actionable download. */
 
 const SKELETON_ROW_COUNT = 2;
-const EMPTY_STARTERS: readonly StarterModel[] = [];
 const EMPTY_COUNTS: ReadonlyMap<string, number> = new Map();
-
-const selectInstalledModels = (snapshot: { models: ModelConfig[] }): readonly ModelConfig[] => snapshot.models;
-const selectStarterModels = (snapshot: {
-  response: { starter_models: StarterModel[] } | null;
-}): readonly StarterModel[] => snapshot.response?.starter_models ?? EMPTY_STARTERS;
-
-interface StatusPresentation {
-  color: string;
-  icon: ElementType | null;
-  labelKey: string;
-}
-
-const STATUS_PRESENTATION: Record<ModelRequirementStatus, StatusPresentation> = {
-  // Amber, per the mock, is the "you can fix this" signal and nothing else.
-  installable: { color: 'fg.warning', icon: DownloadIcon, labelKey: 'workflowLibrary.requirementInstallable' },
-  installed: { color: 'fg.muted', icon: CheckIcon, labelKey: 'workflowLibrary.requirementInstalled' },
-  installing: { color: 'fg.muted', icon: null, labelKey: 'workflowLibrary.requirementInstalling' },
-  unresolvable: { color: 'fg.muted', icon: TriangleAlertIcon, labelKey: 'workflowLibrary.requirementMissing' },
-};
 
 /** The extractor's own dedupe identity, reused so rows keep stable React keys. */
 const getRequirementKey = (requirement: WorkflowModelRequirement): string =>
   requirement.kind === 'exact'
     ? `exact:${requirement.identifier.key}:${requirement.identifier.hash ?? ''}`
     : `slot:${requirement.base ?? ''}:${requirement.modelType ?? ''}`;
-
-export interface ModelRequirementDeps {
-  installedModels: readonly ModelConfig[];
-  starterModels: readonly StarterModel[];
-  activeInstallSources: ReadonlySet<string>;
-}
-
-/** Share catalog loading and resolution inputs between details and grid badges. */
-export const useModelRequirementDeps = (): ModelRequirementDeps => {
-  const installedModels = useModelsSelector(selectInstalledModels);
-  const starterModels = useStartersSelector(selectStarterModels);
-  const activeInstallSources = useActiveInstallSources();
-
-  useMountEffect(() => {
-    void ensureModelsLoaded();
-    ensureStartersLoaded();
-  });
-
-  return useMemo(
-    () => ({ activeInstallSources, installedModels, starterModels }),
-    [activeInstallSources, installedModels, starterModels]
-  );
-};
 
 type ReadyEnrichment = Extract<WorkflowLibraryEntryEnrichment, { status: 'ready' }>;
 
@@ -173,7 +117,7 @@ const RequirementRow = ({
   onFindModel?: (query: string) => void;
 }) => {
   const { t } = useTranslation();
-  const presentation = STATUS_PRESENTATION[resolved.status];
+  const presentation = REQUIREMENT_STATUS_PRESENTATION[resolved.status];
   const statusLabel = t(presentation.labelKey);
   const { label } = resolved.requirement;
   const searchTerm = getAddModelsSearchTerm(resolved);

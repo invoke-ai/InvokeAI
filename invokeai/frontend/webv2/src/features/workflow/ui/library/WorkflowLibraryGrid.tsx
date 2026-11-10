@@ -35,6 +35,7 @@ import {
 import {
   dedupeWorkflowLibraryEntries,
   getWorkflowLibraryDemandIds,
+  useFrozenWhileHidden,
   useLinkedLibraryTemplates,
   WorkflowLibraryDemand,
 } from './workflowLibraryCollection';
@@ -127,6 +128,11 @@ export interface WorkflowLibraryGridProps {
     filter: WorkflowLibraryBrowseSnapshot['filter'];
   };
   error: string | null;
+  /**
+   * Under the preview stage: the grid keeps its layout and scroll position, and its demand stays on the positions it
+   * showed, so a preview stepping elsewhere in the results does not pull the window back.
+   */
+  isHidden?: boolean;
   /** What has the actions menu open, so that tile's control can name it. */
   openMenuAnchor?: WorkflowCardMenuAnchor | null;
   /** Project workflows reuse the grid but have no library visibility state. */
@@ -149,6 +155,7 @@ export const WorkflowLibraryGrid = ({
   entries,
   window: browseWindow,
   error,
+  isHidden = false,
   missingCounts = NO_MISSING_COUNTS,
   openMenuAnchor = null,
   showVisibilityStatus = false,
@@ -456,6 +463,7 @@ export const WorkflowLibraryGrid = ({
     () => getWorkflowLibraryDemandIds(visibleEntries, startIndex, { first, last, visibleFirst, visibleLast }),
     [visibleEntries, startIndex, first, last, visibleFirst, visibleLast]
   );
+  const demandKey = useFrozenWhileHidden(`${first}:${last}:${ids.join(',')}`, isHidden);
   const hasEntries = visibleEntries.length > 0;
   // Idle precedes the first open-time load; render loading rather than an empty result.
   const isPending = status === 'idle' || status === 'loading';
@@ -505,10 +513,18 @@ export const WorkflowLibraryGrid = ({
   const viewportProps = useMemo<ComponentProps<typeof Scrollable>['viewportProps']>(
     () => ({
       onKeyDown: (event) => {
+        const target = event.target as HTMLElement;
+        // Space on a card previews it, as Quick Look does; the card's own activation (selecting) is Enter or a press.
+        if (event.key === ' ' && onPreview && target.dataset.workflowCard && !event.repeat) {
+          event.preventDefault();
+          const id = target.dataset.workflowCard;
+          handleSelect(id);
+          handlePreview(id);
+          return;
+        }
         if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) {
           return;
         }
-        const target = event.target as HTMLElement;
         const isCard = target.hasAttribute('data-workflow-card');
         const isMenu = target.hasAttribute('data-workflow-card-menu');
         if ((!isCard || !event.shiftKey) && (!isMenu || event.shiftKey)) {
@@ -636,6 +652,7 @@ export const WorkflowLibraryGrid = ({
       handleOpen,
       handlePreview,
       handleSelect,
+      onPreview,
     ]
   );
   return (
@@ -651,9 +668,7 @@ export const WorkflowLibraryGrid = ({
       viewportProps={viewportProps}
       contentProps={CONTENT_PROPS}
     >
-      {browseWindow && width > 0 ? (
-        <WorkflowLibraryDemand key={`${first}:${last}:${ids.join(',')}`} ids={ids} start={first} end={last} />
-      ) : null}
+      {browseWindow && width > 0 ? <WorkflowLibraryDemand key={demandKey} ids={ids} start={first} end={last} /> : null}
       <Box display="flex" flexDirection="column" gap="3" minW="0" pr="2" w="full">
         {hasEntries && error ? (
           // Keep recovery within the viewport even for a failed distant range.

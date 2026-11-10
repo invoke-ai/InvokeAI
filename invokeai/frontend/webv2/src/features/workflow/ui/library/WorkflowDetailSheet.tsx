@@ -18,9 +18,12 @@ import {
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import type { WorkflowPreviewStepperProps } from './WorkflowPreviewStepper';
+
 import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WORKFLOW_LIBRARY_NARROW } from './WorkflowLibraryRail';
 import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
+import { WorkflowPreviewStepper } from './WorkflowPreviewStepper';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 /**
@@ -99,6 +102,12 @@ const SUMMARY_CSS: SystemStyleObject = {
   },
 };
 const PLACEHOLDER_CSS: SystemStyleObject = { ...RAIL_CSS, [WORKFLOW_LIBRARY_NARROW]: { display: 'none' } };
+
+/**
+ * The rail's Preview button: kept mounted in preview mode, which the stage already shows, so leaving can hand focus back
+ * to it. The dialog body marks preview mode.
+ */
+export const WORKFLOW_PREVIEW_TRIGGER_CSS: SystemStyleObject = { '[data-previewing] &': { display: 'none' } };
 
 /** Rail chrome the sheet's summary already carries: the large preview, the heading with Open, and More. */
 export const WORKFLOW_DETAIL_WIDE_ONLY_CSS: SystemStyleObject = { [WORKFLOW_LIBRARY_NARROW]: { display: 'none' } };
@@ -193,6 +202,11 @@ export interface WorkflowDetailSheetProps extends Omit<StackProps, 'children' | 
   /** The rail's actions menu items, offered again from the summary's More. */
   actions: ReactNode;
   menuPositioning: Menu.RootProps['positioning'];
+  /**
+   * Preview mode's stepper, which steps the workflow this rail describes: atop the rail, or beside the name in the
+   * narrow sheet's summary.
+   */
+  stepper?: WorkflowPreviewStepperProps | null;
 }
 
 export const WorkflowDetailSheet = ({
@@ -208,6 +222,7 @@ export const WorkflowDetailSheet = ({
   workflowDocument,
   workflowId,
   onOpen,
+  stepper,
   ...railProps
 }: WorkflowDetailSheetProps) => {
   const { t } = useTranslation();
@@ -303,6 +318,19 @@ export const WorkflowDetailSheet = ({
         minH="0"
         minW="0"
       >
+        {stepper ? (
+          <Box
+            borderBottomWidth="1px"
+            borderColor="border.subtle"
+            css={WORKFLOW_DETAIL_WIDE_ONLY_CSS}
+            data-detail-rail-stepper=""
+            flexShrink={0}
+            px="2.5"
+            py="2.5"
+          >
+            <WorkflowPreviewStepper {...stepper} />
+          </Box>
+        ) : null}
         {children}
       </Stack>
       <Box css={SUMMARY_CSS} data-detail-sheet-summary minW="0">
@@ -321,6 +349,11 @@ export const WorkflowDetailSheet = ({
               </Text>
             ) : null}
           </Stack>
+          {stepper ? (
+            <Box data-detail-sheet-stepper="">
+              <WorkflowPreviewStepper {...stepper} />
+            </Box>
+          ) : null}
           <Button
             aria-describedby={isOpenDisabled && facts ? factsId : undefined}
             data-detail-sheet-open

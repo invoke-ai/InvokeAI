@@ -8,6 +8,7 @@ import type { TFunction } from 'i18next';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
+import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
@@ -127,7 +128,7 @@ describe('buildGraphPreviewSource', () => {
     expect(source.isLive).toBe(true);
   });
 
-  it('compiles the workflow source from the live document with position hints', () => {
+  it('compiles the workflow source from the live document, which it hands the preview to draw', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project,
@@ -138,7 +139,8 @@ describe('buildGraphPreviewSource', () => {
     });
 
     expect(source.isLive).toBe(true);
-    expect(source.positionHints).toBeDefined();
+    expect(source.graph).not.toBeNull();
+    expect(source.document).toBe(getActiveProjectGraph(project));
   });
 
   it('returns null graph for workflow when templates are not loaded', () => {

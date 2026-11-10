@@ -5,7 +5,8 @@ import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getArrangedLayout } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
-import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
+import { FlowMiniMap } from '@features/workflow/ui/graph-preview/FlowMiniMap';
+import { flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview/flowTheme';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   useWorkflowCapabilitiesSelector,

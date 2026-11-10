@@ -1,12 +1,11 @@
-import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type {
   WorkflowLibraryBrowseFilter,
   WorkflowLibraryBrowseSnapshot,
-  WorkflowLibraryEntry,
   WorkflowLibraryPlace,
   WorkflowLibrarySort,
 } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 import type { WorkflowLibraryLayout, WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 
 import { Box, HStack, Portal, Spinner, Stack, type SystemStyleObject, Text } from '@chakra-ui/react';
@@ -24,6 +23,7 @@ import {
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { WORKFLOW_PREVIEW_DIALOG_SIZE } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   useWorkflowPreferencesSelector,
@@ -44,19 +44,18 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
-import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import type { WorkflowLibraryPanesPreview } from './WorkflowLibraryBrowsePanes';
 import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
 import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
+import type { WorkflowLibraryPreviewStageHandle } from './WorkflowLibraryPreviewStage';
 import type { WorkflowLibraryCardSize } from './workflowThumbnail';
 
-import {
-  buildLibraryGraphPreviewSource,
-  DeferredGraphPreviewDialog,
-  preloadGraphPreview,
-} from './libraryPreviewSource';
+import { preloadGraphPreview } from './libraryPreviewSource';
 import {
   countProjectWorkflowTags,
   queryProjectWorkflowEntries,
@@ -66,8 +65,10 @@ import { ProjectWorkflowsView } from './ProjectWorkflowsView';
 import { planLibraryWorkflowOpen, useOpenLibraryWorkflow } from './useOpenLibraryWorkflow';
 import { isWorkflowDetailSheetEscape } from './WorkflowDetailSheet';
 import { WorkflowLibraryBrowsePanes, WorkflowLibraryResultLine } from './WorkflowLibraryBrowsePanes';
+import { getWorkflowLibraryCardId } from './WorkflowLibraryCard';
 import {
   getWorkflowLibraryPlaceLabelId,
+  getWorkflowLibraryPlaceLabelKey,
   WORKFLOW_LIBRARY_NARROW,
   WORKFLOW_LIBRARY_WIDE,
   WorkflowLibraryPlaceSelect,
@@ -98,6 +99,16 @@ const CONTENT_CSS: SystemStyleObject = {
  */
 const BODY_CSS: SystemStyleObject = {
   display: 'flex',
+  // Preview mode: the stage covers the places rail and the collection, which stay laid out (scroll positions, the
+  // column widths the detail rail keeps) but leave the tab order and the accessibility tree.
+  '&[data-previewing] > [data-library-rail-slot], &[data-previewing] [data-workflow-library-toolbar], &[data-previewing] [data-workflow-library-results], &[data-previewing] [data-workflow-library-collection]':
+    { visibility: 'hidden' },
+  // Narrow, the stage takes the toolbar's height too; the collection under it keeps its own.
+  [WORKFLOW_LIBRARY_NARROW]: {
+    '&[data-previewing] [data-workflow-library-toolbar], &[data-previewing] [data-workflow-library-results]': {
+      display: 'none',
+    },
+  },
   [WORKFLOW_LIBRARY_WIDE]: {
     columnGap: '3',
     containerName: 'workflow-library-content',
@@ -266,11 +277,6 @@ const WorkflowLibraryOpeningSession = ({
 const SINGLE_USER_PLACES: readonly WorkflowLibraryPlace[] = ['recent', 'user', 'default'];
 const MULTIUSER_PLACES: readonly WorkflowLibraryPlace[] = ['recent', 'user', 'default', 'shared'];
 
-/** A preview request from either view: a library entry's enriched document or a project workflow's own. */
-type PreviewRequest =
-  | { kind: 'library'; entry: WorkflowLibraryEntry }
-  | { kind: 'project'; entry: ProjectWorkflowEntry };
-
 export const WorkflowLibraryDialog = ({
   isOpen,
   onOpenChange,
@@ -299,11 +305,20 @@ export const WorkflowLibraryDialog = ({
   const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [removedWorkflowId, setRemovedWorkflowId] = useState<string | null>(null);
-  // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
-  // them on reopen.
-  const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
-  // Close before clearing the request so the lazy dialog remains mounted through its exit transition.
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  /**
+   * Preview mode, for the life of this opening: the workflow it opened on and the control that opened it, which takes
+   * focus back on leaving. Closing clears it (below), since the persistent shell would otherwise reopen on it.
+   */
+  const [preview, setPreview] = useState<{ opener: HTMLElement | null; workflowId: string } | null>(null);
+  // Graph or Inputs: the stage opens on Graph and keeps the choice until the library closes.
+  const [previewView, setPreviewView] = useState<WorkflowPreviewView>('nodes');
+  // However the library closes (its own controls, the copy question, the host), it reopens on the collection, on Graph.
+  if (!isOpen && (preview !== null || previewView !== 'nodes')) {
+    setPreview(null);
+    setPreviewView('nodes');
+  }
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<WorkflowLibraryPreviewStageHandle | null>(null);
   // A card's or row's actions menu acts on the workflow it was raised for and leaves the selection alone. The anchor
   // says where it is open; the target outlives it, for focus return and the dialogs its items open.
   const [contextMenuAnchor, setContextMenuAnchor] = useState<WorkflowCardMenuAnchor | null>(null);
@@ -325,8 +340,6 @@ export const WorkflowLibraryDialog = ({
     // Closing the library removes its preview immediately; the parent surface is leaving too. The search it would
     // have applied is cleared with the rest of the query.
     cancelPendingSearch();
-    setPreviewRequest(null);
-    setIsPreviewOpen(false);
     setContextMenuAnchor(null);
     onOpenChange(false);
   }, [cancelPendingSearch, onOpenChange]);
@@ -409,69 +422,91 @@ export const WorkflowLibraryDialog = ({
     [isLoadPending, onOpenChange, closeDialog]
   );
   const getInitialFocus = useCallback(() => searchInputRef.current, []);
-  // Escape inside an expanded detail sheet collapses the sheet (its own handler) instead of closing the library.
-  const handleEscapeKeyDown = useCallback((event: KeyboardEvent) => {
-    if (isWorkflowDetailSheetEscape(event)) {
-      event.preventDefault();
-    }
-  }, []);
+  // Escape inside an expanded detail sheet collapses the sheet (its own handler) instead of closing the library; in
+  // preview mode it closes a node card, else leaves the preview. Only the next Escape closes the library.
+  const handleEscapeKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // One keypress can arrive twice (StrictMode registers the open dialog's layer twice); only the first acts, and the
+      // default it prevented keeps the second from closing the library.
+      if (event.defaultPrevented) {
+        return;
+      }
 
-  const handlePreviewRequest = useCallback((entry: WorkflowLibraryEntry) => {
-    setPreviewRequest({ entry, kind: 'library' });
-    setIsPreviewOpen(true);
-  }, []);
-  // A card's Preview quick action names an id; the freshest resident or selected revision answers it.
-  const handleCardPreview = useCallback(
-    (workflowId: string) => {
-      const entry = selectWorkflowLibraryEntry(getWorkflowLibraryBrowseSnapshot(), workflowId);
-
-      if (entry) {
-        handlePreviewRequest(entry);
+      if (isWorkflowDetailSheetEscape(event)) {
+        event.preventDefault();
+      } else if (preview) {
+        event.preventDefault();
+        stageRef.current?.handleEscape();
       }
     },
-    [handlePreviewRequest]
+    [preview]
   );
-  const handleProjectPreviewRequest = useCallback((entry: ProjectWorkflowEntry) => {
-    setPreviewRequest({ entry, kind: 'project' });
-    setIsPreviewOpen(true);
-  }, []);
+  const setContentRef = useCallback((element: HTMLDivElement | null) => {
+    contentRef.current = element;
 
-  const handlePreviewOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setIsPreviewOpen(false);
+    if (element) {
+      preloadGraphPreview();
     }
   }, []);
 
-  // Guarded on `isPreviewOpen`: previewing another card while the last one is
-  // still animating out re-opens the same dialog, and an exit report that
-  // arrives after that must not pull the mount out from under it.
-  const handlePreviewExitComplete = useCallback(() => {
-    if (!isPreviewOpen) {
-      setPreviewRequest(null);
-    }
-  }, [isPreviewOpen]);
+  // Previewing selects the workflow, so the rail describes what the stage shows. The stage takes focus from the
+  // control that asked, which the collection's hiding would otherwise drop to the document.
+  const enterPreview = useCallback(
+    (workflowId: string, view?: WorkflowPreviewView) => {
+      const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-  // Only ready enrichment has a document; guard stale preview entries after revalidation.
-  const previewSource = useMemo(() => {
-    if (!previewRequest || templatesSnapshot.status !== 'loaded') {
-      return null;
-    }
+      flushSync(() => {
+        if (view) {
+          setPreviewView(view);
+        }
 
-    if (previewRequest.kind === 'project') {
-      return buildLibraryGraphPreviewSource(previewRequest.entry.document, templatesSnapshot.templates);
-    }
+        if (isProjectTab) {
+          setWorkflowLibrarySelection({ projectId, workflowId });
+        } else {
+          setSelectedWorkflowId(workflowId);
+        }
 
-    return previewRequest.entry.enrichment.status === 'ready'
-      ? buildLibraryGraphPreviewSource(previewRequest.entry.enrichment.document, templatesSnapshot.templates)
-      : null;
-  }, [previewRequest, templatesSnapshot]);
-  const previewGraphId =
-    previewRequest?.kind === 'project'
-      ? previewRequest.entry.document.id
-      : (previewRequest?.entry.item.workflow_id ?? '');
-  const previewLabel =
-    (previewRequest?.kind === 'project' ? previewRequest.entry.document.name : previewRequest?.entry.item.name) ||
-    t('workflowLibrary.untitled');
+        setContextMenuAnchor(null);
+        setPreview({ opener, workflowId });
+      });
+      contentRef.current?.querySelector<HTMLElement>('[data-preview-stage]')?.focus({ preventScroll: true });
+    },
+    [isProjectTab, projectId]
+  );
+  // Back to the collection as it was. Focus returns to the control that opened the preview while it still shows that
+  // workflow; after stepping, to the card or row now selected.
+  const leavePreview = useCallback(
+    (workflowId: string | null) => {
+      const opener = preview?.opener ?? null;
+      const isRendered = (element: HTMLElement | null | undefined): element is HTMLElement =>
+        element?.isConnected === true && element.getClientRects().length > 0;
+
+      flushSync(() => setPreview(null));
+
+      const selected = workflowId ? document.getElementById(getWorkflowLibraryCardId(workflowId)) : null;
+      const target =
+        workflowId === preview?.workflowId && isRendered(opener)
+          ? opener
+          : isRendered(selected)
+            ? selected
+            : isRendered(opener)
+              ? opener
+              : searchInputRef.current;
+
+      target?.focus();
+    },
+    [preview]
+  );
+  const panesPreview = useMemo<WorkflowLibraryPanesPreview>(
+    () => ({
+      isActive: preview !== null,
+      onLeave: leavePreview,
+      onViewChange: setPreviewView,
+      placeLabel: t(getWorkflowLibraryPlaceLabelKey(tab)),
+      view: previewView,
+    }),
+    [leavePreview, preview, previewView, t, tab]
+  );
 
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -661,196 +696,182 @@ export const WorkflowLibraryDialog = ({
   const emptyMessage = emptyKey ? t(emptyKey) : undefined;
 
   return (
-    <>
-      <Dialog.Root
-        initialFocusEl={getInitialFocus}
-        open={isOpen}
-        size="xl"
-        onEscapeKeyDown={handleEscapeKeyDown}
-        onOpenChange={handleDialogOpenChange}
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content
-              ref={preloadGraphPreview}
-              css={CONTENT_CSS}
-              aria-busy={isLoadPending}
-              h="80vh"
-              maxH="80vh"
-              maxW="min(80rem, calc(100vw - 4rem))"
-              position="relative"
-            >
-              {isLoadPending ? (
-                <Stack
-                  alignItems="center"
-                  aria-live="polite"
-                  bg="bg/85"
-                  inset="0"
-                  justifyContent="center"
-                  position="absolute"
-                  role="status"
-                  zIndex="modal"
-                >
-                  <Spinner color="accent.solid" size="2xl" />
-                  <Text fontSize="md" fontWeight="600">
-                    {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
-                  </Text>
-                </Stack>
-              ) : null}
-              <Dialog.Header
+    <Dialog.Root
+      initialFocusEl={getInitialFocus}
+      open={isOpen}
+      size="xl"
+      onEscapeKeyDown={handleEscapeKeyDown}
+      onOpenChange={handleDialogOpenChange}
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content
+            ref={setContentRef}
+            css={CONTENT_CSS}
+            aria-busy={isLoadPending}
+            {...WORKFLOW_PREVIEW_DIALOG_SIZE}
+            position="relative"
+          >
+            {isLoadPending ? (
+              <Stack
                 alignItems="center"
-                borderBottomWidth="1px"
-                borderColor="border.subtle"
-                display="flex"
-                flex="none"
-                gap="3"
-                h="12"
-                px="4"
-                py="0"
+                aria-live="polite"
+                bg="bg/85"
+                inset="0"
+                justifyContent="center"
+                position="absolute"
+                role="status"
+                zIndex="modal"
               >
-                <HStack align="baseline" flex="1" gap="2.5" minW="0">
-                  <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
-                  {projectContext?.projectName ? (
-                    <Text color="fg.muted" fontSize="md" minW="0" truncate>
-                      {projectContext.projectName}
-                    </Text>
-                  ) : null}
-                </HStack>
-                <Dialog.CloseTrigger asChild>
-                  <CloseButton disabled={isLoadPending} insetEnd="auto" position="static" top="auto" />
-                </Dialog.CloseTrigger>
-              </Dialog.Header>
-              <Dialog.Body
-                css={BODY_CSS}
-                data-library-tab={tab}
-                data-pending-preview={previewGraphId || undefined}
-                flex="1"
-                gap="0"
-                minH="0"
-                p="0"
-              >
-                <Box css={RAIL_SLOT_CSS} display="flex" minH="0">
-                  <WorkflowLibraryRail
-                    checkedTags={query.tags}
-                    footer={isProjectTab ? t('workflowLibrary.thisProjectHint') : undefined}
-                    idBase={placeIdBase}
-                    place={tab}
-                    placeTotals={placeTotals}
-                    projectTotal={projectWorkflows.length}
-                    showShared={authSession.multiuserEnabled}
-                    tagCounts={isProjectTab ? projectTagCounts : tagCounts}
-                    onPlaceChange={handlePlaceChange}
-                    onTagsChange={handleTagsChange}
-                  />
-                </Box>
-                <Box as="section" aria-labelledby={getWorkflowLibraryPlaceLabelId(placeIdBase, tab)} css={CENTRE_CSS}>
-                  <WorkflowLibraryToolbar
-                    narrowLead={
+                <Spinner color="accent.solid" size="2xl" />
+                <Text fontSize="md" fontWeight="600">
+                  {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
+                </Text>
+              </Stack>
+            ) : null}
+            <Dialog.Header
+              alignItems="center"
+              borderBottomWidth="1px"
+              borderColor="border.subtle"
+              display="flex"
+              flex="none"
+              gap="3"
+              h="12"
+              px="4"
+              py="0"
+            >
+              <HStack align="baseline" flex="1" gap="2.5" minW="0">
+                <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
+                {projectContext?.projectName ? (
+                  <Text color="fg.muted" fontSize="md" minW="0" truncate>
+                    {projectContext.projectName}
+                  </Text>
+                ) : null}
+              </HStack>
+              <Dialog.CloseTrigger asChild>
+                <CloseButton disabled={isLoadPending} insetEnd="auto" position="static" top="auto" />
+              </Dialog.CloseTrigger>
+            </Dialog.Header>
+            <Dialog.Body
+              css={BODY_CSS}
+              data-library-tab={tab}
+              data-previewing={preview ? '' : undefined}
+              flex="1"
+              gap="0"
+              minH="0"
+              p="0"
+            >
+              <Box css={RAIL_SLOT_CSS} data-library-rail-slot="" display="flex" minH="0">
+                <WorkflowLibraryRail
+                  checkedTags={query.tags}
+                  footer={isProjectTab ? t('workflowLibrary.thisProjectHint') : undefined}
+                  idBase={placeIdBase}
+                  place={tab}
+                  placeTotals={placeTotals}
+                  projectTotal={projectWorkflows.length}
+                  showShared={authSession.multiuserEnabled}
+                  tagCounts={isProjectTab ? projectTagCounts : tagCounts}
+                  onPlaceChange={handlePlaceChange}
+                  onTagsChange={handleTagsChange}
+                />
+              </Box>
+              <Box as="section" aria-labelledby={getWorkflowLibraryPlaceLabelId(placeIdBase, tab)} css={CENTRE_CSS}>
+                <WorkflowLibraryToolbar
+                  narrowLead={
+                    <>
+                      <WorkflowLibraryPlaceSelect
+                        place={tab}
+                        placeTotals={placeTotals}
+                        projectTotal={projectWorkflows.length}
+                        showShared={authSession.multiuserEnabled}
+                        onPlaceChange={handlePlaceChange}
+                      />
+                      <WorkflowLibraryTagButton
+                        checkedTags={query.tags}
+                        getFallbackFocus={getInitialFocus}
+                        tagCounts={isProjectTab ? projectTagCounts : tagCounts}
+                        onTagsChange={handleTagsChange}
+                      />
+                    </>
+                  }
+                  cardSize={cardSize}
+                  direction={shownOrder.direction}
+                  directionLabels={directionLabels}
+                  isDirectionFixed={tab === 'recent'}
+                  isSortFixed={tab === 'recent' || tab === 'default'}
+                  layout={layout}
+                  search={query.search}
+                  searchInputRef={searchInputRef}
+                  sort={shownOrder.sort}
+                  sortOptions={sortOptions}
+                  thumbnailFit={thumbnailFit}
+                  onCardSizeChange={handleCardSizeChange}
+                  onDirectionToggle={handleDirectionToggle}
+                  onLayoutChange={handleLayoutChange}
+                  onNewWorkflow={isProjectTab ? handleNewWorkflow : undefined}
+                  onSearchChange={handleSearchChange}
+                  onSortChange={handleSortChange}
+                  onThumbnailFitChange={handleThumbnailFitChange}
+                />
+                <WorkflowThumbnailFitContext value={thumbnailFit}>
+                  <WorkflowLibraryCardSizeContext value={cardSize}>
+                    {isProjectTab ? (
                       <>
-                        <WorkflowLibraryPlaceSelect
-                          place={tab}
-                          placeTotals={placeTotals}
-                          projectTotal={projectWorkflows.length}
-                          showShared={authSession.multiuserEnabled}
-                          onPlaceChange={handlePlaceChange}
-                        />
-                        <WorkflowLibraryTagButton
-                          checkedTags={query.tags}
-                          getFallbackFocus={getInitialFocus}
-                          tagCounts={isProjectTab ? projectTagCounts : tagCounts}
-                          onTagsChange={handleTagsChange}
-                        />
-                      </>
-                    }
-                    cardSize={cardSize}
-                    direction={shownOrder.direction}
-                    directionLabels={directionLabels}
-                    isDirectionFixed={tab === 'recent'}
-                    isSortFixed={tab === 'recent' || tab === 'default'}
-                    layout={layout}
-                    search={query.search}
-                    searchInputRef={searchInputRef}
-                    sort={shownOrder.sort}
-                    sortOptions={sortOptions}
-                    thumbnailFit={thumbnailFit}
-                    onCardSizeChange={handleCardSizeChange}
-                    onDirectionToggle={handleDirectionToggle}
-                    onLayoutChange={handleLayoutChange}
-                    onNewWorkflow={isProjectTab ? handleNewWorkflow : undefined}
-                    onSearchChange={handleSearchChange}
-                    onSortChange={handleSortChange}
-                    onThumbnailFitChange={handleThumbnailFitChange}
-                  />
-                  <WorkflowThumbnailFitContext value={thumbnailFit}>
-                    <WorkflowLibraryCardSizeContext value={cardSize}>
-                      {isProjectTab ? (
-                        <>
-                          <WorkflowLibraryResultLine count={projectEntries.length} tagsText={tagsText} />
-                          <ProjectWorkflowsView
-                            contextMenuAnchor={contextMenuAnchor}
-                            contextMenuTarget={contextMenuTarget}
-                            entries={projectEntries}
-                            layout={layout}
-                            missingCounts={missingCounts}
-                            selectedWorkflowId={projectSelectionId}
-                            trailingField={trailingField}
-                            onClose={closeDialog}
-                            onContextMenu={handleCardContextMenu}
-                            onContextMenuClose={closeContextMenu}
-                            onPreview={handleProjectPreviewRequest}
-                            onSelect={handleProjectSelect}
-                          />
-                        </>
-                      ) : (
-                        <WorkflowLibraryBrowsePanes
+                        <WorkflowLibraryResultLine count={projectEntries.length} tagsText={tagsText} />
+                        <ProjectWorkflowsView
                           contextMenuAnchor={contextMenuAnchor}
                           contextMenuTarget={contextMenuTarget}
-                          emptyMessage={emptyMessage}
-                          isOpen={isOpen}
+                          entries={projectEntries}
                           layout={layout}
-                          projectWorkflows={projectWorkflows}
-                          removedWorkflowId={removedWorkflowId}
-                          selectedWorkflowId={selectedWorkflowId}
-                          tab={tab}
-                          tagsText={tagsText}
+                          missingCounts={missingCounts}
+                          selectedWorkflowId={projectSelectionId}
                           trailingField={trailingField}
-                          onCardPreview={handleCardPreview}
                           onClose={closeDialog}
                           onContextMenu={handleCardContextMenu}
                           onContextMenuClose={closeContextMenu}
-                          onDeleted={handleDeleted}
-                          onOpen={handleOpenWorkflow}
-                          onOpenItem={handleOpenItem}
-                          onPreview={handlePreviewRequest}
-                          onSelect={setSelectedWorkflowId}
+                          onPreview={enterPreview}
+                          onSelect={handleProjectSelect}
+                          preview={panesPreview}
+                          previewStageRef={stageRef}
                         />
-                      )}
-                    </WorkflowLibraryCardSizeContext>
-                  </WorkflowThumbnailFitContext>
-                </Box>
-              </Dialog.Body>
-              {isOpen ? <WorkflowLibraryOpeningSession opening={openingFilter} place={tab} places={places} /> : null}
-              {isOpen && !isProjectTab ? (
-                <WorkflowLibraryBrowseSession opening={openingFilter} onLeave={cancelPendingSearch} />
-              ) : null}
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-      {previewRequest && previewSource ? (
-        <Suspense fallback={null}>
-          <DeferredGraphPreviewDialog
-            graphId={previewGraphId}
-            hideInvoke
-            isOpen={isPreviewOpen}
-            source={previewSource}
-            sourceLabel={previewLabel}
-            onExitComplete={handlePreviewExitComplete}
-            onOpenChange={handlePreviewOpenChange}
-          />
-        </Suspense>
-      ) : null}
-    </>
+                      </>
+                    ) : (
+                      <WorkflowLibraryBrowsePanes
+                        contextMenuAnchor={contextMenuAnchor}
+                        contextMenuTarget={contextMenuTarget}
+                        emptyMessage={emptyMessage}
+                        isOpen={isOpen}
+                        layout={layout}
+                        projectWorkflows={projectWorkflows}
+                        removedWorkflowId={removedWorkflowId}
+                        selectedWorkflowId={selectedWorkflowId}
+                        tab={tab}
+                        tagsText={tagsText}
+                        trailingField={trailingField}
+                        preview={panesPreview}
+                        previewStageRef={stageRef}
+                        onClose={closeDialog}
+                        onContextMenu={handleCardContextMenu}
+                        onContextMenuClose={closeContextMenu}
+                        onDeleted={handleDeleted}
+                        onOpen={handleOpenWorkflow}
+                        onOpenItem={handleOpenItem}
+                        onPreview={enterPreview}
+                        onSelect={setSelectedWorkflowId}
+                      />
+                    )}
+                  </WorkflowLibraryCardSizeContext>
+                </WorkflowThumbnailFitContext>
+              </Box>
+            </Dialog.Body>
+            {isOpen ? <WorkflowLibraryOpeningSession opening={openingFilter} place={tab} places={places} /> : null}
+            {isOpen && !isProjectTab ? (
+              <WorkflowLibraryBrowseSession opening={openingFilter} onLeave={cancelPendingSearch} />
+            ) : null}
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 };

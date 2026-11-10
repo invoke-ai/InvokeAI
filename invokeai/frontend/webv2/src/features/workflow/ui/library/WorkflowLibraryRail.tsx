@@ -41,6 +41,10 @@ const PLACES: ReadonlyArray<{ icon: LucideIcon; labelKey: string; value: Workflo
   { icon: UsersIcon, labelKey: 'workflowLibrary.placeShared', value: 'shared' },
 ];
 
+/** A place's name, as the rail lists it. */
+export const getWorkflowLibraryPlaceLabelKey = (place: WorkflowLibraryTab): string =>
+  PLACES.find((candidate) => candidate.value === place)!.labelKey;
+
 /** The id of a place's label in the rail, which names the centre column showing that place. */
 export const getWorkflowLibraryPlaceLabelId = (idBase: string, place: WorkflowLibraryTab) => `${idBase}-place-${place}`;
 

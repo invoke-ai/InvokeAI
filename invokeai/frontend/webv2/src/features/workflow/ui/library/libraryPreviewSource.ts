@@ -10,7 +10,10 @@ type GraphPreviewModule = typeof GraphPreviewDialogModule;
 let loadedGraphPreview: GraphPreviewModule | null = null;
 let graphPreviewModule: Promise<GraphPreviewModule> | null = null;
 
-/** The preview chunk (xyflow and its stylesheet), kept out of the library and publication chunks until needed. */
+/**
+ * The preview chunk (xyflow and its stylesheet), kept out of the library and publication chunks until needed: the
+ * Graph preview dialog, the thumbnail snapshot and the library's in-place workflow graph.
+ */
 export const loadGraphPreview = (): Promise<GraphPreviewModule> =>
   (graphPreviewModule ??= import('@features/workflow/ui/graph-preview/GraphPreviewDialog').then(
     (module) => {
@@ -46,12 +49,9 @@ const deferGraphPreview = <Props extends object>(pick: (module: GraphPreviewModu
 
 export const DeferredGraphPreviewDialog = deferGraphPreview((module) => module.GraphPreviewDialog);
 export const DeferredGraphPreviewSnapshot = deferGraphPreview((module) => module.GraphPreviewSnapshot);
+export const DeferredWorkflowDocumentGraph = deferGraphPreview((module) => module.WorkflowDocumentGraph);
 
-/**
- * Preview the entry's saved document without active-project destination or live updates; catch malformed cached
- * data despite ready enrichment.
- */
-export const buildLibraryGraphPreviewSource = (
+const compileLibraryGraphPreviewSource = (
   document: ProjectGraphState,
   templates: InvocationTemplates
 ): GraphPreviewSourceState => {
@@ -61,6 +61,7 @@ export const buildLibraryGraphPreviewSource = (
 
     return {
       destinationLabel: null,
+      document,
       graph,
       invalidReasons: [],
       isLive: false,
@@ -71,6 +72,7 @@ export const buildLibraryGraphPreviewSource = (
   } catch (error) {
     return {
       destinationLabel: null,
+      document,
       graph: null,
       invalidReasons: [
         error instanceof ForLoopGraphValidationError
@@ -84,4 +86,31 @@ export const buildLibraryGraphPreviewSource = (
       summaryRows: [],
     };
   }
+};
+
+const compiledSources = new WeakMap<
+  ProjectGraphState,
+  { source: GraphPreviewSourceState; templates: InvocationTemplates }
+>();
+
+/**
+ * Preview the entry's saved document without active-project destination or live updates; catch malformed cached
+ * data despite ready enrichment. The preview draws the document; the compiled graph is what its Graph view shows and
+ * its JSON items export. Compiled once per document and templates.
+ */
+export const buildLibraryGraphPreviewSource = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates
+): GraphPreviewSourceState => {
+  const cached = compiledSources.get(document);
+
+  if (cached?.templates === templates) {
+    return cached.source;
+  }
+
+  const source = compileLibraryGraphPreviewSource(document, templates);
+
+  compiledSources.set(document, { source, templates });
+
+  return source;
 };

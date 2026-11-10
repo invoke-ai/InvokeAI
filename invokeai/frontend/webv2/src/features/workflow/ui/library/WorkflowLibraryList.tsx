@@ -4,7 +4,7 @@ import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowse
 import type { ListRange, ListRowProps } from '@platform/ui/list/List';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 import type { ListRow } from '@platform/ui/list/listRows';
-import type { FocusEvent, MouseEvent } from 'react';
+import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 
 import { Badge, Box, HStack, Icon, type SystemStyleObject, Text } from '@chakra-ui/react';
 import {
@@ -35,6 +35,7 @@ import {
 import {
   dedupeWorkflowLibraryEntries,
   getWorkflowLibraryDemandIds,
+  useFrozenWhileHidden,
   useLinkedLibraryTemplates,
   WorkflowLibraryDemand,
 } from './workflowLibraryCollection';
@@ -153,6 +154,7 @@ export const WorkflowLibraryList = ({
   emptyMessage,
   entries,
   error,
+  isHidden = false,
   missingCounts = NO_MISSING_COUNTS,
   openMenuAnchor = null,
   removedWorkflowId = null,
@@ -298,6 +300,7 @@ export const WorkflowLibraryList = ({
     () => getWorkflowLibraryDemandIds(visibleEntries, startIndex, { first, last, visibleFirst, visibleLast }),
     [visibleEntries, startIndex, first, last, visibleFirst, visibleLast]
   );
+  const demandKey = useFrozenWhileHidden(`${first}:${last}:${ids.join(',')}`, isHidden);
   const hasEntries = visibleEntries.length > 0;
   // Idle precedes the first open-time load; show loading rather than an empty result.
   const isPending = status === 'idle' || status === 'loading';
@@ -360,6 +363,21 @@ export const WorkflowLibraryList = ({
       }
     },
     [actions, rows]
+  );
+  // Space on a row's button previews it, as Quick Look does; the row's own activation (selecting) is Enter or a press.
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const target = event.target as Element;
+      const row = target.closest('[data-list-primary]') === target ? rowOf(target) : null;
+      const index = row ? positionOf(row) : -1;
+      const entry = entryAt(rows, index);
+
+      if (event.key === ' ' && !event.repeat && entry && onPreview) {
+        event.preventDefault();
+        actions.preview(entry.item.workflow_id, index);
+      }
+    },
+    [actions, onPreview, rows]
   );
   // Pointer-only quick actions never take focus: it moves to their row, so a dialog they open returns there.
   const handleMouseDown = useCallback((event: MouseEvent<HTMLDivElement>) => {
@@ -424,10 +442,11 @@ export const WorkflowLibraryList = ({
       data-workflow-library-list=""
       onDoubleClick={handleDoubleClick}
       onFocusCapture={handleFocusCapture}
+      onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
     >
       {isWindowed && range !== null && total > 0 ? (
-        <WorkflowLibraryDemand key={`${first}:${last}:${ids.join(',')}`} end={last} ids={ids} start={first} />
+        <WorkflowLibraryDemand key={demandKey} end={last} ids={ids} start={first} />
       ) : null}
       {hasEntries && error ? (
         <HStack color="fg.subtle" flexShrink={0} fontSize="xs" gap="2" justify="center" role="alert">
@@ -578,15 +597,14 @@ const WorkflowLibraryListRow = memo(function WorkflowLibraryListRow({
             {isInProject ? t('workflowLibrary.openWithEllipsis') : t('workflowLibrary.open')}
           </Button>
           {canPreview ? (
-            <Tooltip content={t('workflowLibrary.previewGraph')}>
+            <Tooltip content={t('workflowLibrary.preview.actionHint')}>
               <IconButton
                 aria-hidden
-                aria-label={t('workflowLibrary.previewGraph')}
+                aria-label={t('workflowLibrary.preview.action')}
                 css={ROW_ACTION_CSS}
                 data-row-action="preview"
                 data-row-quick-action
                 data-unavailable={entry === null || undefined}
-                disabled={entry?.enrichment.status !== 'ready'}
                 size="xs"
                 tabIndex={-1}
                 variant="outline"

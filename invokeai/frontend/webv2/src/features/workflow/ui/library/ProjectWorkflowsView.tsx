@@ -1,4 +1,5 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 import type { WorkflowLibraryLayout } from '@features/workflow/ui/WorkflowUiContext';
 
 import { Badge, Box, DataList, HStack, Menu, Portal, Stack, Text } from '@chakra-ui/react';
@@ -11,6 +12,7 @@ import {
 } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
+import { useModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   useOpenAddModels,
@@ -34,19 +36,32 @@ import {
   Trash2Icon,
   WorkflowIcon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectWorkflowLibraryEntry } from './projectWorkflowEntries';
+import type { WorkflowLibraryPanesPreview } from './WorkflowLibraryBrowsePanes';
 import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
 import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
+import type { WorkflowLibraryPreviewStageHandle, WorkflowLibraryPreviewStatus } from './WorkflowLibraryPreviewStage';
+import type { WorkflowPreviewStepperProps } from './WorkflowPreviewStepper';
 
 import { isUpdatableSource, toProjectWorkflowLibraryEntries } from './projectWorkflowEntries';
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import { useOpenLibraryWorkflow } from './useOpenLibraryWorkflow';
 import {
+  useWorkflowPreviewModel,
+  WORKFLOW_SILHOUETTE_THUMBNAIL_CSS,
+  WorkflowAuthorNotes,
+  WorkflowInputsBadge,
+  WorkflowInputsSummary,
+  WorkflowPreviewThumbnailButton,
+  WorkflowProvenance,
+} from './WorkflowDetailOverview';
+import {
   WORKFLOW_DETAIL_WIDE_ONLY_CSS,
+  WORKFLOW_PREVIEW_TRIGGER_CSS,
   WorkflowDetailRailPlaceholder,
   WorkflowDetailSheet,
   WorkflowMissingNodePacks,
@@ -57,13 +72,9 @@ import { WorkflowCardContextMenu } from './WorkflowLibraryContextMenu';
 import { WorkflowDetailFact } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryList } from './WorkflowLibraryList';
+import { WorkflowLibraryPreviewStage } from './WorkflowLibraryPreviewStage';
 import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
-import {
-  getMissingNodePacks,
-  resolveEntryRequirements,
-  useModelRequirementDeps,
-  WorkflowRequirementsList,
-} from './WorkflowRequirementsList';
+import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 /**
@@ -73,6 +84,8 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workf
  */
 
 const NO_NODE_PACKS: readonly string[] = [];
+/** The large preview is wide-only; the expanded sheet's summary carries a small one. */
+const THUMBNAIL_SLOT_CSS = { ...WORKFLOW_DETAIL_WIDE_ONLY_CSS, ...WORKFLOW_SILHOUETTE_THUMBNAIL_CSS };
 /** Keeps the selected rail from re-rendering for template fields it does not show. */
 const selectTemplateSummary = (record: WorkflowRecordDTO) => ({ name: record.name, revision: record.revision });
 
@@ -93,8 +106,12 @@ export interface ProjectWorkflowsViewProps {
   onClose: () => void;
   onContextMenu: WorkflowCardContextMenuHandler;
   onContextMenuClose: () => void;
-  onPreview: (entry: ProjectWorkflowEntry) => void;
+  /** Enters preview mode on a workflow, selecting it; on a given view, else the one last shown. */
+  onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   onSelect: (workflowId: string | null) => void;
+  preview: WorkflowLibraryPanesPreview;
+  /** The stage's handle, through which the dialog's Escape reaches it. */
+  previewStageRef: RefObject<WorkflowLibraryPreviewStageHandle | null>;
 }
 
 export const ProjectWorkflowsView = ({
@@ -110,6 +127,8 @@ export const ProjectWorkflowsView = ({
   onContextMenuClose,
   onPreview,
   onSelect,
+  preview,
+  previewStageRef,
 }: ProjectWorkflowsViewProps) => {
   const { t } = useTranslation();
   const workflows = useWorkflowProjectSelector((project) => project.workflows);
@@ -130,15 +149,34 @@ export const ProjectWorkflowsView = ({
     ? (entries.find((entry) => entry.item.workflow_id === contextMenuTarget.workflowId)?.projectWorkflow ?? null)
     : null;
 
-  const previewWorkflow = useCallback(
-    (workflowId: string) => {
-      const entry = entries.find((candidate) => candidate.item.workflow_id === workflowId);
+  // Stepping walks the project's workflows as the toolbar and tags filter and order them.
+  const position = selectedEntry ? entries.indexOf(selectedEntry) : -1;
+  const stepPreview = useCallback(
+    (delta: -1 | 1) => {
+      const next = position < 0 ? undefined : entries[position + delta];
 
-      if (entry) {
-        onPreview(entry.projectWorkflow);
+      if (next) {
+        onSelect(next.item.workflow_id);
       }
     },
-    [entries, onPreview]
+    [entries, onSelect, position]
+  );
+  const stepper = useMemo(
+    () =>
+      preview.isActive
+        ? {
+            canStepNext: position >= 0 && position < entries.length - 1,
+            canStepPrevious: position > 0,
+            onStep: stepPreview,
+            position: position >= 0 ? position : null,
+            total: entries.length,
+          }
+        : null,
+    [entries.length, position, preview.isActive, stepPreview]
+  );
+  const previewStatus = useMemo<WorkflowLibraryPreviewStatus>(
+    () => (selectedEntry ? { document: selectedEntry.projectWorkflow.document, kind: 'ready' } : { kind: 'pending' }),
+    [selectedEntry]
   );
   const openWorkflow = useCallback(
     (workflowId: string) => {
@@ -195,7 +233,7 @@ export const ProjectWorkflowsView = ({
             status="loaded"
             onContextMenu={onContextMenu}
             onOpen={openWorkflow}
-            onPreview={previewWorkflow}
+            onPreview={onPreview}
             onSelect={onSelect}
             trailingField={trailingField}
           />
@@ -210,12 +248,25 @@ export const ProjectWorkflowsView = ({
             status="loaded"
             onContextMenu={onContextMenu}
             onOpen={openWorkflow}
-            onPreview={previewWorkflow}
+            onPreview={onPreview}
             onSelect={onSelect}
           />
         )}
+        {preview.isActive ? (
+          <WorkflowLibraryPreviewStage
+            ref={previewStageRef}
+            name={selectedEntry?.projectWorkflow.document.name || t('workflowLibrary.untitled')}
+            placeLabel={preview.placeLabel}
+            status={previewStatus}
+            workflowId={activeSelectionId}
+            view={preview.view}
+            onLeave={preview.onLeave}
+            onViewChange={preview.onViewChange}
+          />
+        ) : null}
         <ProjectWorkflowDetailPanel
           entry={selectedEntry ? selectedEntry.projectWorkflow : null}
+          stepper={stepper}
           isActive={selectedEntry?.item.workflow_id === activeWorkflowId}
           missingCount={selectedEntry ? (missingCounts.get(selectedEntry.item.workflow_id) ?? 0) : 0}
           onDuplicate={handleDuplicate}
@@ -380,7 +431,9 @@ const ProjectWorkflowContextMenu = ({
 interface ProjectWorkflowDetailPanelProps extends ProjectWorkflowActionsOptions {
   isActive: boolean;
   missingCount: number;
-  onPreview: (entry: ProjectWorkflowEntry) => void;
+  onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
+  /** Preview mode's stepper (`WorkflowDetailSheet`); none outside preview mode. */
+  stepper: WorkflowPreviewStepperProps | null;
 }
 
 /**
@@ -390,6 +443,7 @@ interface ProjectWorkflowDetailPanelProps extends ProjectWorkflowActionsOptions 
  */
 const ProjectWorkflowDetailPanel = ({
   entry,
+  stepper,
   isActive,
   missingCount,
   onDuplicate,
@@ -478,7 +532,9 @@ const ProjectWorkflowDetailPanel = ({
   );
   const entryId = entry?.document.id ?? null;
   const entryName = entry?.document.name || t('workflowLibrary.untitled');
-  const handlePreview = useCallback(() => entry && onPreview(entry), [entry, onPreview]);
+  const handlePreview = useCallback(() => entry && onPreview(entry.document.id), [entry, onPreview]);
+  const handlePreviewInputs = useCallback(() => entry && onPreview(entry.document.id, 'inputs'), [entry, onPreview]);
+  const previewModel = useWorkflowPreviewModel(entry?.document ?? null);
   const openUpdateConfirm = useCallback(() => setIsUpdateConfirmOpen(true), []);
   const closeUpdateConfirm = useCallback(() => setIsUpdateConfirmOpen(false), []);
   // The copy keeps its id and position; the replacement is one undo step.
@@ -557,34 +613,40 @@ const ProjectWorkflowDetailPanel = ({
         openLabel={t('workflowLibrary.open')}
         thumbnailSrc={showThumbnail ? thumbnailUrl : null}
         workflowDocument={entry.document}
+        stepper={stepper}
         workflowId={workflowId}
         onOpen={handleOpen}
       >
         <Scrollable flex="1" label={name} minH="0">
           <Stack gap="2.5" minW="0" p="2.5">
             {/* The expanded sheet's summary is its compact heading: no large preview, no second name. */}
-            <Box
-              aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO}
-              bg="bg.muted"
-              css={WORKFLOW_DETAIL_WIDE_ONLY_CSS}
-              overflow="hidden"
-              rounded="md"
-              w="full"
-            >
-              {showThumbnail ? (
-                <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
-              ) : (
-                <WorkflowThumbnailPlaceholder
-                  caption={t('workflowLibrary.notRunYet')}
-                  workflowDocument={entry.document}
-                />
-              )}
+            <Box css={THUMBNAIL_SLOT_CSS} w="full">
+              <Box
+                aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO}
+                bg="bg.muted"
+                data-thumbnail-kind={showThumbnail ? 'image' : 'silhouette'}
+                overflow="hidden"
+                position="relative"
+                rounded="md"
+                w="full"
+              >
+                {showThumbnail ? (
+                  <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
+                ) : (
+                  <WorkflowThumbnailPlaceholder
+                    caption={t('workflowLibrary.notRunYet')}
+                    workflowDocument={entry.document}
+                  />
+                )}
+                <WorkflowPreviewThumbnailButton name={name} onPreview={handlePreview} />
+              </Box>
             </Box>
 
             <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
               <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
                 {name}
               </Text>
+              <WorkflowProvenance document={entry.document} kind={t('workflowLibrary.preview.kindProject')} />
               {statusLine ? (
                 <Text color="fg.muted" fontSize="xs" id={statusLineId}>
                   {statusLine}
@@ -598,6 +660,7 @@ const ProjectWorkflowDetailPanel = ({
                 {enrichment ? (
                   <Badge variant="subtle">{t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}</Badge>
                 ) : null}
+                <WorkflowInputsBadge model={previewModel} />
                 {missingNodePacks.length > 0 ? (
                   <Badge bg="bg.error" color="fg.error" data-workflow-missing-node-packs variant="subtle">
                     {t('workflowLibrary.nodePacksMissing', { count: missingNodePacks.length })}
@@ -611,6 +674,9 @@ const ProjectWorkflowDetailPanel = ({
                 {entry.document.description}
               </Text>
             ) : null}
+
+            <WorkflowInputsSummary model={previewModel} onSeeAll={handlePreviewInputs} />
+            <WorkflowAuthorNotes notes={entry.document.notes} />
 
             <Stack
               borderColor="border.subtle"
@@ -705,7 +771,8 @@ const ProjectWorkflowDetailPanel = ({
     carries Open and More instead. */}
         <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
           <Button
-            disabled={libraryEntry.enrichment.status !== 'ready'}
+            css={WORKFLOW_PREVIEW_TRIGGER_CSS}
+            data-workflow-preview-trigger=""
             minW="0"
             size="lg"
             variant="outline"
@@ -713,7 +780,7 @@ const ProjectWorkflowDetailPanel = ({
             onClick={handlePreview}
           >
             <WorkflowIcon />
-            {t('workflowLibrary.previewGraph')}
+            {t('workflowLibrary.preview.action')}
           </Button>
           <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
             {/* The active workflow is already open: the primary slot, disabled, says why through the status line. */}

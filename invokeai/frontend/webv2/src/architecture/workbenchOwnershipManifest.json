@@ -105,7 +105,6 @@
     "focusRegions.tsx": "workbench",
     "generationSettingsOrchestration.ts": "workbench",
     "graphContracts.ts": "workbench",
-    "graphPreviewInvocation.ts": "workbench",
     "graphSurfaces.ts": "workbench",
     "graphWidgets.ts": "workbench",
     "iconResolver.tsx": "workbench",

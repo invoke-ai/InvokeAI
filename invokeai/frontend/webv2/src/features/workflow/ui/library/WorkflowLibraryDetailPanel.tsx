@@ -2,6 +2,7 @@ import type { StarterInstallSource } from '@features/models';
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 
 import { Badge, Box, DataList, HStack, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
@@ -12,6 +13,7 @@ import {
   setLibraryWorkflowPublic,
 } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { useModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
 import { useOpenAddModels, useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
 import {
   assertAccountScopeCurrent,
@@ -24,22 +26,28 @@ import { DownloadIcon, EllipsisIcon, WorkflowIcon } from 'lucide-react';
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { WorkflowPreviewStepperProps } from './WorkflowPreviewStepper';
+
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import { useWorkflowLibraryEntryActions, type WorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import {
+  useWorkflowPreviewModel,
+  WORKFLOW_SILHOUETTE_THUMBNAIL_CSS,
+  WorkflowAuthorNotes,
+  WorkflowInputsBadge,
+  WorkflowInputsSummary,
+  WorkflowProvenance,
+} from './WorkflowDetailOverview';
+import {
   WORKFLOW_DETAIL_WIDE_ONLY_CSS,
+  WORKFLOW_PREVIEW_TRIGGER_CSS,
   WorkflowDetailRailPlaceholder,
   WorkflowDetailSheet,
   WorkflowMissingNodePacks,
 } from './WorkflowDetailSheet';
 import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WorkflowLibraryThumbnail } from './WorkflowLibraryThumbnail';
-import {
-  getMissingNodePacks,
-  resolveEntryRequirements,
-  useModelRequirementDeps,
-  WorkflowRequirementsList,
-} from './WorkflowRequirementsList';
+import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 
 /**
  * The selected template: preview, name with Open, facts, requirements with Install, and its standing in the library
@@ -48,6 +56,8 @@ import {
  */
 
 const INSTALL_HOVER = { opacity: 0.85 } as const;
+/** The large preview is wide-only; the expanded sheet's summary carries a small one. */
+const THUMBNAIL_SLOT_CSS = { ...WORKFLOW_DETAIL_WIDE_ONLY_CSS, ...WORKFLOW_SILHOUETTE_THUMBNAIL_CSS };
 
 type VisibilityState =
   | { requestId: object; previousItem: WorkflowLibraryListItem; isPublic: boolean; status: 'pending' | 'success' }
@@ -75,9 +85,13 @@ export interface WorkflowLibraryDetailPanelProps {
   onDuplicated: (workflowId: string) => void;
   /** Adds the first copy, or asks what to do when the project already holds one. */
   onOpen: (item: WorkflowLibraryListItem) => void;
-  onPreview: (entry: WorkflowLibraryEntry) => void;
+  /** Enters preview mode on the entry (on a given view, else the last shown); its stage shows loading and unreadable
+   * documents too. */
+  onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   /** The project's workflows, so the rail can say when opening will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
+  /** Preview mode's stepper (`WorkflowDetailSheet`); none outside preview mode. */
+  stepper?: WorkflowPreviewStepperProps | null;
 }
 
 /** One label/value row of a detail rail's facts list. */
@@ -104,6 +118,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
   onOpen,
   onPreview,
   projectWorkflows,
+  stepper,
 }: WorkflowLibraryDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Portaled action menus belong to this dialog's visible bounds, rather than the whole viewport.
@@ -159,11 +174,13 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
   const dataTime = useDataTimeSnapshot(entry?.item);
   const moreActionsIds = useTooltipTriggerIds();
 
-  const handlePreview = useCallback(() => {
-    if (entry && entry.enrichment.status === 'ready') {
-      onPreview(entry);
-    }
-  }, [entry, onPreview]);
+  const handlePreview = useCallback(() => entry && onPreview(entry.item.workflow_id), [entry, onPreview]);
+  const handlePreviewInputs = useCallback(
+    () => entry && onPreview(entry.item.workflow_id, 'inputs'),
+    [entry, onPreview]
+  );
+  const workflowDocument = enrichment?.status === 'ready' ? enrichment.document : null;
+  const previewModel = useWorkflowPreviewModel(workflowDocument);
 
   // Close the library before navigating to Add Models.
   const handleFindModel = useCallback(
@@ -414,18 +431,20 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
           openLabel={openLabel}
           thumbnailSrc={item.thumbnail_url}
           workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
+          stepper={stepper}
           workflowId={item.workflow_id}
           onOpen={handleOpen}
         >
           <Scrollable flex="1" label={name} minH="0">
             <Stack gap="2.5" minW="0" p="2.5">
               {/* The expanded sheet's summary is its compact heading: no large preview, no second name. */}
-              <Box css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} w="full">
+              <Box css={THUMBNAIL_SLOT_CSS} w="full">
                 <WorkflowLibraryThumbnail
                   key={item.workflow_id}
                   canEdit={!isReadOnly}
                   item={item}
-                  workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
+                  workflowDocument={workflowDocument}
+                  onPreview={handlePreview}
                 />
               </Box>
 
@@ -437,6 +456,16 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                 <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
                   {name}
                 </Text>
+                <WorkflowProvenance
+                  document={workflowDocument}
+                  kind={t(
+                    item.category === 'default'
+                      ? 'workflowLibrary.preview.kindTemplate'
+                      : isReadOnly
+                        ? 'workflowLibrary.preview.kindShared'
+                        : 'workflowLibrary.preview.kindLibrary'
+                  )}
+                />
                 {openedWhen ? (
                   <Text color="fg.muted" fontSize="xs">
                     {t('workflowLibrary.openedWhen', { when: openedWhen })}
@@ -450,6 +479,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                   {enrichment?.status === 'ready' ? (
                     <Badge variant="subtle">{t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}</Badge>
                   ) : null}
+                  <WorkflowInputsBadge model={previewModel} />
                   {isCallable ? (
                     <Badge data-workflow-callable variant="subtle">
                       {t('workflowLibrary.callable')}
@@ -479,6 +509,8 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                 </HStack>
               ) : null}
 
+              <WorkflowInputsSummary model={previewModel} onSeeAll={handlePreviewInputs} />
+              <WorkflowAuthorNotes notes={workflowDocument?.notes ?? ''} />
               <WorkflowMissingNodePacks packs={missingNodePacks} />
               <WorkflowRequirementsList
                 errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
@@ -574,7 +606,8 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
           carries Open and More instead. */}
           <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
             <Button
-              disabled={enrichment?.status !== 'ready'}
+              css={WORKFLOW_PREVIEW_TRIGGER_CSS}
+              data-workflow-preview-trigger=""
               minW="0"
               size="lg"
               variant="outline"
@@ -582,7 +615,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
               onClick={handlePreview}
             >
               <WorkflowIcon />
-              {t('workflowLibrary.previewGraph')}
+              {t('workflowLibrary.preview.action')}
             </Button>
             <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
               <Button data-workflow-detail-open flex="1" minW="0" size="lg" onClick={handleOpen}>

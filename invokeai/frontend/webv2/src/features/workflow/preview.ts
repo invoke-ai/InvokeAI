@@ -1,5 +1,5 @@
 export { storedGraphToDocument } from './core/graphToDocument';
-export { documentToPreviewGraph, GraphPreviewDialog, GraphPreviewFlow } from './ui/graph-preview';
+export { GraphPreviewDialog } from './ui/graph-preview/GraphPreviewDialog';
 export {
   getWorkflowNodeBodyProps,
   getWorkflowNodeChromeProps,

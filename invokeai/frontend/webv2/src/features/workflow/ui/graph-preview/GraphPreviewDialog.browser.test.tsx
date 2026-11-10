@@ -1,5 +1,10 @@
-import type { InvocationTemplatesSnapshot } from '@features/workflow/core/types';
 import type {
+  InvocationTemplatesSnapshot,
+  ProjectGraphState,
+  WorkflowInvocationNode,
+} from '@features/workflow/core/types';
+import type {
+  GraphPreviewInvoke,
   GraphPreviewSourceState,
   WorkflowInvocationSourceId,
   WorkflowPreviewGraph,
@@ -16,13 +21,13 @@ import { createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import { GraphPreviewDialog } from './GraphPreviewDialog';
 
 // Create mock dependencies with vi.hoisted because factories run before ordinary imports.
-const { downloads, fitViewMock, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.hoisted(() => {
+const { clipboard, downloads, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.hoisted(() => {
   const fieldInput = (name: string, defaultValue: unknown) => ({
     default: defaultValue,
     description: '',
@@ -46,7 +51,7 @@ const { downloads, fitViewMock, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.
     uiModelType: null,
     uiOrder: null,
   });
-  const invocationTemplate = (type: string, inputs: Record<string, ReturnType<typeof fieldInput>>) => ({
+  const invocationTemplate = (type: string, title: string, inputs: Record<string, ReturnType<typeof fieldInput>>) => ({
     category: 'test',
     classification: 'stable',
     description: '',
@@ -55,7 +60,7 @@ const { downloads, fitViewMock, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.
     outputs: {},
     outputType: `${type}_output`,
     tags: [],
-    title: type,
+    title,
     type,
     useCache: true,
     version: '1.0.0',
@@ -68,43 +73,60 @@ const { downloads, fitViewMock, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.
     error: null,
     status: 'loaded',
     templates: {
-      denoise_latents: invocationTemplate('denoise_latents', {
+      denoise_latents: invocationTemplate('denoise_latents', 'Denoise Latents', {
         cfg_scale: fieldInput('cfg_scale', 7),
+        seed: fieldInput('seed', 0),
         steps: fieldInput('steps', 30),
       }),
-      integer: invocationTemplate('integer', { value: fieldInput('value', 0) }),
-      l2i: invocationTemplate('l2i', {}),
+      integer: invocationTemplate('integer', 'Integer Primitive', { value: fieldInput('value', 0) }),
+      l2i: invocationTemplate('l2i', 'Latents to Image', {}),
+      sdxl_compel: invocationTemplate('sdxl_compel', 'SDXL Positive Conditioning', {}),
     },
   };
 
   return {
+    clipboard: { canCopyText: vi.fn(() => true), copyText: vi.fn(() => Promise.resolve()) },
     downloads: { downloadBlob: vi.fn(), downloadText: vi.fn() },
-    // Provide an initialized flow spy to verify pending reveals actually call fitView.
-    fitViewMock: vi.fn(() => Promise.resolve(true)),
     TEMPLATES_SNAPSHOT: templatesSnapshot,
-    templatesSnapshotRef: { current: templatesSnapshot },
+    templatesSnapshotRef: { current: templatesSnapshot, listeners: new Set<() => void>() },
   };
 });
 
-// Stub flow rendering but retain onInit to exercise the dialog's pending-reveal handoff.
-vi.mock('./GraphPreviewFlow', () => ({
-  GraphPreviewFlow: ({ onInit }: { onInit?: (instance: { fitView: typeof fitViewMock }) => void }) => {
-    onInit?.({ fitView: fitViewMock });
-    return <div data-flow-stub />;
-  },
-  documentToPreviewGraph: () => {
-    throw new Error('not used');
-  },
-}));
-
 vi.mock('@platform/browser/downloadBlob', () => downloads);
+vi.mock('@platform/browser/clipboard', () => clipboard);
 
-// Stub reactive templates so Open as disabled state follows the same loading contract as production.
-vi.mock('@features/workflow/react', async (importOriginal) => ({
+// The node card's model markers read the catalog; this suite's graphs need no model.
+vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
-  useInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
+  ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+  ensureStartersLoaded: vi.fn(),
+  useActiveInstallSources: () => new Set<string>(),
+  useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector({ models: [] }),
+  useStartersSelector: (selector: (snapshot: unknown) => unknown) => selector({ response: { starter_models: [] } }),
 }));
+
+// A store like production's, so the menu's disabled state follows the templates loading.
+vi.mock('@features/workflow/react', async (importOriginal) => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    templatesSnapshotRef.listeners.add(listener);
+
+    return () => templatesSnapshotRef.listeners.delete(listener);
+  };
+  const getSnapshot = () => templatesSnapshotRef.current;
+
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    getInvocationTemplatesSnapshot: getSnapshot,
+    useInvocationTemplatesSnapshot: () => useSyncExternalStore(subscribe, getSnapshot),
+  };
+});
+
+const setTemplatesSnapshot = (snapshot: InvocationTemplatesSnapshot) =>
+  act(() => {
+    templatesSnapshotRef.current = snapshot;
+    templatesSnapshotRef.listeners.forEach((listener) => listener());
+  });
 
 const identity = vi.hoisted(() => ({
   session: { multiuserEnabled: false, phase: 'ready', user: null } as {
@@ -134,48 +156,36 @@ vi.mock('@features/workflow/data/api', async (importOriginal) => ({
 // Supply rendered English strings without starting the HTTP-backed i18n client.
 const TRANSLATIONS: Record<string, string> = {
   'common.close': 'Close',
-  'common.json': 'JSON',
-  'graphPreview.back': 'Back',
-  'graphPreview.compiledFrom': 'Compiled from {{source}}.',
-  'graphPreview.copied': 'Copied',
+  'graphPreview.aboutThisGraph': 'About this graph',
+  'graphPreview.cannotInvoke': "Can't invoke yet",
+  'graphPreview.editAsWorkflow': 'Edit as workflow',
+  'graphPreview.invokeRouteBatch': 'Invoke {{route}} ×{{count}}',
+  'graphPreview.readyToInvoke': 'Ready to invoke',
+  'workflowLibrary.preview.graph': 'Graph',
+  'workflowLibrary.preview.graphJson': 'Graph JSON',
+  'workflowLibrary.preview.nodes': 'Nodes',
   'graphPreview.copyFailed': 'Failed to copy JSON',
-  'graphPreview.copyJson': 'Copy JSON',
+  'graphPreview.copyGraphJson': 'Copy graph JSON',
   'graphPreview.destination': 'Destination',
-  'graphPreview.downloadJson': 'Download JSON',
-  'graphPreview.downloadJsonHint': 'For bug reports and sharing',
-  'graphPreview.edges': 'Edges',
-  'graphPreview.edgesIn': 'in · {{count}} inputs from {{sources}}',
-  'graphPreview.edgesInNone': 'in · none',
-  'graphPreview.edgesOut': 'out · {{field}} → {{target}}',
+  'graphPreview.downloadGraphJson': 'Download graph JSON',
   'graphPreview.editInEditor': 'Edit in workflow editor',
   'graphPreview.editInEditorFailed': 'No editable nodes in this graph.',
-  'graphPreview.editInEditorHint': 'Replaces the current workflow',
   'graphPreview.forkIntoProject': 'Fork into new project',
   'graphPreview.forkIntoProjectFailed': 'No nodes to fork into a project.',
-  'graphPreview.forkIntoProjectHint': 'Copies this graph into a fresh project',
-  'graphPreview.graph': 'Graph',
-  'graphPreview.graphJsonLabel': '{{title}} graph JSON',
-  'graphPreview.inputCount': '{{count}} inputs',
+  'graphPreview.graphJsonCopied': 'Graph JSON copied',
   'graphPreview.invalidTitle': "This graph can't compile yet.",
   'graphPreview.invokeRoute': 'Invoke {{route}}',
-  'graphPreview.list': 'List',
   'graphPreview.liveHint': 'Updates as you change settings.',
+  'graphPreview.more': 'More',
   'graphPreview.noCompiledGraph': 'No compiled graph is available for "{{graphId}}" yet.',
   'graphPreview.nodeSummary.denoise': '{{steps}} steps · cfg {{cfg}}',
-  'graphPreview.nodeSummary.noise': '{{width}} × {{height}}',
-  'graphPreview.nodes': 'Nodes',
-  'graphPreview.openAs': 'Open as',
   'graphPreview.openedFromPreview': 'Opened from graph preview',
-  'graphPreview.resolvedInputs': 'Resolved inputs',
-  'graphPreview.savedToLibrary': 'Saved to workflow library',
   'graphPreview.saveToLibrary': 'Save to workflow library',
   'graphPreview.saveToLibraryFailed': 'No saveable nodes in this graph.',
-  'graphPreview.saveToLibraryHint': 'Reusable, leaves this project alone',
-  'graphPreview.selectNode': 'Select a node for details.',
-  'graphPreview.setBy': 'Set by',
-  'graphPreview.showNode': 'show node',
-  'graphPreview.thisGraph': 'This graph',
-  'graphPreview.title': 'Graph preview',
+  'graphPreview.showNode': 'Show node',
+  'workflowLibrary.preview.inputs': 'Inputs',
+  'workflowLibrary.preview.nodePackMissing': 'Node pack missing',
+  'workflowLibrary.preview.youSetThis': 'You set this',
   'workflowLibrary.publicVisibilityHelp': 'Visible to users of this InvokeAI instance.',
   'workflowLibrary.publicVisibilityPartial':
     'The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.',
@@ -199,6 +209,7 @@ vi.mock('react-i18next', () => ({
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const FIXTURE_GRAPH: WorkflowPreviewGraph = {
+  backendGraph: { edges: [], id: 'backend-graph', nodes: { denoise_latents: { type: 'denoise_latents' } } },
   id: 'preview-graph',
   nodes: [
     { id: 'seed', type: 'integer', inputs: { value: 42 } },
@@ -218,15 +229,12 @@ const FIXTURE_GRAPH: WorkflowPreviewGraph = {
   version: 1,
 };
 
+/** Generate's shape: compiled, live, with facts, a notice, a value that is not what runs and fields it set. */
 const FIXTURE_SOURCE: GraphPreviewSourceState = {
   destinationLabel: 'Gallery',
   getProvenance: (nodeId, fieldName) => {
     if (nodeId === 'denoise_latents' && fieldName === 'steps') {
       return { label: 'Generate → Steps' };
-    }
-
-    if (nodeId === 'denoise_latents' && fieldName === 'cfg_scale') {
-      return { label: 'Generate → CFG scale' };
     }
 
     return null;
@@ -244,8 +252,18 @@ const FIXTURE_SOURCE: GraphPreviewSourceState = {
   ],
 };
 
-/** A library entry: previewed before it has been opened into a project, so nothing has routed it anywhere. */
-const NO_DESTINATION_SOURCE: GraphPreviewSourceState = {
+/** The same source recompiled: `steps` changed, or the decoder gone. */
+const withGraph = (graph: WorkflowPreviewGraph): GraphPreviewSourceState => ({ ...FIXTURE_SOURCE, graph });
+const withSteps = (steps: number) =>
+  withGraph({
+    ...FIXTURE_GRAPH,
+    nodes: FIXTURE_GRAPH.nodes.map((node) =>
+      node.id === 'denoise_latents' ? { ...node, inputs: { ...node.inputs, steps } } : node
+    ),
+  });
+
+/** A widget's last graph: nothing set, nothing live, routed nowhere. */
+const PLAIN_SOURCE: GraphPreviewSourceState = {
   destinationLabel: null,
   graph: FIXTURE_GRAPH,
   invalidReasons: [],
@@ -263,40 +281,61 @@ const INVALID_SOURCE: GraphPreviewSourceState = {
   summaryRows: [],
 };
 
-// An unknown-only graph converts to an empty document; document-opening actions must stop.
+// An unknown-only graph still draws; it converts to an empty document, so document-opening actions must stop.
 const UNKNOWN_NODE_GRAPH: WorkflowPreviewGraph = {
   id: 'unknown-node-graph',
-  nodes: [{ id: 'mystery', type: 'unknown_type', inputs: {} }],
+  nodes: [{ id: 'mystery', type: 'unknown_type', inputs: { strength: 3 } }],
   edges: [],
   version: 1,
 };
 
-const UNKNOWN_NODE_SOURCE: GraphPreviewSourceState = {
-  destinationLabel: 'Gallery',
-  graph: UNKNOWN_NODE_GRAPH,
-  invalidReasons: [],
-  isLive: false,
-  notices: [],
-  summaryRows: [],
+const UNKNOWN_NODE_SOURCE: GraphPreviewSourceState = { ...PLAIN_SOURCE, graph: UNKNOWN_NODE_GRAPH };
+
+const invocation = (id: string, type: string, inputs: Record<string, unknown>, label = ''): WorkflowInvocationNode => ({
+  data: {
+    inputs: Object.fromEntries(Object.entries(inputs).map(([name, value]) => [name, { label: '', name, value }])),
+    isIntermediate: true,
+    isOpen: true,
+    label,
+    nodePack: 'invokeai',
+    notes: '',
+    type,
+    useCache: true,
+    version: '1.0.0',
+  },
+  id,
+  position: { x: 0, y: 0 },
+  type: 'invocation',
+});
+
+/** The workflow surface's shape: the document the graph compiles from, its form exposing the steps. */
+const DOCUMENT: ProjectGraphState = {
+  ...createProjectGraph('workflow-doc', 'Portrait workflow'),
+  form: {
+    elements: {
+      root: { data: { children: ['steps-field'], layout: 'column' }, id: 'root', type: 'container' },
+      'steps-field': {
+        data: {
+          fieldIdentifier: { fieldName: 'steps', nodeId: 'denoise_latents' },
+          showDescription: false,
+          showShuffle: false,
+        },
+        id: 'steps-field',
+        parentId: 'root',
+        type: 'node-field',
+      },
+    },
+    rootElementId: 'root',
+  },
+  nodes: [invocation('denoise_latents', 'denoise_latents', { cfg_scale: 4, steps: 28 }, 'Sampler')],
 };
 
-// Long enough to exercise the side panel's ~40-char truncation policy for
-// resolved-input strings.
-const LONG_STRING_VALUE =
-  'a value long enough to need truncation in the resolved inputs list, well past forty characters';
-
-const LONG_VALUE_GRAPH: WorkflowPreviewGraph = {
-  id: 'long-value-graph',
-  nodes: [{ id: 'note', type: 'integer', inputs: { value: LONG_STRING_VALUE } }],
-  edges: [],
-  version: 1,
-};
-
-const LONG_VALUE_SOURCE: GraphPreviewSourceState = {
+const DOCUMENT_SOURCE: GraphPreviewSourceState = {
   destinationLabel: 'Gallery',
-  graph: LONG_VALUE_GRAPH,
+  document: DOCUMENT,
+  graph: FIXTURE_GRAPH,
   invalidReasons: [],
-  isLive: false,
+  isLive: true,
   notices: [],
   summaryRows: [],
 };
@@ -368,11 +407,16 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
 
 const createGraphPreviewPort = (): WorkflowGraphPreviewPort => ({
   focusSource: vi.fn(),
-  getRoute: () => ({ canInvoke: true, label: 'Generate → Gallery' }),
-  invoke: vi.fn(() => Promise.resolve(true)),
   openDocumentInNewProject: vi.fn(),
   openWorkflowEditor: vi.fn(),
 });
+
+/** A host's Invoke: the dialog places it and says whether it can run. */
+const hostInvoke = (isReady: boolean): GraphPreviewInvoke => ({
+  control: <button data-host-invoke="">Host Invoke</button>,
+  isReady,
+});
+const READY = hostInvoke(true);
 
 describe('GraphPreviewDialog', () => {
   let host: HTMLDivElement;
@@ -386,7 +430,7 @@ describe('GraphPreviewDialog', () => {
     source: GraphPreviewSourceState,
     isOpen: boolean,
     sourceId: WorkflowInvocationSourceId,
-    hideInvoke: boolean
+    invoke: GraphPreviewInvoke | null
   ) => (
     <StrictMode>
       <ChakraProvider value={system}>
@@ -394,7 +438,7 @@ describe('GraphPreviewDialog', () => {
           <WorkflowGraphPreviewProvider adapter={graphPreviewPort}>
             <GraphPreviewDialog
               graphId="preview-graph-id"
-              hideInvoke={hideInvoke}
+              invoke={invoke ?? undefined}
               isOpen={isOpen}
               source={source}
               sourceId={sourceId}
@@ -412,10 +456,10 @@ describe('GraphPreviewDialog', () => {
     source: GraphPreviewSourceState,
     isOpen = true,
     sourceId: WorkflowInvocationSourceId = 'generate',
-    hideInvoke = false
+    invoke: GraphPreviewInvoke | null = READY
   ) => {
     await act(() => {
-      root.render(dialogTree(source, isOpen, sourceId, hideInvoke));
+      root.render(dialogTree(source, isOpen, sourceId, invoke));
     });
   };
 
@@ -427,41 +471,63 @@ describe('GraphPreviewDialog', () => {
     onExitComplete = vi.fn();
     graphPreviewPort = createGraphPreviewPort();
     workflowUiAdapter = createWorkflowUiAdapter();
+    clipboard.copyText.mockClear();
     downloads.downloadBlob.mockReset();
     downloads.downloadText.mockReset();
     createLibraryWorkflowRecordMock.mockReset();
     setLibraryWorkflowPublicMock.mockReset();
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
-    fitViewMock.mockClear();
     templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
   });
 
   afterEach(async () => {
     await act(() => root.unmount());
-    // The "Open as" menu's content portals to `document.body`, outside the
-    // React root this suite unmounts above — sweep it so a leftover node
-    // from one test can't answer a `[role="menuitem"]` query in the next.
+    // The More menu's content portals to `document.body`, outside the React root this suite unmounts above; sweep it
+    // so a leftover node from one test can't answer a `[role="menuitem"]` query in the next.
     document.querySelectorAll('[data-scope="menu"]').forEach((element) => element.remove());
     host.remove();
   });
 
-  const switchToMode = async (mode: 'graph' | 'list' | 'json') => {
-    const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((candidate) =>
-      candidate.id.endsWith(`-tab-${mode}`)
-    );
-    expect(tab).not.toBeUndefined();
+  const resizeViewport = async (width: number, height: number) => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
 
-    await act(() => {
-      tab?.click();
+    await page.viewport(width, height);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
+  };
+  /** The dialog's opening animation scales it; measure once it has played. */
+  const settleOpening = () =>
+    act(async () => {
+      await vi.waitFor(() => {
+        const content = document.querySelector('[data-scope="dialog"][data-part="content"]')!;
+
+        expect(
+          content.getAnimations({ subtree: true }).filter((animation) => animation.playState === 'running')
+        ).toEqual([]);
+      });
     });
-    // List mode loads on demand; wait for its rows before acting on them.
-    if (mode === 'list') {
-      await expect.element(page.getByRole('list').getByRole('button').first()).toBeVisible();
-    }
+  const stage = () => document.querySelector<HTMLElement>('[data-graph-preview-stage]');
+  const rail = () => document.querySelector<HTMLElement>('[data-graph-preview-rail]');
+  const title = () => document.querySelector('[data-scope="dialog"][data-part="title"]')?.textContent ?? null;
+  const description = () =>
+    document.querySelector('[data-scope="dialog"][data-part="description"]')?.textContent ?? null;
+  const previewNode = (id: string) => stage()?.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`) ?? null;
+  const drawnNodeIds = () =>
+    [...(stage()?.querySelectorAll<HTMLElement>('.react-flow__node') ?? [])].map((node) => node.dataset.id);
+  const nodeCard = () => stage()?.querySelector<HTMLElement>('[data-preview-node-card]') ?? null;
+  const press = (key: string) => act(() => userEvent.keyboard(key));
+
+  const waitForGraph = () =>
+    act(async () => {
+      await vi.waitFor(() => expect(stage()?.querySelector('.react-flow__node')).not.toBeNull());
+    });
+
+  const openCard = async (nodeId: string) => {
+    await act(() => userEvent.click(previewNode(nodeId)!));
+    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe(nodeId));
   };
 
-  const clickButtonWithText = async (text: string) => {
-    const button = [...document.querySelectorAll('button')].find((candidate) =>
+  const clickButtonWithText = async (text: string, scope: ParentNode = document) => {
+    const button = [...scope.querySelectorAll('button')].find((candidate) =>
       (candidate.textContent ?? '').includes(text)
     );
     expect(button).not.toBeUndefined();
@@ -472,8 +538,8 @@ describe('GraphPreviewDialog', () => {
   };
 
   // Wait for lazy menu portal mounting before querying items.
-  const openAsMenu = async () => {
-    await clickButtonWithText('Open as');
+  const openMoreMenu = async () => {
+    await act(() => document.querySelector<HTMLButtonElement>('[data-preview-more]')?.click());
     await act(async () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 40);
@@ -490,9 +556,8 @@ describe('GraphPreviewDialog', () => {
     const item = findMenuItemWithText(text);
     expect(item).not.toBeUndefined();
 
-    await act(() => {
-      (item as HTMLElement | undefined)?.click();
-    });
+    // Zag selects only the highlighted item, so this takes a real pointer click, which hovers it first.
+    await act(() => userEvent.click(item as HTMLElement));
   };
 
   // Await the detached save handler's async chain before asserting serialization, creation, and notification.
@@ -514,24 +579,371 @@ describe('GraphPreviewDialog', () => {
     return { promise, reject, resolve };
   };
 
-  it('renders summary rows, node count, and the live subtitle', async () => {
+  it('titles itself with the source and says when it follows the settings', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
-    const text = document.body.textContent ?? '';
+    expect(title()).toBe('Generate');
+    expect(description()).toBe('Updates as you change settings.');
 
-    expect(text).toContain('This graph');
-    expect(text).toContain('Gallery');
-    expect(text).toContain('3');
-    expect(text).toContain('Updates as you change settings.');
+    await renderDialog(PLAIN_SOURCE);
+
+    expect(description()).toBeNull();
   });
 
-  it('omits the destination row when the source was never routed anywhere', async () => {
-    await renderDialog(NO_DESTINATION_SOURCE);
+  it('names a document source by its workflow', async () => {
+    await renderDialog(DOCUMENT_SOURCE, true, 'workflow');
 
-    const panel = document.querySelector('[role="region"][aria-label="This graph"]');
-    // A "Destination —" row states nothing; the node count still shows.
-    expect(panel?.textContent ?? '').not.toContain('Destination');
-    expect(panel?.textContent ?? '').toContain('Nodes');
+    expect(title()).toBe('Portrait workflow');
+  });
+
+  it('draws a compiled graph as the library does: helpers folded, set fields and the result marked', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+
+    // The seed primitive folds into a pill on the denoiser, showing what runs rather than the compiled placeholder.
+    expect(drawnNodeIds()).toEqual(['denoise_latents', 'l2i']);
+    expect(previewNode('denoise_latents')?.querySelector('[data-preview-pill="seed"]')?.textContent).toBe(
+      'Integer Primitiveregenerated each run'
+    );
+    // The steps came from a setting: the node is marked as set; the decoder is what the graph makes.
+    expect(previewNode('denoise_latents')?.querySelector('[data-marker="exposed"]')).not.toBeNull();
+    expect(previewNode('l2i')?.querySelector('[data-marker="result"]')).not.toBeNull();
+    expect(stage()?.querySelector('[data-preview-legend]')?.textContent).toContain('You set this');
+  });
+
+  it('draws nodes this server has no template for', async () => {
+    await renderDialog(UNKNOWN_NODE_SOURCE);
+    await waitForGraph();
+
+    expect(drawnNodeIds()).toEqual(['mystery']);
+    expect(previewNode('mystery')?.textContent).toContain('Node pack missing');
+
+    await openCard('mystery');
+
+    expect(nodeCard()?.textContent).toContain('strength');
+  });
+
+  it('lists the source’s notices beside the graph, and a notice shows its node', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+
+    expect(rail()?.querySelector('[data-graph-preview-notice]')?.textContent).toContain('Seed is randomized');
+
+    await clickButtonWithText('Show node', rail()!);
+
+    // The seed is folded in the simplified view, so the graph opens in full with the seed's card.
+    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe('seed'));
+    expect(drawnNodeIds()).toEqual(['seed', 'denoise_latents', 'l2i']);
+    expect(nodeCard()?.textContent).toContain('regenerated each run');
+
+    // Asked again after the card closed, it shows the node again.
+    await press('{Escape}');
+    expect(nodeCard()).toBeNull();
+    await clickButtonWithText('Show node', rail()!);
+    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe('seed'));
+  });
+
+  it('links a set field to its setting, which it focuses before closing', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+    await openCard('denoise_latents');
+
+    const links = [...nodeCard()!.querySelectorAll('[data-preview-field-source]')].map((link) => link.textContent);
+    expect(links).toEqual(['Generate → Steps']);
+    // Named as the setting that set it.
+    expect([...nodeCard()!.querySelectorAll('dt')].some((label) => label.textContent?.startsWith('Steps'))).toBe(true);
+
+    await clickButtonWithText('Generate → Steps', nodeCard()!);
+
+    expect(graphPreviewPort.focusSource).toHaveBeenCalledWith('generate');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps an open card through live recompiles while its node survives, and closes it once the node is gone', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+    await openCard('denoise_latents');
+    expect(nodeCard()?.textContent).toContain('28');
+
+    // A value changes: the same drawing, the card showing the new value.
+    await renderDialog(withSteps(12));
+
+    expect(nodeCard()?.dataset.previewNodeCard).toBe('denoise_latents');
+    expect(nodeCard()?.textContent).toContain('12');
+    expect(nodeCard()?.textContent).not.toContain('28');
+
+    // The structure changes (the decoder goes): drawn afresh, the card still open on its node.
+    await renderDialog(
+      withGraph({ ...FIXTURE_GRAPH, edges: FIXTURE_GRAPH.edges.slice(0, 1), nodes: FIXTURE_GRAPH.nodes.slice(0, 2) })
+    );
+    await vi.waitFor(() => expect(drawnNodeIds()).not.toContain('l2i'));
+    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe('denoise_latents'));
+
+    await renderDialog(
+      withGraph({
+        ...FIXTURE_GRAPH,
+        edges: [],
+        nodes: FIXTURE_GRAPH.nodes.filter((node) => node.id !== 'denoise_latents'),
+      })
+    );
+    await waitForGraph();
+    await vi.waitFor(() => expect(drawnNodeIds()).not.toContain('denoise_latents'));
+
+    expect(nodeCard()).toBeNull();
+  });
+
+  it('closes an open card on Escape before the dialog', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+    await openCard('denoise_latents');
+
+    await press('{Escape}');
+
+    expect(nodeCard()).toBeNull();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await press('{Escape}');
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  const tabs = () => [...(stage()?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
+  const selectTab = async (view: 'nodes' | 'inputs' | 'graph') => {
+    const tab = tabs().find((candidate) => candidate.id.endsWith(`-tab-${view}`));
+
+    expect(tab, `no ${view} tab`).not.toBeUndefined();
+    await act(() => tab!.click());
+  };
+  const moreButton = () => document.querySelector<HTMLElement>('[data-preview-more]');
+
+  it('offers Nodes and Graph for a compiled source, and Inputs too for a document, whose form it reads', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+
+    expect(tabs().map((tab) => tab.textContent)).toEqual(['Nodes', 'Graph']);
+
+    await renderDialog(DOCUMENT_SOURCE, true, 'workflow');
+    await waitForGraph();
+
+    // Drawn from the document: the author's label names the node.
+    expect(previewNode('denoise_latents')?.textContent).toContain('Sampler');
+    expect(tabs().map((tab) => tab.textContent)).toEqual(['Nodes', 'Inputs 1', 'Graph']);
+
+    await selectTab('inputs');
+
+    expect(stage()?.querySelector('[data-preview-input="steps-field"]')?.textContent).toContain('steps');
+  });
+
+  it('keeps the tabs and More where they are in every view; only find comes and goes', async () => {
+    await resizeViewport(1288, 942);
+    await renderDialog(DOCUMENT_SOURCE, true, 'workflow');
+    await waitForGraph();
+    await settleOpening();
+
+    const tabStrip = () => stage()!.querySelector<HTMLElement>('[role="tablist"]')!.getBoundingClientRect().toJSON();
+    const more = () => moreButton()!.getBoundingClientRect().toJSON();
+    const nodes = { more: more(), tabs: tabStrip() };
+
+    expect(stage()?.querySelector('[data-preview-find]')).not.toBeNull();
+
+    for (const view of ['inputs', 'graph', 'nodes'] as const) {
+      await selectTab(view);
+      await vi.waitFor(() => expect({ more: more(), tabs: tabStrip() }).toEqual(nodes));
+      expect(stage()?.querySelector('[data-preview-find]') !== null).toBe(view === 'nodes');
+    }
+  });
+
+  it('shows the compiled backend graph in the Graph view, serialized only once that view shows', async () => {
+    const backendGraph = FIXTURE_GRAPH.backendGraph as Record<string, unknown>;
+    const toJSON = vi.fn(() => backendGraph);
+
+    await renderDialog(withGraph({ ...FIXTURE_GRAPH, backendGraph: { toJSON } }));
+    await waitForGraph();
+
+    expect(toJSON).not.toHaveBeenCalled();
+
+    await selectTab('graph');
+
+    await vi.waitFor(() =>
+      expect(stage()?.querySelector('[data-preview-json] code')?.textContent).toBe(
+        JSON.stringify(backendGraph, null, 2)
+      )
+    );
+  });
+
+  it('shows why a compiled source cannot compile, in the Nodes and Graph views alike', async () => {
+    await renderDialog(INVALID_SOURCE);
+
+    const reason = "This graph can't compile yet. Height must be a multiple of 8.";
+
+    expect(stage()?.querySelector('[role="tabpanel"] [role="alert"]')?.textContent).toBe(reason);
+
+    await selectTab('graph');
+
+    expect(stage()?.querySelector('[role="tabpanel"] [role="alert"]')?.textContent).toBe(reason);
+    // The menu stays where it is and says why there is no JSON to export.
+    await openMoreMenu();
+    expect(findMenuItemWithText('Copy graph JSON')?.textContent).toContain("This graph can't compile yet.");
+  });
+
+  it('draws a document that does not compile, with the reason beside it', async () => {
+    await renderDialog(
+      { ...DOCUMENT_SOURCE, graph: null, invalidReasons: ['Height must be a multiple of 8.'] },
+      true,
+      'workflow'
+    );
+    await waitForGraph();
+
+    expect(drawnNodeIds()).toEqual(['denoise_latents']);
+    expect(rail()?.querySelector('[data-graph-preview-blocked]')?.textContent).toBe(
+      "This graph can't compile yet. Height must be a multiple of 8."
+    );
+  });
+
+  it('says when a widget has no compiled graph yet', async () => {
+    await renderDialog({ ...PLAIN_SOURCE, graph: null });
+
+    expect(stage()?.querySelector('[role="tabpanel"]')?.textContent).toBe(
+      'No compiled graph is available for "preview-graph-id" yet.'
+    );
+  });
+
+  it('opens at the library dialog’s size, so the two previews read the same', async () => {
+    await resizeViewport(1288, 942);
+    await renderDialog(FIXTURE_SOURCE);
+    await settleOpening();
+
+    const box = document.querySelector('[data-scope="dialog"][data-part="content"]')!.getBoundingClientRect();
+
+    // The window less 4rem wide (under the 80rem cap) and 80% of its height.
+    expect(Math.round(box.width)).toBe(1288 - 4 * 16);
+    expect(Math.round(box.height)).toBe(Math.round(942 * 0.8));
+  });
+
+  it('fits a graph clear of the stage’s controls, on opening and on Fit', async () => {
+    await resizeViewport(1288, 942);
+    // Two results at opposite corners, spanning about the stage's shape: fitted to the whole stage, the top-left one
+    // would sit under the legend.
+    const corners: WorkflowPreviewGraph = {
+      edges: [],
+      id: 'corners',
+      nodes: [
+        { id: 'top-left', inputs: {}, type: 'l2i' },
+        { id: 'bottom-right', inputs: {}, type: 'l2i' },
+      ],
+      version: 1,
+    };
+
+    await renderDialog({
+      ...PLAIN_SOURCE,
+      graph: corners,
+      positionHints: { 'bottom-right': { x: 1890, y: 1038 }, 'top-left': { x: 0, y: 0 } },
+    });
+    await waitForGraph();
+
+    const expectClear = (selector: string) => {
+      const controls = [...stage()!.querySelectorAll(selector)].map((control) => control.getBoundingClientRect());
+
+      for (const node of stage()!.querySelectorAll('.react-flow__node')) {
+        const box = node.getBoundingClientRect();
+
+        for (const control of controls) {
+          const overlaps =
+            box.left < control.right &&
+            control.left < box.right &&
+            box.top < control.bottom &&
+            control.top < box.bottom;
+
+          expect(overlaps, `${(node as HTMLElement).dataset.id} under a control`).toBe(false);
+        }
+      }
+    };
+
+    await settleOpening();
+    // Opening: fitted or, when too tall to read fitted, from the top; either way the legend covers no node.
+    expect(stage()?.querySelector('[data-preview-legend]')).not.toBeNull();
+    expectClear('[data-preview-legend]');
+
+    await clickButtonWithText('workflowLibrary.preview.fit', stage()!);
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 300);
+      });
+    });
+    // Fitted: the whole graph in the stage's open area, clear of every control.
+    expectClear('[data-preview-overlay]');
+  });
+
+  it('widens every chip for its longest title where the stage has the room', async () => {
+    await resizeViewport(1288, 942);
+    const graph: WorkflowPreviewGraph = {
+      edges: [
+        {
+          id: 'e',
+          sourceField: 'conditioning',
+          sourceNodeId: 'prompt',
+          targetField: 'latents',
+          targetNodeId: 'decode',
+        },
+      ],
+      id: 'wide',
+      nodes: [
+        { id: 'prompt', inputs: {}, type: 'sdxl_compel' },
+        { id: 'decode', inputs: {}, type: 'l2i' },
+      ],
+      version: 1,
+    };
+
+    await renderDialog({ ...PLAIN_SOURCE, graph });
+    await waitForGraph();
+
+    const width = (id: string) => previewNode(id)!.offsetWidth;
+    const title = previewNode('prompt')!.querySelector<HTMLElement>('[data-preview-chip] p')!;
+
+    // One width for every chip, past the narrowest, and the long title whole.
+    expect(width('prompt')).toBeGreaterThan(136);
+    expect(width('decode')).toBe(width('prompt'));
+    expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);
+  });
+
+  it('keeps its drawing when a host hands a new source object around the same graph each render', async () => {
+    // A host that rebuilds the source on every render, its callbacks fresh each time.
+    const asked: string[] = [];
+    const rebuilt = () => ({
+      ...FIXTURE_SOURCE,
+      getProvenance: (nodeId: string, fieldName: string) => {
+        asked.push(nodeId);
+        return FIXTURE_SOURCE.getProvenance!(nodeId, fieldName);
+      },
+    });
+
+    await renderDialog(rebuilt());
+    await waitForGraph();
+    await openCard('denoise_latents');
+    const chip = previewNode('l2i');
+    asked.length = 0;
+
+    for (let render = 0; render < 3; render += 1) {
+      await renderDialog(rebuilt());
+    }
+
+    // Nothing rebuilt: the seed's fields (no card shows them) were not asked about again; the drawing and card stay.
+    expect(asked).not.toContain('seed');
+    expect(previewNode('l2i')).toBe(chip);
+    expect(nodeCard()?.dataset.previewNodeCard).toBe('denoise_latents');
+  });
+
+  it('starts no model or starter request, open or closed', async () => {
+    const { ensureModelsLoaded, ensureStartersLoaded } = await import('@features/models');
+
+    vi.mocked(ensureModelsLoaded).mockClear();
+    vi.mocked(ensureStartersLoaded).mockClear();
+    await renderDialog(FIXTURE_SOURCE, false);
+    await renderDialog(FIXTURE_SOURCE);
+    await waitForGraph();
+
+    expect(ensureModelsLoaded).not.toHaveBeenCalled();
+    expect(ensureStartersLoaded).not.toHaveBeenCalled();
   });
 
   it('reports when its close transition has finished, so hosts can drop the mount', async () => {
@@ -541,8 +953,7 @@ describe('GraphPreviewDialog', () => {
 
     await renderDialog(FIXTURE_SOURCE, false);
 
-    // The exit animation runs in real time; polling inside `act` keeps its
-    // final commit inside an open act scope.
+    // The exit animation runs in real time; polling inside `act` keeps its final commit inside an open act scope.
     await act(async () => {
       await vi.waitFor(() => {
         expect(onExitComplete).toHaveBeenCalled();
@@ -550,188 +961,53 @@ describe('GraphPreviewDialog', () => {
     });
   });
 
-  it('stays landscape on a tall viewport instead of growing into a full-height column', async () => {
-    const original = { height: window.innerHeight, width: window.innerWidth };
-
-    try {
-      // Resized deliberately: at the default test viewport (~866px tall) an
-      // 80vh dialog and a 46rem-capped one measure within pixels of each other,
-      // so nothing asserted at that size can tell the two sizings apart.
-      await page.viewport(1280, 1400);
-      await renderDialog(FIXTURE_SOURCE);
-
-      const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]');
-      expect(content).not.toBeNull();
-
-      const box = content?.getBoundingClientRect();
-
-      // A viewport-proportional height would be ~1100px here; the cap is 46rem.
-      expect(box?.height ?? 0).toBeLessThanOrEqual(46 * 16 + 1);
-      // Which leaves the dialog the shape a graph reads in.
-      expect(box?.width ?? 0).toBeGreaterThan(box?.height ?? 0);
-    } finally {
-      await page.viewport(original.width, original.height);
-    }
-  });
-
-  it('shows the seed notice inline in the summary panel', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    const panel = document.querySelector('[role="region"][aria-label="This graph"]');
-    expect(panel?.textContent ?? '').toContain('Seed is randomized');
-  });
-
-  it('switches to JSON mode', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    expect(document.querySelector('[data-flow-stub]')).not.toBeNull();
-
-    await switchToMode('json');
-
-    expect(document.querySelector('[data-flow-stub]')).toBeNull();
-    expect(document.body.textContent ?? '').toContain('"denoise_latents"');
-  });
-
-  it('shows the first invalid reason and no flow pane when compile is blocked', async () => {
-    await renderDialog(INVALID_SOURCE);
-
-    expect(document.body.textContent ?? '').toContain('Height must be a multiple of 8.');
-    expect(document.querySelector('[data-flow-stub]')).toBeNull();
-  });
-
-  it('renders the side panel only in graph mode', async () => {
-    // The fixture's own notice text ("...This graph runs differently each
-    // time.") contains the panel's heading as a substring, so this checks
-    // for the panel's `Scrollable` region (`aria-label="This graph"`)
-    // instead of a raw text match.
-    const findSidePanel = () => document.querySelector('[role="region"][aria-label="This graph"]');
+  it('reopens on the nodes, unfiltered, with no card open', async () => {
+    const findField = () => document.querySelector<HTMLInputElement>('[data-preview-find]');
 
     await renderDialog(FIXTURE_SOURCE);
-
-    // Graph mode (the default): the panel is present.
-    expect(findSidePanel()).not.toBeNull();
-
-    await switchToMode('list');
-    expect(findSidePanel()).toBeNull();
-
-    await switchToMode('json');
-    expect(findSidePanel()).toBeNull();
-
-    await switchToMode('graph');
-    expect(findSidePanel()).not.toBeNull();
-  });
-
-  it('disables Copy JSON when there is no compiled graph to copy', async () => {
-    await renderDialog(INVALID_SOURCE);
-
-    const copyButton = [...document.querySelectorAll('button')].find((candidate) =>
-      (candidate.textContent ?? '').includes('Copy JSON')
-    );
-
-    expect(copyButton).toBeInstanceOf(HTMLButtonElement);
-    expect((copyButton as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('selecting a node from the list opens the inspector with resolved inputs and edges', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    await switchToMode('list');
-    expect(document.querySelector('[data-flow-stub]')).toBeNull();
-
-    await clickButtonWithText('denoise_latents');
-
-    // List selection reveals the node in graph mode, not list mode.
-    const graphTab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find((candidate) =>
-      candidate.id.endsWith('-tab-graph')
-    );
-    expect(graphTab?.getAttribute('aria-selected')).toBe('true');
-    expect(document.querySelector('[data-flow-stub]')).not.toBeNull();
-
-    const text = document.body.textContent ?? '';
-    expect(text).toContain('denoise_latents');
-    expect(text).toContain('Resolved inputs');
-    expect(text).toContain('28');
-    expect(text).toContain('Set by');
-    expect(text).toContain('Generate → Steps');
-
-    // Exercise both incoming and outgoing edge details, not merely their heading.
-    expect(text).toContain('Edges');
-    expect(text).toContain('in · 1 inputs from seed');
-    expect(text).toContain('out · latents → l2i');
-
-    // List-mode reveal must wait for the remounted flow's onInit rather than use the destroyed previous instance.
-    expect(fitViewMock).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: 'denoise_latents' }] }));
-  });
-
-  it('lists nodes as a named list and marks the selected node when returning to list mode', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    await switchToMode('list');
-    const list = () => document.querySelector<HTMLElement>('[role="list"][aria-label="Nodes"]');
-
-    expect(list()).not.toBeNull();
-    expect(list()!.querySelectorAll('[role="listitem"]').length).toBeGreaterThan(1);
-    expect(list()!.querySelector('[aria-current="true"]')).toBeNull();
-
-    await clickButtonWithText('denoise_latents');
-    await switchToMode('list');
-
-    const current = list()!.querySelector<HTMLElement>('[data-list-primary][aria-current="true"]');
-
-    expect(current?.textContent).toContain('denoise_latents');
-    // The selected node is the list's single tab stop, so keyboard users land on it.
-    expect(current?.tabIndex).toBe(0);
-    expect(list()!.querySelectorAll('[data-list-primary][tabindex="0"]')).toHaveLength(1);
-  });
-
-  it('show node selects the seed node and inspector shows the randomized override', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    await clickButtonWithText('show node');
-
-    const text = document.body.textContent ?? '';
-    expect(text).toContain('integer');
-    expect(text).toContain('seed');
-    expect(text).toContain('regenerated each run');
-
-    // Graph-mode reveal uses the already-mounted instance immediately.
-    expect(fitViewMock).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: 'seed' }] }));
-  });
-
-  it('clicking a provenance link focuses the source and closes the dialog', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    await switchToMode('list');
-    await clickButtonWithText('denoise_latents');
-    await clickButtonWithText('Generate → Steps');
-
-    expect(graphPreviewPort.focusSource).toHaveBeenCalledWith('generate');
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it('clears the selected node when the dialog closes and reopens', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    await switchToMode('list');
-    await clickButtonWithText('denoise_latents');
-    expect(document.body.textContent ?? '').toContain('Resolved inputs');
-
-    // Model the controlled close/reopen round trip to verify selection resets.
-    await clickButtonWithText('Close');
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitForGraph();
+    await act(() => userEvent.fill(findField()!, 'latents'));
+    await openCard('denoise_latents');
 
     await renderDialog(FIXTURE_SOURCE, false);
+    await act(async () => {
+      await vi.waitFor(() => expect(onExitComplete).toHaveBeenCalled());
+    });
     await renderDialog(FIXTURE_SOURCE, true);
+    await waitForGraph();
 
-    const text = document.body.textContent ?? '';
-    expect(text).toContain('Select a node for details.');
-    expect(text).not.toContain('Resolved inputs');
+    expect(nodeCard()).toBeNull();
+    expect(findField()?.value).toBe('');
   });
 
-  it('Open as → Edit in workflow editor adds the document as a project workflow, opens the editor, closes the dialog', async () => {
+  it('More → Copy graph JSON copies the compiled backend graph', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
+    await clickMenuItemWithText('Copy graph JSON');
+    await flushAsync();
+
+    expect(clipboard.copyText).toHaveBeenCalledWith(JSON.stringify(FIXTURE_GRAPH.backendGraph, null, 2));
+    expect(workflowUiAdapter.notifications.success).toHaveBeenCalledWith('Graph JSON copied');
+  });
+
+  it('More → Download graph JSON downloads the compiled backend graph', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openMoreMenu();
+    await clickMenuItemWithText('Download graph JSON');
+
+    expect(downloads.downloadText).toHaveBeenCalledWith(
+      JSON.stringify(FIXTURE_GRAPH.backendGraph, null, 2),
+      'graph.json',
+      'application/json'
+    );
+  });
+
+  it('More → Edit in workflow editor adds the document as a project workflow, opens the editor, closes the dialog', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openMoreMenu();
     await clickMenuItemWithText('Edit in workflow editor');
 
     expect(workflowUiAdapter.commands.addWorkflow).toHaveBeenCalledTimes(1);
@@ -743,10 +1019,10 @@ describe('GraphPreviewDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('Open as → Fork into new project hands the named document to the port and closes the dialog', async () => {
+  it('More → Fork into new project hands the named document to the port and closes the dialog', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Fork into new project');
 
     expect(graphPreviewPort.openDocumentInNewProject).toHaveBeenCalledTimes(1);
@@ -759,72 +1035,123 @@ describe('GraphPreviewDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('Open as → Download JSON downloads the backend graph', async () => {
-    await renderDialog(FIXTURE_SOURCE);
+  it('More → Fork into new project copies a document source, keeping its labels and form', async () => {
+    await renderDialog(
+      { ...DOCUMENT_SOURCE, graph: null, invalidReasons: ['Height must be a multiple of 8.'] },
+      true,
+      'workflow'
+    );
 
-    await openAsMenu();
-    await clickMenuItemWithText('Download JSON');
+    await openMoreMenu();
+    await clickMenuItemWithText('Fork into new project');
 
-    expect(downloads.downloadText).toHaveBeenCalledTimes(1);
-    const [content, fileName, type] = vi.mocked(downloads.downloadText).mock.calls[0] ?? [];
-    expect(content).toContain('"denoise_latents"');
-    expect(fileName).toBe('graph.json');
-    expect(type).toBe('application/json');
+    const [document_] = vi.mocked(graphPreviewPort.openDocumentInNewProject).mock.calls[0] ?? [];
+    // A copy of its own, even while it does not compile.
+    expect(document_?.id).not.toBe(DOCUMENT.id);
+    expect(document_?.name).toBe('Portrait workflow');
+    expect(document_?.nodes.map((node) => (node.type === 'invocation' ? node.data.label : null))).toEqual(['Sampler']);
+    expect(document_?.form).toEqual(DOCUMENT.form);
   });
 
   it('hides Edit in workflow editor for the workflow source', async () => {
     await renderDialog(FIXTURE_SOURCE, true, 'workflow');
 
-    await openAsMenu();
+    await openMoreMenu();
 
     expect(findMenuItemWithText('Edit in workflow editor')).toBeUndefined();
     expect(findMenuItemWithText('Save to workflow library')).not.toBeUndefined();
-    expect(findMenuItemWithText('Download JSON')).not.toBeUndefined();
+    expect(findMenuItemWithText('Download graph JSON')).not.toBeUndefined();
   });
 
-  it('renders the footer Invoke button by default', async () => {
-    await renderDialog(FIXTURE_SOURCE);
-
-    const buttonText = [...document.querySelectorAll('button')].map((button) => button.textContent ?? '');
-    expect(buttonText.some((text) => text.includes('Invoke Generate → Gallery'))).toBe(true);
-  });
-
-  it('keeps the footer Invoke button inert while the route cannot be invoked', async () => {
-    graphPreviewPort = {
-      ...createGraphPreviewPort(),
-      getRoute: () => ({ canInvoke: false, label: 'Generate → Gallery', validationMessage: 'Preparing generation…' }),
-    };
-    await renderDialog(FIXTURE_SOURCE);
-
-    const button = [...document.querySelectorAll('button')].find((candidate) =>
-      (candidate.textContent ?? '').includes('Invoke Generate → Gallery')
+  const footer = () => document.querySelector<HTMLElement>('[data-graph-preview-footer]');
+  const readiness = () => footer()?.querySelector<HTMLElement>('[data-graph-preview-readiness]') ?? null;
+  const railFacts = () =>
+    [...(rail()?.querySelectorAll('[data-graph-preview-facts] dt') ?? [])].map(
+      (label) => `${label.textContent}: ${label.nextElementSibling?.textContent}`
     );
-    expect(button?.getAttribute('aria-disabled')).toBe('true');
-    expect(button?.getAttribute('title')).toBe('Preparing generation…');
 
-    await clickButtonWithText('Invoke Generate → Gallery');
+  it('says only whether it can invoke in the footer, the run’s facts and destination in the rail', async () => {
+    await renderDialog(FIXTURE_SOURCE);
 
-    expect(graphPreviewPort.invoke).not.toHaveBeenCalled();
-    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(readiness()?.textContent).toBe('Ready to invoke');
+    expect(readiness()?.querySelector('[aria-live="polite"]')?.textContent).toBe('Ready to invoke');
+    expect(footer()?.querySelector('[data-host-invoke]')).not.toBeNull();
+    // Above the notices, as label and value; the destination said there, not again under the title.
+    expect(railFacts()).toEqual(['Steps: 28', 'Model: SDXL', 'Destination: Gallery']);
+    expect(
+      rail()!
+        .querySelector('[data-graph-preview-facts]')!
+        .compareDocumentPosition(rail()!.querySelector('[data-graph-preview-notice]')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(description()).toBe('Updates as you change settings.');
+
+    await renderDialog(FIXTURE_SOURCE, true, 'generate', hostInvoke(false));
+
+    expect(readiness()?.textContent).toBe("Can't invoke yet");
+    expect(railFacts()).toEqual(['Steps: 28', 'Model: SDXL', 'Destination: Gallery']);
   });
 
-  it('hideInvoke hides only the footer Invoke button — Copy JSON and Open as stay', async () => {
-    await renderDialog(FIXTURE_SOURCE, true, 'generate', true);
+  it('shows the rail for facts alone, and none for a source with nothing to say beside the graph', async () => {
+    await renderDialog({ ...PLAIN_SOURCE, destinationLabel: 'Gallery' });
 
-    const buttonText = [...document.querySelectorAll('button')].map((button) => button.textContent ?? '');
-    expect(buttonText.some((text) => text.includes('Invoke'))).toBe(false);
-    expect(buttonText.some((text) => text.includes('Copy JSON'))).toBe(true);
-    expect(buttonText.some((text) => text.includes('Open as'))).toBe(true);
+    expect(railFacts()).toEqual(['Destination: Gallery']);
+
+    await renderDialog(PLAIN_SOURCE);
+
+    expect(rail()).toBeNull();
   });
 
-  it('Open as → Save to workflow library names the document from the source label and notifies success', async () => {
+  it('offers a compiled source as a workflow to edit, left of Invoke', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    expect([...footer()!.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+      'Edit as workflow',
+      'Host Invoke',
+    ]);
+    await clickButtonWithText('Edit as workflow', footer()!);
+
+    expect(workflowUiAdapter.commands.addWorkflow).toHaveBeenCalledTimes(1);
+    expect(graphPreviewPort.openWorkflowEditor).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    // A document is already a workflow.
+    await renderDialog(DOCUMENT_SOURCE, true, 'workflow');
+
+    expect(footer()?.querySelector('[data-graph-preview-edit-as-workflow]')).toBeNull();
+  });
+
+  it('closes from the header, with no footer Close', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    const close = document.querySelector<HTMLButtonElement>('[data-scope="dialog"][data-part="close-trigger"]');
+
+    // In the header, beside the title.
+    expect(close?.parentElement?.contains(document.querySelector('[data-scope="dialog"][data-part="title"]'))).toBe(
+      true
+    );
+    expect(footer()?.textContent).not.toContain('Close');
+    await act(() => close!.click());
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('without a host Invoke has no footer; the facts stay in the rail', async () => {
+    await renderDialog(FIXTURE_SOURCE, true, 'generate', null);
+
+    expect(footer()).toBeNull();
+    expect(railFacts()).toEqual(['Steps: 28', 'Model: SDXL', 'Destination: Gallery']);
+    expect(document.querySelector('[data-preview-more]')).not.toBeNull();
+  });
+
+  it('More → Save to workflow library names the document from the source label and notifies success', async () => {
     createLibraryWorkflowRecordMock.mockImplementation((workflow: Record<string, unknown>) =>
       Promise.resolve({ name: workflow.name, revision: 1, workflow, workflow_id: 'library-workflow-1' })
     );
 
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -843,7 +1170,7 @@ describe('GraphPreviewDialog', () => {
     expect(setLibraryWorkflowPublicMock).not.toHaveBeenCalled();
   });
 
-  it('Open as → Save to workflow library offers the public visibility choice in multiuser mode', async () => {
+  it('More → Save to workflow library offers the public visibility choice in multiuser mode', async () => {
     identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
     createLibraryWorkflowRecordMock.mockImplementation(
       (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
@@ -861,7 +1188,7 @@ describe('GraphPreviewDialog', () => {
 
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
 
     const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
@@ -903,7 +1230,7 @@ describe('GraphPreviewDialog', () => {
 
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
     expect(checkbox).not.toBeNull();
@@ -936,12 +1263,12 @@ describe('GraphPreviewDialog', () => {
     expect(workflowUiAdapter.commands.setWorkflowSource).not.toHaveBeenCalled();
   });
 
-  it('Open as → Save to workflow library retries a lost answer once under the same reserved id, never claiming success', async () => {
+  it('More → Save to workflow library retries a lost answer once under the same reserved id, never claiming success', async () => {
     createLibraryWorkflowRecordMock.mockRejectedValue(new Error('network down'));
 
     await renderDialog(FIXTURE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -952,10 +1279,10 @@ describe('GraphPreviewDialog', () => {
     expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
   });
 
-  it('Open as → Save to workflow library bails with an error notification when the graph has no saveable nodes', async () => {
+  it('More → Save to workflow library bails with an error notification when the graph has no saveable nodes', async () => {
     await renderDialog(UNKNOWN_NODE_SOURCE);
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -969,7 +1296,7 @@ describe('GraphPreviewDialog', () => {
     templatesSnapshotRef.current = { error: null, status: 'loading', templates: {} };
 
     await renderDialog(FIXTURE_SOURCE);
-    await openAsMenu();
+    await openMoreMenu();
 
     const item = findMenuItemWithText('Save to workflow library');
     expect(item).not.toBeUndefined();
@@ -980,13 +1307,12 @@ describe('GraphPreviewDialog', () => {
     templatesSnapshotRef.current = { error: null, status: 'loading', templates: {} };
 
     await renderDialog(FIXTURE_SOURCE);
-    await openAsMenu();
+    await openMoreMenu();
 
     let item = findMenuItemWithText('Fork into new project');
     expect(item?.getAttribute('aria-disabled')).toBe('true');
 
-    templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
-    await renderDialog(FIXTURE_SOURCE);
+    await setTemplatesSnapshot(TEMPLATES_SNAPSHOT);
 
     item = findMenuItemWithText('Fork into new project');
     expect(item?.getAttribute('aria-disabled')).not.toBe('true');
@@ -1013,7 +1339,7 @@ describe('GraphPreviewDialog', () => {
     setLibraryWorkflowPublicMock.mockReturnValue(visibilityRequest.promise);
 
     await renderDialog(FIXTURE_SOURCE);
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
     expect(checkbox).not.toBeNull();
@@ -1045,7 +1371,7 @@ describe('GraphPreviewDialog', () => {
       .mockReturnValueOnce(retry.promise);
 
     await renderDialog(FIXTURE_SOURCE);
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -1081,7 +1407,7 @@ describe('GraphPreviewDialog', () => {
       );
 
     await renderDialog(FIXTURE_SOURCE);
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -1092,7 +1418,7 @@ describe('GraphPreviewDialog', () => {
       throw new Error('Expected the first preview publication request');
     }
 
-    await openAsMenu();
+    await openMoreMenu();
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
@@ -1102,20 +1428,5 @@ describe('GraphPreviewDialog', () => {
     await act(() => root.render(null));
 
     expect(getUnresolvedWorkflowPublication('project-1', firstRequest.workflowId)).toBeNull();
-  });
-
-  it('truncates a long resolved-input string and exposes the full value via title', async () => {
-    await renderDialog(LONG_VALUE_SOURCE);
-
-    await switchToMode('list');
-    await clickButtonWithText('note');
-
-    const truncated = `${LONG_STRING_VALUE.slice(0, 40)}…`;
-    const valueElement = [...document.querySelectorAll('dd')].find((element) => element.textContent === truncated);
-
-    expect(valueElement).not.toBeUndefined();
-    expect(valueElement?.getAttribute('title')).toBe(LONG_STRING_VALUE);
-    // The untruncated value never appears verbatim in the rendered text.
-    expect(document.body.textContent ?? '').not.toContain(LONG_STRING_VALUE);
   });
 });

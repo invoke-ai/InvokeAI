@@ -170,14 +170,11 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
   'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
   'workflowLibrary.deleteFailed': 'Failed to delete workflow',
-  'workflowLibrary.deleteHint': 'Removes it from your library',
   'workflowLibrary.downloadJson': 'Download JSON',
-  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
   'workflowLibrary.rename': 'Rename',
   'workflowLibrary.renameFailed': 'Rename failed',
-  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
   'workflowLibrary.renameTemplateTitle': 'Rename template',
   'workflowLibrary.renameWithEllipsis': 'Rename…',
   'workflowLibrary.renamed': 'Template renamed',
@@ -191,12 +188,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.thumbnailUpdateFailed': 'Failed to update thumbnail',
   'workflowLibrary.thumbnailUpdated': 'Thumbnail updated',
   'workflowLibrary.thumbnailUpdating': 'Updating thumbnail…',
-  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
   'workflowLibrary.findModel': 'Find {{name}} in the model manager',
   'workflowLibrary.forkIntoProject': 'Fork into new project',
-  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.installQueued': 'Model installs queued',
@@ -205,9 +200,8 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
-  'workflowLibrary.openHint': 'Adds a copy to this project',
   'workflowLibrary.openWithEllipsis': 'Open…',
-  'workflowLibrary.previewGraph': 'Preview graph',
+  'workflowLibrary.preview.action': 'Preview',
   'workflowLibrary.requirementInstallable': 'Not installed',
   'workflowLibrary.requirementInstalled': 'Installed',
   'workflowLibrary.requirementInstalling': 'Installing…',
@@ -413,7 +407,7 @@ describe('WorkflowLibraryDetailPanel', () => {
   let onDeleted: (workflowId: string) => void;
   let onDuplicated: (workflowId: string) => void;
   let onOpen: (item: WorkflowLibraryEntry['item']) => void;
-  let onPreview: (selected: WorkflowLibraryEntry) => void;
+  let onPreview: (workflowId: string) => void;
 
   /** See `WorkflowLibraryDialog.browser.test.tsx`: keeps Chakra's observer-driven commits inside the act scope. */
   const settleFrame = () =>
@@ -497,7 +491,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     });
   };
 
-  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[data-menu-item="${value}"]`);
+  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
 
   const clickMenuItem = async (value: string) => {
     await openMenu();
@@ -505,10 +499,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     const item = menuItem(value);
     expect(item, `no menu item "${value}"`).not.toBeNull();
 
-    await act(async () => {
-      item?.click();
-      await settleFrame();
-    });
+    // Zag selects only the highlighted item, so this takes a real pointer click, which hovers it first.
+    await act(() => userEvent.click(item!));
+    await act(settleFrame);
   };
 
   beforeEach(() => {
@@ -1164,10 +1157,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     await openMenu();
     expect(menuItem('duplicate')?.getAttribute('aria-disabled')).toBe('true');
 
-    await act(async () => {
-      menuItem('duplicate')?.click();
-      await settleFrame();
-    });
+    // Forced past the pointer's actionability wait, so the press reaches the disabled item.
+    await act(() => userEvent.click(menuItem('duplicate')!, { force: true }));
+    await act(settleFrame);
 
     await act(async () => {
       release(RAW_WORKFLOW);
@@ -1300,9 +1292,6 @@ describe('WorkflowLibraryDetailPanel', () => {
   it('deletes only after the confirmation is accepted', async () => {
     await renderPanel(TEXT_TO_IMAGE);
 
-    await openMenu();
-    expect(menuItem('delete')?.textContent).toContain('Removes it from your library');
-
     await clickMenuItem('delete');
 
     const confirm = document.querySelector<HTMLElement>('[role="alertdialog"]');
@@ -1373,12 +1362,12 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
   });
 
-  it('hands the selected entry to the preview action', async () => {
+  it('asks to preview the selected workflow', async () => {
     await renderPanel(IMAGE_TO_VIDEO);
 
-    await clickButton('Preview graph');
+    await clickButton('Preview');
 
-    expect(onPreview).toHaveBeenCalledWith(IMAGE_TO_VIDEO);
+    expect(onPreview).toHaveBeenCalledWith(IMAGE_TO_VIDEO.item.workflow_id);
   });
 
   it('links only the rows the account is missing, and takes them to Add Models', async () => {

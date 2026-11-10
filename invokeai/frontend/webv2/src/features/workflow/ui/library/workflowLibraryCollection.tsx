@@ -3,7 +3,7 @@ import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowse
 import { loadWorkflowLibraryRange, setWorkflowLibraryVisibleDemand } from '@features/workflow/data/libraryBrowseStore';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 /**
  * What the grid and the list layouts share over one collection: duplicate-safe entries, the templates the project
@@ -95,4 +95,21 @@ export const WorkflowLibraryDemand = ({ ids, start, end }: { ids: readonly strin
     };
   });
   return null;
+};
+
+/**
+ * A demand key that stops following its window while the collection is hidden under the preview stage: the demand
+ * keeps the positions it showed, so a preview stepping elsewhere in the results does not pull the window back, and
+ * showing the collection again demands its window afresh only if that window changed meanwhile.
+ */
+export const useFrozenWhileHidden = (key: string, isHidden: boolean): string => {
+  const [frozenKey, setFrozenKey] = useState<string | null>(null);
+
+  if (isHidden && frozenKey === null) {
+    setFrozenKey(key);
+  } else if (!isHidden && frozenKey !== null) {
+    setFrozenKey(null);
+  }
+
+  return (isHidden ? frozenKey : null) ?? key;
 };
