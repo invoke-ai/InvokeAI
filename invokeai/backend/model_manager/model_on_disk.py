@@ -27,7 +27,9 @@ SAFETENSORS_DTYPES: dict[str, torch.dtype] = {
     "U8": torch.uint8,
     "I8": torch.int8,
     "F8_E4M3": torch.float8_e4m3fn,
+    "F8_E4M3FNUZ": torch.float8_e4m3fnuz,
     "F8_E5M2": torch.float8_e5m2,
+    "F8_E5M2FNUZ": torch.float8_e5m2fnuz,
     "U16": torch.uint16,
     "I16": torch.int16,
     "BF16": torch.bfloat16,
@@ -38,9 +40,13 @@ SAFETENSORS_DTYPES: dict[str, torch.dtype] = {
     "U64": torch.uint64,
     "I64": torch.int64,
     "F64": torch.float64,
+    "C64": torch.complex64,
 }
-"""safetensors dtype names mapped to their torch equivalents. The sub-byte formats (F4, F6_E2M3, F6_E3M2) are absent:
-their header shapes count 4- and 6-bit elements, which no torch dtype stores one per element."""
+"""safetensors dtype names mapped to their torch equivalents: every dtype `safetensors.torch` reads but F4, because the
+single-file loaders read through the header, and a missing name fails a file `load_file` loads -- at generation, since
+identification falls back to the full load and installs it. The sub-byte formats (F4, F6_E2M3, F6_E3M2) are absent:
+their header shapes count 4- and 6-bit elements, which no torch dtype stores one per element. `load_file` reads F4 as
+`float4_e2m1fn_x2` with the last dimension halved; no loader casts such a tensor, so it is refused here by name."""
 
 # MXFP8 exponent grids, which loaders refuse by name (`fp8_scaled.reject_undecoded_mx_scale`), so they have to get as
 # far as that check. Guarded like `fp8_scaled._MX_SCALE_DTYPES`: older torch builds lack the dtype.

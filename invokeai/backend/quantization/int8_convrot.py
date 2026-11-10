@@ -1201,9 +1201,15 @@ def install_int8_convrot_layers(
         predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns) + extra_reserved_bytes
     )
     if read is not None:
-        for key, tensor in sd.items():
-            if tensor.is_meta:
-                sd[key] = read(key)
+        # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading
+        # an fp32 file's dense tensors first and casting them afterwards holds twice what was reserved, in anonymous
+        # memory. The marked layers' payloads stay as stored for the split to keep or decode. No local holds the payload:
+        # it would keep the stored tensor alive through the next read.
+        marked = _pinned_quantized_keys(quantized)
+        for key in [key for key, tensor in sd.items() if tensor.is_meta]:
+            sd[key] = read(key)
+            if key not in marked and is_castable_float(sd[key]):
+                sd[key] = sd[key].to(dtype)
     surviving = split_int8_convrot_layers(sd, quantized, dtype, model=model, skip_patterns=skip_patterns)
     cast_unquantized(sd, dtype, surviving)
     swap_in_int8_linears(model, sd, surviving)
