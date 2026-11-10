@@ -40,6 +40,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useWorkbenchCommands: () => harness.store!.commands,
 }));
 
+import { getLayerChildSelection, selectLayerChild } from './layerChildSelection';
 import { CanvasLayerContextMenu } from './LayerContextMenu';
 
 const i18n = createInstance();
@@ -143,7 +144,7 @@ const renderMenu = async (
   };
   const document_ = () => store.getState().projects[0]!.canvas.document;
   const notices = () => store.getState().notifications.map(({ message, title }) => [title, message]);
-  return { document: document_, engine, notices, openMenu };
+  return { document: document_, engine, notices, openMenu, projectId };
 };
 
 const item = (name: string) => page.getByRole('menuitem', { exact: true, name });
@@ -218,6 +219,16 @@ describe('Layers context menu over a real engine', () => {
       expect(document().stacks).toBe(before.stacks);
     }
   );
+
+  it('opens Layer properties on the layer itself, clearing a selected child row of that layer', async () => {
+    const { openMenu, projectId } = await renderMenu([imageLayer('art')], ['art']);
+    selectLayerChild(projectId, 'art', 'adjustment-1');
+
+    await openMenu('art');
+    await act(() => item('Layer properties').click());
+
+    expect(getLayerChildSelection()).toBeNull();
+  });
 
   it('describes Add regenerate region under its label', async () => {
     const { openMenu } = await renderMenu([imageLayer('art')]);

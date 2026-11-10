@@ -79,6 +79,7 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
+import { clearLayerChildSelection } from './layerChildSelection';
 import {
   actionTargets,
   getLayerContextActions,
@@ -742,6 +743,8 @@ const LayerMenu = ({
 
   const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
+    // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
+    clearLayerChildSelection();
     revealProperties(layer.id);
     focusRegion('right', 'layers');
     revealLayerSection();

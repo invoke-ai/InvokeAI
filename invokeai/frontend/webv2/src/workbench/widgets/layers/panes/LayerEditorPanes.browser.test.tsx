@@ -675,6 +675,30 @@ describe('Layer section reveal', () => {
     await expect.poll(inView).toBe(true);
     await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeInViewport();
   });
+
+  it('brings the start of a tall Layer section back into view after the user scrolled down within it', async () => {
+    await mount(PropertiesPane, 'control', { height: 160 });
+    await act(() => engine!.tools.setTool('brush'));
+    await settle();
+    const section = host!.querySelector<HTMLElement>('[data-properties-section="layer"]')!;
+    let scroller = section.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
+      scroller = scroller.parentElement;
+    }
+    const viewTop = () => scroller!.getBoundingClientRect().top;
+    const startInView = () => Math.abs(section.getBoundingClientRect().top - viewTop()) < 2;
+    expect(section.getBoundingClientRect().height).toBeGreaterThan(scroller!.clientHeight);
+
+    revealLayerSection();
+    await expect.poll(startInView).toBe(true);
+
+    scroller!.scrollTop += 80;
+    expect(section.getBoundingClientRect().top).toBeLessThan(viewTop());
+
+    revealLayerSection();
+    await expect.poll(startInView).toBe(true);
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeInViewport();
+  });
 });
 
 describe('Tool property scrubbers', () => {
