@@ -1,7 +1,9 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { Flex, Stack, Text } from '@chakra-ui/react';
+import { Stack, Text } from '@chakra-ui/react';
+import { PaintBucketIcon, SquareIcon } from 'lucide-react';
+import { ToggleIconButton } from '@platform/ui/Button';
 import { Button } from '@platform/ui/Button';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { ColorPicker } from '@platform/ui/ColorPicker';
@@ -61,34 +63,42 @@ const VectorTraceSettings = ({ engine, layer }: { engine: Engine; layer: Extract
   const taper = layer.traceTaper ?? 100;
   const label = (key: string) => t(`widgets.layers.vector.${key}`);
   const clampTaper = (value: number) => Math.round(Math.min(500, Math.max(1, Number.isFinite(value) ? value : taper)));
-  const commitSettings = (patch: { traceTaperEnds?: boolean; traceTaper?: number }) => {
+  const commitSettings = (patch: { traceTaperEnds?: boolean; traceTaper?: number; fillColor?: string; fillEnabled?: boolean; strokeEnabled?: boolean }) => {
     const config = { layerType: 'vector', ...patch } as const;
     commit(label('traceTitle'), (model, baseline) => {
       if (model.document.selectedLayerId !== layer.id) { return { status: 'unchanged' }; }
       return model.prepare({ id: layer.id, type: 'patch-config', config, before: baselineConfig(baseline, config) });
     });
   };
-  const trace = () => setFailed(!engine.layers.traceVectorLayer(layer.id));
+  const trace = () => setFailed(!engine.layers.traceFillVectorLayer(layer.id));
   const disabled = !layer.isEnabled || layer.isLocked || layer.isHidden === true;
   return (
     <Stack borderTopWidth="1px" borderColor="border.subtle" gap="2" mt="2" pt="3">
-      <Flex align="center" gap="2" w="full">
-        <Text color="fg.muted" fontWeight="600">{label('traceTitle')}</Text>
-        <Flex flexShrink="0" ms="auto">
-          <ColorPicker aria-label={label('traceColor')} disabled={disabled} value={brush.color}
-            onSampleColor={sampleColor} onValueChange={colorCommands.applySampledColor} onValueChangeEnd={colorCommands.applySampledColor} />
-        </Flex>
-      </Flex>
-      <ScrubberField label={label('strokeWidth')} disabled={disabled} value={brush.size} min={1} max={600} step={1}
+      <Text color="fg.muted" fontWeight="600">{t('widgets.properties.groups.appearance')}</Text>
+      <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeFill')}>
+        <ColorPicker aria-label={label('fillColor')} disabled={disabled || !layer.fillEnabled} value={layer.fillColor ?? '#ffffff'}
+          onSampleColor={sampleColor}
+          onValueChange={(fillColor) => preview({ type: 'updateCanvasLayerConfig', id: layer.id, config: { layerType: 'vector', fillColor } })}
+          onValueChangeEnd={(fillColor) => commitSettings({ fillColor })} />
+        <ToggleIconButton checked={layer.fillEnabled ?? false} disabled={disabled} icon={PaintBucketIcon}
+          label={t('widgets.canvas.toolOptions.shapeFill')} onCheckedChange={(fillEnabled) => commitSettings({ fillEnabled })} />
+      </PropertyControlRow>
+      <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeStroke')}>
+        <ColorPicker aria-label={label('traceColor')} disabled={disabled || layer.strokeEnabled === false} value={brush.color}
+          onSampleColor={sampleColor} onValueChange={colorCommands.applySampledColor} onValueChangeEnd={colorCommands.applySampledColor} />
+        <ToggleIconButton checked={layer.strokeEnabled ?? true} disabled={disabled} icon={SquareIcon}
+          label={t('widgets.canvas.toolOptions.shapeStroke')} onCheckedChange={(strokeEnabled) => commitSettings({ strokeEnabled })} />
+      </PropertyControlRow>
+      <ScrubberField label={label('strokeWidth')} disabled={disabled || layer.strokeEnabled === false} value={brush.size} min={1} max={600} step={1}
         defaultValue={50} formatValue={(value) => `${value}px`}
         onChange={(size) => engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), size: Math.round(size) })} />
-      <PropertySwitchRow label={label('taperEnds')} disabled={disabled} checked={taperEnds}
+      <PropertySwitchRow label={label('taperEnds')} disabled={disabled || layer.strokeEnabled === false} checked={taperEnds}
         onCheckedChange={(traceTaperEnds) => commitSettings({ traceTaperEnds })} />
-      <ScrubberField label={label('taper')} disabled={disabled || !taperEnds} value={taper} min={1} max={500} step={10}
+      <ScrubberField label={label('taper')} disabled={disabled || layer.strokeEnabled === false || !taperEnds} value={taper} min={1} max={500} step={10}
         defaultValue={100} marks={[1, 100, 250, 500]} formatValue={(value) => `${value}%`}
         onChange={(value) => preview({ id: layer.id, type: 'updateCanvasLayerConfig', config: { layerType: 'vector', traceTaper: clampTaper(value) } })}
         onChangeEnd={(value) => commitSettings({ traceTaper: clampTaper(value) })} />
-      <Button size="sm" disabled={disabled || !layer.paths.some((path) => path.points.length >= 2)} onClick={trace}>{label('traceAll')}</Button>
+      <Button size="sm" disabled={disabled || !layer.paths.some((path) => (layer.strokeEnabled !== false && path.points.length >= 2) || (layer.fillEnabled && path.isClosed && path.points.length >= 3))} onClick={trace}>{label('traceFill')}</Button>
       {failed ? <Text color="fg.error" fontSize="sm">{label('traceFailed')}</Text> : null}
     </Stack>
   );

@@ -249,6 +249,9 @@ export class VectorEditingController implements Tool {
     layer.opacity = leaf.layer.opacity;
     layer.blendMode = leaf.layer.blendMode;
     layer.guideColor = leaf.layer.guideColor;
+    layer.fillColor = leaf.layer.fillColor;
+    layer.fillEnabled = leaf.layer.fillEnabled;
+    layer.strokeEnabled = leaf.layer.strokeEnabled;
     layer.traceTaperEnds = leaf.layer.traceTaperEnds;
     layer.traceTaper = leaf.layer.traceTaper;
     // Export the active draft version without committing or changing the source draft.

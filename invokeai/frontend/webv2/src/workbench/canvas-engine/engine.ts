@@ -3088,6 +3088,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         width: stores.brushOptions.get().size, color: stores.brushOptions.get().color,
         id: createLayerId(), anchor: captureInsertionAnchor('raster') });
     },
+    fillVectorPath: (layerId, pathId) => {
+      const document = mirror.getDocument();
+      if (!document) { return false; }
+      return traceVectorLayerCommand({ document, layerId, pathId, fillOnly: true, ctx: mutationContext, backend,
+        width: 1, color: '#ffffff', id: createLayerId(), anchor: captureInsertionAnchor('raster') });
+    },
+    traceFillVectorLayer: (layerId) => {
+      const document = mirror.getDocument();
+      if (!document) { return false; }
+      return traceVectorLayerCommand({ document, layerId, appearance: true, ctx: mutationContext, backend,
+        width: stores.brushOptions.get().size, color: stores.brushOptions.get().color, id: createLayerId(), anchor: captureInsertionAnchor('raster') });
+    },
     vectorEdit: {
       setPointType: vectorEditor.setPointType,
       targetContextMenu: vectorEditor.targetContextMenu,

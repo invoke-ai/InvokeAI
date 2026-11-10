@@ -609,6 +609,9 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
       ...layer,
       ...(Object.hasOwn(config, 'paths') ? { paths: config.paths ?? layer.paths } : {}),
       ...(Object.hasOwn(config, 'guideColor') ? { guideColor: config.guideColor } : {}),
+      ...(Object.hasOwn(config, 'fillEnabled') ? { fillEnabled: config.fillEnabled } : {}),
+      ...(Object.hasOwn(config, 'strokeEnabled') ? { strokeEnabled: config.strokeEnabled } : {}),
+      ...(Object.hasOwn(config, 'fillColor') ? { fillColor: config.fillColor } : {}),
       ...(Object.hasOwn(config, 'traceTaperEnds') ? { traceTaperEnds: config.traceTaperEnds } : {}),
       ...(Object.hasOwn(config, 'traceTaper') ? { traceTaper: config.traceTaper } : {}),
     };

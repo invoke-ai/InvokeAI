@@ -369,6 +369,9 @@ export interface CanvasVectorLayerContract extends CanvasLayerBaseContract {
   paths: CanvasBezierPathContract[];
   /** Display-only guide color; absent uses DEFAULT_VECTOR_GUIDE_COLOR. */
   guideColor?: string;
+  fillColor?: string;
+  fillEnabled?: boolean;
+  strokeEnabled?: boolean;
   traceTaperEnds?: boolean;
   traceTaper?: number;
   isHidden?: boolean;

@@ -2,7 +2,7 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Menu, Portal } from '@chakra-ui/react';
 import { MenuActionItem, MenuContent } from '@platform/ui/menu';
-import { CopyIcon, ScanIcon, SquareArrowOutUpRightIcon, Trash2Icon, WavesIcon } from 'lucide-react';
+import { CopyIcon, PaintBucketIcon, ScanIcon, SquareArrowOutUpRightIcon, Trash2Icon, WavesIcon } from 'lucide-react';
 import { useNotify } from '@workbench/useNotify';
 import { useTranslation } from 'react-i18next';
 
@@ -45,6 +45,11 @@ export const VectorPathContextMenu = ({ engine, target, onClose }: {
             disabled={!session.paths.some((path) => path.id === target.pathId && path.points.length >= 2)}
             onSelect={run(() => {
               if (!engine.layers.traceVectorLayer(target.layerId, target.pathId)) { notify.error(label('traceFailed')); }
+            })} />
+          <MenuActionItem value="fill-path" icon={PaintBucketIcon} label={label('fillPath')}
+            disabled={!session.paths.some((path) => path.id === target.pathId && path.isClosed && path.points.length >= 3)}
+            onSelect={run(() => {
+              if (!engine.layers.fillVectorPath(target.layerId, target.pathId)) { notify.error(label('fillFailed')); }
             })} />
           <MenuActionItem value="extract-path" icon={SquareArrowOutUpRightIcon} label={label('extractPath')} onSelect={run(api.extractPath)} />
           <MenuActionItem value="copy-path" icon={CopyIcon} label={label('copy')} onSelect={run(api.copyPath)} />

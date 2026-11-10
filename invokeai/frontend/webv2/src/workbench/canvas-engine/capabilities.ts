@@ -774,6 +774,8 @@ export interface CanvasVectorEditCapability {
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */
   traceVectorLayer(layerId: string, pathId?: string): boolean;
+  traceFillVectorLayer(layerId: string): boolean;
+  fillVectorPath(layerId: string, pathId: string): boolean;
   readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
   /**
