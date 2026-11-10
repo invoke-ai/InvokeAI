@@ -1,3 +1,4 @@
+import { getQueueStagedResults } from '@app/queueStagedResults';
 import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
 import { getAuthSession } from '@features/identity';
 import { modelLoadActivitySink } from '@features/models';
@@ -131,6 +132,7 @@ export const QueueRuntimeAdapter = () => {
               viewerUserId,
             }),
           },
+          listStagedResults: () => getQueueStagedResults(queries.getSnapshot().projects),
           getSnapshot: () => {
             const snapshot = queries.getSnapshot();
 

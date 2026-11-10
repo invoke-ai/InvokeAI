@@ -124,6 +124,8 @@ export interface QueueResultImage {
   imageUrl: string;
   isIntermediate?: boolean;
   queuedAt: string;
+  /** Retained across result flattening so Canvas delivery acknowledges the item that produced each image. */
+  sourceBackendItemId?: number;
   sourceQueueItemId: string;
   thumbnailUrl: string;
   width: number;

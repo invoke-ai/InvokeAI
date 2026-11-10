@@ -2171,6 +2171,7 @@
     "contextPasteWithConnections": "Smart paste",
     "contextCollapse": "Collapse",
     "contextExpand": "Expand",
+    "contextFitSelection": "Fit selection",
     "contextAddConnector": "Add connector",
     "arithmeticSequence": "Arithmetic sequence",
     "linearDistribution": "Linear distribution",
