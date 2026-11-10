@@ -2,7 +2,10 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import type { FamilyConditioning } from '@features/generation/core/familyGraph';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
-import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
+import {
+  getArchitectureFeatures,
+  getArchitectureGenerationConfig,
+} from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
 import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
@@ -30,6 +33,11 @@ export interface RegionalGuidanceSupport {
   negativePrompt: boolean;
   /** The positive prompt can be re-encoded over the inverted mask as a negative. */
   autoNegative: boolean;
+  /**
+   * The base reads negatives only while CFG Scale is above 1 (backend `negative_prompt.usage` is `cfg-gated`), so
+   * regional negatives and auto-negatives apply only then. See {@link areRegionalNegativesActive}.
+   */
+  negativesNeedCfg: boolean;
   /** Mask-scoped reference images, or `null` when the denoiser has no regional image path. */
   referenceImages: RegionalReferenceImageKind | null;
   /** The roles a layout prompt distinguishes; empty for mask bases. */
@@ -42,7 +50,10 @@ type LayoutSupportRow = Pick<RegionalGuidanceSupport, 'label' | 'layoutKinds'> &
   referenceImages: null;
 };
 
-/** Graph code owns node mapping and each base's mode; the backend owns regional-negative support. */
+/**
+ * Graph code owns node mapping and each base's mode; the backend owns regional-negative support and whether negatives
+ * need CFG above 1.
+ */
 const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow> &
   Record<LayoutRegionalGuidanceBase, LayoutSupportRow> = {
   'sd-1': { label: 'SD 1.x', mode: 'masks', referenceImages: 'ip_adapter' },
@@ -82,12 +93,20 @@ export const getRegionalGuidanceSupport = (base: string | null): RegionalGuidanc
 
   const row = REGIONAL_GUIDANCE_SUPPORT[base];
   if (row.mode === 'layout') {
-    return { ...row, autoNegative: false, negativePrompt: false };
+    return { ...row, autoNegative: false, negativePrompt: false, negativesNeedCfg: false };
   }
   const negative = getArchitectureFeatures(base)?.regional_negative ?? false;
 
-  return { ...row, autoNegative: negative, layoutKinds: [], negativePrompt: negative };
+  const negativesNeedCfg = getArchitectureGenerationConfig(base)?.negativePrompt.usage === 'cfg-gated';
+
+  return { ...row, autoNegative: negative, layoutKinds: [], negativePrompt: negative, negativesNeedCfg };
 };
+
+/** Whether regional negatives and auto-negatives reach the graph at this CFG Scale. */
+export const areRegionalNegativesActive = (
+  support: Pick<RegionalGuidanceSupport, 'negativePrompt' | 'negativesNeedCfg'>,
+  cfgScale: number
+): boolean => support.negativePrompt && (!support.negativesNeedCfg || cfgScale > 1);
 
 /** A region's role in a layout prompt; the canvas persists a subset of these and Canvas checks it does. */
 export type RegionalLayoutKind = 'object' | 'character' | 'text';
@@ -474,18 +493,20 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
 
 /**
  * Omit unsupported content without erasing stored values. Count resolved references; auto-negative requires
- * positive text. Layout bases need a caption, and a text region its visible text.
+ * positive text, and negatives count only at a CFG Scale the base reads them at. Layout bases need a caption, and a
+ * text region its visible text.
  */
 export const getRegionalGuidanceRejectionReason = (params: {
   layerName: string;
   mainBase: string;
+  cfgScale: number;
   hasContent: boolean;
   positivePrompt: string | null;
   negativePrompt: string | null;
   referenceImageCount: number;
   layout?: RegionalLayout;
 }): string | null => {
-  const { hasContent, layerName, mainBase, negativePrompt, positivePrompt, referenceImageCount } = params;
+  const { cfgScale, hasContent, layerName, mainBase, negativePrompt, positivePrompt, referenceImageCount } = params;
 
   const support = getRegionalGuidanceSupport(mainBase);
   if (!support) {
@@ -506,7 +527,7 @@ export const getRegionalGuidanceRejectionReason = (params: {
   }
   const contributes =
     Boolean(positivePrompt) ||
-    (Boolean(negativePrompt) && support.negativePrompt) ||
+    (Boolean(negativePrompt) && areRegionalNegativesActive(support, cfgScale)) ||
     (referenceImageCount > 0 && support.referenceImages !== null);
   if (!contributes) {
     return `Regional guidance "${layerName}" has no prompt or reference image ${support.label} can use.`;

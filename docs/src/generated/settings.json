@@ -295,6 +295,28 @@
     },
     {
       "category": "PATHS",
+      "default": 52428800,
+      "description": "Maximum size in bytes of one managed file upload.",
+      "env_var": "INVOKEAI_MAX_FILE_UPLOAD_SIZE_BYTES",
+      "literal_values": [],
+      "name": "max_file_upload_size_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": 5368709120,
+      "description": "Maximum total size in bytes of all managed files.",
+      "env_var": "INVOKEAI_MAX_FILE_LIBRARY_BYTES",
+      "literal_values": [],
+      "name": "max_file_library_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "flat",
       "description": "Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.",
       "env_var": "INVOKEAI_IMAGE_SUBFOLDER_STRATEGY",

@@ -151,6 +151,8 @@ const StylePresetInput = lazy(() =>
 const SystemPromptInput = lazy(() =>
   import('./RecordPickerInput').then((module) => ({ default: module.SystemPromptInput }))
 );
+// Managed-file controls load with their node; uploads and file metadata stay out of the editor's boot graph.
+const FileFieldInput = lazy(() => import('./FileFieldInput').then((module) => ({ default: module.FileFieldInput })));
 
 export const getWorkflowSelectedGalleryImage = getSelectedGalleryImageFromValues;
 
@@ -1920,6 +1922,12 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
       );
     case 'BoardField':
       return <BoardInput {...props} />;
+    case 'FileField':
+      return (
+        <Suspense fallback={RECORD_PICKER_FALLBACK}>
+          <FileFieldInput {...props} />
+        </Suspense>
+      );
     case 'ImageField':
       return <MediaInput {...props} kind="image" />;
     case 'VideoField':
@@ -1952,6 +1960,7 @@ const formatSnapshotObject = (value: Record<string, unknown>): string | null => 
     'name',
     'image_name',
     'video_name',
+    'file_id',
     'latents_name',
     'tensor_name',
     'key',

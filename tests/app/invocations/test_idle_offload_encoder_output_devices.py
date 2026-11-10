@@ -119,7 +119,13 @@ def test_ideogram4_conditioning_is_saved_on_cpu(monkeypatch):
 
     cpu_embeds = MagicMock(spec=torch.Tensor)
     gpu_embeds = _gpu_tensor_yielding(cpu_embeds)
-    monkeypatch.setattr(ideogram4_module, "encode_qwen3vl_prompt", lambda prompt, tokenizer, text_encoder: gpu_embeds)
+    encoded_on: list[object] = []
+
+    def encode(prompt, tokenizer, text_encoder, *, device):
+        encoded_on.append(device)
+        return gpu_embeds
+
+    monkeypatch.setattr(ideogram4_module, "encode_qwen3vl_prompt", encode)
 
     context = MagicMock()
     # `with model_on_device() as (_, model)` — the mock's __enter__ must unpack into two values.
@@ -128,6 +134,8 @@ def test_ideogram4_conditioning_is_saved_on_cpu(monkeypatch):
 
     invocation.invoke(context)
 
+    # Where the encoder computes, not where its first weight happens to sit after a partial load.
+    assert encoded_on == [context.models.load.return_value.compute_device]
     gpu_embeds.detach.return_value.to.assert_called_once_with("cpu")
     info = context.conditioning.save.call_args.args[0].conditionings[0]
     assert info.prompt_embeds is cpu_embeds
