@@ -12,13 +12,16 @@ import {
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 
+import { useWorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import { WORKFLOW_DETAIL_PANES_CSS } from './WorkflowDetailSheet';
+import { WorkflowLibraryContextMenu } from './WorkflowLibraryContextMenu';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryList } from './WorkflowLibraryList';
@@ -26,8 +29,9 @@ import { WORKFLOW_LIBRARY_WIDE } from './WorkflowLibraryRail';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
 
 /**
- * The template places' result line, grid or list, and detail rail. They alone subscribe to the listing's entries, so
- * range loads and enrichment results re-render this subtree, never the dialog shell, its rail or its toolbar.
+ * The template places' result line, grid or list, detail rail and card actions menu. They alone subscribe to the
+ * listing's entries, so range loads and enrichment results re-render this subtree, never the dialog shell, its rail or
+ * its toolbar.
  */
 
 /**
@@ -52,6 +56,25 @@ export const WORKFLOW_LIBRARY_PANES_CSS: SystemStyleObject = {
       minH: '0',
     },
   },
+};
+
+type AuthSession = ReturnType<typeof useAuthSession>;
+
+/**
+ * What the account may do to a library entry: only its own templates (on a multi-user server, the ones it owns) are
+ * writable, and visibility changes only from My library on a multi-user server.
+ */
+const getLibraryEntryAccess = (
+  entry: WorkflowLibraryEntry | null | undefined,
+  session: AuthSession,
+  tab: WorkflowLibraryTab
+) => {
+  const isOwner =
+    session.phase === 'ready' &&
+    (session.multiuserEnabled ? Boolean(entry?.item.user_id && entry.item.user_id === session.user?.user_id) : true);
+  const isWritable = entry?.item.category === 'user' && isOwner;
+
+  return { canChangeVisibility: isWritable && tab === 'user' && session.multiuserEnabled, isReadOnly: !isWritable };
 };
 
 /** Flat and shallow-comparable, so place totals, tag counts and scroll anchors do not re-render the panes. */
@@ -112,8 +135,10 @@ export interface WorkflowLibraryBrowsePanesProps {
   trailingField: WorkflowLibraryListTrailingField;
   tagsText: string;
   emptyMessage: string | undefined;
-  contextMenuPoint: WorkflowCardMenuAnchor | null;
-  contextMenuTriggerId: string | null;
+  /** Where the card actions menu is anchored; null while it is closed. */
+  contextMenuAnchor: WorkflowCardMenuAnchor | null;
+  /** The workflow the card actions menu was raised for, kept through its close. */
+  contextMenuTarget: WorkflowContextMenuTarget | null;
   /** The user's explicit choice; the panes fall back to the selected pin or the first resident entry. */
   selectedWorkflowId: string | null;
   removedWorkflowId: string | null;
@@ -121,8 +146,8 @@ export interface WorkflowLibraryBrowsePanesProps {
   onClose: () => void;
   onContextMenu: WorkflowCardContextMenuHandler;
   onContextMenuClose: () => void;
-  /** Receives the workflow the detail rail showed when it was deleted. */
-  onDeleted: (workflowId: string | null) => void;
+  /** Receives the deleted workflow, from the rail or a card's menu. */
+  onDeleted: (workflowId: string) => void;
   onOpen: (workflowId: string) => void;
   onOpenItem: (item: WorkflowLibraryListItem) => void;
   onCardPreview: (workflowId: string) => void;
@@ -131,8 +156,8 @@ export interface WorkflowLibraryBrowsePanesProps {
 }
 
 export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePanes({
-  contextMenuPoint,
-  contextMenuTriggerId,
+  contextMenuAnchor,
+  contextMenuTarget,
   emptyMessage,
   isOpen,
   layout,
@@ -165,21 +190,14 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
       ? desiredWorkflowId
       : (entries[0]?.item.workflow_id ?? null);
   const activeEntry = selectWorkflowLibraryEntry({ entries, selectedEntry }, activeWorkflowId) ?? null;
-  const isCurrentLibraryOwner =
-    authSession.phase === 'ready' &&
-    (authSession.multiuserEnabled
-      ? Boolean(activeEntry?.item.user_id && activeEntry.item.user_id === authSession.user?.user_id)
-      : true);
-  const canEditLibraryEntry = activeEntry?.item.category === 'user' && isCurrentLibraryOwner;
-  const isReadOnlyLibraryEntry = activeEntry?.item.category === 'user' && !isCurrentLibraryOwner;
-  const canChangeVisibility =
-    tab === 'user' &&
-    authSession.phase === 'ready' &&
-    authSession.multiuserEnabled &&
-    activeEntry?.item.category === 'user' &&
-    isCurrentLibraryOwner;
+  const activeAccess = getLibraryEntryAccess(activeEntry, authSession, tab);
+  // The menu acts on the card it was raised for, resident or the selected pin; once that leaves, it has nothing to
+  // act on and stays closed (the shell clears its anchor).
+  const menuEntry = contextMenuTarget
+    ? (selectWorkflowLibraryEntry({ entries, selectedEntry }, contextMenuTarget.workflowId) ?? null)
+    : null;
   const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
-  const handleDeleted = useCallback(() => onDeleted(activeWorkflowId), [activeWorkflowId, onDeleted]);
+  const duplicateGuard = useWorkflowLibraryDuplicateGuard();
 
   return (
     <>
@@ -197,7 +215,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             entries={entries}
             error={error}
             missingCounts={missingCounts}
-            openMenuAnchor={contextMenuPoint}
+            openMenuAnchor={contextMenuAnchor}
             showVisibilityStatus={authSession.multiuserEnabled}
             selectedWorkflowId={activeWorkflowId}
             status={status}
@@ -216,7 +234,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             entries={entries}
             error={error}
             missingCounts={missingCounts}
-            openMenuAnchor={contextMenuPoint}
+            openMenuAnchor={contextMenuAnchor}
             showVisibilityStatus={authSession.multiuserEnabled}
             selectedWorkflowId={activeWorkflowId}
             status={status}
@@ -227,20 +245,31 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
           />
         )}
         <WorkflowLibraryDetailPanel
-          contextMenuPoint={contextMenuPoint}
-          contextMenuTriggerId={contextMenuTriggerId}
           entry={activeEntry}
-          canChangeVisibility={canChangeVisibility}
-          isReadOnly={isReadOnlyLibraryEntry || !canEditLibraryEntry}
+          canChangeVisibility={activeAccess.canChangeVisibility}
+          duplicateGuard={duplicateGuard}
+          isReadOnly={activeAccess.isReadOnly}
           projectWorkflows={projectWorkflows}
           onClose={onClose}
-          onContextMenuClose={onContextMenuClose}
-          onDeleted={handleDeleted}
+          onDeleted={onDeleted}
           onDuplicated={onSelect}
           onOpen={onOpenItem}
           onPreview={onPreview}
         />
       </HStack>
+      <WorkflowLibraryContextMenu
+        anchor={contextMenuAnchor}
+        duplicateGuard={duplicateGuard}
+        entry={menuEntry}
+        isReadOnly={getLibraryEntryAccess(menuEntry, authSession, tab).isReadOnly}
+        projectWorkflows={projectWorkflows}
+        target={contextMenuTarget}
+        onClose={onClose}
+        onDeleted={onDeleted}
+        onDuplicated={onSelect}
+        onMenuClose={onContextMenuClose}
+        onOpen={onOpenItem}
+      />
     </>
   );
 });

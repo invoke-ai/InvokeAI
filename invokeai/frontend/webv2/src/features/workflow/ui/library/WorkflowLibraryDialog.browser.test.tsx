@@ -91,11 +91,32 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
 /** The library templates the project rail reads by id; an absent id fails as a missing record does. */
 const templateRecords = vi.hoisted(() => new Map<string, { name: string; revision: number }>());
 
+/** The library writes a card menu's Rename and Delete make; each answers as the server would. */
+const libraryWrites = vi.hoisted(() => ({
+  cached: vi.fn((workflowId: string, _options: { expectedRevision: number }) =>
+    Promise.resolve({ id: workflowId, meta: { category: 'user' }, name: workflowId })
+  ),
+  create: vi.fn((_workflow: { name: string }, _signal?: AbortSignal) => Promise.resolve('wf-landscape-copy')),
+  delete: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
+  record: vi.fn((workflowId: string, _signal?: AbortSignal) =>
+    Promise.resolve({ revision: 3, workflow: { id: workflowId, name: workflowId }, workflow_id: workflowId })
+  ),
+  update: vi.fn((_workflowId: string, _workflow: { name: string }, _options: { expectedRevision: number }) =>
+    Promise.resolve()
+  ),
+}));
+
 vi.mock('@features/workflow/queries', async (importOriginal) => {
   const original = await importOriginal<typeof workflowQueriesModule>();
 
   return {
     ...original,
+    createLibraryWorkflow: libraryWrites.create,
+    deleteLibraryWorkflow: libraryWrites.delete,
+    getLibraryWorkflowCached: libraryWrites.cached,
+    getLibraryWorkflowRecord: libraryWrites.record,
+    invalidateWorkflowLibraryCache: vi.fn(),
+    updateLibraryWorkflow: libraryWrites.update,
     savedWorkflowDetailQueryOptions: (workflowId: string) => ({
       ...original.savedWorkflowDetailQueryOptions(workflowId),
       queryFn: () => {
@@ -259,6 +280,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
   'workflowLibrary.deleteHint': 'Removes it from your library',
 
+  'common.cancel': 'Cancel',
   'common.close': 'Close',
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
@@ -266,6 +288,8 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.chooseProjectCopy': 'Open which copy?',
   'workflowLibrary.applying': 'Applying workflow…',
   'workflowLibrary.delete': 'Delete',
+  'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
+  'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
   'workflowLibrary.downloadJson': 'Download JSON',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateName': '{{name}} copy',
@@ -749,6 +773,9 @@ describe('WorkflowLibraryDialog', () => {
     loader.phase.current = 'idle';
     for (const command of Object.values(COMMANDS)) {
       command.mockClear();
+    }
+    for (const write of Object.values(libraryWrites)) {
+      write.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
     preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
@@ -1891,8 +1918,8 @@ describe('WorkflowLibraryDialog', () => {
       await settleFrame();
     });
 
-    // The button selects its tile and opens the same actions the right-click offers, anchored to the button.
-    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-landscape');
+    // The button opens the same actions the right-click offers, anchored to the button, and leaves the selection.
+    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-portrait');
     const open = () =>
       document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"] [data-menu-item="open"]');
     await vi.waitFor(() => expect(open()).not.toBeNull());
@@ -1922,7 +1949,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(LOADED_SNAPSHOT);
 
     const first = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-landscape"]');
-    const second = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-portrait"]');
+    const second = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-sketch"]');
     expect(second).not.toBeNull();
 
     await pressTileMenuButton(first);
@@ -1934,7 +1961,9 @@ describe('WorkflowLibraryDialog', () => {
     expect(first?.getAttribute('aria-expanded')).toBe('false');
     expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-portrait');
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')?.id).toBe(
+        second?.getAttribute('aria-controls')
+      )
     );
   });
 
@@ -1952,24 +1981,306 @@ describe('WorkflowLibraryDialog', () => {
     await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
   });
 
-  it('opens the rail actions for a card from a right-click and runs them', async () => {
-    await openWith(LOADED_SNAPSHOT);
+  describe('a card menu acts on its own card, never moving the selection', () => {
+    const detail = () => document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail;
+    const openMenu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+    const alertDialog = () => document.querySelector<HTMLElement>('[role="alertdialog"]');
+    const confirmIn = async (label: string) => {
+      const confirm = [...(alertDialog()?.querySelectorAll('button') ?? [])].find(
+        (candidate) => (candidate.textContent ?? '').trim() === label
+      );
+      expect(confirm).not.toBeUndefined();
+      await act(async () => {
+        confirm?.click();
+        await settleFrame();
+      });
+    };
 
-    await act(() =>
-      card('wf-landscape')?.dispatchEvent(
-        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
-      )
+    /** Raises Landscape's menu by one of its three paths and returns the control that names it. */
+    const raise = async (path: 'right-click' | 'Shift+F10' | 'More button') => {
+      const source = card('wf-landscape')!;
+      if (path === 'More button') {
+        const more = document.querySelector<HTMLElement>('[data-workflow-card-menu="wf-landscape"]')!;
+        await pressTileMenuButton(more);
+        return more;
+      }
+      await act(() => source.focus());
+      await act(() =>
+        source.dispatchEvent(
+          // A keyboard-raised menu (Shift+F10, the Menu key) reports no pointer position.
+          path === 'Shift+F10'
+            ? new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+            : new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      return source;
+    };
+
+    it.each(['right-click', 'Shift+F10', 'More button'] as const)(
+      'opens from a %s on another card, keeping the rail, and renames that workflow',
+      async (path) => {
+        await openWith(LOADED_SNAPSHOT);
+        await act(() => card('wf-upscale')?.click());
+        expect(detail()).toBe('wf-upscale');
+
+        const trigger = await raise(path);
+
+        await vi.waitFor(() => expect(openMenu()?.id).toBe('workflow-library-card-wf-landscape-actions'));
+        expect(trigger.getAttribute('aria-controls')).toBe(openMenu()?.id);
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        expect(detail()).toBe('wf-upscale');
+        expect(card('wf-upscale')?.getAttribute('aria-pressed')).toBe('true');
+        expect(card('wf-landscape')?.getAttribute('aria-pressed')).toBe('false');
+
+        await act(async () => {
+          openMenu()?.querySelector<HTMLElement>('[data-menu-item="rename"]')?.click();
+          await settleFrame();
+        });
+        const input = await vi.waitFor(() => {
+          const element = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+          expect(element?.value).toBe('Landscape Pass');
+          return element!;
+        });
+        const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        await act(async () => {
+          setValue?.call(input, 'Landscape, tuned');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          await Promise.resolve();
+        });
+        await act(async () => {
+          input.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+          await settleFrame();
+        });
+
+        expect(libraryWrites.update).toHaveBeenCalledExactlyOnceWith(
+          'wf-landscape',
+          expect.objectContaining({ name: 'Landscape, tuned' }),
+          expect.objectContaining({ expectedRevision: 3 })
+        );
+        expect(detail()).toBe('wf-upscale');
+      }
     );
 
-    // The right-click selects the card, so the rail (which owns the actions) shows it.
-    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-landscape');
+    it('runs Open on the card it was raised for', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
 
-    const open = () => document.querySelector<HTMLElement>('[data-workflow-context-menu] [data-menu-item="open"]');
+      const open = () => openMenu()?.querySelector<HTMLElement>('[data-menu-item="open"]');
+      await vi.waitFor(() => expect(open()).not.toBeUndefined());
+      await act(() => open()?.click());
 
-    await vi.waitFor(() => expect(open()).not.toBeNull());
-    await act(() => open()?.click());
+      expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+      expect(detail()).toBe('wf-portrait');
+    });
 
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+    it('deletes another card and keeps the selection; deleting the selected one clears it', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await act(() => card('wf-upscale')?.click());
+      await raise('right-click');
+
+      await vi.waitFor(() => expect(openMenu()?.querySelector('[data-menu-item="delete"]')).not.toBeNull());
+      await act(async () => {
+        openMenu()?.querySelector<HTMLElement>('[data-menu-item="delete"]')?.click();
+        await settleFrame();
+      });
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Landscape Pass'));
+      await confirmIn('Delete');
+
+      expect(libraryWrites.delete).toHaveBeenCalledExactlyOnceWith('wf-landscape', expect.anything());
+      // The listing refreshes without it, as the store does after the invalidation.
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+      expect(card('wf-landscape')).toBeNull();
+      expect(detail()).toBe('wf-upscale');
+
+      // The selected card's own menu deletes it as the rail does: the selection clears to the first entry.
+      await act(() =>
+        card('wf-upscale')?.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      await vi.waitFor(() => expect(openMenu()?.querySelector('[data-menu-item="delete"]')).not.toBeNull());
+      await act(async () => {
+        openMenu()?.querySelector<HTMLElement>('[data-menu-item="delete"]')?.click();
+        await settleFrame();
+      });
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Upscale Chain'));
+      await confirmIn('Delete');
+      expect(libraryWrites.delete).toHaveBeenLastCalledWith('wf-upscale', expect.anything());
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH], total: 22 })));
+      expect(detail()).toBe('wf-portrait');
+    });
+
+    it('keeps a confirmation opened from a menu on its own workflow when a refresh drops that card', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
+      await vi.waitFor(() => expect(openMenu()?.querySelector('[data-menu-item="delete"]')).not.toBeNull());
+      await act(async () => {
+        openMenu()?.querySelector<HTMLElement>('[data-menu-item="delete"]')?.click();
+        await settleFrame();
+      });
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Landscape Pass'));
+
+      // A refresh drops the card (a re-sort, a newer record): the menu host loses its entry, not the dialog its target.
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+      // Past any exit transition: the confirmation is still up, still naming its workflow.
+      await wait(400);
+      expect(alertDialog()?.getAttribute('data-state')).toBe('open');
+      expect(alertDialog()?.textContent).toContain('Landscape Pass');
+      await confirmIn('Cancel');
+      await vi.waitFor(() => expect(alertDialog()).toBeNull());
+
+      // The cancelled confirmation does not come back with the next writable card's menu.
+      await act(() =>
+        card('wf-upscale')?.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      await vi.waitFor(() => expect(openMenu()?.id).toBe('workflow-library-card-wf-upscale-actions'));
+      await settleFrame();
+      expect(alertDialog()).toBeNull();
+      expect(libraryWrites.delete).not.toHaveBeenCalled();
+    });
+
+    it("offers Rename and Delete by the card's own access, not the selection's", async () => {
+      identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+      const othersShared = { ...NON_OWNER_SHARED, item: { ...NON_OWNER_SHARED.item, workflow_id: 'wf-shared' } };
+      await openWith(withSnapshot({ entries: [OWNER_PRIVATE, othersShared] }));
+      const items = () =>
+        [...(openMenu()?.querySelectorAll<HTMLElement>('[data-menu-item]') ?? [])].map((item) => item.dataset.menuItem);
+      const raiseOn = async (workflowId: string) => {
+        await act(() =>
+          card(workflowId)?.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+          )
+        );
+        await vi.waitFor(() => expect(openMenu()?.id).toBe(`workflow-library-card-${workflowId}-actions`));
+      };
+
+      // The account's own template is selected; another account's is not the account's to change.
+      expect(detail()).toBe('wf-portrait');
+      await raiseOn('wf-shared');
+      expect(items()).toEqual(['open', 'duplicate', 'fork-into-project', 'download-json']);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+
+      // And the other way round: with the read-only one selected, the own card's menu still offers its writes.
+      await act(() => card('wf-shared')?.click());
+      expect(detail()).toBe('wf-shared');
+      await raiseOn('wf-portrait');
+      expect(items()).toContain('rename');
+      expect(items()).toContain('delete');
+    });
+
+    it('duplicates the card it was raised for, once per press, and selects the copy', async () => {
+      let finishCopy!: (workflowId: string) => void;
+      libraryWrites.create.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            finishCopy = resolve;
+          })
+      );
+      await openWith(LOADED_SNAPSHOT);
+      const duplicateItem = () => openMenu()?.querySelector<HTMLElement>('[data-menu-item="duplicate"]');
+      const raiseOn = async (workflowId: string) => {
+        await act(() =>
+          card(workflowId)?.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+          )
+        );
+        await vi.waitFor(() => expect(openMenu()?.id).toBe(`workflow-library-card-${workflowId}-actions`));
+      };
+
+      await raiseOn('wf-landscape');
+      await act(async () => {
+        duplicateItem()?.click();
+        await settleFrame();
+      });
+      expect(libraryWrites.cached).toHaveBeenCalledExactlyOnceWith(
+        'wf-landscape',
+        expect.objectContaining({ expectedRevision: 1 })
+      );
+      await vi.waitFor(() => expect(libraryWrites.create).toHaveBeenCalledOnce());
+      expect(libraryWrites.create.mock.calls[0]![0].name).toBe('Landscape Pass copy');
+
+      // While that copy is in flight, the same workflow offers no second Duplicate; another workflow still does.
+      await raiseOn('wf-landscape');
+      expect(duplicateItem()?.hasAttribute('data-disabled')).toBe(true);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+      await raiseOn('wf-sketch');
+      expect(duplicateItem()?.hasAttribute('data-disabled')).toBe(false);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+
+      await act(async () => {
+        finishCopy('wf-landscape-copy');
+        await settleFrame();
+      });
+      // Listed after the first entry, so only the selection, not the rail's first-entry fallback, shows the copy.
+      const copy = entry('wf-landscape-copy', 'Landscape Pass copy', readyEnrichment(7, 'flux'));
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, LANDSCAPE, copy, SKETCH, UPSCALE] })));
+      expect(detail()).toBe('wf-landscape-copy');
+      expect(libraryWrites.create).toHaveBeenCalledOnce();
+    });
+
+    it('closes when its card leaves the listing', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
+      await vi.waitFor(() => expect(openMenu()).not.toBeNull());
+
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+      // Coming back later does not reopen it.
+      await act(() => browse.setSnapshot?.(LOADED_SNAPSHOT));
+      await settleFrame();
+      expect(openMenu()).toBeNull();
+      expect(card('wf-landscape')?.closest('[data-menu-open]')).toBeNull();
+    });
+
+    it('keeps one menu open: the rail’s More and a card’s menu close each other', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      const railMore = document.querySelector<HTMLElement>('[data-workflow-detail] [aria-label="More actions"]')!;
+      const isRailMenuOpen = () => railMore.getAttribute('aria-expanded') === 'true';
+
+      await act(() => userEvent.click(railMore));
+      await vi.waitFor(() => expect(isRailMenuOpen()).toBe(true));
+
+      await act(() => userEvent.click(card('wf-landscape')!, { button: 'right' }));
+      await vi.waitFor(() => expect(openMenu()?.id).toBe('workflow-library-card-wf-landscape-actions'));
+      expect(isRailMenuOpen()).toBe(false);
+
+      // One press, however quick: the card's menu closes before the rail's opens over it.
+      await act(() => userEvent.click(railMore));
+      await vi.waitFor(() => expect(isRailMenuOpen()).toBe(true));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+      expect(card('wf-landscape')?.getAttribute('aria-expanded')).toBeNull();
+      // The press that closed the card's menu keeps focus in the menu it opened, rather than back on the card.
+      await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull());
+      await settleFrame();
+      expect(isRailMenuOpen()).toBe(true);
+    });
+
+    it('leaves focus in the field a press moved it to when that press closes the menu', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
+      await vi.waitFor(() => expect(openMenu()).not.toBeNull());
+      const search = document.querySelector<HTMLInputElement>(
+        'input[placeholder="Search names, tags, or descriptions"]'
+      )!;
+
+      await act(() => userEvent.click(search));
+
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+      await settleFrame();
+      expect(document.activeElement).toBe(search);
+
+      // The next menu returns focus to its card again.
+      await raise('right-click');
+      await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull());
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(card('wf-landscape')));
+    });
   });
 
   // The question mounts while the menu that asked it is still closing; the menu's teardown must not dismiss it.
@@ -2229,7 +2540,7 @@ describe('WorkflowLibraryDialog', () => {
     await vi.waitFor(() =>
       expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
     );
-    expect(document.querySelector('[data-workflow-detail]')?.getAttribute('data-workflow-detail')).toBe('wf-landscape');
+    expect(document.querySelector('[data-workflow-detail]')?.getAttribute('data-workflow-detail')).toBe('wf-portrait');
 
     // An open menu treats a right-click on a card's strip, or a press on a menu button, as a retarget, not a dismissal.
     const retargets = (target: Element, button: number) => {
@@ -2793,7 +3104,8 @@ describe('WorkflowLibraryDialog', () => {
           new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 200 })
         )
       );
-      expect(rail()).toBe('wf-landscape');
+      // The menu is the row's, not the selection's: the rail stays on the first entry.
+      expect(rail()).toBe('wf-portrait');
       await vi.waitFor(() => expect(menu()?.querySelector('[data-menu-item="open"]')).not.toBeNull());
       // The row's button names the menu, so the dialog's focus trap lets focus into it.
       expect(primary('wf-landscape')?.getAttribute('aria-expanded')).toBe('true');
@@ -2805,18 +3117,49 @@ describe('WorkflowLibraryDialog', () => {
       await vi.waitFor(() => expect(menu()).toBeNull());
       await vi.waitFor(() => expect(document.activeElement).toBe(primary('wf-landscape')));
 
-      const more = row('wf-portrait')?.querySelector<HTMLButtonElement>('[data-workflow-card-menu]') ?? null;
+      const more = row('wf-sketch')?.querySelector<HTMLButtonElement>('[data-workflow-card-menu]') ?? null;
       await pressTileMenuButton(more);
       expect(rail()).toBe('wf-portrait');
       await vi.waitFor(() => expect(menu()?.querySelector('[data-menu-item="open"]')).not.toBeNull());
       expect(more?.getAttribute('aria-expanded')).toBe('true');
-      expect(primary('wf-portrait')?.hasAttribute('aria-expanded')).toBe(false);
+      expect(more?.getAttribute('aria-controls')).toBe(menu()?.id);
+      expect(primary('wf-sketch')?.hasAttribute('aria-expanded')).toBe(false);
       await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), {
         timeout: 2000,
       });
       await act(() => userEvent.keyboard('{Escape}'));
       await vi.waitFor(() => expect(menu()).toBeNull());
       await vi.waitFor(() => expect(document.activeElement).toBe(more));
+    });
+
+    it("deletes another row from that row's menu and keeps the selection", async () => {
+      await openAsList(LOADED_SNAPSHOT);
+      await act(() => userEvent.click(primary('wf-upscale')!));
+      expect(rail()).toBe('wf-upscale');
+
+      await act(() => userEvent.click(primary('wf-landscape')!, { button: 'right' }));
+      await vi.waitFor(() => expect(menu()?.id).toBe('workflow-library-card-wf-landscape-actions'));
+      expect(rail()).toBe('wf-upscale');
+      expect(primary('wf-upscale')?.getAttribute('aria-current')).toBe('true');
+
+      await act(async () => {
+        menu()?.querySelector<HTMLElement>('[data-menu-item="delete"]')?.click();
+        await settleFrame();
+      });
+      const alert = await vi.waitFor(() => {
+        const element = document.querySelector<HTMLElement>('[role="alertdialog"]');
+        expect(element?.textContent).toContain('Landscape Pass');
+        return element!;
+      });
+      await act(async () => {
+        [...alert.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Delete')?.click();
+        await settleFrame();
+      });
+
+      expect(libraryWrites.delete).toHaveBeenCalledExactlyOnceWith('wf-landscape', expect.anything());
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+      await vi.waitFor(() => expect(row('wf-landscape')).toBeNull());
+      expect(rail()).toBe('wf-upscale');
     });
 
     it('opens from the Open quick action without taking focus off the row, asking first when the project holds a copy', async () => {
@@ -3175,6 +3518,64 @@ describe('WorkflowLibraryDialog — This project', () => {
     await vi.waitFor(() =>
       expect(document.querySelector('[data-workflow-context-menu] [data-menu-item="rename"]')).not.toBeNull()
     );
+    // The menu is the tile's; the rail keeps the active workflow.
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-alpha');
+  });
+
+  it("duplicates another workflow from its card's menu and selects the copy", async () => {
+    await renderDialog();
+    await selectCard('wf-bundled');
+
+    await act(() => userEvent.click(card('wf-user')!, { button: 'right' }));
+    const contextMenu = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+      expect(element?.id).toBe('workflow-library-card-wf-user-actions');
+      return element!;
+    });
+    await click(contextMenu.querySelector<HTMLElement>('[data-menu-item="duplicate"]'));
+
+    expect(COMMANDS.duplicateWorkflow).toHaveBeenCalledExactlyOnceWith('wf-user', 'User copy copy');
+    expect(workflowUiStore.getSnapshot().librarySelection).toEqual({ projectId: PROJECT_ID, workflowId: 'wf-copy' });
+  });
+
+  it("renames and removes another workflow from its card's menu, keeping the selected one", async () => {
+    await renderDialog();
+    await selectCard('wf-bundled');
+    const contextMenu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+    const raiseOnUserCopy = async () => {
+      await act(() => userEvent.click(card('wf-user')!, { button: 'right' }));
+      await vi.waitFor(() => expect(contextMenu()?.id).toBe('workflow-library-card-wf-user-actions'));
+      expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
+    };
+
+    await raiseOnUserCopy();
+    await click(contextMenu()?.querySelector<HTMLElement>('[data-menu-item="rename"]'));
+    const input = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+      expect(element?.value).toBe('User copy');
+      return element!;
+    });
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'User copy, tuned');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await click(input.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]'));
+    expect(COMMANDS.renameWorkflow).toHaveBeenCalledExactlyOnceWith('wf-user', 'User copy, tuned');
+
+    await vi.waitFor(() => expect(alertDialog()).toBeNull());
+    await raiseOnUserCopy();
+    await click(contextMenu()?.querySelector<HTMLElement>('[data-menu-item="remove"]'));
+    expect(alertDialog()?.textContent).toContain('Remove "User copy" from this project?');
+    await click(
+      [...(alertDialog()?.querySelectorAll('button') ?? [])].find(
+        (candidate) => (candidate.textContent ?? '').trim() === 'Remove'
+      )
+    );
+
+    expect(COMMANDS.removeWorkflow).toHaveBeenCalledExactlyOnceWith('wf-user');
+    expect(workflowUiStore.getSnapshot().librarySelection).toEqual({ projectId: PROJECT_ID, workflowId: 'wf-bundled' });
     expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
   });
 
@@ -3268,6 +3669,8 @@ describe('WorkflowLibraryDialog — This project', () => {
     await click(confirm);
 
     expect(COMMANDS.removeWorkflow).toHaveBeenCalledWith('wf-bundled');
+    // Removing the selected workflow clears the selection.
+    expect(workflowUiStore.getSnapshot().librarySelection).toBeNull();
   });
 
   it('offers a template update only for a source the account can write', async () => {

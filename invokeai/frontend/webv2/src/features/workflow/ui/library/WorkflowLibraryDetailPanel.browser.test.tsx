@@ -13,13 +13,26 @@ import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/ut
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
-import { act, StrictMode, type ReactNode } from 'react';
+import { act, StrictMode, type ComponentProps, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { loadGraphPreview } from './libraryPreviewSource';
+import { useWorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
+
+/**
+ * The rail as the template panes mount it, with their duplicate guard. Write access is the panes' decision
+ * (`getLibraryEntryAccess`); for this single-user owner, only the account's own templates are writable.
+ */
+const PanesRail = (props: Omit<ComponentProps<typeof WorkflowLibraryDetailPanel>, 'duplicateGuard' | 'isReadOnly'>) => (
+  <WorkflowLibraryDetailPanel
+    {...props}
+    duplicateGuard={useWorkflowLibraryDuplicateGuard()}
+    isReadOnly={props.entry?.item.category !== 'user'}
+  />
+);
 
 /**
  * Use mutable catalog fixtures but real install-source expansion to verify deduplicated catalog sources reach
@@ -397,7 +410,7 @@ describe('WorkflowLibraryDetailPanel', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onClose: () => void;
-  let onDeleted: () => void;
+  let onDeleted: (workflowId: string) => void;
   let onDuplicated: (workflowId: string) => void;
   let onOpen: (item: WorkflowLibraryEntry['item']) => void;
   let onPreview: (selected: WorkflowLibraryEntry) => void;
@@ -418,14 +431,11 @@ describe('WorkflowLibraryDetailPanel', () => {
         <WorkflowUiProvider adapter={ADAPTER}>
           <GalleryHostProvider host={GALLERY_HOST}>
             <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-              <WorkflowLibraryDetailPanel
-                contextMenuPoint={null}
-                contextMenuTriggerId={null}
+              <PanesRail
                 entry={selected}
                 canChangeVisibility={canChangeVisibility}
                 projectWorkflows={projectWorkflows}
                 onClose={onClose}
-                onContextMenuClose={NOOP}
                 onDeleted={onDeleted}
                 onDuplicated={onDuplicated}
                 onOpen={onOpen}
@@ -1311,7 +1321,7 @@ describe('WorkflowLibraryDetailPanel', () => {
 
     expect(queries.deleteLibraryWorkflow).toHaveBeenCalledWith('wf-text-to-image', expect.anything());
     expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledTimes(1);
-    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(onDeleted).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
   });
 
   it('animates the delete confirmation out when the deleted workflow leaves the panel', async () => {

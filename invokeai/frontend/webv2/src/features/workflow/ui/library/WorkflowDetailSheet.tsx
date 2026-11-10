@@ -18,6 +18,7 @@ import {
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WORKFLOW_LIBRARY_NARROW } from './WorkflowLibraryRail';
 import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
@@ -180,8 +181,6 @@ export interface WorkflowDetailSheetProps extends Omit<StackProps, 'children' | 
   workflowId: string;
   /** The full rail: its scroll area and action footer. */
   children: ReactNode;
-  /** Portalled companions (menus, dialogs) that belong to the rail but lay out nowhere. */
-  portals?: ReactNode;
   name: string;
   /** The summary's facts line, such as "SDXL · 23 nodes · Ready to run"; empty for none. */
   facts: string;
@@ -204,7 +203,6 @@ export const WorkflowDetailSheet = ({
   menuPositioning,
   name,
   openLabel,
-  portals,
   ref,
   thumbnailSrc,
   workflowDocument,
@@ -333,7 +331,11 @@ export const WorkflowDetailSheet = ({
           >
             {openLabel}
           </Button>
-          <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
+          <Menu.Root
+            ids={moreActionsIds}
+            positioning={menuPositioning}
+            onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
+          >
             {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
                 menu never takes focus and the first pointer move onto it closes it. */}
             <Menu.Trigger asChild>
@@ -367,7 +369,6 @@ export const WorkflowDetailSheet = ({
           {isExpanded ? t('workflowLibrary.hideDetails') : t('workflowLibrary.detailsAndRequirements')}
         </Button>
       </Box>
-      {portals}
     </Stack>
   );
 };

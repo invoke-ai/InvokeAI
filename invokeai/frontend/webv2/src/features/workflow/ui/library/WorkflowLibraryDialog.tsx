@@ -48,6 +48,7 @@ import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 import type { WorkflowLibraryCardSize } from './workflowThumbnail';
 
@@ -303,10 +304,10 @@ export const WorkflowLibraryDialog = ({
   const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
   // Close before clearing the request so the lazy dialog remains mounted through its exit transition.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [contextMenuPoint, setContextMenuPoint] = useState<WorkflowCardMenuAnchor | null>(null);
-  // The element focus returns to when the menu closes. It outlives the open menu: the menu is told it closed only
-  // after React has rendered the close, so the trigger it restores focus to must still be the one that opened it.
-  const [contextMenuTriggerId, setContextMenuTriggerId] = useState<string | null>(null);
+  // A card's or row's actions menu acts on the workflow it was raised for and leaves the selection alone. The anchor
+  // says where it is open; the target outlives it, for focus return and the dialogs its items open.
+  const [contextMenuAnchor, setContextMenuAnchor] = useState<WorkflowCardMenuAnchor | null>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<WorkflowContextMenuTarget | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const placeIdBase = useId();
@@ -326,7 +327,7 @@ export const WorkflowLibraryDialog = ({
     cancelPendingSearch();
     setPreviewRequest(null);
     setIsPreviewOpen(false);
-    setContextMenuPoint(null);
+    setContextMenuAnchor(null);
     onOpenChange(false);
   }, [cancelPendingSearch, onOpenChange]);
   const { loadPhase, open } = useOpenLibraryWorkflow(closeDialog);
@@ -347,6 +348,24 @@ export const WorkflowLibraryDialog = ({
     [isProjectTab, projectOrder, projectWorkflows, query, templatesSnapshot]
   );
   const projectTagCounts = useMemo(() => countProjectWorkflowTags(projectWorkflows), [projectWorkflows]);
+
+  // A menu whose workflow left the view (a filter, a removal, a window that moved on) has nothing to act on: close it.
+  // The template places hold their entries in the browse store; only this flag reaches the shell.
+  const contextMenuWorkflowId = contextMenuAnchor?.workflowId ?? null;
+  const isLibraryMenuTargetShown = useWorkflowLibraryBrowseSelector(
+    (snapshot) =>
+      contextMenuWorkflowId === null ||
+      isProjectTab ||
+      selectWorkflowLibraryEntry(snapshot, contextMenuWorkflowId) !== undefined
+  );
+  if (
+    contextMenuWorkflowId !== null &&
+    !(isProjectTab
+      ? projectEntries.some((entry) => entry.item.workflow_id === contextMenuWorkflowId)
+      : isLibraryMenuTargetShown)
+  ) {
+    setContextMenuAnchor(null);
+  }
   const missingCounts = useWorkflowLibraryMissingCounts(projectEntries);
 
   // The project selection belongs to the project it was made in; another project starts from its active workflow.
@@ -472,7 +491,7 @@ export const WorkflowLibraryDialog = ({
 
   const handlePlaceChange = useCallback(
     (place: WorkflowLibraryTab) => {
-      setContextMenuPoint(null);
+      setContextMenuAnchor(null);
       cancelPendingSearch();
       setWorkflowLibraryTab(place);
 
@@ -581,43 +600,42 @@ export const WorkflowLibraryDialog = ({
     [handleOpenItem]
   );
 
-  const handleDeleted = useCallback((workflowId: string | null) => {
+  // Deleting another workflow, from its card's menu, keeps the selection.
+  const handleDeleted = useCallback((workflowId: string) => {
     setRemovedWorkflowId(workflowId);
-    setSelectedWorkflowId(null);
-    setContextMenuPoint(null);
+    setSelectedWorkflowId((current) => (current === workflowId ? null : current));
+    setContextMenuAnchor(null);
   }, []);
   const handleCardContextMenu = useCallback(
-    (workflowId: string, point: WorkflowCardMenuAnchor) => {
-      if (tab === 'project') {
-        setWorkflowLibrarySelection({ projectId, workflowId });
-      } else {
-        setSelectedWorkflowId(workflowId);
-      }
-
-      setContextMenuTriggerId(point.kind === 'trigger' ? point.triggerId : null);
+    (workflowId: string, anchor: WorkflowCardMenuAnchor) => {
+      const target = { triggerId: anchor.kind === 'trigger' ? anchor.triggerId : null, workflowId };
 
       // The menu button that opened the menu closes it again.
       if (
-        point.kind === 'trigger' &&
-        contextMenuPoint?.kind === 'trigger' &&
-        contextMenuPoint.triggerId === point.triggerId
+        anchor.kind === 'trigger' &&
+        contextMenuAnchor?.kind === 'trigger' &&
+        contextMenuAnchor.triggerId === anchor.triggerId
       ) {
-        setContextMenuPoint(null);
+        setContextMenuAnchor(null);
         return;
       }
 
-      // An open menu does not follow a new anchor: close it and reopen it at the
-      // new point once that close has rendered, as a native menu relocates.
-      if (contextMenuPoint) {
-        setContextMenuPoint(null);
-        requestAnimationFrame(() => setContextMenuPoint(point));
+      // An open menu does not follow a new anchor: close it and reopen it at the new point once that close has
+      // rendered, as a native menu relocates. The closing menu keeps its own workflow's items and focus return.
+      if (contextMenuAnchor) {
+        setContextMenuAnchor(null);
+        requestAnimationFrame(() => {
+          setContextMenuTarget(target);
+          setContextMenuAnchor(anchor);
+        });
       } else {
-        setContextMenuPoint(point);
+        setContextMenuTarget(target);
+        setContextMenuAnchor(anchor);
       }
     },
-    [contextMenuPoint, projectId, tab]
+    [contextMenuAnchor]
   );
-  const closeContextMenu = useCallback(() => setContextMenuPoint(null), []);
+  const closeContextMenu = useCallback(() => setContextMenuAnchor(null), []);
   const handleProjectSelect = useCallback(
     (workflowId: string | null) => setWorkflowLibrarySelection(workflowId ? { projectId, workflowId } : null),
     [projectId]
@@ -770,8 +788,8 @@ export const WorkflowLibraryDialog = ({
                         <>
                           <WorkflowLibraryResultLine count={projectEntries.length} tagsText={tagsText} />
                           <ProjectWorkflowsView
-                            contextMenuPoint={contextMenuPoint}
-                            contextMenuTriggerId={contextMenuTriggerId}
+                            contextMenuAnchor={contextMenuAnchor}
+                            contextMenuTarget={contextMenuTarget}
                             entries={projectEntries}
                             layout={layout}
                             missingCounts={missingCounts}
@@ -786,8 +804,8 @@ export const WorkflowLibraryDialog = ({
                         </>
                       ) : (
                         <WorkflowLibraryBrowsePanes
-                          contextMenuPoint={contextMenuPoint}
-                          contextMenuTriggerId={contextMenuTriggerId}
+                          contextMenuAnchor={contextMenuAnchor}
+                          contextMenuTarget={contextMenuTarget}
                           emptyMessage={emptyMessage}
                           isOpen={isOpen}
                           layout={layout}

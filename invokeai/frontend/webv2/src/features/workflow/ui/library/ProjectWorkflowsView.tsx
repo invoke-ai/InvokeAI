@@ -38,6 +38,8 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectWorkflowLibraryEntry } from './projectWorkflowEntries';
+import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+import type { WorkflowContextMenuTarget } from './WorkflowLibraryContextMenu';
 import type { WorkflowLibraryListTrailingField } from './WorkflowLibraryList';
 
 import { isUpdatableSource, toProjectWorkflowLibraryEntries } from './projectWorkflowEntries';
@@ -50,13 +52,8 @@ import {
   WorkflowMissingNodePacks,
 } from './WorkflowDetailSheet';
 import { WORKFLOW_LIBRARY_PANES_CSS } from './WorkflowLibraryBrowsePanes';
-import {
-  getWorkflowLibraryCardId,
-  getWorkflowLibraryCardMenuContentId,
-  keepCardMenuOpenForRetarget,
-  type WorkflowCardMenuAnchor,
-  type WorkflowCardContextMenuHandler,
-} from './WorkflowLibraryCard';
+import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
+import { WorkflowCardContextMenu } from './WorkflowLibraryContextMenu';
 import { WorkflowDetailFact } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryList } from './WorkflowLibraryList';
@@ -80,14 +77,16 @@ const NO_NODE_PACKS: readonly string[] = [];
 const selectTemplateSummary = (record: WorkflowRecordDTO) => ({ name: record.name, revision: record.revision });
 
 export interface ProjectWorkflowsViewProps {
-  contextMenuPoint: WorkflowCardMenuAnchor | null;
-  /** What opened the menu last, kept through its close so focus returns there. */
-  contextMenuTriggerId: string | null;
+  /** Where the card actions menu is anchored; null while it is closed. */
+  contextMenuAnchor: WorkflowCardMenuAnchor | null;
+  /** The workflow the card actions menu was raised for, kept through its close. */
+  contextMenuTarget: WorkflowContextMenuTarget | null;
   /** The project's workflows the toolbar and tags let through, in the toolbar's order. */
   entries: readonly ProjectWorkflowLibraryEntry[];
   layout: WorkflowLibraryLayout;
   /** Missing-model counts for `entries`, by workflow id. */
   missingCounts: ReadonlyMap<string, number>;
+  /** The explicit choice; the rail falls back to the active workflow, then the first match. */
   selectedWorkflowId: string | null;
   /** The date the list's rows show, from the current order. */
   trailingField: WorkflowLibraryListTrailingField;
@@ -99,8 +98,8 @@ export interface ProjectWorkflowsViewProps {
 }
 
 export const ProjectWorkflowsView = ({
-  contextMenuPoint,
-  contextMenuTriggerId,
+  contextMenuAnchor,
+  contextMenuTarget,
   entries,
   layout,
   missingCounts,
@@ -126,6 +125,10 @@ export const ProjectWorkflowsView = ({
       ? activeWorkflowId
       : (entries[0]?.item.workflow_id ?? null);
   const selectedEntry = entries.find((entry) => entry.item.workflow_id === activeSelectionId) ?? null;
+  // The card menu acts on the workflow it was raised for; one the filters hide has nothing to act on.
+  const menuEntry = contextMenuTarget
+    ? (entries.find((entry) => entry.item.workflow_id === contextMenuTarget.workflowId)?.projectWorkflow ?? null)
+    : null;
 
   const previewWorkflow = useCallback(
     (workflowId: string) => {
@@ -154,12 +157,16 @@ export const ProjectWorkflowsView = ({
     },
     [duplicateWorkflow, onSelect, t]
   );
+  // Removing another workflow, from its card's menu, keeps the selection.
   const confirmRemove = useCallback(() => {
     if (removeTarget) {
       removeWorkflow(removeTarget);
-      onSelect(null);
+
+      if (removeTarget === selectedWorkflowId) {
+        onSelect(null);
+      }
     }
-  }, [onSelect, removeTarget, removeWorkflow]);
+  }, [onSelect, removeTarget, removeWorkflow, selectedWorkflowId]);
   const closeRename = useCallback(() => setRenameTarget(null), []);
   const closeRemove = useCallback(() => setRemoveTarget(null), []);
   const submitRename = useCallback(
@@ -183,7 +190,7 @@ export const ProjectWorkflowsView = ({
             entries={entries}
             error={null}
             missingCounts={missingCounts}
-            openMenuAnchor={contextMenuPoint}
+            openMenuAnchor={contextMenuAnchor}
             selectedWorkflowId={activeSelectionId}
             status="loaded"
             onContextMenu={onContextMenu}
@@ -198,7 +205,7 @@ export const ProjectWorkflowsView = ({
             entries={entries}
             error={null}
             missingCounts={missingCounts}
-            openMenuAnchor={contextMenuPoint}
+            openMenuAnchor={contextMenuAnchor}
             selectedWorkflowId={activeSelectionId}
             status="loaded"
             onContextMenu={onContextMenu}
@@ -208,12 +215,9 @@ export const ProjectWorkflowsView = ({
           />
         )}
         <ProjectWorkflowDetailPanel
-          contextMenuPoint={contextMenuPoint}
-          contextMenuTriggerId={contextMenuTriggerId}
           entry={selectedEntry ? selectedEntry.projectWorkflow : null}
           isActive={selectedEntry?.item.workflow_id === activeWorkflowId}
           missingCount={selectedEntry ? (missingCounts.get(selectedEntry.item.workflow_id) ?? 0) : 0}
-          onContextMenuClose={onContextMenuClose}
           onDuplicate={handleDuplicate}
           onOpen={openWorkflow}
           onPreview={onPreview}
@@ -221,6 +225,16 @@ export const ProjectWorkflowsView = ({
           onRename={setRenameTarget}
         />
       </HStack>
+      <ProjectWorkflowContextMenu
+        anchor={contextMenuAnchor}
+        entry={menuEntry}
+        target={contextMenuTarget}
+        onDuplicate={handleDuplicate}
+        onMenuClose={onContextMenuClose}
+        onOpen={openWorkflow}
+        onRemove={setRemoveTarget}
+        onRename={setRenameTarget}
+      />
 
       <RenameDialog
         initialName={renameEntry?.document.name ?? ''}
@@ -245,19 +259,128 @@ export const ProjectWorkflowsView = ({
   );
 };
 
-interface ProjectWorkflowDetailPanelProps {
-  contextMenuPoint: WorkflowCardMenuAnchor | null;
-  /** What opened the menu last, kept through its close so focus returns there. */
-  contextMenuTriggerId: string | null;
+interface ProjectWorkflowActionsOptions {
+  /** The workflow the actions act on: the rail's selection, or the card a context menu was raised on. */
   entry: ProjectWorkflowEntry | null;
-  isActive: boolean;
-  missingCount: number;
-  onContextMenuClose: () => void;
   onDuplicate: (workflowId: string, name: string) => void;
   onOpen: (workflowId: string) => void;
-  onPreview: (entry: ProjectWorkflowEntry) => void;
+  /** Asks to remove it; the view owns the confirmation. */
   onRemove: (workflowId: string) => void;
+  /** Asks to rename it; the view owns the dialog. */
   onRename: (workflowId: string) => void;
+}
+
+/** One project workflow's menu items, and the handlers the rail's own buttons share with them. */
+const useProjectWorkflowActions = ({
+  entry,
+  onDuplicate,
+  onOpen,
+  onRemove,
+  onRename,
+}: ProjectWorkflowActionsOptions) => {
+  const { t } = useTranslation();
+  const session = useAuthSession();
+  const entryId = entry?.document.id ?? null;
+  const entryName = entry?.document.name || t('workflowLibrary.untitled');
+  const canUpdateSource = isUpdatableSource(entry?.source, session);
+  const open = useCallback(() => entryId && onOpen(entryId), [entryId, onOpen]);
+  const handleRename = useCallback(() => entryId && onRename(entryId), [entryId, onRename]);
+  const handleDuplicate = useCallback(
+    () => entryId && onDuplicate(entryId, entryName),
+    [entryId, entryName, onDuplicate]
+  );
+  const handleRemove = useCallback(() => entryId && onRemove(entryId), [entryId, onRemove]);
+  const handleSaveToLibrary = useCallback(
+    () => entryId && requestWorkflowPublication({ kind: 'save-as-new', workflowId: entryId }),
+    [entryId]
+  );
+  const updateTemplate = useCallback(
+    () => entryId && requestWorkflowPublication({ kind: 'update-source', workflowId: entryId }),
+    [entryId]
+  );
+
+  const actionItems = (
+    <>
+      <MenuActionItem
+        hint={t('workflowLibrary.openProjectWorkflowHint')}
+        icon={WorkflowIcon}
+        label={t('workflowLibrary.open')}
+        value="open"
+        onSelect={open}
+      />
+      <MenuActionItem
+        hint={t('workflowLibrary.renameProjectWorkflowHint')}
+        icon={PencilIcon}
+        label={t('workflowLibrary.renameWithEllipsis')}
+        value="rename"
+        onSelect={handleRename}
+      />
+      <MenuActionItem
+        hint={t('workflowLibrary.duplicateProjectWorkflowHint')}
+        icon={CopyIcon}
+        label={t('workflowLibrary.duplicate')}
+        value="duplicate"
+        onSelect={handleDuplicate}
+      />
+      <MenuActionItem
+        hint={t('workflowLibrary.saveToLibraryHint')}
+        icon={BookmarkIcon}
+        label={t('workflowLibrary.saveToLibraryWithEllipsis')}
+        value="save-to-library"
+        onSelect={handleSaveToLibrary}
+      />
+      {canUpdateSource ? (
+        <MenuActionItem
+          hint={t('workflowLibrary.updateTemplateHint')}
+          icon={RefreshCwIcon}
+          label={t('workflowLibrary.updateTemplate')}
+          value="update-template"
+          onSelect={updateTemplate}
+        />
+      ) : null}
+      <MenuActionItem
+        hint={t('workflowLibrary.removeHint')}
+        icon={Trash2Icon}
+        label={t('workflowLibrary.removeWithEllipsis')}
+        tone="danger"
+        value="remove"
+        onSelect={handleRemove}
+      />
+    </>
+  );
+
+  return { actionItems, canUpdateSource, open, updateTemplate };
+};
+
+interface ProjectWorkflowContextMenuProps extends Omit<ProjectWorkflowActionsOptions, 'entry'> {
+  anchor: WorkflowCardMenuAnchor | null;
+  /** The target's workflow; null once the filters hide it, when the shell has already closed the menu. */
+  entry: ProjectWorkflowEntry | null;
+  target: WorkflowContextMenuTarget | null;
+  onMenuClose: () => void;
+}
+
+/** A project card's actions menu; its rename and remove dialogs are the view's, as the rail's are. */
+const ProjectWorkflowContextMenu = ({
+  anchor,
+  entry,
+  target,
+  onMenuClose,
+  ...actions
+}: ProjectWorkflowContextMenuProps) => {
+  const { actionItems } = useProjectWorkflowActions({ entry, ...actions });
+
+  return (
+    <WorkflowCardContextMenu anchor={anchor} target={target} onClose={onMenuClose}>
+      {actionItems}
+    </WorkflowCardContextMenu>
+  );
+};
+
+interface ProjectWorkflowDetailPanelProps extends ProjectWorkflowActionsOptions {
+  isActive: boolean;
+  missingCount: number;
+  onPreview: (entry: ProjectWorkflowEntry) => void;
 }
 
 /**
@@ -266,12 +389,9 @@ interface ProjectWorkflowDetailPanelProps {
  * workflow header shares; the query client is account-scoped.
  */
 const ProjectWorkflowDetailPanel = ({
-  contextMenuPoint,
-  contextMenuTriggerId,
   entry,
   isActive,
   missingCount,
-  onContextMenuClose,
   onDuplicate,
   onOpen,
   onPreview,
@@ -287,7 +407,6 @@ const ProjectWorkflowDetailPanel = ({
     []
   );
   const { t } = useTranslation();
-  const session = useAuthSession();
   const deps = useModelRequirementDeps();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const openAddModels = useOpenAddModels();
@@ -345,38 +464,13 @@ const ProjectWorkflowDetailPanel = ({
   const handleReplaced = useCallback(() => notify.success(t('workflowLibrary.updatedFromTemplate')), [notify, t]);
   const { loadPhase, replace } = useOpenLibraryWorkflow(handleReplaced);
   const isReplacing = loadPhase !== 'idle';
-
-  // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
-  const contextMenuPositioning = useMemo(
-    () =>
-      contextMenuPoint?.kind === 'point'
-        ? {
-            ...menuPositioning,
-            getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
-            placement: 'bottom-start' as const,
-          }
-        : { ...menuPositioning, placement: 'bottom-end' as const },
-    [contextMenuPoint, menuPositioning]
-  );
-  const handleContextMenuOpenChange = useCallback(
-    (event: { open: boolean }) => {
-      if (!event.open) {
-        onContextMenuClose();
-      }
-    },
-    [onContextMenuClose]
-  );
-  // Focus returns to whatever opened the menu: the card's menu button, or the right-clicked card.
-  const contextMenuIds = useMemo(
-    () =>
-      entry
-        ? {
-            content: getWorkflowLibraryCardMenuContentId(entry.document.id),
-            trigger: contextMenuTriggerId ?? getWorkflowLibraryCardId(entry.document.id),
-          }
-        : undefined,
-    [contextMenuTriggerId, entry]
-  );
+  // The rail's More and the sheet's More act on the selection; a card's own menu has its own instance.
+  const {
+    actionItems,
+    canUpdateSource,
+    open: handleOpen,
+    updateTemplate: handleUpdateTemplate,
+  } = useProjectWorkflowActions({ entry, onDuplicate, onOpen, onRemove, onRename });
   const moreActionsIds = useTooltipTriggerIds();
   const handleThumbnailError = useCallback(
     () => setFailedThumbnailUrl(libraryEntry?.item.thumbnail_url ?? null),
@@ -384,22 +478,7 @@ const ProjectWorkflowDetailPanel = ({
   );
   const entryId = entry?.document.id ?? null;
   const entryName = entry?.document.name || t('workflowLibrary.untitled');
-  const handleOpen = useCallback(() => entryId && onOpen(entryId), [entryId, onOpen]);
-  const handleRename = useCallback(() => entryId && onRename(entryId), [entryId, onRename]);
-  const handleDuplicate = useCallback(
-    () => entryId && onDuplicate(entryId, entryName),
-    [entryId, entryName, onDuplicate]
-  );
-  const handleRemove = useCallback(() => entryId && onRemove(entryId), [entryId, onRemove]);
   const handlePreview = useCallback(() => entry && onPreview(entry), [entry, onPreview]);
-  const handleSaveToLibrary = useCallback(
-    () => entryId && requestWorkflowPublication({ kind: 'save-as-new', workflowId: entryId }),
-    [entryId]
-  );
-  const handleUpdateTemplate = useCallback(
-    () => entryId && requestWorkflowPublication({ kind: 'update-source', workflowId: entryId }),
-    [entryId]
-  );
   const openUpdateConfirm = useCallback(() => setIsUpdateConfirmOpen(true), []);
   const closeUpdateConfirm = useCallback(() => setIsUpdateConfirmOpen(false), []);
   // The copy keeps its id and position; the replacement is one undo step.
@@ -428,7 +507,6 @@ const ProjectWorkflowDetailPanel = ({
   const showThumbnail = Boolean(thumbnailUrl) && thumbnailUrl !== failedThumbnailUrl;
   const lastRun = entry.lastRun ? formatTimeSince(entry.lastRun.completedAt, dataTime) : '';
   const edited = entry.document.updatedAt ? formatTimeSince(entry.document.updatedAt, dataTime) : '';
-  const canUpdateSource = isUpdatableSource(source, session);
   const enrichment = libraryEntry.enrichment.status === 'ready' ? libraryEntry.enrichment : null;
   const primaryBase = enrichment?.requirements.primaryBase ?? null;
   const statusLine = isActive
@@ -455,289 +533,227 @@ const ProjectWorkflowDetailPanel = ({
     .filter((fact) => fact !== null)
     .join(' · ');
 
-  const actionItems = (
-    <>
-      <MenuActionItem
-        hint={t('workflowLibrary.openProjectWorkflowHint')}
-        icon={WorkflowIcon}
-        label={t('workflowLibrary.open')}
-        value="open"
-        onSelect={handleOpen}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.renameProjectWorkflowHint')}
-        icon={PencilIcon}
-        label={t('workflowLibrary.renameWithEllipsis')}
-        value="rename"
-        onSelect={handleRename}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.duplicateProjectWorkflowHint')}
-        icon={CopyIcon}
-        label={t('workflowLibrary.duplicate')}
-        value="duplicate"
-        onSelect={handleDuplicate}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.saveToLibraryHint')}
-        icon={BookmarkIcon}
-        label={t('workflowLibrary.saveToLibraryWithEllipsis')}
-        value="save-to-library"
-        onSelect={handleSaveToLibrary}
-      />
-      {canUpdateSource ? (
-        <MenuActionItem
-          hint={t('workflowLibrary.updateTemplateHint')}
-          icon={RefreshCwIcon}
-          label={t('workflowLibrary.updateTemplate')}
-          value="update-template"
-          onSelect={handleUpdateTemplate}
-        />
-      ) : null}
-      <MenuActionItem
-        hint={t('workflowLibrary.removeHint')}
-        icon={Trash2Icon}
-        label={t('workflowLibrary.removeWithEllipsis')}
-        tone="danger"
-        value="remove"
-        onSelect={handleRemove}
-      />
-    </>
+  const updateConfirm = (
+    <ConfirmDialog
+      body={t('workflowLibrary.updateFromTemplateBody', { name })}
+      confirmLabel={t('workflowLibrary.updateFromTemplateConfirm')}
+      isOpen={isUpdateConfirmOpen}
+      title={t('workflowLibrary.updateFromTemplate')}
+      onClose={closeUpdateConfirm}
+      onConfirm={confirmUpdateFromTemplate}
+    />
   );
 
   return (
-    <WorkflowDetailSheet
-      ref={panelRef}
-      actions={actionItems}
-      data-project-workflow-detail={workflowId}
-      facts={summaryFacts}
-      isOpenDisabled={isActive}
-      menuPositioning={menuPositioning}
-      name={name}
-      openLabel={t('workflowLibrary.open')}
-      portals={
-        <>
-          <Menu.Root
-            ids={contextMenuIds}
-            open={contextMenuPoint !== null}
-            positioning={contextMenuPositioning}
-            onOpenChange={handleContextMenuOpenChange}
-            onPointerDownOutside={keepCardMenuOpenForRetarget}
-          >
-            <Portal>
-              <Menu.Positioner>
-                <MenuContent
-                  data-workflow-context-menu
-                  minW="min(16rem, var(--available-width))"
-                  maxW="var(--available-width)"
-                >
-                  {actionItems}
-                </MenuContent>
-              </Menu.Positioner>
-            </Portal>
-          </Menu.Root>
+    <>
+      <WorkflowDetailSheet
+        ref={panelRef}
+        actions={actionItems}
+        data-project-workflow-detail={workflowId}
+        facts={summaryFacts}
+        isOpenDisabled={isActive}
+        menuPositioning={menuPositioning}
+        name={name}
+        openLabel={t('workflowLibrary.open')}
+        thumbnailSrc={showThumbnail ? thumbnailUrl : null}
+        workflowDocument={entry.document}
+        workflowId={workflowId}
+        onOpen={handleOpen}
+      >
+        <Scrollable flex="1" label={name} minH="0">
+          <Stack gap="2.5" minW="0" p="2.5">
+            {/* The expanded sheet's summary is its compact heading: no large preview, no second name. */}
+            <Box
+              aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO}
+              bg="bg.muted"
+              css={WORKFLOW_DETAIL_WIDE_ONLY_CSS}
+              overflow="hidden"
+              rounded="md"
+              w="full"
+            >
+              {showThumbnail ? (
+                <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
+              ) : (
+                <WorkflowThumbnailPlaceholder
+                  caption={t('workflowLibrary.notRunYet')}
+                  workflowDocument={entry.document}
+                />
+              )}
+            </Box>
 
-          <ConfirmDialog
-            body={t('workflowLibrary.updateFromTemplateBody', { name })}
-            confirmLabel={t('workflowLibrary.updateFromTemplateConfirm')}
-            isOpen={isUpdateConfirmOpen}
-            title={t('workflowLibrary.updateFromTemplate')}
-            onClose={closeUpdateConfirm}
-            onConfirm={confirmUpdateFromTemplate}
-          />
-        </>
-      }
-      thumbnailSrc={showThumbnail ? thumbnailUrl : null}
-      workflowDocument={entry.document}
-      workflowId={workflowId}
-      onOpen={handleOpen}
-    >
-      <Scrollable flex="1" label={name} minH="0">
-        <Stack gap="2.5" minW="0" p="2.5">
-          {/* The expanded sheet's summary is its compact heading: no large preview, no second name. */}
-          <Box
-            aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO}
-            bg="bg.muted"
-            css={WORKFLOW_DETAIL_WIDE_ONLY_CSS}
-            overflow="hidden"
-            rounded="md"
-            w="full"
-          >
-            {showThumbnail ? (
-              <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
-            ) : (
-              <WorkflowThumbnailPlaceholder
-                caption={t('workflowLibrary.notRunYet')}
-                workflowDocument={entry.document}
-              />
-            )}
-          </Box>
-
-          <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
-            <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
-              {name}
-            </Text>
-            {statusLine ? (
-              <Text color="fg.muted" fontSize="xs" id={statusLineId}>
-                {statusLine}
+            <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
+              <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
+                {name}
               </Text>
-            ) : null}
-          </Stack>
-
-          {primaryBase || enrichment || missingNodePacks.length > 0 ? (
-            <HStack flexWrap="wrap" gap="1" minW="0">
-              {primaryBase ? <Badge variant="subtle">{getModelBaseLabel(primaryBase)}</Badge> : null}
-              {enrichment ? (
-                <Badge variant="subtle">{t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}</Badge>
+              {statusLine ? (
+                <Text color="fg.muted" fontSize="xs" id={statusLineId}>
+                  {statusLine}
+                </Text>
               ) : null}
-              {missingNodePacks.length > 0 ? (
-                <Badge bg="bg.error" color="fg.error" data-workflow-missing-node-packs variant="subtle">
-                  {t('workflowLibrary.nodePacksMissing', { count: missingNodePacks.length })}
-                </Badge>
-              ) : null}
-            </HStack>
-          ) : null}
+            </Stack>
 
-          {entry.document.description ? (
-            <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
-              {entry.document.description}
-            </Text>
-          ) : null}
-
-          <Stack
-            borderColor="border.subtle"
-            borderWidth="1px"
-            data-linked-template={source?.libraryWorkflowId ?? 'none'}
-            gap="1.5"
-            minW="0"
-            p="2"
-            rounded="md"
-          >
-            <HStack gap="1.5" justify="space-between" minW="0">
-              <Text color="fg.muted" fontSize="xs" fontWeight="600">
-                {t('workflowLibrary.linkedTemplate')}
-              </Text>
-              {isTemplateNewer ? (
-                <Badge bg="bg.warning" color="fg.warning" data-template-newer flexShrink={0} variant="subtle">
-                  {t('workflowLibrary.templateNewer')}
-                </Badge>
-              ) : null}
-            </HStack>
-            <Text color="fg.muted" fontSize="xs" data-workflow-source={source?.libraryWorkflowId ?? 'none'}>
-              {source
-                ? isBundledSource
-                  ? t('workflowLibrary.sourceBundled')
-                  : source.revision === null
-                    ? t('workflowLibrary.sourceUnknownRevision')
-                    : template.data?.name
-                      ? t('workflowLibrary.sourceNamedRevision', {
-                          name: template.data.name,
-                          revision: source.revision,
-                        })
-                      : t('workflowLibrary.sourceRevision', { revision: source.revision })
-                : t('workflowLibrary.sourceNone')}
-            </Text>
-            {templateRevision !== null ? (
-              <Text color="fg.muted" data-template-revision={templateRevision} fontSize="xs">
-                {t('workflowLibrary.templateRevision', { revision: templateRevision })}
-              </Text>
-            ) : null}
-            {source ? (
-              // Stacked full width: side by side the two labels wrap unevenly in the 18rem rail.
-              <Stack gap="1.5" minW="0">
-                <Button
-                  disabled={!canUpdateFromTemplate || isReplacing}
-                  loading={isReplacing}
-                  size="xs"
-                  variant={isTemplateNewer ? 'solid' : 'outline'}
-                  w="full"
-                  onClick={openUpdateConfirm}
-                >
-                  {t('workflowLibrary.updateFromTemplate')}
-                </Button>
-                {canUpdateSource ? (
-                  <Button size="xs" variant="outline" w="full" onClick={handleUpdateTemplate}>
-                    {t('workflowLibrary.updateTemplate')}
-                  </Button>
+            {primaryBase || enrichment || missingNodePacks.length > 0 ? (
+              <HStack flexWrap="wrap" gap="1" minW="0">
+                {primaryBase ? <Badge variant="subtle">{getModelBaseLabel(primaryBase)}</Badge> : null}
+                {enrichment ? (
+                  <Badge variant="subtle">{t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}</Badge>
                 ) : null}
-              </Stack>
+                {missingNodePacks.length > 0 ? (
+                  <Badge bg="bg.error" color="fg.error" data-workflow-missing-node-packs variant="subtle">
+                    {t('workflowLibrary.nodePacksMissing', { count: missingNodePacks.length })}
+                  </Badge>
+                ) : null}
+              </HStack>
             ) : null}
+
+            {entry.document.description ? (
+              <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
+                {entry.document.description}
+              </Text>
+            ) : null}
+
+            <Stack
+              borderColor="border.subtle"
+              borderWidth="1px"
+              data-linked-template={source?.libraryWorkflowId ?? 'none'}
+              gap="1.5"
+              minW="0"
+              p="2"
+              rounded="md"
+            >
+              <HStack gap="1.5" justify="space-between" minW="0">
+                <Text color="fg.muted" fontSize="xs" fontWeight="600">
+                  {t('workflowLibrary.linkedTemplate')}
+                </Text>
+                {isTemplateNewer ? (
+                  <Badge bg="bg.warning" color="fg.warning" data-template-newer flexShrink={0} variant="subtle">
+                    {t('workflowLibrary.templateNewer')}
+                  </Badge>
+                ) : null}
+              </HStack>
+              <Text color="fg.muted" fontSize="xs" data-workflow-source={source?.libraryWorkflowId ?? 'none'}>
+                {source
+                  ? isBundledSource
+                    ? t('workflowLibrary.sourceBundled')
+                    : source.revision === null
+                      ? t('workflowLibrary.sourceUnknownRevision')
+                      : template.data?.name
+                        ? t('workflowLibrary.sourceNamedRevision', {
+                            name: template.data.name,
+                            revision: source.revision,
+                          })
+                        : t('workflowLibrary.sourceRevision', { revision: source.revision })
+                  : t('workflowLibrary.sourceNone')}
+              </Text>
+              {templateRevision !== null ? (
+                <Text color="fg.muted" data-template-revision={templateRevision} fontSize="xs">
+                  {t('workflowLibrary.templateRevision', { revision: templateRevision })}
+                </Text>
+              ) : null}
+              {source ? (
+                // Stacked full width: side by side the two labels wrap unevenly in the 18rem rail.
+                <Stack gap="1.5" minW="0">
+                  <Button
+                    disabled={!canUpdateFromTemplate || isReplacing}
+                    loading={isReplacing}
+                    size="xs"
+                    variant={isTemplateNewer ? 'solid' : 'outline'}
+                    w="full"
+                    onClick={openUpdateConfirm}
+                  >
+                    {t('workflowLibrary.updateFromTemplate')}
+                  </Button>
+                  {canUpdateSource ? (
+                    <Button size="xs" variant="outline" w="full" onClick={handleUpdateTemplate}>
+                      {t('workflowLibrary.updateTemplate')}
+                    </Button>
+                  ) : null}
+                </Stack>
+              ) : null}
+            </Stack>
+
+            {libraryEntry.tags.length > 0 ? (
+              <HStack flexWrap="wrap" gap="1" minW="0">
+                {libraryEntry.tags.map((tag) => (
+                  <Badge key={tag} variant="outline">
+                    {tag}
+                  </Badge>
+                ))}
+              </HStack>
+            ) : null}
+
+            <WorkflowMissingNodePacks packs={missingNodePacks} />
+            <WorkflowRequirementsList errorMessage={null} resolved={resolved} onFindModel={openAddModels} />
+            {missingCount > 0 ? (
+              <Text color="fg.warning" fontSize="xs">
+                {t('workflowLibrary.modelsToInstall', { count: missingCount })}
+              </Text>
+            ) : null}
+
+            <DataList.Root data-project-workflow-facts gap="1.5" orientation="horizontal">
+              <WorkflowDetailFact label={t('workflowLibrary.factLastRun')}>
+                {lastRun || t('workflowLibrary.notRunYet')}
+              </WorkflowDetailFact>
+              {edited ? (
+                <WorkflowDetailFact label={t('workflowLibrary.factEdited')}>{edited}</WorkflowDetailFact>
+              ) : null}
+            </DataList.Root>
           </Stack>
+        </Scrollable>
 
-          {libraryEntry.tags.length > 0 ? (
-            <HStack flexWrap="wrap" gap="1" minW="0">
-              {libraryEntry.tags.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
-            </HStack>
-          ) : null}
-
-          <WorkflowMissingNodePacks packs={missingNodePacks} />
-          <WorkflowRequirementsList errorMessage={null} resolved={resolved} onFindModel={openAddModels} />
-          {missingCount > 0 ? (
-            <Text color="fg.warning" fontSize="xs">
-              {t('workflowLibrary.modelsToInstall', { count: missingCount })}
-            </Text>
-          ) : null}
-
-          <DataList.Root data-project-workflow-facts gap="1.5" orientation="horizontal">
-            <WorkflowDetailFact label={t('workflowLibrary.factLastRun')}>
-              {lastRun || t('workflowLibrary.notRunYet')}
-            </WorkflowDetailFact>
-            {edited ? <WorkflowDetailFact label={t('workflowLibrary.factEdited')}>{edited}</WorkflowDetailFact> : null}
-          </DataList.Root>
-        </Stack>
-      </Scrollable>
-
-      {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
-      carries Open and More instead. */}
-      <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
-        <Button
-          disabled={libraryEntry.enrichment.status !== 'ready'}
-          minW="0"
-          size="lg"
-          variant="outline"
-          w="full"
-          onClick={handlePreview}
-        >
-          <WorkflowIcon />
-          {t('workflowLibrary.previewGraph')}
-        </Button>
-        <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
-          {/* The active workflow is already open: the primary slot, disabled, says why through the status line. */}
+        {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
+    carries Open and More instead. */}
+        <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
           <Button
-            aria-describedby={isActive ? statusLineId : undefined}
-            data-project-workflow-open
-            disabled={isActive}
-            flex="1"
+            disabled={libraryEntry.enrichment.status !== 'ready'}
             minW="0"
             size="lg"
-            onClick={handleOpen}
+            variant="outline"
+            w="full"
+            onClick={handlePreview}
           >
-            {t('workflowLibrary.open')}
+            <WorkflowIcon />
+            {t('workflowLibrary.previewGraph')}
           </Button>
-          <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
-            {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
-                menu never takes focus and the first pointer move onto it closes it. */}
-            <Menu.Trigger asChild>
-              <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-                <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
-                  <EllipsisIcon />
-                </IconButton>
-              </Tooltip>
-            </Menu.Trigger>
-            <Portal>
-              <Menu.Positioner>
-                <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
-                  {actionItems}
-                </MenuContent>
-              </Menu.Positioner>
-            </Portal>
-          </Menu.Root>
-        </HStack>
-      </Stack>
-    </WorkflowDetailSheet>
+          <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
+            {/* The active workflow is already open: the primary slot, disabled, says why through the status line. */}
+            <Button
+              aria-describedby={isActive ? statusLineId : undefined}
+              data-project-workflow-open
+              disabled={isActive}
+              flex="1"
+              minW="0"
+              size="lg"
+              onClick={handleOpen}
+            >
+              {t('workflowLibrary.open')}
+            </Button>
+            <Menu.Root
+              ids={moreActionsIds}
+              positioning={menuPositioning}
+              onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
+            >
+              {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
+              menu never takes focus and the first pointer move onto it closes it. */}
+              <Menu.Trigger asChild>
+                <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
+                  <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
+                    <EllipsisIcon />
+                  </IconButton>
+                </Tooltip>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                    {actionItems}
+                  </MenuContent>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </HStack>
+        </Stack>
+      </WorkflowDetailSheet>
+      {updateConfirm}
+    </>
   );
 };
