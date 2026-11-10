@@ -197,6 +197,82 @@ def test_a_kohya_lora_with_non_block_layers_is_a_klein_4b_lora(tmp_path: Path) -
     assert config.variant is Flux2VariantType.Klein4B
 
 
+def _layers(keys: dict[str, Any], *layer_names: str) -> dict[str, Any]:
+    """The fixture's keys of the named kohya layers only (a LoRA that trains just those)."""
+    return {k: v for k, v in keys.items() if k.split(".")[0] in {f"lora_unet_{name}" for name in layer_names}}
+
+
+_KLEIN_4B_KOHYA = flux2_lora_kohya_non_block_format.state_dict_keys
+
+
+@pytest.mark.parametrize(
+    ("keys", "claimed_by", "variant"),
+    [
+        # The shared modulation exists in FLUX.2 only; the fused linear1 of a Klein 4B single block is 27648 wide where
+        # FLUX.1's is 21504 (a mismatch at apply time if it were read as FLUX.1).
+        (
+            _layers(
+                _KLEIN_4B_KOHYA, "single_blocks_0_linear1", "single_blocks_0_linear2", "single_stream_modulation_lin"
+            ),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(_KLEIN_4B_KOHYA, "single_blocks_0_linear1", "single_blocks_0_linear2"),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(_KLEIN_4B_KOHYA, "double_stream_modulation_img_lin", "double_blocks_0_txt_attn_qkv"),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(flux_lora_kohya_format.state_dict_keys, "single_blocks_0_linear1", "single_blocks_0_linear2"),
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        # LoKr with a whole `lokr_w1`, whose single key carries both widths: (4 x 6912) by (4 x 768) is Klein 4B's
+        # 27648 x 3072 linear1, (4 x 5376) by (4 x 768) FLUX.1's 21504 x 3072.
+        (
+            {
+                "lora_unet_single_blocks_0_linear1.lokr_w1": [4, 4],
+                "lora_unet_single_blocks_0_linear1.lokr_w2": [6912, 768],
+                "lora_unet_single_blocks_0_linear1.alpha": [],
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            {
+                "lora_unet_single_blocks_0_linear1.lokr_w1": [4, 4],
+                "lora_unet_single_blocks_0_linear1.lokr_w2": [5376, 768],
+                "lora_unet_single_blocks_0_linear1.alpha": [],
+            },
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+    ],
+    ids=[
+        "klein-single-block-and-modulation",
+        "klein-single-block-only",
+        "klein-modulation-and-txt-attn",
+        "flux1-single-block-only",
+        "klein-lokr-whole-w1",
+        "flux1-lokr-whole-w1",
+    ],
+)
+def test_a_partial_kohya_lora_is_identified_by_the_layers_it_has(
+    keys: dict[str, Any], claimed_by: str, variant: Flux2VariantType | None, tmp_path: Path
+) -> None:
+    assert keys
+    state_dict = _state_dict(keys)
+
+    assert _claimed_by(state_dict, tmp_path) == [claimed_by]
+    if variant is not None:
+        assert _probe(LoRA_LyCORIS_Flux2_Config, state_dict, tmp_path).variant is variant
+
+
 def test_an_sd3_onetrainer_lora_with_top_level_layers_is_not_claimed_as_flux(tmp_path: Path) -> None:
     """SD3's top-level layers and double blocks are named like FLUX's, which OneTrainer's LEGACY_LORA keys keep; only
     FLUX has single blocks."""

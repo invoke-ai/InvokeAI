@@ -418,6 +418,30 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
                 if in_dim is not None:
                     return in_dim in _FLUX2_VEC_IN_DIMS
 
+    # Kohya format: the shared modulations exist only in FLUX.2 (FLUX.1 modulates per block), and a single block's
+    # `linear1` fuses q, k, v and the MLP input, so its width gives the hidden size and the MLP ratio (FLUX.1's is
+    # hidden_size * (3 + _FLUX1_MLP_RATIO)). This covers LoRAs that train no double block and no embedder.
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if key.startswith(("lora_unet_double_stream_modulation_", "lora_unet_single_stream_modulation_")):
+            return True
+        if key.startswith("lora_unet_single_blocks_") and "_linear1." in key:
+            in_dim = out_dim = None
+            if key.endswith("lora_down.weight"):
+                in_dim = state_dict[key].shape[1]
+            elif key.endswith("lora_up.weight"):
+                out_dim = state_dict[key].shape[0]
+            # Not elif: a whole `lokr_w1` is in both suffix lists and gives both widths.
+            if key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+                in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
+            if key.endswith(_LYCORIS_OUT_DIM_SUFFIXES):
+                out_dim = _lycoris_out_dim(state_dict, key.rsplit(".", 1)[0])
+            if in_dim is not None and in_dim != _FLUX1_HIDDEN_SIZE:
+                return True
+            if out_dim is not None and out_dim != _FLUX1_HIDDEN_SIZE * (3 + _FLUX1_MLP_RATIO):
+                return True
+
     # Kohya format: check transformer block dimensions (hidden_size and MLP ratio).
     # This handles LoRAs that only target transformer blocks (no txt_in/vector_in/context_embedder).
     # Klein 9B has hidden_size=4096 (vs 3072 for FLUX.1 and Klein 4B).
@@ -584,6 +608,22 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             return _variant_from_hidden_size(state_dict[key].shape[1])
         # LyCORIS variant
         elif "_img_attn_proj." in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
+            if in_dim is not None:
+                return _variant_from_hidden_size(in_dim)
+
+    # No double block: the hidden size is also the input width of a single block's fused `linear1` and of the shared
+    # modulations.
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if not key.startswith("lora_unet_") or not (
+            "_single_blocks_" in key and "_linear1." in key or "_stream_modulation_" in key
+        ):
+            continue
+        if key.endswith("lora_down.weight"):
+            return _variant_from_hidden_size(state_dict[key].shape[1])
+        elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
             in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)
