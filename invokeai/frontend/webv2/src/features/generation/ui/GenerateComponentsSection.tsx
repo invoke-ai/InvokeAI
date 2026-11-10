@@ -1,13 +1,14 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Stack } from '@chakra-ui/react';
+import { Box, Stack } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
   getComponentSlotIssue,
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
+import { describeGenerationIssue } from '@features/generation/core/generationIssues';
 import {
   DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
   isMainModelConfig,
@@ -25,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { GenerateIssueNotes } from './shared/GenerateIssues';
+import { GenerateIssueNotes, useGenerateSectionIssues } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateComponentsSectionProps {
@@ -53,6 +54,7 @@ const selectComponentSettings = pickGenerateSettings([
   'qwen35EncoderModel',
   'qwen3EncoderModel',
   'qwen3VLEncoderModel',
+  'qwen3VLVisionTowerModel',
   'qwenVLEncoderModel',
   't5EncoderModel',
   'vae',
@@ -77,6 +79,7 @@ const getComponentPolicyContext = (
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
@@ -104,24 +107,37 @@ const ComponentPicker = ({
   const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
   const isIncompatible = Boolean(value && slot.filter && !filter(value as ModelConfig));
   const isRequired = Boolean(slot.required?.(ctx));
-  const error = getComponentSlotIssue(slot, ctx) ?? undefined;
+  const slotIssue = getComponentSlotIssue(slot, ctx);
+  // Issues other rules aim at this slot (references that need the tower) show here too, beside its own message.
+  const componentIssues = useGenerateSectionIssues('components');
+  const fieldIssues = useMemo(
+    () => componentIssues.filter((issue) => issue.target.field === slot.key),
+    [componentIssues, slot.key]
+  );
+  const shownIssue = fieldIssues.find((issue) => issue.message === slotIssue) ?? fieldIssues[0];
+  const error = slotIssue ?? (shownIssue ? describeGenerationIssue(t, shownIssue) : undefined);
   // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
   const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
 
   return (
-    <Field label={slot.label} helpText={slot.helpText} error={error}>
-      <ModelSelect
-        filter={slot.filter ? filter : undefined}
-        invalid={Boolean(error)}
-        isClearable
-        modelTypes={modelTypes}
-        placeholder={
-          slot.placeholder ?? (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
-        }
-        value={selectedValue}
-        onChange={onChange}
-      />
-    </Field>
+    // A fix button carries the issue id itself; without one this wrapper does, so a reveal lands on the slot.
+    <Box data-issue-id={shownIssue && !shownIssue.fix ? shownIssue.id : undefined}>
+      <Field label={slot.label} helpText={slot.helpText} error={error}>
+        <ModelSelect
+          filter={slot.filter ? filter : undefined}
+          invalid={Boolean(error)}
+          isClearable
+          modelTypes={modelTypes}
+          placeholder={
+            slot.placeholder ??
+            (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+          }
+          value={selectedValue}
+          onChange={onChange}
+        />
+      </Field>
+      <GenerateIssueNotes field={slot.key} fixesOnly section="components" />
+    </Box>
   );
 };
 

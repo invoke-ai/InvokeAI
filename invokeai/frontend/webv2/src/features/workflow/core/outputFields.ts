@@ -42,7 +42,16 @@ export const getOutputFieldRows = (fieldNames: OutputFieldNamesByScope): OutputF
 };
 
 const OUTPUT_VALUE_MAX_LENGTH = 40;
-const NAMED_OBJECT_KEYS = ['image_name', 'video_name', 'latents_name', 'tensor_name', 'name', 'key', 'board_id'];
+const NAMED_OBJECT_KEYS = [
+  'image_name',
+  'video_name',
+  'file_id',
+  'latents_name',
+  'tensor_name',
+  'name',
+  'key',
+  'board_id',
+];
 
 /** Compact label for one output field's runtime value; `null` when the result carries no such field. */
 export const formatOutputFieldValue = (result: unknown, fieldName: string): { full: string; short: string } | null => {

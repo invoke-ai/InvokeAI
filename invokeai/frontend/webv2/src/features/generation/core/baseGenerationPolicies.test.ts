@@ -32,9 +32,10 @@ import {
   getGenerationValidationIssues,
   getGenerationValidationReasons,
   getImageExpandPromptSuggestion,
+  getCompatibleReferenceImages,
   getKrea2EditLoraState,
   getMaxReferenceImages,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
@@ -44,7 +45,8 @@ import {
   isLossyModelSwitch,
   isModelFromRepo,
   isSupportedGenerateModel,
-  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
+  QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON,
+  QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { describeGenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
@@ -617,6 +619,63 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
+  describe('Qwen Image Edit with a GGUF Qwen VL Encoder', () => {
+    const model = createModel('qwen-image', { format: 'gguf_quantized', variant: 'edit' });
+    const ggufEncoder: ComponentModelConfig = {
+      ...qwenVlEncoder,
+      format: 'gguf_quantized',
+      key: 'qwen-vl-gguf',
+      name: 'Qwen VL Q4_K_M',
+    };
+    const reference = (id: string, isEnabled = true) => ({
+      config: { image: referenceImage, type: 'qwen_image_reference_image' as const },
+      id,
+      isEnabled,
+    });
+    const reasonsFor = (overrides: Partial<GenerateSettings>) =>
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, { qwenVLEncoderModel: ggufEncoder, vae: qwenImageVae, ...overrides })
+      );
+
+    it('blocks Invoke once with the reason when reference images are on', () => {
+      expect(reasonsFor({ referenceImages: [reference('a'), reference('b')] })).toEqual([
+        'Qwen VL Encoder "Qwen VL Q4_K_M" is a GGUF build with no vision tower, so it cannot read reference images. ' +
+          'Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+      ]);
+    });
+
+    it('leaves a text-to-image model to the reason that it takes no reference images', () => {
+      // The encoder is not what blocks this graph, so naming it would send the user after the wrong fix.
+      const generateModel = createModel('qwen-image', { format: 'gguf_quantized' });
+
+      expect(
+        getGenerationValidationReasons(
+          generateModel,
+          createSettings(generateModel, {
+            qwenVLEncoderModel: ggufEncoder,
+            referenceImages: [reference('a')],
+            vae: qwenImageVae,
+          })
+        )
+      ).toEqual(['qwen-image model cannot use reference image 1. Turn it off, or remove it.']);
+    });
+
+    it('allows text-only prompts, which is what the GGUF encoder is for', () => {
+      expect(reasonsFor({ referenceImages: [] })).toEqual([]);
+      expect(reasonsFor({ referenceImages: [reference('a', false)] })).toEqual([]);
+    });
+
+    it('allows reference images with an encoder that carries the vision tower', () => {
+      expect(
+        reasonsFor({
+          qwenVLEncoderModel: { ...qwenVlEncoder, format: 'checkpoint' },
+          referenceImages: [reference('a')],
+        })
+      ).toEqual([]);
+    });
+  });
+
   describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
@@ -878,6 +937,59 @@ describe('component policies', () => {
       { kind: 'reset', subject: 'cfgRescale' },
     ]);
     expect(isLossyModelSwitch(result)).toBe(true);
+  });
+
+  it('offers the Qwen-Image-2.1 Vision Tower slot below a GGUF 8B encoder only, and drops a stale pick with it', () => {
+    const qwen21 = createModel('qwen-image-2-1', { format: 'checkpoint' });
+    const encoder = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: `qwen3-vl-8b-${format}`,
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'mmproj-8b',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant: 'qwen3_vl_8b',
+    } as const;
+    const slotKeys = (qwen3VLEncoderModel: ReturnType<typeof encoder> | null) =>
+      getComponentSectionPolicy(qwen21, createSettings(qwen21, { qwen3VLEncoderModel })).slots.map((slot) => slot.key);
+
+    expect(slotKeys(encoder('gguf_quantized'))).toEqual(['vae', 'qwen3VLEncoderModel', 'qwen3VLVisionTowerModel']);
+    expect(slotKeys(encoder('checkpoint'))).toEqual(['vae', 'qwen3VLEncoderModel']);
+    expect(slotKeys(null)).toEqual(['vae', 'qwen3VLEncoderModel']);
+
+    const withTower = createSettings(qwen21, {
+      qwen3VLEncoderModel: encoder('gguf_quantized'),
+      qwen3VLVisionTowerModel: tower,
+    });
+    const flux = createModel('flux');
+
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withTower, model: qwen21, models: [] }).settings
+    ).toMatchObject({
+      qwen3VLVisionTowerModel: tower,
+    });
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withTower, model: flux, models: [] }).settings
+    ).toMatchObject({
+      qwen3VLEncoderModel: null,
+      qwen3VLVisionTowerModel: null,
+    });
+    // A 4B tower fails the slot's filter, as a stale one from another encoder size would.
+    expect(
+      getGenerateModelSelectionResult({
+        currentValues: { ...withTower, qwen3VLVisionTowerModel: { ...tower, variant: 'qwen3_vl_4b' } },
+        model: qwen21,
+        models: [],
+      }).settings.qwen3VLVisionTowerModel
+    ).toBeNull();
   });
 
   it('keeps concepts and their weights through SDXL -> FLUX -> SDXL, reporting only the ones that stop', () => {
@@ -1869,27 +1981,111 @@ describe('component policies', () => {
     expect(isReferenceImageSupported(undefined)).toBe(false);
   });
 
-  it('offers Qwen-Image-2.1 reference images only on its Diffusers pipeline, whose encoder reads images', () => {
-    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+  describe('Qwen-Image-2.1 references follow the encoder that reads them', () => {
+    const encoderModel = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: `qwen3-vl-8b-${format}`,
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const encoder = (format: string) => ({ qwen3VLEncoderModel: encoderModel(format) });
+    const tower = (variant = 'qwen3_vl_8b') =>
+      ({
+        base: 'any',
+        format: 'gguf_quantized',
+        key: `mmproj-${variant}`,
+        name: 'mmproj',
+        type: 'qwen3_vl_vision_tower',
+        variant,
+      }) as const;
 
-    expect(isReferenceImageSupported(diffusers)).toBe(true);
-    expect(getMaxReferenceImages(diffusers)).toBe(4);
-    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
-    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+    it('reads them with the standalone safetensors encoder of a single-file main', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const gguf = createModel('qwen-image-2-1', { format: 'gguf_quantized' });
+
+      expect(isReferenceImageSupported(checkpoint, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(gguf, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(checkpoint, encoder('qwen3_vl_encoder'))).toBe(true);
+      expect(getMaxReferenceImages(checkpoint, encoder('checkpoint'))).toBe(4);
+      expect(getReferenceImageUnavailableReason(checkpoint, encoder('checkpoint'))).toBeNull();
+    });
+
+    it('has no tower without an encoder, or with a GGUF one, on a single-file main', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+
+      expect(isReferenceImageSupported(checkpoint)).toBe(false);
+      expect(getMaxReferenceImages(checkpoint)).toBe(0);
+      expect(getReferenceImageUnavailableReason(checkpoint)).toBe('visionTower');
+      expect(isReferenceImageSupported(checkpoint, encoder('gguf_quantized'))).toBe(false);
+      expect(getReferenceImageUnavailableReason(checkpoint, encoder('gguf_quantized'))).toBe('ggufVisionTower');
+    });
+
+    it('uses a Diffusers main own encoder unless a GGUF one replaces it', () => {
+      const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+
+      expect(isReferenceImageSupported(diffusers)).toBe(true);
+      expect(getMaxReferenceImages(diffusers)).toBe(4);
+      expect(isReferenceImageSupported(diffusers, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(diffusers, encoder('gguf_quantized'))).toBe(false);
+      expect(getReferenceImageUnavailableReason(diffusers, encoder('gguf_quantized'))).toBe('ggufVisionTower');
+    });
+
+    it('ignores an encoder of the wrong size, which the graph does not use either', () => {
+      const wrongSize = { qwen3VLEncoderModel: { ...encoderModel('gguf_quantized'), variant: 'qwen3_vl_4b' } };
+
+      expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'diffusers' }), wrongSize)).toBe(true);
+      expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }), wrongSize)).toBe(false);
+    });
+
+    it('reads them with a GGUF 8B encoder once its 8B vision tower is selected', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+      const ggufWithTower = { ...encoder('gguf_quantized'), qwen3VLVisionTowerModel: tower() };
+
+      expect(isReferenceImageSupported(checkpoint, ggufWithTower)).toBe(true);
+      expect(isReferenceImageSupported(diffusers, ggufWithTower)).toBe(true);
+      expect(getMaxReferenceImages(checkpoint, ggufWithTower)).toBe(4);
+      expect(getReferenceImageUnavailableReason(checkpoint, ggufWithTower)).toBeNull();
+      // The loader rejects a 4B tower, so it does not count.
+      const wrongTower = { ...encoder('gguf_quantized'), qwen3VLVisionTowerModel: tower('qwen3_vl_4b') };
+
+      expect(isReferenceImageSupported(checkpoint, wrongTower)).toBe(false);
+    });
+
+    it('ignores a stale vision tower beside an encoder that is not a GGUF 8B one', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+
+      // No encoder at all: a single-file main still has no tower; a tower alone never makes one.
+      expect(isReferenceImageSupported(checkpoint, { qwen3VLVisionTowerModel: tower() })).toBe(false);
+      expect(
+        isReferenceImageSupported(checkpoint, { ...encoder('checkpoint'), qwen3VLVisionTowerModel: tower() })
+      ).toBe(true);
+    });
+
+    it('never lets an encoder change delete references on a model switch', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const referenceImages = [
+        {
+          config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+          id: 'ref-1',
+          isEnabled: true,
+        },
+      ];
+
+      expect(getCompatibleReferenceImages(referenceImages, checkpoint, [])).toBe(referenceImages);
+    });
   });
 
-  // The UI names the missing format only when switching to it would enable references.
-  it('names the format a model lacks for reference images only when the format alone blocks them', () => {
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(
-      'diffusers'
-    );
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe('diffusers');
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'diffusers' }))).toBeNull();
-    // Qwen-Image needs the Edit variant, not a format; CogView4 takes no references at all.
-    expect(getMissingReferenceImageFormat(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
-    expect(getMissingReferenceImageFormat(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
-    expect(getMissingReferenceImageFormat(externalModel)).toBeNull();
-    expect(getMissingReferenceImageFormat(undefined)).toBeNull();
+  // The UI explains the missing tower only when an encoder alone blocks references.
+  it('explains unavailable references only where the base takes them', () => {
+    // Qwen-Image needs the Edit variant, not an encoder; CogView4 takes no references at all.
+    expect(getReferenceImageUnavailableReason(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getReferenceImageUnavailableReason(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getReferenceImageUnavailableReason(externalModel)).toBeNull();
+    expect(getReferenceImageUnavailableReason(undefined)).toBeNull();
   });
 
   it('derives the reference image limit from external provider capabilities', () => {
@@ -1959,13 +2155,22 @@ describe('component policies', () => {
     ).toContain('sd-3 model cannot use reference image 1. Turn it off, or remove it.');
   });
 
-  it('blocks Qwen-Image-2.1 references while a standalone encoder replaces the one that reads them', () => {
-    const model = createModel('qwen-image-2-1', { format: 'diffusers' });
-    const encoder = {
+  it('blocks Qwen-Image-2.1 references whose encoder has no vision tower', () => {
+    const encoder = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = {
       base: 'any',
-      key: 'qwen3-vl-8b',
-      name: 'Qwen3-VL 8B',
-      type: 'qwen3_vl_encoder',
+      format: 'gguf_quantized',
+      key: 'mmproj-8b',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
       variant: 'qwen3_vl_8b',
     } as const;
     const referenceImages = [
@@ -1975,13 +2180,102 @@ describe('component policies', () => {
         isEnabled: true,
       },
     ];
+    const reasons = (model: MainModelConfig, qwen3VLEncoderModel: ReturnType<typeof encoder> | null) =>
+      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel, referenceImages }));
+    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+    const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
 
+    expect(reasons(diffusers, encoder('gguf_quantized'))).toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+    expect(reasons(checkpoint, encoder('gguf_quantized'))).toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+    expect(reasons(diffusers, encoder('checkpoint'))).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+    expect(reasons(checkpoint, encoder('checkpoint'))).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+    expect(reasons(diffusers, null)).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+
+    const issueFor = (model: MainModelConfig) =>
+      getGenerationValidationIssues(
+        model,
+        createSettings(model, { qwen3VLEncoderModel: encoder('gguf_quantized'), referenceImages })
+      ).find((candidate) => candidate.message === QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+
+    // A GGUF encoder is fixed by its Vision Tower, so the issue points there; a Diffusers main can also drop the encoder.
+    expect(issueFor(checkpoint)?.target).toEqual({ field: 'qwen3VLVisionTowerModel', section: 'components' });
+    expect(issueFor(checkpoint)?.fix).toBeUndefined();
+    expect(issueFor(diffusers)?.target).toEqual({ field: 'qwen3VLVisionTowerModel', section: 'components' });
+    expect(issueFor(diffusers)?.fix).toEqual({ key: 'qwen3VLEncoderModel', kind: 'clearModel' });
+
+    // The tower clears the issue; a stale one beside a safetensors encoder does not matter either way.
     expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel: encoder, referenceImages }))
-    ).toContain(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
-    expect(getGenerationValidationReasons(model, createSettings(model, { referenceImages }))).not.toContain(
-      QWEN_IMAGE_21_STANDALONE_ENCODER_REASON
-    );
+      getGenerationValidationReasons(
+        checkpoint,
+        createSettings(checkpoint, {
+          qwen3VLEncoderModel: encoder('gguf_quantized'),
+          qwen3VLVisionTowerModel: tower,
+          referenceImages,
+        })
+      )
+    ).not.toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+
+    // Without a GGUF encoder the issue keeps its old targets and fixes.
+    const noEncoderIssue = getGenerationValidationIssues(
+      checkpoint,
+      createSettings(checkpoint, { qwen3VLEncoderModel: null, referenceImages })
+    ).find((candidate) => candidate.message === QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+
+    expect(noEncoderIssue?.target).toEqual({ field: 'qwen3VLEncoderModel', section: 'components' });
+    expect(noEncoderIssue?.fix).toBeUndefined();
+  });
+
+  it('blocks Qwen-Image-2.1 references when the GGUF encoder and its Vision Tower differ in CPU Only', () => {
+    const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+    const encoder = (cpuOnly?: boolean) =>
+      ({
+        base: 'any',
+        cpu_only: cpuOnly,
+        format: 'gguf_quantized',
+        key: 'enc',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = (cpuOnly?: boolean) =>
+      ({
+        base: 'any',
+        cpu_only: cpuOnly,
+        format: 'gguf_quantized',
+        key: 'mmproj',
+        name: 'mmproj',
+        type: 'qwen3_vl_vision_tower',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const referenceImages = [
+      {
+        config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+    const issues = (encoderCpu: boolean | undefined, towerCpu: boolean | undefined, refs = referenceImages) =>
+      getGenerationValidationIssues(
+        checkpoint,
+        createSettings(checkpoint, {
+          qwen3VLEncoderModel: encoder(encoderCpu),
+          qwen3VLVisionTowerModel: tower(towerCpu),
+          referenceImages: refs,
+        })
+      ).filter((issue) => issue.message.includes('CPU Only'));
+
+    expect(issues(true, undefined)).toEqual([
+      expect.objectContaining({
+        message:
+          'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.',
+        target: { field: 'qwen3VLVisionTowerModel', section: 'components' },
+      }),
+    ]);
+    expect(issues(undefined, true)).toHaveLength(1);
+    // Unset and false are the same setting, and matching settings or no references raise nothing.
+    expect(issues(false, undefined)).toEqual([]);
+    expect(issues(true, true)).toEqual([]);
+    expect(issues(true, undefined, [])).toEqual([]);
   });
 
   it('reports missing reference image model dependencies', () => {
