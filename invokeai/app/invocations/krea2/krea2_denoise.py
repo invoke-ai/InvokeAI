@@ -248,6 +248,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         grid_width: int,
         dtype: torch.dtype,
         device: torch.device,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> Krea2RegionalPromptingExtension:
         conditioning_fields = (
             [conditioning_field] if isinstance(conditioning_field, Krea2ConditioningField) else conditioning_field
@@ -293,6 +295,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return Krea2RegionalPromptingExtension.from_text_conditionings(
             text_conditionings=text_conditionings,
             image_seq_len=grid_height * grid_width,
+            unmasked_covers_whole_image=unmasked_covers_whole_image,
         )
 
     def _get_noise(self, height: int, width: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
@@ -559,6 +562,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_extension: Krea2RegionalPromptingExtension | None = None
         neg_prompt_embeds = None
         if do_cfg and self.negative_conditioning is not None:
+            # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
             neg_extension = self._load_text_conditioning(
                 context,
                 self.negative_conditioning,
@@ -566,6 +570,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 grid_width,
                 inference_dtype,
                 device,
+                unmasked_covers_whole_image=True,
             )
             neg_prompt_embeds = neg_extension.regional_text_conditioning.prompt_embeds
 

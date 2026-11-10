@@ -1731,17 +1731,48 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
   });
 
   it.each([
-    ['a negative prompt', { negativePrompt: 'blurry' }],
-    ['auto-negative', { autoNegative: true }],
-    [
-      'a complete IP-Adapter reference',
-      {
+    ['a negative prompt', { negativePrompt: 'blurry' }, 'rg_neg_cond_rg', 'blurry', 'rg_mask_to_tensor_rg'],
+    ['auto-negative', { autoNegative: true }, 'rg_pos_cond_inverted_rg', 'a red hat', 'rg_invert_mask_rg'],
+  ] as const)(
+    'submits an Anima region with %s and its spatial mask',
+    async (_label, overrides, nodeId, prompt, maskId) => {
+      const harness = makeAnimaHarness(regionalLayer('rg', overrides));
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+      const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+      expect(graph?.nodes.rg_pos_cond_rg).toMatchObject({ prompt: 'a red hat', type: 'anima_text_encoder' });
+      expect(graph?.nodes[nodeId]).toMatchObject({ prompt, type: 'anima_text_encoder' });
+      expect(
+        graph?.edges.find((edge) => edge.destination.node_id === nodeId && edge.destination.field === 'mask')?.source
+      ).toEqual({ field: 'mask', node_id: maskId });
+      expect(
+        graph?.edges
+          .filter((edge) => edge.destination.node_id === 'neg_cond_collect')
+          .map((edge) => edge.source.node_id)
+      ).toEqual(['neg_cond', nodeId]);
+    }
+  );
+
+  it('submits an Anima regional prompt while omitting its unsupported regional IP-Adapter', async () => {
+    const harness = makeAnimaHarness(
+      regionalLayer('rg', {
         referenceImages: [
           {
             config: {
               beginEndStepPct: [0, 1],
               clipVisionModel: 'ViT-H',
-              image: { imageName: 'ref.png' },
+              image: {
+                height: 64,
+                imageName: 'ref.png',
+                imageUrl: '/images/ref.png',
+                queuedAt: '2026-01-01T00:00:00.000Z',
+                sourceQueueItemId: 'reference-queue-item',
+                thumbnailUrl: '/thumbnails/ref.png',
+                width: 64,
+              },
               method: 'full',
               model: { base: 'anima', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' },
               type: 'ip_adapter',
@@ -1751,30 +1782,36 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
             isEnabled: true,
           },
         ],
-      },
-    ],
-  ] as const)(
-    'still submits the positive prompt of an Anima region carrying %s, without the extra',
-    async (_label, overrides) => {
-      const harness = makeAnimaHarness(regionalLayer('rg', overrides as Parameters<typeof regionalLayer>[1]));
+      })
+    );
 
-      await runCanvasInvocation(harness.deps);
+    await runCanvasInvocation(harness.deps);
 
-      expect(harness.notices()).toHaveLength(0);
-      const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
-      expect(graph?.nodes.rg_pos_cond_rg).toMatchObject({ prompt: 'a red hat', type: 'anima_text_encoder' });
-      expect(graph?.nodes.rg_neg_cond_rg).toBeUndefined();
-      expect(graph?.nodes.rg_pos_cond_inverted_rg).toBeUndefined();
-      expect(graph?.nodes.ip_adapter_ref).toBeUndefined();
-      const negativeSources = graph?.edges
-        .filter((edge) => edge.destination.node_id === 'neg_cond_collect')
-        .map((edge) => edge.source.node_id);
-      expect(negativeSources).toEqual(['neg_cond']);
-    }
-  );
+    expect(harness.notices()).toHaveLength(0);
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.rg_pos_cond_rg).toMatchObject({ prompt: 'a red hat', type: 'anima_text_encoder' });
+    expect(graph?.nodes.ip_adapter_ref).toBeUndefined();
+  });
 
-  it('skips an Anima region that carries only a negative prompt', async () => {
+  it('composites and submits an Anima region that carries only a negative prompt', async () => {
     const harness = makeAnimaHarness(regionalLayer('rg', { negativePrompt: 'blurry', positivePrompt: null }));
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.rg_mask_to_tensor_rg).toMatchObject({ image: { image_name: 'composite-1.png' } });
+    expect(graph?.nodes.rg_pos_cond_rg).toBeUndefined();
+    expect(graph?.nodes.rg_neg_cond_rg).toMatchObject({ prompt: 'blurry', type: 'anima_text_encoder' });
+    expect(
+      graph?.edges.filter((edge) => edge.destination.node_id === 'neg_cond_collect').map((edge) => edge.source.node_id)
+    ).toEqual(['neg_cond', 'rg_neg_cond_rg']);
+  });
+
+  it('neither composites nor grafts an Anima region with only a negative prompt while CFG Scale is 1', async () => {
+    const harness = makeAnimaHarness(regionalLayer('rg', { negativePrompt: 'blurry', positivePrompt: null }));
+    harness.deps.generateValues = { ...animaGenerateValues(), cfgScale: 1 };
 
     await runCanvasInvocation(harness.deps);
 
@@ -1783,6 +1820,7 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
     const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
     expect(graph?.nodes.denoise_latents?.type).toBe('anima_denoise');
     expect(graph?.nodes.rg_mask_to_tensor_rg).toBeUndefined();
+    expect(graph?.nodes.rg_neg_cond_rg).toBeUndefined();
   });
 });
 

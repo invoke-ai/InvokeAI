@@ -81,9 +81,7 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(
-          JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })
-        ),
+        body: JSON.stringify(JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })),
       }
     );
     assert.ok(response.ok, `Could not set ${themeId} accessibility fixture theme.`);
