@@ -433,6 +433,37 @@ describe('compileCanvasGraph', () => {
       }
     );
 
+    it('records the SD 3 encoder overrides used for a Canvas image', () => {
+      const clipG = { ...clipEmbed, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+      const { backendGraph } = compile(sd3Model, 'img2img', {
+        settings: { clipGEmbedModel: clipG, clipLEmbedModel: clipEmbed, t5EncoderModel: t5Encoder },
+      });
+
+      expect(backendGraph.nodes.model_loader).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipEmbed,
+        t5_encoder_model: t5Encoder,
+      });
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+      expect(metadata).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipEmbed,
+        generation_mode: 'sd3_img2img',
+        t5_encoder: t5Encoder,
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe(metadata?.id);
+    });
+
+    it('leaves bundled SD 3 encoders unrecorded when no override was selected', () => {
+      const { backendGraph } = compile(sd3Model, 'img2img');
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+
+      expect(metadata).toBeDefined();
+      expect(metadata?.clip_g_model).toBeUndefined();
+      expect(metadata?.clip_l_model).toBeUndefined();
+      expect(metadata?.t5_encoder).toBeUndefined();
+    });
+
     it('feeds the encode node from the same VAE source as the decode node', () => {
       const { backendGraph } = compile(sd1Model, 'img2img');
       const encode = getNodeByType(backendGraph, 'i2l');

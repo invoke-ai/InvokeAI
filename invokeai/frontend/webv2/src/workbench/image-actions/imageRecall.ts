@@ -845,6 +845,8 @@ type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
+  | 'clipGEmbedModel'
+  | 'clipLEmbedModel'
   | 'componentSourceModel'
   | 'gemma2EncoderModel'
   | 'ideogram4UnconditionalModel'
@@ -879,6 +881,8 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'clip_g_model', setting: 'clipGEmbedModel' },
+  { metadataKey: 'clip_l_model', setting: 'clipLEmbedModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
   { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },

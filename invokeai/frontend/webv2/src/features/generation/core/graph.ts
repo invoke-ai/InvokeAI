@@ -650,7 +650,10 @@ const buildSD3Graph = (
   addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addMetadata(graph, output, settings, model, 'sd3_txt2img', projectSettings, {
+    clip_g_model: modelLoader.clip_g_model,
+    clip_l_model: modelLoader.clip_l_model,
     scheduler: undefined,
+    t5_encoder: modelLoader.t5_encoder_model,
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
