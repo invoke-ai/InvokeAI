@@ -2170,7 +2170,7 @@
     "updateDroppedFormFields_one": "Removed {{count}} form field for an input its updated node no longer has.",
     "updateDroppedFormFields_other": "Removed {{count}} form fields for inputs their updated nodes no longer have.",
     "contextPaste": "Paste",
-    "contextPasteWithConnections": "Paste with connections",
+    "contextPasteWithConnections": "Smart paste",
     "contextCollapse": "Collapse",
     "contextExpand": "Expand",
     "contextAddConnector": "Add connector",
