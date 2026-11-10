@@ -1,4 +1,4 @@
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { ResizableTextarea } from '@platform/ui/ResizableTextarea';
@@ -12,33 +12,49 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderTextarea = async (maxHeightPx?: number) => {
+const WELL_HOST_CSS = { '--wb-control-well': '{colors.bg}', '& textarea': { bg: 'var(--wb-control-well)' } };
+
+const renderTextarea = async (maxHeightPx?: number, well?: { zoom: number }) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   const onResizeEnd = vi.fn();
+  const textarea = (
+    <ResizableTextarea
+      aria-label="Prompt"
+      defaultHeightPx={100}
+      maxHeightPx={maxHeightPx}
+      minHeightPx={60}
+      resizeHandleAriaLabel="Resize prompt"
+      onResizeEnd={onResizeEnd}
+    />
+  );
 
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <ResizableTextarea
-          aria-label="Prompt"
-          defaultHeightPx={100}
-          maxHeightPx={maxHeightPx}
-          minHeightPx={60}
-          resizeHandleAriaLabel="Resize prompt"
-          onResizeEnd={onResizeEnd}
-        />
+        {well ? (
+          // A scaled well host, as the node editor is: it paints its controls on the well, and its zoom puts the inner
+          // bottom edge inside a device pixel.
+          <Box css={WELL_HOST_CSS} data-control-well="" transform={`scale(${well.zoom})`}>
+            {textarea}
+          </Box>
+        ) : (
+          textarea
+        )}
       </ChakraProvider>
     );
   });
 
   return {
+    fade: host.querySelector<HTMLElement>('[data-resizable-textarea-fade]')!,
     handle: host.querySelector<HTMLElement>('[role="separator"]')!,
     onResizeEnd,
     textarea: host.querySelector<HTMLTextAreaElement>('textarea')!,
   };
 };
+
+const lastColor = (gradient: string) => [...gradient.matchAll(/(?:rgba?|oklch)\([^)]*\)/g)].at(-1)?.[0];
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -116,6 +132,82 @@ describe('ResizableTextarea', () => {
 
     await expect.poll(() => scrollbar.hasAttribute('data-overflow-y')).toBe(true);
     await expect.poll(() => host!.querySelector<HTMLElement>('[data-part="thumb"]')!.clientHeight).toBeGreaterThan(0);
+  });
+
+  it('fades to whatever lies behind it outside a well host', async () => {
+    const { fade, textarea } = await renderTextarea();
+
+    expect(getComputedStyle(textarea.parentElement!.parentElement!).maskImage).not.toBe('none');
+    expect(getComputedStyle(fade).display).toBe('none');
+  });
+
+  it('covers a scaled well host’s bottom edge with an opaque well fade and repaints the border over it', async () => {
+    const zoom = 1.37;
+    const { fade, textarea } = await renderTextarea(undefined, { zoom });
+    const style = getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    await act(() => {
+      textarea.value = Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // Half a line past a line boundary, so a line straddles the inner bottom edge.
+    textarea.scrollTop =
+      Math.ceil(textarea.clientHeight / lineHeight) * lineHeight - textarea.clientHeight + lineHeight / 2;
+    expect(textarea.scrollTop).toBeGreaterThan(0);
+
+    const box = textarea.getBoundingClientRect();
+    const fill = fade.getBoundingClientRect();
+    const border = getComputedStyle(fade, '::after');
+    const innerBottom = box.bottom - Number.parseFloat(style.borderBottomWidth) * zoom;
+    expect(getComputedStyle(textarea.parentElement!.parentElement!).maskImage).toBe('none');
+    // The fill is the text area's own bottom, so it covers the inner bottom edge and the row the border shares with it;
+    // the repainted border's inner edge is the text area's.
+    expect(Math.abs(fill.bottom - box.bottom)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(fill.left - box.left)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(fill.right - box.right)).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(fill.bottom - Number.parseFloat(border.borderBottomWidth) * zoom - innerBottom)
+    ).toBeLessThanOrEqual(0.5);
+    expect(lastColor(getComputedStyle(fade).backgroundImage)).toBe(style.backgroundColor);
+    expect(style.backgroundColor).not.toMatch(/rgba|\//);
+    expect(border.borderBottomLeftRadius).toBe(style.borderBottomLeftRadius);
+    expect(border.borderBottomColor).toBe(style.borderBottomColor);
+  });
+
+  it('repaints the well fade’s border in the text area’s hover, focus and error colours', async () => {
+    const { fade, textarea } = await renderTextarea(undefined, { zoom: 1 });
+    const settled = () =>
+      act(async () => {
+        await new Promise((resolve) => {
+          globalThis.setTimeout(resolve, 200);
+        });
+      });
+    const colors = () => [
+      getComputedStyle(fade, '::after').borderBottomColor,
+      getComputedStyle(textarea).borderBottomColor,
+    ];
+    const rest = colors()[1];
+
+    await act(() => userEvent.hover(textarea));
+    await settled();
+    const [hoverRing, hoverBorder] = colors();
+    expect(hoverBorder).not.toBe(rest);
+    expect(hoverRing).toBe(hoverBorder);
+
+    await act(async () => {
+      await userEvent.unhover(textarea);
+      await userEvent.tab();
+    });
+    await settled();
+    const [focusRing, focusBorder] = colors();
+    expect(focusBorder).not.toBe(rest);
+    expect(focusRing).toBe(focusBorder);
+
+    await act(() => textarea.setAttribute('aria-invalid', 'true'));
+    await settled();
+    const [errorRing, errorBorder] = colors();
+    expect(errorBorder).not.toBe(focusBorder);
+    expect(errorRing).toBe(errorBorder);
   });
 
   it('retains bounded End behavior when a maximum is supplied', async () => {
