@@ -27,6 +27,7 @@ import {
   validateConnection,
 } from '@features/workflow/utility';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { shallowEqual } from '@platform/state/selectors';
 import {
   Background,
@@ -114,6 +115,7 @@ import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
 import { WorkflowEditorMiniMap } from './WorkflowEditorMiniMap';
 import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
+import { registerWorkflowPngExportHost } from './workflowPngExport';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
@@ -425,6 +427,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     return element;
   }, []);
   const onExportComplete = useCallback(() => setExportView(null), []);
+  // The toolbar's camera and the widget menu's Download as PNG both draw from this editor's offscreen view.
+  useMountEffect(() => registerWorkflowPngExportHost({ complete: onExportComplete, prepare: onExportPrepare }));
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
@@ -1461,8 +1465,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           tool={tool}
           updatableNodeCount={updatableNodeCount}
           onArrangeNodes={onArrangeNodes}
-          onExportPrepare={onExportPrepare}
-          onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
           onRedo={redo}
           onToolChange={setTool}
