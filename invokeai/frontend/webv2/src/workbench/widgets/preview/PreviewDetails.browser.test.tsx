@@ -6,6 +6,7 @@ import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
 import type * as ClipboardModule from '@platform/browser/clipboard';
 import type { ImageActions, ImageRecallCapabilities } from '@workbench/image-actions';
+import type { ReadCallback } from 'i18next';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { galleryKeys } from '@features/gallery/queries';
@@ -140,6 +141,7 @@ void i18n.use(initReactI18next).init({
   lng: 'en',
   resources: {
     en: {
+      metadata: { widgets: { preview: { metadataLabels: { generation_mode: 'Generation path' } } } },
       translation: {
         common: { countOfTotal: '{{count}} of {{total}}', copy: 'Copy', retry: 'Retry' },
         widgets: {
@@ -214,14 +216,16 @@ const POSITION = { boardItemCount: 2, isLoadingBoard: false, selectedIndex: 0 };
 const renderDetails = async ({
   isOpen,
   item,
+  localization = i18n,
 }: {
   isOpen: boolean;
   item: GalleryImageItem | GalleryVideoItem;
+  localization?: typeof i18n;
 }): Promise<void> => {
   await interact(() => {
     root?.render(
       <QueryClientProvider client={queryClient}>
-        <I18nextProvider i18n={i18n}>
+        <I18nextProvider i18n={localization}>
           <ChakraProvider value={system}>
             <PreviewDetailsPanel
               actions={actions}
@@ -285,6 +289,165 @@ describe('Preview query-driven Details', () => {
       { source: { node_id: 'noise', field: 'noise' }, destination: { node_id: 'collector', field: 'item' } },
     ],
   };
+
+  it.each([
+    {
+      label: 'Executed controls',
+      expected: 'Depth model',
+      metadata: { control_layers: [{ model: { name: 'Depth model' }, type: 'controlnet', weight: 0.75 }] },
+    },
+    {
+      label: 'IP-Adapters',
+      expected: 'Portrait model',
+      metadata: {
+        ipAdapters: [
+          {
+            ip_adapter_model: { name: 'Portrait model' },
+            image: { image_name: 'portrait.png' },
+            clip_vision_model: 'ViT-G',
+            method: 'style_precise',
+            weight: 0.75,
+            begin_step_percent: 0.2,
+            end_step_percent: 0.9,
+          },
+        ],
+      },
+    },
+    ...(['array', 'entities'] as const).map((shape) => {
+      const reference = {
+        id: 'global-style',
+        type: 'reference_image',
+        name: 'Global style',
+        ipAdapter: {
+          type: 'ip_adapter',
+          model: { name: 'Historical portrait' },
+          image: { image_name: 'portrait.png', width: 320, height: 200 },
+          clipVisionModel: 'ViT-G',
+          method: 'style_precise',
+          weight: 0.75,
+          beginEndStepPct: [0.2, 0.9],
+        },
+      };
+      return {
+        label: 'Reference images',
+        expected: 'Historical portrait',
+        metadata: {
+          canvas_v2_metadata: {
+            rasterLayers: [],
+            controlLayers: [],
+            inpaintMasks: [],
+            regionalGuidance: [],
+            referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+          },
+        },
+      };
+    }),
+  ])(
+    'shows readable $label metadata from the emitted English namespace beside root actions',
+    async ({ label, expected, metadata }) => {
+      const localization = createInstance().use(initReactI18next);
+      await localization.init({
+        initAsync: false,
+        lng: 'en',
+        resources: {
+          en: {
+            translation: await fetch('/locales/en.json').then((response) => response.json()),
+            metadata: await fetch('/locales/en.metadata.json').then((response) => response.json()),
+          },
+        },
+      });
+      galleryMocks.imageMetadata.mockResolvedValueOnce(metadata);
+      await renderDetails({ isOpen: true, item: imageItem, localization });
+      await act(async () => {
+        await vi.waitFor(() => expect(document.body.textContent).toContain(expected));
+      });
+      const controlRow = [...document.querySelectorAll('.chakra-data-list__item')].find((row) =>
+        row.textContent?.includes(expected)
+      );
+      expect(controlRow?.querySelector('dt')?.textContent).toBe(label);
+      if (label !== 'Executed controls') {
+        expect(controlRow?.textContent).toContain('portrait.png · ViT-G · style_precise · Weight 0.75 · Steps 0.2–0.9');
+      }
+      expect(controlRow?.textContent).toContain('Weight 0.75');
+      expect(controlRow?.querySelector('button[aria-label="Copy"]')).not.toBeNull();
+      if (label === 'Reference images') {
+        expect(document.body.textContent).toContain('0 layers');
+        expect(document.body.textContent).not.toContain('Global style');
+      }
+    }
+  );
+
+  it.each([imageItem, videoItem])(
+    'loads $kind metadata labels on opening, preserving rows and raw tabs while pending',
+    async (item) => {
+      let complete!: ReadCallback;
+      const read = vi.fn((_language: string, _namespace: string, callback: ReadCallback) => {
+        complete = callback;
+      });
+      const localization = createInstance()
+        .use(initReactI18next)
+        .use({ type: 'backend' as const, init: () => undefined, read });
+      await localization.init({
+        fallbackLng: 'en',
+        initAsync: false,
+        lng: 'en',
+        partialBundledLanguages: true,
+        resources: { en: { translation: i18n.getResourceBundle('en', 'translation') } },
+      });
+      const metadata = { positive_prompt: 'available prompt', generation_mode: 'recorded mode' };
+      galleryMocks.imageMetadata.mockResolvedValueOnce(metadata);
+      galleryMocks.videoMetadata.mockResolvedValueOnce(metadata);
+
+      await renderDetails({ isOpen: false, item, localization });
+      expect(read).not.toHaveBeenCalled();
+      await renderDetails({ isOpen: true, item, localization });
+      await act(async () => {
+        await vi.waitFor(() => expect(document.body.textContent).toContain('available prompt'));
+      });
+      expect(read).toHaveBeenCalledWith('en', 'metadata', expect.any(Function));
+      expect(document.body.textContent).not.toContain('widgets.preview.metadataLabels.');
+      await interact(() => getButton('Metadata').click());
+      expect(document.body.textContent).toContain('"generation_mode": "recorded mode"');
+      await interact(() =>
+        complete(null, { widgets: { preview: { metadataLabels: { generation_mode: 'Recorded workflow' } } } })
+      );
+      await interact(() => getButton('Details').click());
+      expect(document.body.textContent).toContain('Recorded workflow');
+      expect(document.body.textContent).toContain('recorded mode');
+    }
+  );
+
+  it.each([imageItem, videoItem])(
+    'keeps $kind basic rows and raw metadata usable when the label namespace fails',
+    async (item) => {
+      let fail!: ReadCallback;
+      const localization = createInstance()
+        .use(initReactI18next)
+        .use({
+          type: 'backend' as const,
+          init: () => undefined,
+          read: (_language: string, _namespace: string, callback: ReadCallback) => {
+            fail = callback;
+          },
+        });
+      await localization.init({
+        fallbackLng: 'en',
+        initAsync: false,
+        lng: 'en',
+        partialBundledLanguages: true,
+        resources: { en: { translation: i18n.getResourceBundle('en', 'translation') } },
+      });
+      const metadata = { positive_prompt: 'available prompt', generation_mode: 'recorded mode' };
+      galleryMocks.imageMetadata.mockResolvedValueOnce(metadata);
+      galleryMocks.videoMetadata.mockResolvedValueOnce(metadata);
+      await renderDetails({ isOpen: true, item, localization });
+      await interact(() => fail(new Error('labels unavailable'), false));
+      expect(document.body.textContent).toContain('available prompt');
+      expect(document.body.textContent).not.toContain('widgets.preview.metadataLabels.');
+      await interact(() => getButton('Metadata').click());
+      expect(document.body.textContent).toContain('"generation_mode": "recorded mode"');
+    }
+  );
 
   it("shows this image's resolved Noise and math inputs in the Graph tab", async () => {
     galleryMocks.imageWorkflow.mockResolvedValueOnce({
@@ -481,7 +644,7 @@ describe('Preview query-driven Details', () => {
   });
 
   it('renders raw Metadata, Workflow, and Graph JSON tabs without image recall controls', async () => {
-    galleryMocks.videoMetadata.mockResolvedValueOnce({ codec: 'h264', duration: 15 });
+    galleryMocks.videoMetadata.mockResolvedValueOnce({ codec: 'h264' });
     galleryMocks.videoWorkflow.mockResolvedValueOnce({
       graph: '{"nodes":[{"id":"video"}]}',
       workflow: '{"name":"Video workflow"}',
@@ -536,9 +699,17 @@ describe('Preview query-driven Details', () => {
         row,
       ])
     );
-    expect(Object.keys(rows)).toEqual(['Prompt text', 'Checkpoint', 'Seed value', 'Frame count', 'Frame rate']);
+    expect(Object.keys(rows)).toEqual([
+      'Prompt text',
+      'Checkpoint',
+      'Seed value',
+      'Frame count',
+      'Frame rate',
+      'Generation path',
+    ]);
     expect(rows['Checkpoint']?.textContent).toContain('Wan 2.2 T2V');
     expect(rows['Frame count']?.textContent).toContain('81');
+    expect(rows['Generation path']?.textContent).toContain('wan_t2v');
     // Copy is each row's only action; video recall lives in its menu.
     expect(document.querySelector('[aria-label="Use prompt"]')).toBeNull();
     expect(rows['Frame rate']?.querySelectorAll('button')).toHaveLength(1);

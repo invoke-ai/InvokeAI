@@ -16,6 +16,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 
 ## React and product quality
 
+- Polished desktop experience: deliberate layouts, responsive interactions, cohesive accessible controls, complete loading/empty/error/recovery states.
 - No direct `useEffect`. Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters.
 - `@platform/react/useMountEffect`: only mount/unmount registration with stable dependencies and complete cleanup. No changing-dependency refs, wrapper aliases, layout-effect evasions. Layout effects only for pre-paint DOM measurement.
 - Changing an effect's behavior: migrate it. No unrelated sweeps. Identity changes use store/runtime lifecycles or deliberate keyed remounts, without accidental state loss.
@@ -42,21 +43,22 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Preserve disposal, bounded memory, account transitions, responsive input. Never update goldens/baselines to hide regressions.
 - Run pnpm from this directory: Corepack picks pnpm's version from the current directory, so `pnpm -C` from the repo root can get the wrong one. Install: `pnpm install --frozen-lockfile`.
 
-| Change/check                          | Command                                                               |
-| ------------------------------------- | --------------------------------------------------------------------- |
-| Formatting, lint, types, architecture | `pnpm lint`                                                           |
-| Focused behavior                      | `pnpm test <test-path>` or `pnpm test:browser <browser-test-path>`    |
-| Unit, Chromium, mock-backend fixtures | `pnpm test:all`                                                       |
-| Architecture and browser performance  | `pnpm test:performance:architecture` ([guide](performance/README.md)) |
-| Project-file integration              | `pnpm test:project-files`                                             |
-| Accessibility in a fresh build        | `pnpm test:accessibility`                                             |
-| Milestone/release completion          | `pnpm check:release`                                                  |
+| Change/check                            | Command                                                               |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| Formatting, lint, types, architecture   | `pnpm lint`                                                           |
+| Focused behavior                        | `pnpm test <test-path>` or `pnpm test:browser <browser-test-path>`    |
+| Unit, Chromium, mock-backend fixtures   | `pnpm test:all`                                                       |
+| Architecture and browser performance    | `pnpm test:performance:architecture` ([guide](performance/README.md)) |
+| Project-file integration                | `pnpm test:project-files`                                             |
+| Three-engine lifecycle in a fresh build | `pnpm test:browser:smoke`                                             |
+| Accessibility in a fresh build          | `pnpm test:accessibility`                                             |
+| Milestone/release completion            | `pnpm check:release`                                                  |
 
-- Missing Chromium: `pnpm exec playwright install chromium` (`--with-deps` in Linux CI).
+- Missing engines for completion: `pnpm exec playwright install chromium firefox webkit` (`--with-deps` in Linux CI).
 - Colocate tests: unit `*.test.ts`/`*.test.tsx`, browser `*.browser.test.ts`/`*.browser.test.tsx`.
 - Use real IndexedDB, Web Locks, focus, pointer, rendering where mocks cannot prove correctness.
 - Droppable enabled only after drag start: drag through dnd-kit mouse sensors with `dragWithMouse` (`@platform/browser/mouseDrag.testing`). Single-jump drags such as `userEvent.dragAndDrop` miss it.
 
 Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.
 
-Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility. CI splits completion between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and link review, no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.
+Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility, three-engine lifecycle smoke. CI splits completion between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and link review, no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.

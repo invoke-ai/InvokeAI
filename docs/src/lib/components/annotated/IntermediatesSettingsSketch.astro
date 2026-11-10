@@ -1,0 +1,398 @@
+---
+/*
+ * Settings › Intermediates as an annotated app sketch: the Settings dialog's section list on the left and the
+ * Intermediates section (`features/intermediates/ui/IntermediatesManager.tsx`) on the right, as an administrator
+ * filtered to one account sees it. Text is drawn as skeleton bars, so the sketch needs no translation; the callouts
+ * passed as children name the controls.
+ *
+ * Layout follows the app at 1 stage unit ≈ 1px: a 150-unit section list (`SettingsDialog.tsx`); the section's 16-unit
+ * padding; a header row with an outline Refresh button; the search field and the account filter tag; the select-all
+ * bar (`ListSelectionBar.tsx`) with its estimate and the red ghost Delete button; and 52-unit comfortable list rows
+ * (`ListItem.tsx`, `IntermediatesList.tsx`) with checkbox, 36-unit cover, name and size, and the Used and Unused
+ * figures. The last row is Unassigned, with its folder cover and "No project" badge.
+ */
+import BrushCleaning from '@lucide/astro/icons/brush-cleaning';
+import Check from '@lucide/astro/icons/check';
+import CodeXml from '@lucide/astro/icons/code-xml';
+import Database from '@lucide/astro/icons/database';
+import Folder from '@lucide/astro/icons/folder';
+import Info from '@lucide/astro/icons/info';
+import Keyboard from '@lucide/astro/icons/keyboard';
+import Minus from '@lucide/astro/icons/minus';
+import Palette from '@lucide/astro/icons/palette';
+import RefreshCw from '@lucide/astro/icons/refresh-cw';
+import Search from '@lucide/astro/icons/search';
+import Server from '@lucide/astro/icons/server';
+import SlidersHorizontal from '@lucide/astro/icons/sliders-horizontal';
+// Lucide 1 renamed Trash2, the app's Delete icon, to Trash; lucide-react still exports it under both names.
+import Trash from '@lucide/astro/icons/trash';
+import X from '@lucide/astro/icons/x';
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from '../whats-new/box';
+import Annotated from './Annotated.astro';
+
+type Props = {
+  /** Names the sketch for screen readers. */
+  label: string;
+};
+
+const { label } = Astro.props;
+
+const WIDTH = 640;
+const HEIGHT = 400;
+const sk = (width: number) => `--sk: ${width}`;
+
+// The section list: group headings and their sections; Intermediates is the current one.
+const nav = [
+  { heading: 48, items: [{ Icon: Palette, w: 44 }, { Icon: SlidersHorizontal, w: 40 }, { Icon: Keyboard, w: 38 }] },
+  { heading: 36, items: [{ Icon: Folder, w: 34 }] },
+  {
+    heading: 40,
+    items: [
+      { Icon: CodeXml, w: 46 },
+      { Icon: Server, w: 32 },
+      { Icon: Database, w: 70 },
+      { Icon: BrushCleaning, w: 58, current: true },
+      { Icon: Info, w: 52 },
+    ],
+  },
+];
+type NavRow = { y: number; w: number; Icon?: typeof Palette; current?: boolean };
+const navRows: NavRow[] = [];
+let navY = 40;
+for (const { heading, items } of nav) {
+  navRows.push({ y: navY + 8, w: heading });
+  navY += 20;
+  for (const item of items) {
+    navRows.push({ y: navY, ...item });
+    navY += 20;
+  }
+  navY += 6;
+}
+
+// Section body: 16 units of padding inside the right-hand column.
+const left = 166;
+const right = 624;
+const rowTop = (index: number) => 150 + index * 54;
+const rows = [
+  { name: 104, size: 58, used: 12, unused: 148, checked: true, crop: 'object-position: 20% 50%; scale: 1.8' },
+  { name: 82, size: 52, used: 3, unused: 64, crop: 'object-position: 70% 50%; scale: 2.4' },
+  { name: 120, size: 46, used: 0, unused: 21, crop: 'object-position: 45% 50%' },
+  { name: 64, size: 40, used: 0, unused: 9, unassigned: true },
+];
+const thumbProps = { src: landscape, alt: '', width: 96 };
+---
+
+<Annotated label={label} width={WIDTH} height={HEIGHT}>
+  <Fragment slot="sketch">
+    <div class="window wn-abs" style={box(0, 0, WIDTH, HEIGHT)}>
+      <!-- Section list -->
+      <div class="wn-abs rule" style={`${box(0, 0, 150, HEIGHT)}; border-right-width: 1px`}></div>
+      <div class="wn-abs field" style={box(10, 10, 130, 22)}><Search /><i class="sk" style={sk(52)}></i></div>
+      {
+        navRows.map(({ y, w, Icon, current }) =>
+          Icon ? (
+            <div class:list={['wn-abs row nav-item', { 'nav-item--current': current }]} style={box(10, y, 130, 18)}>
+              <Icon />
+              <i class="sk" style={sk(w)} />
+            </div>
+          ) : (
+            <i class="wn-abs sk sk--heading" style={box(18, y, w, 3)} />
+          )
+        )
+      }
+
+      <!-- Section header -->
+      <div class="wn-abs rule" style={`${box(150, 0, 490, 36)}; border-bottom-width: 1px`}></div>
+      <div class="wn-abs row panel-head" style={box(left, 0, 300, 36)}>
+        <BrushCleaning /><i class="sk sk--strong" style={sk(62)}></i>
+      </div>
+      <div class="wn-abs row" style={box(606, 0, 20, 36)}><X /></div>
+
+      <!-- Title, description and Refresh -->
+      <i class="wn-abs sk sk--title" style={box(left, 50, 92, 6)}></i>
+      <i class="wn-abs sk" style={box(left, 64, 240, 3.5)}></i>
+      <div class="wn-abs icon-button" style={box(right - 26, 48, 26, 26)}><RefreshCw /></div>
+
+      <!-- Search and the account filter -->
+      <div class="wn-abs field" style={box(left, 84, 336, 26)}><Search /><i class="sk" style={sk(96)}></i></div>
+      <div class="wn-abs row tag" style={box(right - 112, 87, 112, 20)}>
+        <i class="sk sk--strong" style={sk(72)}></i><i class="spacer"></i><X />
+      </div>
+
+      <!-- Select-all bar -->
+      <div class="wn-abs row select-bar" style={box(left, 118, right - left, 30)}>
+        <span class="checkbox checkbox--on"><Minus /></span>
+        <i class="sk" style={sk(30)}></i>
+        <i class="spacer"></i>
+        <i class="sk" style={sk(120)}></i>
+        <i class="separator"></i>
+        <span class="row delete"><Trash /><i class="sk" style={sk(24)}></i></span>
+      </div>
+
+      <!-- Rows -->
+      {
+        rows.map(({ name, size, used, unused, checked, crop, unassigned }, index) => (
+          <div
+            class:list={['wn-abs row list-row', { 'list-row--selected': checked }]}
+            style={box(left + 12, rowTop(index), right - left - 24, 52)}
+          >
+            <span class:list={['checkbox', { 'checkbox--on': checked }]}>{checked && <Check />}</span>
+            <span class="cover">
+              {unassigned ? <Folder /> : <Image {...thumbProps} class="fill" style={crop} />}
+            </span>
+            <span class="body">
+              <span class="row">
+                <i class="sk sk--strong" style={sk(name)} />
+                {unassigned && (
+                  <span class="badge">
+                    <i class="sk" style={sk(34)} />
+                  </span>
+                )}
+              </span>
+              <i class="sk" style={sk(size)} />
+            </span>
+            <span class="figure">
+              <b class:list={{ zero: used === 0 }}>{used}</b>
+              <i class="sk" style={sk(16)} />
+            </span>
+            <span class="figure">
+              <b class:list={{ zero: unused === 0 }}>{unused}</b>
+              <i class="sk" style={sk(22)} />
+            </span>
+          </div>
+        ))
+      }
+    </div>
+  </Fragment>
+  <slot />
+</Annotated>
+
+<style>
+  .window {
+    overflow: hidden;
+    border-radius: inherit;
+    background-color: var(--wn-panel);
+    color: var(--wn-ink);
+    font-size: calc(var(--u) * 8);
+  }
+
+  /* Lucide icons size from `--i`, in stage units, set by the context that holds them. */
+  .window :global(.lucide) {
+    flex: none;
+    width: calc(var(--u) * var(--i, 9));
+    height: calc(var(--u) * var(--i, 9));
+    stroke-width: 2;
+  }
+
+  .rule {
+    border: 0 solid var(--wn-line);
+  }
+
+  .row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    white-space: nowrap;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  /* Skeleton text, `--sk` units wide. */
+  .sk {
+    flex: none;
+    width: calc(var(--u) * var(--sk));
+    height: calc(var(--u) * 3.5);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-faint);
+  }
+
+  .wn-abs.sk {
+    width: calc(var(--u) * var(--w));
+    height: calc(var(--u) * var(--h));
+  }
+
+  .sk--strong {
+    background-color: color-mix(in oklab, var(--wn-strong) 45%, transparent);
+  }
+
+  .sk--title {
+    background-color: color-mix(in oklab, var(--wn-strong) 55%, transparent);
+  }
+
+  .sk--heading {
+    background-color: color-mix(in oklab, var(--wn-ink) 35%, transparent);
+  }
+
+  .field {
+    --i: 8;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    padding-inline: calc(var(--u) * 8);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  /* Section list: ghost buttons; the current section is the subtle variant. */
+  .nav-item {
+    --i: 8;
+    padding-inline: calc(var(--u) * 8);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .nav-item--current {
+    background-color: var(--wn-shown);
+    color: var(--wn-strong);
+
+    .sk {
+      background-color: color-mix(in oklab, var(--wn-strong) 45%, transparent);
+    }
+  }
+
+  .panel-head {
+    --i: 10;
+    color: var(--wn-strong);
+  }
+
+  .icon-button {
+    --i: 10;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    color: var(--wn-strong);
+  }
+
+  /* The account filter: a removable tag. */
+  .tag {
+    --i: 7;
+    gap: calc(var(--u) * 4);
+    padding-inline: calc(var(--u) * 8) calc(var(--u) * 5);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-raised);
+  }
+
+  .select-bar {
+    --i: 7;
+    gap: calc(var(--u) * 8);
+    padding-inline: calc(var(--u) * 20) calc(var(--u) * 12);
+    border-bottom: 1px solid var(--docs-border-subtle);
+  }
+
+  .separator {
+    flex: none;
+    width: 1px;
+    height: calc(var(--u) * 16);
+    background-color: var(--docs-border-subtle);
+  }
+
+  .delete {
+    --i: 9;
+    gap: calc(var(--u) * 4);
+    color: var(--invoke-danger, var(--docs-text-strong));
+
+    .sk {
+      background-color: color-mix(in oklab, currentColor 55%, transparent);
+    }
+  }
+
+  .checkbox {
+    --i: 9;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: calc(var(--u) * 14);
+    height: calc(var(--u) * 14);
+    border: 1px solid var(--docs-border-strong);
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .checkbox--on {
+    border-color: var(--docs-accent);
+    background-color: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+
+    :global(.lucide) {
+      stroke-width: 3;
+    }
+  }
+
+  .list-row {
+    gap: calc(var(--u) * 10);
+    padding-inline: calc(var(--u) * 8) calc(var(--u) * 12);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .list-row--selected {
+    background-color: color-mix(in oklab, var(--wn-raised) 60%, transparent);
+  }
+
+  .cover {
+    --i: 14;
+    display: grid;
+    flex: none;
+    overflow: hidden;
+    place-items: center;
+    width: calc(var(--u) * 36);
+    height: calc(var(--u) * 36);
+    border: 1px solid var(--docs-border-subtle);
+    border-radius: calc(var(--u) * 5);
+    background-color: var(--wn-raised);
+  }
+
+  .fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--u) * 7);
+  }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    height: calc(var(--u) * 13);
+    padding-inline: calc(var(--u) * 5);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 3);
+    background-color: var(--wn-raised);
+  }
+
+  /* The app's figures sit 16 apart (`gap="4"`), 6 more than the row's gap. */
+  .figure + .figure {
+    margin-left: calc(var(--u) * 6);
+  }
+
+  .figure {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: calc(var(--u) * 4);
+    width: calc(var(--u) * 52);
+
+    b {
+      color: var(--wn-strong);
+      font-size: calc(var(--u) * 11);
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .zero {
+      color: var(--wn-ink);
+      font-weight: 500;
+    }
+  }
+</style>

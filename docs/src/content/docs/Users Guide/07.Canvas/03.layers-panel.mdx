@@ -1,7 +1,7 @@
 ---
 title: Layers panel guide
 description: A detailed guide to the Canvas Layers panel — the color picker, managing layers, history, the layer menu, and every layer type's settings in the Properties pane.
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-02
 ---
 
 import { Image } from 'astro:assets';
@@ -17,7 +17,7 @@ The **Layers** panel sits to the right of the Canvas in the **Edit** layout. It 
 
 Drag the dividers between the parts to resize them, and use the chevron at the right of the Color and Properties tabs to collapse them. The sizes are saved with the project.
 
-<Image src={layersPanel} alt="The Layers panel: the color wheel at the top, the layer list grouped into Inpaint Masks, Regional Guidance, Control Layers and Raster Layers, and the Properties pane showing a control layer's settings." width={420} />
+<Image src={layersPanel} alt="The Layers panel: the color wheel at the top; the layer list with Inpaint Masks, Regional Guidance, Control Layers and Raster Layers, each row ending in an eye and a lock in one column; an Exposure adjustment as a child row under the City raster layer, joined to it by a connector line, its eye in the same column; and the Properties pane showing the selected depth control layer's settings." width={420} />
 
 For an introduction to the layer types, see [Crafting images with the Canvas](/users-guide/canvas/introduction/#canvas-concepts).
 
@@ -27,7 +27,7 @@ The **Color** tab edits the two painting colors: the **Foreground color**, which
 
 * The color wheel, or a box picker via **Switch to box picker**, and the hex value, always shown. The format button next to it cycles through hex only, RGB, HSB and HSL, adding a field for each channel.
 * **Swap foreground and background colors** (**X**) and **Reset colors to black and white** (**D**).
-* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
+* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas with the Brush, Eraser, Gradient, Text or View tool. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
 
 Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick never turns on a fill or stroke the shape does not have: on such a shape it sets the active foreground or background color instead. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
@@ -40,17 +40,19 @@ The **Swatches** tab has built-in **Swatches**, your **Recent colors**, and the 
 
 ### The layer list
 
-Layers are grouped into four stacks: **Inpaint Masks**, **Regional Guidance**, **Control Layers** and **Raster Layers**. Within a stack, higher layers are drawn over lower ones. Click a stack's header to collapse it. Its buttons add a **New layer** of that type, and **Hide all** or **Show all**: for raster layers this hides them (and leaves them out of generation); for masks, regional guidance and control layers it is **Hide all on canvas**, which only gets them out of view. The Raster Layers header also has **Merge visible** and **Export to PSD**. Collapsed stacks and groups stay as you left them when you switch to another open project and back.
+Layers are grouped into four stacks: **Inpaint Masks**, **Regional Guidance**, **Control Layers** and **Raster Layers**. Within a stack, higher layers are drawn over lower ones. Click a stack's header to collapse it. The buttons at the right of a header end with **New layer**, which adds a layer of that type. The Inpaint Masks, Regional Guidance and Control Layers headers have **Hide all on canvas** (or **Show all on canvas**) just before it, which only gets the stack's layers out of view: they still affect generation. The Raster Layers header has **Merge visible** and **Export to PSD** instead. Collapsed stacks and groups stay as you left them when you switch to another open project and back.
 
 Each row shows, from left to right:
 
 * A colored stripe, if you gave the layer a color label.
-* An eye button (**Show or hide layer**). A hidden layer is off the canvas and takes no part in generation.
 * A thumbnail, the layer type and the name.
 * On masks, regional guidance and control layers hidden with **Hide on canvas only** (in the layer menu), a closed-eye button: the layer is off the canvas but still affects generation. Click it to show the layer again.
+* An eye button (**Show or hide layer**). A hidden layer is off the canvas and takes no part in generation.
 * A lock button (**Toggle lock**), which prevents editing. Painting, moving or transforming a locked layer is refused with a notice that says so.
 
-Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. Select a child row to edit it in Properties.
+Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. A child row shows its icon (or the reference image), its name, its value where it has one, and its own eye button (**Enable/disable**), which turns it off without removing it. While its layer is hidden, a child row's eye is dimmed and the child has no effect. Select a child row to edit it in Properties. Thin lines run from each expanded layer or group down to its child rows and the layers inside it, so you can see what belongs where.
+
+The eye buttons of layers and child rows line up in one column at the right edge of the list, with the lock buttons in a column beside them, however deeply a layer is nested in groups.
 
 Drag an adjustment to reorder it, or drop it on another raster layer or group, or among that layer's adjustments, to move it there as one undoable step. Reference images move between regional guidance layers the same way. A child row's right-click menu also has a **Move to layer** submenu listing the layers that can take it.
 
@@ -101,7 +103,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Use as control layer** — copies the layer's pixels to a new control layer, whose Properties then ask for its **Type**.
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
   * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting a layer with adjustments to a control layer, or using it as one, bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
-* **Control layers:** **Transform**, **Select object**, **Run workflow**, **Enable transparent preview**, and **Convert to raster layer**. A control layer's map comes from its **Detection** row in Properties, so it has no **Filter**.
+* **Control layers:** **Transform**, **Select object**, **Run workflow**, **Enable transparent preview**, **Convert to raster layer**, and **Hide on canvas only**. A control layer's map comes from its **Detection** row in Properties, so it has no **Filter**.
 * **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas only**.
 * **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide on canvas only**.
 
@@ -125,7 +127,8 @@ The Layer section is dimmed while Filter or Select Object is running.
 
 ### Raster layer
 
-* **Lock transparency** — paint only where the layer already has pixels, leaving transparent areas transparent, like Photoshop's "Lock transparent pixels". Use it to recolor a shape without spilling paint around it, or to refine a subject painted on a transparent layer without growing its outline. Brushes, shapes and pen input all respect the lock.
+* **Lock transparency** — paint only where the layer already has pixels, leaving transparent areas transparent, like Photoshop's "Lock transparent pixels". Use it to recolor a shape without spilling paint around it, or to refine a subject painted on a transparent layer without growing its outline. Brushes, shapes and pen input all respect the lock, and the Eraser and a Shape cutout can't remove pixels while it's on.
+* **Shape appearance** — with a shape layer selected, its **Fill**, **Stroke** and stroke **Width** appear under **Appearance**, whatever canvas tool is active. Each gesture is one undoable step and changes only the selected shape. The Shape tool's own **Appearance** group sets creation defaults separately.
 * **Filter** — start the Filter operation.
 
 The Brush and Eraser paint directly on a selected image layer, such as an accepted result or an added picture, rather than adding a new layer. The first stroke turns it into a paint layer, with its position, scale and adjustments applied to its pixels; one undo restores the original image layer.

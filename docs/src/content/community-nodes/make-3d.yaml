@@ -1,0 +1,15 @@
+title: Make 3D
+author: srcrr
+repo: https://gitlab.com/srcrr/shift3d
+summary: Create 3D stereo images from 2D originals.
+categories: [video-3d]
+install: manual
+links:
+  - label: Example workflow
+    url: https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&inline=false
+thumbnail: ./make-3d.webp
+images:
+  - src: https://gitlab.com/srcrr/shift3d/-/raw/main/example-1.png
+    alt: A stereo image pair made from a 2D image
+  - src: https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png
+    alt: A second stereo image pair

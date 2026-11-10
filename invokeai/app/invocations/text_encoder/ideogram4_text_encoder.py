@@ -59,7 +59,9 @@ class Ideogram4TextEncoderInvocation(BaseInvocation):
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
             context.util.signal_progress("Running Qwen3-VL text encoder")
-            prompt_embeds = encode_qwen3vl_prompt(self.prompt, tokenizer, text_encoder)
+            prompt_embeds = encode_qwen3vl_prompt(
+                self.prompt, tokenizer, text_encoder, device=text_encoder_info.compute_device
+            )
 
         # Move to CPU for storage to save VRAM.
         prompt_embeds = prompt_embeds.detach().to("cpu")

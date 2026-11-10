@@ -288,7 +288,7 @@ def test_an_undecodable_nvfp4_tower_layer_is_refused_as_the_vision_tower(tmp_pat
     path = tmp_path / "qwen3vl_nvfp4.safetensors"
     loader = _single_file(path, state_dict, tiny_qwen3vl_config(), metadata)
 
-    with pytest.raises(ValueError, match="Qwen3-VL vision tower, which Krea-2 edit needs for reference images") as e:
+    with pytest.raises(ValueError, match="Qwen3-VL vision tower, which reference images need") as e:
         loader._load_model(_checkpoint_config(path), SubModelType.VisionEncoder)
 
     assert reason in str(e.value)

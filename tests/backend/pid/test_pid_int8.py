@@ -173,7 +173,7 @@ def test_an_int8_weight_no_marker_claims_is_refused(monkeypatch: pytest.MonkeyPa
     state_dict = {k: v for k, v in state_dict.items() if not k.endswith((".comfy_quant", ".weight_scale"))}
     monkeypatch.setattr(pid_decode_module, "build_pid_net", lambda backbone, version: _tiny_net())
 
-    with pytest.raises(ValueError, match="no `comfy_quant` marker"):
+    with pytest.raises(ValueError, match="no readable int8_tensorwise marker"):
         load_pid_decoder(state_dict, BaseModelType.Flux)
 
 

@@ -6,7 +6,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { readPsd, writePsd } from 'ag-psd';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   PsdExportGroupInput,
@@ -427,5 +427,63 @@ describe('executePsdExport — adjustments', () => {
     // The world surface resamples the adjusted layer-local copy, not the raw cache.
     const drawn = (world!.surface as StubRasterSurface).callLog.find((call) => call.op === 'drawImage');
     expect(drawn?.args[0]).toBe(local!.surface.canvas);
+  });
+});
+
+describe('PSD execution resource ownership', () => {
+  it.each(['success', 'failure', 'abort'] as const)(
+    'clears temporary surfaces after %s without clearing snapshot pixels',
+    async (outcome) => {
+      const backend = createTestStubRasterBackend();
+      const source = backend.createSurface(100, 50);
+      const temporary: RasterSurface[] = [];
+      const controller = new AbortController();
+      const download = vi.fn();
+      const operation = executePsdExport(planPsdExport([layer()]), 'owned.psd', {
+        backend: {
+          createSurface: (width, height) => {
+            const surface = backend.createSurface(width, height);
+            temporary.push(surface);
+            return surface;
+          },
+        },
+        signal: controller.signal,
+        getLayerSurface: () => Promise.resolve({ rect: { x: 0, y: 0, width: 100, height: 50 }, surface: source }),
+        readImageData: (_surface, rect) =>
+          ({
+            data: new Uint8ClampedArray(rect.width * rect.height * 4),
+            width: rect.width,
+            height: rect.height,
+          }) as ImageData,
+        writePsd: () => {
+          expect(temporary.length).toBeGreaterThan(0);
+          expect(temporary.every((surface) => surface.width === 0 && surface.height === 0)).toBe(true);
+          if (outcome === 'failure') {
+            throw new Error('writer failed');
+          }
+          if (outcome === 'abort') {
+            controller.abort();
+          }
+          return Promise.resolve(new ArrayBuffer(0));
+        },
+        download,
+      });
+      if (outcome === 'success') {
+        await operation;
+      } else {
+        await expect(operation).rejects.toThrow();
+      }
+      expect(download).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+      expect(temporary.length).toBeGreaterThan(0);
+      expect(temporary.every((surface) => surface.width === 0 && surface.height === 0)).toBe(true);
+      expect(source.width).toBe(100);
+      expect(source.height).toBe(50);
+    }
+  );
+  it('refuses records that cannot fit the signed PSD layer count, including folder markers', () => {
+    const children = Array.from({ length: 32766 }, (_, i) => layer({ id: String(i) }));
+    expect(planPsdExport([{ type: 'group', id: 'g', name: 'g', isEnabled: true, children }]).status).toBe('too-large');
+    children.pop();
+    expect(planPsdExport([{ type: 'group', id: 'g', name: 'g', isEnabled: true, children }]).status).toBe('ok');
   });
 });

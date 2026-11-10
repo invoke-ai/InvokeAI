@@ -537,10 +537,7 @@ interface PresetMenuTarget {
   ticket: number;
 }
 
-/**
- * Mounted only while open: closing unmounts it in the same commit that opens an admin dialog, so zag never sees the
- * dialog's layer nested above a menu that is still exiting (which dismisses the dialog).
- */
+/** Mounted only while open. */
 const PresetMenu = ({
   isActive,
   isUnsaved,
@@ -567,8 +564,6 @@ const PresetMenu = ({
   const apply = useCallback(() => onApply(preset), [onApply, preset]);
   const revert = useCallback(() => layout.revertPreset(preset.id), [layout, preset.id]);
   const save = useCallback(() => layout.savePreset(preset.id), [layout, preset.id]);
-  // Unmount the menu in the same commit the dialog mounts; zag's own close lands a commit later and its layer
-  // teardown would dismiss the dialog as nested above it.
   const edit = useCallback(() => {
     onClose();
     onEdit(preset);

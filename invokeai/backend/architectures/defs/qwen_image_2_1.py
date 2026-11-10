@@ -36,7 +36,7 @@ register(
         scheduler_set="flow",
         # Each reference holds ~1 megapixel of latents in the prefix the cache keeps: ~2 GiB per guidance branch.
         max_reference_images=4,
-        reference_images_require_format="diffusers",
+        reference_images_require_vision_tower=True,
     ),
     # Values are qwen_image_21_* because variant strings resolve without the base and must be unique.
     VariantFacet({ModelType.Main: QwenImage21VariantType}),
