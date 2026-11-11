@@ -2229,6 +2229,20 @@ const issue = (
 });
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+
+/**
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
+ * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ */
+const referenceNameValues = (
+  referenceImage: Pick<GenerateReferenceImage, 'name'>,
+  position: number
+): Record<string, number | string> => ({
+  index: position,
+  ...(referenceImage.name === undefined ? {} : { referenceName: referenceImage.name }),
+});
+const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
+  referenceImage.name ?? `Reference image ${position}`;
 /** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
 /** One reference image: its card shows the issue. */
@@ -2324,9 +2338,9 @@ export const getGenerationModelAvailabilityIssues = (
         issue(
           `referenceImages:modelNotInstalled:${referenceImage.id}`,
           'referenceModelNotInstalled',
-          `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          `${englishReferenceName(referenceImage, index + 1)} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
           referenceImageTarget(referenceImage.id),
-          { index: index + 1, name: config.model.name },
+          { ...referenceNameValues(referenceImage, index + 1), name: config.model.name },
           { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
         )
       );
@@ -2499,9 +2513,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:unsupported:${id}`,
           'referenceImageUnsupported',
-          `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
+          `${model.name} cannot use ${englishReferenceName(referenceImage, index)}. Turn it off, or remove it.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2513,9 +2527,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsImage:${id}`,
           'referenceImageNeedsImage',
-          `Reference image ${index} needs an image.`,
+          `${englishReferenceName(referenceImage, index)} needs an image.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );
@@ -2527,9 +2541,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:needsIpAdapter:${id}`,
             'referenceImageNeedsIpAdapter',
-            `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
+            `${englishReferenceName(referenceImage, index)} needs an IP Adapter model for ${model.name}.`,
             referenceImageTarget(id),
-            { index, name: model.name },
+            { ...referenceNameValues(referenceImage, index), name: model.name },
             turnOff
           )
         );
@@ -2542,9 +2556,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:strength:${id}`,
             'referenceImageStrength',
-            `Reference image ${index} strength must be between 0 and 2.`,
+            `${englishReferenceName(referenceImage, index)} strength must be between 0 and 2.`,
             referenceImageTarget(id),
-            { index },
+            referenceNameValues(referenceImage, index),
             turnOff
           )
         );
@@ -2559,9 +2573,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsRedux:${id}`,
           'referenceImageNeedsRedux',
-          `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
+          `${englishReferenceName(referenceImage, index)} needs a FLUX Redux model for ${model.name}.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2575,9 +2589,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsKontext:${id}`,
           'referenceImageNeedsKontext',
-          `Reference image ${index} needs the selected FLUX Kontext model.`,
+          `${englishReferenceName(referenceImage, index)} needs the selected FLUX Kontext model.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );

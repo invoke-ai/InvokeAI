@@ -9,9 +9,9 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+import { ReferenceImageRow } from './ReferenceImageRow';
 
-/** FLUX.3 names its references in the prompt; the card's tag button explains the tag and copies it where it can. */
+/** FLUX.3 names its references in the prompt; the row's tag button explains the tag and copies it where it can. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -39,12 +39,12 @@ let originalClipboard: PropertyDescriptor | undefined;
 
 const noop = vi.fn();
 
-const renderCard = () =>
+const renderRow = () =>
   act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <ReferenceImageCard
+          <ReferenceImageRow
             count={1}
             index={0}
             promptTag={TAG}
@@ -54,6 +54,7 @@ const renderCard = () =>
             onMove={noop}
             onPatch={noop}
             onRemove={noop}
+            onRename={noop}
             onUseSize={noop}
           />
         </ChakraProvider>
@@ -88,7 +89,7 @@ describe('reference image prompt tag', () => {
   it('explains the tag and copies it', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    await renderCard();
+    await renderRow();
 
     await expect.element(tagButton()).not.toHaveAttribute('aria-disabled');
     await act(() => userEvent.hover(tagButton()));
@@ -101,7 +102,7 @@ describe('reference image prompt tag', () => {
 
   it('still explains the tag, beside why it cannot copy, when the clipboard is unavailable', async () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
-    await renderCard();
+    await renderRow();
     const expected = `${EXPLANATION} Copying needs HTTPS or localhost`;
 
     await expect.element(tagButton()).toHaveAttribute('aria-disabled', 'true');

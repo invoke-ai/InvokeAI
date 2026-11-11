@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 
+import { normalizeReferenceImageName } from '@features/generation/settings';
 import { readRecordedModelRef } from '@workbench/image-actions';
 import { getLegacyCanvasReferenceEntries } from '@workbench/image-actions/imageRecall';
 
@@ -260,6 +261,8 @@ export const parsePreviewMetadata = (
       const original =
         asset && isRecord(asset.original) && isRecord(asset.original.image) ? asset.original.image : asset;
       const parts = [
+        // A Generate reference the user named leads with its name.
+        key === 'ref_images' && !showLegacyReferences ? (normalizeReferenceImageName(entry.name) ?? null) : null,
         model,
         getString(config, 'type'),
         getString(config, 'imageName') ??

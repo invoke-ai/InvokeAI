@@ -8,8 +8,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
 import { getModeLabelKey } from './referenceImageConfig';
+import { ReferenceImageRow } from './ReferenceImageRow';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;
@@ -32,7 +32,7 @@ const referenceImage = (base: string): GenerateReferenceImage => ({
   config: {
     beginEndStepPct: [0, 1],
     clipVisionModel: 'ViT-H',
-    image: null,
+    image: { original: { image: { height: 512, image_name: 'character.png', width: 512 } } },
     method: 'style',
     model: { base, key: `${base}-ip-adapter`, name: `${base} IP-Adapter`, type: 'ip_adapter' },
     type: 'ip_adapter',
@@ -57,7 +57,7 @@ const render = async (selectedModel: GenerateModelConfig) => {
     root?.render(
       <ChakraProvider value={system}>
         <GenerationUiProvider adapter={ADAPTER}>
-          <ReferenceImageCard
+          <ReferenceImageRow
             count={1}
             index={0}
             referenceImage={referenceImage(selectedModel.base)}
@@ -66,17 +66,17 @@ const render = async (selectedModel: GenerateModelConfig) => {
             onMove={vi.fn()}
             onPatch={onPatch}
             onRemove={vi.fn()}
+            onRename={vi.fn()}
             onUseSize={vi.fn()}
           />
         </GenerationUiProvider>
       </ChakraProvider>
     )
   );
-  // Advanced holds the model picker and active steps.
-  const advanced = [...host.querySelectorAll('button')].find(
-    (button) => button.textContent === 'widgets.generate.advanced'
+  // The settings under the row hold the mode, the model picker and active steps.
+  await act(() =>
+    host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.referenceImageSettings"]')?.click()
   );
-  await act(() => advanced?.click());
 
   return host;
 };
@@ -88,19 +88,20 @@ afterEach(async () => {
   root = null;
 });
 
-describe('Anima IP-Adapter reference card', () => {
+describe('Anima IP-Adapter reference row', () => {
   it('offers strength and active steps, without the SD mode, style variant or CLIP Vision encoder', async () => {
     const card = await render(ANIMA);
     const text = card.textContent ?? '';
 
     expect(text).toContain('widgets.generate.strength');
     expect(text).not.toContain('widgets.generate.weight');
-    expect(text).not.toContain('widgets.generate.mode');
+    expect(card.querySelector('[aria-label="widgets.generate.mode"]')).toBeNull();
     expect(text).not.toContain('widgets.generate.styleVariant');
     expect(text).not.toContain('ViT-H');
-    expect(text).toContain('widgets.generate.activeSteps');
+    expect(text).toContain('widgets.generate.activeStepsShort');
     expect(text).toContain('IP-Adapter picker');
 
+    // The row's own control, ahead of the step range under it.
     const strength = card.querySelector('[role="slider"]');
     expect(strength?.getAttribute('aria-valuenow')).toBe('1.5');
     expect(strength?.getAttribute('aria-valuemin')).toBe('0');
@@ -123,23 +124,22 @@ describe('Anima IP-Adapter reference card', () => {
     expect(onPatch).toHaveBeenLastCalledWith('ref-1', { config: expect.objectContaining({ weight: 0 }) });
   });
 
-  it('summarizes the collapsed card by its strength, not an SD mode', async () => {
+  it('summarizes the row by its adapter, not an SD mode', async () => {
     const card = await render(ANIMA);
-    const collapse = card.querySelector<HTMLButtonElement>(
-      'button[aria-label="widgets.generate.collapseReferenceImage"]'
-    )!;
+    const summary = card.querySelector('[data-list-primary]')?.textContent ?? '';
 
-    await act(() => collapse.click());
-
-    expect(card.textContent).toContain('widgets.generate.strength 1.50');
-    expect(card.textContent).not.toContain(getModeLabelKey('style'));
+    expect(summary).toContain('anima IP-Adapter');
+    expect(summary).not.toContain(getModeLabelKey('style'));
   });
 
   it('keeps the SD controls for an SDXL reference', async () => {
     const text = (await render(SDXL)).textContent ?? '';
 
+    const card = host!;
+
     expect(text).toContain('widgets.generate.weight');
-    expect(text).toContain('widgets.generate.mode');
+    expect(card.querySelector('[aria-label="widgets.generate.mode"]')).not.toBeNull();
+    expect(card.querySelector('[data-list-primary]')?.textContent).toContain(getModeLabelKey('style'));
     expect(text).toContain('widgets.generate.styleVariant');
     expect(text).toContain('ViT-H');
     expect(text).not.toContain('widgets.generate.strength');

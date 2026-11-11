@@ -147,6 +147,22 @@ const primaryOf = (viewport: HTMLElement, key: string): HTMLElement | null =>
  * Virtualized list with pinned section headers and a roving tabindex. Headers and items share one flat index
  * space; the header at the top of the visible range renders in flow as a sticky element, pushed out by the next.
  */
+/** Inputs whose arrows, Home and End do nothing of their own: a row's selection checkbox and button-like inputs. */
+const KEYLESS_INPUT_TYPES = new Set(['button', 'checkbox', 'color', 'file', 'image', 'reset', 'submit']);
+
+/**
+ * Whether a focused control uses ArrowUp, ArrowDown, Home and End itself: a field in a row (a title editor moves its
+ * caret), a select, or a radio or range input. The List leaves those keys to it and moves between rows from anything
+ * else, the selection checkbox included.
+ */
+const usesNavigationKeys = (target: HTMLElement): boolean => {
+  if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+    return true;
+  }
+
+  return target instanceof HTMLInputElement && !KEYLESS_INPUT_TYPES.has(target.type);
+};
+
 export const List = <T,>({
   activeKey = null,
   defaultFocusKey = null,
@@ -327,7 +343,9 @@ export const List = <T,>({
   );
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.defaultPrevented || !(event.target as HTMLElement).closest('[data-list-row]')) {
+      const target = event.target as HTMLElement;
+
+      if (event.defaultPrevented || !target.closest('[data-list-row]') || usesNavigationKeys(target)) {
         return;
       }
 

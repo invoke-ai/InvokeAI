@@ -22,6 +22,14 @@ export interface ListContextMenuAnchor {
 
 export interface ListItemProps {
   title: string;
+  /**
+   * An editor shown in place of the title, such as a rename field; it names itself. While set, the primary area is a
+   * plain container instead of a button, since a field cannot sit inside a button, and the row opens no context menu,
+   * so the field keeps the browser's text menu. Size it to the title's line so the row keeps its height. Inside a `List`
+   * the field keeps its own arrows, Home and End; the caller ends the edit (Enter, Escape, blur) and moves focus back
+   * to the row, whose button returns with the List's tab stop.
+   */
+  titleEditor?: ReactNode;
   /** Identifiers keep their tail visible; prose keeps its start. */
   titleTruncate?: 'middle' | 'end';
   /** Media or icon before the text; size it for the density (36px at comfortable and snug). */
@@ -108,6 +116,7 @@ export const ListItem = ({
   setSize,
   tabIndex = 0,
   title,
+  titleEditor,
   titleTruncate = 'middle',
   trailing,
   onCheckedChange,
@@ -129,7 +138,8 @@ export const ListItem = ({
   // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
   // nothing to act on stays static.
   const isStatic = !isInteractive && (actions === undefined || actions === null);
-  const menu = isDisabled ? undefined : onContextMenu;
+  const isEditingTitle = titleEditor !== undefined && titleEditor !== null;
+  const menu = isDisabled || isEditingTitle ? undefined : onContextMenu;
   const intent = isDisabled ? undefined : onIntent;
 
   const openContextMenu = useCallback(
@@ -223,12 +233,16 @@ export const ListItem = ({
       {leading}
       <chakra.span css={styles.body}>
         <chakra.span css={styles.titleLine}>
-          <MiddleTruncate
-            as="span"
-            css={styles.title}
-            tailGraphemes={titleTruncate === 'end' ? 0 : undefined}
-            text={title}
-          />
+          {isEditingTitle ? (
+            titleEditor
+          ) : (
+            <MiddleTruncate
+              as="span"
+              css={styles.title}
+              tailGraphemes={titleTruncate === 'end' ? 0 : undefined}
+              text={title}
+            />
+          )}
           {badges !== undefined && badges !== null ? <chakra.span css={styles.badges}>{badges}</chakra.span> : null}
         </chakra.span>
         {description !== undefined && description !== null ? (
@@ -269,7 +283,7 @@ export const ListItem = ({
           </Checkbox.Root>
         </chakra.div>
       ) : null}
-      {isInteractive ? (
+      {isInteractive && !isEditingTitle ? (
         <chakra.button
           aria-current={isActive || undefined}
           aria-disabled={isBusy || isDisabled || undefined}
@@ -288,7 +302,7 @@ export const ListItem = ({
           {content}
         </chakra.button>
       ) : (
-        // Static rows (nothing to press, no menu) must not announce themselves as buttons.
+        // Static rows (nothing to press, no menu) and a row editing its title must not announce themselves as buttons.
         <chakra.div aria-current={isActive || undefined} css={styles.primary} data-list-primary="">
           {content}
         </chakra.div>

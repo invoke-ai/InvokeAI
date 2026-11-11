@@ -257,6 +257,53 @@ describe('ListItem', () => {
     expect(title.getBoundingClientRect().height).toBe(singleLineHeight);
     expect(title.textContent).toContain('third line');
   });
+
+  it('edits the title in place outside any button, at the same height, without the row menu', async () => {
+    const onContextMenu = vi.fn();
+    const row = (titleEditor?: ReactElement) => (
+      <ListItem
+        actions={<button type="button">Toggle</button>}
+        density="snug"
+        description="Summary"
+        leading={<span style={{ display: 'block', height: 36, width: 36 }} />}
+        title="Hero pose"
+        titleEditor={titleEditor}
+        onContextMenu={onContextMenu}
+      />
+    );
+
+    await render(row());
+    const surface = host.querySelector<HTMLElement>('[role="listitem"]')!;
+    const restingHeight = surface.getBoundingClientRect().height;
+
+    expect(primary().tagName).toBe('BUTTON');
+    expect(primary().getAttribute('aria-haspopup')).toBe('menu');
+
+    await render(row(<input aria-label="Rename" defaultValue="Hero pose" style={{ height: 20, minWidth: 0 }} />));
+    const field = host.querySelector<HTMLInputElement>('input[aria-label="Rename"]')!;
+
+    // The field takes the title's place inside the primary area, which no longer announces itself as a button.
+    expect(primary().tagName).toBe('DIV');
+    expect(primary().hasAttribute('tabindex')).toBe(false);
+    expect(primary().hasAttribute('aria-haspopup')).toBe(false);
+    expect(primary().contains(field)).toBe(true);
+    expect(field.closest('button')).toBeNull();
+    expect(host.textContent).not.toContain('Hero pose');
+    expect(host.textContent).toContain('Summary');
+    expect(host.querySelector('[role="listitem"]')).toBe(surface);
+    expect(surface.getBoundingClientRect().height).toBe(restingHeight);
+
+    // A right-click in the field keeps the browser's text menu instead of opening the row's.
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 });
+    field.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onContextMenu).not.toHaveBeenCalled();
+
+    // Done editing, the title and its button come back.
+    await render(row());
+    expect(primary().tagName).toBe('BUTTON');
+    expect(host.textContent).toContain('Hero pose');
+  });
 });
 
 describe('list checkboxes inside a form Field', () => {

@@ -11,7 +11,7 @@ import type {
 import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDebounce';
 import type { MouseEvent } from 'react';
 
-import { HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, chakra, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, toGalleryItemKey } from '@features/gallery';
 import { GalleryPickerPopover } from '@features/gallery/picker';
@@ -34,19 +34,39 @@ import {
   deriveAspectRatioId,
   moveReferenceImage,
   normalizeGenerateWidgetValues,
+  renameReferenceImage,
 } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssueNotes } from '@features/generation/ui/shared/GenerateIssues';
-import { Button, DropTargetOverlay, DropZone } from '@platform/ui';
-import { ChevronDownIcon, ImagePlusIcon } from 'lucide-react';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { Button } from '@platform/ui/Button';
+import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
+import { FieldLabel } from '@platform/ui/Field';
+import { FeatureHint } from '@platform/ui/hints';
+import { ListStack } from '@platform/ui/list/ListStack';
+import { Row } from '@platform/ui/Row';
+import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+import { getReferenceModelTypes, ReferenceImageRow } from './ReferenceImageRow';
 
-const UPLOAD_ZONE_HOVER_STYLES = { bg: 'bg.muted', color: 'fg' };
-/** Display names for the formats the backend can require of reference-image models. */
 const IMAGE_ONLY = ['image'] as const;
+const FOCUS_WAIT_FRAMES = 30;
+
+/** An undone removal brings its row back with the settings store's next render; it takes focus once it is there. */
+const focusReferenceWhenRendered = (id: string, framesLeft = FOCUS_WAIT_FRAMES) =>
+  requestAnimationFrame(() => {
+    const row = document.querySelector<HTMLElement>(
+      `[data-reference-image-id="${CSS.escape(id)}"] [data-list-primary]`
+    );
+
+    if (row) {
+      row.focus();
+    } else if (framesLeft > 0) {
+      focusReferenceWhenRendered(id, framesLeft - 1);
+    }
+  });
 /** The picker's trigger skips a click whose default is prevented, so a full set opens no picker. */
 const preventPickerOpen = (event: MouseEvent) => event.preventDefault();
 
@@ -69,7 +89,9 @@ export const GenerateReferenceImagesContent = ({
   visionComponents,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
-  const { gallery, notifications, project, settings } = useGenerationUi();
+  const { gallery, models: uiModels, notifications, project, settings } = useGenerationUi();
+  const { openManager } = uiModels;
+  const openModelManager = useCallback((modelType: string) => openManager({ modelType }), [openManager]);
   const isSupported = isReferenceImageSupported(selectedModel, visionComponents);
   const unavailableReason = getReferenceImageUnavailableReason(selectedModel, visionComponents);
   const maxReferenceImages = getMaxReferenceImages(selectedModel, visionComponents);
@@ -133,12 +155,15 @@ export const GenerateReferenceImagesContent = ({
     [onCommit]
   );
 
-  const removeReferenceImage = useCallback(
-    (id: string) => {
-      onCommit((currentSettings) => ({
-        ...currentSettings,
-        referenceImages: currentSettings.referenceImages.filter((referenceImage) => referenceImage.id !== id),
-      }));
+  const handleRenameReferenceImage = useCallback(
+    (id: string, name: string, isDefaultName: (name: string) => boolean) => {
+      onCommit((currentSettings) => {
+        const referenceImages = renameReferenceImage(currentSettings.referenceImages, id, name, isDefaultName);
+
+        return referenceImages === currentSettings.referenceImages
+          ? currentSettings
+          : { ...currentSettings, referenceImages: [...referenceImages] };
+      });
     },
     [onCommit]
   );
@@ -157,6 +182,87 @@ export const GenerateReferenceImagesContent = ({
     [onCommit]
   );
 
+  /**
+   * Puts removed references back at `at` among those there now (any added since stay), each as it was: name, crop and
+   * settings. A model that takes references gets no more running than it takes: the rest come back turned off.
+   */
+  const restoreReferenceImages = useCallback(
+    (removed: readonly GenerateReferenceImage[], at: number, projectId: string) => {
+      const values = normalizeGenerateWidgetValues(settings.readGenerateValues(projectId));
+      const removedIds = new Set(removed.map((referenceImage) => referenceImage.id));
+      const kept = (values?.referenceImages ?? []).filter((referenceImage) => !removedIds.has(referenceImage.id));
+      const position = Math.min(at, kept.length);
+      const restored = [...kept.slice(0, position), ...removed, ...kept.slice(position)];
+      const limit =
+        values && isReferenceImageSupported(values.model, values) ? getMaxReferenceImages(values.model, values) : null;
+      let running = 0;
+
+      settings.patchGenerateSettings(
+        {
+          referenceImages:
+            limit === null
+              ? restored
+              : restored.map((referenceImage) => {
+                  if (!referenceImage.isEnabled) {
+                    return referenceImage;
+                  }
+
+                  running += 1;
+                  return running > limit ? { ...referenceImage, isEnabled: false } : referenceImage;
+                }),
+        },
+        projectId
+      );
+    },
+    [settings]
+  );
+
+  // Undoable, so it does not ask first: the Undo puts the reference back where it was, as it was.
+  const removeReferenceImage = useCallback(
+    (id: string) => {
+      const { activeProjectId: projectId } = project;
+      let found: { at: number; referenceImage: GenerateReferenceImage } | null = null;
+
+      // The commit applies the update at once, so `found` is set when it returns; a later replay finds the same.
+      onCommit((currentSettings) => {
+        const at = currentSettings.referenceImages.findIndex((referenceImage) => referenceImage.id === id);
+        const referenceImage = currentSettings.referenceImages[at];
+
+        if (!referenceImage) {
+          return currentSettings;
+        }
+
+        found ??= { at, referenceImage };
+        return {
+          ...currentSettings,
+          referenceImages: currentSettings.referenceImages.filter((candidate) => candidate.id !== id),
+        };
+      });
+
+      const removed = found as { at: number; referenceImage: GenerateReferenceImage } | null;
+
+      if (!removed) {
+        return;
+      }
+
+      notifications.undoable(
+        t('widgets.generate.referenceImageRemoved', {
+          name: removed.referenceImage.name ?? t('widgets.generate.referenceImageNumbered', { index: removed.at + 1 }),
+        }),
+        {
+          onUndo: () => {
+            // The removal may still sit in the form's debounce; it lands before the restore reads the settings.
+            flushWorkbenchDrafts();
+            restoreReferenceImages([removed.referenceImage], removed.at, projectId);
+            focusReferenceWhenRendered(id);
+          },
+          projectId,
+        }
+      );
+    },
+    [notifications, onCommit, project, restoreReferenceImages, t]
+  );
+
   // Undoable, so it does not ask first. The Undo puts the removed references back ahead of any added since.
   const clearReferenceImages = useCallback(() => {
     const { activeProjectId: projectId } = project;
@@ -164,38 +270,10 @@ export const GenerateReferenceImagesContent = ({
 
     onCommitImmediate({ referenceImages: [] });
     notifications.undoable(t('widgets.generate.referenceImagesRemoved', { count: removed.length }), {
-      onUndo: () => {
-        const values = normalizeGenerateWidgetValues(settings.readGenerateValues(projectId));
-        const current = values?.referenceImages ?? [];
-        const removedIds = new Set(removed.map((referenceImage) => referenceImage.id));
-        const restored = [...removed, ...current.filter((referenceImage) => !removedIds.has(referenceImage.id))];
-        // A model that takes references gets no more running than it takes: the rest come back turned off.
-        const limit =
-          values && isReferenceImageSupported(values.model, values)
-            ? getMaxReferenceImages(values.model, values)
-            : null;
-        let running = 0;
-
-        settings.patchGenerateSettings(
-          {
-            referenceImages:
-              limit === null
-                ? restored
-                : restored.map((referenceImage) => {
-                    if (!referenceImage.isEnabled) {
-                      return referenceImage;
-                    }
-
-                    running += 1;
-                    return running > limit ? { ...referenceImage, isEnabled: false } : referenceImage;
-                  }),
-          },
-          projectId
-        );
-      },
+      onUndo: () => restoreReferenceImages(removed, 0, projectId),
       projectId,
     });
-  }, [notifications, onCommitImmediate, project, referenceImages, settings, t]);
+  }, [notifications, onCommitImmediate, project, referenceImages, restoreReferenceImages, t]);
 
   const pickerSelection = useMemo<GalleryPickerSelection>(
     () => ({
@@ -293,10 +371,44 @@ export const GenerateReferenceImagesContent = ({
     ) : null;
   }
 
-  // Unsupported-model references remain read-only with removal as recovery.
+  const referenceModelTypes = getReferenceModelTypes(selectedModel?.base);
+  const hasModelChoice = models.some(
+    (model) => model.base === selectedModel?.base && referenceModelTypes.includes(model.type)
+  );
+  const rows = referenceImages.map((referenceImage, index) => (
+    <ReferenceImageRow
+      key={referenceImage.id}
+      count={referenceImageCount}
+      hasModelChoice={hasModelChoice}
+      onOpenModelManager={openModelManager}
+      index={index}
+      isSupported={isSupported}
+      promptTag={promptTags.get(referenceImage.id)}
+      referenceImage={referenceImage}
+      selectedModel={selectedModel}
+      onFindInGallery={gallery.findImage}
+      onMove={handleMoveReferenceImage}
+      onPatch={patchReferenceImage}
+      onRemove={removeReferenceImage}
+      onRename={handleRenameReferenceImage}
+      onUseSize={applyReferenceImageSize}
+    />
+  ));
+  const label = (
+    <Box>
+      <FeatureHint hint="referenceImage">
+        <chakra.span>
+          <FieldLabel>{t('widgets.generate.referenceImages')}</FieldLabel>
+        </chakra.span>
+      </FeatureHint>
+    </Box>
+  );
+
+  // References the model cannot use stay listed, inert, so it is clear what Remove all would clear.
   if (!isSupported) {
     return (
-      <Stack gap="2">
+      <Stack gap="1.5">
+        {label}
         <HStack gap="2" justify="space-between">
           <Text color="fg.muted" fontSize="xs" minW="0">
             {unsupportedMessage}
@@ -305,14 +417,19 @@ export const GenerateReferenceImagesContent = ({
             {t('widgets.generate.clearReferenceImages')}
           </Button>
         </HStack>
-        {/* No cards to show them on: every reference's issue lists here. */}
+        {/* The rows are inert here, so every reference's issue lists above them, with its fix. */}
         <GenerateIssueNotes field="referenceImage" section="guidance" />
+        <Box mx={-1}>
+          <ListStack dividers label={t('widgets.generate.referenceImages')}>
+            {rows}
+          </ListStack>
+        </Box>
       </Stack>
     );
   }
 
   return (
-    <Stack ref={setNodeRef} gap="2" position="relative">
+    <Stack ref={setNodeRef} gap="1.5" position="relative">
       <DropTargetOverlay
         isActive={acceptsActiveDrag}
         isOver={isOver}
@@ -322,69 +439,71 @@ export const GenerateReferenceImagesContent = ({
             : t('widgets.generate.referenceSlotsFull', { count: maxReferenceImages })
         }
       />
-      <GalleryPickerPopover
-        accept={IMAGE_ONLY}
-        label={t('widgets.generate.addReferenceImage')}
-        selection={pickerSelection}
-        onPick={handlePick}
-      >
-        {/* Full, it stays a focusable drop target that says why it adds nothing: `aria-disabled` rather than `disabled`,
-            since Chrome sends no mouseup to a disabled control and a drag released over one would never end. */}
-        <DropZone
-          as="button"
-          alignItems="center"
-          aria-disabled={canAdd ? undefined : true}
-          cursor={canAdd ? undefined : 'not-allowed'}
-          display="flex"
-          flexDirection="column"
-          fontSize="xs"
-          gap="1"
-          isDisabled={!canAdd}
-          isOver={isOver}
-          justifyContent="center"
-          minH="14"
-          minW="0"
-          opacity={canAdd ? 1 : 0.6}
-          px="3"
-          w="full"
-          _hover={canAdd ? UPLOAD_ZONE_HOVER_STYLES : undefined}
-          onClickCapture={canAdd ? undefined : preventPickerOpen}
-        >
-          <HStack as="span" color="fg" fontSize="md" fontWeight="600" gap="1.5">
-            <Icon as={ImagePlusIcon} boxSize="4" />
-            {t('widgets.generate.addReferenceImage')}
-            <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />
-          </HStack>
-          <Text as="span" color="fg.muted" textAlign="center" textWrap="pretty">
-            {canAdd
-              ? t('widgets.generate.referenceSlotsHint', { count: referenceImageCount, max: maxReferenceImages })
-              : t('widgets.generate.referenceSlotsFullZone', { count: maxReferenceImages })}
-          </Text>
-        </DropZone>
-      </GalleryPickerPopover>
-
-      {/* Issues about the references as a group (their count); each card shows its own. */}
+      {label}
+      {/* Issues about the references as a group (their count); each row shows its own. */}
       <GenerateIssueNotes field="referenceImages" section="guidance" />
-
-      {referenceImageCount > 0 ? (
-        <Stack gap="2">
-          {referenceImages.map((referenceImage, index) => (
-            <ReferenceImageCard
-              key={referenceImage.id}
-              count={referenceImageCount}
-              index={index}
-              referenceImage={referenceImage}
-              selectedModel={selectedModel}
-              onFindInGallery={gallery.findImage}
-              onMove={handleMoveReferenceImage}
-              onPatch={patchReferenceImage}
-              onRemove={removeReferenceImage}
-              onUseSize={applyReferenceImageSize}
-              promptTag={promptTags.get(referenceImage.id)}
-            />
-          ))}
-        </Stack>
-      ) : null}
+      <Box mx={-1}>
+        <ListStack dividers label={t('widgets.generate.referenceImages')}>
+          {rows}
+          {/* The list's last row, and its whole empty state. */}
+          <Box role="listitem">
+            <GalleryPickerPopover
+              accept={IMAGE_ONLY}
+              label={t('widgets.generate.addReferenceImage')}
+              selection={pickerSelection}
+              onPick={handlePick}
+            >
+              {/* Full, it stays a focusable drop target that says why it adds nothing: `aria-disabled` rather than
+                  `disabled`, since Chrome sends no mouseup to a disabled control and a drag released over one would
+                  never end. */}
+              <Row
+                asChild
+                aria-disabled={canAdd ? undefined : true}
+                cursor={canAdd ? undefined : 'not-allowed'}
+                data-disabled={canAdd ? undefined : ''}
+                data-hover={isOver && canAdd ? '' : undefined}
+                data-list-surface=""
+                data-reference-add=""
+                gap="2.5"
+                minH="12"
+                px="1.5"
+                py="1.5"
+                onClickCapture={canAdd ? undefined : preventPickerOpen}
+              >
+                <chakra.button type="button">
+                  <Box
+                    alignItems="center"
+                    borderColor="border.emphasized"
+                    borderStyle="dashed"
+                    borderWidth="1px"
+                    boxSize="9"
+                    color="fg.muted"
+                    display="flex"
+                    flexShrink={0}
+                    justifyContent="center"
+                    rounded="sm"
+                  >
+                    <Icon as={PlusIcon} boxSize="3.5" />
+                  </Box>
+                  <Stack as="span" flex="1" gap="0.5" minW="0">
+                    <Text as="span" fontSize="md" fontWeight="600" lineHeight="shorter" truncate>
+                      {t('widgets.generate.addReferenceImage')}
+                    </Text>
+                    <Text as="span" color="fg.muted" fontSize="xs" lineHeight="shorter" textWrap="pretty">
+                      {canAdd
+                        ? t('widgets.generate.referenceSlotsHint', {
+                            count: referenceImageCount,
+                            max: maxReferenceImages,
+                          })
+                        : t('widgets.generate.referenceSlotsFullZone', { count: maxReferenceImages })}
+                    </Text>
+                  </Stack>
+                </chakra.button>
+              </Row>
+            </GalleryPickerPopover>
+          </Box>
+        </ListStack>
+      </Box>
     </Stack>
   );
 };

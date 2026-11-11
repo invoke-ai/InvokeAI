@@ -10,7 +10,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CLIP_VISION_MODELS } from './referenceImageConfig';
-import { FluxReduxControls, IPAdapterControls } from './ReferenceImageControls';
+import { FluxReduxControls, IPAdapterWeightField } from './ReferenceImageControls';
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -51,7 +51,7 @@ let host: HTMLDivElement;
 let root: Root;
 const onChange = vi.fn();
 
-/** Mirrors the real card: each commit lands back on the rendered config. */
+/** Mirrors the real row: each commit lands back on the rendered config. */
 const Harness = () => {
   const [config, setConfig] = useState<IPAdapterConfig>(CONFIG);
   const handleChange = useCallback((next: GenerateReferenceImageConfig) => {
@@ -59,7 +59,7 @@ const Harness = () => {
     setConfig(next as IPAdapterConfig);
   }, []);
 
-  return <IPAdapterControls config={config} disabled={false} onChange={handleChange} />;
+  return <IPAdapterWeightField config={config} disabled={false} onChange={handleChange} />;
 };
 
 beforeEach(() => {
@@ -78,7 +78,7 @@ afterEach(async () => {
 const pointer = (target: EventTarget, type: string, init: PointerEventInit) =>
   act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, ...init })));
 
-describe('IPAdapterControls weight', () => {
+describe('IPAdapterWeightField', () => {
   it('commits every step of a drag, including the one back to where the drag started', async () => {
     await act(() =>
       root.render(

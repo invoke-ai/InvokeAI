@@ -20,9 +20,9 @@ The **Size** section sets the width and height of the image.
 * **Swap width and height** turns a landscape image into a portrait one and back.
 * Each model has an optimal image area, typically about one megapixel for newer models and less for SD 1.5. The line under the fields shows the image's size in megapixels, marks the recommended size, and estimates the run time from your recent runs.
 * **Reset size**, the button beside **Swap width and height**, opens a menu. Each item shows the size it sets, and the item matching the current size is checked; choosing it again changes nothing:
-  * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio, named by its saved name when it has one. It is absent at 1:1, where it would be the native square.
-  * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one. A locked ratio stays locked and takes the default size's ratio; an unlocked one stays unlocked.
-  * **Square at native size** — a 1:1 square at the model's native size, such as 1024×1024 for SDXL and FLUX or 512×512 for SD 1.5, with the ratio locked.
+  * **Optimal for** the current ratio — the model's optimal area at the current aspect ratio, named by its saved name when it has one. It is absent at 1:1, where it would be the native square.
+  * **Model default** — the size set in the model's default settings. It appears only when the model sets one. A locked ratio stays locked and takes the default size's ratio; an unlocked one stays unlocked.
+  * **Native square** — a 1:1 square at the model's native size, such as 1024×1024 for SDXL and FLUX or 512×512 for SD 1.5, with the ratio locked.
 
   Right-clicking the width and height and choosing **Reset to model default** also resets the size this way.
 
@@ -104,7 +104,7 @@ Concepts, also called LoRAs, are small add-on models that teach the main model a
 
 <Steps>
 
-1. Click **Add concept** and choose a LoRA. The list only shows LoRAs made for the selected model's family.
+1. Under **Concepts**, click the search field and choose a LoRA. The list only shows LoRAs made for the selected model's family.
 
 2. Adjust its **Weight**, which sets how strongly it acts. The default is the LoRA's own recommended weight, or 0.75. Values between 0.5 and 1 are typical; higher values can overpower the image, and negative values push the image away from the concept.
 
@@ -112,15 +112,22 @@ Concepts, also called LoRAs, are small add-on models that teach the main model a
 
 </Steps>
 
-You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, the concepts it cannot use stay in the list, marked **Incompatible** and switched off; they run again when you switch back to a model they fit. A concept that is no longer installed is marked **Not installed**. CogView4, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
+You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, the concepts it cannot use stay in the list, marked **Incompatible** and switched off; they run again when you switch back to a model they fit. A concept that is no longer installed is marked **Not installed**, with a warning icon beside its switch: hover it to read the problem, or click it for **Remove**. CogView4, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
 
 ## Adding reference images
 
 A reference image guides the new image by example rather than by words: its style, its composition, a person or an object in it. Reference images are added at the top of the **Guidance** section, and only appear for models that support them.
 
-To add one, click **Add reference image** and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the section. You can also right-click any image and choose **Use as reference image**. Most models accept up to five. The order of the references matters to some models; use the arrow buttons on each card to reorder them.
+To add one, click **Add reference image**, the last row of the **Reference images** list, and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the list. You can also right-click any image and choose **Use as reference image**. Most models accept up to five; the add row counts how many are in use.
 
-Hovering over a reference's thumbnail offers **Crop**, to use only part of the image, and **Use size**, to set the generation's size to match the reference. The switch on each card turns a reference off without removing it.
+Each reference is a row like a concept's: a thumbnail of the image as it will be used (a crop mark shows when it is cropped), its name, a summary of its settings, a switch, and a **⋯** menu. The row's main control, such as **Weight**, sits on the row; the chevron beside it opens the rest of its settings. The switch turns a reference off without removing it; an off reference keeps its settings and shows a grey thumbnail.
+
+- **Rename** a reference by double-clicking its name, pressing <kbd>F2</kbd>, or choosing **Rename** in its menu. <kbd>Enter</kbd> or clicking elsewhere keeps the name, <kbd>Esc</kbd> cancels. An empty name, or one that reads like a default, goes back to the default, *Reference image 1*, *Reference image 2* and so on by position. Warnings about a reference use its name. Names are saved with the project and in the metadata of the images they make, and come back when you reuse an image's settings.
+- **Reorder** with **Move up** and **Move down** in the menu, or <kbd>Alt</kbd>+<kbd>↑</kbd> and <kbd>Alt</kbd>+<kbd>↓</kbd> while the row has keyboard focus. The order matters to some models.
+- **Crop…**, to use only part of the image, **Use size**, to set the generation's size to match the reference, and **Find in Gallery** are in the menu, and as buttons at the foot of a row's open settings.
+- **Remove** a reference from its menu, or press <kbd>Delete</kbd> while its row has keyboard focus. A notification offers **Undo**, which puts it back where it was, with its name, crop and settings.
+- The menu opens with a right-click, the **⋯** button, or <kbd>Enter</kbd> on a focused row. <kbd>→</kbd> and <kbd>←</kbd> open and close a row's settings.
+- A reference that stops Invoke from running shows a warning icon beside its switch, for example when it still needs an IP-Adapter model. Hover the icon to read why, or click it: **Choose model** opens the row's settings at its model picker, and **Turn off** switches the reference off.
 
 In the crop dialog, drag the crop box or its handles, or pick an **Aspect ratio** (16:9, 3:2, 4:3, 1:1, 3:4, 2:3 or 9:16) to keep the box in proportion while you resize it. Scroll to zoom in on the image, hold **Space** (or use the middle mouse button) and drag to move the view, and use the **Fit image**, **Actual size**, **Zoom in** and **Zoom out** buttons. **Apply** uses the crop for the reference; **Save to Uploads** also stores the cropped image as an upload in the Gallery without changing the reference.
 
@@ -128,19 +135,19 @@ What a reference does, and what options it has, depends on the model family:
 
 | Model family | How references work | Options |
 |---|---|---|
-| **SD 1.5, SDXL** | An IP-Adapter model carries the reference's look into the image. | **Mode**: **Style**, **Composition** or **Both**. **Weight**. Under **Advanced**: the IP-Adapter model, a **Style variant** and the **Active steps** range. |
-| **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) for Redux. |
-| **Anima** (not Anima-3.8B) | An Anima IP-Adapter carries a character's appearance (hair, outfit, accessories) into the image. Up to four references (experimental); images of one character combine well, different characters blend. | **Strength** (0 to 2; 0 turns it off), per reference. Under **Advanced**: the IP-Adapter model and the **Active steps** range. |
-| **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
+| **SD 1.5, SDXL** | An IP-Adapter model carries the reference's look into the image. | **Weight** on the row. In its settings: **Mode** (**Style**, **Composition** or **Both**), a **Style variant** for Style, the **Steps** range it is active for, and the IP-Adapter model with its CLIP Vision encoder. |
+| **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) on the row for Redux, with the Redux model in its settings. |
+| **Anima** (not Anima-3.8B) | An Anima IP-Adapter carries a character's appearance (hair, outfit, accessories) into the image. Up to four references (experimental); images of one character combine well, different characters blend. | **Strength** (0 to 2; 0 turns it off) on the row. In its settings: the **Steps** range and the IP-Adapter model. |
+| **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | The Kontext model, on the row. |
 | **FLUX.2, Qwen Image Edit, Qwen-Image-2.1** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
-| **FLUX.3** | As FLUX.2, with up to ten references. The prompt names them by the tag on each card, such as `<ref_image_0>`; click the tag to copy it. | None. |
-| **Krea-2** | **Style**: one reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content. **Edit**: up to three references for an edit LoRA, such as a pose skeleton or a depth map, read in card order. See [Krea-2 style reference](/users-guide/models/local-models/krea-2/#style-reference) and [edit LoRAs](/users-guide/models/local-models/krea-2/#edit-loras-and-reference-images). | **Mode**: **Style** or **Edit**. **Style strength** (0–2; 0 turns the reference off) for Style. |
+| **FLUX.3** | As FLUX.2, with up to ten references. The prompt names them by the tag on each row, such as `<ref_image_0>`; click the tag to copy it. The tag follows the row's position, not its name. | None. |
+| **Krea-2** | **Style**: one reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content. **Edit**: up to three references for an edit LoRA, such as a pose skeleton or a depth map, read in list order. See [Krea-2 style reference](/users-guide/models/local-models/krea-2/#style-reference) and [edit LoRAs](/users-guide/models/local-models/krea-2/#edit-loras-and-reference-images). | **Style strength** (0–2; 0 turns the reference off) on the row for Style, with **Mode** (**Style** or **Edit**) in its settings; an Edit reference has **Mode** on the row. |
 
 Reference images require an extra model for SD 1.5, SDXL, FLUX.1 and Anima (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
 
 Qwen-Image-2.1 reads its references through the Qwen3-VL vision tower, so it needs a Diffusers model, a non-GGUF Qwen3-VL 8B encoder, or a GGUF 8B encoder together with its **Vision Tower** (the `mmproj` file) under **Components**. Without one (a single-file model with no encoder selected, or a GGUF encoder with no Vision Tower) the Guidance section says so instead of offering references. See [Qwen-Image-2.1 reference images](/users-guide/models/local-models/qwen-image-2-1/#reference-images).
 
-A new Krea-2 reference starts as **Style** when it is the only active one; added beside other active references, or several at once, it starts as **Edit**. A Style reference at strength 0 is not active. Adding an image beside a lone Style reference still at its default strength turns that card into **Edit** too; one whose strength was changed keeps its mode. Krea-2 runs either one Style reference or up to three Edit references, never both; Invoke stays disabled and says why until the active references fit. The **Mode** can be changed while a card is switched off. Switching a card back to Style resets its strength to 1.
+A new Krea-2 reference starts as **Style** when it is the only active one; added beside other active references, or several at once, it starts as **Edit**. A Style reference at strength 0 is not active. Adding an image beside a lone Style reference still at its default strength turns that reference into **Edit** too; one whose strength was changed keeps its mode. Krea-2 runs either one Style reference or up to three Edit references, never both; Invoke stays disabled and says why until the active references fit. The **Mode** can be changed while a reference is switched off. Switching a reference back to Style resets its strength to 1.
 
 ## Prompt tools
 

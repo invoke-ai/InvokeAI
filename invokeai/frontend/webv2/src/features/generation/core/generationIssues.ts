@@ -62,11 +62,32 @@ export interface GenerationIssue {
   fix?: GenerationIssueFix;
 }
 
-/** The issue text in the active language; issues without a locale entry fall back to their English. */
+/** The localized default name of the reference image at a 1-based position, as its row shows it. */
+const REFERENCE_IMAGE_DEFAULT_NAME_KEY = 'widgets.generate.referenceImageNumbered';
+
+/**
+ * The issue text in the active language; issues without a locale entry fall back to their English. An issue about one
+ * reference image names it as its row does (`reference`): its own name, else the localized positional default.
+ */
 export const describeGenerationIssue = (
   t: (key: string, values?: Record<string, unknown>) => string,
   issue: Pick<GenerationIssue, 'message' | 'messageKey' | 'messageValues'>
-): string => (issue.messageKey ? t(issue.messageKey, { ...issue.messageValues }) : issue.message);
+): string => {
+  if (!issue.messageKey) {
+    return issue.message;
+  }
+
+  const values = issue.messageValues ?? {};
+  const { referenceName } = values;
+  const reference =
+    typeof referenceName === 'string'
+      ? referenceName
+      : typeof values.index === 'number'
+        ? t(REFERENCE_IMAGE_DEFAULT_NAME_KEY, { index: values.index })
+        : undefined;
+
+  return t(issue.messageKey, reference === undefined ? { ...values } : { ...values, reference });
+};
 
 /** What applying `fix` does, in the active language: the label of a one-step fix button. */
 export const describeGenerationIssueFix = (

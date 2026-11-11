@@ -45,6 +45,7 @@ export {
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
+  normalizeReferenceImageName,
   normalizeReferenceImages,
   syncGenerateWidgetValuesWithModels,
 } from './core/settings';

@@ -16,7 +16,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { commands } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import { GenerateReferenceImagesContent } from './GenerateReferenceImagesSection';
 
@@ -56,7 +56,8 @@ const reference = (id: string): GenerateReferenceImage => ({
     clipVisionModel: 'ViT-H',
     image: { original: { image: { height: 512, image_name: `${id}.png`, width: 512 } } },
     method: 'full',
-    model: null,
+    // With its adapter chosen, a row starts with its settings closed.
+    model: { base: 'sdxl', key: 'ip-adapter-sdxl', name: 'IP Adapter SDXL', type: 'ip_adapter' },
     type: 'ip_adapter',
     weight: 1,
   },
@@ -107,6 +108,7 @@ const Dnd = ({ children }: { children: ReactNode }) => {
 };
 
 const render = async ({
+  applyFix = vi.fn(),
   dragged = 0,
   issues = [],
   onCommit = vi.fn(),
@@ -114,6 +116,7 @@ const render = async ({
   referenceImages,
   selectedModel = SDXL,
 }: {
+  applyFix?: (fix: unknown) => void;
   dragged?: number;
   issues?: GenerationIssue[];
   onCommit?: (update: unknown) => void;
@@ -126,7 +129,7 @@ const render = async ({
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <GenerationUiProvider adapter={ADAPTER}>
-            <GenerateIssuesProvider applyFix={vi.fn()} issues={issues}>
+            <GenerateIssuesProvider applyFix={applyFix} issues={issues}>
               <Dnd>
                 {dragged > 0 ? <DraggedSelection count={dragged} /> : null}
                 <div data-testid="section">
@@ -289,8 +292,9 @@ describe('reference image slots', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it("shows a reference's issue on its own card and the limit above the cards", async () => {
+  it("shows a reference's issue as an icon on its own row, which opens it with its fix, and the limit above the list", async () => {
     const referenceImages = references(2);
+    const applyFix = vi.fn();
     const cardIssue: GenerationIssue = {
       fix: { kind: 'turnOffReferenceImages', referenceImageIds: ['ref-1'] },
       id: 'referenceImages:needsIpAdapter:ref-1',
@@ -303,21 +307,43 @@ describe('reference image slots', () => {
       target: { field: 'referenceImages', section: 'guidance' },
     };
 
-    await render({ issues: [cardIssue, limitIssue], referenceImages });
+    await render({ applyFix, issues: [cardIssue, limitIssue], referenceImages });
 
-    const cards = [...host!.querySelectorAll<HTMLElement>('[data-issue-notes]')];
-    // The nearest ancestor of the second card's title holding notes is that card.
-    let secondCard: HTMLElement | null = [...host!.querySelectorAll('p')].find(
-      (title) => title.textContent === 'Reference image 2'
-    )!;
-    while (secondCard && !secondCard.querySelector('[data-issue-notes]')) {
-      secondCard = secondCard.parentElement;
-    }
+    const notes = [...host!.querySelectorAll<HTMLElement>('[data-issue-notes]')];
+    const firstRow = host!.querySelector<HTMLElement>('[data-reference-image-id="ref-0"]')!;
+    const secondRow = host!.querySelector<HTMLElement>('[data-reference-image-id="ref-1"]')!;
+    const icon = secondRow.querySelector<HTMLButtonElement>('button[data-issue-ids]')!;
 
-    expect(cards).toHaveLength(2);
-    expect(secondCard?.textContent).toContain(cardIssue.message);
-    expect(secondCard?.textContent).not.toContain(limitIssue.message);
-    expect(secondCard?.querySelector('[data-issue-fix]')?.textContent).toBe('Turn off');
-    expect(cards[0]?.textContent).toBe(limitIssue.message);
+    // Only the row with an issue shows the icon, beside its switch, named by what is wrong.
+    expect(firstRow.querySelector('[data-issue-ids]')).toBeNull();
+    expect(icon.getAttribute('aria-label')).toBe(`1 issue: ${cardIssue.message}`);
+    expect(icon.closest('[role="group"]')?.querySelector('[data-scope="switch"]')).not.toBeNull();
+    expect(secondRow.textContent).not.toContain(cardIssue.message);
+    // The group's issue sits above the list, outside every row.
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.closest('[role="list"]')).toBeNull();
+    expect(notes[0]?.textContent).toBe(limitIssue.message);
+
+    // The tooltip reads exactly as the icon's name, so assistive tech says it once.
+    await act(() => userEvent.hover(icon));
+    await expect
+      .poll(() => [...document.querySelectorAll('[role="tooltip"]')].map((tooltip) => tooltip.textContent))
+      .toContain(`1 issue: ${cardIssue.message}`);
+
+    await act(() => userEvent.click(icon));
+    const popover = () => document.querySelector<HTMLElement>(`[data-issue-id="${cardIssue.id}"]`);
+    await expect.poll(() => popover()?.textContent).toContain(cardIssue.message);
+    expect(popover()?.querySelector('[data-issue-fix]')?.textContent).toBe('Turn off');
+
+    // Escape closes it and gives focus back to the icon.
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => popover()).toBeNull();
+    expect(document.activeElement).toBe(icon);
+
+    // The keyboard opens it too; Turn off applies the fix.
+    await act(() => userEvent.keyboard('{Enter}'));
+    await expect.poll(() => popover()?.querySelector('[data-issue-fix]')).not.toBeNull();
+    await act(() => popover()!.querySelector<HTMLButtonElement>('[data-issue-fix]')!.click());
+    expect(applyFix).toHaveBeenCalledExactlyOnceWith(cardIssue.fix);
   });
 });
