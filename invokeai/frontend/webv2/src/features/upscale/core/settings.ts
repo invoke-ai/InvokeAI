@@ -6,6 +6,7 @@ import type {
   ModelIdentifierConfig,
   VaePrecision,
 } from '@features/generation/contracts';
+import type { GenerateSubmissionSource, ProjectPromptDraft } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 
 import {
@@ -1204,6 +1205,10 @@ export const getUpscaleOutputDimensions = (
   };
 };
 
+/** Refine reads the prompt Upscale shares with Generate; Model only reads none, so nothing wraps or expands it. */
+export const readsUpscalePrompt = (values: Record<string, unknown>): boolean =>
+  normalizeUpscaleMode(values.mode) === 'refine';
+
 /** Model only runs the upscaler alone, which gives the same image every time, so iterations would only repeat it. */
 export const isUpscaleBatchCountFixed = (values: Record<string, unknown>): boolean =>
   normalizeUpscaleMode(values.mode) === 'model-only';
@@ -1226,7 +1231,7 @@ export const resolveUpscaleSubmissionValues = (
     promptDraft,
     sourceImageName,
   }: {
-    promptDraft: Pick<UpscaleWidgetValues, 'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt'>;
+    promptDraft: Pick<ProjectPromptDraft, 'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt'>;
     sourceImageName: string | undefined;
   }
 ): UpscaleWidgetValues | null => {
@@ -1234,10 +1239,38 @@ export const resolveUpscaleSubmissionValues = (
     return null;
   }
 
-  return values.mode === 'model-only'
-    ? { ...values, batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' }
-    : { ...values, ...promptDraft };
+  if (values.mode === 'model-only') {
+    return { ...values, batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' };
+  }
+
+  const { negativePrompt, negativePromptEnabled, positivePrompt } = promptDraft;
+
+  return { ...values, negativePrompt, negativePromptEnabled, positivePrompt };
 };
+
+/**
+ * What a resolved Upscale run submits its prompts and seeds from: its own iterations and seed, with the shared
+ * prompt's template and dynamic prompts, as Generate submits that prompt. Model only reads no prompt, so nothing
+ * wraps or expands it.
+ */
+export const getUpscaleSubmissionSource = (
+  values: UpscaleWidgetValues,
+  promptDraft: ProjectPromptDraft
+): GenerateSubmissionSource => ({
+  batchCount: values.batchCount,
+  negativePrompt: values.negativePrompt,
+  negativePromptEnabled: values.negativePromptEnabled,
+  positivePrompt: values.positivePrompt,
+  seed: values.seed,
+  seedMode: values.seedMode,
+  ...(values.mode === 'model-only'
+    ? { dynamicPromptsEnabled: false, promptTemplate: null }
+    : {
+        dynamicPromptsEnabled: promptDraft.dynamicPromptsEnabled,
+        dynamicPromptsSeedBehaviour: promptDraft.dynamicPromptsSeedBehaviour,
+        promptTemplate: promptDraft.promptTemplate,
+      }),
+});
 
 export const clearDeletedUpscaleInput = (
   values: UpscaleWidgetValues,

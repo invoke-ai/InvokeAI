@@ -148,19 +148,21 @@ export interface PromptTemplateState {
   active: PromptTemplateSnapshot | null;
   /** Whether the box is showing the merged result rather than the authored text. */
   isViewMode: boolean;
-  /** Absent on surfaces with no template concept (Upscale). */
+  /** Absent on surfaces with no template concept (Video). */
   onApply?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
   /** Absent wherever `onApply` is; view mode has nothing to show without it. */
   onViewModeChange?: (viewMode: boolean) => void;
   /** Writes already-merged text into the authored field and drops the template. */
   onFlatten: (prompt: string) => void;
+  /** Whether a template draft handed over from the gallery opens here (Generate's field, not Upscale's). */
+  takesPendingDraft: boolean;
 }
 
 interface PositivePromptActionsProps {
   batchCount: number;
   /** An image dropped on the prompt box, for the image-to-prompt popover to open on. */
   droppedImage: DroppedPromptImage;
-  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  /** Absent on surfaces whose prompt is not batch-expanded. */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
   /** Absent on surfaces whose model family has no prompt enhancer of its own. */
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
@@ -255,6 +257,7 @@ const PromptTemplateControls = ({
       <PromptTemplatesButton
         activeTemplate={template.active}
         showSyntaxHighlighting={showSyntaxHighlighting}
+        takesPendingDraft={template.takesPendingDraft}
         onApply={template.onApply}
       />
     ) : null}

@@ -10,12 +10,13 @@ import {
   describeGenerationIssue,
   getDynamicPromptsConfig,
   getEffectivePrompts,
+  getPromptDraftFromValues,
   normalizeGenerateSettings,
   sanitizeBatchCount,
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
-import { isUpscaleBatchCountFixed } from '@features/upscale';
+import { isUpscaleBatchCountFixed, readsUpscalePrompt } from '@features/upscale';
 import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -170,15 +171,26 @@ export const useInvocationState = (): InvocationState => {
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
-  // Video reads its own normalized values, so the count follows what its submission expands.
+  // Video reads its own normalized values, so the count follows what its submission expands. Upscale's Refine reads
+  // the draft it shares with Generate, as its submission does.
   const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
+  const upscalePromptDraft =
+    invocation.sourceId === 'upscale' && readsUpscalePrompt(routeInput.upscaleValues)
+      ? getPromptDraftFromValues(routeInput.generateValues)
+      : null;
   const promptExpansion = useDynamicPrompts(
-    videoValues ? videoValues.positivePrompt : readEffectivePositivePrompt(routeInput.generateValues),
+    videoValues
+      ? videoValues.positivePrompt
+      : upscalePromptDraft
+        ? getEffectivePrompts(upscalePromptDraft).positivePrompt
+        : readEffectivePositivePrompt(routeInput.generateValues),
     videoValues
       ? getDynamicPromptsConfig(videoValues)
-      : invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
-        ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
-        : null
+      : upscalePromptDraft
+        ? getDynamicPromptsConfig(upscalePromptDraft)
+        : invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
+          ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
+          : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
   // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
@@ -195,7 +207,13 @@ export const useInvocationState = (): InvocationState => {
         : [
             {
               message: expansionReason,
-              target: { kind: 'prompt', widgetId: invocation.sourceId === 'video' ? 'video' : 'generate' },
+              target: {
+                kind: 'prompt',
+                widgetId:
+                  invocation.sourceId === 'video' || invocation.sourceId === 'upscale'
+                    ? invocation.sourceId
+                    : 'generate',
+              },
             } as const,
           ]),
       ...resolvedRoute.validationReasons.map((reason) => ({

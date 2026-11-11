@@ -94,7 +94,7 @@ import { useTranslation } from 'react-i18next';
 import { areInputImagesEquivalent, valuesAreEqual } from './upscaleComparators';
 import { UpscalePromptFields } from './UpscaleFormFields';
 import { UpscaleImageField } from './UpscaleImageField';
-import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
+import { UPSCALE_SECTION_IDS, useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
 
 /** Keep props stable across project patches so memoized form sections do not rerender for unrelated field edits. */
 
@@ -700,7 +700,11 @@ export const UpscaleWidgetView = () => {
         values={values}
       />
 
-      <GenerationSettingsSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
+      <GenerationSettingsSection
+        defaultOpen
+        label={t('widgets.upscale.sourceAndTreatment')}
+        sectionId={UPSCALE_SECTION_IDS.source}
+      >
         <Stack gap="3" p="2">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
           <UpscaleOutputPreflight
@@ -813,8 +817,14 @@ export const UpscaleWidgetView = () => {
       </GenerationSettingsSection>
 
       {isRefine ? (
-        <GenerationSettingsSection badges={sharedBadge} label={t('widgets.upscale.detailGuidance')}>
+        <GenerationSettingsSection
+          badges={sharedBadge}
+          label={t('widgets.upscale.detailGuidance')}
+          sectionId={UPSCALE_SECTION_IDS.detailGuidance}
+        >
           <UpscalePromptFields
+            batchCount={values.batchCount}
+            isSeedFixed={values.seedMode === 'fixed'}
             loras={values.loras}
             model={values.model}
             negativePromptHeightPx={values.negativePromptHeightPx}
@@ -829,7 +839,7 @@ export const UpscaleWidgetView = () => {
       ) : null}
 
       {isRefine ? (
-        <GenerationSettingsSection label={t('widgets.upscale.generation')}>
+        <GenerationSettingsSection label={t('widgets.upscale.generation')} sectionId={UPSCALE_SECTION_IDS.generation}>
           <Stack gap="3" p="2">
             <Field
               error={
@@ -927,7 +937,7 @@ export const UpscaleWidgetView = () => {
       ) : null}
 
       {isRefine ? (
-        <GenerationSettingsSection label={t('widgets.upscale.advanced')}>
+        <GenerationSettingsSection label={t('widgets.upscale.advanced')} sectionId={UPSCALE_SECTION_IDS.advanced}>
           <Stack gap="3" p="2">
             {tileControlNet?.required && (
               <Field

@@ -175,6 +175,7 @@ import {
   createDefaultUpscaleWidgetValues,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleSubmissionSource,
   getUpscaleValidationReasons,
   isUpscaleSourceMetadataCurrent,
   normalizeUpscaleWidgetValues,
@@ -4081,13 +4082,18 @@ const enqueueCompiledSnapshot = (
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
-  // Upscale has no dynamic prompts switch: its prompt always runs as typed.
+  // Upscale runs the prompt it shares with Generate, template and dynamic prompts included, from the same snapshot its
+  // prompt text was resolved from.
+  const upscalePromptDraft = upscaleSettings ? getPromptDraftFromValues(widgetStates.generate?.values ?? {}) : null;
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : (videoSettings ?? (upscaleSettings ? { ...upscaleSettings, dynamicPromptsEnabled: false } : null));
+        : (videoSettings ??
+          (upscaleSettings && upscalePromptDraft
+            ? getUpscaleSubmissionSource(upscaleSettings, upscalePromptDraft)
+            : null));
   // Resolve template-merged prompts and seeds here, where Generate, Canvas, Upscale and Video submissions converge; the
   // planner decides whether the expansion counts.
   const submissionPlan = sourceGenerateSettings
@@ -4228,7 +4234,7 @@ const enqueueCompiledSnapshot = (
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
   // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
-  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings;
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings ?? upscalePromptDraft;
   // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
   const resampledProject =
     expansionSampleSeed !== null &&
@@ -4237,7 +4243,8 @@ const enqueueCompiledSnapshot = (
     dynamicPromptsSettings.dynamicPromptsResample
       ? updateProjectWidgetValues(
           advancedProject,
-          route.sourceId === 'canvas' ? 'generate' : route.sourceId,
+          // Canvas and Upscale draw from Generate's dynamic prompts settings.
+          route.sourceId === 'canvas' || route.sourceId === 'upscale' ? 'generate' : route.sourceId,
           (values) =>
             // Sanitized as the expansion read it: a record saved without the field drew sample seed 0.
             sanitizeSampleSeed(values.dynamicPromptsSampleSeed) === expansionSampleSeed &&

@@ -158,8 +158,13 @@ export {
   sanitizeSampleSeed,
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
+  type GenerateSubmissionSource,
 } from './core/dynamicPrompts';
-export { getEffectivePrompts } from './core/promptTemplates';
+export {
+  flattenPromptTemplateExpansion,
+  getEffectivePrompts,
+  type PromptTemplateSnapshot,
+} from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,

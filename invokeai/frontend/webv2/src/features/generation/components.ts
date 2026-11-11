@@ -6,6 +6,7 @@ export {
 } from './ui/shared/AspectRatioPicker';
 export { NegativePromptField } from './ui/promptFields/NegativePromptField';
 export { PositivePromptField } from './ui/promptFields/PositivePromptField';
+export type { PromptTemplateChange } from './ui/promptFields/PromptTemplatesButton';
 export { PromptTextarea } from './ui/promptFields/PromptTextarea';
 export { SeedField, type SeedFieldProps } from './ui/shared/SeedField';
 export { FluxReduxControls } from './ui/reference-images/ReferenceImageControls';

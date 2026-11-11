@@ -4,6 +4,17 @@ import type { ReactNode } from 'react';
 
 import { createContext, use, useMemo } from 'react';
 
+/**
+ * The persisted open state of each Upscale section, kept with Generate's under the same per-user preference. Detail
+ * guidance holds the prompt, which an invoke issue opens to show.
+ */
+export const UPSCALE_SECTION_IDS = {
+  advanced: 'upscaleAdvanced',
+  detailGuidance: 'upscaleDetailGuidance',
+  generation: 'upscaleGeneration',
+  source: 'upscaleSource',
+} as const;
+
 /** This UI port preserves dependency direction: Upscale cannot import Workbench. */
 export interface UpscaleUiAdapter {
   /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
