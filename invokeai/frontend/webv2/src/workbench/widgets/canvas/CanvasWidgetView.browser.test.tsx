@@ -734,10 +734,15 @@ describe('CanvasWidgetView control layer overlay', () => {
     expect(viewSwitch().elements()).toHaveLength(0);
   });
 
-  it('keeps the view switch while a result is staged', async () => {
+  it('hides the view switch while a staged result hides the layer, and offers it again once staging ends', async () => {
     await renderView('completed', { selectedLayer: readyLayer });
 
     await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
+    await expect.poll(() => harness.engine!.interaction.get('stagingHidesOverlays')).toBe(true);
+    expect(viewSwitch().elements()).toHaveLength(0);
+
+    // The view clears the preview as accept or discard ends staging; the harness view does not rerender on its own.
+    await act(() => harness.engine!.previews.setStagedPreview(null));
     await expect.element(viewSwitch()).toBeVisible();
   });
 

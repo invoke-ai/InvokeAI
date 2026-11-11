@@ -27,6 +27,7 @@ import {
   useCanvasActiveTool,
   useCanvasDocumentEditingLocked,
   useCanvasEngineRead,
+  useCanvasStagingHidesOverlays,
   useControlDetectionStatus,
   useControlLayerView,
 } from './engineStoreHooks';
@@ -96,6 +97,7 @@ const SelectedControlLayerOverlay = ({
   const { notifications } = useWorkbenchCommands();
   const isDocumentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const isDisplayed = useActiveProjectSelector(selectSelectedLayerDisplayed);
+  const isStagingHidingLayer = useCanvasStagingHidesOverlays(engine);
   const controlView = useControlLayerView(engine);
   // The requested view shows at once; the engine's view takes over when the request settles.
   const [pendingView, setPendingView] = useState<{ layerId: string; mode: ControlLayerViewMode } | null>(null);
@@ -141,12 +143,14 @@ const SelectedControlLayerOverlay = ({
   const isHintVisible =
     imageState === 'empty' && (isUploading || (!isImageDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
   // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
-  // a view while an operation holds the document, and a layer that does not draw has nothing to compare.
+  // a view while an operation holds the document, and a layer that does not draw has nothing to compare: hidden,
+  // disabled, or off the screen while a staged result shows only raster layers.
   const isViewSwitchVisible =
     layer.original !== undefined &&
     !!layer.detection &&
     isControlMapCurrent(layer) &&
     isDisplayed &&
+    !isStagingHidingLayer &&
     status.status === 'idle' &&
     !isDocumentEditingLocked &&
     !isImageDrag;

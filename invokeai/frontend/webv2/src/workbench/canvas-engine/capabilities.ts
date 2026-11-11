@@ -227,6 +227,11 @@ export interface CanvasInteractionState {
   showBbox: boolean;
   showGrid: boolean;
   snapToGrid: boolean;
+  /**
+   * Whether a staged or progress preview, shown or toggled off with the staging bar's eye, hides control layers, masks
+   * and regions from the screen. An edit of one shows them meanwhile; that does not change this.
+   */
+  stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
   transformSession: TransformSession | null;
@@ -890,8 +895,8 @@ export interface StagedPreviewPlacement extends Rect {
  * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
  * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
  * `hidden`: the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but
- * the screen keeps hiding masks, regions and the regenerate tint as the shown candidate does, so both sides of the
- * comparison read alike.
+ * the screen keeps hiding control layers, masks, regions and the regenerate tint as the shown candidate does, so both
+ * sides of the comparison read alike.
  */
 export type StagedPreviewInput =
   | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }

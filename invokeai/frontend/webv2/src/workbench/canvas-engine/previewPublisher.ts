@@ -29,6 +29,8 @@ export interface CreatePreviewPublisherDeps {
   readonly resolveImage: ImageResolver;
   readonly decodeBlob: (blob: Blob) => Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }>;
   readonly invalidateAll: () => void;
+  /** Publishes {@link PreviewStateController.hidesStagingOverlays} after each staged change, for canvas chrome. */
+  readonly publishHidesStagingOverlays: (hidden: boolean) => void;
   readonly invalidateLayer: (layerId: string) => void;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
@@ -84,9 +86,15 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
   const stagedPreviewBlobs = createStagedPreviewBlobCache(deps.resolveImage);
   const stagedImageDecodes = new Map<string, ReturnType<CreatePreviewPublisherDeps['decodeBlob']>>();
 
+  /** The staged preview showed, hid or changed: repaint, and publish whether the overlay stacks are hidden. */
+  const stagedChanged = (): void => {
+    deps.invalidateAll();
+    deps.publishHidesStagingOverlays(previews.hidesStagingOverlays());
+  };
+
   const clearStagedPreview = (): void => {
     if (previews.clearStaged()) {
-      deps.invalidateAll();
+      stagedChanged();
     }
   };
 
@@ -235,7 +243,7 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
       }
       if ('imageName' in input && input.hidden) {
         if (previews.hideStaged()) {
-          deps.invalidateAll();
+          stagedChanged();
         }
         return;
       }
@@ -244,7 +252,7 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
         .then((decoded) => {
           // A newer set/clear superseded this decode while it was in flight.
           if (previews.publishStaged(token, decoded)) {
-            deps.invalidateAll();
+            stagedChanged();
           }
         })
         .catch(() => {

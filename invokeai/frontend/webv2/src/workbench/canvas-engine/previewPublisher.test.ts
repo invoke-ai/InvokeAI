@@ -36,6 +36,7 @@ const build = (overrides: Partial<CreatePreviewPublisherDeps> = {}): PreviewPubl
     invalidateLayer,
     isGuardCurrent,
     previews,
+    publishHidesStagingOverlays: () => undefined,
     resolveImage,
     ...overrides,
   });
@@ -214,7 +215,8 @@ describe('staged previews', () => {
   });
 
   it('drops a hidden candidate without decoding it, keeping the overlays hidden until staging ends', async () => {
-    const publisher = build();
+    const published = vi.fn<(hidden: boolean) => void>();
+    const publisher = build({ publishHidesStagingOverlays: published });
     publisher.setStagedPreview(staged('shown.png'));
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
     invalidateAll.mockClear();
@@ -231,6 +233,8 @@ describe('staged previews', () => {
     publisher.setStagedPreview(null);
     expect(previews.hidesStagingOverlays()).toBe(false);
     expect(invalidateAll).toHaveBeenCalledTimes(2);
+    // Canvas chrome learns each change: shown, hidden to compare, then staging ended.
+    expect(published.mock.calls).toEqual([[true], [true], [false]]);
   });
 
   it('never shows a result the eye hid while it was still decoding, nor masks while showing it decodes', async () => {

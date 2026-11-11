@@ -16096,6 +16096,146 @@ describe('masks while a result is staged', () => {
     h.dispose();
   });
 
+  it('hides control layers under a shown preview too, showing them while a stroke paints one', async () => {
+    const h = setup(stacksFrom([controlLayerForThumbnail('c'), maskLayer('m'), rasterLayer('a')]));
+    const { frame, overlay } = h;
+    const SHOWN = { drawn: ['a', 'c', 'm'], regionOverlays: true };
+    expect(frame()).toEqual({ ...SHOWN, full: 1 });
+
+    // Only raster layers draw under the result; selecting the control layer alone keeps it hidden.
+    await h.showPreview();
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    h.select('c');
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+
+    // A brush stroke on it shows the overlay stacks for the stroke, and hides them again as it lands.
+    h.useTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...SHOWN, full: 1 });
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // Accepting or discarding ends the preview, and the control layer draws again.
+    h.engine.previews.setStagedPreview(null);
+    expect(frame()).toEqual({ ...SHOWN, full: 1 });
+    h.dispose();
+  });
+
+  it('shows them while a transform session is open on a control layer, until it is applied or cancelled', async () => {
+    const h = setup(stacksFrom([controlLayerForThumbnail('c'), maskLayer('m'), rasterLayer('a')]));
+    const { frame } = h;
+    const SHOWN = { drawn: ['a', 'c', 'm'], regionOverlays: true };
+    await h.showPreview();
+    h.select('c');
+    await flushMicrotasks();
+    frame();
+
+    for (const end of ['cancelTransform', 'applyTransform'] as const) {
+      expect(h.engine.layers.beginTransform('c')).toBe('started');
+      expect(frame()).toEqual({ ...SHOWN, full: 1 });
+      // A step of the session keeps them shown.
+      h.engine.layers.updateTransformSession({ ...h.engine.stores.transformSession.get()!.transform, x: 5 });
+      expect(frame()).toMatchObject(SHOWN);
+      h.engine.layers[end]();
+      await flushMicrotasks();
+      expect(h.engine.stores.transformSession.get()).toBeNull();
+      expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    }
+    h.dispose();
+  });
+
+  it('shows them while a float lifted from a control layer exists, until it is dropped or cancelled', async () => {
+    const h = setup(stacksFrom([controlLayerForThumbnail('c'), maskLayer('m'), rasterLayer('a')]));
+    const { frame, overlay } = h;
+    const SHOWN = { drawn: ['a', 'c', 'm'], regionOverlays: true };
+    await h.showPreview();
+    h.select('c');
+    await flushMicrotasks();
+    frame();
+    h.useTool('move');
+
+    // Apply banks a float and Cancel abandons it, as for a transform session.
+    for (const end of ['cancelTransform', 'applyTransform'] as const) {
+      h.engine.selection.selectAll();
+      frame();
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      overlay.fire('pointermove', pointerAt(15, 15));
+      expect(h.engine.stores.hasFloatingSelection.get()).toBe(true);
+      expect(frame()).toEqual({ ...SHOWN, full: 1 });
+      overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+      // The float outlives the drag that lifted it, and so does the reveal.
+      expect(frame()).toMatchObject(SHOWN);
+      h.engine.layers[end]();
+      expect(h.engine.stores.hasFloatingSelection.get()).toBe(false);
+      expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    }
+    h.dispose();
+  });
+
+  it('follows the held layer to its new stack when a conversion or its undo lands during a transform session', async () => {
+    const control = controlLayerForThumbnail('c');
+    const h = setup(stacksFrom([control, maskLayer('m'), rasterLayer('a')]));
+    const { frame } = h;
+    await h.showPreview();
+    h.select('c');
+    await flushMicrotasks();
+    frame();
+    expect(h.engine.layers.beginTransform('c')).toBe('started');
+    expect(frame()).toEqual({ drawn: ['a', 'c', 'm'], full: 1, regionOverlays: true });
+
+    // The layer keeps its id and its session but becomes a raster layer, which the preview does not hide.
+    const withLayer = (layer: CanvasLayerContract) =>
+      h.update({
+        document: {
+          ...h.engine.document.getDocument()!,
+          stacks: stacksFrom([layer, maskLayer('m'), rasterLayer('a')]),
+        },
+      });
+    withLayer({ ...rasterLayer('c'), transform: control.transform });
+    expect(h.engine.stores.transformSession.get()?.layerId).toBe('c');
+    expect(frame()).toEqual({ drawn: ['a', 'c'], full: 1, regionOverlays: false });
+
+    // Undoing the conversion makes it a control layer again, and the stacks show for the rest of the session.
+    withLayer(control);
+    expect(frame()).toEqual({ drawn: ['a', 'c', 'm'], full: 1, regionOverlays: true });
+    h.engine.layers.cancelTransform();
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    h.dispose();
+  });
+
+  it('keeps them hidden for a transform session or float on a raster layer', async () => {
+    // A paint layer, so pixels can be lifted from it.
+    const paint: CanvasRasterLayerContractV2 = {
+      ...(rasterLayer('a') as CanvasRasterLayerContractV2),
+      source: { bitmap: { height: 20, imageName: 'a.png', width: 20 }, offset: { x: 0, y: 0 }, type: 'paint' },
+    };
+    const h = setup(stacksFrom([controlLayerForThumbnail('c'), maskLayer('m'), paint]));
+    const { frame, overlay } = h;
+    await h.showPreview();
+    h.select('a');
+    await flushMicrotasks();
+    frame();
+
+    expect(h.engine.layers.beginTransform('a')).toBe('started');
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+    h.engine.layers.cancelTransform();
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+
+    h.useTool('move');
+    h.engine.selection.selectAll();
+    frame();
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    overlay.fire('pointermove', pointerAt(15, 15));
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(h.engine.stores.hasFloatingSelection.get()).toBe(true);
+    expect(frame()).toMatchObject({ regionOverlays: false });
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+    h.engine.layers.applyTransform();
+    expect(h.engine.stores.hasFloatingSelection.get()).toBe(false);
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+    h.dispose();
+  });
+
   it('keeps them hidden while the eye hides the result to compare, until staging ends, changing no state', async () => {
     const h = setup();
     const { frame, overlay } = h;

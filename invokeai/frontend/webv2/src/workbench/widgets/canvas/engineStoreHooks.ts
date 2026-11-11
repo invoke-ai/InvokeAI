@@ -114,6 +114,10 @@ export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boole
 export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
   useCanvasInteractionState(engine, 'controlLayerView');
 
+/** Whether a staged or progress preview, shown or toggled off, hides control layers, masks and regions. */
+export const useCanvasStagingHidesOverlays = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'stagingHidesOverlays');
+
 /** The generation frame while a Frame tool drag reshapes it; null when the committed frame is current. */
 export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
   useCanvasInteractionState(engine, 'bboxPreview');

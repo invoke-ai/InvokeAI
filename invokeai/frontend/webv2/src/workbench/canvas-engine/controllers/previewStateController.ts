@@ -69,8 +69,8 @@ export class PreviewStateController {
     return this.staged;
   }
   /**
-   * Whether the screen hides masks, regions and the regenerate tint for a staged result: while its preview shows, and
-   * while the user toggled it off to compare, so both sides of the comparison read alike.
+   * Whether the screen hides control layers, masks, regions and the regenerate tint for a staged result: while its
+   * preview shows, and while the user toggled it off to compare, so both sides of the comparison read alike.
    */
   hidesStagingOverlays(): boolean {
     return this.staged !== null || this.stagedHidden;
