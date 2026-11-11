@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  '@zag-js/menu@1.43.3':
+    hash: 53908275123b086ad52831e6cdb0d7ca9287a8d5c6ce4ef0db32325fdcb702a5
+    path: patches/@zag-js__menu@1.43.3.patch
   '@zag-js/react@1.43.3':
     hash: a0448ebf0273ebd3cc9b57d2f1421568477fd5e4c673fa13180dfe6e8de2d3b5
     path: patches/@zag-js__react@1.43.3.patch
@@ -71,8 +74,8 @@ importers:
         specifier: ^8.0.4
         version: 8.0.4
       lucide-react:
-        specifier: ^1.61.0
-        version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
+        specifier: ^1.69.0
+        version: 1.69.0(@types/react@19.3.0)(react@19.3.1)
       perfect-freehand:
         specifier: ^1.2.3
         version: 1.2.3
@@ -1894,8 +1897,8 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.61.0:
-    resolution: {integrity: sha512-v2SQPPPNjnr+BlhL9Spuzmo5yR+hLkftfuE4E3jaxdNPgSH0hJKPcLJBP7yAta87jQNPsSERS59PJjCJ/CorBA==}
+  lucide-react@1.69.0:
+    resolution: {integrity: sha512-UTFECm4yEgkgMN0kfLuxWcmlk+4u02Jrqehgk3ZXRx/Ud68OpP7hjkp67bvkBHmIpMaZCIveF1QDYeupO7XmYQ==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -2424,7 +2427,7 @@ snapshots:
       '@zag-js/json-tree-utils': 1.43.3
       '@zag-js/listbox': 1.43.3
       '@zag-js/marquee': 1.43.3
-      '@zag-js/menu': 1.43.3
+      '@zag-js/menu': 1.43.3(patch_hash=53908275123b086ad52831e6cdb0d7ca9287a8d5c6ce4ef0db32325fdcb702a5)
       '@zag-js/navigation-menu': 1.43.3
       '@zag-js/number-input': 1.43.3
       '@zag-js/pagination': 1.43.3
@@ -3655,7 +3658,7 @@ snapshots:
       '@zag-js/types': 1.43.3
       '@zag-js/utils': 1.43.3
 
-  '@zag-js/menu@1.43.3':
+  '@zag-js/menu@1.43.3(patch_hash=53908275123b086ad52831e6cdb0d7ca9287a8d5c6ce4ef0db32325fdcb702a5)':
     dependencies:
       '@zag-js/anatomy': 1.43.3
       '@zag-js/core': 1.43.3
@@ -4307,7 +4310,7 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1):
+  lucide-react@1.69.0(@types/react@19.3.0)(react@19.3.1):
     dependencies:
       react: 19.3.1
     optionalDependencies:
