@@ -11,7 +11,9 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageCollectionOutput
+from invokeai.app.services.external_generation.errors import ExternalProviderCapabilityError
 from invokeai.app.services.external_generation.external_generation_common import (
+    MINIMAX_MAX_INPUT_IMAGES,
     ExternalGenerationRequest,
     ExternalGenerationResult,
     ExternalReferenceImage,
@@ -377,3 +379,39 @@ class AtlasCloudImageGenerationInvocation(BaseExternalImageGenerationInvocation)
     )
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
     reference_images: list[ImageField] = InputField(default=[], description="Reference images", ui_hidden=True)
+
+
+@invocation(
+    "minimax_image_generation",
+    title="MiniMax Image Generation",
+    tags=["external", "generation", "minimax"],
+    category="image",
+    version="1.0.0",
+)
+class MiniMaxImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate and edit images with MiniMax H3-Image."""
+
+    provider_id = "minimax"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["minimax"],
+    )
+
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    seed: int | None = InputField(default=None, description=FieldDescriptions.seed, ui_hidden=True)
+    image_size: str | None = InputField(default=None, description="Uses width and height instead.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image (use reference_images instead)", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+
+    def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
+        if len(self.reference_images) + int(self.init_image is not None) > MINIMAX_MAX_INPUT_IMAGES:
+            raise ExternalProviderCapabilityError(
+                f"MiniMax image edits accept at most {MINIMAX_MAX_INPUT_IMAGES} inputs, including the init image"
+            )
+        return super().invoke(context)

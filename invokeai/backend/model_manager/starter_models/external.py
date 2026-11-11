@@ -596,6 +596,36 @@ atlascloud_nano_banana_2 = StarterModel(
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
+minimax_h3_image = StarterModel(
+    name="MiniMax H3-Image",
+    base=BaseModelType.External,
+    source="external://minimax/MiniMax-H3-Image",
+    description="MiniMax H3-Image text-to-image generation and reference-guided editing. "
+    "Requires a configured MiniMax API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_negative_prompt=False,
+        supports_reference_images=True,
+        max_reference_images=16,
+        max_images_per_request=10,
+        max_image_size=ExternalImageSize(width=4096, height=4096),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+
+minimax_h3_image_highspeed = minimax_h3_image.model_copy(
+    deep=True,
+    update={
+        "name": "MiniMax H3-Image Highspeed",
+        "source": "external://minimax/MiniMax-H3-Image-Highspeed",
+        "description": "Highspeed variant of MiniMax H3-Image for text-to-image generation and reference-guided "
+        "editing. Requires a configured MiniMax API key and may incur provider usage costs.",
+    },
+)
+
 openai_gpt_image_2 = StarterModel(
     name="GPT Image 2",
     base=BaseModelType.External,
