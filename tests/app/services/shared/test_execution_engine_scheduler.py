@@ -73,6 +73,27 @@ def test_generic_scheduler_honors_opaque_readiness_predicate() -> None:
     assert scheduler.pop_next() == "blocked"
 
 
+def test_ready_ids_lists_each_queued_node_once_in_pop_order() -> None:
+    plan = ExecutionPlan()
+    plan.add_node("a1", "x")
+    plan.add_node("a2", "x", dependencies=("a1",))
+    plan.add_node("b1", "y")
+    plan.add_node("q1", "w")
+    scheduler = ExecutionScheduler(plan, ready_order=("x", "y"))
+
+    assert scheduler.pop_next() == "a1"
+    assert scheduler.complete("a1") == ("a2",)
+
+    listed = scheduler.ready_ids
+    assert scheduler.ready_ids == listed  # reading must not consume the queue
+
+    popped: list[str] = []
+    while (node_id := scheduler.pop_next()) is not None:
+        popped.append(node_id)
+
+    assert listed == tuple(popped) == ("a2", "b1", "q1")
+
+
 def test_generic_scheduler_discards_node_with_unmet_prerequisites() -> None:
     plan = ExecutionPlan()
     plan.add_node("prerequisite", "Prerequisite")

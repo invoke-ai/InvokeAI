@@ -72,15 +72,17 @@ def test_dependency_creation_does_not_leak_capacity_on_invalid_child() -> None:
     assert capability.remaining_capacity == 2
 
 
-def test_continue_policy_reports_terminal_failure_after_all_children_finish() -> None:
-    dependency = _capability(failure_policy="continue").create_dependency(["first", "second"])
+def test_failed_child_makes_the_dependency_terminal_before_siblings_finish() -> None:
+    dependency = _capability().create_dependency(["first", "second"])
 
-    dependency.fail_child("first", "first failed")
-    update = dependency.complete_child("second", {"value": 2})
+    update = dependency.fail_child("first", "first failed")
+    later = dependency.complete_child("second", {"value": 2})
 
     assert update.status == "failed"
     assert update.terminal
     assert dependency.error_message == "first failed"
+    assert later.changed is False
+    assert later.status == "failed"
 
 
 def test_dependency_rejects_duplicate_prebuilt_children() -> None:
@@ -134,15 +136,12 @@ def test_dependency_is_idempotent_and_rejects_conflicting_or_foreign_completion(
         dependency.complete_child("other", {"value": 2})
 
 
-def test_failure_cancels_siblings_and_notifies_parent_once() -> None:
-    capability = _capability(failure_policy="cancel_siblings")
-    dependency = capability.create_dependency(["first", "second", "third"], dependency_id="dependency")
+def test_failure_is_terminal_once_and_repeated_reports_change_nothing() -> None:
+    dependency = _capability().create_dependency(["first", "second", "third"], dependency_id="dependency")
 
     update = dependency.fail_child("second", "child failed")
 
     assert update.status == "failed"
-    assert update.parent_action == "failed"
-    assert update.cancel_child_ids == ["first", "third"]
     assert update.terminal is True
 
     duplicate = dependency.fail_child("second", "child failed")

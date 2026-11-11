@@ -310,7 +310,11 @@ class ExecutionScheduler:
         ordered_classes: list[str] = []
         if self._active_class in classes:
             ordered_classes.append(self._active_class)
-        ordered_classes.extend(class_name for class_name in self.ready_order if class_name in classes)
+        # The active class is usually also the first ready_order entry; listing it twice
+        # would emit its queued nodes twice.
+        ordered_classes.extend(
+            class_name for class_name in self.ready_order if class_name in classes and class_name not in ordered_classes
+        )
         ordered_classes.extend(sorted(classes.difference(ordered_classes)))
         return tuple(
             node_id
