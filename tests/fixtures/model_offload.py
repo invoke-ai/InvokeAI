@@ -1,5 +1,6 @@
 """Native offload/construction races shared by the three application entrypoints."""
 
+import gc
 import threading
 from time import monotonic
 
@@ -30,6 +31,7 @@ def offload_race(monkeypatch):
     def run(offload, construction_first: bool):
         assert_load_lock_idle()
         with monkeypatch.context() as patch:
+            patch.setattr(gc, "collect", lambda: 0)
             patch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, **kwargs: None))
             cache = ModelCache(
                 execution_device_working_mem_gb=0,

@@ -712,6 +712,8 @@ class ModelsInterface(InvocationContextInterface):
         so the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so
         a subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             identifier: The key or ModelField representing the model to offload.
 
@@ -732,6 +734,8 @@ class ModelsInterface(InvocationContextInterface):
         and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
         is kept free on top of the request.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             vram_bytes_needed: The VRAM footprint the caller is about to allocate.
 
@@ -740,7 +744,8 @@ class ModelsInterface(InvocationContextInterface):
             (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
             `vram_bytes_needed` before allocating.
         """
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:

@@ -59,6 +59,7 @@ from tests.fixtures.database import (  # noqa: F401
     empty_database,
     external_test_db_url,
 )
+from tests.fixtures.model_offload import offload_race  # noqa: F401
 from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
