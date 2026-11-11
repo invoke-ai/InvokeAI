@@ -11,7 +11,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import ModelIdentifierField, Qwen3VLEncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import accepted_vae_bases, accepts_vae
-from invokeai.backend.model_manager.qwen3_vl_labels import variant_label
+from invokeai.backend.model_manager.qwen3_vl_labels import raise_for_unfit_vision_tower, variant_label
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -129,30 +129,18 @@ class QwenImage21ModelLoaderInvocation(BaseInvocation):
         )
 
     def _vision_tower(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
-        """The mmproj tower for a GGUF encoder, checked against it; None when none was selected.
-
-        Refused beside any other encoder rather than ignored: those bring a tower of their own, and a stale
-        selection would silently decide nothing while looking as if it did.
-        """
+        """The mmproj tower for a GGUF encoder, checked against it; None when none was selected."""
         if self.qwen3_vl_vision_tower_model is None:
             return None
-        tower_config = context.models.get_config(self.qwen3_vl_vision_tower_model)
-        tower_variant = getattr(tower_config, "variant", None)
-        if tower_config.type is not ModelType.Qwen3VLVisionTower:
-            raise ValueError(f"'{tower_config.name}' is not a Qwen3-VL vision tower (the llama.cpp mmproj file).")
-        if tower_variant is not Qwen3VLVariantType.Qwen3VL_8B:
-            raise ValueError(
-                f"'{tower_config.name}' is the Qwen3-VL {variant_label(tower_variant)} vision tower. "
-                "Qwen-Image-2.1 reads references with the 8B one (hidden size 4096)."
-            )
         encoder_config = (
             context.models.get_config(self.qwen3_vl_encoder_model) if self.qwen3_vl_encoder_model is not None else None
         )
-        if encoder_config is None or encoder_config.format is not ModelFormat.GGUFQuantized:
-            raise ValueError(
-                f"The vision tower '{tower_config.name}' pairs only with a GGUF Qwen3-VL encoder, which has none. "
-                "Any other encoder brings its own: clear the vision tower."
-            )
+        raise_for_unfit_vision_tower(
+            context.models.get_config(self.qwen3_vl_vision_tower_model),
+            encoder_config,
+            Qwen3VLVariantType.Qwen3VL_8B,
+            "Qwen-Image-2.1",
+        )
         return self.qwen3_vl_vision_tower_model
 
     @staticmethod

@@ -27,7 +27,7 @@ import { getIsPidSupportedBase } from './pid';
 export interface ModelShape {
   label: string;
   overrides: Partial<MainModelConfig>;
-  /** Qwen-Image-2.1: read the references with a GGUF encoder and its Vision Tower instead of a safetensors encoder. */
+  /** Qwen-Image-2.1 and Krea-2: read the references with a GGUF encoder and its Vision Tower instead of a safetensors encoder. */
   ggufEncoder?: true;
 }
 
@@ -55,8 +55,12 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
     { label: 'klein-9b-standalone', overrides: { format: 'gguf_quantized', variant: 'klein_9b' } },
   ],
-  // The Vision Tower slot opens only beside a GGUF encoder, so that path needs its own shape.
+  // The Vision Tower slot opens only beside a GGUF encoder, so that path needs its own shape (Krea-2 below).
   'qwen-image-2-1': [
+    ...DEFAULT_SHAPES,
+    { ggufEncoder: true, label: 'standalone-gguf-encoder', overrides: { format: 'gguf_quantized' } },
+  ],
+  'krea-2': [
     ...DEFAULT_SHAPES,
     { ggufEncoder: true, label: 'standalone-gguf-encoder', overrides: { format: 'gguf_quantized' } },
   ],
