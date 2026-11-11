@@ -514,6 +514,51 @@ describe('compileCanvasGraph', () => {
       provider_model_id: 'gpt-image-1',
     };
 
+    it('passes the Canvas composite and up to 15 additional references to a MiniMax edit', () => {
+      const minimax: GenerateModelConfig = {
+        ...editModel,
+        capabilities: {
+          max_image_size: { height: 4096, width: 4096 },
+          max_reference_images: 16,
+          modes: ['txt2img', 'img2img'],
+          supports_reference_images: true,
+        },
+        key: 'minimax-h3-image',
+        name: 'MiniMax H3-Image',
+        provider_id: 'minimax',
+        provider_model_id: 'MiniMax-H3-Image',
+      };
+      const references = Array.from({ length: 16 }, (_, index) => ({
+        config: {
+          image: { original: { image: { height: 512, image_name: `ref-${index}.png`, width: 512 } } },
+          type: 'external_reference_image' as const,
+        },
+        id: `reference-${index}`,
+        isEnabled: true,
+      }));
+      const { backendGraph } = compile(minimax, 'img2img', {
+        settings: { referenceImages: references.slice(0, 15) },
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({
+        height: bbox.height,
+        init_image: { image_name: 'canvas-composite.png' },
+        mode: 'img2img',
+        reference_images: references.slice(0, 15).map(({ config }) => ({
+          image_name: config.image.original.image.image_name,
+        })),
+        type: 'minimax_image_generation',
+        width: bbox.width,
+      });
+      expect(backendGraph.nodes.canvas_processing_output).not.toHaveProperty('mask_image');
+      expect(() => compile(minimax, 'img2img', { settings: { referenceImages: references } })).toThrow(
+        'supports at most 15 reference images'
+      );
+      const textGraph = compile(minimax, 'txt2img', { settings: { referenceImages: references } }).backendGraph;
+      expect(textGraph.nodes.canvas_processing_output?.reference_images).toHaveLength(16);
+      expect(textGraph.nodes.canvas_processing_output).not.toHaveProperty('init_image');
+    });
+
     it('writes hosted canvas graphs for backend invocation contract validation', async () => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
       const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);

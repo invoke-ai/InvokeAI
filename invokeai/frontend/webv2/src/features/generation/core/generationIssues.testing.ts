@@ -67,7 +67,15 @@ export const collectGenerationIssueScenarios = (): GenerationIssue[] => {
     ...external,
     capabilities: { max_reference_images: 1, modes: ['txt2img'], supports_reference_images: true },
   };
+  const minimax: GenerateModelConfig = {
+    ...external,
+    capabilities: { max_image_size: { height: 4096, width: 4096 }, modes: ['txt2img', 'img2img'] },
+    key: 'minimax-h3-image',
+    name: 'MiniMax H3-Image',
+    provider_id: 'minimax',
+  };
   const issues = [
+    ...getGenerationValidationIssues(minimax, settingsFor(minimax, { height: 128, width: 512 })),
     ...getGenerationValidationIssues(sdxl, settingsFor(sdxl, { height: 1001, width: 40 })),
     ...getGenerationValidationIssues(sdxl, settingsFor(sdxl, { height: 40, width: 1001 })),
     ...getGenerationValidationIssues(external, settingsFor(external, { height: 1536, width: 4096 })),

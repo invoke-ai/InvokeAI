@@ -59,6 +59,15 @@ export const isSeedreamBatchModel = (model: GenerateModelConfig): boolean =>
   typeof model.provider_model_id === 'string' &&
   SEEDREAM_BATCH_MODEL_PREFIXES.some((prefix) => (model.provider_model_id as string).startsWith(prefix));
 
+// MiniMax H3-Image's free-form output and edit limits. The backend also validates workflow requests.
+export const MINIMAX_H3_IMAGE_MIN_PIXELS = 655_360;
+export const MINIMAX_H3_IMAGE_MAX_PIXELS = 20_000_000;
+export const MINIMAX_H3_IMAGE_MAX_ASPECT = 3;
+export const MINIMAX_H3_IMAGE_MAX_INPUT_IMAGES = 16;
+
+export const isMiniMaxImageModel = (model: GenerateModelConfig): boolean =>
+  model.type === 'external_image_generator' && model.provider_id === 'minimax';
+
 export type ExternalProviderOptionKey = keyof Pick<
   GenerateSettings,
   | 'openaiQuality'

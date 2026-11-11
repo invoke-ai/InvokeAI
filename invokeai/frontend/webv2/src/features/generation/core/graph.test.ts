@@ -898,6 +898,55 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.canvas_output?.reference_images).toEqual([{ image_name: 'reference.png' }]);
   });
 
+  describe('MiniMax H3-Image', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: {
+        max_image_size: { height: 4096, width: 4096 },
+        max_reference_images: 16,
+        modes: ['txt2img', 'img2img'],
+        supports_negative_prompt: false,
+        supports_reference_images: true,
+        supports_seed: false,
+      },
+      key: 'minimax-h3-image',
+      name: 'MiniMax H3-Image',
+      provider_id: 'minimax',
+      provider_model_id: 'MiniMax-H3-Image',
+    };
+
+    it('compiles Generate requests with exact dimensions and optional references', () => {
+      const settings: Partial<GenerateSettings> = { height: 512, width: 1280 };
+      const graph = compile(model, settings);
+
+      expect(graph.nodes.canvas_output).toMatchObject({
+        height: 512,
+        mode: 'txt2img',
+        num_images: 1,
+        type: 'minimax_image_generation',
+        width: 1280,
+      });
+      expect(graph.nodes.canvas_output).not.toHaveProperty('reference_images');
+      expect(getEdge(graph, 'canvas_output', 'prompt')?.source.node_id).toBe('positive_prompt');
+      expect(getEdge(graph, 'canvas_output', 'negative_prompt')).toBeUndefined();
+      expect(getEdge(graph, 'canvas_output', 'seed')).toBeUndefined();
+
+      const withReference = compile(model, {
+        ...settings,
+        referenceImages: [
+          { config: { image: refImage, type: 'external_reference_image' }, id: 'ref-1', isEnabled: true },
+        ],
+      });
+
+      expect(withReference.nodes.canvas_output?.reference_images).toEqual([{ image_name: 'reference.png' }]);
+    });
+
+    it('rejects a provider-incompatible aspect ratio or image area before submission', () => {
+      expect(() => compile(model, { height: 600, width: 2000 })).toThrow('aspect ratio between 1:3 and 3:1');
+      expect(() => compile(model, { height: 800, width: 800 })).toThrow('image area between 655,360 and 20,000,000');
+    });
+  });
+
   describe('external provider options', () => {
     const providerSettings: Partial<GenerateSettings> = {
       externalImageSize: '2K',
