@@ -230,7 +230,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Mask from Alpha",
     tags=["image", "mask"],
     category="mask",
-    version="1.2.2",
+    version="1.3.0",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Extracts the alpha channel of an image as a mask."""
