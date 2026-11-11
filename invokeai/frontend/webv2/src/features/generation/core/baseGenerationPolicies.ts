@@ -115,6 +115,7 @@ import {
   isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isSameModelFile,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
@@ -1495,13 +1496,49 @@ export const isComponentCompatibleWithModel = (
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
-const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
-  Boolean(
-    model &&
-    model.type !== 'external_image_generator' &&
-    model.base === 'flux' &&
-    model.name.toLowerCase().includes('kontext')
-  );
+// The official FLUX.1 Kontext repo and the repositories used by its quantized starters.
+const FLUX_KONTEXT_REPOS = new Set([
+  'black-forest-labs/flux.1-kontext-dev',
+  'comfy-org/flux-1-kontext-dev',
+  'comfy-org/flux1-kontext-dev_comfyui',
+  'unsloth/flux.1-kontext-dev-gguf',
+]);
+
+const isFluxMainModel = (model: GenerateModelConfig | null | undefined): model is MainModelConfig =>
+  model?.type === 'main' && model.base === 'flux';
+
+const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig => {
+  if (!isFluxMainModel(model)) {
+    return false;
+  }
+
+  // Keep recognizing custom installations that have no known repository.
+  if (model.name.toLowerCase().includes('kontext')) {
+    return true;
+  }
+
+  const { source, source_type: sourceType } = model;
+  if (typeof source !== 'string' || sourceType === 'path') {
+    return false;
+  }
+
+  if (sourceType === 'hf_repo_id') {
+    const [repo] = source.toLowerCase().split(':', 1);
+    return repo !== undefined && FLUX_KONTEXT_REPOS.has(repo);
+  }
+
+  try {
+    const url = new URL(source);
+    if (url.hostname !== 'huggingface.co' || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+      return false;
+    }
+
+    const [, owner, repo] = url.pathname.toLowerCase().split('/', 3);
+    return FLUX_KONTEXT_REPOS.has(`${owner}/${repo}`);
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
@@ -1737,8 +1774,17 @@ const getReferenceImageConfigSupported = (
     case 'qwen_image_2_1_reference_image':
       // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
       return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
-    case 'flux_kontext_reference_image':
-      return isFluxKontextModel(model);
+    case 'flux_kontext_reference_image': {
+      const boundModel = referenceImage.config.model;
+      return (
+        (isFluxMainModel(model) &&
+          isFluxMainModel(boundModel) &&
+          boundModel.key === model.key &&
+          (boundModel.variant === undefined || boundModel.variant === null || boundModel.variant === model.variant) &&
+          (!boundModel.hash || !model.hash || isSameModelFile(model, boundModel))) ||
+        isFluxKontextModel(model)
+      );
+    }
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':

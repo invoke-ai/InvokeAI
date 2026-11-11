@@ -754,9 +754,8 @@ const buildFluxGraph = (
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
-  if (model.name.toLowerCase().includes('kontext')) {
-    addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
-  }
+  // Generation validation has checked that the enabled Kontext references belong to this model.
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
   const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {

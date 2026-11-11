@@ -129,9 +129,10 @@ A FLUX.1 model accepts up to **five** reference images. Three kinds are availabl
 - **Kontext** — when the selected model is FLUX.1 Kontext dev, reference images are passed to Kontext for
   instruction-style editing: describe the change you want in the prompt.
 
-:::note[Kontext is recognized by name]
-The Generate tab treats a FLUX.1 model as Kontext only if its name contains "kontext". If you rename a
-Kontext model in the Model Manager, keep that word in the name.
+:::note[Renaming a Kontext model]
+Invoke recognizes FLUX.1 Kontext from its official Hugging Face repository and the sources used by its
+Starter Models. Existing Kontext references stay attached when you rename their installed model. For a
+custom model from another source, include **Kontext** in its display name when adding new references.
 :::
 
 ## ControlNets and Control LoRAs

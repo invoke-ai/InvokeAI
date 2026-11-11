@@ -699,8 +699,16 @@ const syncReferenceImageConfigWithModels = (
   switch (config.type) {
     case 'flux_kontext_reference_image': {
       const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+      if (model === config.model || !isMainModelConfig(model)) {
+        return config;
+      }
 
-      return model === config.model ? config : { ...config, model: isMainModelConfig(model) ? model : config.model };
+      // Retain the bound file identity if the record under its key now points to different weights.
+      if (config.model?.hash && model.hash && !isSameModelFile(model, config.model)) {
+        return config;
+      }
+
+      return { ...config, model };
     }
     case 'flux_redux':
     case 'ip_adapter': {
