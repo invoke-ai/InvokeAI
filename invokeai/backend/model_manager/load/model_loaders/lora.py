@@ -69,6 +69,10 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils impor
     lora_model_from_krea2_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import lora_model_from_ltx2_state_dict
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import lycoris_flat_family
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_conversion_utils import (
+    lora_model_from_lycoris_flat_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
     lora_model_from_minimax_h3_state_dict,
 )
@@ -158,8 +162,13 @@ class LoRALoader(ModelLoader):
 
         factorized_dora_layers = _count_factorized_layers_with_dora_magnitude(state_dict)
 
+        # SimpleTuner's LyCORIS flattens the model's own module names behind `lycoris_` (#10174); map them back and
+        # hand each family its own converter. State dicts this layout does not claim (SD 3's flat spelling, which
+        # `lora_model_from_sd3_state_dict` resolves already, and every other format) fall through to the dispatch.
+        if lycoris_flat_family(state_dict) is not None:
+            model = lora_model_from_lycoris_flat_state_dict(state_dict, base=self._model_base)
         # Apply state_dict key conversions, if necessary.
-        if self._model_base == BaseModelType.StableDiffusionXL:
+        elif self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base in (BaseModelType.Flux, BaseModelType.Flux2):
