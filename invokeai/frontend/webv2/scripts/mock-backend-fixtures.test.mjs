@@ -2237,7 +2237,7 @@ test('hosted-provider credentials and the starter catalog agree with the hosted 
     // Every backend provider is listed; those the hosted records route to have a key.
     assert.deepEqual(
       configs.map((config) => config.provider_id),
-      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream']
+      ['alibabacloud', 'atlascloud', 'gemini', 'minimax', 'openai', 'seedream']
     );
     assert.deepEqual(
       configs.filter((config) => config.api_key_configured).map((config) => config.provider_id),
@@ -2293,7 +2293,10 @@ test('hosted-provider credentials and the starter catalog agree with the hosted 
     const empty = await startMockBackend(0, { profile: 'empty' });
     try {
       const emptyConfigs = await getJson(empty, '/api/v1/app/external_providers/config');
-      assert.equal(emptyConfigs.length, 5);
+      assert.deepEqual(
+        emptyConfigs.map((config) => config.provider_id),
+        configs.map((config) => config.provider_id)
+      );
       assert.ok(emptyConfigs.every((config) => !config.api_key_configured));
     } finally {
       await empty.close();
