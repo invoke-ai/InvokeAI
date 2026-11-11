@@ -1,5 +1,5 @@
 import type { ProjectGraphState, ProjectWorkflowSource, WorkflowNode } from '@features/workflow/core/types';
-import type { WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
+import type { WorkflowRegion, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 import type {
   WorkflowProjectPersistence,
   WorkflowReadPort,
@@ -13,6 +13,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { WorkflowUiProvider } from './WorkflowUiContext';
 import { clearWorkflowPublicationIntent, workflowUiStore } from './workflowUiStore';
@@ -66,6 +67,8 @@ const TRANSLATIONS: Record<string, string> = {
   'widgets.workflow.persistencePendingNoRecovery': 'Project changes waiting to save — no browser recovery available',
   'widgets.workflow.persistenceSaved': 'Project saved to the server',
   'widgets.workflow.persistenceSaving': 'Saving project…',
+  'widgets.workflow.toolbar.redo': 'Redo',
+  'widgets.workflow.toolbar.undo': 'Undo',
   'widgets.workflow.saveToLibraryWithEllipsis': 'Save to library…',
   'widgets.workflow.linkedTemplateUnnamed': 'Linked to a library template',
   'widgets.workflow.untitled': 'Untitled Workflow',
@@ -130,6 +133,13 @@ const projectSnapshot = (graph: ProjectGraphState, source?: ProjectWorkflowSourc
   workflowValues: {},
   workflows: [{ document: graph, source }],
 });
+
+interface HistoryState {
+  canRedo: boolean;
+  canUndo: boolean;
+}
+
+const NO_HISTORY: HistoryState = { canRedo: false, canUndo: false };
 
 const SAVED: WorkflowProjectPersistence = { error: null, hasLocalRecovery: true, lastSavedAt: null, status: 'saved' };
 
@@ -332,12 +342,20 @@ describe('WorkflowHeaderActions', () => {
     clearWorkflowPublicationIntent();
   });
 
-  const renderHeader = async (source?: ProjectWorkflowSource) => {
+  let commands: ReturnType<typeof createCommands>;
+  let project: ReturnType<typeof createMutablePort<ReturnType<typeof projectSnapshot> & HistoryState>>;
+
+  const renderHeader = async (
+    source?: ProjectWorkflowSource,
+    { history = NO_HISTORY, region = 'center' }: { history?: HistoryState; region?: WorkflowRegion } = {}
+  ) => {
     const graph = createProjectGraph('workflow-1');
-    const project = createMutablePort(projectSnapshot(graph, source));
+    project = createMutablePort({ ...projectSnapshot(graph, source), ...history });
+    commands = createCommands();
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
     const adapter = {
-      commands: createCommands(),
+      CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd>,
+      commands,
       getProjectGraph: () => graph,
       notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
       persistence: persistence.port,
@@ -349,7 +367,7 @@ describe('WorkflowHeaderActions', () => {
       root.render(
         <ChakraProvider value={system}>
           <WorkflowUiProvider adapter={adapter}>
-            <WorkflowHeaderActions region="center" runtime={TEST_RUNTIME} />
+            <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
           </WorkflowUiProvider>
         </ChakraProvider>
       );
@@ -357,6 +375,164 @@ describe('WorkflowHeaderActions', () => {
   };
 
   const status = () => host.querySelector<HTMLElement>('[role="status"][data-persistence-status]');
+  const actionLabels = () =>
+    Array.from(host.querySelectorAll<HTMLElement>('button, [role="status"]'), (action) =>
+      action.getAttribute('aria-label')
+    );
+  const historyButton = (label: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+
+  it('steps the editor history from the header only where the editor is, and only while there is a step', async () => {
+    await renderHeader();
+    expect(actionLabels()).toEqual(['Add node', 'Undo', 'Redo', 'Save to library…', 'Project saved to the server']);
+    expect(historyButton('Undo')?.getAttribute('aria-disabled')).toBe('true');
+    expect(historyButton('Redo')?.getAttribute('aria-disabled')).toBe('true');
+
+    await act(() => historyButton('Undo')?.click());
+    await act(() => historyButton('Redo')?.click());
+    expect(commands.undo).not.toHaveBeenCalled();
+    expect(commands.redo).not.toHaveBeenCalled();
+
+    await act(() => project.setSnapshot({ ...project.port.getSnapshot(), canRedo: true, canUndo: true }));
+    expect(historyButton('Undo')?.hasAttribute('aria-disabled')).toBe(false);
+    await act(() => historyButton('Undo')?.click());
+    await act(() => historyButton('Redo')?.click());
+    // The click event must not reach the command as a target: no argument means the active workflow.
+    expect(commands.undo).toHaveBeenCalledExactlyOnceWith();
+    expect(commands.redo).toHaveBeenCalledExactlyOnceWith();
+
+    // The expanded bottom panel shows the editor too; the left region's linear form has no history to step.
+    await renderHeader(undefined, { region: 'bottom' });
+    expect(actionLabels()).toEqual(['Undo', 'Redo', 'Workflow library']);
+    await renderHeader(undefined, { region: 'left' });
+    expect(actionLabels()).toEqual(['Workflow library']);
+  });
+
+  it('hands Undo and Redo to the ⋯ menu while a narrow header hides them, keys and availability included', async () => {
+    const graph = createProjectGraph('workflow-1');
+    const history: HistoryState = { canRedo: false, canUndo: true };
+    project = createMutablePort({ ...projectSnapshot(graph), ...history });
+    commands = createCommands();
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
+    const adapter = {
+      CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd>,
+      commands,
+      getProjectGraph: () => graph,
+      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+      persistence: persistence.port,
+      project: project.port,
+      widgets: { open: vi.fn(), patchValues: vi.fn() },
+    } as unknown as WorkflowUiAdapter;
+    const renderAt = (width: number) =>
+      act(() => {
+        root.render(
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider adapter={adapter}>
+              {/* The header row is the inline-size container the actions query, as the center chrome is. */}
+              <div style={{ containerType: 'inline-size', width }}>
+                <WorkflowHeaderActions region="center" runtime={TEST_RUNTIME} />
+              </div>
+              <Menu.Root open>
+                <Menu.Positioner>
+                  <Menu.Content>
+                    <WorkflowMenuItems region="center" runtime={TEST_RUNTIME} />
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Menu.Root>
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        );
+      });
+    const menuItem = (value: string) => host.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
+
+    await renderAt(480);
+    expect(historyButton('Undo')?.checkVisibility()).toBe(true);
+    expect(historyButton('Save to library…')?.checkVisibility()).toBe(true);
+    expect(menuItem('undo')).toBeNull();
+
+    await renderAt(304);
+    // The library action keeps its place; the history steps give way.
+    expect(host.querySelector<HTMLElement>('button[aria-label="Save to library…"]')?.checkVisibility()).toBe(true);
+    expect(historyButton('Undo')?.checkVisibility()).toBe(false);
+    await vi.waitFor(() => expect(menuItem('undo')).not.toBeNull());
+    expect(menuItem('undo')?.textContent).toBe('Undoworkflows.undo');
+    expect(menuItem('redo')?.textContent).toBe('Redoworkflows.redo');
+    expect(menuItem('redo')?.hasAttribute('data-disabled')).toBe(true);
+
+    await userEvent.click(menuItem('undo')!);
+    // Pointer tooling refuses a disabled item; forced, the press must still do nothing.
+    await userEvent.click(menuItem('redo')!, { force: true });
+    expect(commands.undo).toHaveBeenCalledExactlyOnceWith();
+    expect(commands.redo).not.toHaveBeenCalled();
+
+    // Room again: the header shows them and the menu stops repeating them.
+    await renderAt(480);
+    await vi.waitFor(() => expect(menuItem('undo')).toBeNull());
+  });
+
+  it('lets each header hand its history to its own ⋯ menu, and leaving forgets only its own', async () => {
+    const graph = createProjectGraph('workflow-1');
+    project = createMutablePort({ ...projectSnapshot(graph), ...NO_HISTORY });
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
+    const adapter = {
+      CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd>,
+      commands: createCommands(),
+      getProjectGraph: () => graph,
+      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+      persistence: persistence.port,
+      project: project.port,
+      widgets: { open: vi.fn(), patchValues: vi.fn() },
+    } as unknown as WorkflowUiAdapter;
+    /** A header at its own width beside its own open ⋯ menu, as the frame places them. */
+    const Surface = ({ region, width }: { region: 'bottom' | 'center'; width: number }) => (
+      <div data-surface={region}>
+        <div style={{ containerType: 'inline-size', width }}>
+          <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
+        </div>
+        <Menu.Root open>
+          <Menu.Positioner>
+            <Menu.Content>
+              <WorkflowMenuItems region={region} runtime={TEST_RUNTIME} />
+            </Menu.Content>
+          </Menu.Positioner>
+        </Menu.Root>
+      </div>
+    );
+    const renderSurfaces = (withBottom: boolean) =>
+      act(() => {
+        root.render(
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider adapter={adapter}>
+              <Surface region="center" width={304} />
+              {withBottom ? <Surface region="bottom" width={720} /> : null}
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        );
+      });
+    const menuOffersUndo = (region: string) =>
+      host.querySelector(`[data-surface="${region}"] [role="menuitem"][data-value="undo"]`) !== null;
+
+    // The wide bottom header mounts last; the narrow center's menu still offers what its own header hides.
+    await renderSurfaces(true);
+    await vi.waitFor(() => expect(menuOffersUndo('center')).toBe(true));
+    expect(menuOffersUndo('bottom')).toBe(false);
+
+    await renderSurfaces(false);
+    await vi.waitFor(() => expect(host.querySelector('[data-surface="bottom"]')).toBeNull());
+    expect(menuOffersUndo('center')).toBe(true);
+  });
+
+  it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {
+    await renderHeader(undefined, { history: { canRedo: false, canUndo: true } });
+    const undo = historyButton('Undo')!;
+    undo.focus();
+    await act(() => undo.click());
+    // The history is now empty: the button says so but keeps focus, so the keyboard user is not dropped to the page.
+    await act(() => project.setSnapshot({ ...project.port.getSnapshot(), canRedo: true, canUndo: false }));
+
+    expect(commands.undo).toHaveBeenCalledOnce();
+    expect(undo.getAttribute('aria-disabled')).toBe('true');
+    expect(document.activeElement).toBe(undo);
+  });
 
   it('names the project persistence state, including a pending save with no local safety net', async () => {
     await renderHeader();
