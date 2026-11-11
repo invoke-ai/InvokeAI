@@ -6,7 +6,7 @@ import torch
 from transformers import CLIPTextModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
-from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
@@ -318,14 +318,9 @@ class LayerPatcher:
         sub-patches, alone or in a list or tuple, and those need not share a dtype; so the leaves
         under them are recorded and restored one by one. Leaves without tensors have nothing to restore.
         """
-        sub_patches = [
-            item
-            for value in vars(patch).values()
-            for item in (value if isinstance(value, (list, tuple)) else (value,))
-            if isinstance(item, BaseLayerPatch)
-        ]
-        if sub_patches:
-            return [leaf for sub_patch in sub_patches for leaf in LayerPatcher._leaf_placements(sub_patch)]
+        wrapped = sub_patches(patch)
+        if wrapped:
+            return [leaf for sub_patch in wrapped for leaf in LayerPatcher._leaf_placements(sub_patch)]
         tensor = next((value for value in vars(patch).values() if isinstance(value, torch.Tensor)), None)
         return [] if tensor is None else [(patch, tensor.device, tensor.dtype)]
 
