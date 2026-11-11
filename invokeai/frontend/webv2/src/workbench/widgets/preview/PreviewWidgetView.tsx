@@ -78,6 +78,7 @@ import { useLivePreviewFollow } from './livePreviewFollow';
 import { PreviewCompare } from './PreviewCompare';
 import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
+import { PreviewDropSurface } from './PreviewDropSurface';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
 import {
   PreviewFrame,
@@ -650,8 +651,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [isComparing, runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
 
   return (
-    // Let the dot grid fill the widget; containerType bounds Details cqh sizing to this surface.
-    <Box ref={rootRef} containerType="size" h="full" position="relative" w="full">
+    <PreviewDropSurface
+      ref={rootRef}
+      isComparing={isComparing}
+      isFollowingLive={shouldFollowLive}
+      shownKind={selectedItem?.kind ?? null}
+    >
       {/*
        * Show progress beneath floating Preview's title bar when the main topbar may be out of view; overlay it
        * without reflow.
@@ -733,7 +738,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             confirmation, nor cut its exit animation short. */}
         {deletionConfirmationDialog}
       </Stack>
-    </Box>
+    </PreviewDropSurface>
   );
 };
 

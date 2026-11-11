@@ -3840,6 +3840,10 @@
       "details": "Details",
       "dragVideo": "Drag video",
       "dropToCompare": "Drop to compare",
+      "dropToShow": "Drop to show",
+      "dropPending": "The files you dropped are still uploading. Try again when they are done.",
+      "dropUploading_one": "Uploading the dropped file…",
+      "dropUploading_other": "Uploading {{count}} dropped files…",
       "editOnCanvas": "Edit on Canvas",
       "editThisImage": "Edit this image",
       "emptyDescription": "Select an image or video in the Gallery to see it here.",
@@ -4664,14 +4668,15 @@
         "bboxHoldHelp": "Hold C to use it until you let go; tap C to stay on it."
       },
       "controlHint": {
-        "title": "Drop an image here",
-        "body": "or pick one in Properties",
+        "title": "Add an image",
+        "body": "Drag one onto Add as control layer, or pick one in Properties",
         "uploading": "Uploading…"
       },
       "fileDrop": {
-        "oneFile": "Drop one image at a time.",
         "notImage": "Only image files can be dropped on the canvas.",
-        "noTarget": "Select an empty control layer to drop an image on it."
+        "pending": "The files you dropped are still uploading. Try again when they are done.",
+        "uploading_one": "Uploading the dropped image…",
+        "uploading_other": "Uploading {{count}} dropped images…"
       },
       "controlView": {
         "label": "Control layer view",

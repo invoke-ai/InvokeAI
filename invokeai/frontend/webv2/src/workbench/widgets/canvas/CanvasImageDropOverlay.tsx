@@ -1,8 +1,13 @@
+import type { NativeFileDrag } from '@platform/react/useNativeFileDrag';
+
 import { Grid } from '@chakra-ui/react';
 import { useDndContext } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
+import { DropZone } from '@platform/ui/DropZone';
+import { DropZoneLabel } from '@workbench/widgets/shared/DropZoneLabel';
+import { useTranslation } from 'react-i18next';
 
-import { getCanvasImageDropData, getCanvasImageDropId } from './canvasImageDnd';
+import { getCanvasImageDropData, getCanvasImageDropId, type CanvasImageDropData } from './canvasImageDnd';
 import { CanvasImageDropZone, type CanvasImageDropZoneProps } from './CanvasImageDropZone';
 
 export const CANVAS_IMAGE_DROP_LAYOUT = [
@@ -38,17 +43,47 @@ const CANVAS_IMAGE_DROP_ZONES = CANVAS_IMAGE_DROP_LAYOUT.map((zone) => ({
   labelKey: LABEL_KEYS[zone.destination],
 })) satisfies readonly CanvasImageDropZoneProps[];
 
-export const CanvasImageDropOverlay = ({ isDocumentEditingLocked }: { isDocumentEditingLocked: boolean }) => {
+/**
+ * The drop zones over the canvas while a gallery image is dragged with dnd-kit, or files from the desktop
+ * (`fileDrag`); both land the same way. A canvas held by a running operation takes neither and says so instead.
+ */
+export const CanvasImageDropOverlay = ({
+  fileDrag,
+  isDocumentEditingLocked,
+}: {
+  fileDrag: NativeFileDrag<CanvasImageDropData['destination']> | null;
+  isDocumentEditingLocked: boolean;
+}) => {
+  const { t } = useTranslation();
   const { active } = useDndContext();
 
-  if (isDocumentEditingLocked || !isGalleryImageDragData(active?.data.current)) {
+  if (fileDrag === null && !isGalleryImageDragData(active?.data.current)) {
     return null;
+  }
+
+  if (isDocumentEditingLocked) {
+    return (
+      <DropZone
+        alignItems="center"
+        display="flex"
+        inset="0.5"
+        isDisabled
+        justifyContent="center"
+        p="6"
+        pointerEvents="none"
+        position="absolute"
+        variant="overlay"
+        zIndex="2"
+      >
+        <DropZoneLabel>{t('widgets.layers.actions.busy')}</DropZoneLabel>
+      </DropZone>
+    );
   }
 
   return (
     <Grid {...CANVAS_IMAGE_DROP_GRID_LAYOUT} inset="0" pointerEvents="none" position="absolute" zIndex="2">
       {CANVAS_IMAGE_DROP_ZONES.map((zone) => (
-        <CanvasImageDropZone key={zone.id} {...zone} />
+        <CanvasImageDropZone key={zone.id} {...zone} isFileOver={fileDrag?.zone === zone.destination} />
       ))}
     </Grid>
   );

@@ -1,20 +1,15 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
-import { invalidateGallery } from '@features/gallery/queries';
+import { classifyGalleryUpload } from '@features/gallery/contracts';
 import { useQueueItemProgressImage } from '@features/queue/react';
 import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useNativeFileDrag } from '@platform/react/useNativeFileDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import {
-  getControlUploadNotice,
-  resolveControlFileDrop,
-  uploadControlImageFile,
-  type ControlSourceNotice,
-} from '@workbench/canvas-operations/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlotRect, getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
@@ -24,6 +19,7 @@ import { useWorkbenchPreferenceSelector, useWorkbenchSettingsSelector } from '@w
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
+import { useDroppedFileUpload } from '@workbench/widgets/shared/useDroppedFileUpload';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -50,7 +46,7 @@ import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
-import { resolveCanvasImageDrop } from './canvasImageDnd';
+import { findCanvasImageDropDestination, resolveCanvasImageDrop, type CanvasImageDropData } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
@@ -80,8 +76,6 @@ import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
-
-const isFileDrag = (dataTransfer: DataTransfer): boolean => dataTransfer.types.includes('Files');
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -195,72 +189,48 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isDocumentEditingLocked = operationKind !== null;
   const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
 
-  // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
-  // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
-  // hovers, the drop effect shows whether the canvas would take it; a drop that still arrives and cannot be used
-  // says why instead of doing nothing.
+  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload
+  // and import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows
+  // no zones, so it takes no drop; the overlay says why.
   const queryClient = useQueryClient();
-  const showNotice = useCallback(
-    (notice: ControlSourceNotice | null) => {
-      if (notice) {
+  const startDroppedFileUpload = useDroppedFileUpload({
+    pendingKey: 'widgets.canvas.fileDrop.pending',
+    uploadingKey: 'widgets.canvas.fileDrop.uploading',
+  });
+  const importDroppedFiles = useCallback(
+    (files: File[], destination: CanvasImageDropData['destination']) => {
+      const images = files.filter((file) => classifyGalleryUpload(file)?.kind === 'image');
+      if (images.length < files.length) {
         notifications.add({
-          kind: notice.kind,
-          message: notice.messageKey ? t(notice.messageKey) : notice.message,
-          title: t(notice.titleKey),
+          kind: images.length === 0 ? 'error' : 'info',
+          title: t('widgets.canvas.fileDrop.notImage'),
         });
       }
-    },
-    [notifications, t]
-  );
-  const handleFileDragOver = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      const { dataTransfer } = event;
-      if (!isFileDrag(dataTransfer)) {
+      if (images.length === 0) {
         return;
       }
-      event.preventDefault();
-      const accepted =
-        engine !== null &&
-        resolveControlFileDrop({
-          document,
-          engine,
-          // File contents stay hidden until the drop, but each item's type is readable while it hovers.
-          files: [...dataTransfer.items].filter((item) => item.kind === 'file'),
-          isCanvasLocked: isDocumentEditingLocked,
-        }).status === 'accepted';
-      dataTransfer.dropEffect = accepted ? 'copy' : 'none';
-    },
-    [document, engine, isDocumentEditingLocked]
-  );
-  const handleFileDrop = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!isFileDrag(event.dataTransfer)) {
-        return;
-      }
-      event.preventDefault();
-      if (!engine) {
-        return;
-      }
-      const files = [...event.dataTransfer.files];
-      const resolution = resolveControlFileDrop({
-        document,
-        engine,
-        files,
-        isCanvasLocked: isDocumentEditingLocked,
+      startDroppedFileUpload(images, {
+        load: () => import('./importCanvasFileDrop'),
+        run: ({ importCanvasFileDrop }, context) =>
+          importCanvasFileDrop({
+            ...context,
+            canvas: canvasCommands,
+            destination,
+            files: images,
+            notifications,
+            queries,
+            queryClient,
+            t,
+          }),
+        runFailedMessage: t('widgets.canvas.import.failed'),
       });
-      if (resolution.status === 'refused') {
-        showNotice(resolution.notice);
-        return;
-      }
-      void uploadControlImageFile({
-        engine,
-        file: files[0]!,
-        layerId: resolution.layerId,
-        onUploaded: (owner) => void invalidateGallery(queryClient, owner),
-      }).then((outcome) => showNotice(getControlUploadNotice(outcome)));
     },
-    [document, engine, isDocumentEditingLocked, queryClient, showNotice]
+    [canvasCommands, notifications, queries, queryClient, startDroppedFileUpload, t]
   );
+  const { drag: fileDrag, handlers: fileDragHandlers } = useNativeFileDrag({
+    findZone: findCanvasImageDropDestination,
+    onDrop: importDroppedFiles,
+  });
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
@@ -585,8 +555,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       position="relative"
       role="region"
       w="full"
-      onDragOver={handleFileDragOver}
-      onDrop={handleFileDrop}
+      {...fileDragHandlers}
     >
       {engine ? (
         <CanvasShortcutHintRegistration
@@ -606,11 +575,11 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         </Suspense>
       ) : null}
       <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
-        <CanvasImageDropOverlay isDocumentEditingLocked={isDocumentEditingLocked} />
+        <CanvasImageDropOverlay fileDrag={fileDrag} isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
             <ToolStrip engine={engine} />
-            <ControlLayerCanvasOverlay engine={engine} />
+            <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
               engine={engine}
