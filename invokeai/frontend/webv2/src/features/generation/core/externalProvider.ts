@@ -61,7 +61,6 @@ export const isSeedreamBatchModel = (model: GenerateModelConfig): boolean =>
 
 // MiniMax H3-Image's free-form output and edit limits. The backend also validates workflow requests.
 export const MINIMAX_H3_IMAGE_MIN_PIXELS = 655_360;
-export const MINIMAX_H3_IMAGE_MAX_PIXELS = 20_000_000;
 export const MINIMAX_H3_IMAGE_MAX_ASPECT = 3;
 export const MINIMAX_H3_IMAGE_MAX_INPUT_IMAGES = 16;
 

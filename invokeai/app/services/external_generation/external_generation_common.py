@@ -7,8 +7,6 @@ from PIL.Image import Image as PILImageType
 
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalGenerationMode
 
-MINIMAX_MAX_INPUT_IMAGES = 16
-
 
 @dataclass(frozen=True)
 class ExternalReferenceImage:

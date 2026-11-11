@@ -596,6 +596,9 @@ atlascloud_nano_banana_2 = StarterModel(
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
+MINIMAX_MAX_INPUT_IMAGES = 16
+
+
 minimax_h3_image = StarterModel(
     name="MiniMax H3-Image",
     base=BaseModelType.External,
@@ -608,8 +611,9 @@ minimax_h3_image = StarterModel(
         modes=["txt2img", "img2img"],
         supports_negative_prompt=False,
         supports_reference_images=True,
-        max_reference_images=16,
+        max_reference_images=MINIMAX_MAX_INPUT_IMAGES,
         max_images_per_request=10,
+        # Match the shared Invoke dimension limit used by Generate and Canvas.
         max_image_size=ExternalImageSize(width=4096, height=4096),
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),

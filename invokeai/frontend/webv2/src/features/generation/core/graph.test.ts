@@ -943,7 +943,7 @@ describe('compileGenerateGraph', () => {
 
     it('rejects a provider-incompatible aspect ratio or image area before submission', () => {
       expect(() => compile(model, { height: 600, width: 2000 })).toThrow('aspect ratio between 1:3 and 3:1');
-      expect(() => compile(model, { height: 800, width: 800 })).toThrow('image area between 655,360 and 20,000,000');
+      expect(() => compile(model, { height: 800, width: 800 })).toThrow('image area of at least 655,360');
     });
   });
 

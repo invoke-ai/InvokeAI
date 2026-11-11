@@ -87,7 +87,10 @@ def test_generation_uses_inline_jpeg_and_returns_successes_from_a_partial_respon
         return_value=_response(
             {
                 "request_id": "minimax-request",
-                "data": [{"error": {"code": "1027"}}, {"b64_json": _jpeg()}],
+                "data": [
+                    {"error": {"code": "1027", "message": "test-key and private prompt"}},
+                    {"b64_json": _jpeg()},
+                ],
             }
         )
     )
@@ -99,7 +102,8 @@ def test_generation_uses_inline_jpeg_and_returns_successes_from_a_partial_respon
     assert post.call_args.args == ("https://api.minimax.io/v1/images/generations",)
     kwargs = post.call_args.kwargs
     assert kwargs["headers"] == {"Authorization": "Bearer test-key", "Content-Type": "application/json"}
-    assert kwargs["timeout"] >= 600
+    connect_timeout, read_timeout = kwargs["timeout"]
+    assert 0 < connect_timeout < 600 < read_timeout
     assert kwargs["allow_redirects"] is False
     assert json.loads(kwargs["data"]) == {
         "model": generation_request.model.provider_model_id,
@@ -107,10 +111,22 @@ def test_generation_uses_inline_jpeg_and_returns_successes_from_a_partial_respon
         "n": 2,
         "size": "1024x1024",
         "output_format": "jpeg",
+        "output_compression": 100,
         "response_format": "b64_json",
     }
     assert result.provider_request_id == "minimax-request"
-    assert result.provider_metadata == {"model": generation_request.model.provider_model_id}
+    assert result.provider_metadata == {
+        "model": generation_request.model.provider_model_id,
+        "partial_failures": [
+            {
+                "image_index": 0,
+                "code": "1027",
+                "message": (
+                    "The generated image failed MiniMax's content safety check. Try adjusting the prompt or reference images."
+                ),
+            }
+        ],
+    }
     assert result.seed_used is None
     assert len(result.images) == 1
     assert result.images[0].image.size == (1024, 1024)
@@ -172,6 +188,7 @@ def test_graph_invocation_sends_init_then_references_to_edits(
     payload = json.loads(post.call_args.kwargs["data"])
     assert payload["model"] == model.provider_model_id
     assert payload["output_format"] == "jpeg"
+    assert payload["output_compression"] == 100
     assert payload["response_format"] == "b64_json"
     data_urls = [item["image_url"] for item in payload["images"]]
     assert all(url.startswith("data:image/png;base64,") for url in data_urls)
@@ -265,6 +282,27 @@ def test_rejects_invalid_requests_before_sending(
     post.assert_not_called()
 
 
+def test_custom_edit_model_still_requires_an_input(
+    monkeypatch: pytest.MonkeyPatch, generation_request: ExternalGenerationRequest
+) -> None:
+    custom_model = generation_request.model.model_copy(
+        update={
+            "provider_model_id": "custom-minimax-image",
+            "source": "external://minimax/custom-minimax-image",
+            "capabilities": generation_request.model.capabilities.model_copy(
+                update={"input_image_required_for": ["inpaint"]}
+            ),
+        }
+    )
+    post = Mock()
+    monkeypatch.setattr(requests, "post", post)
+
+    with pytest.raises(ExternalProviderCapabilityError, match="MiniMax image edits require an input image"):
+        _service().generate(replace(generation_request, model=custom_model, mode="img2img"))
+
+    post.assert_not_called()
+
+
 def test_edit_body_limit_includes_json_overhead(
     monkeypatch: pytest.MonkeyPatch, generation_request: ExternalGenerationRequest
 ) -> None:
@@ -295,6 +333,49 @@ def test_http_failures_are_sanitized_and_never_retried(
     post.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("status_code", "error_type", "code", "reason"),
+    [
+        (402, "insufficient_balance_error", "1008", "Your MiniMax account has insufficient balance."),
+        (402, "insufficient_balance_error", "2068", "Your MiniMax plan does not include this model."),
+        (401, "authorized_error", "9999", "Check your MiniMax API key."),
+        (
+            422,
+            "unprocessable_entity_error",
+            "1026",
+            "The input failed MiniMax's content safety check. Try adjusting the prompt or reference images.",
+        ),
+        (
+            422,
+            "unprocessable_entity_error",
+            "1027",
+            "The generated image failed MiniMax's content safety check. Try adjusting the prompt or reference images.",
+        ),
+        (429, "rate_limit_error", "1002", "MiniMax's image generation rate limit was reached. Try again later."),
+    ],
+)
+def test_http_failure_reports_a_sanitized_reason_without_retrying(
+    monkeypatch: pytest.MonkeyPatch,
+    generation_request: ExternalGenerationRequest,
+    status_code: int,
+    error_type: str,
+    code: str,
+    reason: str,
+) -> None:
+    post = Mock(
+        return_value=_response(
+            {"error": {"type": error_type, "message": f"test-key and private prompt ({code})"}}, status_code
+        )
+    )
+    monkeypatch.setattr(requests, "post", post)
+
+    with pytest.raises(ExternalProviderRequestError) as caught:
+        _service().generate(generation_request)
+
+    assert str(caught.value) == f"MiniMax image request failed (HTTP {status_code}): {reason}"
+    post.assert_called_once()
+
+
 def test_network_errors_do_not_expose_the_request(
     monkeypatch: pytest.MonkeyPatch, generation_request: ExternalGenerationRequest
 ) -> None:
@@ -312,10 +393,14 @@ def test_network_errors_do_not_expose_the_request(
     [
         ({"data": [{"url": "https://example.test/private"}]}, "no inline images"),
         ({"data": [{"b64_json": "not an image"}]}, "invalid inline image"),
+        (
+            {"data": [{"error": {"code": 1027, "message": "test-key and private prompt"}}]},
+            "MiniMax returned no images. The generated image failed",
+        ),
         ({"data": ["bad"] * 3}, "invalid image data"),
     ],
 )
-def test_rejects_non_inline_or_malformed_results(
+def test_rejects_responses_without_usable_inline_images(
     monkeypatch: pytest.MonkeyPatch, generation_request: ExternalGenerationRequest, payload: object, message: str
 ) -> None:
     monkeypatch.setattr(requests, "post", Mock(return_value=_response(payload)))

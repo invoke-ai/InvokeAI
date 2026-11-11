@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import requests
 from PIL import Image
@@ -12,17 +13,64 @@ from invokeai.app.services.external_generation.errors import (
 )
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
-    MINIMAX_MAX_INPUT_IMAGES,
     ExternalGeneratedImage,
     ExternalGenerationRequest,
     ExternalGenerationResult,
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64, encode_image_base64
+from invokeai.backend.model_manager.starter_models.external import MINIMAX_MAX_INPUT_IMAGES
 
 _DEFAULT_BASE_URL = "https://api.minimax.io"
-_REQUEST_TIMEOUT = 600
+_REQUEST_TIMEOUT = (10, 660)
 _MAX_EDIT_BODY_BYTES = 64 * 1024 * 1024
 _MAX_JPEG_RESPONSE_PIXELS = 80_000_000
+_ERROR_CODE_SUFFIX = re.compile(r"\(([0-9]{4})\)\s*$")
+_ERROR_MESSAGES = {
+    "1000": "MiniMax could not generate the image. Try again later.",
+    "1001": "MiniMax timed out while generating the image.",
+    "1002": "MiniMax's image generation rate limit was reached. Try again later.",
+    "1004": "Check your MiniMax API key.",
+    "1008": "Your MiniMax account has insufficient balance.",
+    "1026": "The input failed MiniMax's content safety check. Try adjusting the prompt or reference images.",
+    "1027": "The generated image failed MiniMax's content safety check. Try adjusting the prompt or reference images.",
+    "2013": "MiniMax rejected the image generation settings.",
+    "2049": "Check your MiniMax API key.",
+    "2053": "Your MiniMax account has insufficient credits.",
+    "2056": "Your MiniMax plan's usage limit was reached. Try again in the next usage window.",
+    "2067": "Your MiniMax plan quota is exhausted. Check your plan or credit settings.",
+    "2068": "Your MiniMax plan does not include this model.",
+}
+_HTTP_ERROR_TYPE_MESSAGES = {
+    (400, "bad_request_error"): "MiniMax rejected the image generation settings.",
+    (401, "authorized_error"): "Check your MiniMax API key.",
+    (402, "insufficient_balance_error"): "Check your MiniMax balance, credits or plan limits.",
+    (422, "unprocessable_entity_error"): "MiniMax's content safety check blocked the request.",
+    (429, "rate_limit_error"): "A MiniMax usage limit was reached. Try again later.",
+}
+
+
+def _http_error_message(response: requests.Response) -> str:
+    status = response.status_code
+    fallback = f"MiniMax image request failed (HTTP {status})"
+    if status < 400:
+        return fallback
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return fallback
+
+    # Only use documented codes and types. The response text can include request details.
+    message = error.get("message")
+    match = _ERROR_CODE_SUFFIX.search(message) if isinstance(message, str) else None
+    reason = _ERROR_MESSAGES.get(match[1]) if match else None
+    error_type = error.get("type")
+    if reason is None and isinstance(error_type, str):
+        reason = _HTTP_ERROR_TYPE_MESSAGES.get((status, error_type))
+    return f"{fallback}: {reason}" if reason else fallback
 
 
 class MiniMaxProvider(ExternalProvider):
@@ -49,6 +97,7 @@ class MiniMaxProvider(ExternalProvider):
             "n": request.num_images,
             "size": f"{request.width}x{request.height}",
             "output_format": "jpeg",
+            "output_compression": 100,
             "response_format": "b64_json",
         }
         if inputs:
@@ -60,7 +109,7 @@ class MiniMaxProvider(ExternalProvider):
 
         endpoint = "edits" if inputs else "generations"
 
-        # The provider charges for successful images even after a client disconnects.
+        # Keep the read timeout above MiniMax's 600s server wait to avoid losing billed images.
         try:
             response = requests.post(
                 f"{base_url}/v1/images/{endpoint}",
@@ -76,7 +125,7 @@ class MiniMaxProvider(ExternalProvider):
 
         if not 200 <= response.status_code < 300:
             # The shared service retries ExternalProviderRateLimitError. MiniMax generation is non-idempotent.
-            raise ExternalProviderRequestError(f"MiniMax image request failed (HTTP {response.status_code})")
+            raise ExternalProviderRequestError(_http_error_message(response))
 
         try:
             result = response.json()
@@ -87,8 +136,23 @@ class MiniMaxProvider(ExternalProvider):
             raise ExternalProviderRequestError("MiniMax returned invalid image data")
 
         images: list[ExternalGeneratedImage] = []
-        for item in data:
-            encoded = item.get("b64_json") if isinstance(item, dict) and "error" not in item else None
+        item_errors: list[dict[str, int | str]] = []
+        for index, item in enumerate(data):
+            if not isinstance(item, dict):
+                continue
+            if "error" in item:
+                error = item["error"]
+                code = error.get("code") if isinstance(error, dict) else None
+                code = str(code) if isinstance(code, (int, str)) else ""
+                reason = _ERROR_MESSAGES.get(code)
+                if reason is None:
+                    item_errors.append(
+                        {"image_index": index, "message": "MiniMax reported an image generation failure."}
+                    )
+                else:
+                    item_errors.append({"image_index": index, "code": code, "message": reason})
+                continue
+            encoded = item.get("b64_json")
             if not isinstance(encoded, str) or not encoded:
                 continue
             try:
@@ -97,18 +161,31 @@ class MiniMaxProvider(ExternalProvider):
                 raise ExternalProviderRequestError("MiniMax returned an invalid inline image") from None
 
         if not images:
+            if item_errors:
+                failure = next((error for error in item_errors if "code" in error), item_errors[0])
+                raise ExternalProviderRequestError(f"MiniMax returned no images. {failure['message']}")
             raise ExternalProviderRequestError("MiniMax response contained no inline images")
+
+        provider_metadata: dict[str, object] = {"model": model_id}
+        if item_errors:
+            provider_metadata["partial_failures"] = item_errors
+            self._logger.warning(
+                "MiniMax returned %d image(s) with %d partial failure(s): %s",
+                len(images),
+                len(item_errors),
+                item_errors,
+            )
 
         request_id = result.get("request_id")
         return ExternalGenerationResult(
             images=images,
             provider_request_id=request_id if isinstance(request_id, str) else None,
-            provider_metadata={"model": model_id},
+            provider_metadata=provider_metadata,
         )
 
     @staticmethod
     def _validate_request(request: ExternalGenerationRequest, inputs: list[PILImageType]) -> None:
-        if request.mode not in ("txt2img", "img2img") or request.mask_image is not None:
+        if request.mask_image is not None:
             raise ExternalProviderCapabilityError("MiniMax supports text-to-image and image edits without masks")
         if not 1 <= len(request.prompt.strip()) <= 32_000:
             raise ExternalProviderCapabilityError("MiniMax requires a prompt of 1 to 32,000 characters")
@@ -116,18 +193,20 @@ class MiniMaxProvider(ExternalProvider):
             raise ExternalProviderCapabilityError("MiniMax supports 1 to 10 outputs per request")
 
         width, height = request.width, request.height
+        # Match Invoke's shared Compose and Canvas dimension limit.
         if not (1 <= width <= 4096 and 1 <= height <= 4096):
             raise ExternalProviderCapabilityError("MiniMax output width and height must be between 1 and 4096 pixels")
         area = width * height
-        if not 655_360 <= area <= 20_000_000 or max(width, height) > 3 * min(width, height):
+        if area < 655_360 or max(width, height) > 3 * min(width, height):
             raise ExternalProviderCapabilityError(
-                "MiniMax output size requires 655,360 to 20,000,000 pixels and an aspect ratio between 1:3 and 3:1"
+                "MiniMax output size requires at least 655,360 pixels and an aspect ratio between 1:3 and 3:1"
             )
         if request.num_images * area > _MAX_JPEG_RESPONSE_PIXELS:
             raise ExternalProviderCapabilityError(
                 "MiniMax inline JPEG output is limited to 80,000,000 pixels per request"
             )
 
+        # Custom model records can override the service's required input modes.
         if request.mode == "img2img" and not inputs:
             raise ExternalProviderCapabilityError("MiniMax image edits require an input image")
         if len(inputs) > MINIMAX_MAX_INPUT_IMAGES:

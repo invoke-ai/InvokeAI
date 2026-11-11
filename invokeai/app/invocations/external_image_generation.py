@@ -13,13 +13,13 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageCollectionOutput
 from invokeai.app.services.external_generation.errors import ExternalProviderCapabilityError
 from invokeai.app.services.external_generation.external_generation_common import (
-    MINIMAX_MAX_INPUT_IMAGES,
     ExternalGenerationRequest,
     ExternalGenerationResult,
     ExternalReferenceImage,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalGenerationMode
+from invokeai.backend.model_manager.starter_models.external import MINIMAX_MAX_INPUT_IMAGES
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 if TYPE_CHECKING:
@@ -410,6 +410,7 @@ class MiniMaxImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
+        # Reject oversized requests before loading their source images.
         if len(self.reference_images) + int(self.init_image is not None) > MINIMAX_MAX_INPUT_IMAGES:
             raise ExternalProviderCapabilityError(
                 f"MiniMax image edits accept at most {MINIMAX_MAX_INPUT_IMAGES} inputs, including the init image"

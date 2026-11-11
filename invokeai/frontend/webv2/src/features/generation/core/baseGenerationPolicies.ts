@@ -67,7 +67,6 @@ import {
   isSeedreamBatchModel,
   MINIMAX_H3_IMAGE_MAX_ASPECT,
   MINIMAX_H3_IMAGE_MAX_INPUT_IMAGES,
-  MINIMAX_H3_IMAGE_MAX_PIXELS,
   MINIMAX_H3_IMAGE_MIN_PIXELS,
   resolveExternalCanvasRequestSize,
   resolveExternalImageSize,
@@ -2442,12 +2441,12 @@ const getDimensionValidationIssues = (model: GenerateModelConfig, settings: Gene
         )
       );
     }
-    if (area < MINIMAX_H3_IMAGE_MIN_PIXELS || area > MINIMAX_H3_IMAGE_MAX_PIXELS) {
+    if (area < MINIMAX_H3_IMAGE_MIN_PIXELS) {
       issues.push(
         issue(
           'dimensions:minimaxArea',
           'minimaxArea',
-          'MiniMax H3-Image requires an image area between 655,360 and 20,000,000 pixels.',
+          'MiniMax H3-Image requires an image area of at least 655,360 pixels.',
           target
         )
       );
