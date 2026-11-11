@@ -210,9 +210,12 @@ describe('gallery state view', () => {
     };
 
     expect(getGalleryStateView(values, boards, [selected]).isComparisonActive).toBe(true);
+    expect(getGalleryStateView(values, boards, [selected]).isCompareArmed).toBe(false);
     expect(getGalleryStateView({ ...values, compareImage: selected }, boards, [selected]).isComparisonActive).toBe(
       false
     );
+    // The same image on both sides: Select for compare is waiting for the second one.
+    expect(getGalleryStateView({ ...values, compareImage: selected }, boards, [selected]).isCompareArmed).toBe(true);
     expect(getGalleryStateView(values, boards, []).isComparisonActive).toBe(false);
 
     const video = createVideoItem('clip');

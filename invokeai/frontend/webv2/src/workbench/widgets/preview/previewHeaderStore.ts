@@ -55,6 +55,8 @@ export interface PreviewHeaderContext {
   /** The view's `useImageActions` instance (carries delete-neighbor handling). */
   actions: ImageActions | null;
   boardName: string | null;
+  /** Set only while Select for compare waits for a second image: switches it off again. */
+  cancelCompare: (() => void) | null;
   copyCurrentVideoFrame: (() => void) | null;
   /** Preview's focusable region, where a header control removed while it holds focus hands it on. */
   getRegion: (() => HTMLElement | null) | null;
@@ -74,6 +76,7 @@ const emptyContext: PreviewHeaderContext = {
   actionItem: null,
   actions: null,
   boardName: null,
+  cancelCompare: null,
   copyCurrentVideoFrame: null,
   getRegion: null,
   isVideoFrameCopyAvailable: false,
@@ -134,3 +137,7 @@ registerAccountOwnedResource({
 });
 
 export const usePreviewStageContext = (): PreviewStageContext => stageStore.useSelector((snapshot) => snapshot);
+
+/** Only the measured density, for readers that must not re-render on every zoom readout. */
+export const usePreviewStageDensity = (): PreviewDensity | null =>
+  stageStore.useSelector((snapshot) => snapshot.density);

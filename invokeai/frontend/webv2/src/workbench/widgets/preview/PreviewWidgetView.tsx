@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import type { QueueActiveSession, QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Flex, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import {
   galleryImages,
@@ -39,8 +39,9 @@ import {
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
-import { Button } from '@platform/ui/Button';
+import { Button, IconButton } from '@platform/ui/Button';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -48,7 +49,7 @@ import {
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
@@ -68,6 +69,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
+import { ImagesIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -95,6 +97,7 @@ import {
   getPreviewVideoLoop,
   type PreviewComparisonMode,
 } from './previewSettings';
+import { getPreviewStagePadding } from './PreviewStage';
 import { usePreviewNavigation } from './usePreviewNavigation';
 
 /** For the live footer's Details slot, which renders disabled and never fires. */
@@ -207,12 +210,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const activeGalleryPlaceholder =
     livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ?? null;
   const shouldFollowLive = activeGalleryPlaceholder !== null;
+  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
   const isComparing =
-    !shouldFollowLive &&
-    selectedItem?.kind === 'image' &&
-    compareImage !== null &&
-    toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) !== selectedItemKey;
-  const { t } = useTranslation();
+    !shouldFollowLive && selectedItem?.kind === 'image' && compareImage !== null && compareImageKey !== selectedItemKey;
+  // Select for compare on the shown image: the comparison image is the selection itself until a second one is picked.
+  const isCompareArmed = !shouldFollowLive && selectedItem?.kind === 'image' && compareImageKey === selectedItemKey;
+  const { i18n, t } = useTranslation();
   const navigationBoundaryRef = useRef<HTMLDivElement | null>(null);
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
   // The header's zoom commands close over the controls ref, so they are stable
@@ -546,6 +549,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       actionItem: shouldFollowLive ? null : contextMenuItem,
       actions: shouldFollowLive ? null : imageActions,
       boardName: headerItemName === null ? null : boardName,
+      cancelCompare: isCompareArmed ? exitCompare : null,
       copyCurrentVideoFrame: !shouldFollowLive && contextMenuItem?.kind === 'video' ? copyCurrentVideoFrame : null,
       getRegion: getNavigationBoundary,
       isVideoFrameCopyAvailable: !shouldFollowLive && isVideoFrameCopyAvailable,
@@ -562,10 +566,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
+    exitCompare,
     getNavigationBoundary,
     hasHeaderItem,
     headerItemName,
     imageActions,
+    isCompareArmed,
     isComparing,
     isLoadingBoard,
     isVideoFrameCopyAvailable,
@@ -676,6 +682,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         tabIndex={0}
         w="full"
       >
+        {/* Mounted throughout, so arming is announced once as its text arrives; the hint itself repeats it visually. */}
+        <Text aria-live="polite" role="status" srOnly>
+          {isCompareArmed ? t('widgets.preview.compareArmedHint') : ''}
+        </Text>
+        {isComparing || isCompareArmed ? (
+          <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
+        ) : null}
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             density={density}
@@ -703,6 +716,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               loupeControlsRef={loupeControlsRef}
               shouldAntialiasProgressImage={antialiasProgressImages}
               swipe={swipeNavigation}
+              onCancelCompare={isCompareArmed ? exitCompare : undefined}
               onContextMenu={openItemContextMenu}
             />
           ) : (
@@ -830,6 +844,8 @@ interface SelectedMediaPreviewProps {
   isItemCurrent: (itemKey: GalleryItemKey) => boolean;
   item: GalleryItem;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
+  /** Set only while Select for compare waits for a second image: the stage shows the hint that cancels it. */
+  onCancelCompare?: () => void;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   onContextMenu: (x: number, y: number) => void;
   swipe?: PreviewSwipeNavigation;
@@ -848,7 +864,6 @@ const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
   </Flex>
 );
 
-const getMediaStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');
 const { setStageElement, setZoom: setZoomReadout } = previewStageStore;
 
 const SelectedMediaPreview = ({
@@ -861,6 +876,7 @@ const SelectedMediaPreview = ({
   isItemCurrent,
   item,
   loupeControlsRef,
+  onCancelCompare,
   onCopyAvailabilityChange,
   onSourceError,
   onSourceLoaded,
@@ -899,7 +915,7 @@ const SelectedMediaPreview = ({
         onSourceLoaded={onSourceLoaded}
         onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
         onZoomChange={setZoomReadout}
-        padding={getMediaStagePadding(density)}
+        padding={getPreviewStagePadding(density)}
         placeholderSrc={placeholderSrc}
         shouldAntialiasLiveImage={shouldAntialiasHoldImage ?? true}
         source={source}
@@ -911,10 +927,115 @@ const SelectedMediaPreview = ({
         onVideoLoopChange={onVideoLoopChange}
       />
       {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
+      {onCancelCompare ? <PreviewCompareArmedHint density={density} onCancel={onCancelCompare} /> : null}
     </Flex>
     {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
   </PreviewMediaScaffold>
 );
+
+// Clear of the centre region's floating chrome, at the top of the stage: the Details panel pins to its right end.
+const COMPARE_HINT_TOP = 'calc(var(--wb-center-chrome-inset, 0px) + var(--chakra-spacing-2))';
+const COMPARE_HINT_MOTION_REDUCE = { animation: 'none' } as const;
+
+/**
+ * Says Select for compare is waiting for a second image, where the shown image is, with the way to call it off. Over
+ * the top of the stage, under the drop zones that cover it during a drag; the filmstrip below stays free to pick from.
+ * Narrower Preview keeps the text, then only its icon: the status line beside the stage says it in full.
+ */
+const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensity; onCancel: () => void }) => {
+  const { t } = useTranslation();
+  const cancelLabel = t('widgets.preview.cancelCompare');
+  // Cancel removes the hint and itself with it; Preview keeps the keys.
+  const cancelRef = useCallback(
+    (node: HTMLButtonElement | null) => (node ? releaseFocusOnRemoval(node) : undefined),
+    []
+  );
+
+  return (
+    <Box
+      data-preview-compare-hint=""
+      display="flex"
+      insetInline="2"
+      justifyContent="center"
+      pointerEvents="none"
+      position="absolute"
+      top={COMPARE_HINT_TOP}
+      zIndex="1"
+    >
+      <HStack
+        animationDuration="fast"
+        animationName="fade-in"
+        bg="bg.panel"
+        borderColor="border.emphasized"
+        borderWidth="1px"
+        boxShadow="md"
+        gap="1.5"
+        maxW="full"
+        minW="0"
+        pointerEvents="auto"
+        ps={density === 'minimal' ? '1' : '2.5'}
+        pe="1"
+        py="0.5"
+        rounded="full"
+        _motionReduce={COMPARE_HINT_MOTION_REDUCE}
+      >
+        <Icon as={ImagesIcon} aria-hidden="true" boxSize="3.5" color="accent.fg" flexShrink={0} />
+        {density === 'minimal' ? null : (
+          // The status line announces it; read here too, it would be said twice.
+          <Text aria-hidden="true" color="fg" fontSize="md" minW="0" truncate>
+            {t('widgets.preview.compareArmedHint')}
+          </Text>
+        )}
+        {density === 'full' ? (
+          <Button ref={cancelRef} aria-label={cancelLabel} flexShrink={0} size="xs" variant="ghost" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+        ) : (
+          <IconButton
+            ref={cancelRef}
+            aria-label={cancelLabel}
+            flexShrink={0}
+            size="xs"
+            tooltip={cancelLabel}
+            variant="ghost"
+            onClick={onCancel}
+          >
+            <XIcon />
+          </IconButton>
+        )}
+      </HStack>
+    </Box>
+  );
+};
+
+const PREVIEW_EXIT_COMPARE_COMMAND = 'viewer.exitCompare';
+
+/**
+ * Esc calls off Select for compare while it waits, and closes an open comparison. Mounted only meanwhile, so Esc keeps
+ * its other meanings the rest of the time; Preview keys it by project and language, which its registration's source
+ * and title follow. An open menu or dialog takes Esc first (`resolveHotkey`).
+ */
+const PreviewExitCompareHotkey = ({ onExit, runtime }: { onExit: () => void; runtime: WidgetViewProps['runtime'] }) => {
+  const { t } = useTranslation();
+
+  // `onExit` clears the active project's comparison through the store's commands, the same for the mount's lifetime.
+  useMountEffect(() => {
+    const title = t('widgets.preview.commands.exitCompare');
+    const disposers = [
+      runtime.commands.register({ handler: onExit, id: PREVIEW_EXIT_COMPARE_COMMAND, title }),
+      runtime.hotkeys.register({
+        commandId: PREVIEW_EXIT_COMPARE_COMMAND,
+        defaultKeys: ['esc'],
+        id: PREVIEW_EXIT_COMPARE_COMMAND,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+
+  return null;
+};
 
 /** Match finished-frame geometry for live previews; saved-image navigation stays in the filmstrip. */
 const LivePreview = ({
@@ -956,7 +1077,7 @@ const LivePreview = ({
         frameHeight={previewImage?.height ?? placeholder.height}
         frameWidth={previewImage?.width ?? placeholder.width}
         isLive
-        padding={getMediaStagePadding(density)}
+        padding={getPreviewStagePadding(density)}
         shouldAntialiasLiveImage={shouldAntialiasProgressImage}
         source={source}
         variant="framed"

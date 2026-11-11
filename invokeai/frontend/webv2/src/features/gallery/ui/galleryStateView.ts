@@ -90,6 +90,8 @@ export interface GalleryStateView {
   galleryView: GalleryView;
   /** A compare image is set and differs from the visible image selection. */
   isComparisonActive: boolean;
+  /** Select for compare is waiting for a second image: the compare image is the visible image selection itself. */
+  isCompareArmed: boolean;
   /** A text, date or semantic search narrows the listing, so the search scope applies. */
   isSearchActive: boolean;
   /** The current scope's listing only; how it stands (loading, failed, ...) is the listing read state's to say. */
@@ -520,6 +522,7 @@ export const getGalleryStateView = (
     visibleSelectedItemKey?.startsWith('image:') === true &&
     compareImageKey !== null &&
     compareImageKey !== visibleSelectedItemKey;
+  const isCompareArmed = compareImageKey !== null && compareImageKey === visibleSelectedItemKey;
   const semanticImageQuery = getGallerySemanticImageQuery(values);
   const page = getGalleryPage(values);
   const selectedImageQuery = getGallerySelectedImageQuery(values);
@@ -546,6 +549,7 @@ export const getGalleryStateView = (
     compareImageKey,
     galleryView,
     isComparisonActive,
+    isCompareArmed,
     isSearchActive: isGallerySearchActive(values),
     items,
     listingBoardId,

@@ -2,6 +2,8 @@ import type { Ref } from 'react';
 
 import { Box, Flex, type BoxProps, type FlexProps, type SystemStyleObject } from '@chakra-ui/react';
 
+import type { PreviewDensity } from './previewDensity';
+
 /**
  * Share PreviewStage's fitted dot-grid surface and chrome clearance across media/live/empty states; FittedFrame
  * supplies bordered, shadowed media geometry.
@@ -30,6 +32,9 @@ const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
  */
 const getStagePaddingTop = (padding: string | undefined): string =>
   padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
+
+/** Stage padding by density, shared by the single item's stage and the comparison stage so their geometry matches. */
+export const getPreviewStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');
 
 /**
  * Use parent fill for inset widget bodies and flex fill for framed stages. Both establish positioning for absolute

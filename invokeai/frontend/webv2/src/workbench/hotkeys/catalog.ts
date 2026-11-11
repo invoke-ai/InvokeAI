@@ -237,6 +237,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('workflows', 'redo', ['mod+shift+z', 'mod+y']),
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
+  // Bound only while Select for compare waits for a second image or a comparison is open, so Esc is otherwise free.
+  hotkey('viewer', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
   hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
   hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
@@ -278,5 +280,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
   hotkey('gallery', 'remix', ['r']),
   hotkey('gallery', 'starImage', ['.']),
+  // Preview's compare Esc, answered where its second image is picked.
+  hotkey('gallery', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('gallery', 'toggleStarredOnly', []),
 ];

@@ -29,6 +29,7 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
   const {
     actionItem,
     actions,
+    cancelCompare,
     copyCurrentVideoFrame,
     getRegion,
     isVideoFrameCopyAvailable,
@@ -72,6 +73,7 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
             getRegion={getRegion ?? undefined}
             isVideoFrameCopyAvailable={isVideoFrameCopyAvailable}
             item={actionItem}
+            onCancelCompare={cancelCompare ?? undefined}
             onCopyCurrentFrame={copyCurrentVideoFrame ?? undefined}
             onOpenMenu={openItemMenu}
           />

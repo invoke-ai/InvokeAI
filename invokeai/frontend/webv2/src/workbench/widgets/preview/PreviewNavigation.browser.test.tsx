@@ -530,6 +530,7 @@ await i18n.use(initReactI18next).init({
     en: {
       translation: {
         common: {
+          cancel: 'Cancel',
           countOfTotal: '{{count}} of {{total}}',
           generating: 'Generating',
           videoPlayer: {
@@ -546,7 +547,13 @@ await i18n.use(initReactI18next).init({
         widgets: {
           gallery: { commands: { clearSelection: 'Clear gallery selection' } },
           preview: {
-            commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
+            cancelCompare: 'Cancel compare',
+            commands: {
+              exitCompare: 'Cancel or exit compare',
+              nextItem: 'Show next item',
+              previousItem: 'Show previous item',
+            },
+            compareArmedHint: 'Pick another image to compare with this one',
             imageActions: 'Item actions',
             noGallerySelection: 'No gallery selection',
             showGallery: 'Show Gallery',
@@ -3634,16 +3641,21 @@ describe('preview keyboard navigation boundary', () => {
     const values = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
     values.compareImage = mocks.recentImages[1];
     mocks.project.settings.viewerAutoSwitch = 'progress';
+    // Narrow Preview shows exit as an icon, so look for the control by its accessible name.
+    const isComparing = () =>
+      Array.from(host!.querySelectorAll('button')).some(
+        (button) => (button.getAttribute('aria-label') ?? button.textContent) === 'widgets.preview.exitCompare'
+      );
     await render();
-    expect(host!.textContent).toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(true);
     mocks.project.queue.items = [queueItem];
     mocks.runningProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
     await rerender();
-    expect(host!.textContent).not.toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(false);
     mocks.runningProgressTargets = [];
     mocks.project.queue.items = [];
     await rerender();
-    expect(host!.textContent).toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(true);
   });
   it('keeps pinned live controls and footer inside the widget without saved-image arrows or zero count', async () => {
     mocks.project.queue.items = [queueItem];
@@ -4010,6 +4022,43 @@ describe('preview deletion confirmation', () => {
   });
 });
 
+/** The shared item actions as stand-ins, for tests that open the real item menu. */
+const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions => ({
+  canUseAsConditioningClip: { audio: false, video: false },
+  canUseAsReferenceImage: false,
+  canUseAsReferenceVideo: false,
+  copyImage: vi.fn(() => Promise.resolve()),
+  createCanvasFromImages: vi.fn(() => Promise.resolve()),
+  deleteItems: vi.fn(() => Promise.resolve()),
+  deleteImages: vi.fn(() => Promise.resolve()),
+  deriveImageRecallCapabilities: vi.fn(() => EMPTY_IMAGE_RECALL_CAPABILITIES),
+  downloadItem: vi.fn(() => Promise.resolve()),
+  downloadItems: vi.fn(() => Promise.resolve()),
+  downloadImage: vi.fn(() => Promise.resolve()),
+  downloadImages: vi.fn(() => Promise.resolve()),
+  generatePbrMaps: vi.fn(() => Promise.resolve()),
+  loadImageWorkflow: vi.fn(() => Promise.resolve()),
+  moveItemsToBoard: vi.fn(() => Promise.resolve()),
+  moveImagesToBoard: vi.fn(() => Promise.resolve()),
+  openItemInNewTab: vi.fn(),
+  openItemInPreview: vi.fn(),
+  openImageInPreview: vi.fn(),
+  recallImageData: vi.fn(() => Promise.resolve()),
+  loadVideoWorkflow: vi.fn(() => Promise.resolve()),
+  recallVideoData: vi.fn(() => Promise.resolve()),
+  selectForCompare: vi.fn(),
+  sendToCanvas: vi.fn(() => Promise.resolve()),
+  sendImageAsControl: vi.fn(() => Promise.resolve()),
+  setItemsStarred: vi.fn(() => Promise.resolve()),
+  setImagesStarred: vi.fn(() => Promise.resolve()),
+  savePromptAsTemplate: vi.fn(),
+  sendToInitialVideo: vi.fn(),
+  useAsReferenceImage: vi.fn(),
+  useAsConditioningClip: vi.fn(),
+  useAsReferenceVideo: vi.fn(),
+  ...overrides,
+});
+
 describe('preview item menu focus', () => {
   const successor = { ...mocks.recentImages[1], boardId: 'none' };
   let confirmDeletion: (() => void) | null = null;
@@ -4025,41 +4074,6 @@ describe('preview item menu focus', () => {
       };
     });
   };
-  const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions => ({
-    canUseAsConditioningClip: { audio: false, video: false },
-    canUseAsReferenceImage: false,
-    canUseAsReferenceVideo: false,
-    copyImage: vi.fn(() => Promise.resolve()),
-    createCanvasFromImages: vi.fn(() => Promise.resolve()),
-    deleteItems: vi.fn(() => Promise.resolve()),
-    deleteImages: vi.fn(() => Promise.resolve()),
-    deriveImageRecallCapabilities: vi.fn(() => EMPTY_IMAGE_RECALL_CAPABILITIES),
-    downloadItem: vi.fn(() => Promise.resolve()),
-    downloadItems: vi.fn(() => Promise.resolve()),
-    downloadImage: vi.fn(() => Promise.resolve()),
-    downloadImages: vi.fn(() => Promise.resolve()),
-    generatePbrMaps: vi.fn(() => Promise.resolve()),
-    loadImageWorkflow: vi.fn(() => Promise.resolve()),
-    moveItemsToBoard: vi.fn(() => Promise.resolve()),
-    moveImagesToBoard: vi.fn(() => Promise.resolve()),
-    openItemInNewTab: vi.fn(),
-    openItemInPreview: vi.fn(),
-    openImageInPreview: vi.fn(),
-    recallImageData: vi.fn(() => Promise.resolve()),
-    loadVideoWorkflow: vi.fn(() => Promise.resolve()),
-    recallVideoData: vi.fn(() => Promise.resolve()),
-    selectForCompare: vi.fn(),
-    sendToCanvas: vi.fn(() => Promise.resolve()),
-    sendImageAsControl: vi.fn(() => Promise.resolve()),
-    setItemsStarred: vi.fn(() => Promise.resolve()),
-    setImagesStarred: vi.fn(() => Promise.resolve()),
-    savePromptAsTemplate: vi.fn(),
-    sendToInitialVideo: vi.fn(),
-    useAsReferenceImage: vi.fn(),
-    useAsConditioningClip: vi.fn(),
-    useAsReferenceVideo: vi.fn(),
-    ...overrides,
-  });
   /** Renders Preview with the real item menu, whose Delete asks first unless the user chose not to be asked. */
   const renderWithItemMenu = async ({ asks = true, ...overrides }: Partial<ImageActions> & { asks?: boolean } = {}) => {
     const deleteItems = vi.fn<ImageActions['deleteItems']>((items, options) =>
@@ -4403,5 +4417,90 @@ describe('preview label clear selection', () => {
 
     expect(mocks.revealPlacedWidget).toHaveBeenCalledWith(expect.objectContaining({ typeId: 'gallery' }));
     expect(mocks.openWidget).not.toHaveBeenCalled();
+  });
+});
+
+describe('preview select for compare', () => {
+  const shown = { ...mocks.recentImages[0], boardId: 'none' };
+  const other = { ...mocks.recentImages[1], boardId: 'none' };
+  const status = () => host!.querySelector('[role="status"][aria-live="polite"]')?.textContent ?? '';
+  const hint = () => host!.querySelector<HTMLElement>('[data-preview-compare-hint]');
+  const cancelButton = () => hint()?.querySelector<HTMLButtonElement>('button[aria-label="Cancel compare"]') ?? null;
+  const isComparing = () =>
+    Array.from(host!.querySelectorAll('button')).some(
+      (button) => (button.getAttribute('aria-label') ?? button.textContent) === 'widgets.preview.exitCompare'
+    );
+
+  beforeEach(() => {
+    mocks.commands.gallery.setCompareItem.mockClear();
+    // Waiting for a second image: the comparison image is the shown image itself.
+    setGalleryValues({ compareImage: shown });
+  });
+
+  it('says it is waiting, from the persisted state alone, and calls it off from the hint', async () => {
+    await render();
+
+    expect(status()).toBe('Pick another image to compare with this one');
+    expect(hint()).not.toBeNull();
+    expect(isComparing()).toBe(false);
+
+    await act(() => userEvent.click(cancelButton()!));
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it('compares once another image is picked, the hint giving way to the comparison', async () => {
+    await render();
+    await act(async () => {
+      publishGalleryValues({ selectedImage: other, selectedImageName: other.imageName });
+      await Promise.resolve();
+    });
+
+    expect(isComparing()).toBe(true);
+    expect(hint()).toBeNull();
+    expect(status()).toBe('');
+  });
+
+  it('shows nothing while no image waits', async () => {
+    setGalleryValues({ compareImage: null });
+    await render();
+
+    expect(hint()).toBeNull();
+    expect(status()).toBe('');
+  });
+
+  it('calls it off on Esc, after an open menu takes the first press', async () => {
+    mocks.imageActions = createItemMenuActions({});
+    await render();
+    getBoundary().focus();
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'full');
+      await Promise.resolve();
+    });
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+    expect(mocks.commands.gallery.setCompareItem).not.toHaveBeenCalled();
+
+    await pressKeyOn(getBoundary(), 'Escape');
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it('closes an open comparison on Esc, and leaves Esc alone once nothing is compared', async () => {
+    setGalleryValues({ compareImage: other });
+    await render();
+    expect(isComparing()).toBe(true);
+
+    await pressKeyOn(getBoundary(), 'Escape');
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+
+    await act(async () => {
+      publishGalleryValues({ compareImage: null });
+      await Promise.resolve();
+    });
+    const press = await pressKeyOn(getBoundary(), 'Escape');
+
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledOnce();
+    expect(press.defaultPrevented).toBe(false);
   });
 });

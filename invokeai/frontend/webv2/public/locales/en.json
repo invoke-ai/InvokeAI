@@ -3819,6 +3819,7 @@
       "chooseAnotherItem": "{{label}}. Choose another item",
       "commands": {
         "deletePreviewImage": "Delete preview image",
+        "exitCompare": "Cancel or exit compare",
         "nextComparisonMode": "Next comparison mode",
         "nextItem": "Show next item",
         "previousItem": "Show previous item",
@@ -3828,7 +3829,10 @@
         "zoomToActual": "Zoom preview to 100%",
         "zoomToFit": "Zoom preview to fit"
       },
+      "cancelCompare": "Cancel compare",
       "compare": "Compare",
+      "compareArmedHint": "Pick another image to compare with this one",
+      "compareArmedTooltip": "Pick another image to compare · click to cancel",
       "copyCurrentFrame": "Copy current frame",
       "copyCurrentFrameDrawFailed": "Could not read the current video frame",
       "copyCurrentFrameEncodeFailed": "Could not encode the current video frame",

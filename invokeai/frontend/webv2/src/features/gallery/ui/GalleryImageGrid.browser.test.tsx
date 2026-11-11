@@ -331,6 +331,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isCompareArmed: false,
     isSearchActive: false,
     items,
     listingBoardId: overrides.selectedBoardId ?? board.id,
@@ -1430,6 +1431,54 @@ describe('GalleryImageGrid mixed item cells', () => {
       ],
       kind: 'gallery-item',
     });
+  });
+
+  it('marks the image Select for compare waits with as the comparison, and only it', async () => {
+    const tileText = (name: string) =>
+      getButton(`Select ${name} for preview`).closest('[role="listitem"]')?.textContent ?? '';
+    await renderGallery(
+      createGallery({
+        compareImageKey: 'image:first.png',
+        isCompareArmed: true,
+        items: [createItem('image', 'first.png'), createItem('image', 'second.png')],
+        selectedItemKey: 'image:first.png',
+        selectedItemKeys: ['image:first.png'],
+      })
+    );
+
+    expect(tileText('first.png')).toContain('Compare');
+    expect(tileText('second.png')).not.toContain('Compare');
+    expect(host!.textContent).not.toContain('Viewing');
+
+    // Esc calls it off from the Gallery too, where the second image is picked.
+    registeredCommands.get('gallery.exitCompare')?.();
+    expect(actionMocks.setCompareItem).toHaveBeenLastCalledWith(null);
+
+    // Live frames on screen do not hide it here: the next click would still pick the second image.
+    currentProgressSessions = [
+      {
+        backendItemId: 10,
+        height: 768,
+        id: 'run:1',
+        itemCount: 1,
+        itemIndex: 1,
+        label: 'Workflow A',
+        queueItemId: 'run',
+        sourceId: 'workflow',
+        state: 'running',
+        width: 512,
+      },
+    ];
+    currentLiveFollowEnabled = true;
+    await renderGallery();
+    expect(tileText('first.png')).toContain('Compare');
+    expect(registeredCommands.has('gallery.exitCompare')).toBe(true);
+  });
+
+  it('leaves Esc unclaimed while nothing is compared', async () => {
+    await renderGallery(createGallery({ items: [createItem('image', 'first.png')] }));
+
+    expect(registeredCommands.has('gallery.exitCompare')).toBe(false);
   });
 
   it('keeps Alt comparison image-only and forms a one-video context target outside selection', async () => {

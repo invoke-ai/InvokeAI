@@ -134,9 +134,13 @@ const createCommands = (
           itemKeys,
         })
       ),
-      removeItems: command('removeGalleryItems', (itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys']) => ({
-        itemKeys,
-      })),
+      removeItems: command(
+        'removeGalleryItems',
+        (
+          itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys'],
+          options?: Pick<ActionPayload<'removeGalleryItems'>, 'keepComparisonForSuccessor'>
+        ) => ({ itemKeys, ...options })
+      ),
       reconcileDeletedBoardOutcome: command(
         'reconcileDeletedGalleryBoard',
         (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })

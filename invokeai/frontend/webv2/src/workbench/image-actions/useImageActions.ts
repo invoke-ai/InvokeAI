@@ -371,7 +371,8 @@ export const useImageActions = ({
     const applyGalleryItemRemoval = (itemKeys: GalleryItemKey[]): GalleryWidgetKeySnapshotEntry[] => {
       const before = captureGalleryWidgetKeyValues(queries.getSnapshot().projects);
 
-      gallery.removeItems(itemKeys);
+      // The request decides whether a next image is selected; until it settles an open comparison waits for it.
+      gallery.removeItems(itemKeys, { keepComparisonForSuccessor: true });
 
       return diffGalleryWidgetKeyValues(before, queries.getSnapshot().projects);
     };
@@ -581,7 +582,11 @@ export const useImageActions = ({
             { kind: 'delete', result },
             { totals: cachesRolledBack ? 'listing' : 'holder' }
           );
-          gallery.removeItems(result.succeeded.map(toGalleryItemKey));
+          // Deleting the shown image of a comparison shows the next image against the same comparison image; with no
+          // next image, a comparison left without a selection ends here.
+          gallery.removeItems(result.succeeded.map(toGalleryItemKey), {
+            keepComparisonForSuccessor: successor !== null,
+          });
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));
             const retainedFailedKeys = items

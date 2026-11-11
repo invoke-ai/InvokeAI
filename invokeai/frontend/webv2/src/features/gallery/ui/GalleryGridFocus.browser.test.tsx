@@ -165,6 +165,7 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   compareImageKey: null,
   galleryView: 'images',
   isComparisonActive: false,
+  isCompareArmed: false,
   isSearchActive: false,
   items,
   listingBoardId: 'board-a',

@@ -119,6 +119,8 @@ export const PreviewDetailsPanel = ({
         return;
       }
       event.preventDefault();
+      // The press is the panel's alone: Preview's own Esc (cancelling or closing a comparison) must not also take it.
+      event.stopPropagation();
       onOpenChange(false);
     },
     [onOpenChange]

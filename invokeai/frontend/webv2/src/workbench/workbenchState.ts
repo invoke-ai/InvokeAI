@@ -576,7 +576,15 @@ type WorkbenchReducerAction =
       changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>;
       itemKeys: GalleryItemKey[];
     }
-  | { type: 'removeGalleryItems'; itemKeys: GalleryItemKey[] }
+  | {
+      type: 'removeGalleryItems';
+      itemKeys: GalleryItemKey[];
+      /**
+       * The caller selects a next image right after, as deleting the shown item does: an open comparison stays for it.
+       * Otherwise a removal that leaves nothing selected ends the comparison.
+       */
+      keepComparisonForSuccessor?: boolean;
+    }
   | {
       type: 'reconcileDeletedGalleryBoard';
       outcome: GalleryBoardDeletionResult;
@@ -1441,6 +1449,57 @@ const getGalleryItemFromPersistedValue = (values: Record<string, unknown>, value
     selectedImage: value,
     selectedImageName: null,
   });
+
+const getPersistedPrimaryGalleryItemKey = (values: Record<string, unknown>): GalleryItemKey | null => {
+  if (typeof values.selectedImageName === 'string') {
+    return canonicalizeGalleryItemKey(values.selectedImageName);
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? toGalleryItemKey(selectedItem) : null;
+};
+
+/**
+ * Preview compares the stored comparison image with a different selected image. While both are the same image, Select
+ * for compare is waiting for the second one (`armed`).
+ */
+const getGalleryCompareState = (values: Record<string, unknown>): 'armed' | 'comparing' | null => {
+  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
+  const primaryKey = getPersistedPrimaryGalleryItemKey(values);
+
+  if (!compareItem || primaryKey === null || parseGalleryItemKey(primaryKey).kind !== 'image') {
+    return null;
+  }
+
+  return primaryKey === toGalleryItemKey(compareItem) ? 'armed' : 'comparing';
+};
+
+/**
+ * What selecting `item` does to the comparison. A video cannot be compared. Picking the comparison image of an open pair
+ * swaps the pair, as Swap does; picking it with nothing selected leaves no pair to wait in.
+ */
+const getSelectionComparePatch = (values: Record<string, unknown>, item: GalleryItem): Record<string, unknown> => {
+  if (item.kind === 'video') {
+    return { compareImage: null };
+  }
+
+  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
+
+  if (!compareItem || toGalleryItemKey(compareItem) !== toGalleryItemKey(item)) {
+    return {};
+  }
+
+  const compareState = getGalleryCompareState(values);
+
+  if (compareState === 'armed') {
+    return {};
+  }
+
+  const previousItem = compareState === 'comparing' ? getSelectedGalleryItemFromValues(values) : null;
+
+  return { compareImage: previousItem?.kind === 'image' ? previousItem : null };
+};
 
 /**
  * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
@@ -3444,7 +3503,8 @@ const getLocallyKnownGalleryItemsOnBoard = (
 
 const removeGalleryItemsFromAllProjects = (
   state: WorkbenchState,
-  removedItemKeys: ReadonlySet<GalleryItemKey>
+  removedItemKeys: ReadonlySet<GalleryItemKey>,
+  keepComparisonForSuccessor = false
 ): WorkbenchState => {
   if (removedItemKeys.size === 0) {
     return state;
@@ -3482,8 +3542,14 @@ const removeGalleryItemsFromAllProjects = (
       );
       const nextSelectedItemKeys = selectedItemKeys.filter((key) => !removedItemKeys.has(key));
       const nextSelectedImage = selectedImageKey && removedItemKeys.has(selectedImageKey) ? null : selectedImage;
-      const nextCompareImage = compareImageKey && removedItemKeys.has(compareImageKey) ? null : compareImage;
       const nextSelectedImageName = selectedNameKey && removedItemKeys.has(selectedNameKey) ? null : selectedImageName;
+      // As clearing the selection does: a comparison left without a selection would open on whatever image is selected
+      // next, unless the caller is about to select the next image itself.
+      const nextCompareImage =
+        (compareImageKey && removedItemKeys.has(compareImageKey)) ||
+        (!keepComparisonForSuccessor && !nextSelectedImage && !nextSelectedImageName)
+          ? null
+          : compareImage;
 
       if (
         nextRecentImages.length === recentImages.length &&
@@ -3760,7 +3826,8 @@ const getGalleryResultSelectionValues = (
   const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
-    ...(item.kind === 'video' ? { compareImage: null } : {}),
+    // A comparison waiting for its second image is the user's to complete; a result arriving does not complete it.
+    ...(item.kind === 'video' || getGalleryCompareState(galleryValues) === 'armed' ? { compareImage: null } : {}),
     selectedImage: item,
     selectedImageName: itemKey,
     selectedImageNames: [itemKey],
@@ -5882,7 +5949,7 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+            ...getSelectionComparePatch(values, action.item),
             selectedImage: action.item,
             selectedImageName: itemKey,
             selectedImageNames: [itemKey],
@@ -5899,13 +5966,15 @@ const reduceWorkbenchAction = (
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
+          // Building a selection is not picking the second image: a comparison waiting for one ends.
+          const isCompareArmed = getGalleryCompareState(values) === 'armed';
 
           if (!selectedItemKeys.includes(itemKey)) {
             const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
-              ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+              ...(action.item.kind === 'video' || isCompareArmed ? { compareImage: null } : {}),
               selectedImage: action.item,
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
@@ -5927,6 +5996,7 @@ const reduceWorkbenchAction = (
           if (!wasPrimary) {
             return {
               ...values,
+              ...(isCompareArmed ? { compareImage: null } : {}),
               selectedImageNames: remainingItemKeys,
             };
           }
@@ -5947,7 +6017,7 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(nextPrimaryItem?.kind === 'image' ? {} : { compareImage: null }),
+            ...(nextPrimaryItem?.kind === 'image' && !isCompareArmed ? {} : { compareImage: null }),
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
@@ -5975,7 +6045,10 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(action.primaryItem.kind === 'video' ? { compareImage: null } : {}),
+            // Building a selection is not picking the second image: a comparison waiting for one ends.
+            ...(action.primaryItem.kind === 'video' || getGalleryCompareState(values) === 'armed'
+              ? { compareImage: null }
+              : {}),
             selectedImage: action.primaryItem,
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
@@ -6022,7 +6095,14 @@ const reduceWorkbenchAction = (
     case 'clearGallerySelection': {
       return updateGalleryValues(
         state,
-        (values) => ({ ...values, selectedImage: null, selectedImageName: null, selectedImageNames: [] }),
+        // A comparison has no pair without a selection; one left behind would open on the next image selected.
+        (values) => ({
+          ...values,
+          compareImage: null,
+          selectedImage: null,
+          selectedImageName: null,
+          selectedImageNames: [],
+        }),
         action.projectId
       );
     }
@@ -6182,7 +6262,7 @@ const reduceWorkbenchAction = (
       return patchGalleryItemsAcrossProjects(state, new Set(action.itemKeys), action.changes);
     }
     case 'removeGalleryItems': {
-      return removeGalleryItemsFromAllProjects(state, new Set(action.itemKeys));
+      return removeGalleryItemsFromAllProjects(state, new Set(action.itemKeys), action.keepComparisonForSuccessor);
     }
     case 'reconcileDeletedGalleryBoard': {
       const { outcome } = action;
@@ -6614,9 +6694,21 @@ const reduceWorkbenchAction = (
           keyof ProjectSettings
         >;
 
-        return [...keys].every((key) => areProjectSettingValuesEqual(project.settings[key], settings[key]))
-          ? project
-          : { ...project, settings };
+        if ([...keys].every((key) => areProjectSettingValuesEqual(project.settings[key], settings[key]))) {
+          return project;
+        }
+
+        // Select for compare turns Auto-switch Off; turning it back on ends the wait, so live frames can never hide a
+        // comparison that a later selection would open.
+        const endsCompareWait =
+          project.settings.viewerAutoSwitch === 'off' &&
+          settings.viewerAutoSwitch !== 'off' &&
+          getGalleryCompareState(getWidgetValues(project, 'gallery')) === 'armed';
+        const nextProject = { ...project, settings };
+
+        return endsCompareWait
+          ? updateProjectWidgetValues(nextProject, 'gallery', (values) => ({ ...values, compareImage: null }))
+          : nextProject;
       });
     }
     case 'setScopedDefaults': {

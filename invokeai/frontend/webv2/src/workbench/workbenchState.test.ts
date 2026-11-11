@@ -6493,7 +6493,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(createDraftProject([]).settings.viewerAutoSwitch).toBe('progress');
   });
 
-  it('clears the Gallery selection while keeping the compare image and navigation stamp', () => {
+  it('clears the Gallery selection and its comparison, keeping the navigation stamp', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
@@ -6508,8 +6508,180 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.selectedImage).toBeNull();
     expect(values.selectedImageName).toBeNull();
     expect(values.selectedImageNames).toEqual([]);
-    expect(values.compareImage).toMatchObject({ name: 'compare.png' });
+    // A comparison left behind would open again on whatever image is selected next.
+    expect(values.compareImage).toBeNull();
     expect(values.selectedImageQuery).toBeDefined();
+  });
+
+  describe('a comparison waiting for its second image', () => {
+    const galleryValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    // Select for compare on the shown image: the comparison image is the selection itself until another is picked.
+    const arm = (name = 'base.png') => {
+      const base = createGalleryImageItem(name);
+      let state = workbenchReducer(createInitialWorkbenchState(), { item: base, type: 'selectGalleryItem' });
+
+      state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+      return state;
+    };
+
+    it('compares the next image picked against it', () => {
+      const state = workbenchReducer(arm(), { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: { name: 'base.png' },
+        selectedImageName: 'image:other.png',
+      });
+    });
+
+    it('is cancelled by a multi-selection, whether toggled or ranged', () => {
+      const toggled = workbenchReducer(arm(), {
+        item: createGalleryImageItem('other.png'),
+        nextPrimaryItem: null,
+        type: 'toggleGalleryItemInSelection',
+      });
+      const ranged = workbenchReducer(arm(), {
+        itemKeys: ['image:base.png', 'image:other.png'],
+        primaryItem: createGalleryImageItem('other.png'),
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(galleryValues(toggled).compareImage).toBeNull();
+      expect(galleryValues(toggled).selectedImageNames).toEqual(['image:base.png', 'image:other.png']);
+      expect(galleryValues(ranged).compareImage).toBeNull();
+    });
+
+    it('keeps an open comparison through a multi-selection, as before', () => {
+      let state = workbenchReducer(arm(), { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+
+      state = workbenchReducer(state, {
+        item: createGalleryImageItem('third.png'),
+        nextPrimaryItem: null,
+        type: 'toggleGalleryItemInSelection',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'base.png' });
+    });
+
+    it('is cancelled, not consumed, by a result Auto-switch selects', () => {
+      let state = primeGenerate();
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = submitGenerate(state);
+      const queueItem = getActiveProject(state).queue.items[0]!;
+      const base = createGalleryImageItem('base.png');
+
+      state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+      state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+      // Arming turned Auto-switch Off; the user turns it back on before the run finishes.
+      state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'latest' }, type: 'setActiveProjectSettings' });
+      state = workbenchReducer(state, {
+        images: [createImage('result.png', queueItem.id)],
+        projectId: getActiveProject(state).id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+      expect(galleryValues(state)).toMatchObject({ compareImage: null, selectedImageName: 'image:result.png' });
+    });
+
+    it.each(['progress', 'latest'] as const)(
+      'is ended by turning Auto-switch back on (%s), so live frames never hide it',
+      (mode) => {
+        let state = primeGenerate();
+        state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+        state = submitGenerate(state);
+        const queueItem = getActiveProject(state).queue.items[0]!;
+        const base = createGalleryImageItem('base.png');
+
+        state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+        state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+        expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+        // Following the run's live frames again (the Auto-switch menu, or a progress tile) ends the wait at once.
+        state = workbenchReducer(state, { settings: { viewerAutoSwitch: mode }, type: 'setActiveProjectSettings' });
+        expect(galleryValues(state).compareImage).toBeNull();
+
+        // Picking another image mid-run, then the result arriving, opens no comparison.
+        state = workbenchReducer(state, { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+        state = workbenchReducer(state, {
+          images: [createImage('result.png', queueItem.id)],
+          projectId: getActiveProject(state).id,
+          queueItemId: queueItem.id,
+          type: 'routeQueueItemResults',
+        });
+        expect(galleryValues(state).compareImage).toBeNull();
+      }
+    );
+
+    it('is cancelled by deleting the image it waits with', () => {
+      const state = workbenchReducer(arm(), { itemKeys: ['image:base.png'], type: 'removeGalleryItems' });
+
+      expect(galleryValues(state).compareImage).toBeNull();
+    });
+  });
+
+  describe('deleting the shown image of an open comparison', () => {
+    const galleryValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    const compareWithReference = () => {
+      const state = workbenchReducer(createInitialWorkbenchState(), {
+        item: createGalleryImageItem('candidate-1.png'),
+        type: 'selectGalleryItem',
+      });
+
+      return workbenchReducer(state, {
+        image: createGalleryImageItem('reference.png'),
+        type: 'setGalleryCompareImage',
+      });
+    };
+
+    it('keeps the comparison for the next candidate the deletion selects', () => {
+      // Culling: each rejected candidate is deleted, and the next one shows against the same reference.
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'reference.png' });
+      state = workbenchReducer(state, { item: createGalleryImageItem('candidate-2.png'), type: 'selectGalleryItem' });
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: { name: 'reference.png' },
+        selectedImageName: 'image:candidate-2.png',
+      });
+    });
+
+    it('ends the comparison when no next image follows, so a later selection opens none', () => {
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state)).toMatchObject({ compareImage: null, selectedImage: null });
+      state = workbenchReducer(state, { item: createGalleryImageItem('later.png'), type: 'selectGalleryItem' });
+      expect(galleryValues(state).compareImage).toBeNull();
+    });
+
+    it('keeps the comparison when the selection survives the deletion', () => {
+      const state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:unrelated.png'],
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'reference.png' });
+    });
+  });
+
+  it('swaps an open comparison when its comparison image is picked', () => {
+    const base = createGalleryImageItem('base.png');
+    const viewing = createGalleryImageItem('viewing.png');
+    let state = workbenchReducer(createInitialWorkbenchState(), { item: viewing, type: 'selectGalleryItem' });
+
+    state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+    state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+
+    // The pair stays open with its sides exchanged, rather than collapsing into a comparison waiting for an image.
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).toMatchObject({
+      compareImage: { name: 'viewing.png' },
+      selectedImageName: 'image:base.png',
+    });
   });
 
   it('preserves a manually selected image when later Gallery results arrive', () => {

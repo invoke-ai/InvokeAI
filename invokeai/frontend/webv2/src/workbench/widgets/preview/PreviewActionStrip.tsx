@@ -4,7 +4,7 @@ import type { ImageActions, ImageContextMenuVariant } from '@workbench/image-act
 import { Icon, HStack, Menu, Portal } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
 import { canCopyImage } from '@platform/browser/clipboard';
-import { Button, IconButton } from '@platform/ui/Button';
+import { Button, IconButton, ToggleIconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { releaseFocusOnRemoval } from '@workbench/focusRegions';
@@ -46,6 +46,7 @@ export const PreviewActionStrip = ({
   getRegion,
   isVideoFrameCopyAvailable = false,
   item,
+  onCancelCompare,
   onCopyCurrentFrame,
   onOpenMenu,
 }: {
@@ -55,6 +56,8 @@ export const PreviewActionStrip = ({
   getRegion?: () => HTMLElement | null;
   isVideoFrameCopyAvailable?: boolean;
   item: GalleryItem;
+  /** Set only while Select for compare waits for a second image, which shows it pressed; switches it off. */
+  onCancelCompare?: () => void;
   onCopyCurrentFrame?: () => void;
   /** Opens the view's image context menu at viewport coordinates, leaving out what the strip already offers. */
   onOpenMenu: ((x: number, y: number, variant: ImageContextMenuVariant) => void) | null;
@@ -65,7 +68,17 @@ export const PreviewActionStrip = ({
     () => void actions.setItemsStarred([toGalleryItemRef(item)], !item.starred),
     [actions, item]
   );
-  const selectForCompare = useCallback(() => image && actions.selectForCompare(image), [actions, image]);
+  const isCompareArmed = onCancelCompare !== undefined;
+  const toggleCompare = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        onCancelCompare?.();
+      } else if (image) {
+        actions.selectForCompare(image);
+      }
+    },
+    [actions, image, onCancelCompare]
+  );
   const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
   const hasItemMenus = density !== 'minimal';
   const openMenu = useCallback(
@@ -124,7 +137,17 @@ export const PreviewActionStrip = ({
       {image ? <EditMenu actions={actions} image={image} /> : null}
       <UseMenu actions={actions} item={item} />
       {image ? (
-        <StripIconButton icon={ImagesIcon} label={t('widgets.preview.selectForCompare')} onClick={selectForCompare} />
+        // A fixed name with the state in aria-pressed, as the routing lock is: pressed, it waits for a second image.
+        <ToggleIconButton
+          bg={isCompareArmed ? 'accent.subtle' : undefined}
+          checked={isCompareArmed}
+          color={isCompareArmed ? 'accent.fg' : 'fg.muted'}
+          icon={ImagesIcon}
+          label={t('widgets.preview.selectForCompare')}
+          tooltip={isCompareArmed ? t('widgets.preview.compareArmedTooltip') : undefined}
+          variant="ghost"
+          onCheckedChange={toggleCompare}
+        />
       ) : null}
       {starButton}
       {item.kind === 'video' && onCopyCurrentFrame ? (

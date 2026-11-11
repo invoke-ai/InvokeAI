@@ -19,6 +19,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
+import { getPreviewDockBarHeight, PREVIEW_DOCK_BAR_PROPS } from './previewDockBar';
+
 /**
  * Render board thumbnails below the stage in the gallery's order: the starred strip, the live GPU slots, then the
  * listing, where each slot's result lands beside it. Reserve height outside media; item drag payloads work with
@@ -87,18 +89,13 @@ export const PreviewFilmstrip = ({
     // Set explicit ScrollArea height and inline-size containment so the strip neither consumes widget height nor
     // expands its width.
     <Scrollable
-      bg="bg.subtle"
-      borderColor="border.subtle"
-      borderTopWidth="1px"
+      {...PREVIEW_DOCK_BAR_PROPS}
       contentProps={FILMSTRIP_CONTENT_PROPS}
       css={FILMSTRIP_CONTAIN_CSS}
       data-preview-filmstrip
-      flexShrink={0}
-      h={density === 'full' ? '3.75rem' : '2.75rem'}
+      h={getPreviewDockBarHeight(density)}
       minW="0"
       orientation="horizontal"
-      px="2"
-      w="full"
     >
       <HStack align="center" gap="1" h="full">
         {items.slice(0, leadingItemCount).map(renderItem)}

@@ -16,6 +16,7 @@ import {
   imageIndexAvailabilityOptions,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, DropZone } from '@platform/ui';
 import { LoadError, RetryButton } from '@platform/ui/LoadError';
@@ -405,6 +406,37 @@ const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | '
   }
 };
 
+const GALLERY_EXIT_COMPARE_COMMAND = 'gallery.exitCompare';
+
+/**
+ * Esc ends a comparison from the Gallery, where its second image is picked: one waiting for that image, or one open in
+ * Preview. Mounted only meanwhile, so Esc keeps its other meanings the rest of the time; the grid keys it by project and
+ * language, which its registration's source and title follow.
+ */
+const GalleryExitCompareHotkey = () => {
+  const { t } = useTranslation();
+  const { actions, runtime } = useGalleryWidget();
+
+  // The host's compare command clears the open project's comparison, the same for the mount's lifetime.
+  useMountEffect(() => {
+    const exitCompare = () => actions.setCompareItem(null);
+    const title = t('widgets.preview.commands.exitCompare');
+    const disposers = [
+      runtime.commands.register({ handler: exitCompare, id: GALLERY_EXIT_COMPARE_COMMAND, title }),
+      runtime.hotkeys.register({
+        commandId: GALLERY_EXIT_COMPARE_COMMAND,
+        defaultKeys: ['esc'],
+        id: GALLERY_EXIT_COMPARE_COMMAND,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+
+  return null;
+};
+
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = ({
   mediaFilterTriggerRef,
@@ -412,7 +444,7 @@ export const GalleryImageGrid = ({
   /** The layout's media filter trigger, which takes focus when "Show all media" removes itself. */
   mediaFilterTriggerRef?: RefObject<HTMLButtonElement | null>;
 } = {}) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const {
     actions,
     filter,
@@ -420,6 +452,7 @@ export const GalleryImageGrid = ({
     itemActions,
     listing,
     pinRevealIndex,
+    projectId,
     region,
     setVisibleRange,
     sparseListing,
@@ -509,6 +542,8 @@ export const GalleryImageGrid = ({
     : 0;
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
+  // Not hidden while live frames show: the waiting image stays marked where the second image is picked.
+  const isCompareArmed = gallery.isCompareArmed;
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
   const selectedBoardName = selectedBoard
     ? getGalleryBoardLabel(selectedBoard, t)
@@ -1709,7 +1744,8 @@ export const GalleryImageGrid = ({
           compareRole={
             isComparisonActive && itemKey === gallery.selectedItemKey
               ? t('widgets.preview.viewing')
-              : isComparisonActive && itemKey === gallery.compareImageKey
+              : // Waiting for the second image, the base already carries the side it will take.
+                (isComparisonActive || isCompareArmed) && itemKey === gallery.compareImageKey
                 ? t('widgets.preview.compare')
                 : null
           }
@@ -1740,6 +1776,7 @@ export const GalleryImageGrid = ({
       handleThumbnailClick,
       handleThumbnailContextMenu,
       handleToggleStarred,
+      isCompareArmed,
       isComparisonActive,
       isFollowingLive,
       middleClickOpensInNewTab,
@@ -1757,6 +1794,7 @@ export const GalleryImageGrid = ({
   const sparseErrorPageOffset = [...(sparseListing?.pageStates ?? [])].find(([, pageState]) => pageState.error)?.[0];
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
+      {isComparisonActive || isCompareArmed ? <GalleryExitCompareHotkey key={`${projectId}:${i18n.language}`} /> : null}
       {listing.status === 'stale-error' &&
       (!usesSparseListing || (Boolean(sparseListing?.pageStates.get(0)?.error) && !sparsePageStatusOffsets.has(0))) ? (
         <GalleryLoadNotice
