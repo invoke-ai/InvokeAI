@@ -506,6 +506,73 @@ def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
     assert exc_info.value.status_code == 424
 
 
+@pytest.mark.parametrize("source_urls", [[], ["https://example.com/model", "https://example.com/quantization"]])
+def test_conversion_preserves_source_links_on_the_replacement_record(
+    monkeypatch: Any, mm2_installer: Any, mm2_app_config: Any, diffusers_dir: Path, source_urls: list[str]
+) -> None:
+    import shutil
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+    from invokeai.app.services.model_records import UnknownModelException
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelVariantType, SchedulerPredictionType
+
+    store = mm2_installer.record_store
+    checkpoint = mm2_app_config.models_path / "original.safetensors"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_bytes(b"original checkpoint")
+    original = Main_Checkpoint_SD1_Config(
+        key="original",
+        path=checkpoint.name,
+        name="Original Model",
+        config_path="model.yaml",
+        hash="original-hash",
+        file_size=checkpoint.stat().st_size,
+        source="org/original",
+        source_type=ModelSourceType.HFRepoID,
+        source_urls=source_urls,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+    store.add_model(original)
+
+    class ConvertedPipeline:
+        def save_pretrained(self, path: Path) -> None:
+            shutil.copytree(diffusers_dir, path)
+
+    class ModelImages(DummyModelImages):
+        def get(self, _key: str) -> None:
+            raise ModelImageFileNotFoundException()
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=store,
+            install=mm2_installer,
+            load=SimpleNamespace(load_model=lambda *_args, **_kwargs: SimpleNamespace(model=ConvertedPipeline())),
+        ),
+        configuration=mm2_app_config,
+        model_images=ModelImages(),
+        logger=logging.getLogger(__name__),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    converted = model_manager_router.convert_model(current_admin=SimpleNamespace(user_id="test-user"), key=original.key)
+
+    assert converted.key != original.key
+    assert converted.format == ModelFormat.Diffusers
+    assert converted.source_urls == source_urls
+    replacement = store.get_model(converted.key)
+    assert replacement.name == "Original Model"
+    assert replacement.source == "org/original"
+    assert replacement.source_urls == source_urls
+    assert (mm2_app_config.models_path / replacement.path).is_dir()
+    with pytest.raises(UnknownModelException):
+        store.get_model(original.key)
+    assert not checkpoint.exists()
+
+
 def test_convert_model_retains_recovery_source_and_restores_model_name(monkeypatch: Any, tmp_path: Path) -> None:
     from types import SimpleNamespace
     from unittest.mock import MagicMock

@@ -1439,6 +1439,7 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
                             description=model_config.description,
                             hash=model_config.hash,
                             source=model_config.source,
+                            source_urls=model_config.source_urls,
                         ),
                     )
                 )

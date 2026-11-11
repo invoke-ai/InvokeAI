@@ -51,16 +51,26 @@ describe('starter source links', () => {
     expect(host.querySelector('button')).toBeNull();
   });
 
-  it('offers each source as a menu link and restores focus on Escape', async () => {
-    await render(['https://example.com/model', 'https://example.org/quantized']);
-    const trigger = host.querySelector('button')!;
-    await userEvent.click(trigger);
-    await expect.poll(() => document.querySelectorAll('[role="menuitem"]').length).toBe(2);
-    const links = [...document.querySelectorAll<HTMLAnchorElement>('a[role="menuitem"]')];
-    expect(links.map((link) => link.href)).toEqual(['https://example.com/model', 'https://example.org/quantized']);
-    expect(links.every((link) => link.target === '_blank' && link.rel.includes('noreferrer'))).toBe(true);
-    await userEvent.keyboard('{ArrowDown}{Escape}');
-    await expect.poll(() => document.activeElement).toBe(trigger);
-    await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
-  });
+  it.each(['pointer', 'keyboard'])(
+    'offers source links and restores focus after %s opening and Escape',
+    async (input) => {
+      await render(['https://example.com/model', 'https://example.org/quantized']);
+      const trigger = host.querySelector('button')!;
+      if (input === 'pointer') {
+        await userEvent.click(trigger);
+      } else {
+        await userEvent.tab();
+        expect(document.activeElement).toBe(trigger);
+        await userEvent.keyboard('{ArrowDown}');
+      }
+      await expect.poll(() => document.querySelectorAll('[role="menuitem"]').length).toBe(2);
+      const links = [...document.querySelectorAll<HTMLAnchorElement>('a[role="menuitem"]')];
+      expect(links.map((link) => link.href)).toEqual(['https://example.com/model', 'https://example.org/quantized']);
+      expect(links.every((link) => link.target === '_blank' && link.rel.includes('noreferrer'))).toBe(true);
+      await expect.poll(() => document.activeElement?.getAttribute('role')).toBe('menu');
+      await userEvent.keyboard('{Escape}');
+      await expect.poll(() => document.activeElement).toBe(trigger);
+      await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
+    }
+  );
 });
