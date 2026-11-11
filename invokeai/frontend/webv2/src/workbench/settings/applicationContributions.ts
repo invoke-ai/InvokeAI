@@ -84,7 +84,7 @@ export const behaviorSettings = section('behavior', 'Behavior', [
       { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
     ],
   },
-  preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
+  preference('autoSwitchInvocationRoute', "Auto-switch Invoke to what you're editing", 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
   preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),

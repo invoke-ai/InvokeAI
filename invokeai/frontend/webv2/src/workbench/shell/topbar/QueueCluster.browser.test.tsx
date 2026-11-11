@@ -157,6 +157,26 @@ describe('QueueCluster', () => {
     expect(confirmation()).toBeNull();
   });
 
+  it('keeps the cancel button in place, disabled, while nothing is generating', async () => {
+    await render({ current: null, items: [] });
+
+    expect(cancelButton().disabled).toBe(true);
+  });
+
+  it('does not arm cancel-all on the disabled button, though Shift is held over it with work waiting', async () => {
+    await render({ current: null, items: [serverItem(8, 'pending')] });
+    const button = cancelButton();
+
+    await act(() => userEvent.hover(button));
+    await act(() => userEvent.keyboard('{Shift>}'));
+    const labelWithShift = button.getAttribute('aria-label');
+    const disabledWithShift = button.disabled;
+    await act(() => userEvent.keyboard('{/Shift}'));
+
+    expect(labelWithShift).toBe('widgets.queue.cancelCurrentItem');
+    expect(disabledWithShift).toBe(true);
+  });
+
   it('asks before cancelling everything on shift-click, and cancels nothing until confirmed', async () => {
     await render();
 

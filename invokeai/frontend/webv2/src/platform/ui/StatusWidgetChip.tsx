@@ -18,11 +18,19 @@ export interface StatusWidgetChipProgress {
   value: number | null;
 }
 
+/** Clips the hairline to the chip's rounded corners, which match its host's hover and active fill. */
+const PROGRESS_CLIP_SX: SystemStyleObject = {
+  borderRadius: 'inherit',
+  inset: 0,
+  overflow: 'hidden',
+  pointerEvents: 'none',
+  position: 'absolute',
+};
+
 const PROGRESS_TRACK_SX: SystemStyleObject = {
   bottom: 0,
   height: '2px',
   insetInline: 0,
-  pointerEvents: 'none',
   position: 'absolute',
 };
 
@@ -70,15 +78,17 @@ export const StatusWidgetChip = ({
       <Icon as={icon} boxSize="3" />
       <Text whiteSpace="nowrap">{children}</Text>
       {progress ? (
-        <Box aria-hidden="true" css={PROGRESS_TRACK_SX} overflow="hidden">
-          {progress.value === null ? (
-            <>
-              <Box css={PROGRESS_FILL_SX} opacity={0.35} position="absolute" width="full" />
-              <Box css={PROGRESS_SWEEP_SX} position="absolute" />
-            </>
-          ) : (
-            <Box css={PROGRESS_FILL_SX} width={`${progress.value * 100}%`} />
-          )}
+        <Box aria-hidden="true" css={PROGRESS_CLIP_SX}>
+          <Box css={PROGRESS_TRACK_SX}>
+            {progress.value === null ? (
+              <>
+                <Box css={PROGRESS_FILL_SX} opacity={0.35} position="absolute" width="full" />
+                <Box css={PROGRESS_SWEEP_SX} position="absolute" />
+              </>
+            ) : (
+              <Box css={PROGRESS_FILL_SX} width={`${progress.value * 100}%`} />
+            )}
+          </Box>
         </Box>
       ) : null}
     </HStack>

@@ -11,7 +11,7 @@ import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences
 import { act, createRef, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
@@ -276,6 +276,56 @@ describe('useDeletionConfirmation', () => {
     await clickButton('Delete');
     expect(executeDeletion).toHaveBeenCalledOnce();
     consoleError.mockRestore();
+  });
+
+  it('sits centred in the window like other confirmations, and a report taller than the window scrolls', async () => {
+    let settleCheck: (report: GalleryMediaUsageReport) => void = () => {};
+    const checkUsage = () =>
+      new Promise<GalleryMediaUsageReport>((resolve) => {
+        settleCheck = resolve;
+      });
+    // Once the enter animation is over, so its transform does not shift the box.
+    const settledBox = async () => {
+      const dialog = openDialog()!;
+      await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
+      return dialog.getBoundingClientRect();
+    };
+    const verticalOffset = (box: DOMRect) => (box.top + box.bottom) / 2 - window.innerHeight / 2;
+
+    const original = { height: window.innerHeight, width: window.innerWidth };
+
+    try {
+      await page.viewport(1000, 700);
+      await act(() => {
+        void confirmationRef.current!.requestDeletionConfirmation(imageRefs, async () => {}, { checkUsage });
+      });
+
+      expect(Math.abs(verticalOffset(await settledBox()))).toBeLessThanOrEqual(1);
+
+      await page.viewport(1000, 320);
+      await act(() =>
+        settleCheck(
+          usageReport({
+            groups: Array.from({ length: 12 }, (_, index) => ({
+              count: 1,
+              kind: 'workflow' as const,
+              name: `Workflow ${index + 1}`,
+            })),
+            inUseCount: 1,
+          })
+        )
+      );
+      await vi.waitFor(() => expect(openDialog()?.querySelector('[role="group"]')).not.toBeNull(), REPORT_WAIT);
+
+      // Taller than the window: its top stays reachable, and the rest scrolls into view.
+      const tallBox = await settledBox();
+      const positioner = openDialog()!.parentElement!;
+      expect(tallBox.height).toBeGreaterThan(window.innerHeight);
+      expect(tallBox.top).toBeGreaterThanOrEqual(0);
+      expect(positioner.scrollHeight).toBeGreaterThan(positioner.clientHeight);
+    } finally {
+      await page.viewport(original.width, original.height);
+    }
   });
 
   it('warns when the check failed, offers Retry, and still offers the deletion', async () => {

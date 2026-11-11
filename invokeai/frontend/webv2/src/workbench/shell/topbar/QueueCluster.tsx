@@ -78,8 +78,9 @@ export const QueueCluster = () => {
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
 
-  // The "x" unmounts while hovered when the running job finishes, so its
-  // pointer-leave never fires; reset the gesture state with it.
+  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing. It
+  // turns disabled under a resting pointer when the running job finishes, and that pointer's leave goes unhandled;
+  // reset the gesture state with it.
   if (isCancellable !== lastCancellable) {
     setLastCancellable(isCancellable);
 
@@ -145,23 +146,27 @@ export const QueueCluster = () => {
           </Button>
         </QueueButtonTooltip>
 
-        {isCancellable && cancelCurrent ? (
+        {/* Always present, so the cluster keeps its width and the control its place; disabled with nothing running. */}
+        {cancelCurrent ? (
           <Tooltip
             content={
               isCancelAllArmed && cancelAll
                 ? cancelAll.label
-                : `${cancelCurrent.label} · ${t('topbar.queue.shiftCancelsAll')}`
+                : isCancellable
+                  ? `${cancelCurrent.label} · ${t('topbar.queue.shiftCancelsAll')}`
+                  : cancelCurrent.label
             }
             showArrow
           >
             <IconButton
               aria-label={isCancelAllArmed && cancelAll ? cancelAll.label : cancelCurrent.label}
-              color="fg.error"
+              color={isCancellable ? 'fg.error' : undefined}
+              disabled={!isCancellable}
               size="lg"
               variant="outline"
               onClick={handleCancelClick}
-              onPointerEnter={handleCancelPointerEnter}
-              onPointerLeave={handleCancelPointerLeave}
+              onPointerEnter={isCancellable ? handleCancelPointerEnter : undefined}
+              onPointerLeave={isCancellable ? handleCancelPointerLeave : undefined}
             >
               <Icon as={isCancelAllArmed ? ListXIcon : XIcon} />
             </IconButton>

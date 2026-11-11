@@ -395,6 +395,7 @@
   },
   "notifications": {
     "empty": "Successful operations, errors, and system messages appear here.",
+    "emptyTitle": "No notifications",
     "labelWithCount": "Notifications: {{label}}",
     "newCount_one": "{{count}} new",
     "newCount_other": "{{count}} new",
@@ -406,6 +407,7 @@
       "success": "Success"
     },
     "markRead": "Mark read",
+    "unread": "Unread",
     "actions": {
       "openWidget": "Open {{widget}}",
       "showInQueue": "Show in queue"
@@ -515,6 +517,12 @@
     },
     "presets": {
       "builtIn": "Built-in",
+      "builtInDescriptions": {
+        "automate": "Build and run workflows",
+        "compose": "Generate images from text",
+        "edit": "Edit and refine images",
+        "video": "Generate video"
+      },
       "builtInLabels": {
         "automate": "Workflow",
         "compose": "Compose",
@@ -2563,7 +2571,7 @@
         "description": "Highlight the region receiving keyboard shortcuts."
       },
       "autoSwitchInvocationRoute": {
-        "label": "Invoke follows what you edit",
+        "label": "Auto-switch Invoke to what you're editing",
         "description": "When you edit in Generate, Canvas, Upscale, Video or a workflow, the Invoke button switches to run that. A route you locked never changes."
       },
       "enableInformationalPopovers": {
@@ -2931,12 +2939,14 @@
     "panelLabel": "{{region}} widget panel",
     "resizePanel": "Resize {{region}} widget panel",
     "settingsLabel": "{{label}} settings",
-    "visibilityLabel": "{{region}} widget visibility",
+    "regionWidgets": {
+      "bottom": "Status bar widgets",
+      "left": "Left panel widgets",
+      "right": "Right panel widgets"
+    },
     "rail": {
-      "create": "Create",
-      "inspect": "Inspect",
-      "createWidgets": "Create widgets",
-      "inspectWidgets": "Inspect widgets"
+      "left": "Left rail",
+      "right": "Right rail"
     },
     "properties": {
       "noCanvas": "Open a canvas to edit its properties.",

@@ -16,10 +16,11 @@ import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const CHROME_INSET_PADDING_TOP = 'calc(var(--chakra-spacing-2) + var(--wb-center-chrome-inset, 0px))';
+const CENTER_HANDLE_INSET = { pb: '2', pt: CHROME_INSET_PADDING_TOP } as const;
 
 export const GalleryWideLayout = () => {
   const { t } = useTranslation();
-  const { actions, gallery } = useGalleryWidget();
+  const { actions, gallery, region } = useGalleryWidget();
   const { boardPanelCollapsed, boardPanelWidthPx } = gallery.settings;
   const viewTabsIdBase = useId();
   const boardPanelRef = useRef<HTMLDivElement>(null);
@@ -49,9 +50,10 @@ export const GalleryWideLayout = () => {
           >
             <GalleryBoardsPanel />
           </Flex>
-          {/* Inset like the panel: the handle paints above the center chrome islands, so a full-height line would
-              cross them. */}
-          <Flex flexShrink={0} pb="2" pt={CHROME_INSET_PADDING_TOP}>
+          {/* The handle is the sidebar's edge. A docked or floating frame closes its header with a rule, so the line
+              runs from that rule to the bottom edge. In the center it paints above the floating chrome islands, so
+              it is inset like the panel instead of crossing them. */}
+          <Flex flexShrink={0} {...(region === 'center' ? CENTER_HANDLE_INSET : null)}>
             <ResizeHandle
               label={t('widgets.gallery.resizeBoardPanel')}
               max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}

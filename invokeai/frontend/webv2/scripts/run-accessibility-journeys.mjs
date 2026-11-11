@@ -275,7 +275,7 @@ const surfaces = [
       // The new layer's Properties panel and the canvas hint over its empty source are both scanned.
       const type = page.getByRole('combobox', { exact: true, name: 'Type' });
       await type.waitFor();
-      await page.getByRole('note').filter({ hasText: 'Drop an image here' }).waitFor();
+      await page.getByRole('note').filter({ hasText: 'Add an image' }).waitFor();
       await waitForSettledDocument(page);
       await assertNoAxeViolations(page, 'workbench-canvas-control-layer-untyped');
       // Typed as Depth: the seed holds two depth models, so the panel asks for one; the runner scans this state.
@@ -438,7 +438,7 @@ const runStatusBarNamesJourney = async (browser) => {
   try {
     await waitForWorkbench(page);
     const footer = page.locator('footer');
-    await footer.getByRole('button', { exact: true, name: 'Bottom widget visibility' }).click();
+    await footer.getByRole('button', { exact: true, name: 'Status bar widgets' }).click();
     const menu = page.getByRole('menu');
     await menu.waitFor();
     const items = menu.getByRole('menuitemcheckbox');
@@ -690,7 +690,7 @@ const runTopbarMenuJourney = async (browser) => {
     await centerViewTrigger(page, 'Workflow').waitFor();
     await selectCenterView(page, 'Workflow', 'Preview');
 
-    const leftWidgetRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    const leftWidgetRail = page.getByRole('navigation', { exact: true, name: 'Left rail' });
     const upscaleWidget = leftWidgetRail.getByRole('button', { exact: true, name: 'Upscale' });
     await upscaleWidget.click({ button: 'right' });
     await page.getByRole('menuitem', { exact: true, name: 'Remove Upscale' }).click();
@@ -1264,12 +1264,12 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForWorkbench(page);
     await selectLayoutPreset(page, 'Video', 'Preview');
 
-    const rail = page.getByRole('navigation', { exact: true, name: 'Inspect widget visibility' });
+    const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
     const center = centerRegion(page);
     const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
     const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
     const floatPreviewFromRail = async () => {
-      await rail.getByRole('button', { exact: true, name: 'Inspect widgets' }).click();
+      await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
       await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
       await page.keyboard.press('Escape');
       await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
@@ -1395,26 +1395,26 @@ const runFloatingWindowJourney = async (browser) => {
       await waitForFocusedRegion(focusedRegionAfter);
     };
 
-    await floatImageMapFrom(rail, 'Inspect widgets');
+    await floatImageMapFrom(rail, 'Right panel widgets');
     await removeImageMapFrom(rail, 'right');
 
-    await floatImageMapFrom(rail, 'Inspect widgets');
+    await floatImageMapFrom(rail, 'Right panel widgets');
     await rail.getByRole('button', { pressed: true }).click();
     await page.getByRole('complementary', { exact: true, name: 'right widget panel' }).waitFor({ state: 'detached' });
     await removeImageMapFrom(rail, 'center');
 
-    const leftRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    const leftRail = page.getByRole('navigation', { exact: true, name: 'Left rail' });
     for (const name of ['Video', 'Upscale']) {
       await leftRail.getByRole('button', { exact: true, name }).click({ button: 'right' });
       await page.getByRole('menuitem', { exact: true, name: `Remove ${name}` }).click();
     }
-    await floatImageMapFrom(leftRail, 'Create widgets');
+    await floatImageMapFrom(leftRail, 'Left panel widgets');
     await page.getByRole('complementary', { exact: true, name: 'left widget panel' }).waitFor({ state: 'detached' });
     await removeImageMapFrom(leftRail, 'center');
 
     // The enable menu stays open across a toggle and keeps focus; removing a window from it moves none.
-    await floatImageMapFrom(leftRail, 'Create widgets');
-    await leftRail.getByRole('button', { exact: true, name: 'Create widgets' }).click();
+    await floatImageMapFrom(leftRail, 'Left panel widgets');
+    await leftRail.getByRole('button', { exact: true, name: 'Left panel widgets' }).click();
     await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
     await floatingWindow.waitFor({ state: 'detached' });
     // A focus move would have landed within a frame of the removal.

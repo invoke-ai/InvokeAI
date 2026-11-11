@@ -19,7 +19,7 @@ import { Button, IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useQuery } from '@tanstack/react-query';
-import { DatabaseIcon } from 'lucide-react';
+import { DatabaseZapIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -65,7 +65,7 @@ const CachePopover = () => {
       <Tooltip content={t('widgets.queue.cache.title')} ids={triggerIds}>
         <Popover.Trigger asChild>
           <IconButton aria-label={t('widgets.queue.cache.title')} color="fg.muted" size="sm" variant="ghost">
-            <Icon as={DatabaseIcon} boxSize="3.5" />
+            <Icon as={DatabaseZapIcon} boxSize="3.5" />
           </IconButton>
         </Popover.Trigger>
       </Tooltip>

@@ -1,9 +1,14 @@
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { LayoutPreset, LayoutPresetId, LayoutPresetSnapshot } from '@workbench/layoutContracts';
+import type {
+  BuiltInLayoutPresetId,
+  LayoutPreset,
+  LayoutPresetId,
+  LayoutPresetSnapshot,
+} from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 
-import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, Menu, Portal, Stack, Text, useTooltipContext, VisuallyHidden } from '@chakra-ui/react';
 import {
   closestCenter,
   DndContext,
@@ -28,10 +33,14 @@ import { HIDDEN_SCROLLBAR_CSS } from '@platform/ui/scrollStripEdges';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
-import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
+import { useShortcutBinding, useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
-import { getLayoutPresetLabel } from '@workbench/layoutPresets';
+import {
+  builtInLayoutPresetDescriptors,
+  getLayoutPresetLabel,
+  isBuiltInLayoutPresetId,
+} from '@workbench/layoutPresets';
 import { findLayoutPresetWorkingCopy } from '@workbench/layoutPresetSnapshots';
 import { CUE_WIDTH, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
@@ -45,7 +54,7 @@ import {
   SettingsIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
@@ -54,6 +63,7 @@ import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
+import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useActiveLayoutPresetId, useLayoutDrift, useUnsavedInactiveLayoutPresetIds } from './useLayoutDrift';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
@@ -75,6 +85,30 @@ const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 
 
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** What each built-in preset is for, as the tab's tip says under its name. */
+const BUILT_IN_PRESET_DESCRIPTION_KEYS: Record<BuiltInLayoutPresetId, string> = {
+  automate: 'topbar.presets.builtInDescriptions.automate',
+  compose: 'topbar.presets.builtInDescriptions.compose',
+  edit: 'topbar.presets.builtInDescriptions.edit',
+  video: 'topbar.presets.builtInDescriptions.video',
+};
+
+const findPresetShortcutCommandId = (presetId: LayoutPresetId): string | null => {
+  const descriptor = builtInLayoutPresetDescriptors.find(({ preset }) => preset.id === presetId);
+
+  return descriptor ? `app.${descriptor.hotkeyId}` : null;
+};
+
+// The label's own hiding condition, so the tip and the label never disagree about whether the name is on screen.
+const matchLabelHidden = (): MediaQueryList =>
+  globalThis.matchMedia(Object.keys(HIDE_BELOW_PRESET_LABEL_WIDTH)[0]!.replace(/^@media\s+/, ''));
+const subscribeLabelHidden = (onChange: () => void): (() => void) => {
+  const query = matchLabelHidden();
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+const getLabelHidden = (): boolean => matchLabelHidden().matches;
 
 const selectPresetWorkingLayouts = (project: Project) => project.presetWorkingLayouts;
 
@@ -109,6 +143,23 @@ export const LayoutPresetStrip = () => {
   const isPresetUnsaved = useCallback(
     (presetId: LayoutPresetId) => (presetId === activePresetId ? hasDrifted : unsavedInactiveIds.has(presetId)),
     [activePresetId, hasDrifted, unsavedInactiveIds]
+  );
+  const [isReordering, setIsReordering] = useState(false);
+  const isLabelHidden = useSyncExternalStore(subscribeLabelHidden, getLabelHidden);
+  // Like the top bar's other labelled controls, a visible label is not repeated: beside it, a preset has a tip only for
+  // what the label does not say (a built-in's shortcut and purpose, unsaved changes).
+  const hasTip = useCallback(
+    (presetId: LayoutPresetId) => isLabelHidden || isBuiltInLayoutPresetId(presetId) || isPresetUnsaved(presetId),
+    [isLabelHidden, isPresetUnsaved]
+  );
+  // Quiet while a preset's menu is open or a tab is being dragged, where it would cover the menu or trail the drag.
+  const isTipShown = useCallback(
+    (presetId: LayoutPresetId) => menuTarget === null && !isReordering && hasTip(presetId),
+    [hasTip, isReordering, menuTarget]
+  );
+  const presetTip = useMemo(
+    () => <PresetTipContent hasTip={hasTip} isUnsaved={isPresetUnsaved} presets={presets} />,
+    [hasTip, isPresetUnsaved, presets]
   );
   const tabsIdPrefix = useId();
   // Named so the strip's tooltip can anchor to each tab's own id instead of replacing it.
@@ -204,8 +255,12 @@ export const LayoutPresetStrip = () => {
   const closeMenu = useCallback(() => setMenuTarget(null), []);
   const requestEdit = useCallback((preset: LayoutPreset) => openLayoutPresetEdit(preset.id), []);
   const requestDelete = useCallback((preset: LayoutPreset) => openLayoutPresetDelete(preset.id), []);
+  const handleDragStart = useCallback(() => setIsReordering(true), []);
+  const handleDragCancel = useCallback(() => setIsReordering(false), []);
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      setIsReordering(false);
+
       if (!event.over || event.active.id === event.over.id) {
         return;
       }
@@ -238,7 +293,9 @@ export const LayoutPresetStrip = () => {
               collisionDetection={closestCenter}
               modifiers={DND_MODIFIERS}
               sensors={sensors}
+              onDragCancel={handleDragCancel}
               onDragEnd={handleDragEnd}
+              onDragStart={handleDragStart}
             >
               <Tabs.Root
                 ids={tabIds}
@@ -251,14 +308,14 @@ export const LayoutPresetStrip = () => {
                 {/* The name belongs on the tablist, not the root — the root is a plain
                   container and carries no role for it to name. */}
                 <SortableContext items={presetIds} strategy={horizontalListSortingStrategy}>
-                  {/* One tip for the strip, shown on unsaved presets: it follows focus and the pointer from tab to tab.
-                    Not closed by scrolling: an arrow-key switch re-lays out the workbench, whose panels restore their
-                    scroll positions, and the tab itself never scrolls out from under the tip. */}
+                  {/* One tip for the strip: it follows focus and the pointer from tab to tab. Not closed by scrolling:
+                    an arrow-key switch re-lays out the workbench, whose panels restore their scroll positions, and the
+                    tab itself never scrolls out from under the tip. */}
                   <TooltipGroup.Root
                     closeOnScroll={false}
-                    content={t('topbar.presets.unsavedLayoutChanges')}
+                    content={presetTip}
                     getTriggerId={tabIds.trigger}
-                    isEnabled={isPresetUnsaved}
+                    isEnabled={isTipShown}
                   >
                     <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
                       {presets.map((preset) => (
@@ -365,6 +422,9 @@ const PresetTab = ({
 }) => {
   const { t } = useTranslation();
   const icon = resolveLayoutPresetIcon(preset.iconId);
+  // An unknown command id resolves to no binding, so a custom preset advertises no key.
+  const shortcut = useShortcutBinding(findPresetShortcutCommandId(preset.id) ?? '');
+  const keyShortcuts = [isActive ? 'ArrowDown' : null, shortcut?.aria].filter(Boolean).join(' ') || undefined;
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     attributes: { role: 'tab', roleDescription: 'sortable', tabIndex: isActive ? 0 : -1 },
     id: preset.id,
@@ -455,7 +515,7 @@ const PresetTab = ({
         {...attributes}
         {...listeners}
         aria-label={isUnsaved ? `${preset.label}, ${unsavedLabel}` : preset.label}
-        aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
+        aria-keyshortcuts={keyShortcuts}
         css={PRESET_TAB_CSS}
         cursor={isDragging ? 'grabbing' : 'default'}
         data-layout-preset-id={preset.id}
@@ -515,6 +575,66 @@ const PRESET_TAB_SELECTED_PROPS = {
   [PRESET_TAB_SURFACE]: '{colors.bg.emphasized}',
 } as const;
 const UNSAVED_DOT_CSS = { boxShadow: `0 0 0 1.5px var(${PRESET_TAB_SURFACE})` } as const;
+
+/**
+ * The strip's one tip, describing the tab it is on: the preset's name and shortcut, what a built-in is for while it is
+ * still the built-in (not renamed), and the unsaved state its dot marks. The shared tooltip reports which tab that is.
+ */
+const PresetTipContent = ({
+  hasTip,
+  isUnsaved,
+  presets,
+}: {
+  hasTip: (presetId: LayoutPresetId) => boolean;
+  isUnsaved: (presetId: LayoutPresetId) => boolean;
+  presets: readonly LayoutPreset[];
+}) => {
+  const { t } = useTranslation();
+  const { triggerValue } = useTooltipContext();
+  const preset = presets.find(({ id }) => id === triggerValue);
+
+  // Focus moving off an open tip switches the tooltip's tab at once and closes the tip a render later: a tab with no
+  // tip of its own must not show in the fading one.
+  if (!preset || !hasTip(preset.id)) {
+    return null;
+  }
+
+  const shortcutCommandId = findPresetShortcutCommandId(preset.id);
+
+  return (
+    <Stack gap="0.5" maxW="16rem">
+      <HStack gap="1.5" justify="space-between">
+        <Text as="span" fontWeight="600">
+          {preset.label}
+        </Text>
+        {shortcutCommandId ? <PresetShortcutKeys commandId={shortcutCommandId} /> : null}
+      </HStack>
+      {/* A renamed built-in may have been turned to another purpose; its shipped description could contradict it. */}
+      {isBuiltInLayoutPresetId(preset.id) && preset.labelKey !== undefined ? (
+        <Text as="span" color="fg.muted">
+          {t(BUILT_IN_PRESET_DESCRIPTION_KEYS[preset.id])}
+        </Text>
+      ) : null}
+      {isUnsaved(preset.id) ? (
+        <HStack as="span" gap="1.5">
+          <Box aria-hidden="true" bg="accent.solid" boxSize="1.5" flexShrink={0} rounded="full" />
+          <Text as="span">{t('topbar.presets.unsavedLayoutChanges')}</Text>
+        </HStack>
+      ) : null}
+    </Stack>
+  );
+};
+
+/** Reads the effective binding, so a remapped or unbound shortcut is never advertised. */
+const PresetShortcutKeys = ({ commandId }: { commandId: string }) => {
+  const binding = useShortcutBinding(commandId);
+
+  return binding ? (
+    <Kbd variant="subtle">
+      <TopbarShortcutKeys parts={binding.parts} />
+    </Kbd>
+  ) : null;
+};
 
 /** Over the icon's upper-right corner; the tab's accessible name and tooltip carry the state, not the colour. */
 const UnsavedDot = () => (

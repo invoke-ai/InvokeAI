@@ -233,9 +233,22 @@ describe('ProjectSwitcher', () => {
     await vi.waitFor(() => expect(chevronColor()).toBe(bright));
   });
 
-  it('stands a folder icon in for the project name where the topbar is too narrow for it', async () => {
+  it('shows an open folder while its menu is open and a closed one otherwise', async () => {
     const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
-    const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder')!;
+
+    expect(trigger.querySelector('svg.lucide-folder-open')).not.toBeNull();
+    expect(trigger.querySelector('svg.lucide-folder')).toBeNull();
+
+    await act(() => setProjectSwitcherOpen(false));
+
+    expect(trigger.querySelector('svg.lucide-folder')).not.toBeNull();
+    expect(trigger.querySelector('svg.lucide-folder-open')).toBeNull();
+  });
+
+  it('keeps its folder icon and drops the project name where the topbar is too narrow for it', async () => {
+    const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
+    // The menu is open here, so the trigger shows its open-folder glyph.
+    const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder-open')!;
     const name = [...trigger.children].find((child) => child.textContent === 'Prompt project')!;
     const { innerHeight, innerWidth } = window;
 
@@ -249,7 +262,7 @@ describe('ProjectSwitcher', () => {
       await page.viewport(1200, 700);
       await vi.waitFor(() => {
         expect(name.checkVisibility()).toBe(true);
-        expect(folderIcon.checkVisibility()).toBe(false);
+        expect(folderIcon.checkVisibility()).toBe(true);
       });
     } finally {
       await page.viewport(innerWidth, innerHeight);

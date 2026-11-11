@@ -68,7 +68,7 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
           <Separator />
           <HStack gap="2" minH="4">
             {onDisable && (
-              <Button color="fg.subtle" fontSize="xs" h="auto" px="1" size="sm" variant="plain" onClick={onDisable}>
+              <Button size="xs" variant="outline" onClick={onDisable}>
                 {t('common.dontShowMeThese')}
               </Button>
             )}

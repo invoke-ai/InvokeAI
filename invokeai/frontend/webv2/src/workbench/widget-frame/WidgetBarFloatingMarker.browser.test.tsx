@@ -79,7 +79,7 @@ await i18n.use(initReactI18next).init({
             railMarker: '{{label}}, floating window',
             railMarkerHint: '{{label}} is floating — click to show the window',
           },
-          rail: { inspectWidgets: 'Inspect widgets' },
+          regionWidgets: { right: 'Right panel widgets' },
           removeWidget: 'Remove {{label}}',
         },
       },
@@ -228,7 +228,7 @@ describe('WidgetBar floating marker', () => {
   it('removes the window from the enable menu as a toggle, not as a marker removal', async () => {
     await renderBar();
     await act(async () => {
-      slot('Inspect widgets').click();
+      slot('Right panel widgets').click();
       await Promise.resolve();
     });
 

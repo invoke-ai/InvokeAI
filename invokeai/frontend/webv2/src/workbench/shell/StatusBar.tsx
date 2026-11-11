@@ -70,6 +70,11 @@ const WIDGET_POPOVER_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
 /** Use content color for active brand accents; background tint is indistinguishable on the light theme. */
 const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
+/**
+ * Chips read as SegmentTabs segments: rounded fills inset from the bar's edges (the strip's vertical padding) with a
+ * small gap between them. Gaps sit inside the clusters, so the remaining-space chip's capacity already excludes them.
+ */
+const CHIP_GAP = '0.5';
 
 /** Size drop overlays per cluster so one strip-wide curtain cannot cover the other target. */
 const ClusterDropRing = ({ dropState, isOver }: { dropState: WidgetRegionDropState; isOver: boolean }) => (
@@ -98,6 +103,7 @@ const BottomEndCluster = ({
       align="center"
       alignSelf="stretch"
       flexShrink={0}
+      gap={CHIP_GAP}
       position="relative"
     >
       {children}
@@ -203,11 +209,14 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
   // The bottom panel's outline is drawn over this border.
   const isBottomOutlined = useHighlightedRegion() === 'bottom';
+  const bottomWidgetsLabel = t('widgets.regionWidgets.bottom');
 
   return (
     <CompactWidgetCapacityProvider capacity={capacity}>
       <WidgetStrip
         align="center"
+        // The status bar's landmark, named like the rails beside it ("Left rail", "Right rail").
+        aria-label={t('shell.widgets.placement.bottom')}
         as="footer"
         bg="bg.subtle"
         borderTopWidth="1px"
@@ -218,13 +227,21 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
         h="6"
         overlay="none"
         px="2"
+        py={CHIP_GAP}
         region="bottom"
         sortableInstanceIds={sortableInstanceIds}
         strategy={horizontalListSortingStrategy}
         w="full"
         onContextMenu={openEnableMenu}
       >
-        <Flex data-status-bar-cluster align="center" alignSelf="stretch" flexShrink={0} position="relative">
+        <Flex
+          data-status-bar-cluster
+          align="center"
+          alignSelf="stretch"
+          flexShrink={0}
+          gap={CHIP_GAP}
+          position="relative"
+        >
           {startItems.map((item) => (
             <CompactBottomWidget
               key={item.id}
@@ -237,11 +254,11 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
 
           <WidgetEnableMenu
             contextTarget={enableMenuTarget}
-            groupLabel="Bottom Widgets"
+            groupLabel={bottomWidgetsLabel}
             items={items}
             positioning={BOTTOM_MENU_POSITIONING}
             trigger={BOTTOM_MENU_TRIGGER}
-            triggerLabel="Bottom widget visibility"
+            triggerLabel={bottomWidgetsLabel}
             onContextClose={handleContextClose}
             onToggle={toggleBottomWidget}
           />
@@ -414,8 +431,9 @@ const CompactBottomWidget = ({
       aria-pressed={item.isPopover || recovery.error ? undefined : isRowActive}
       color={isRowActive ? undefined : 'fg.muted'}
       cursor={isDragging ? 'grabbing' : 'default'}
-      px={item.widget.manifest.compactSizing === 'remaining-space' ? '1.5' : undefined}
+      px={item.widget.manifest.compactSizing === 'remaining-space' ? '2' : undefined}
       h="full"
+      rounded="control"
       w="auto"
       {...(isRowActive ? COMPACT_ROW_ACTIVE_PROPS : null)}
       _hover={isRowActive ? COMPACT_ROW_ACTIVE_HOVER_PROPS : COMPACT_ROW_HOVER_PROPS}

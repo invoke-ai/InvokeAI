@@ -297,7 +297,7 @@ describe('contextual status-bar guide', () => {
     expect(guide.element().getBoundingClientRect().width).toBeLessThan(80);
     await act(() => widgetWidths.setSnapshot({ ...widgetWidths.getSnapshot(), 'server-status': 250 }));
     await render(700);
-    await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(24);
+    await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(28);
     // Icon only: the visible label is gone, and its hidden copy keeps the chip's name.
     expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
@@ -311,6 +311,49 @@ describe('contextual status-bar guide', () => {
     );
     await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
     expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
+  });
+  it('keeps the chip, padding included, within its space at every width as its content steps down', async () => {
+    await leaveCanvas();
+    await page.viewport(700, 600);
+    await render(700);
+    const footer = host!.querySelector('footer')!;
+    // The strip's own padding is no room for widgets: the trailing chip must end where its content box does.
+    const stripEnd = footer.getBoundingClientRect().right - parseFloat(getComputedStyle(footer).paddingRight);
+    const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
+    const content = () => host!.querySelector<HTMLElement>('[data-shortcut-guide]')!;
+    const visibleRow = () => content().lastElementChild!;
+    // Text runs past its box when the chip is too narrow for it, so measure the glyphs, not the elements. The
+    // visually hidden name is clipped to nothing and stays out.
+    const visibleContentRight = () =>
+      Math.max(
+        ...[...visibleRow().children]
+          .filter((child) => getComputedStyle(child).position !== 'absolute')
+          .map((child) => {
+            const range = document.createRange();
+            range.selectNodeContents(child);
+            return range.getBoundingClientRect().right;
+          })
+      );
+    const misfits: number[] = [];
+    // One pixel at a time from a hint through the label to icon only, so every fit boundary is crossed.
+    for (let other = 400; visibleRow().querySelector('p'); other++) {
+      expect(other).toBeLessThan(700);
+      await act(() => widgetWidths.setSnapshot({ 'server-status': other }));
+      // The strip and the guide measure from ResizeObserver callbacks; two frames let both settle.
+      await act(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          })
+      );
+      if (
+        notification.getBoundingClientRect().right > stripEnd + 0.5 ||
+        visibleContentRight() > content().getBoundingClientRect().right + 0.5
+      ) {
+        misfits.push(other);
+      }
+    }
+    expect(misfits).toEqual([]);
   });
   it('shrinks whole hints, preserves source in its popover, consumes Escape and restores the editing origin', async () => {
     const canvas = host!.querySelector<HTMLElement>('[data-testid="canvas"]')!;
