@@ -326,6 +326,37 @@ it.each([
   }
 );
 
+it('selects the existing Compose graph while preserving the shared left Workflow panel', async () => {
+  await act(() => runtime.store.commands.layout.applyPreset('compose'));
+  await press('4');
+  const graphInstanceId = project().widgetRegions.center.activeInstanceId;
+  expect(project().widgetInstances[graphInstanceId]?.typeId).toBe('workflow');
+
+  await act(() => {
+    runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+    runtime.store.commands.widgets.select({ region: 'center', widgetId: 'preview' });
+  });
+  const before = project();
+  expect(before.widgetRegions.left.activeInstanceId).toBe(graphInstanceId);
+  expect(before.widgetRegions.center.activeInstanceId).toBe('preview');
+  expect(before.widgetRegions.center.instanceIds).toContain(graphInstanceId);
+  await focusRegion('left');
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('center');
+  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
+  expect(project().layout.panels.isLeftOpen).toBe(true);
+  expect(project().widgetRegions.center).toEqual({
+    ...before.widgetRegions.center,
+    activeInstanceId: graphInstanceId,
+  });
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
+  expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+});
+
 it('reopens a bottom workflow graph using the remapped shortcut only from workflow surfaces', async () => {
   await act(() => {
     runtime.store.commands.widgets.open({ region: 'bottom', widgetId: 'workflow' });

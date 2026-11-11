@@ -336,6 +336,23 @@ export const useRegisterFirstPartyCommands = () => {
       return;
     }
 
+    const placedCenterGraph =
+      destination === 'center' ? project.widgetRegions.center.instanceIds.find(isWorkflow) : undefined;
+    if (placedCenterGraph) {
+      if (
+        getOpenableWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['center'] },
+          typeId: 'workflow',
+        })
+      ) {
+        // Use the center picker's instance selection to keep the left panel in view.
+        widgets.select({ projectId: project.id, region: 'center', widgetId: placedCenterGraph });
+        focus.focusRegion('center', undefined, placedCenterGraph);
+      }
+      return;
+    }
+
     // The Workflow preset uses a separate graph instance so opening the center leaves the form active.
     if (!region && hasWorkflow('left')) {
       const leftInstanceId = project.widgetRegions.left.activeInstanceId;
