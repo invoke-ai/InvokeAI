@@ -1114,3 +1114,41 @@ describe('CanvasWidgetView desktop file drops', () => {
     expect(zone('Add as raster layer').elements()).toHaveLength(0);
   });
 });
+
+describe('CanvasWidgetView frame size readout', () => {
+  it('follows a Frame tool resize through the engine, then shows the committed frame', async () => {
+    await renderView('completed', { domRaster: true, staged: false });
+    const engine = harness.engine!;
+    const screen = document.createElement('canvas');
+    const overlay = document.createElement('canvas');
+    for (const canvas of [screen, overlay]) {
+      Object.assign(canvas.style, { height: '300px', left: '0', position: 'fixed', top: '0', width: '300px' });
+      host!.append(canvas);
+    }
+    await act(() => engine.surface.attach(screen, overlay));
+    await act(() => engine.tools.setTool('bbox'));
+    const readout = page.getByRole('group', { name: 'Frame and render size' });
+    const frameValue = () => readout.element().querySelector('dd')?.textContent;
+    const { bbox } = activeProject().canvas.document;
+    await expect.element(readout).toHaveTextContent(`Frame${bbox.width}×${bbox.height}`);
+
+    // Drag the bottom-right handle inward by 64 document pixels; Alt turns grid snapping off, so the size is exact.
+    const viewport = engine.viewport.getViewport();
+    const corner = viewport.documentToScreen({ x: bbox.x + bbox.width, y: bbox.y + bbox.height });
+    const target = viewport.documentToScreen({ x: bbox.x + bbox.width - 64, y: bbox.y + bbox.height - 64 });
+    const pointer = (type: string, { x, y }: { x: number; y: number }, buttons: number) =>
+      new PointerEvent(type, { altKey: true, bubbles: true, buttons, clientX: x, clientY: y, pointerId: 1 });
+    await act(() => {
+      overlay.dispatchEvent(pointer('pointerdown', corner, 1));
+      overlay.dispatchEvent(pointer('pointermove', target, 1));
+    });
+    // Mid-drag, before anything commits, the readout shows the frame being drawn.
+    expect(frameValue()).toBe(`${bbox.width - 64}×${bbox.height - 64}`);
+    expect(activeProject().canvas.document.bbox).toEqual(bbox);
+
+    await act(() => overlay.dispatchEvent(pointer('pointerup', target, 0)));
+    expect(activeProject().canvas.document.bbox).toMatchObject({ height: bbox.height - 64, width: bbox.width - 64 });
+    expect(frameValue()).toBe(`${bbox.width - 64}×${bbox.height - 64}`);
+    engine.surface.detach();
+  });
+});

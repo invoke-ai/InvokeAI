@@ -43,7 +43,7 @@ export interface PreviewPublisher {
   dispose(): void;
   /** Warms one full-resolution staged result without decoding it. */
   preloadStagedPreview(imageName: string): void;
-  /** Decodes and publishes a staged-generation preview; `null` clears. Never throws. */
+  /** Decodes and publishes a staged-generation preview; a hidden candidate shows none, `null` clears. Never throws. */
   setStagedPreview(input: StagedPreviewInput | null): void;
   /** Drops one layer's filter preview and invalidates it. */
   clearFilterPreview(layerId: string): void;
@@ -231,6 +231,12 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
     setStagedPreview: (input) => {
       if (input === null) {
         clearStagedPreview();
+        return;
+      }
+      if ('imageName' in input && input.hidden) {
+        if (previews.hideStaged()) {
+          deps.invalidateAll();
+        }
         return;
       }
       const token = previews.nextStagedToken();

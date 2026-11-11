@@ -1,6 +1,8 @@
 /**
- * Prefer the visible finished candidate, then the selected placeholder's live progress frame, otherwise no
- * preview. Both land at the rect pinned at submission, so moving the bbox mid-run never moves them.
+ * Prefer the selected finished candidate, then the selected placeholder's live progress frame, otherwise no
+ * preview. Both land at the rect pinned at submission, so moving the bbox mid-run never moves them. A candidate the
+ * eye toggled off stays selected as a hidden preview: the canvas under it compares without the masks the shown
+ * candidate hides.
  */
 
 import type { CanvasPlacementContract, Rect, StagedPreviewInput } from '@workbench/canvas-engine/api';
@@ -23,8 +25,9 @@ export const selectStagedPreviewSource = ({
   progressRect,
   selectedCandidate,
 }: StagedPreviewSelection): StagedPreviewInput | null => {
-  if (isVisible && selectedCandidate) {
-    return { imageName: selectedCandidate.imageName, placement: selectedCandidate.placement };
+  if (selectedCandidate) {
+    const { imageName, placement } = selectedCandidate;
+    return isVisible ? { imageName, placement } : { hidden: true, imageName, placement };
   }
   if (progressRect && progressImage && progressRect.width > 0 && progressRect.height > 0) {
     // Progress frames are low-res latents of the submitted region; scale to fill it.
@@ -40,5 +43,8 @@ export const stagedPreviewKey = (source: StagedPreviewInput | null): string => {
   }
   const { placement } = source;
   const rect = `${placement.x}:${placement.y}:${placement.width}:${placement.height}:${placement.opacity}`;
-  return 'imageName' in source ? `image:${source.imageName}:${rect}` : `data:${rect}:${source.dataUrl}`;
+  if ('imageName' in source) {
+    return `${source.hidden ? 'hidden' : 'image'}:${source.imageName}:${rect}`;
+  }
+  return `data:${rect}:${source.dataUrl}`;
 };

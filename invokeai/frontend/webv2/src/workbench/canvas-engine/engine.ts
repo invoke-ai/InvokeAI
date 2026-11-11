@@ -391,6 +391,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     bboxGrid: stores.bboxGrid,
     bboxOptions: stores.bboxOptions,
     bboxOverlay: stores.bboxOverlay,
+    bboxPreview: stores.bboxPreview,
     brushOptions: stores.brushOptions,
     canRedo: stores.canRedo,
     canUndo: stores.canUndo,
@@ -1526,18 +1527,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const scheduler: RenderScheduler = renderController.scheduler;
 
-  /** Whether the pointer gesture in progress edits a mask or a region, which a shown staged preview otherwise hides. */
+  /** Whether the pointer gesture in progress edits a mask or a region, which a staged preview otherwise hides. */
   let gestureEditsStagingHiddenStack = false;
   /**
-   * Set once per gesture, so its pointer moves read a flag. While a preview is shown, setting and clearing it each
-   * repaint in full: the stacks show above the preview, then hide again.
+   * Set once per gesture, so its pointer moves read a flag. While a preview is shown or toggled off, setting and
+   * clearing it each repaint in full: the stacks show (above the preview), then hide again.
    */
   const setGestureEditsStagingHiddenStack = (edits: boolean): void => {
     if (edits === gestureEditsStagingHiddenStack) {
       return;
     }
     gestureEditsStagingHiddenStack = edits;
-    if (renderController.previews.getStaged()) {
+    if (renderController.previews.hidesStagingOverlays()) {
       scheduler.invalidate({ all: true });
     }
   };

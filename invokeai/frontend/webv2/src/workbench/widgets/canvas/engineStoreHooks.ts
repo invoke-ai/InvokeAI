@@ -114,6 +114,10 @@ export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boole
 export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
   useCanvasInteractionState(engine, 'controlLayerView');
 
+/** The generation frame while a Frame tool drag reshapes it; null when the committed frame is current. */
+export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
+  useCanvasInteractionState(engine, 'bboxPreview');
+
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');

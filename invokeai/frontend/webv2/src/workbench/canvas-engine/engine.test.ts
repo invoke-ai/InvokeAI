@@ -15409,6 +15409,8 @@ describe('doc-replace mid-gesture: cancels the active tool gesture', () => {
     // Start a bbox move-drag (press inside the 100x100 frame, then drag).
     overlay.fire('pointerdown', pointerAt(40, 40));
     overlay.fire('pointermove', pointerAt(60, 60));
+    // Published to callers too, so canvas chrome can follow the drag.
+    expect(engine.interaction.get('bboxPreview')).toEqual(engine.stores.bboxPreview.get());
     expect(engine.stores.bboxPreview.get()).not.toBeNull();
 
     // A wholesale document swap mid-drag (dims change → onDocumentReplaced).
@@ -16013,7 +16015,7 @@ describe('masks while a result is staged', () => {
       composite.mockRestore();
       engine.lifecycle.dispose();
     };
-    return { dispose, engine, expectPressHidden, frame, key, overlay, select, showPreview, update, useTool };
+    return { dispose, engine, expectPressHidden, frame, key, overlay, select, showPreview, store, update, useTool };
   };
 
   it('hides masks and region tints under a shown preview, showing them only while a gesture edits a mask', async () => {
@@ -16021,7 +16023,7 @@ describe('masks while a result is staged', () => {
     const { frame, overlay } = h;
     expect(frame()).toEqual({ ...MASKED, full: 1 });
 
-    // A staged candidate whose preview is off hides nothing, so staging it repaints nothing either.
+    // Staging data alone repaints nothing: the screen follows only what the canvas widget publishes.
     h.update({ stagingArea: { ...makeCanvas(makeDoc()).stagingArea, isVisible: false, pendingImages: [candidate] } });
     expect(frame().drawn).toBeUndefined();
 
@@ -16091,6 +16093,44 @@ describe('masks while a result is staged', () => {
     expect(frame()).toEqual({ ...MASKED, full: 0 });
     overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
     expect(frame()).toMatchObject(MASKED);
+    h.dispose();
+  });
+
+  it('keeps them hidden while the eye hides the result to compare, until staging ends, changing no state', async () => {
+    const h = setup();
+    const { frame, overlay } = h;
+    await h.showPreview();
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    const document = h.engine.document.getDocument();
+
+    // The eye shows the canvas under the result as the shown result left it: no mask, no region tint.
+    h.update({ stagingArea: { ...makeCanvas(makeDoc()).stagingArea, isVisible: false, pendingImages: [candidate] } });
+    h.engine.previews.setStagedPreview({ ...candidate, hidden: true });
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    // Selecting another hidden candidate repaints nothing; showing and hiding again never brings the mask back.
+    h.engine.previews.setStagedPreview({ hidden: true, imageName: 'other.png', placement: candidate.placement });
+    expect(frame().drawn).toBeUndefined();
+    await h.showPreview();
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    h.engine.previews.setStagedPreview({ ...candidate, hidden: true });
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // Nothing but the screen changed: the mask's visibility and the document stand, nothing recorded or dispatched.
+    expect(h.engine.document.getDocument()).toBe(document);
+    expect(h.engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: [] });
+    expect(h.store.dispatch).not.toHaveBeenCalled();
+
+    // A stroke on the mask shows it while it paints, as over the shown result, and hides it as it lands.
+    h.select('m');
+    h.useTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // Accepting or discarding ends the preview, and the mask shows again.
+    h.engine.previews.setStagedPreview(null);
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
     h.dispose();
   });
 

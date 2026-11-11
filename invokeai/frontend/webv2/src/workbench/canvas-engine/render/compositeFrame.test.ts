@@ -384,11 +384,58 @@ describe('masks while a result is staged', () => {
     drawFrame();
     expect(description()).toBe(hidden);
 
-    // Toggling the preview off (or accepting/discarding) shows them again.
+    // Accepting or discarding ends the preview and shows them again.
     harness.previews.clearStaged();
     drawFrame();
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+  });
+
+  it('keeps them hidden while the staged result is toggled off to compare, until staging ends', () => {
+    const frame = createCompositeFrame(harness.deps);
+    const drawFrame = (document = doc) => frame.draw(surface(), document, VIEW, null, null);
+    const hiddenWhileComparing = () => {
+      expect(drawnIds()).toEqual(['a', 'c']);
+      expect(demandedIds()).toEqual(['a', 'c']);
+      expect(lastCompositeOptions().regionOverlays).toBe(false);
+    };
+
+    publishPreview();
+    drawFrame();
+    hiddenWhileComparing();
+    expect(lastCompositeOptions().stagedPreview).not.toBeNull();
+
+    // The eye shows the canvas under the result exactly as the shown result left it: no masks, no tint.
+    harness.previews.hideStaged();
+    drawFrame();
+    hiddenWhileComparing();
+    expect(lastCompositeOptions().stagedPreview).toBeNull();
+
+    // A mask gesture reveals them as it would over the shown result, and the frame keeps the selected mask ready.
+    harness.entries.set('m', entryFor(undefined, true));
+    drawFrame({ ...doc, selectedLayerId: 'm' });
+    expect(harness.rasterizeLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'm' }), expect.anything());
+    expect(demandedIds()).toEqual(['a', 'c', 'm']);
+    harness.editingHiddenStack = true;
+    drawFrame({ ...doc, selectedLayerId: 'm' });
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    harness.editingHiddenStack = false;
+    harness.entries.set('m', entryFor());
+
+    // Showing it again and hiding it again never brings them back.
+    publishPreview();
+    drawFrame();
+    hiddenWhileComparing();
+    harness.previews.hideStaged();
+    drawFrame();
+    hiddenWhileComparing();
+
+    // Accepting or discarding while it is toggled off ends the comparison.
+    harness.previews.clearStaged();
+    drawFrame();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
   });
 
   it('shows them over the preview only while a gesture edits a mask or region, whatever is selected', () => {

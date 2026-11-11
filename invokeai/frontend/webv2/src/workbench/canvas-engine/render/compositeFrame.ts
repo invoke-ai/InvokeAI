@@ -63,8 +63,9 @@ export interface CreateCompositeFrameDeps {
 }
 
 /**
- * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
- * would be accepted; control layers stay.
+ * While a staged or progress preview shows, or the user toggled the staged result off to compare, masks and regions
+ * stop tinting the screen, so the result reads as it would be accepted and the canvas under it reads the same way;
+ * control layers stay.
  */
 const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
 
@@ -234,8 +235,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPreview = previews.getStaged();
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      // A shown preview hides masks, regions and the regenerate tint, unless a gesture is editing one of them.
-      const staging = stagedPreview !== null && !deps.isEditingStagingHiddenStack();
+      // A shown or toggled-off preview hides masks, regions and the regenerate tint, unless a gesture edits one.
+      const staging = previews.hidesStagingOverlays() && !deps.isEditingStagingHiddenStack();
       const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.

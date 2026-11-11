@@ -44,6 +44,7 @@ import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
+import { CanvasFrameSizeReadout } from './CanvasFrameSizeReadout';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { findCanvasImageDropDestination, resolveCanvasImageDrop, type CanvasImageDropData } from './canvasImageDnd';
@@ -579,6 +580,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         {engine ? (
           <>
             <ToolStrip engine={engine} />
+            <CanvasFrameSizeReadout engine={engine} />
             <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}

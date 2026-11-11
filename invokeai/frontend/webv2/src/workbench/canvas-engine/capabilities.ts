@@ -194,6 +194,8 @@ export interface CanvasInteractionState {
   bboxGrid: number;
   bboxOptions: BboxToolOptions;
   bboxOverlay: boolean;
+  /** The generation frame as a Frame tool drag shows it, before it commits; null when no drag is under way. */
+  bboxPreview: Rect | null;
   brushOptions: BrushOptions;
   canRedo: boolean;
   canUndo: boolean;
@@ -887,9 +889,12 @@ export interface StagedPreviewPlacement extends Rect {
 /**
  * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
  * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
+ * `hidden`: the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but
+ * the screen keeps hiding masks, regions and the regenerate tint as the shown candidate does, so both sides of the
+ * comparison read alike.
  */
 export type StagedPreviewInput =
-  | { imageName: string; placement: StagedPreviewPlacement }
+  | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }
   | { dataUrl: string; placement: StagedPreviewPlacement };
 /** One pending result's landing rect in document space, for the staged-region overlay. */
 export interface StagedRegion {

@@ -4442,6 +4442,12 @@
         "operationRunning": "Finish or cancel the current canvas operation first.",
         "clearFailedMessage": "The canvas didn’t take the change, so nothing was cleared. Try again in a moment."
       },
+      "frameReadout": {
+        "frame": "Frame",
+        "label": "Frame and render size",
+        "render": "Render",
+        "size": "{{width}}×{{height}}"
+      },
       "hideStagedResultPreview": "Hide staged result preview",
       "hideStagingThumbnails": "Hide staging thumbnails",
       "import": {
