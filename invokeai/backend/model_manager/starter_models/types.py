@@ -8,6 +8,7 @@ from typing import Optional, Self
 from pydantic import BaseModel, Field, model_validator
 
 from invokeai.backend.architectures import generative_bases, latent_space_with_channels
+from invokeai.backend.model_manager.configs.base import SourceURL
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
     ExternalModelCapabilities,
@@ -25,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
 class StarterModelWithoutDependencies(BaseModel):
     description: str
     source: str
+    source_urls: list[SourceURL] = Field(default_factory=list, description="Web pages about the model.")
     name: str
     base: BaseModelType
     type: ModelType

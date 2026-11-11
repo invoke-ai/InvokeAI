@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.taxonomy import (
 # base=QwenImage override the installer sends is trusted instead (see pid_decoder.py::_validate_base). Only the
 # 2K-to-4K preset exists.
 pid_decoder_qwenimage_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder Qwen-Image (2K to 4K)",
     base=BaseModelType.QwenImage,
     source="nvidia/PiD::checkpoints_deprecated/PiD_res2kto4k_sr4x_official_qwenimage_distill_4step/model_ema_bf16.pth",
@@ -26,6 +27,7 @@ pid_decoder_qwenimage_2kto4k = StarterModel(
 )
 
 pid_1_5_decoder_qwenimage_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder Qwen-Image (2K to 4K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_bf16.safetensors",
@@ -37,6 +39,7 @@ pid_1_5_decoder_qwenimage_2kto4k = StarterModel(
 )
 
 pid_1_5_decoder_qwenimage_2kto4k_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder Qwen-Image (2K to 4K, int8)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_int8_convrot.safetensors",
@@ -49,6 +52,7 @@ pid_1_5_decoder_qwenimage_2kto4k_int8 = StarterModel(
 
 # region Qwen Image components (shared between Edit and txt2img variants)
 qwen_image_vae = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-Edit-2511"],
     name="Qwen Image VAE",
     base=BaseModelType.QwenImage,
     source="Qwen/Qwen-Image-Edit-2511::vae/diffusion_pytorch_model.safetensors",
@@ -60,6 +64,7 @@ qwen_image_vae = StarterModel(
 
 # region Qwen Image Edit
 qwen_image_edit = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-Edit-2511"],
     name="Qwen Image Edit 2511",
     base=BaseModelType.QwenImage,
     source="Qwen/Qwen-Image-Edit-2511",
@@ -69,6 +74,7 @@ qwen_image_edit = StarterModel(
 )
 
 qwen_image_edit_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF"],
     name="Qwen Image Edit 2511 (Q4_K_M)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q4_K_M.gguf",
@@ -80,6 +86,7 @@ qwen_image_edit_gguf_q4_k_m = StarterModel(
 )
 
 qwen_image_edit_gguf_q2_k = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF"],
     name="Qwen Image Edit 2511 (Q2_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q2_K.gguf",
@@ -91,6 +98,7 @@ qwen_image_edit_gguf_q2_k = StarterModel(
 )
 
 qwen_image_edit_gguf_q6_k = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF"],
     name="Qwen Image Edit 2511 (Q6_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q6_K.gguf",
@@ -102,6 +110,7 @@ qwen_image_edit_gguf_q6_k = StarterModel(
 )
 
 qwen_image_edit_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF"],
     name="Qwen Image Edit 2511 (Q8_0)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q8_0.gguf",
@@ -113,6 +122,7 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
 )
 
 qwen_image_edit_fp8_mixed = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image-Edit"],
     name="Qwen Image Edit 2511 (fp8 mixed)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/Comfy-Org/Qwen-Image-Edit/resolve/f68ace85e60b4a02a323e394253731947657b7d2/split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors",
@@ -127,6 +137,7 @@ qwen_image_edit_fp8_mixed = StarterModel(
 )
 
 qwen_image_edit_lightning_4step = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning"],
     name="Qwen Image Edit Lightning (4-step, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
@@ -136,6 +147,7 @@ qwen_image_edit_lightning_4step = StarterModel(
 )
 
 qwen_image_edit_lightning_8step = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning"],
     name="Qwen Image Edit Lightning (8-step, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
@@ -146,6 +158,7 @@ qwen_image_edit_lightning_8step = StarterModel(
 
 # Qwen Image (txt2img)
 qwen_image = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-2512"],
     name="Qwen Image 2512",
     base=BaseModelType.QwenImage,
     source="Qwen/Qwen-Image-2512",
@@ -154,6 +167,7 @@ qwen_image = StarterModel(
 )
 
 qwen_image_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-2512-GGUF"],
     name="Qwen Image 2512 (Q4_K_M)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q4_K_M.gguf",
@@ -164,6 +178,7 @@ qwen_image_gguf_q4_k_m = StarterModel(
 )
 
 qwen_image_gguf_q2_k = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-2512-GGUF"],
     name="Qwen Image 2512 (Q2_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q2_K.gguf",
@@ -174,6 +189,7 @@ qwen_image_gguf_q2_k = StarterModel(
 )
 
 qwen_image_gguf_q6_k = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-2512-GGUF"],
     name="Qwen Image 2512 (Q6_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q6_K.gguf",
@@ -184,6 +200,7 @@ qwen_image_gguf_q6_k = StarterModel(
 )
 
 qwen_image_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-2512-GGUF"],
     name="Qwen Image 2512 (Q8_0)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q8_0.gguf",
@@ -194,6 +211,7 @@ qwen_image_gguf_q8_0 = StarterModel(
 )
 
 qwen_image_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image"],
     name="Qwen Image 2512 (fp8)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/Comfy-Org/Qwen-Image/resolve/1f12b17be14c89b026c51a91d67c32f84bb047bc/split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
@@ -209,6 +227,7 @@ qwen_image_fp8 = StarterModel(
 )
 
 qwen_image_lightning_4step = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Qwen-Image-Lightning"],
     name="Qwen Image Lightning (4-step, V2.0, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-4steps-V2.0-bf16.safetensors",
@@ -218,6 +237,7 @@ qwen_image_lightning_4step = StarterModel(
 )
 
 qwen_image_lightning_8step = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Qwen-Image-Lightning"],
     name="Qwen Image Lightning (8-step, V2.0, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors",
@@ -228,6 +248,7 @@ qwen_image_lightning_8step = StarterModel(
 
 # region Qwen Image ControlNet
 qwen_image_fun_controlnet_union = StarterModel(
+    source_urls=["https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union"],
     name="Qwen Image ControlNet Union",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union/resolve/main/Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors",
@@ -236,6 +257,7 @@ qwen_image_fun_controlnet_union = StarterModel(
     type=ModelType.ControlNet,
 )
 qwen_image_instantx_controlnet_union = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets"],
     name="Qwen Image InstantX ControlNet Union",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets/resolve/main/split_files/controlnet/Qwen-Image-InstantX-ControlNet-Union.safetensors",

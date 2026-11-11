@@ -24,6 +24,7 @@ interface InstallSourceRowProps extends InstallSourceStatus {
  * itself is not a tab stop, since the button already offers the same action to the keyboard.
  */
 export const InstallSourceRow = ({
+  actions,
   badges,
   description,
   isMenuOpen,
@@ -34,6 +35,7 @@ export const InstallSourceRow = ({
   title,
   ...status
 }: InstallSourceRowProps & {
+  actions?: ReactNode;
   badges?: ReactNode;
   description?: ReactNode;
   /** What installs, so repeated Install controls stay distinguishable to assistive tech. */
@@ -42,7 +44,12 @@ export const InstallSourceRow = ({
   title: string;
 }) => (
   <ListItem
-    actions={<InstallSourceButton {...status} name={name} source={source} onInstall={onInstall} />}
+    actions={
+      <>
+        {actions}
+        <InstallSourceButton {...status} name={name} source={source} onInstall={onInstall} />
+      </>
+    }
     badges={badges}
     description={description}
     isMenuOpen={isMenuOpen}

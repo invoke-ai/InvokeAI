@@ -15,6 +15,7 @@ _MODEL_METADATA_FIELDS: tuple[str, ...] = (
     "source_type",
     "source_api_response",
     "source_url",
+    "source_urls",
     "trigger_phrases",
 )
 

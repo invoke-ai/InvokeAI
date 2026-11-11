@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.taxonomy import (
 # The 128-channel packed latent is unambiguous (unlike the 16ch FLUX/SD3 case), so no directory-name disambiguation
 # is needed for the config probe.
 pid_decoder_flux2_2k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder FLUX.2 (2K)",
     base=BaseModelType.Flux2,
     source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
@@ -31,6 +32,7 @@ pid_decoder_flux2_2k = StarterModel(
 )
 
 pid_decoder_flux2_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder FLUX.2 (2K to 4K)",
     base=BaseModelType.Flux2,
     source="nvidia/PiD::checkpoints_deprecated/PiD_res2kto4k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
@@ -44,6 +46,7 @@ pid_decoder_flux2_2kto4k = StarterModel(
 # Comfy-Org's single-file builds of PiD 1.5, pinned to a commit. Only the 4-step (distilled) files: the repo's
 # names without `_4step` are the undistilled teachers, which the config refuses.
 pid_1_5_decoder_flux2_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder FLUX.2 (2K to 4K)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux2_1024_to_4096_4step_bf16.safetensors",
@@ -55,6 +58,7 @@ pid_1_5_decoder_flux2_2kto4k = StarterModel(
 )
 
 pid_1_5_decoder_flux2_2kto4k_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder FLUX.2 (2K to 4K, int8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux2_1024_to_4096_4step_int8_convrot.safetensors",
@@ -67,6 +71,7 @@ pid_1_5_decoder_flux2_2kto4k_int8 = StarterModel(
 
 # region FLUX.2 Klein
 flux2_vae = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"],
     name="FLUX.2 VAE",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B::vae",
@@ -75,6 +80,7 @@ flux2_vae = StarterModel(
 )
 
 taef2 = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taef2"],
     name="TAEF2 (FLUX.2 preview decoder)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/madebyollin/taef2/resolve/bd244ebfe4398c84fbf312a2f1c868c676b500e3/taef2.safetensors",
@@ -84,6 +90,7 @@ taef2 = StarterModel(
 )
 
 flux2_klein_4b = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"],
     name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B",
@@ -92,6 +99,7 @@ flux2_klein_4b = StarterModel(
 )
 
 flux2_klein_4b_single = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"],
     name="FLUX.2 Klein 4B",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/main/flux-2-klein-4b.safetensors",
@@ -101,6 +109,7 @@ flux2_klein_4b_single = StarterModel(
 )
 
 flux2_klein_4b_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8"],
     name="FLUX.2 Klein 4B (FP8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors",
@@ -112,6 +121,7 @@ flux2_klein_4b_fp8 = StarterModel(
 # A community repack, pinned to a commit for the same reason as the Klein 9B int8 entry below: the decode follows
 # the file's own `comfy_quant` marker, and a reupload at the same path could change what that marker says.
 flux2_klein_4b_int8 = StarterModel(
+    source_urls=["https://huggingface.co/supermind/int8_convrot_models"],
     name="FLUX.2 Klein 4B (int8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/diffusion_models/flux/flux-2-klein-4b_int8_convrot.safetensors",
@@ -123,6 +133,7 @@ flux2_klein_4b_int8 = StarterModel(
 )
 
 flux2_klein_9b = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-9B"],
     name="FLUX.2 Klein 9B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
@@ -131,6 +142,7 @@ flux2_klein_9b = StarterModel(
 )
 
 flux2_klein_9b_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8"],
     name="FLUX.2 Klein 9B (FP8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8/resolve/main/flux-2-klein-9b-fp8.safetensors",
@@ -150,6 +162,7 @@ flux2_klein_9b_fp8 = StarterModel(
 # -- or that was genuinely rotated -- would be derotated with a Hadamard that was never applied, and
 # the result loads cleanly, logs "kept 144 layer(s) in int8" and generates noise.
 flux2_klein_9b_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Winnougan/Klein9b-Distilled-Base-INT8-Convrot"],
     name="FLUX.2 Klein 9B (int8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/Winnougan/Klein9b-Distilled-Base-INT8-Convrot/resolve/0373bf363446b8aa1e77245658dc2163875d7f08/flux-2-klein-9b-int8-convrot.safetensors",
@@ -162,6 +175,7 @@ flux2_klein_9b_int8 = StarterModel(
 )
 
 flux2_klein_4b_sdnq = StarterModel(
+    source_urls=["https://huggingface.co/Disty0/FLUX.2-klein-4B-SDNQ-4bit-dynamic"],
     name="FLUX.2 Klein 4B (SDNQ dynamic 4-bit)",
     base=BaseModelType.Flux2,
     source="Disty0/FLUX.2-klein-4B-SDNQ-4bit-dynamic",
@@ -172,6 +186,7 @@ flux2_klein_4b_sdnq = StarterModel(
 )
 
 flux2_klein_9b_sdnq = StarterModel(
+    source_urls=["https://huggingface.co/Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32"],
     name="FLUX.2 Klein 9B (SDNQ dynamic 4-bit + SVD)",
     base=BaseModelType.Flux2,
     source="Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32",
@@ -182,6 +197,7 @@ flux2_klein_9b_sdnq = StarterModel(
 )
 
 flux2_klein_4b_gguf_q4 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF"],
     name="FLUX.2 Klein 4B (GGUF Q4)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q4_K_M.gguf",
@@ -192,6 +208,7 @@ flux2_klein_4b_gguf_q4 = StarterModel(
 )
 
 flux2_klein_4b_gguf_q8 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF"],
     name="FLUX.2 Klein 4B (GGUF Q8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q8_0.gguf",
@@ -202,6 +219,7 @@ flux2_klein_4b_gguf_q8 = StarterModel(
 )
 
 flux2_klein_9b_gguf_q4 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF"],
     name="FLUX.2 Klein 9B (GGUF Q4)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/resolve/main/flux-2-klein-9b-Q4_K_M.gguf",
@@ -212,6 +230,7 @@ flux2_klein_9b_gguf_q4 = StarterModel(
 )
 
 flux2_klein_9b_gguf_q8 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF"],
     name="FLUX.2 Klein 9B (GGUF Q8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/resolve/main/flux-2-klein-9b-Q8_0.gguf",
@@ -223,6 +242,7 @@ flux2_klein_9b_gguf_q8 = StarterModel(
 
 # --- Diffusers transformer ---
 flux2_dev_diffusers = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-dev"],
     name="FLUX.2 [dev] (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-dev",
@@ -231,6 +251,7 @@ flux2_dev_diffusers = StarterModel(
 )
 
 flux2_dev_diffusers_nf4 = StarterModel(
+    source_urls=["https://huggingface.co/diffusers/FLUX.2-dev-bnb-4bit"],
     name="FLUX.2 [dev] (Diffusers, NF4)",
     base=BaseModelType.Flux2,
     source="diffusers/FLUX.2-dev-bnb-4bit",
@@ -242,6 +263,7 @@ flux2_dev_diffusers_nf4 = StarterModel(
 # These are the GGUFs BFL/community curate for cow-paired inference. Default
 # encoder dependency is cow Q4 to make starter installs work out of the box.
 flux2_dev_gguf_q3_k_m = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] Transformer (GGUF Q3_K_M)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q3_k_m.gguf",
@@ -252,6 +274,7 @@ flux2_dev_gguf_q3_k_m = StarterModel(
 )
 
 flux2_dev_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] Transformer (GGUF Q4_K_M)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q4_k_m.gguf",
@@ -262,6 +285,7 @@ flux2_dev_gguf_q4_k_m = StarterModel(
 )
 
 flux2_dev_gguf_q5_k_m = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] Transformer (GGUF Q5_K_M)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q5_k_m.gguf",
@@ -272,6 +296,7 @@ flux2_dev_gguf_q5_k_m = StarterModel(
 )
 
 flux2_dev_gguf_q6_k = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] Transformer (GGUF Q6_K)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q6_k.gguf",
@@ -282,6 +307,7 @@ flux2_dev_gguf_q6_k = StarterModel(
 )
 
 flux2_dev_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] Transformer (GGUF Q8_0)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q8_0.gguf",
@@ -292,6 +318,7 @@ flux2_dev_gguf_q8_0 = StarterModel(
 )
 
 flux2_dev_fp8_mixed = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Flux-2-Dev"],
     name="FLUX.2 [dev] Transformer (FP8 mixed)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/9630c1b4b6e690497ae0c19bb6b1b35d4ebedcb7/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors",
@@ -304,6 +331,7 @@ flux2_dev_fp8_mixed = StarterModel(
 
 # region FLUX.2 [dev] ControlNet
 flux2_dev_fun_controlnet_union = StarterModel(
+    source_urls=["https://huggingface.co/alibaba-pai/FLUX.2-dev-Fun-Controlnet-Union"],
     name="FLUX.2 [dev] ControlNet Union",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/alibaba-pai/FLUX.2-dev-Fun-Controlnet-Union/resolve/main/FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors",

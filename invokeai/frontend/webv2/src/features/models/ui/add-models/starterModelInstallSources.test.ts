@@ -29,12 +29,34 @@ describe('starter model install sources', () => {
 
   it('registers each entry with its own curated config', () => {
     const sources = getStarterModelInstallSources(
-      model('main', { base: 'flux', dependencies: [model('vae', { base: 'sdxl', type: 'vae' })] })
+      model('main', {
+        base: 'flux',
+        source_urls: ['https://example.com/main'],
+        dependencies: [model('vae', { base: 'sdxl', type: 'vae', source_urls: ['https://example.com/vae'] })],
+      })
     );
 
     expect(sources).toEqual([
-      { config: { base: 'sdxl', description: 'vae', name: 'vae', type: 'vae' }, source: 'vae' },
-      { config: { base: 'flux', description: 'main', name: 'main', type: 'main' }, source: 'main' },
+      {
+        config: {
+          base: 'sdxl',
+          description: 'vae',
+          name: 'vae',
+          source_urls: ['https://example.com/vae'],
+          type: 'vae',
+        },
+        source: 'vae',
+      },
+      {
+        config: {
+          base: 'flux',
+          description: 'main',
+          name: 'main',
+          source_urls: ['https://example.com/main'],
+          type: 'main',
+        },
+        source: 'main',
+      },
     ]);
   });
 

@@ -7636,6 +7636,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -7724,6 +7729,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7814,6 +7824,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -7899,6 +7914,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -8081,6 +8101,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10024,6 +10049,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10259,6 +10289,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10342,6 +10377,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10431,6 +10471,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10523,6 +10568,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10609,6 +10659,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10688,6 +10743,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10766,6 +10826,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10856,6 +10921,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -10935,6 +11005,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -11010,6 +11085,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -11087,6 +11167,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -11162,6 +11247,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -13716,6 +13806,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -14185,6 +14280,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18818,6 +18918,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18907,6 +19012,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18987,6 +19097,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19073,6 +19188,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19848,6 +19968,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19920,6 +20045,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19994,6 +20124,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20066,6 +20201,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20140,6 +20280,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20212,6 +20357,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20288,6 +20438,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20362,6 +20517,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -27624,6 +27784,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29305,6 +29470,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29613,6 +29783,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29695,6 +29870,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -29782,6 +29962,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29867,6 +30052,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29947,6 +30137,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30026,6 +30221,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30112,6 +30312,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30192,6 +30397,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30276,6 +30486,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30359,6 +30574,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30448,6 +30668,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30527,6 +30752,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30610,6 +30840,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30700,6 +30935,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30788,6 +31028,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30870,6 +31115,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30963,6 +31213,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31055,6 +31310,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31139,6 +31399,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31222,6 +31487,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31302,6 +31572,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31381,6 +31656,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31469,6 +31749,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31549,6 +31834,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31641,6 +31931,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31731,6 +32026,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31812,6 +32112,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -31891,6 +32196,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32290,6 +32600,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -32381,6 +32696,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32476,6 +32796,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -32563,6 +32888,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32652,6 +32982,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32745,6 +33080,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32844,6 +33184,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -32937,6 +33282,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33032,6 +33382,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33139,6 +33494,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33238,6 +33598,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33325,6 +33690,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33421,6 +33791,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33506,6 +33881,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33594,6 +33974,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33681,6 +34066,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33767,6 +34157,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33870,6 +34265,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -33966,6 +34366,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34052,6 +34457,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34136,6 +34546,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34222,6 +34637,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34307,6 +34727,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34397,6 +34822,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34489,6 +34919,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34573,6 +35008,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34672,6 +35112,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34777,6 +35222,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34872,6 +35322,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -34956,6 +35411,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35043,6 +35503,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -35125,6 +35590,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35210,6 +35680,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -35293,6 +35768,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35384,6 +35864,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -35467,6 +35952,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35558,6 +36048,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35656,6 +36151,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -35746,6 +36246,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35842,6 +36347,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -35929,6 +36439,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36019,6 +36534,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -36107,6 +36627,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36202,6 +36727,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -36295,6 +36825,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36391,6 +36926,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36491,6 +37031,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -36578,6 +37123,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36667,6 +37217,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36760,6 +37315,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36857,6 +37417,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -36945,6 +37510,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37040,6 +37610,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -37132,6 +37707,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37226,6 +37806,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -37315,6 +37900,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -37403,6 +37993,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -40507,6 +41102,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -40610,6 +41210,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -40695,6 +41300,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -41241,6 +41851,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page)
              */
             source_url?: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls?: string[] | null;
             /**
              * Name
              * @description Name of the model.
@@ -42707,6 +43322,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -42789,6 +43409,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -42877,6 +43502,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -42960,6 +43590,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -43042,6 +43677,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44142,6 +44782,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -44255,6 +44900,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -44342,6 +44992,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44434,6 +45089,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -44516,6 +45176,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44607,6 +45272,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44717,6 +45387,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -44819,6 +45494,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -44917,6 +45597,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -45009,6 +45694,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -45109,6 +45799,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46547,6 +47242,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -46643,6 +47343,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -46727,6 +47432,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -49640,6 +50350,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -49847,6 +50562,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -49917,6 +50637,11 @@ export type components = {
             description: string;
             /** Source */
             source: string;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls?: string[];
             /** Name */
             name: string;
             base: components["schemas"]["BaseModelType"];
@@ -49973,6 +50698,11 @@ export type components = {
             description: string;
             /** Source */
             source: string;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls?: string[];
             /** Name */
             name: string;
             base: components["schemas"]["BaseModelType"];
@@ -51022,6 +51752,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51097,6 +51832,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51189,6 +51929,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51272,6 +52017,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51362,6 +52112,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51461,6 +52216,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51542,6 +52302,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51632,6 +52397,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51704,6 +52474,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51778,6 +52553,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51850,6 +52630,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51924,6 +52709,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -51996,6 +52786,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52216,6 +53011,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -52308,6 +53108,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52678,6 +53483,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -52760,6 +53570,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52844,6 +53659,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -52926,6 +53746,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53010,6 +53835,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -53093,6 +53923,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -53175,6 +54010,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53261,6 +54101,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53523,6 +54368,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53884,6 +54734,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -53966,6 +54821,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54053,6 +54913,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54138,6 +55003,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54225,6 +55095,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54307,6 +55182,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54391,6 +55271,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54474,6 +55359,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54556,6 +55446,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54646,6 +55541,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54735,6 +55635,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54817,6 +55722,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54901,6 +55811,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -54980,6 +55895,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55061,6 +55981,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -55140,6 +56065,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55223,6 +56153,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -57055,6 +57990,11 @@ export type components = {
              */
             source_url: string | null;
             /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -57146,6 +58086,11 @@ export type components = {
              * @description Optional URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model

@@ -9,6 +9,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 taesd = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taesd"],
     name="TAESD (SD 1.x/2.x preview decoder)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/madebyollin/taesd/resolve/614f76814bbe30edbe2e627ace1c2234c81a2c0e/taesd_decoder.safetensors",
@@ -18,6 +19,7 @@ taesd = StarterModel(
 )
 
 cyberrealistic_negative = StarterModel(
+    source_urls=["https://huggingface.co/cyberdelia/CyberRealistic_Negative"],
     name="CyberRealistic Negative v3",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/cyberdelia/CyberRealistic_Negative/resolve/main/CyberRealistic_Negative_v3.pt",
@@ -26,6 +28,7 @@ cyberrealistic_negative = StarterModel(
 )
 
 cyberrealistic_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/cyberdelia/CyberRealistic"],
     name="CyberRealistic v4.1",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V4.1_FP16.safetensors",
@@ -35,6 +38,7 @@ cyberrealistic_sd1 = StarterModel(
 )
 
 rev_animated_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/stablediffusionapi/rev-animated"],
     name="ReV Animated",
     base=BaseModelType.StableDiffusion1,
     source="stablediffusionapi/rev-animated",
@@ -43,6 +47,7 @@ rev_animated_sd1 = StarterModel(
 )
 
 dreamshaper_8_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/Lykon/dreamshaper-8"],
     name="Dreamshaper 8",
     base=BaseModelType.StableDiffusion1,
     source="Lykon/dreamshaper-8",
@@ -51,6 +56,7 @@ dreamshaper_8_sd1 = StarterModel(
 )
 
 dreamshaper_8_inpainting_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/Lykon/dreamshaper-8-inpainting"],
     name="Dreamshaper 8 (inpainting)",
     base=BaseModelType.StableDiffusion1,
     source="Lykon/dreamshaper-8-inpainting",
@@ -59,6 +65,7 @@ dreamshaper_8_inpainting_sd1 = StarterModel(
 )
 
 deliberate_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/XpucT/Deliberate"],
     name="Deliberate v5",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5.safetensors",
@@ -67,6 +74,7 @@ deliberate_sd1 = StarterModel(
 )
 
 deliberate_inpainting_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/XpucT/Deliberate"],
     name="Deliberate v5 (inpainting)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5-inpainting.safetensors",
@@ -77,6 +85,7 @@ deliberate_inpainting_sd1 = StarterModel(
 # endregion
 # region TI
 easy_neg_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/embed/EasyNegative"],
     name="EasyNegative",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors",
@@ -87,6 +96,7 @@ easy_neg_sd1 = StarterModel(
 # endregion
 # region IP Adapter
 ip_adapter_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_sd15"],
     name="Standard Reference (IP Adapter)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_sd15/resolve/main/ip-adapter_sd15.safetensors",
@@ -97,6 +107,7 @@ ip_adapter_sd1 = StarterModel(
 )
 
 ip_adapter_plus_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_plus_sd15"],
     name="Precise Reference (IP Adapter Plus)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_plus_sd15/resolve/main/ip-adapter-plus_sd15.safetensors",
@@ -107,6 +118,7 @@ ip_adapter_plus_sd1 = StarterModel(
 )
 
 ip_adapter_plus_face_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_plus_face_sd15"],
     name="Face Reference (IP Adapter Plus Face)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_plus_face_sd15/resolve/main/ip-adapter-plus-face_sd15.safetensors",
@@ -119,6 +131,7 @@ ip_adapter_plus_face_sd1 = StarterModel(
 # endregion
 # region ControlNet
 qr_code_cnet_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/monster-labs/control_v1p_sd15_qrcode_monster"],
     name="QRCode Monster v2 (SD1.5)",
     base=BaseModelType.StableDiffusion1,
     source="monster-labs/control_v1p_sd15_qrcode_monster::v2",
@@ -127,6 +140,7 @@ qr_code_cnet_sd1 = StarterModel(
 )
 
 canny_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_canny"],
     name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_canny",
@@ -136,6 +150,7 @@ canny_sd1 = StarterModel(
 )
 
 inpaint_cnet_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_inpaint"],
     name="Inpainting",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_inpaint",
@@ -145,6 +160,7 @@ inpaint_cnet_sd1 = StarterModel(
 )
 
 mlsd_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_mlsd"],
     name="Line Drawing (mlsd)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_mlsd",
@@ -154,6 +170,7 @@ mlsd_sd1 = StarterModel(
 )
 
 depth_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11f1p_sd15_depth"],
     name="Depth Map",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11f1p_sd15_depth",
@@ -163,6 +180,7 @@ depth_sd1 = StarterModel(
 )
 
 normal_bae_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_normalbae"],
     name="Lighting Detection (Normals)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_normalbae",
@@ -172,6 +190,7 @@ normal_bae_sd1 = StarterModel(
 )
 
 seg_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_seg"],
     name="Segmentation Map",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_seg",
@@ -181,6 +200,7 @@ seg_sd1 = StarterModel(
 )
 
 lineart_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_lineart"],
     name="Lineart",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_lineart",
@@ -190,6 +210,7 @@ lineart_sd1 = StarterModel(
 )
 
 lineart_anime_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15s2_lineart_anime"],
     name="Lineart Anime",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15s2_lineart_anime",
@@ -199,6 +220,7 @@ lineart_anime_sd1 = StarterModel(
 )
 
 openpose_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_openpose"],
     name="Pose Detection (openpose)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_openpose",
@@ -208,6 +230,7 @@ openpose_sd1 = StarterModel(
 )
 
 scribble_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_scribble"],
     name="Contour Detection (scribble)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_scribble",
@@ -217,6 +240,7 @@ scribble_sd1 = StarterModel(
 )
 
 softedge_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11p_sd15_softedge"],
     name="Soft Edge Detection (softedge)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_softedge",
@@ -226,6 +250,7 @@ softedge_sd1 = StarterModel(
 )
 
 shuffle_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11e_sd15_shuffle"],
     name="Remix (shuffle)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11e_sd15_shuffle",
@@ -235,6 +260,7 @@ shuffle_sd1 = StarterModel(
 )
 
 tile_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile"],
     name="Tile",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11f1e_sd15_tile",
@@ -246,6 +272,7 @@ tile_sd1 = StarterModel(
 # endregion
 # region T2I Adapter
 t2i_canny_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2iadapter_canny_sd15v2"],
     name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_canny_sd15v2",
@@ -255,6 +282,7 @@ t2i_canny_sd1 = StarterModel(
 )
 
 t2i_sketch_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2iadapter_sketch_sd15v2"],
     name="Sketch",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_sketch_sd15v2",
@@ -264,6 +292,7 @@ t2i_sketch_sd1 = StarterModel(
 )
 
 t2i_depth_sd1 = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2iadapter_depth_sd15v2"],
     name="Depth Map",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_depth_sd15v2",

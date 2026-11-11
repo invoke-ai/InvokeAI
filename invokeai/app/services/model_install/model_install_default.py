@@ -1912,6 +1912,7 @@ class ModelInstallService(ModelInstallServiceBase):
             key=key,
             name=name,
             description=job.config_in.description,
+            source_urls=job.config_in.source_urls or [],
             provider_id=provider_id,
             provider_model_id=provider_model_id,
             capabilities=capabilities,

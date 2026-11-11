@@ -174,6 +174,7 @@ export interface ModelConfig {
   source: string;
   source_type: 'path' | 'url' | 'hf_repo_id' | (string & {});
   source_url?: string | null;
+  source_urls?: string[];
   cover_image?: string | null;
   base: ModelBase;
   type: ModelTaxonomyType;
@@ -208,6 +209,7 @@ export interface ModelRecordChanges {
   path?: string;
   description?: string | null;
   source_url?: string | null;
+  source_urls?: string[];
   base?: ModelBase;
   type?: ModelTaxonomyType;
   format?: ModelFileFormat;
@@ -295,6 +297,7 @@ export interface HuggingFaceModels {
 }
 
 export interface StarterModel {
+  source_urls?: string[];
   name: string;
   description: string;
   source: string;
