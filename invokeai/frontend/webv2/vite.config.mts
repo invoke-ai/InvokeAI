@@ -260,6 +260,7 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/queue/runtime.ts',
   '/features/queue/runtime/cancelRequests.ts',
   '/features/queue/runtime/coordinator.ts',
+  '/features/queue/runtime/deliveryClaims.ts',
   '/features/queue/runtime/receiptAcknowledgements.ts',
   '/features/queue/ui/useDeviceLabel.ts',
   '/features/upscale/core/settings.ts',
