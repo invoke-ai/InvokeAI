@@ -22,7 +22,7 @@ export const TREE_ROW_FOCUS = {
   outline: 'none',
 };
 // The leading inset mirrors the end inset.
-export const LAYER_ROW_INSET_PX = 6;
+export const LAYER_ROW_INSET_PX = 3;
 /** Layer and group rows lead with a box this wide: thumbnail, group pile or degraded placeholder. */
 export const LAYER_LEADING_BOX_PX = 32;
 
