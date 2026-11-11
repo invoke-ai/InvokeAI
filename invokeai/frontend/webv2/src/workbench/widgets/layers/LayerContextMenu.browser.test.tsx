@@ -219,15 +219,18 @@ describe('Layers context menu over a real engine', () => {
     }
   );
 
-  it('describes Add regenerate region under its label', async () => {
+  it('describes Add regenerate region under its label without widening the menu', async () => {
     const { openMenu } = await renderMenu([imageLayer('art')]);
 
     await openMenu('art');
 
-    const regenerate = document.querySelector('[role="menuitem"][data-value="add-regenerate-region"]');
-    expect(regenerate?.textContent).toBe(
-      'Add regenerate regionRegenerate where this layer has content, as a live inpaint mask.'
-    );
+    const regenerate = document.querySelector<HTMLElement>('[role="menuitem"][data-value="add-regenerate-region"]')!;
+    expect(regenerate.textContent).toBe('Add regenerate regionInpaint where this layer has content.');
+    const menu = regenerate.closest<HTMLElement>('[role="menu"]')!;
+    const description = document.getElementById(regenerate.getAttribute('aria-describedby')!)!;
+    const width = menu.getBoundingClientRect().width;
+    description.textContent = '';
+    expect(menu.getBoundingClientRect().width).toBe(width);
   });
 
   it('keeps an unavailable Merge masks reachable by keyboard and says why', async () => {

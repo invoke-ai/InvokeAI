@@ -87,7 +87,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
   const { canManageModels } = useCapabilities();
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
@@ -252,7 +252,6 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   );
   const adapterEditing = useMemo<ControlAdapterEditing>(
     () => ({
-      cancel: cancelPreview,
       commit: commitAdapter,
       preview: (patch) => {
         previewStructural({
@@ -262,7 +261,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         });
       },
     }),
-    [cancelPreview, commitAdapter, layer.id, previewStructural]
+    [commitAdapter, layer.id, previewStructural]
   );
 
   const memoryKey = baseId && layer.controlType ? controlModelMemoryKey(baseId, layer.controlType) : null;

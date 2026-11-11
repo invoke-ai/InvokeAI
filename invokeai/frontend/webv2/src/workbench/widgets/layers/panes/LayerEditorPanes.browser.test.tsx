@@ -1355,6 +1355,62 @@ describe('Overview pane', () => {
       .toBeCloseTo(offset.y, 0);
   });
 
+  it('paints the viewport outline as dark, light and dark bands just inside its box', async () => {
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    engine!.surface.resize(400, 300, 1);
+    await act(async () => {
+      await userEvent.click(canvas);
+    });
+    const outline = pan.element().querySelector('div')!;
+    // Wait out the glide so the painted box matches its final rect.
+    let settledLeft = NaN;
+    await expect
+      .poll(() => {
+        const left = outline.getBoundingClientRect().left;
+        const stable = left === settledLeft;
+        settledLeft = left;
+        return stable;
+      })
+      .toBe(true);
+
+    const button = pan.element().getBoundingClientRect();
+    const box = outline.getBoundingClientRect();
+    const png = await page.screenshot({ element: pan.element(), save: false });
+    const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+    const scale = bitmap.width / button.width;
+    const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    // Scan the outline's left edge at its vertical middle, from a pixel outside the box to a pixel past the bands.
+    const row = Math.round((box.top + box.height / 2 - button.top) * scale);
+    const edge = (box.left - button.left) * scale;
+    const start = Math.floor(edge - scale);
+    const pixels = context.getImageData(start, row, Math.ceil(5 * scale) + 1, 1).data;
+    // Runs of near-black and near-white pixels, in scan order; mid tones (the checkerboard) start no run.
+    const runs: { start: number; tone: 'dark' | 'light' }[] = [];
+    for (let i = 0; i < pixels.length / 4; i++) {
+      const luma = 0.2126 * pixels[i * 4]! + 0.7152 * pixels[i * 4 + 1]! + 0.0722 * pixels[i * 4 + 2]!;
+      const tone = luma < 48 ? 'dark' : luma > 208 ? 'light' : null;
+      if (tone && tone !== runs.at(-1)?.tone) {
+        runs.push({ start: start + i, tone });
+      }
+    }
+    const lightBand = runs.findIndex(
+      (run, i) => run.tone === 'light' && runs[i - 1]?.tone === 'dark' && runs[i + 1]?.tone === 'dark'
+    );
+    expect(lightBand).toBeGreaterThan(0);
+    // The light band sits one dark band inside the box edge: the outline stays within the viewport's rect.
+    const lightStart = runs[lightBand]!.start;
+    expect(lightStart).toBeGreaterThanOrEqual(edge);
+    expect(lightStart).toBeLessThanOrEqual(edge + 2 * scale);
+  });
+
   it('zooms the view around the document point under the wheel', async () => {
     const outpaint = layerContract('outpaint', 'raster', {
       source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
