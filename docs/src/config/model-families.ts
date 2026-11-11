@@ -186,6 +186,7 @@ const externalProviders = [
   { name: 'Google Gemini', link: '/users-guide/models/external-models/gemini/' },
   { name: 'BytePlus Seedream', link: '/users-guide/models/external-models/seedream/' },
   { name: 'Alibaba Cloud', link: '/users-guide/models/external-models/alibabacloud/' },
+  { name: 'MiniMax', link: '/users-guide/models/external-models/minimax/' },
 ];
 
 export { externalProviders, modelFamilies };
