@@ -208,7 +208,7 @@ export const FilterMenuItem = memo(function FilterMenuItem({
 }: FilterMenuItemProps) {
   return (
     <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
-      <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
+      <Icon as={CheckIcon} boxSize="3" color="fg" opacity={isChecked ? 1 : 0} />
       <Menu.ItemText fontSize="md">{label}</Menu.ItemText>
       {trailing ? (
         <Text color="fg.subtle" fontSize="xs" ms="auto">

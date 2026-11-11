@@ -154,16 +154,17 @@ const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => 
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="15rem">
+          <MenuContent minW="0">
             <Menu.RadioItemGroup value={current} onValueChange={onValueChange}>
               {choices.map((choice) => (
-                <Menu.RadioItem key={choice.value} value={choice.value}>
+                // The row draws its own check, so it drops the indent a radio item keeps for an indicator.
+                <Menu.RadioItem key={choice.value} ps="2" value={choice.value}>
                   <HStack gap="2" minW="0" w="full">
                     <Icon
                       as={CheckIcon}
                       aria-hidden
                       boxSize="3.5"
-                      color="fg.subtle"
+                      color="fg"
                       flexShrink={0}
                       opacity={choice.value === current ? 1 : 0}
                     />

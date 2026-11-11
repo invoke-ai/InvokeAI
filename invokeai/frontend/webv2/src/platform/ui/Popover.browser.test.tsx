@@ -1,10 +1,12 @@
 import { Box, ChakraProvider, Popover } from '@chakra-ui/react';
+import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { page, server, userEvent } from 'vitest/browser';
 
+import { findArrowJointSeams } from './arrowJoint.testing';
 import { PopoverContent } from './Popover';
 
 let host: HTMLDivElement | null = null;
@@ -16,10 +18,14 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  await server.commands.emulateDevicePixelRatio(null);
+  applyThemeToRoot('classic');
 });
 
 const PLACEMENTS = {
   bottom: { placement: 'bottom' },
+  left: { placement: 'left' },
+  right: { placement: 'right' },
   top: { placement: 'top' },
 } as const;
 
@@ -100,4 +106,56 @@ describe('PopoverContent arrow', () => {
     expect(content.dataset.state).toBe('open');
     expect(page.getByRole('button', { name: 'Open' }).element().getAttribute('aria-expanded')).toBe('true');
   });
+});
+
+describe('PopoverContent arrow joint', () => {
+  // The status bar's composition: no padding, and the clipped column inside it ends in a footer flush with the edge.
+  it.each([
+    ['classic', 1, 'top'],
+    ['classic', 1, 'bottom'],
+    ['classic', 1.25, 'top'],
+    ['classic', 1.25, 'bottom'],
+    ['classic', 1.25, 'left'],
+    ['classic', 1.25, 'right'],
+    ['light', 1.25, 'top'],
+  ] as const)(
+    'reads as one shape with the content, its border never crossing the arrow (%s theme, DPR %s, %s)',
+    async (themeId, ratio, placement) => {
+      applyThemeToRoot(themeId);
+      await server.commands.emulateDevicePixelRatio(ratio);
+      await vi.waitFor(() => expect(globalThis.devicePixelRatio).toBe(ratio));
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      await act(async () => {
+        root?.render(
+          <ChakraProvider value={system}>
+            <Box left="50vw" position="fixed" top="50vh">
+              <Popover.Root positioning={PLACEMENTS[placement]}>
+                <Popover.Trigger>Open</Popover.Trigger>
+                <Popover.Positioner>
+                  <PopoverContent display="flex" flexDirection="column" p="0" w="8rem">
+                    <Box display="flex" flexDirection="column" overflow="hidden" rounded="inherit">
+                      <Box h="16" />
+                      <Box as="button" bg="bg.emphasized" h="8" w="full">
+                        Settings
+                      </Box>
+                    </Box>
+                  </PopoverContent>
+                </Popover.Positioner>
+              </Popover.Root>
+            </Box>
+          </ChakraProvider>
+        );
+        await Promise.resolve();
+      });
+      await act(() => userEvent.click(page.getByRole('button', { name: 'Open' })));
+      const content = document.querySelector<HTMLElement>('[data-scope="popover"][data-part="content"]')!;
+      await vi.waitFor(() => expect(content.dataset.placement).toBe(placement));
+      await Promise.all(content.getAnimations().map((animation) => animation.finished));
+      const tip = content.querySelector<HTMLElement>('[data-part="arrow-tip"]')!;
+
+      expect(await findArrowJointSeams(content, tip)).toEqual([]);
+    }
+  );
 });

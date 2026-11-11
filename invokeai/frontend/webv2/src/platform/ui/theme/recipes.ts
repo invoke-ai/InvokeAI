@@ -54,9 +54,13 @@ const arrowClearOfCorners = (visibleSize: string) => ({
 /**
  * A popover's or hover card's arrow sits inside its content, which is `position: relative`, so Zag's offset out of the
  * content lands on the padding edge, one border width (1px) inside the outer edge. Moved out by that width, away from
- * the content only, it centres on the outer edge, as a menu's arrow does beside its content.
+ * the content only, it centres on the outer edge, as a menu's arrow does beside its content. It stacks below the
+ * content's children, in the stacking context the content slot isolates: the tip's cover over the content's edge
+ * (`arrowTipOutsideContent`) paints over the content's own border and shading but never over a child flush with that
+ * edge, such as the footer of a popover without padding.
  */
-const arrowOnContentBorderEdge = {
+const arrowInsideContent = {
+  zIndex: '-1',
   '[data-placement^=bottom] > &': { translate: '0 -1px' },
   '[data-placement^=top] > &': { translate: '0 1px' },
   '[data-placement^=right] > &': { translate: '-1px 0' },
@@ -64,16 +68,21 @@ const arrowOnContentBorderEdge = {
 };
 
 /**
- * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus the
- * content's 1px border, which it covers so tip and panel share one outline, it never draws over the content or its
- * items. A tip of no size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow
- * box, the visible tip takes the pointer as part of the surface, so resting on it keeps a hover card open and a click
- * on it never reaches whatever lies beneath.
+ * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus a
+ * band into the content, it covers the content's edge across its base, so tip and panel share one outline. The band
+ * spans the 1px border and the 1px inset highlight the dark `lg` shadow paints inside it, with room to spare: a
+ * rotated element loses its sub-pixel offset, so at a fractional device pixel ratio (125%) the tip lands up to half a
+ * device pixel off its layout position, and the arrow's 1px move outward overshoots a border the browser snapped to
+ * one device pixel (0.8px). A band of about 3px (4.5px along each side) absorbs both; one of 1px left part of the
+ * border or the highlight as a line across the base. A menu's tip, on top of its content, covers only padding with it.
+ * A tip of no size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow box,
+ * the visible tip takes the pointer as part of the surface, so resting on it keeps a hover card open and a click on
+ * it never reaches whatever lies beneath.
  */
 const arrowTipOutsideContent = {
   borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
   borderTopWidth: 'min(1px, var(--arrow-visible-size))',
-  clipPath: 'polygon(0 0, calc(100% + 1.5px) 0, 0 calc(100% + 1.5px))',
+  clipPath: 'polygon(0 0, calc(100% + 4.5px) 0, 0 calc(100% + 4.5px))',
   pointerEvents: 'auto',
 };
 
@@ -121,6 +130,8 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.hoverCard.base?.content,
       '--hovercard-bg': 'colors.bg.muted',
+      // The arrow stacks below the content's children, within the content: see `arrowInsideContent`.
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
@@ -130,7 +141,7 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
     arrow: {
       ...chakraSlotRecipes.hoverCard.base?.arrow,
       ...arrowClearOfCorners('{sizes.3}'),
-      ...arrowOnContentBorderEdge,
+      ...arrowInsideContent,
     },
     arrowTip: {
       ...chakraSlotRecipes.hoverCard.base?.arrowTip,
@@ -149,6 +160,8 @@ export const popoverSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.popover.base?.content,
       '--popover-bg': 'colors.bg.muted',
+      // The arrow stacks below the content's children, within the content: see `arrowInsideContent`.
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
@@ -159,7 +172,7 @@ export const popoverSlotRecipe = defineSlotRecipe({
     arrow: {
       ...chakraSlotRecipes.popover.base?.arrow,
       ...arrowClearOfCorners('{sizes.3}'),
-      ...arrowOnContentBorderEdge,
+      ...arrowInsideContent,
     },
     arrowTip: {
       ...chakraSlotRecipes.popover.base?.arrowTip,
@@ -658,6 +671,9 @@ export const menuSlotRecipe = defineSlotRecipe({
     item: {
       ...chakraSlotRecipes.menu.base?.item,
       ...dropdownItem,
+      // An item's own icon sits back from its label, so every menu reads the same without each caller coloring it. A
+      // danger item keeps its tone, and a glyph nested deeper (an indicator, an icon-only item) keeps its own color.
+      '&:not([data-danger]) > svg': { color: 'fg.subtle' },
     },
     itemGroupLabel: {
       ...chakraSlotRecipes.menu.base?.itemGroupLabel,
@@ -1306,10 +1322,26 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * A chip label's box trimmed to its cap height, so flex centring lines the letters up with the chip's icon wherever the
+ * engine's rounded ascent and descent put the baseline in the line box (about 2 device px high in Linux Chromium at
+ * 125%). Equal block padding keeps that centre and leaves room for descenders and accents inside a clipping label.
+ * Without `text-box` support the label keeps its full line box.
+ */
+export const chipLabelStyles = {
+  '@supports (text-box: trim-both cap alphabetic)': {
+    paddingBlock: '0.3em',
+    textBox: 'trim-both cap alphabetic',
+  },
+} as const;
+
 export const chipRecipe = defineRecipe({
   base: {
     alignItems: 'center',
-    borderRadius: 'sm',
+    // Fill the host row, so a progress hairline keeps to its bottom edge however tall the trimmed label is.
+    alignSelf: 'stretch',
+    // The status bar's hover and active fill radius, which the progress hairline is clipped to.
+    borderRadius: 'control',
     display: 'inline-flex',
     flexShrink: '0',
     fontSize: 'xs',
@@ -1318,6 +1350,8 @@ export const chipRecipe = defineRecipe({
     px: '2',
     py: '0.5',
     whiteSpace: 'nowrap',
+    // The label is the chip's text child.
+    '& > p': chipLabelStyles,
   },
   variants: {
     tone: {

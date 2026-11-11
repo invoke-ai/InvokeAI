@@ -133,7 +133,7 @@ export const ProjectsToolbar = ({
                 </Menu.ItemGroupLabel>
                 {PROJECT_SORT_IDS.map((id) => (
                   <Menu.Item key={id} value={id}>
-                    <Icon as={CheckIcon} boxSize="3.5" opacity={id === sort ? 1 : 0} />
+                    <Icon as={CheckIcon} boxSize="3.5" color="fg" opacity={id === sort ? 1 : 0} />
                     <Menu.ItemText>{t(SORT_LABEL_KEY[id])}</Menu.ItemText>
                   </Menu.Item>
                 ))}
