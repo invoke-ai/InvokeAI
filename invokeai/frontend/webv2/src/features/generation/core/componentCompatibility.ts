@@ -14,6 +14,8 @@ export type GenerateComponentCandidate = {
   /** VAE latent width. Only `wan` ships more than one, and its two are different decoders. */
   latent_channels?: number | null;
   submodels?: Record<string, unknown> | null;
+  /** Text LLMs only: whether the model reads images. */
+  supports_images?: unknown;
   type: string;
   variant?: unknown;
 };
@@ -91,6 +93,10 @@ export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
 
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
+
+/** The FLUX.3 prompt upsampler reads reference images, so a text-only LLM cannot serve it. */
+export const isVisionTextLlm: GenerateComponentFilter = (model) =>
+  model.type === 'text_llm' && model.supports_images === true;
 
 /** Ministral and Mistral encoders require distinct variants. */
 const MINISTRAL_3B_VARIANT = 'ministral3_3b';
