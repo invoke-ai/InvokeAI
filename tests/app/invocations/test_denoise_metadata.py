@@ -2677,6 +2677,7 @@ def test_extract_adapters_respects_explicit_empty_list() -> None:
     from invokeai.app.invocations.metadata_linked import (
         _extract_controlnets_from_metadata,
         _extract_ip_adapters_from_metadata,
+        _extract_t2i_adapters_from_metadata,
     )
 
     data_with_empty_cn = {
@@ -2703,6 +2704,85 @@ def test_extract_adapters_respects_explicit_empty_list() -> None:
     }
     # Must return [] without falling back to ipAdapters
     assert _extract_ip_adapters_from_metadata(data_with_empty_ref) == []
+
+    data_with_empty_t2i = {
+        "t2iAdapters": [],
+        "control_layers": [
+            {
+                "type": "t2i_adapter",
+                "image": {"image_name": "fallback-t2i.png"},
+                "model": {"key": "legacy-t2i"},
+            }
+        ],
+        "canvas_v2_metadata": {
+            "controlLayers": [
+                {
+                    "isEnabled": True,
+                    "controlAdapter": {
+                        "type": "t2i_adapter",
+                        "model": {"key": "canvas-v2-t2i"},
+                    },
+                }
+            ]
+        },
+    }
+    # Must return [] without falling back to control_layers or canvas_v2_metadata
+    assert _extract_t2i_adapters_from_metadata(data_with_empty_t2i) == []
+
+
+def test_core_model_labels_unwrapping_and_wan_low_noise() -> None:
+    """Finding 8: CORE_MODEL_LABELS includes all 13 model/VAE labels and unwraps WanTransformerField properly."""
+    from invokeai.app.invocations.metadata import unwrap_metadata_value
+    from invokeai.app.invocations.metadata_constants import CORE_MODEL_LABELS
+    from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, WanTransformerField
+
+    # All 13 labels reported by @lstein must be present in CORE_MODEL_LABELS
+    expected_13 = {
+        "ideogram4_unconditional_model",
+        "ltx2_component_source",
+        "ltx2_text_encoder_model",
+        "minimax_h3_component_source",
+        "minimax_h3_hybrid_base_model",
+        "minimax_h3_text_encoder_model",
+        "minimax_h3_transformer_model",
+        "qwen_image_component_source",
+        "qwen_image_qwen_vl_encoder",
+        "qwen_image_vae",
+        "wan_component_source",
+        "wan_t5_encoder_model",
+        "wan_transformer_low_noise",
+    }
+    assert expected_13.issubset(CORE_MODEL_LABELS)
+
+    # Test WanTransformerField unwrapping:
+    high_model = ModelIdentifierField(
+        key="wan-high", hash="h1", name="high", base=BaseModelType.Wan, type=ModelType.Main
+    )
+    low_model = ModelIdentifierField(key="wan-low", hash="h2", name="low", base=BaseModelType.Wan, type=ModelType.Main)
+    lora_model = ModelIdentifierField(key="lora1", hash="l1", name="lora", base=BaseModelType.Wan, type=ModelType.LoRA)
+    lora = LoRAField(lora=lora_model, weight=1.0)
+
+    wan_field = WanTransformerField(
+        transformer=high_model,
+        transformer_low_noise=low_model,
+        loras=[lora],
+        loras_low_noise=[lora],
+    )
+
+    # Under core label 'model', unwraps to high_model
+    unwrapped_model = unwrap_metadata_value(wan_field, label="model")
+    assert isinstance(unwrapped_model, ModelIdentifierField)
+    assert unwrapped_model.key == "wan-high"
+
+    # Under core label 'wan_transformer_low_noise', unwraps to low_model
+    unwrapped_low = unwrap_metadata_value(wan_field, label="wan_transformer_low_noise")
+    assert isinstance(unwrapped_low, ModelIdentifierField)
+    assert unwrapped_low.key == "wan-low"
+
+    # Under custom label, remains wrapped so LoRAs are preserved
+    custom_val = unwrap_metadata_value(wan_field, label="my_custom_label")
+    assert isinstance(custom_val, WanTransformerField)
+    assert len(custom_val.loras) == 1
 
 
 def test_metadata_to_ip_adapters_tensor_mask() -> None:

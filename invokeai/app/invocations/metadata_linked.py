@@ -3,7 +3,7 @@
 # Thanks to @skunworkxdark for the original implementation!
 
 import copy
-from typing import Any, Dict, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
@@ -28,11 +28,23 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.metadata import (
-    CUSTOM_LABEL,
     LatentsMetaOutput,
     MetadataOutput,
     build_denoise_metadata,
     unwrap_metadata_value,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS,
+    CORE_LABELS_BOOL,
+    CORE_LABELS_FLOAT,
+    CORE_LABELS_INTEGER,
+    CORE_LABELS_MODEL,
+    CORE_LABELS_SCHEDULER,
+    CORE_LABELS_STRING,
+    CORE_LABELS_VAE,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CUSTOM_LABEL as CUSTOM_LABEL,
 )
 from invokeai.app.invocations.model import (
     CLIPField,
@@ -65,279 +77,6 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.version import __version__
-
-CORE_LABELS = Literal[
-    f"{CUSTOM_LABEL}",
-    "generation_mode",
-    "positive_prompt",
-    "positive_style_prompt",
-    "negative_prompt",
-    "negative_style_prompt",
-    "width",
-    "height",
-    "seed",
-    "rand_device",
-    "cfg_scale",
-    "cfg_rescale_multiplier",
-    "steps",
-    "scheduler",
-    "clip_skip",
-    "model",
-    "vae",
-    "seamless_x",
-    "seamless_y",
-    "guidance",
-    "cfg_scale_start_step",
-    "cfg_scale_end_step",
-    "denoising_start",
-    "denoising_end",
-    "strength",
-    "init_image",
-    "add_noise",
-    "shift",
-    "dype_preset",
-    "dype_scale",
-    "dype_exponent",
-    "freeu_s1",
-    "freeu_s2",
-    "freeu_b1",
-    "freeu_b2",
-    "hidiffusion",
-    "hidiffusion_raunet",
-    "hidiffusion_window_attn",
-    "hidiffusion_t1_ratio",
-    "hidiffusion_t2_ratio",
-    "hrf_enabled",
-    "hrf_method",
-    "hrf_strength",
-    "refiner_model",
-    "refiner_cfg_scale",
-    "refiner_steps",
-    "refiner_scheduler",
-    "refiner_positive_aesthetic_score",
-    "refiner_negative_aesthetic_score",
-    "refiner_start",
-    "pid_mode",
-    "pid_steps",
-    "pid_decoder",
-    "gemma2_encoder",
-    "tile_width",
-    "tile_height",
-    "tile_overlap",
-    "num_frames",
-    "fps",
-    "source_video_start_frame",
-    "source_video_end_frame",
-    "t5_encoder",
-    "clip_embed_model",
-    "clip_l_model",
-    "clip_g_model",
-    "mistral_encoder",
-    "qwen3_encoder",
-    "qwen3_source",
-    "qwen3_5_encoder",
-    "qwen3_vl_encoder",
-    "flux3_caption",
-    "ideogram4_caption",
-    "ideogram4_color_palette",
-    "ideogram4_guidance_scale",
-    "ideogram4_mu",
-    "ideogram4_sampler_preset",
-    "ideogram4_steps",
-    "ideogram4_unconditional_model",
-    "krea2_rebalance_enabled",
-    "krea2_rebalance_multiplier",
-    "krea2_rebalance_weights",
-    "krea2_reference_kv_cache",
-    "krea2_seed_variance_enabled",
-    "krea2_seed_variance_randomize_percent",
-    "krea2_seed_variance_strength",
-    "krea2_style_strength",
-    "ltx2_audio_cfg_scale",
-    "ltx2_base_height",
-    "ltx2_base_width",
-    "ltx2_component_source",
-    "ltx2_conditioning_role",
-    "ltx2_context_frames",
-    "ltx2_guidance_rescale",
-    "ltx2_modality_scale",
-    "ltx2_noise_scale",
-    "ltx2_schedule",
-    "ltx2_stg_scale",
-    "ltx2_text_encoder_model",
-    "ltx2_two_stage",
-    "minimax_h3_component_source",
-    "minimax_h3_hybrid_base_model",
-    "minimax_h3_hybrid_start_block",
-    "minimax_h3_text_encoder_model",
-    "minimax_h3_transformer_model",
-    "moss_image_layout_prompt",
-    "moss_image_uncond_skip_layers",
-    "qwen_image_2_1_prefix_kv_cache",
-    "qwen_image_component_source",
-    "qwen_image_quantization",
-    "qwen_image_qwen_vl_encoder",
-    "qwen_image_shift",
-    "qwen_image_vae",
-    "wan_component_source",
-    "wan_guidance_scale_low_noise",
-    "wan_t5_encoder_model",
-    "wan_transformer_low_noise",
-    "z_image_seed_variance_enabled",
-    "z_image_seed_variance_randomize_percent",
-    "z_image_seed_variance_strength",
-    "z_image_shift",
-]
-
-CORE_LABELS_STRING = Literal[
-    f"{CUSTOM_LABEL}",
-    "generation_mode",
-    "positive_prompt",
-    "positive_style_prompt",
-    "negative_prompt",
-    "negative_style_prompt",
-    "rand_device",
-    "init_image",
-    "hrf_method",
-    "pid_mode",
-    "dype_preset",
-    "flux3_caption",
-    "ideogram4_caption",
-    "ideogram4_color_palette",
-    "ideogram4_sampler_preset",
-    "krea2_rebalance_weights",
-    "ltx2_conditioning_role",
-    "ltx2_schedule",
-    "moss_image_layout_prompt",
-    "qwen_image_quantization",
-    "qwen_image_shift",
-    "z_image_shift",
-]
-
-CORE_LABELS_INTEGER = Literal[
-    f"{CUSTOM_LABEL}",
-    "width",
-    "height",
-    "seed",
-    "steps",
-    "clip_skip",
-    "cfg_scale_start_step",
-    "cfg_scale_end_step",
-    "refiner_steps",
-    "pid_steps",
-    "tile_width",
-    "tile_height",
-    "tile_overlap",
-    "num_frames",
-    "fps",
-    "source_video_start_frame",
-    "source_video_end_frame",
-    "ideogram4_steps",
-    "krea2_seed_variance_randomize_percent",
-    "ltx2_base_height",
-    "ltx2_base_width",
-    "ltx2_context_frames",
-    "minimax_h3_hybrid_start_block",
-    "moss_image_uncond_skip_layers",
-    "z_image_seed_variance_randomize_percent",
-]
-
-CORE_LABELS_FLOAT = Literal[
-    f"{CUSTOM_LABEL}",
-    "cfg_scale",
-    "cfg_rescale_multiplier",
-    "guidance",
-    "denoising_start",
-    "denoising_end",
-    "strength",
-    "shift",
-    "dype_scale",
-    "dype_exponent",
-    "freeu_s1",
-    "freeu_s2",
-    "freeu_b1",
-    "freeu_b2",
-    "hidiffusion_t1_ratio",
-    "hidiffusion_t2_ratio",
-    "hrf_strength",
-    "refiner_cfg_scale",
-    "refiner_positive_aesthetic_score",
-    "refiner_negative_aesthetic_score",
-    "refiner_start",
-    "fps",
-    "ideogram4_guidance_scale",
-    "ideogram4_mu",
-    "krea2_rebalance_multiplier",
-    "krea2_seed_variance_strength",
-    "krea2_style_strength",
-    "ltx2_audio_cfg_scale",
-    "ltx2_guidance_rescale",
-    "ltx2_modality_scale",
-    "ltx2_noise_scale",
-    "ltx2_stg_scale",
-    "qwen_image_shift",
-    "wan_guidance_scale_low_noise",
-    "z_image_seed_variance_strength",
-    "z_image_shift",
-]
-
-CORE_LABELS_BOOL = Literal[
-    f"{CUSTOM_LABEL}",
-    "seamless_x",
-    "seamless_y",
-    "add_noise",
-    "hidiffusion",
-    "hidiffusion_raunet",
-    "hidiffusion_window_attn",
-    "hrf_enabled",
-    "krea2_rebalance_enabled",
-    "krea2_reference_kv_cache",
-    "krea2_seed_variance_enabled",
-    "ltx2_two_stage",
-    "qwen_image_2_1_prefix_kv_cache",
-    "z_image_seed_variance_enabled",
-]
-
-CORE_LABELS_SCHEDULER = Literal[
-    f"{CUSTOM_LABEL}",
-    "scheduler",
-    "refiner_scheduler",
-]
-
-CORE_LABELS_MODEL = Literal[
-    f"{CUSTOM_LABEL}",
-    "model",
-    "refiner_model",
-    "pid_decoder",
-    "gemma2_encoder",
-    "t5_encoder",
-    "clip_embed_model",
-    "clip_l_model",
-    "clip_g_model",
-    "mistral_encoder",
-    "qwen3_encoder",
-    "qwen3_source",
-    "qwen3_5_encoder",
-    "qwen3_vl_encoder",
-    "ideogram4_unconditional_model",
-    "ltx2_component_source",
-    "ltx2_text_encoder_model",
-    "minimax_h3_component_source",
-    "minimax_h3_hybrid_base_model",
-    "minimax_h3_text_encoder_model",
-    "minimax_h3_transformer_model",
-    "qwen_image_component_source",
-    "qwen_image_qwen_vl_encoder",
-    "wan_component_source",
-    "wan_t5_encoder_model",
-    "wan_transformer_low_noise",
-]
-
-CORE_LABELS_VAE = Literal[
-    f"{CUSTOM_LABEL}",
-    "vae",
-    "qwen_image_vae",
-]
 
 T = TypeVar("T")
 
@@ -1409,15 +1148,17 @@ def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, A
 
 def _extract_t2i_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    for item in data.get("t2iAdapters") or []:
-        if not isinstance(item, dict):
-            continue
-        img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
-        if img is None or ("t2i_adapter_model" not in item and "model" not in item):
-            continue
-        normalized = dict(item)
-        normalized["image"] = img
-        result.append(normalized)
+    if "t2iAdapters" in data:
+        for item in data.get("t2iAdapters") or []:
+            if not isinstance(item, dict):
+                continue
+            img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+            if img is None or ("t2i_adapter_model" not in item and "model" not in item):
+                continue
+            normalized = dict(item)
+            normalized["image"] = img
+            result.append(normalized)
+        return result
     if not result:
         raw_control_layers = data.get("control_layers")
         if isinstance(raw_control_layers, list):
@@ -1724,9 +1465,14 @@ class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return StringCollectionOutput(collection=output)
+        val = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label))
+        if val is None:
+            return StringCollectionOutput(collection=self.default_value)
+        if isinstance(val, list):
+            return StringCollectionOutput(collection=val)
+        if isinstance(val, str):
+            return StringCollectionOutput(collection=[val])
+        return StringCollectionOutput(collection=self.default_value)
 
 
 @invocation(

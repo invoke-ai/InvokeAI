@@ -22,6 +22,12 @@ from invokeai.app.invocations.fields import (
     UIType,
     VideoField,
 )
+from invokeai.app.invocations.metadata_constants import (
+    CORE_MODEL_LABELS as CORE_MODEL_LABELS,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CUSTOM_LABEL as CUSTOM_LABEL,
+)
 from invokeai.app.invocations.model import (
     ModelIdentifierField,
     PiDDecoderField,
@@ -98,28 +104,7 @@ class MetadataItemOutput(BaseInvocationOutput):
     item: MetadataItemField = OutputField(description="Metadata Item")
 
 
-CUSTOM_LABEL: str = "* CUSTOM LABEL *"
 _SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = ("vae", "text_encoder", "unet", "transformer", "decoder")
-
-CORE_MODEL_LABELS: set[str] = {
-    "model",
-    "vae",
-    "refiner_model",
-    "pid_decoder",
-    "gemma2_encoder",
-    "t5_encoder",
-    "t5_encoder_model",
-    "clip_embed_model",
-    "clip_l_model",
-    "clip_g_model",
-    "mistral_encoder",
-    "mistral_encoder_model",
-    "qwen3_encoder",
-    "qwen3_encoder_model",
-    "qwen3_source",
-    "qwen3_5_encoder",
-    "qwen3_vl_encoder",
-}
 
 
 def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
@@ -138,6 +123,8 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
     if isinstance(val, (TransformerField, WanTransformerField)):
         if is_custom and (getattr(val, "loras", None) or getattr(val, "loras_low_noise", None)):
             return val
+        if isinstance(val, WanTransformerField) and label == "wan_transformer_low_noise":
+            return val.transformer_low_noise or val.transformer
         return val.transformer
     if isinstance(val, VAEField):
         return val.vae
