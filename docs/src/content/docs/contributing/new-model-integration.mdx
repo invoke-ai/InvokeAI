@@ -852,7 +852,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    - A per-family setting that is not a model, such as Krea-2's rebalance or MOSS-Image's skip layers, needs its own metadata reader, a `RecalledField` member, its flag in `getImageRecallCapabilities` and its patch in `buildImageRecallSettings`.
    - Add the base to `GUIDANCE_BASES` in `recallParameters.ts` if it takes the shared guidance slider.
 
-   Nothing checks recall against what the builder writes, so test it.
+   Every metadata key the builder writes needs an entry in `IMAGE_RECALL_CONTRACT` (`imageRecallContract.test.ts`; video graphs have theirs in `videoRecallContract.test.ts`): `restores` with the settings it sets, or `consumed` or `ignored` with the reason. The contract compiles every shape of `generateGraphCases` with each recalled setting off its default (`recallTunedSettingsFor` in `graphCoverage.testing.ts`), fails for a written key without an entry, and checks that recall restores every `restores` entry and that an `ignored` key changes nothing. It sees only keys those graphs write: if the builder writes a key only under some setting, set that setting off its default in `recallTunedSettingsFor`, or add a dedicated case.
 
 7. **Model registry and labels**
 
@@ -881,7 +881,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    pnpm test src/features/generation/core/graphCoverage.test.ts -u
    ```
 
-   This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the remix round trip compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
+   This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the image recall contract compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
 </Steps>
 
 :::tip[Checklist: webv2]{icon="approve-check"}
@@ -891,7 +891,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 - [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
 - [ ] `FamilyGraph` facts checked through `generateGraphCases`, with `latents` and Canvas `BASE_CASES`
 - [ ] Non-null `conditioning` naming the global prompt nodes and collectors for mask-based regional guidance
-- [ ] Recall
+- [ ] Recall, with an `IMAGE_RECALL_CONTRACT` entry for every metadata key the builder writes
 - [ ] Model registry, labels, `en.json`
 - [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
 - [ ] Graph snapshot regenerated, `SUPPORTED_BASE_COUNTS` raised
@@ -960,8 +960,8 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/app/invocations/test_ideal_size.py` | A row in `IDEAL_SIZE_AT_NODE_DEFAULTS`: the size Ideal Size returns for the base at the node's defaults, derived by hand from the declared default size and `dimension_grid` |
 | `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |
 | `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
-| `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs |
-| `src/workbench/image-actions/imageRecall.test.ts` (webv2) | The recorded component setting in the remix round-trip list |
+| `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs; a non-default value in `recallTunedSettingsFor` for a new recalled setting |
+| `src/workbench/image-actions/imageRecallContract.test.ts` (webv2) | An `IMAGE_RECALL_CONTRACT` entry for every metadata key the builder writes |
 
 Beyond those tables, test what can silently go wrong:
 - detection of every format, including negative cases against similar architectures

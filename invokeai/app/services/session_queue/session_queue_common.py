@@ -24,6 +24,7 @@ from invokeai.app.services.shared.execution_state_migration import (
     UnsupportedExecutionStateVersionError,
     dump_execution_state,
     load_execution_state,
+    strip_legacy_child_policy_keys,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
@@ -249,7 +250,13 @@ def get_session(queue_item_dict: dict) -> GraphExecutionState:
     return load_execution_state(session_payload)
 
 
-def _normalize_queue_read_effects(payload: dict[str, Any], *, normalize_effects: bool) -> None:
+def _normalize_queue_read_ledgers(payload: dict[str, Any], *, normalize_effects: bool) -> None:
+    """Normalize one persisted payload for a response-shaped read, without rehydrating runtime state.
+
+    The legacy child policy keys are dropped here too: this projection validates the same `extra="forbid"`
+    child records as full rehydration, so a row written before their removal is otherwise unreadable.
+    """
+    strip_legacy_child_policy_keys(payload)
     if normalize_effects and "execution_effects" in payload:
         payload["execution_effects"] = normalize_persisted_execution_effects(payload["execution_effects"])
 
@@ -261,10 +268,10 @@ def _normalize_queue_read_effects(payload: dict[str, Any], *, normalize_effects:
     child_state = child_payload.get("state")
     if isinstance(child_payload.get("version"), int) and isinstance(child_state, Mapping):
         child_state = dict(child_state)
-        _normalize_queue_read_effects(child_state, normalize_effects=normalize_effects)
+        _normalize_queue_read_ledgers(child_state, normalize_effects=normalize_effects)
         child_payload["state"] = child_state
     else:
-        _normalize_queue_read_effects(child_payload, normalize_effects=normalize_effects)
+        _normalize_queue_read_ledgers(child_payload, normalize_effects=normalize_effects)
     payload["waiting_workflow_call_child_session"] = child_payload
 
 
@@ -294,7 +301,7 @@ def get_session_for_queue_read(queue_item_dict: dict) -> GraphExecutionState:
     execution_graph_payload = session_payload.get("execution_graph")
     if isinstance(execution_graph_payload, Mapping):
         session_payload["execution_graph"] = Graph.model_validate(execution_graph_payload, strict=False)
-    _normalize_queue_read_effects(session_payload, normalize_effects=version != 0)
+    _normalize_queue_read_ledgers(session_payload, normalize_effects=version != 0)
 
     return GraphExecutionState.model_validate(session_payload, context={"queue_read_projection": True})
 
