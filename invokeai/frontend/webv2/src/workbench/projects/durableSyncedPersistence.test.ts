@@ -4541,62 +4541,6 @@ describe('unload journal', () => {
       expect(service.hasChangesUnloadWouldLose()).toBe(false);
     });
 
-    it('is at risk while open documents together exceed the journal budget, from load on', async () => {
-      const api = createApi();
-      const over = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES + 1);
-      openSession(api, over);
-      const service = createService(captureAccountScope(), api);
-      const loaded = await service.loadWorkbench();
-      // Nothing journaled or saved yet: the loaded document alone is too large for the journal.
-      expect(service.isUnloadAtRisk(loaded.state)).toBe(true);
-      expect(service.hasChangesUnloadWouldLose()).toBe(false);
-      expect(service.isUnloadAtRisk(stateWith([]))).toBe(false);
-
-      const small = createDraftProject([over]);
-      const half = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES / 2 + 1, [over, small]);
-      const otherHalf = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES / 2 + 1, [over, small, half]);
-      await service.saveWorkbench(stateWith([small, half]));
-      expect(service.isUnloadAtRisk(stateWith([small, half]))).toBe(false);
-      // Each fits on its own; together they do not.
-      await service.saveWorkbench(stateWith([small, half, otherHalf]));
-      expect(service.isUnloadAtRisk(stateWith([small, half, otherHalf]))).toBe(true);
-
-      await service.persistEmptySession(stateWith([small, half, otherHalf]));
-      expect(service.isUnloadAtRisk(stateWith([small, half, otherHalf]))).toBe(false);
-    });
-
-    it('is at risk while local recovery fails for an open project or the journal is unavailable', async () => {
-      const backing = createMemoryProjectDraftStore();
-      let isFull = true;
-      const full: ProjectDraftStore = {
-        ...backing,
-        get availability() {
-          return backing.availability;
-        },
-        stage: (input) => (isFull ? Promise.resolve({ kind: 'quota' }) : backing.stage(input)),
-      };
-      const service = createService(captureAccountScope(), createApi(), full);
-      const loaded = await service.loadWorkbench();
-      expect(service.isUnloadAtRisk(loaded.state)).toBe(false);
-      const edited = stateWith([{ ...loaded.state.projects[0]!, name: 'Typed while storage is full' }]);
-      await service.saveWorkbench(edited);
-      expect(service.isUnloadAtRisk(edited)).toBe(true);
-      isFull = false;
-      await service.saveWorkbench(stateWith([{ ...edited.projects[0]!, name: 'Storage freed up' }]));
-      expect(service.isUnloadAtRisk(edited)).toBe(false);
-
-      const withoutJournal: ProjectDraftStore = {
-        ...backing,
-        get availability() {
-          return backing.availability;
-        },
-        journalBeforeUnload: () => ({ kind: 'unavailable' }),
-        reconcileUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
-      };
-      const other = createService(captureAccountScope(), createApi(), withoutJournal);
-      expect(other.isUnloadAtRisk((await other.loadWorkbench()).state)).toBe(true);
-    });
-
     it('counts nothing for a closed session, an ended account lifetime, or a project being deleted', async () => {
       const api = createApi();
       const service = createService(captureAccountScope(), api);

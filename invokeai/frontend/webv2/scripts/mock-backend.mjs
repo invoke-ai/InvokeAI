@@ -15,6 +15,7 @@ import {
   MOCK_BACKEND_FIXED_EPOCH,
   MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
+import { fixturePng, mediaDimensions } from './mock-media.mjs';
 import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
@@ -62,10 +63,6 @@ const writtenRecordOf = ({ workspace, ...project }) => ({
 /** In-memory test backend; no Socket.IO. POST /__reset restores the startup profile unless ?profile= overrides it. */
 
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
-const TINY_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XcX1WQAAAABJRU5ErkJggg==',
-  'base64'
-);
 const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.mp4'));
 const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
 // Share the backend-pinned capabilities fixture to keep journey payloads aligned with the real API.
@@ -1287,13 +1284,15 @@ const writeJson = (response, status, value) => {
   response.end(body);
 };
 
-const writePng = (response) => {
+const writePng = (response, image, thumbnail) => {
+  const { width, height } = mediaDimensions(image, thumbnail);
+  const bytes = fixturePng(width, height);
   response.writeHead(200, {
     'cache-control': 'public, max-age=3600',
-    'content-length': TINY_PNG.length,
+    'content-length': bytes.length,
     'content-type': 'image/png',
   });
-  response.end(TINY_PNG);
+  response.end(bytes);
 };
 
 const writeBinary = (response, status, body, headers) => {
@@ -1581,12 +1580,26 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         });
       }
 
+      if (method === 'GET' && path === '/api/v1/image_map/vocab') {
+        return json(200, {
+          terms: ['architectural study', 'watercolor'],
+          state: 'ready',
+          error: null,
+          max_terms: 500,
+          max_term_length: 64,
+        });
+      }
+
       if (method === 'POST' && path === '/api/v1/image_map/refresh') {
         return json(200, { enqueued: true });
       }
 
       if (method === 'GET' && path === '/api/v1/app/version') {
         return json(200, { version: MOCK_APP_VERSION });
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/app_deps') {
+        return json(200, { CUDA: 'N/A', invokeai: MOCK_APP_VERSION });
       }
 
       if (method === 'GET' && path === '/api/v1/app/frontend_config') {
@@ -3125,7 +3138,10 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       if (method === 'GET' && imageAssetMatch) {
         const imageName = decodeURIComponent(imageAssetMatch[1]);
 
-        return state.images.has(imageName) ? writePng(response) : json(404, { detail: 'Image not found' });
+        const image = state.images.get(imageName);
+        return image
+          ? writePng(response, image, imageAssetMatch[2] === 'thumbnail')
+          : json(404, { detail: 'Image not found' });
       }
 
       const imageWorkflowMatch = /^\/api\/v1\/images\/i\/([^/]+)\/workflow$/.exec(path);

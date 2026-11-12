@@ -5,6 +5,7 @@ Supports multiple LoRA formats:
 - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
 - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model./base_model.model.)
 - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight (underscores instead of dots)
+- LyCORIS: lycoris_transformer_blocks_0_attn_to_k.lokr_w1 (also ai-toolkit's lora_transformer_transformer_blocks_0_...)
 
 Text-encoder layers are routed to the Qwen2.5-VL encoder under their own prefix:
 - Diffusers/PEFT: text_encoder.model.language_model.layers.0.mlp.down_proj.lora_A.weight (also base_model.model.,
@@ -63,10 +64,17 @@ _KOHYA_TEXT_ENCODER_TREE: ParsingTree = {
     "lm_head": {},
 }
 
+# Prefixes of the flattened (Kohya-style) spellings: Kohya's, LyCORIS' own, and ai-toolkit's.
+_KOHYA_PREFIXES = (
+    "lora_unet_transformer_blocks_",
+    "lycoris_transformer_blocks_",
+    "lora_transformer_transformer_blocks_",
+)
+
 # Regex for Kohya-format Qwen Image LoRA keys.
 # Example: lora_unet_transformer_blocks_0_attn_to_k
 # Groups: (block_idx, sub_module_with_underscores)
-_KOHYA_KEY_REGEX = re.compile(r"lora_unet_transformer_blocks_(\d+)_(.*)")
+_KOHYA_KEY_REGEX = re.compile(r"(?:lora_unet_|lycoris_|lora_transformer_)transformer_blocks_(\d+)_(.*)")
 
 # Mapping from Kohya underscore-separated sub-module names to dot-separated model paths.
 # The Kohya format uses underscores everywhere, but some underscores are part of the
@@ -98,7 +106,7 @@ def is_state_dict_likely_kohya_qwen_image(state_dict: dict[str | int, torch.Tens
     if not str_keys:
         return False
     # Check if any key matches the Kohya pattern
-    return any(k.startswith("lora_unet_transformer_blocks_") for k in str_keys)
+    return any(k.startswith(_KOHYA_PREFIXES) for k in str_keys)
 
 
 def _convert_kohya_key(kohya_layer: str) -> str | None:
@@ -154,6 +162,7 @@ def lora_model_from_qwen_image_state_dict(
     - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight
       (also diffusion_model., base_model.model.)
     - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight
+      (also LyCORIS' lycoris_transformer_blocks_ and ai-toolkit's lora_transformer_transformer_blocks_)
     """
     is_kohya = is_state_dict_likely_kohya_qwen_image(state_dict)
 
@@ -189,7 +198,7 @@ def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | No
             unmapped += 1
             continue
 
-        layers[f"{prefix}{model_path}"] = any_lora_layer_from_state_dict(layer_dict)
+        layers[f"{prefix}{model_path}"] = any_lora_layer_from_state_dict(_fold_lycoris_scalar(layer_dict))
 
     _warn_unmapped_layers(unmapped)
     return ModelPatchRaw(layers=layers)
@@ -206,6 +215,7 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
 
     unmapped = 0
     for layer_key, layer_dict in grouped.items():
+        values = _normalize_lora_keys(_fold_lycoris_scalar(layer_dict), alpha)
         # Text-encoder layers first: `base_model.model.` is also in the transformer strip list.
         text_encoder_prefix = next((p for p in _DIFFUSERS_TEXT_ENCODER_PREFIXES if layer_key.startswith(p)), None)
         if text_encoder_prefix is not None:
@@ -215,10 +225,9 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
             if not kohya_module_path_is_leaf(module_path, _KOHYA_TEXT_ENCODER_TREE):
                 unmapped += 1
                 continue
-            layer = any_lora_layer_from_state_dict(_normalize_lora_keys(layer_dict, alpha))
-            layers[f"{QWEN_IMAGE_LORA_QWEN_VL_PREFIX}{module_path}"] = layer
+            layers[f"{QWEN_IMAGE_LORA_QWEN_VL_PREFIX}{module_path}"] = any_lora_layer_from_state_dict(values)
             continue
-        layer = any_lora_layer_from_state_dict(_normalize_lora_keys(layer_dict, alpha))
+        layer = any_lora_layer_from_state_dict(values)
         clean_key = layer_key
         for prefix in strip_prefixes:
             if clean_key.startswith(prefix):
@@ -229,6 +238,25 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
 
     _warn_unmapped_layers(unmapped)
     return ModelPatchRaw(layers=layers)
+
+
+def _fold_lycoris_scalar(layer_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Fold LyCORIS' learned `scalar` into the layer's weights.
+
+    LyCORIS multiplies a LoKr, LoHa or LoRA/LoCon layer's whole update by `scalar` (trained from zero, so it is
+    usually far from 1), and the patch layers ignore it. The update is linear in the LoKr's `w1`, the LoHa's `w1_a`
+    and the LoRA's up matrix, so scaling that factor gives the same update. Runs before key normalization, which
+    drops keys it does not know.
+    """
+    if "scalar" not in layer_dict:
+        return layer_dict
+    folded = dict(layer_dict)
+    scalar = folded.pop("scalar")
+    for key in ("lokr_w1", "lokr_w1_a", "hada_w1_a", "lora_up.weight", "lora_B.weight"):
+        if key in folded:
+            folded[key] = folded[key] * scalar.to(folded[key].dtype)
+            break
+    return folded
 
 
 def _normalize_lora_keys(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:
@@ -264,6 +292,21 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
         ".lora_magnitude_vector.weight",
         ".dora_scale",
         ".alpha",
+        ".scalar",
+        # LoKr and LoHa parameters
+        ".lokr_w1",
+        ".lokr_w1_a",
+        ".lokr_w1_b",
+        ".lokr_w2",
+        ".lokr_w2_a",
+        ".lokr_w2_b",
+        ".lokr_t2",
+        ".hada_w1_a",
+        ".hada_w1_b",
+        ".hada_w2_a",
+        ".hada_w2_b",
+        ".hada_t1",
+        ".hada_t2",
     ]
 
     for key in state_dict:
