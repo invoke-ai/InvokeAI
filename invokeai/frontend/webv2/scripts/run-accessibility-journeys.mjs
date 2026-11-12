@@ -897,6 +897,8 @@ const runTopbarMenuJourney = async (browser) => {
 
     await appMenuButton.press('Enter');
     await launchpadItem.waitFor();
+    // Keys pressed before the reopened menu holds focus are lost.
+    await expectFocused(appMenu, 'Reopening the app menu from the keyboard should focus its composite.');
     await appMenu.press('Home');
     await appMenu.press('ArrowDown');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await settingsItem.getAttribute('id'));
