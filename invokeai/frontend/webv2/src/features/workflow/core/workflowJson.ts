@@ -13,7 +13,13 @@ import type {
 
 import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
-import { isInvocationNode } from './types';
+import {
+  CURRENT_IMAGE_DEFAULT_HEIGHT,
+  CURRENT_IMAGE_DEFAULT_WIDTH,
+  clampCurrentImageHeight,
+  clampCurrentImageWidth,
+  isInvocationNode,
+} from './types';
 
 /**
  * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges
@@ -64,6 +70,8 @@ const zNotesNode = z.object({
 const zCurrentImageNode = z.object({
   data: z.looseObject({
     label: z.string().catch('Current Image'),
+    width: z.number().optional().catch(undefined),
+    height: z.number().optional().catch(undefined),
   }),
   id: z.string().min(1),
   position: zXYPosition,
@@ -321,8 +329,14 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     }
 
     if (node.type === 'current_image') {
+      const width = clampCurrentImageWidth(node.data.width);
+      const height = clampCurrentImageHeight(node.data.height);
       nodes.push({
-        data: { label: node.data.label },
+        data: {
+          label: node.data.label,
+          ...(height === CURRENT_IMAGE_DEFAULT_HEIGHT ? {} : { height }),
+          ...(width === CURRENT_IMAGE_DEFAULT_WIDTH ? {} : { width }),
+        },
         id: node.id,
         position: node.position,
         type: 'current_image',

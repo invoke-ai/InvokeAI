@@ -143,12 +143,30 @@ export interface WorkflowNotesNode {
 }
 
 /** UI-only node mirroring the legacy `current_image` node: shows the latest run output / progress image. */
+export const CURRENT_IMAGE_DEFAULT_WIDTH = 320;
+export const CURRENT_IMAGE_DEFAULT_HEIGHT = 288;
+export const CURRENT_IMAGE_MIN_WIDTH = 200;
+export const CURRENT_IMAGE_MIN_HEIGHT = 160;
+export const CURRENT_IMAGE_MAX_SIZE = 1600;
+
+export const clampCurrentImageWidth = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.round(Math.min(CURRENT_IMAGE_MAX_SIZE, Math.max(CURRENT_IMAGE_MIN_WIDTH, value)))
+    : CURRENT_IMAGE_DEFAULT_WIDTH;
+
+export const clampCurrentImageHeight = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.round(Math.min(CURRENT_IMAGE_MAX_SIZE, Math.max(CURRENT_IMAGE_MIN_HEIGHT, value)))
+    : CURRENT_IMAGE_DEFAULT_HEIGHT;
+
 export interface WorkflowCurrentImageNode {
   id: string;
   type: 'current_image';
   position: XYPosition;
   data: {
     label: string;
+    width?: number;
+    height?: number;
   };
 }
 

@@ -4750,6 +4750,8 @@
       "copiedNodes_one": "Copied {{count}} node",
       "copiedNodes_other": "Copied {{count}} nodes",
       "currentImageEmpty": "No image yet — the latest generation will appear here.",
+      "currentImageDragImage": "Drag image",
+      "currentImageResizeHandle": "Resize Current Image node ({{width}} × {{height}} px). Drag or use arrow keys to resize; double-click or press Enter to reset.",
       "currentImageNode": "Current Image node",
       "declaredOutputs": "Declared outputs",
       "description": "Description",

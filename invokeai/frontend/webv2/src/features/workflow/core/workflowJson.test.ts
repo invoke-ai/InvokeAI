@@ -627,4 +627,40 @@ describe('summarizeWorkflowLoadWarnings', () => {
     );
     expect(summarizeWorkflowLoadWarnings([])).toBeNull();
   });
+
+  it('preserves clamped non-default current_image dimensions through parse and serialize', () => {
+    const { document, warnings } = parseWorkflowJson({
+      edges: [],
+      name: 'current-image-size',
+      nodes: [
+        {
+          data: { height: 540, id: 'ci-custom', isOpen: true, label: 'Monitor', width: 720 },
+          id: 'ci-custom',
+          position: { x: 10, y: 20 },
+          type: 'current_image',
+        },
+        {
+          data: { height: 288, id: 'ci-default', isOpen: true, label: 'Default', width: 320 },
+          id: 'ci-default',
+          position: { x: 40, y: 50 },
+          type: 'current_image',
+        },
+      ],
+    });
+    expect(warnings).toEqual([]);
+    expect(document.nodes).toEqual([
+      {
+        data: { height: 540, label: 'Monitor', width: 720 },
+        id: 'ci-custom',
+        position: { x: 10, y: 20 },
+        type: 'current_image',
+      },
+      {
+        data: { label: 'Default' },
+        id: 'ci-default',
+        position: { x: 40, y: 50 },
+        type: 'current_image',
+      },
+    ]);
+  });
 });

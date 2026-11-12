@@ -34,7 +34,14 @@ import {
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
 import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
-import { isInvocationNode, isNotesNode } from './types';
+import {
+  CURRENT_IMAGE_DEFAULT_HEIGHT,
+  CURRENT_IMAGE_DEFAULT_WIDTH,
+  clampCurrentImageHeight,
+  clampCurrentImageWidth,
+  isInvocationNode,
+  isNotesNode,
+} from './types';
 
 const now = (): string => new Date().toISOString();
 
@@ -702,6 +709,7 @@ export type ProjectGraphAction =
   /** Moves several nodes at once as one undoable step (an automatic arrangement); unknown ids are ignored. */
   | { type: 'setNodePositions'; positions: Record<string, XYPosition> }
   | { type: 'setNodeLabel'; nodeId: string; label: string }
+  | { type: 'setCurrentImageNodeSize'; nodeId: string; width?: number; height?: number }
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
   | { type: 'setNodeIsIntermediate'; nodeId: string; isIntermediate: boolean }
@@ -763,6 +771,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   removeNodes: 'Delete workflow nodes',
   renameWorkflow: 'Rename workflow',
   setContainerLayout: 'Edit workflow form',
+  setCurrentImageNodeSize: 'Resize workflow current image node',
   setFieldDescription: 'Edit workflow field description',
   setFieldLabel: 'Rename workflow field',
   setFieldSeedMode: 'Change workflow seed mode',
@@ -816,6 +825,7 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
       const variant = getGeneratorVariant(action.value);
 
       return variant ? `${action.type}:${action.nodeId}:${action.fieldName}:${variant}` : undefined;
+    case 'setCurrentImageNodeSize':
     case 'setNodeLabel':
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
@@ -1032,6 +1042,32 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'updateNodes': {
       return updateWorkflowNodes(document, action.templates, action.nodeIds).document;
+    }
+    case 'setCurrentImageNodeSize': {
+      const current = document.nodes.find((node) => node.id === action.nodeId);
+      if (!current || current.type !== 'current_image') {
+        return document;
+      }
+      const clampedW = clampCurrentImageWidth(action.width);
+      const clampedH = clampCurrentImageHeight(action.height);
+      const width = clampedW === CURRENT_IMAGE_DEFAULT_WIDTH ? undefined : clampedW;
+      const height = clampedH === CURRENT_IMAGE_DEFAULT_HEIGHT ? undefined : clampedH;
+      if (current.data.width === width && current.data.height === height) {
+        return document;
+      }
+      return updateNode(document, action.nodeId, (node) => {
+        if (node.type !== 'current_image') {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            label: node.data.label,
+            ...(height === undefined ? {} : { height }),
+            ...(width === undefined ? {} : { width }),
+          },
+        };
+      });
     }
     case 'setNodeLabel': {
       // Narrowed per branch so TS keeps the node type / data correlation through the spread.
