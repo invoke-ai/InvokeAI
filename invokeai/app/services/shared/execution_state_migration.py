@@ -1,6 +1,6 @@
 """Compatibility helpers for persisted internal execution-state snapshots."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from typing import Any, Final
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
@@ -157,15 +157,46 @@ def dump_execution_state(state: GraphExecutionState) -> dict[str, Any]:
     return snapshot
 
 
-def _normalize_persisted_effects_in_snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """Normalize effect ledgers before GraphExecutionState rehydrates runtime state."""
+# Child dependency records used to persist per-child failure/cancellation policies. Every dependency was created
+# with the defaults and no caller consumed the policy-derived update fields, so the fields are gone. Rows written
+# before their removal still carry the keys and child records are `extra="forbid"`, so the keys are dropped on
+# load instead of rejecting the session.
+LEGACY_CHILD_POLICY_KEYS: Final[frozenset[str]] = frozenset({"failure_policy", "cancellation_policy"})
+
+
+def strip_legacy_child_policy_keys(payload: MutableMapping[str, Any]) -> None:
+    """Drop the removed per-child policy keys from one persisted payload, in place.
+
+    Rows written while the knobs existed still carry them and child records are `extra="forbid"`, so every
+    load path - full rehydration and the queue read projection - must drop them or active work reads as an
+    unreadable placeholder. A ledger that is not a mapping is malformed persisted state rather than something
+    to skip, so it raises ValueError, which queue hydration turns into a quarantined row.
+    """
+    ledger = payload.get("execution_child_dependencies")
+    if ledger is None:
+        return
+    if not isinstance(ledger, Mapping):
+        raise ValueError("Persisted execution child dependencies must be a mapping")
+    payload["execution_child_dependencies"] = {
+        dependency_id: (
+            {key: value for key, value in dependency.items() if key not in LEGACY_CHILD_POLICY_KEYS}
+            if isinstance(dependency, Mapping)
+            else dependency
+        )
+        for dependency_id, dependency in ledger.items()
+    }
+
+
+def _normalize_persisted_ledgers(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize effect ledgers and drop superseded child-dependency keys before rehydration."""
     normalized = dict(payload)
     if "execution_effects" in normalized:
         normalized["execution_effects"] = normalize_persisted_execution_effects(normalized["execution_effects"])
+    strip_legacy_child_policy_keys(normalized)
 
     child_snapshot = normalized.get("waiting_workflow_call_child_session")
     if isinstance(child_snapshot, Mapping):
-        normalized["waiting_workflow_call_child_session"] = _normalize_persisted_effects_in_snapshot(child_snapshot)
+        normalized["waiting_workflow_call_child_session"] = _normalize_persisted_ledgers(child_snapshot)
     return normalized
 
 
@@ -196,7 +227,7 @@ def load_execution_state(snapshot: Mapping[str, Any]) -> GraphExecutionState:
 
     legacy_execution_snapshot = version == LEGACY_EXECUTION_STATE_VERSION
     execution_effects_persisted = "execution_effects" in payload and not legacy_execution_snapshot
-    normalized_payload = _normalize_persisted_effects_in_snapshot(payload)
+    normalized_payload = _normalize_persisted_ledgers(payload)
     return GraphExecutionState.model_validate(
         normalized_payload,
         strict=False,
