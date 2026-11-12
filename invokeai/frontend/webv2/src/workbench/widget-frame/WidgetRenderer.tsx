@@ -550,8 +550,11 @@ const HeaderSlot = memo(function HeaderSlot({
 
 // Stretch fill-height views while allowing flowing content to scroll vertically. minmax(0,1fr) prevents long
 // content from widening and clipping panels.
+// Never shrunk: the viewport is a flex column, and `minH: full` would let it squeeze the content to its own height.
+// The scroll area sizes its thumb from this element, so a squeezed one leaves a stale or missing scrollbar.
 const panelBodyContentProps = {
   display: 'grid',
+  flexShrink: 0,
   gridTemplateColumns: 'minmax(0, 1fr)',
   maxW: 'full',
   minH: 'full',
