@@ -45,7 +45,7 @@ const FLUX_REDUX_CONFIG: FluxReduxConfig = { image: null, imageInfluence: 'highe
 const HINTS_ON = { enabled: true, onDisable: null };
 
 /** Track inset the scrubber keeps from its frame edge (see ScrubberField). */
-const TRACK_INSET_PX = 10;
+const TRACK_INSET_PX = 6;
 
 let host: HTMLDivElement;
 let root: Root;

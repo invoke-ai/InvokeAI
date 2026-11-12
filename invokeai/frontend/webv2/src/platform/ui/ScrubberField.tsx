@@ -16,8 +16,11 @@ import { fieldLabelRecipe, scrubberInteraction } from '@theme/recipes';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** Track inset from the frame edge; the text padding clears it so the thumb never crosses a glyph. */
-const TRACK_INSET_PX = 10;
+/**
+ * Track inset from the frame edge. The label and value sit 12px in (`INSIDE_LABEL_INSET`, the value's `pe`), so an
+ * end thumb lands a stop's text clearance outside them and the fill's rounded end stops short of the first glyph.
+ */
+const TRACK_INSET_PX = 6;
 /**
  * At the track's start the fill ends this far past the thumb's centre, just enough for its rounded end to frame the
  * 2px thumb without drifting away from it.

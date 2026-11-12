@@ -531,7 +531,7 @@ describe('Properties pane', () => {
     // The log track spends its middle on the sizes text is set at.
     const frame = slider.element().closest<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
     const thumb = slider.element().parentElement!.querySelector('[data-part="thumb"]')!.getBoundingClientRect();
-    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 6) / (frame.width - 12);
     expect(thumbFraction).toBeGreaterThan(0.4);
     expect(thumbFraction).toBeLessThan(0.6);
     await act(() => (slider.element() as HTMLElement).focus());
