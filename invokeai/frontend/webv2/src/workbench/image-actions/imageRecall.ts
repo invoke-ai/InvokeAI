@@ -13,6 +13,7 @@ import type { TFunction } from 'i18next';
 import {
   clampAnimaInpaintAdapterWeight,
   clampDimension,
+  clampPidSteps,
   cloneGenerateWidgetValues,
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
@@ -37,6 +38,7 @@ import {
   isOpenAIImageBackground,
   isOpenAIImageQuality,
   isOpenAIInputFidelity,
+  isPidMode,
   GEMINI_TEMPERATURE_MAX,
   GEMINI_TEMPERATURE_MIN,
   isRefinerModel,
@@ -554,26 +556,15 @@ const getRecordedTimestepShift = (metadata: unknown, key: string): number | null
   return getBoundedNumber(metadata, key, MIN_TIMESTEP_SHIFT, MAX_TIMESTEP_SHIFT) ?? undefined;
 };
 
-/**
- * Per-family tuning the graphs record under their own keys. Gated on the model recall settles on, since each
- * setting only reaches that family's denoise or encoder nodes.
- *
- * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
- * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
- * Values that only matter while a switch is on (DyPE scale, variance strength) stay as they are when missing.
- */
-const getMetadataModelTuning = (
-  metadata: unknown,
-  model: GenerateModelConfig | undefined
+/** The recorded value, else the fallback when a generation record of the model's own family leaves the key out. */
+type RecordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T) => T | undefined;
+
+/** The settings each family records under its own keys. */
+const getFamilyTuning = (
+  metadata: Record<string, unknown>,
+  model: GenerateModelConfig,
+  recordedOrDefault: RecordedOrDefault
 ): Partial<GenerateWidgetValues> => {
-  if (!model || model.type !== 'main' || !isRecord(metadata)) {
-    return {};
-  }
-
-  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
-  const recordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T): T | undefined =>
-    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
-
   if (model.base === 'flux') {
     const preset = recordedOrDefault(
       'dype_preset',
@@ -676,6 +667,56 @@ const getMetadataModelTuning = (
   }
 
   return {};
+};
+
+/**
+ * PiD decoding, shared by several families. The graphs record its keys only while it decodes, so a generation record
+ * of the model's family without the mode decoded through the VAE. Out-of-range steps are clamped to what the decoder
+ * takes rather than applied.
+ */
+const getPidTuning = (
+  metadata: Record<string, unknown>,
+  model: GenerateModelConfig,
+  recordedOrDefault: RecordedOrDefault
+): Partial<Pick<GenerateWidgetValues, 'pidMode' | 'pidSteps'>> => {
+  if (!getGenerationUiPolicy(model).pidVisible) {
+    return {};
+  }
+
+  const mode = recordedOrDefault('pid_mode', isPidMode(metadata.pid_mode) ? metadata.pid_mode : undefined, 'off');
+  const steps = getNumber(metadata, 'pid_steps');
+
+  return {
+    ...(mode === undefined ? {} : { pidMode: mode }),
+    ...(steps === null ? {} : { pidSteps: clampPidSteps(steps) }),
+  };
+};
+
+/**
+ * Per-family tuning the graphs record under their own keys, and PiD. Gated on the model recall settles on, since each
+ * setting only reaches that family's denoise, encoder or decode nodes.
+ *
+ * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
+ * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
+ * Values that only matter while a switch is on (DyPE scale, variance strength, PiD steps) stay as they are when
+ * missing.
+ */
+const getMetadataModelTuning = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (!model || model.type !== 'main' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
+  const recordedOrDefault: RecordedOrDefault = (key, recorded, fallback) =>
+    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
+
+  return {
+    ...getFamilyTuning(metadata, model, recordedOrDefault),
+    ...getPidTuning(metadata, model, recordedOrDefault),
+  };
 };
 
 const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>

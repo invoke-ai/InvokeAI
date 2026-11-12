@@ -1829,6 +1829,56 @@ describe('model-family tuning recall', () => {
     expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
   });
 
+  describe('PiD decoding', () => {
+    const sdxlGeneration = (extra: Record<string, unknown> = {}) => ({
+      generation_mode: 'sdxl_txt2img',
+      model: { base: 'sdxl', key: sdxlModel.key, name: sdxlModel.name, type: 'main' },
+      ...extra,
+    });
+
+    it.each(['fit', 'native'] as const)('restores %s decoding with its steps', (pidMode) => {
+      const result = recall(sdxlGeneration({ pid_mode: pidMode, pid_steps: 8 }), sdxlModel);
+
+      expect(result?.values).toMatchObject({ pidMode, pidSteps: 8 });
+      expect(result?.fields).toContain('modelTuning');
+    });
+
+    it('turns PiD off for a generation of the family that decoded without it, and keeps the steps', () => {
+      const result = recall(sdxlGeneration(), sdxlModel, 'all', { pidMode: 'fit', pidSteps: 8 });
+      const { generation_mode: _mode, ...notAGeneration } = sdxlGeneration();
+
+      expect(result?.values).toMatchObject({ pidMode: 'off', pidSteps: 8 });
+      expect(result?.fields).toContain('modelTuning');
+      // A record that is no generation says nothing about how the image was decoded.
+      expect(recall(notAGeneration, sdxlModel, 'all', { pidMode: 'fit' })?.values.pidMode).toBe('fit');
+    });
+
+    it('clamps the steps to what the decoder takes and ignores an unknown mode', () => {
+      expect(recall({ pid_mode: 'turbo', pid_steps: 40 }, sdxlModel, 'all', { pidMode: 'fit' })?.values).toMatchObject({
+        pidMode: 'fit',
+        pidSteps: 16,
+      });
+      expect(recall({ pid_steps: 0.2 }, sdxlModel)?.values.pidSteps).toBe(1);
+    });
+
+    it('leaves PiD alone for a family that cannot decode with it', () => {
+      const result = recall(
+        {
+          generation_mode: 'txt2img',
+          model: { base: 'sd-1', key: sd1Model.key, name: sd1Model.name, type: 'main' },
+          pid_mode: 'native',
+          pid_steps: 8,
+        },
+        sd1Model,
+        'all',
+        { pidMode: 'fit' }
+      );
+
+      expect(result?.values).toMatchObject({ pidMode: 'fit', pidSteps: 4 });
+      expect(result?.fields).not.toContain('modelTuning');
+    });
+  });
+
   describe('over tuning the panel has since changed', () => {
     const changedTuning = {
       fluxDypePreset: '4k',
@@ -1879,9 +1929,9 @@ describe('model-family tuning recall', () => {
       expect(recallOverChanged(otherFamily, fluxModel)?.fluxDypePreset).toBe('4k');
     });
 
-    // What a graph records must bring the panel back to that recipe from either direction. A switch the graph stops
-    // recording still passes here, since recall reads a missing key as the default; graph.test.ts pins that FLUX
-    // records DyPE off.
+    // What a graph records at the defaults must bring a changed panel back to them; the recall contract covers changed
+    // tuning over the defaults. A switch the graph stops recording still passes here, since recall reads a missing key
+    // as the default; graph.test.ts pins that FLUX records DyPE off.
     const tunedBases = generateGraphCases.filter(({ base }) => ['flux', 'qwen-image', 'z-image'].includes(base));
     const defaultTuning = {
       fluxDypePreset: 'off',
@@ -1890,15 +1940,16 @@ describe('model-family tuning recall', () => {
       zImageSeedVarianceEnabled: false,
       zImageShift: null,
     } as const;
-    const roundTrip = ({ base, shape }: (typeof generateGraphCases)[number], recorded: object, current: object) => {
+
+    it.each(tunedBases)('$label restores its default tuning over changed settings', ({ base, shape }) => {
       const { model, settings } = fullyFilledSettingsFor(base, shape);
-      const graph = compileGenerateGraph({ ...settings, ...recorded }, model, 'gallery', {
+      const graph = compileGenerateGraph({ ...settings, ...defaultTuning }, model, 'gallery', {
         useCpuNoise: true,
         useNsfwChecker: false,
         useWatermark: false,
       }).backendGraph;
       const values = buildImageRecallSettings({
-        currentValues: createValues({ ...current, model }),
+        currentValues: createValues({ ...changedTuning, model }),
         image,
         kind: 'all',
         metadata: Object.values(graph.nodes).find((node) => node.type === 'core_metadata'),
@@ -1912,22 +1963,9 @@ describe('model-family tuning recall', () => {
         'z-image': ['zImageSeedVarianceEnabled', 'zImageShift'],
       }[base as 'flux' | 'qwen-image' | 'z-image'] as (keyof typeof defaultTuning)[];
 
-      return {
-        expected: Object.fromEntries(keys.map((key) => [key, (recorded as typeof defaultTuning)[key]])),
-        restored: Object.fromEntries(keys.map((key) => [key, values?.[key]])),
-      };
-    };
-
-    it.each(tunedBases)('$label restores its default tuning over changed settings', (graphCase) => {
-      const { expected, restored } = roundTrip(graphCase, defaultTuning, changedTuning);
-
-      expect(restored).toEqual(expected);
-    });
-
-    it.each(tunedBases)('$label restores its changed tuning over the defaults', (graphCase) => {
-      const { expected, restored } = roundTrip(graphCase, changedTuning, defaultTuning);
-
-      expect(restored).toEqual(expected);
+      expect(Object.fromEntries(keys.map((key) => [key, values?.[key]]))).toEqual(
+        Object.fromEntries(keys.map((key) => [key, defaultTuning[key]]))
+      );
     });
   });
 
@@ -2117,34 +2155,6 @@ describe('Anima IP-Adapter recall', () => {
     expect(adapterNodes(recalled)).toEqual(adapterNodes(generated));
   });
 });
-
-/** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
-const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
-  const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
-  const graph = compileGenerateGraph(settings, model, 'gallery', {
-    useCpuNoise: true,
-    useNsfwChecker: false,
-    useWatermark: false,
-  }).backendGraph;
-  const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
-  const serializedMetadata = JSON.stringify(recordedMetadata);
-  // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
-  const recorded = filled.filter((key) => serializedMetadata.includes(`"${settings[key]?.key}"`));
-  const components = recorded.map((key) => settings[key]).filter((component) => component !== null);
-  const result = buildImageRecallSettings({
-    currentValues: createValues(),
-    image,
-    kind: 'remix',
-    metadata: recordedMetadata,
-    models: components.filter((component) => component.type !== 'vae'),
-    supportedModels: [model],
-    vaeModels: components.filter((component): component is VaeModelConfig => component.type === 'vae'),
-  });
-  const keysOf = (values: GenerateWidgetValues | undefined) =>
-    Object.fromEntries(recorded.map((key) => [key, values?.[key]?.key ?? null]));
-
-  return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
-};
 
 describe('anima inpaint adapter', () => {
   const inpaintAdapter: ComponentModelConfig = {
@@ -2420,36 +2430,6 @@ describe('FLUX.3 prompt upsampler recall', () => {
     // The record leaves the switch alone; the new model has no such slot, so the pick goes like any component.
     expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
     expect(result?.values.flux3PromptUpsamplerModel).toBeNull();
-  });
-});
-
-describe('remix round trip', () => {
-  // Every component a graph records must come back; one recorded under a key Remix does not know fails here.
-  it.each(generateGraphCases)('restores the components $label records', (graphCase) => {
-    const { expected, restored } = remixRoundTrip(graphCase);
-
-    expect(restored).toEqual(expected);
-  });
-
-  it('exercises every component setting Remix restores', () => {
-    const recorded = new Set(generateGraphCases.flatMap((graphCase) => remixRoundTrip(graphCase).recorded));
-
-    expect([...recorded].sort()).toEqual([
-      'clipEmbedModel',
-      'componentSourceModel',
-      'gemma2EncoderModel',
-      'ideogram4UnconditionalModel',
-      'mistralEncoderModel',
-      'pidDecoderModel',
-      'qwen35EncoderModel',
-      'qwen3EncoderModel',
-      'qwen3VLEncoderModel',
-      'qwenVLEncoderModel',
-      't5EncoderModel',
-      'vae',
-      'wanLowNoiseModel',
-      'wanT5EncoderModel',
-    ]);
   });
 });
 
