@@ -51,7 +51,7 @@ export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProp
           pe="2.5"
           ps="1.5"
         >
-          <ListSectionHeader count={totalCount} label={t('widgets.labels.notifications')} />
+          <ListSectionHeader count={totalCount} label={t('widgets.labels.notifications')} placement="bar" />
           <NotificationsHeaderActions />
         </HStack>
         {list}

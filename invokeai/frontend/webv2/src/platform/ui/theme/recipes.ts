@@ -1043,6 +1043,32 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
 });
 
 /**
+ * Keycaps sit inside menu items and palette rows, whose hover fill is close to the stock keycap border. The emphasized
+ * border keeps the cap's outline readable on that fill; each size is 2px shorter than stock so a cap sits inside a
+ * row's text line without crowding it.
+ */
+const KBD_HEIGHTS: Record<string, string> = { '4.5': '16px', '5': '18px', '6': '22px' };
+
+export const kbdRecipe = defineRecipe({
+  ...chakraRecipes.kbd,
+  variants: {
+    ...chakraRecipes.kbd.variants,
+    variant: {
+      ...chakraRecipes.kbd.variants?.variant,
+      raised: { ...chakraRecipes.kbd.variants?.variant?.raised, borderColor: 'border.emphasized' },
+      outline: { ...chakraRecipes.kbd.variants?.variant?.outline, borderColor: 'border.emphasized' },
+    },
+    // Keyed by stock height, as the size names are already rebased onto the workbench scale.
+    size: Object.fromEntries(
+      Object.entries(chakraRecipes.kbd.variants?.size ?? {}).map(([name, styles]) => [
+        name,
+        { ...styles, height: KBD_HEIGHTS[String((styles as { height?: unknown }).height)] ?? styles.height },
+      ])
+    ),
+  } as unknown as typeof chakraRecipes.kbd.variants,
+});
+
+/**
  * Use a linear sweep to avoid endpoint pauses; system.ts disables skeleton motion and gradients under reduced
  * motion.
  */
@@ -1320,6 +1346,15 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
       lineHeight: 'shorter',
     },
   },
+  variants: {
+    placement: {
+      // Above a list: the label sits low in its row, close to the rows it names.
+      list: {},
+      // In a bar beside centred controls: the label centres with them.
+      bar: { root: { alignItems: 'center', pb: '0' } },
+    },
+  },
+  defaultVariants: { placement: 'list' },
 });
 
 /**

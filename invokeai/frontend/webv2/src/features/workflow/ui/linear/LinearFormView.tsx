@@ -10,11 +10,30 @@ import { useTranslation } from 'react-i18next';
 import { LinkifiedText } from './LinkifiedText';
 import { NodeFieldControl } from './NodeFieldControl';
 
-const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; projectGraph: ProjectGraphState }) => {
+/**
+ * The form reads like the Generate and Upscale sections: a heading is a section title, and a hairline that runs edge
+ * to edge starts a section. Only root elements bleed; inside a container a line stays within its column.
+ */
+const ROOT_INSET = '3';
+const ROOT_HEADING_STYLES = {
+  '&:not(:first-child)': { borderTopWidth: '1px', mx: `-${ROOT_INSET}`, pt: ROOT_INSET, px: ROOT_INSET },
+  // An authored divider already drew the line. With equal specificity, this must follow the rule above.
+  '[data-form-divider] + &': { borderTopWidth: 0, mx: 0, pt: 0, px: 0 },
+} as const;
+
+const ViewElement = ({
+  element,
+  isRoot = false,
+  projectGraph,
+}: {
+  element: WorkflowFormElement;
+  isRoot?: boolean;
+  projectGraph: ProjectGraphState;
+}) => {
   switch (element.type) {
     case 'container':
       return (
-        <Stack direction={element.data.layout === 'row' ? 'row' : 'column'} gap="3">
+        <Stack direction={element.data.layout === 'row' ? 'row' : 'column'} gap="2.5">
           {getFormChildren(projectGraph.form, element.id).map((child) => (
             <ViewElement key={child.id} element={child} projectGraph={projectGraph} />
           ))}
@@ -24,7 +43,13 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
       return <NodeFieldControl element={element} projectGraph={projectGraph} />;
     case 'heading':
       return (
-        <Text fontSize="lg" fontWeight="700">
+        <Text
+          css={isRoot ? ROOT_HEADING_STYLES : undefined}
+          fontSize="xs"
+          fontWeight="semibold"
+          letterSpacing="wider"
+          textTransform="uppercase"
+        >
           {element.data.content}
         </Text>
       );
@@ -35,7 +60,7 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
         </LinkifiedText>
       );
     case 'divider':
-      return <Separator borderColor="border.subtle" />;
+      return <Separator data-form-divider mx={isRoot ? `-${ROOT_INSET}` : undefined} />;
   }
 };
 
@@ -63,9 +88,9 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
   }
 
   return (
-    <Stack gap="3" p="3">
+    <Stack gap="2.5" p={ROOT_INSET}>
       {rootChildren.map((element) => (
-        <ViewElement key={element.id} element={element} projectGraph={projectGraph} />
+        <ViewElement key={element.id} element={element} isRoot projectGraph={projectGraph} />
       ))}
     </Stack>
   );

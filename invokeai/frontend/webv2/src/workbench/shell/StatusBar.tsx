@@ -226,8 +226,8 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
         flexShrink={0}
         h="6"
         overlay="none"
-        px="2"
-        py={CHIP_GAP}
+        // The same inset on every side, so the end chips sit as close to the bar's edges as to its top and bottom.
+        p={CHIP_GAP}
         region="bottom"
         sortableInstanceIds={sortableInstanceIds}
         strategy={horizontalListSortingStrategy}

@@ -1,4 +1,5 @@
 import { createListCollection, Field, HStack, Input, Slider, Stack, Switch, Text } from '@chakra-ui/react';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { useCallback, useId, useMemo, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -133,6 +134,25 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, laye
           onValueChange={handleSelectChange}
         />
       </Field.Root>
+    );
+  }
+
+  if (field.kind === 'slider' && surface === 'quick') {
+    // One inline row like the switches and selects around it: the scrubber carries its own label and value.
+    return (
+      <HStack data-setting-control="" gap="2">
+        <ScrubberField
+          disabled={disabled}
+          flex="1"
+          label={label}
+          max={field.max}
+          min={field.min}
+          step={field.step ?? 1}
+          value={Number(value)}
+          onChange={onChange}
+        />
+        {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+      </HStack>
     );
   }
 

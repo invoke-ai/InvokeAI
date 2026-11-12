@@ -297,6 +297,8 @@ export const ModelSelect = ({
               className={className}
               borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
               colorPalette={isInvalid ? 'red' : 'gray'}
+              // Opening it puts the caret in a search box, so it points like a combobox's input does.
+              cursor={isInert ? undefined : 'text'}
               disabled={isInert}
               // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its own.
               fontWeight={insideLabel ? 'normal' : undefined}

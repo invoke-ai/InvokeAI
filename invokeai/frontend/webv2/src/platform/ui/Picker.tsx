@@ -299,7 +299,7 @@ export const Picker = <T,>({
 
   return (
     <Stack gap="0" minH="0">
-      <Stack gap="2" p="2">
+      <Stack gap="1.5" p="1.5">
         <HStack gap="1">
           <InputGroup flex="1" minW="0" startElement={SEARCH_ICON}>
             <SearchInput

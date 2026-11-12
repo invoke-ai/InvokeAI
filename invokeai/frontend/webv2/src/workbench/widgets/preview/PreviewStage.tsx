@@ -28,10 +28,11 @@ const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
 
 /**
  * Reserve chrome clearance on the stage content box so fitting shrinks media while the dot grid continues behind
- * chrome.
+ * chrome. The inset already ends a gap below the islands, so the stage's own padding is not added on top of it: the
+ * larger of the two is the top padding.
  */
 const getStagePaddingTop = (padding: string | undefined): string =>
-  padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
+  padding === undefined ? CENTER_CHROME_INSET : `max(var(--chakra-spacing-${padding}), ${CENTER_CHROME_INSET})`;
 
 /** Stage padding by density, shared by the single item's stage and the comparison stage so their geometry matches. */
 export const getPreviewStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');

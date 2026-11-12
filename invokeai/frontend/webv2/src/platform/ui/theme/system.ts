@@ -10,6 +10,7 @@ import {
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
+  kbdRecipe,
   menuSlotRecipe,
   numberInputSlotRecipe,
   popoverSlotRecipe,
@@ -426,6 +427,7 @@ const config = defineConfig({
     recipes: {
       button: buttonRecipe,
       input: inputRecipe,
+      kbd: kbdRecipe,
       skeleton: skeletonRecipe,
       textarea: textareaRecipe,
     },
