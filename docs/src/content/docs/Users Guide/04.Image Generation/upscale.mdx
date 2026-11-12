@@ -86,14 +86,14 @@ The panel says what is missing before you can queue, for example "Select a compa
 
 ## What each model family needs
 
-Refine works with **SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2** and **Qwen Image** main models.
+Refine works with **SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2**, **Qwen Image** and **MOSS-Image** main models.
 
 | Family | Tile ControlNet | Negative prompt | Detail pass |
 | --- | --- | --- | --- |
 | SD1.5, SDXL | Required | Yes | Tile by tile |
 | FLUX.1, FLUX.2 | – | – | Whole image |
 | Z-Image | Optional | When CFG > 1 | Whole image |
-| Anima, Krea-2, Qwen Image | – | When CFG > 1 | Whole image |
+| Anima, Krea-2, Qwen Image, MOSS-Image | – | When CFG > 1 | Whole image |
 
 Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores the negative prompt, the prompt is hidden and not recorded.
 
@@ -137,12 +137,19 @@ Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores
     - **Components**: a **Qwen VL Encoder** and a **VAE** (the Wan 2.1 VAE, installed as a Qwen Image or Anima VAE). A Diffusers install brings its own.
     - **Not supported**: Qwen Image Edit models. Without a reference image they would carry a blank one the size of the output through every step, for about 2.5 to 3 times the time and nothing gained.
   </TabItem>
+  <TabItem label="MOSS-Image">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: set when you pick the model: 3.
+    - **Steps**: set when you pick the model: 50. Like FLUX.2, MOSS-Image runs all of **Steps** in the detail pass, so lower it if the pass is slow.
+    - **Components**: a **Qwen3.5 Encoder** (9B, not the 4B Anima-3.8B uses) and a FLUX.2 **VAE**. A Diffusers install brings its own.
+    - **Not supported**: LoRAs, which MOSS-Image has no loader for.
+  </TabItem>
 </Tabs>
 
-A value "set when you pick the model" is the model's default setting, which you can change in the Model Manager. Switching from FLUX.2 to another family sets **Steps** back to 30.
+A value "set when you pick the model" is the model's default setting, which you can change in the Model Manager. Switching from FLUX.2 or MOSS-Image to another family sets **Steps** back to 30.
 
 :::note[Output size]
-FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image need sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass: 2040 px becomes 2032 px. Other families, and Model only, round down to a multiple of 8.
+FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen Image and MOSS-Image need sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass: 2040 px becomes 2032 px. Other families, and Model only, round down to a multiple of 8.
 :::
 
 ## Creativity per family
@@ -161,6 +168,7 @@ FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image need sizes that are a multiple of
 | Anima | Euler, DPM++ 2M, DPM++ 2M SDE, ER-SDE | As Z-Image; the last 8 |
 | Krea-2 | Euler only | As Z-Image; the last 7. Turbo and Raw both keep your **Steps**: Turbo, distilled for 8 steps, runs the end of a 30-step schedule |
 | Qwen Image | Euler only | As Z-Image; the last 9 |
+| MOSS-Image | Euler only | Starts where FLUX.1 does, then spreads all of **Steps** over the rest of the pass, as FLUX.2 does |
 
 Z-Image, Anima, Krea-2 and Qwen Image count the start in steps rather than in noise level, so the panel translates Creativity for them: it starts on the step whose noise level is closest to where FLUX.1 would start. A preset therefore means the same on every family. These families need at least 2 steps.
 

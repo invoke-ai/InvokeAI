@@ -907,8 +907,8 @@ const buildQwenImageUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Z-Image's, Anima's, Krea-2's and Qwen Image's text encoders take their encoders on named fields. All but Qwen
- * Image's hand the denoise a collected list; its denoise takes the one conditioning. The negative branch exists
+ * Z-Image's, Anima's, Krea-2's, Qwen Image's and MOSS-Image's text encoders take their encoders on named fields. All
+ * but Qwen Image's and MOSS-Image's hand the denoise a collected list; theirs take the one conditioning. The negative branch exists
  * only where the caller decided it is read.
  */
 const addPromptConditioning = (
@@ -954,6 +954,81 @@ const addPromptConditioning = (
 };
 
 /**
+ * MOSS-Image runs the pass whole like FLUX.2, whose VAE it shares: `moss_image_denoise` takes and returns the FLUX.2
+ * VAE's raw latent layout, so the FLUX.2 encode and decode nodes, tiled at both ends, work on either side of it. It
+ * clips by sigma value like FLUX. It has no LoRA loader and no tile ControlNet, so the pass is anchored only by where
+ * it starts. Generate's layout prompt is left out: it only turns a layout draft or canvas regions into the prompt.
+ */
+const buildMossImageUpscalePath: UpscalePathBuilder = ({
+  graph,
+  settings,
+  model,
+  components,
+  destination,
+  positivePrompt,
+  negativePrompt,
+  seed,
+  frame,
+  denoiseSize,
+  denoisingStart,
+}) => {
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model: toModelIdentifier(model),
+    qwen3_5_encoder_model: components.qwen35EncoderModel ? toModelIdentifier(components.qwen35EncoderModel) : undefined,
+    type: 'moss_image_model_loader',
+    vae_model: settings.vae ? toModelIdentifier(settings.vae) : undefined,
+  });
+  const imageToLatents = addNode(graph, {
+    id: 'i2l',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'flux2_vae_encode',
+  });
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: denoisingStart,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'moss_image_denoise',
+    width: denoiseSize.width,
+  });
+  const output = addNode(graph, {
+    id: 'upscale_output',
+    is_intermediate: destination === 'canvas',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'flux2_vae_decode',
+    use_cache: false,
+  });
+
+  addPromptConditioning(graph, {
+    // The denoise takes the one conditioning, not a collected list.
+    collect: false,
+    denoise,
+    encoderFields: [{ field: 'qwen3_5_encoder', source: modelLoader }],
+    encoderType: 'moss_image_text_encoder',
+    negativePrompt: wiresUpscaleNegativePrompt(model, settings.cfgScale) ? negativePrompt : null,
+    positivePrompt,
+  });
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
+  addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
+  addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
+  // The denoise reads this VAE's BatchNorm statistics, which define the latent space it works in.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+
+  return { frame: fitted, output, title: `${model.name} upscale` };
+};
+
+/**
  * Keyed by the same bases as `UPSCALE_ARCHITECTURES`, and `satisfies` makes that a compile error to
  * break: declaring an architecture supported without giving it a builder will not type-check.
  */
@@ -962,6 +1037,7 @@ const UPSCALE_PATH_BUILDERS = {
   flux: buildFluxUpscalePath,
   flux2: buildFlux2UpscalePath,
   'krea-2': buildKrea2UpscalePath,
+  'moss-image': buildMossImageUpscalePath,
   'qwen-image': buildQwenImageUpscalePath,
   'sd-1': buildSdUpscalePath,
   sdxl: buildSdUpscalePath,
