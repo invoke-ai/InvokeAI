@@ -17693,10 +17693,15 @@ describe('engine selection: fill / erase', () => {
     engine.lifecycle.dispose();
   });
 
-  it('fillSelection is a no-op on an image-source layer (deferred to rasterize task)', () => {
+  it('fillSelection refuses an image layer whose pixels have not loaded, asking for them', () => {
     const { engine } = makeEngine(imageSelectedDoc());
+    const refusals: CanvasEditRefusal[] = [];
+    engine.tools.onEditRefused((refusal) => refusals.push(refusal));
     engine.selection.selectAll();
     engine.selection.fillSelection();
+    // Materializing now would bake an empty cache over the image; the real edit is covered in Chromium
+    // (`widgets/canvas/canvasSelectionEdits.browser.test.ts`).
+    expect(refusals).toEqual([{ layerId: 'img', layerName: 'img', status: 'layer-loading' }]);
     expect(editSteps(engine)).toEqual([]);
     engine.lifecycle.dispose();
   });
@@ -20369,6 +20374,7 @@ describe('layer quick-switch memory', () => {
       reportStructuralCommit: vi.fn(),
       reportPreparedCommit: vi.fn(),
       reportLayerOperation: vi.fn(),
+      reportMergeDownRefusal: vi.fn(),
       reportTransformRefusal: vi.fn(),
       t: (key) => key,
     });

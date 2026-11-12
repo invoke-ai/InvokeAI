@@ -19,7 +19,12 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
-import { CANVAS_COMPANION_HOTKEYS, executeCanvasToolCommand, reportTransformRefusal } from './canvasToolCommands';
+import {
+  CANVAS_COMPANION_HOTKEYS,
+  executeCanvasToolCommand,
+  reportMergeDownRefusal,
+  reportTransformRefusal,
+} from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -107,6 +112,7 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   cropAllLayers: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
+  reportMergeDownRefusal: vi.fn(),
   reportTransformRefusal: vi.fn(),
   reportPreparedCommit: () => undefined,
   reportStructuralCommit: () => undefined,
@@ -503,21 +509,33 @@ describe('tool selection', () => {
       expect(engine.tools.setTool).not.toHaveBeenCalled();
       return reportTransformRefusal.mock.calls;
     };
-    expect(report('locked')).toEqual([['locked']]);
-    expect(report('ineligible')).toEqual([['ineligible']]);
+    expect(report('locked')).toEqual([['locked', 'a']]);
+    expect(report('ineligible')).toEqual([['ineligible', 'a']]);
     expect(report('busy')).toEqual([]);
   });
 
-  it("gives an ineligible layer Transform's own reason and other refusals the shared layer notice", () => {
+  it("explains an ineligible layer as a notice naming it, with Transform's own reason; other refusals as failures", () => {
     const explain = (refusal: Exclude<BeginTransformResult, 'started'>) => {
-      const reportError = vi.fn();
-      reportTransformRefusal(refusal, reportError, ((key: string) => key) as unknown as TFunction);
-      return reportError.mock.calls;
+      const report = { error: vi.fn(), notice: vi.fn() };
+      const t = ((key: string, options?: { name?: string }) =>
+        options?.name === undefined ? key : `${key}:${options.name}`) as unknown as TFunction;
+      reportTransformRefusal(refusal, { id: 'a', name: 'Sky' }, report, t);
+      return { error: report.error.mock.calls, notice: report.notice.mock.calls };
     };
-    expect(explain('ineligible')).toEqual([
-      ['widgets.layers.actions.actionFailed', 'widgets.layers.actions.transformIneligible'],
-    ]);
-    expect(explain('locked')).toEqual([['widgets.layers.actions.actionFailed', 'widgets.layers.actions.locked']]);
+    expect(explain('ineligible')).toEqual({
+      error: [],
+      notice: [
+        [
+          'transform:ineligible:a',
+          'widgets.layers.actions.transformUnavailable:Sky',
+          'widgets.layers.actions.transformIneligible',
+        ],
+      ],
+    });
+    expect(explain('locked')).toEqual({
+      error: [['widgets.layers.actions.actionFailed', 'widgets.layers.actions.locked']],
+      notice: [],
+    });
   });
 
   it('lasso selects the tool when not already active', () => {
@@ -628,14 +646,80 @@ describe('mergeDown', () => {
     expect(engine.layers.mergeLayerDown).toHaveBeenCalledWith('a');
   });
 
-  it('refuses when the selected layer is bottom-most', () => {
-    const engine = run('canvas.mergeDown', { document: documentOf([rasterLayer('a'), rasterLayer('b')], 'b') });
+  /** What a refused merge down says, as `[key, title, message]`, through the same report the Canvas wires. */
+  const explainMergeDown = (document: CanvasDocumentContractV3): unknown[][] => {
+    const info = vi.fn();
+    const t = ((key: string, options?: { name?: string }) =>
+      options?.name === undefined ? key : `${key}:${options.name}`) as unknown as TFunction;
+    const engine = run('canvas.mergeDown', {
+      document,
+      reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, info, t),
+    });
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
+    return info.mock.calls;
+  };
+  const title = 'widgets.layers.actions.mergeDownRefused:b';
+  const shape = (id: string, overrides: Partial<CanvasLayerContract> = {}) =>
+    rasterLayer(id, {
+      source: { fill: '#fff', height: 4, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 4 },
+      ...overrides,
+    } as Partial<CanvasLayerContract>);
+
+  it.each<[string, CanvasNodeContract[], string, string]>([
+    ['the bottom-most layer', [rasterLayer('a'), rasterLayer('b')], 'no-layer-below', 'mergeDownNoLayerBelow:b'],
+    [
+      'the bottom layer of a group',
+      [groupContract('G', [rasterLayer('a'), rasterLayer('b')])],
+      'bottom-of-group',
+      'mergeDownBottomOfGroup:b',
+    ],
+    [
+      'a layer above a group',
+      [rasterLayer('b'), groupContract('Below', [rasterLayer('a')])],
+      'group-below',
+      'mergeDownGroupBelow:Below',
+    ],
+    ['a layer above a shape layer', [rasterLayer('b'), shape('a')], 'not-mergeable', 'mergeDownNotMergeable:a'],
+    [
+      'paint above a disabled shape layer, for its kind',
+      [rasterLayer('b'), shape('a', { isEnabled: false })],
+      'not-mergeable',
+      'mergeDownNotMergeable:a',
+    ],
+    [
+      'a layer above a hidden one',
+      [rasterLayer('b'), rasterLayer('a', { isEnabled: false })],
+      'disabled',
+      'mergeDownHidden:a',
+    ],
+    [
+      'a layer in a hidden group, naming the group',
+      [groupContract('Hidden', [rasterLayer('b'), rasterLayer('a')], { isEnabled: false })],
+      'disabled',
+      'mergeDownHidden:Hidden',
+    ],
+    [
+      'a layer above a locked one',
+      [rasterLayer('b'), rasterLayer('a', { isLocked: true })],
+      'locked',
+      'mergeDownLocked:a',
+    ],
+    [
+      'a mask, pointing to Merge masks',
+      [rasterLayer('b', { type: 'inpaint_mask' } as Partial<CanvasLayerContract>)],
+      'wrong-type',
+      'mergeDownMaskSelected',
+    ],
+    ['a group', [groupContract('b', [rasterLayer('a')]), rasterLayer('c')], 'wrong-type', 'mergeDownGroupSelected'],
+  ])('explains why %s cannot merge down, once per layer and reason', (_, nodes, reason, message) => {
+    const document = { ...documentOf([], 'b'), stacks: stacksFrom(nodes) };
+    expect(explainMergeDown(document)).toEqual([
+      [`merge-down:b:${reason}`, title, `widgets.layers.actions.${message}`],
+    ]);
   });
 
-  it('refuses with no selected layer', () => {
-    const engine = run('canvas.mergeDown', { document: documentOf([rasterLayer('a')], null) });
-    expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
+  it('stays silent with no selected layer', () => {
+    expect(explainMergeDown(documentOf([rasterLayer('a')], null))).toEqual([]);
   });
 
   it('reports a merge the engine refused', async () => {

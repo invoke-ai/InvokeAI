@@ -1,25 +1,34 @@
 import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { SelectionPixelEditRefusal } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { PixelEditTransaction } from '@workbench/canvas-engine/tools/tool';
-import type { Rect } from '@workbench/canvas-engine/types';
+import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
-import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
-import { getSourceBounds } from '@workbench/canvas-engine/document/sources';
+import { getDocumentLayer, getDocumentNode } from '@workbench/canvas-engine/document/documentIndex';
+import { isLayerTransparencyLocked } from '@workbench/canvas-engine/document/layerEligibility';
+import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
+import { selectionPixelEditRefusal } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
-import { intersect, isEmpty, roundOut } from '@workbench/canvas-engine/math/rect';
+import { invert } from '@workbench/canvas-engine/math/mat2d';
+import { intersect, isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { eraseMaskedRegion, fillMaskedRegion } from '@workbench/canvas-engine/selection/selectionOps';
+import { hittableLayerRect, layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
+import { MASK_PAINT_COLOR } from '@workbench/canvas-engine/tools/paintConstants';
 
 import type { CanvasMutationContext, EditTransaction } from './mutationContext';
 
+/**
+ * A paint layer or mask is edited in its own local space, the selection mapped into it. A control layer or raster
+ * image edits through a pixel-edit transaction, which bakes its transform first, so the document is its space.
+ */
 type PixelTarget =
-  | { kind: 'raster'; layerId: string; transparencyLocked: boolean }
-  | { kind: 'control'; transaction: PixelEditTransaction; transparencyLocked: false };
+  | { kind: 'direct'; color: string | null; toLocal: Mat2d; transparencyLocked: boolean; txn: EditTransaction }
+  | { kind: 'transaction'; transaction: PixelEditTransaction; transparencyLocked: boolean };
 
 export interface SelectionPixelControllerOptions {
   readonly selection: SelectionState;
@@ -32,6 +41,8 @@ export interface SelectionPixelControllerOptions {
   readonly beginPixelEdit: (layerId: string) => PixelEditTransaction | null;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
+  /** The layer an open transform session previews, whose placement the selection would not match until it lands. */
+  readonly getTransformSessionLayerId: () => string | null;
   readonly getFillColor: () => string;
   readonly deleteDerived: (layerId: string) => void;
   readonly invalidateLayer: (layerId: string) => void;
@@ -59,59 +70,108 @@ export class SelectionPixelController {
 
   constructor(private readonly deps: SelectionPixelControllerOptions) {}
 
-  private target(): PixelTarget | null {
-    const document = this.deps.getDocument();
-    if (!document?.selectedLayerId) {
-      return null;
+  /**
+   * Says why the selection cannot be edited, as the brush and eraser would. Removing the selection's pixels (Erase,
+   * Delete, Cut) names what it could not act on; Fill is only offered for a layer it can fill.
+   */
+  private reportTargetRefusal(
+    document: CanvasDocumentContractV3,
+    kind: 'fill' | 'erase',
+    refusal: SelectionPixelEditRefusal
+  ): void {
+    const node = getDocumentNode(document, document.selectedLayerId);
+    if (refusal === 'no-target' || refusal === 'unsupported') {
+      if (kind === 'erase') {
+        this.deps.reportRefusal(
+          node
+            ? { layerId: node.id, layerName: node.name, status: 'selection-erase-unsupported' }
+            : { status: 'selection-erase-no-target' }
+        );
+      }
+      return;
     }
-    const leaf = lookupDocumentLeaf(document, document.selectedLayerId);
-    const layer = leaf?.layer;
-    if (leaf && layer?.type === 'raster' && layer.source.type === 'paint' && isLeafEditable(leaf)) {
-      return { kind: 'raster', layerId: layer.id, transparencyLocked: layer.isTransparencyLocked === true };
+    if (node) {
+      this.deps.reportRefusal({ layerId: node.id, layerName: node.name, status: refusal });
     }
-    if (layer?.type === 'control') {
-      const transaction = this.deps.beginPixelEdit(layer.id);
-      return transaction ? { kind: 'control', transaction, transparencyLocked: false } : null;
-    }
-    return null;
   }
 
-  run(kind: 'fill' | 'erase'): void {
+  /**
+   * The selection and the layer a Fill or Erase would edit now, or null after reporting why not. Waiting pixels are
+   * requested, so a later try can edit them.
+   */
+  private admit(kind: 'fill' | 'erase') {
     if (this.disposed || !this.deps.canEdit() || this.deps.isGestureActive()) {
-      return;
+      return null;
     }
     const document = this.deps.getDocument();
     const placedMask = this.deps.selection.mask();
     const bounds = this.deps.selection.bounds();
     if (!document || !placedMask || !bounds) {
+      return null;
+    }
+    const node = getDocumentNode(document, document.selectedLayerId);
+    const refusal = selectionPixelEditRefusal(node ? (lookupDocumentLeaf(document, node.id) ?? 'group') : null, kind);
+    const layer = getDocumentLayer(document, document.selectedLayerId);
+    if (refusal || !layer) {
+      this.reportTargetRefusal(document, kind, refusal ?? 'no-target');
+      return null;
+    }
+    const sessionLayerId = this.deps.getTransformSessionLayerId();
+    if (sessionLayerId !== null) {
+      // The session previews a placement the document does not hold yet; editing now would land elsewhere.
+      const sessionLayer = getDocumentNode(document, sessionLayerId);
+      this.deps.reportRefusal({
+        layerId: sessionLayerId,
+        layerName: sessionLayer?.name ?? '',
+        status: 'transform-session',
+      });
+      return null;
+    }
+    if (!this.deps.isRasterCacheReady(layer, document)) {
+      // Editing now would grow a transparent cache over pixels still on their way.
+      this.deps.requestRasterization(layer.id);
+      this.deps.reportRefusal({ layerId: layer.id, layerName: layer.name, status: 'layer-loading' });
+      return null;
+    }
+    return { document, layer, placedMask, selectionRect: roundOut(bounds) };
+  }
+
+  /** Whether an Erase may run now; otherwise it reports why, as the Erase itself would. Cut asks before it copies. */
+  admitErase(): boolean {
+    return this.admit('erase') !== null;
+  }
+
+  run(kind: 'fill' | 'erase'): void {
+    const admitted = this.admit(kind);
+    if (!admitted) {
       return;
     }
-    const selectionRect = roundOut(bounds);
-    const selectedLayer = getDocumentLayer(document, document.selectedLayerId);
-    if (
-      selectedLayer?.type === 'raster' &&
-      selectedLayer.source.type === 'paint' &&
-      !this.deps.isRasterCacheReady(selectedLayer, document)
-    ) {
-      this.deps.requestRasterization(selectedLayer.id);
+    const { document, layer, placedMask, selectionRect } = admitted;
+    const transparencyLocked = isLayerTransparencyLocked(layer);
+    if (layer.type === 'control' || (layer.type === 'raster' && layer.source.type === 'image')) {
+      // Nothing to erase is no reason to bake the layer's transform. The extent includes pixels not saved yet.
+      const content = hittableLayerRect(layer, document, this.deps.layers.get(layer.id)?.rect);
+      if (
+        kind === 'erase' &&
+        (!content || !intersect(selectionRect, roundOut(transformBounds(layerMatrix(layer.transform), content))))
+      ) {
+        return;
+      }
+      const transaction = this.deps.beginPixelEdit(layer.id);
+      if (transaction) {
+        this.edit(
+          kind,
+          transaction.layerId,
+          { kind: 'transaction', transaction, transparencyLocked },
+          selectionRect,
+          placedMask
+        );
+      }
       return;
     }
-    if (
-      kind === 'erase' &&
-      selectedLayer?.type === 'control' &&
-      !intersect(selectionRect, roundOut(getSourceBounds(selectedLayer, document)))
-    ) {
-      return;
-    }
-    const target = this.target();
-    if (!target) {
-      return;
-    }
-    if (kind === 'erase' && target.transparencyLocked) {
-      return;
-    }
-    if (target.kind === 'control') {
-      this.edit(kind, target.transaction.layerId, target, selectionRect, placedMask);
+    const toLocal = invert(layerMatrix(layer.transform));
+    if (!toLocal) {
+      // A zero-scale layer has no pixels under the selection.
       return;
     }
     const txn = this.deps.ctx.begin({ historyBytes: 0 });
@@ -120,7 +180,13 @@ export class SelectionPixelController {
       return;
     }
     try {
-      this.edit(kind, target.layerId, { ...target, txn }, selectionRect, placedMask);
+      this.edit(
+        kind,
+        layer.id,
+        { color: isMaskLayer(layer) ? MASK_PAINT_COLOR : null, kind: 'direct', toLocal, transparencyLocked, txn },
+        roundOut(transformBounds(toLocal, selectionRect)),
+        placedMask
+      );
     } finally {
       txn.end();
     }
@@ -133,14 +199,13 @@ export class SelectionPixelController {
   private edit(
     kind: 'fill' | 'erase',
     layerId: string,
-    target:
-      | Exclude<PixelTarget, { kind: 'raster' }>
-      | (Extract<PixelTarget, { kind: 'raster' }> & { txn: EditTransaction }),
+    target: PixelTarget,
+    /** The selection's bounds in the target's space. */
     selectionRect: Rect,
     placedMask: NonNullable<ReturnType<SelectionState['mask']>>
   ): void {
     const { deps } = this;
-    const live = target.kind === 'control' ? target.transaction : null;
+    const live = target.kind === 'transaction' ? target.transaction : null;
     const existing = deps.layers.get(layerId);
     const grows = kind === 'fill' && !target.transparencyLocked;
     const rect = grows
@@ -153,7 +218,7 @@ export class SelectionPixelController {
       return;
     }
     const footprint = rect.width * rect.height * 8;
-    if (!(live ? live.grow(footprint) : target.kind === 'raster' && target.txn.growHistory(footprint))) {
+    if (!(live ? live.grow(footprint) : target.kind === 'direct' && target.txn.growHistory(footprint))) {
       if (!live) {
         deps.reportRefusal('over-budget');
       }
@@ -181,13 +246,15 @@ export class SelectionPixelController {
       const surface = entry.surface;
       const origin = { x: entry.rect.x, y: entry.rect.y };
       before = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
+      const maskToLocal = target.kind === 'direct' ? target.toLocal : undefined;
       if (kind === 'fill') {
         fillMaskedRegion({
           backend: deps.backend,
-          color: deps.getFillColor(),
+          color: (target.kind === 'direct' ? target.color : null) ?? deps.getFillColor(),
           composite: target.transparencyLocked ? 'source-atop' : 'source-over',
           mask: placedMask.surface,
           maskOrigin: placedMask.rect,
+          maskToLocal,
           rect,
           target: surface,
           targetOrigin: origin,
@@ -197,6 +264,7 @@ export class SelectionPixelController {
           backend: deps.backend,
           mask: placedMask.surface,
           maskOrigin: placedMask.rect,
+          maskToLocal,
           rect,
           target: surface,
           targetOrigin: origin,
@@ -208,7 +276,7 @@ export class SelectionPixelController {
         published = live.commitPatch(label, { after, before, rect });
         return;
       }
-      if (target.kind !== 'raster' || imageDataEqual(before, after)) {
+      if (target.kind !== 'direct' || imageDataEqual(before, after)) {
         return;
       }
       const result = target.txn.publish(

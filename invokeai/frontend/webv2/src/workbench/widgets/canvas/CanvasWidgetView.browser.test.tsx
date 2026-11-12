@@ -475,6 +475,8 @@ describe('CanvasWidgetView clipboard shortcuts', () => {
     const { commandHandlers, store } = await renderView('completed', { staged: false });
     withoutClipboard();
     vi.spyOn(harness.engine!.selection, 'exportSelectionBlob').mockResolvedValue(new Blob([], { type: 'image/png' }));
+    // A cut the layer allows, so it reaches the clipboard write that fails.
+    vi.spyOn(harness.engine!.selection, 'admitSelectionErase').mockReturnValue(true);
     const erase = vi.spyOn(harness.engine!.selection, 'eraseSelection');
 
     await act(() => commandHandlers.get('canvas.copySelection')!());

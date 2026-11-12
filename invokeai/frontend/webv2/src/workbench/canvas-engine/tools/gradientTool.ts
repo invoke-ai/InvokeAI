@@ -1,10 +1,12 @@
 /**
  * Gradient drag defines linear start/end or radial center/radius. Editable selected gradients update placement in
- * layer-local space while preserving kind/stops/extent; locked or hidden gradients refuse. Otherwise create a
- * bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection masks
- * do not clip parametric gradients.
+ * layer-local space while preserving kind/stops/extent; locked or hidden gradients, and a selected mask or region
+ * (a gradient is a raster layer of its own), refuse at the press, with the not-allowed cursor beforehand. Otherwise
+ * create a bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection
+ * masks do not clip parametric gradients.
  */
 
+import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasLayerBaseContract,
   CanvasLayerSourceContract,
@@ -16,6 +18,7 @@ import type { Vec2 } from '@workbench/canvas-engine/types';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
+import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
 import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { Tool, ToolContext } from './tool';
@@ -65,6 +68,24 @@ const toLayerLocal = (
   return inverse ? [applyToPoint(inverse, start), applyToPoint(inverse, end)] : null;
 };
 
+/**
+ * Why a drag now would be refused: the selected gradient it would edit is locked or hidden, or a mask or region is
+ * selected, which never takes a new raster layer in its place.
+ */
+const predictRefusal = (ctx: ToolContext): CanvasLayerEditRefusal | null => {
+  const doc = ctx.getDocument();
+  const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+  const selected = leaf?.layer;
+  if (!leaf || !selected) {
+    return null;
+  }
+  if (isMaskLayer(selected)) {
+    return { layerId: selected.id, layerName: selected.name, status: 'gradient-unsupported' };
+  }
+  const status = selected.type === 'raster' && selected.source.type === 'gradient' ? leafEditRefusal(leaf) : null;
+  return status ? { layerId: selected.id, layerName: selected.name, status } : null;
+};
+
 /** Creates a fresh gradient tool with its own gesture state. */
 export const createGradientTool = (): Tool => {
   let state: GestureState | null = null;
@@ -75,7 +96,7 @@ export const createGradientTool = (): Tool => {
   };
 
   return {
-    cursor: () => 'crosshair',
+    cursor: (ctx) => (!state && predictRefusal(ctx) ? 'not-allowed' : 'crosshair'),
     id: 'gradient',
     onDeactivate: (ctx) => {
       state = null;
@@ -99,6 +120,11 @@ export const createGradientTool = (): Tool => {
       }
       const doc = ctx.getDocument();
       if (!doc) {
+        return;
+      }
+      const refusal = predictRefusal(ctx);
+      if (refusal) {
+        ctx.reportEditRefusal?.(refusal);
         return;
       }
       const selected = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId)?.layer : null;
@@ -144,7 +170,7 @@ export const createGradientTool = (): Tool => {
       const selected = leaf?.layer;
 
       if (leaf && selected && selected.type === 'raster' && selected.source.type === 'gradient') {
-        // Edit the selected gradient layer, unless it is locked or hidden (refused with a notice).
+        // The press refused a locked or hidden gradient; this catches one that became so during the drag.
         const refusal = leafEditRefusal(leaf);
         if (refusal) {
           ctx.reportEditRefusal?.({ layerId: selected.id, layerName: selected.name, status: refusal });

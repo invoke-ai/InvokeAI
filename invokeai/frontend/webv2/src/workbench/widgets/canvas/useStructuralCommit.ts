@@ -2,6 +2,7 @@ import type {
   AdjustmentRefusal,
   AdjustmentRefusalReason,
   CanvasDocumentCapability,
+  CanvasLayerEditRefusal,
   CanvasLayerBasePatch,
   CanvasLayerCapability,
   CanvasLayerConfigPatch,
@@ -53,6 +54,83 @@ const ADJUSTMENT_REFUSAL_KEYS: Record<AdjustmentRefusalReason, string> = {
 /** Names the layer or group whose Clarity, Texture or Dehaze could not run, and why. */
 export const describeAdjustmentRefusal = (refusal: AdjustmentRefusal, t: TFunction): string =>
   t(ADJUSTMENT_REFUSAL_KEYS[refusal.reason], { name: refusal.ownerName });
+
+/**
+ * Each status's title and message for a layer the Canvas refused to edit, and the message that goes with an offer to paint on a new layer instead: only a
+ * hidden or locked layer makes that offer, since a new layer above it escapes the cause.
+ */
+const LAYER_REFUSAL_KEYS: Record<
+  CanvasLayerEditRefusal['status'],
+  { message: string; offerMessage: string | null; title: string }
+> = {
+  'erase-unsupported': {
+    message: 'widgets.canvas.editRefusal.eraseUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.eraseUnsupported',
+  },
+  'gradient-unsupported': {
+    message: 'widgets.canvas.editRefusal.gradientUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.gradientUnsupported',
+  },
+  'layer-alpha-locked': {
+    message: 'widgets.canvas.editRefusal.alphaLockedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.alphaLocked',
+  },
+  'layer-display-hidden': {
+    message: 'widgets.canvas.editRefusal.displayHiddenMessage',
+    offerMessage: 'widgets.canvas.editRefusal.displayHiddenOfferMessage',
+    title: 'widgets.canvas.editRefusal.displayHidden',
+  },
+  'layer-hidden': {
+    message: 'widgets.canvas.editRefusal.hiddenMessage',
+    offerMessage: 'widgets.canvas.editRefusal.hiddenOfferMessage',
+    title: 'widgets.canvas.editRefusal.hidden',
+  },
+  'layer-loading': {
+    message: 'widgets.canvas.editRefusal.loadingMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.loading',
+  },
+  'layer-unpaintable': {
+    message: 'widgets.canvas.editRefusal.unpaintableMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.unpaintable',
+  },
+  'layer-locked': {
+    message: 'widgets.canvas.editRefusal.lockedMessage',
+    offerMessage: 'widgets.canvas.editRefusal.lockedOfferMessage',
+    title: 'widgets.canvas.editRefusal.locked',
+  },
+  'selection-erase-unsupported': {
+    message: 'widgets.canvas.editRefusal.selectionEraseUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.selectionEraseUnsupported',
+  },
+  'transform-session': {
+    message: 'widgets.canvas.editRefusal.transformSessionMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.transformSession',
+  },
+};
+
+/**
+ * The notice for a layer the active tool could not edit: its title, its message, and whether it offers a new paint
+ * layer instead (only for a status that has offer wording).
+ */
+export const describeLayerEditRefusal = (
+  refusal: CanvasLayerEditRefusal,
+  t: TFunction
+): { message: string; offersNewLayer: boolean; title: string } => {
+  const keys = LAYER_REFUSAL_KEYS[refusal.status];
+  const offerMessage = refusal.canPaintNewLayer ? keys.offerMessage : null;
+  return {
+    message: t(offerMessage ?? keys.message),
+    offersNewLayer: offerMessage !== null,
+    title: t(keys.title, { name: refusal.layerName }),
+  };
+};
 
 /** Words a refusal that names its layer: an image that could not be read, or adjustments that could not run. */
 export const describeNamedRefusal = (refusal: AdjustmentRefusal | LayerUnreadable, t: TFunction): string =>

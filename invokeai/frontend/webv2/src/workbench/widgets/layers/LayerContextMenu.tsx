@@ -41,7 +41,7 @@ import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
-import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasToolCommands';
+import { reportTransformRefusal, showCanvasRefusalNotice } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   useCanvasDocumentEditingLocked,
   useCanvasEngineRead,
@@ -649,9 +649,14 @@ const LayerMenu = ({
     }
     const result = engine.layers.beginTransform(layer.id);
     if (result !== 'started') {
-      reportTransformRefusal(result, notify.error, t);
+      reportTransformRefusal(
+        result,
+        { id: layer.id, name: layer.name },
+        { error: notify.error, notice: showCanvasRefusalNotice },
+        t
+      );
     }
-  }, [engine, layer.id, makeStatusError, notify, t]);
+  }, [engine, layer.id, layer.name, makeStatusError, notify, t]);
 
   const handleFitToBbox = useCallback(() => {
     const transform = fitLayerTransformToBbox(layer, bbox, documentRect);

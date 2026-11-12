@@ -89,27 +89,87 @@ const refusal = (
 describe('CanvasEditRefusalNotices', () => {
   it.each([
     ['layer-hidden', '“Sky” is hidden', 'Show the layer to edit it.'],
+    ['layer-display-hidden', '“Sky” is hidden on the canvas', 'Show it on the canvas to edit it.'],
+    [
+      'erase-unsupported',
+      '“Sky” can’t be erased',
+      'The eraser works on paint layers, images, control layers and masks.',
+    ],
+    [
+      'gradient-unsupported',
+      'Can’t add a gradient to “Sky”',
+      'A gradient is a raster layer of its own. Select a raster layer, or nothing, to add one.',
+    ],
     ['layer-locked', '“Sky” is locked', 'Unlock the layer to edit it.'],
     ['layer-alpha-locked', '“Sky” has its transparency locked', 'Unlock its transparency to remove pixels from it.'],
     ['layer-loading', '“Sky” is still loading', 'Its pixels are on their way. Try again in a moment.'],
+    [
+      'layer-unpaintable',
+      '“Sky” has no pixels to edit',
+      'Its shape is empty, so there is nothing to paint on or erase.',
+    ],
+    [
+      'selection-erase-unsupported',
+      'Can’t remove the selection from “Sky”',
+      'Erase, Delete and Cut remove pixels from paint layers, images, control layers and masks.',
+    ],
+    ['transform-session', '“Sky” is being transformed', 'Apply or cancel the transform first.'],
   ] as const)('explains a %s refusal with no offer', async (status, title, message) => {
     const { emit } = await mount([layerContract('sky', 'raster', { name: 'Sky' })], 'sky');
     await emit(refusal(status, 'sky', 'Sky'));
     await expect.poll(toastTexts).toEqual([{ actions: [], message, title }]);
   });
 
-  it('explains a shape cutout with nothing to cut from, once however often it is pressed', async () => {
+  it.each([
+    ['cutout-no-target', 'Nothing to cut the shape out of', 'Select a paint layer or mask to cut the shape out of it.'],
+    ['erase-no-target', 'Nothing to erase', 'Select a paint layer, image, control layer or mask to erase from it.'],
+    [
+      'selection-erase-no-target',
+      'No layer to remove the selection from',
+      'Select a paint layer, image, control layer or mask, then try again.',
+    ],
+  ] as const)('explains a %s refusal once however often it is pressed', async (status, title, message) => {
     const { emit } = await mount([], null);
-    await emit({ status: 'cutout-no-target' });
-    await emit({ status: 'cutout-no-target' });
-    await expect.poll(toastTexts).toEqual([
-      {
-        actions: [],
-        message: 'Select a paint layer or mask to cut the shape out of it.',
-        title: 'Nothing to cut the shape out of',
-      },
-    ]);
+    await emit({ status });
+    await emit({ status });
+    await expect.poll(toastTexts).toEqual([{ actions: [], message, title }]);
   });
+
+  it.each([
+    [
+      'layer-hidden',
+      '“Sky” is hidden',
+      'Show the layer to paint on it, or paint on a new layer above it.',
+      ['Paint on a new layer'],
+    ],
+    [
+      'layer-display-hidden',
+      '“Sky” is hidden on the canvas',
+      'Show it on the canvas to paint on it, or paint on a new layer above it.',
+      ['Paint on a new layer'],
+    ],
+    [
+      'layer-locked',
+      '“Sky” is locked',
+      'Unlock the layer to paint on it, or paint on a new layer above it.',
+      ['Paint on a new layer'],
+    ],
+    // A status a new layer would not escape keeps its own words and makes no offer.
+    ['layer-loading', '“Sky” is still loading', 'Its pixels are on their way. Try again in a moment.', []],
+    [
+      'layer-alpha-locked',
+      '“Sky” has its transparency locked',
+      'Unlock its transparency to remove pixels from it.',
+      [],
+    ],
+  ] as const)(
+    'words a %s refusal that could offer a new layer in its own terms',
+    async (status, title, message, actions) => {
+      const { emit } = await mount([layerContract('sky', 'raster', { name: 'Sky' })], 'sky');
+      await emit(refusal(status, 'sky', 'Sky', true));
+      await expect.poll(toastTexts).toEqual([{ actions: [...actions], message, title }]);
+    }
+  );
 
   it('replaces a repeated refusal without an offer, one toast per layer and reason', async () => {
     const { emit } = await mount(

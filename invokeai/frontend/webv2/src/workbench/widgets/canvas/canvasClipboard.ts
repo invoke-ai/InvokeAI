@@ -3,6 +3,8 @@
  * clipboard/canvas access.
  */
 
+import type { CanvasSelectionCapability } from '@workbench/canvas-engine/api';
+
 import { type ClipboardAccess, ClipboardUnavailableError, readClipboardItems } from '@platform/browser/clipboard';
 
 /** MIME types accepted from the clipboard, best first. */
@@ -73,5 +75,29 @@ export const decodeImageBlob = async (blob: Blob, deps: DecodeImageBlobDeps = {}
     return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
   } finally {
     bitmap.close?.();
+  }
+};
+
+/**
+ * Copies the selected pixels with `write`, and for a cut then removes them from the layer. A cut asks first whether
+ * the removal could run, so one the engine refuses (it says why) writes nothing to the clipboard rather than turning
+ * into a copy. Resolves without writing when there is nothing selected to copy; a failed write rejects before
+ * anything is removed.
+ */
+export const copyCanvasSelection = async (
+  selection: Pick<CanvasSelectionCapability, 'admitSelectionErase' | 'eraseSelection' | 'exportSelectionBlob'>,
+  cut: boolean,
+  write: (blob: Blob) => Promise<void>
+): Promise<void> => {
+  if (cut && !selection.admitSelectionErase()) {
+    return;
+  }
+  const blob = await selection.exportSelectionBlob();
+  if (!blob) {
+    return;
+  }
+  await write(blob);
+  if (cut) {
+    selection.eraseSelection();
   }
 };

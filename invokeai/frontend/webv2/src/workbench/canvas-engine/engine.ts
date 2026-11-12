@@ -999,6 +999,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
       isRasterCacheReady: (layer, document) => isLayerCacheReadyForOp(layer, document),
       isGestureActive: () => pipeline.isGestureActive(),
+      getTransformSessionLayerId: () => stores.transformSession.get()?.layerId ?? null,
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
@@ -2636,6 +2637,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     floatingSelection.commit();
     editingController.selectionPixels.run('erase');
   };
+  const admitSelectionErase = (): boolean => editingController.selectionPixels.admitErase();
 
   /** Copy reuses the float's nonmutating masked-copy path so clipboard and lift select identical pixels. */
   const exportSelectionBlob = (): Promise<Blob | null> => {
@@ -3027,6 +3029,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const selectionCapability: CanvasEngineSelectionCapability = {
     deselect,
+    admitSelectionErase,
     eraseSelection,
     fillSelection,
     getSelectionBounds: () => selection.bounds(),

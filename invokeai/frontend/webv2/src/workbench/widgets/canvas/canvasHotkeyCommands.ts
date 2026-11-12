@@ -3,6 +3,7 @@ import type {
   LayerUnreadable,
   CanvasDocumentContractV3,
   CanvasEngine,
+  DocumentRefusal,
   LayerStackMoveKind,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/api';
@@ -156,6 +157,8 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
   readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void;
+  /** Explains why the selected layer cannot merge down. */
+  readonly reportMergeDownRefusal: (refusal: DocumentRefusal) => void;
   readonly t: (key: string) => string;
 }
 
@@ -324,6 +327,6 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       );
     }
   } else if (commandId === 'canvas.mergeDown') {
-    mergeSelectedLayerDown(engine, document, ctx.reportLayerOperation);
+    mergeSelectedLayerDown(engine, document, ctx.reportLayerOperation, ctx.reportMergeDownRefusal);
   }
 };

@@ -1,10 +1,10 @@
 import type {
   CanvasDocumentContractV3,
   CanvasLayerEditRefusal,
+  CanvasNoTargetRefusal,
   CanvasNodeContract,
 } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
-import type { TFunction } from 'i18next';
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -16,6 +16,7 @@ import { useNotify } from '@workbench/useNotify';
 import {
   commitPreparedEdit,
   describeAdjustmentRefusal,
+  describeLayerEditRefusal,
   reportPreparedCommit,
   reportStructuralCommit,
   type CanvasPreparedEngine,
@@ -24,36 +25,19 @@ import {
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { useTranslation } from 'react-i18next';
 
-const LAYER_REFUSAL_KEYS: Record<CanvasLayerEditRefusal['status'], { message: string; title: string }> = {
-  'layer-alpha-locked': {
-    message: 'widgets.canvas.editRefusal.alphaLockedMessage',
-    title: 'widgets.canvas.editRefusal.alphaLocked',
+const NO_TARGET_KEYS: Record<CanvasNoTargetRefusal['status'], { message: string; title: string }> = {
+  'cutout-no-target': {
+    message: 'widgets.canvas.editRefusal.noCutoutTargetMessage',
+    title: 'widgets.canvas.editRefusal.noCutoutTarget',
   },
-  'layer-hidden': { message: 'widgets.canvas.editRefusal.hiddenMessage', title: 'widgets.canvas.editRefusal.hidden' },
-  'layer-loading': {
-    message: 'widgets.canvas.editRefusal.loadingMessage',
-    title: 'widgets.canvas.editRefusal.loading',
+  'erase-no-target': {
+    message: 'widgets.canvas.editRefusal.noEraseTargetMessage',
+    title: 'widgets.canvas.editRefusal.noEraseTarget',
   },
-  'layer-locked': { message: 'widgets.canvas.editRefusal.lockedMessage', title: 'widgets.canvas.editRefusal.locked' },
-};
-
-/** The notice's title and message for a layer the active tool could not edit. */
-export const describeLayerEditRefusal = (
-  refusal: CanvasLayerEditRefusal,
-  t: TFunction
-): { message: string; title: string } => {
-  const keys = LAYER_REFUSAL_KEYS[refusal.status];
-  const name = refusal.layerName;
-  return {
-    message: refusal.canPaintNewLayer
-      ? t(
-          refusal.status === 'layer-hidden'
-            ? 'widgets.canvas.editRefusal.hiddenOfferMessage'
-            : 'widgets.canvas.editRefusal.lockedOfferMessage'
-        )
-      : t(keys.message),
-    title: t(keys.title, { name }),
-  };
+  'selection-erase-no-target': {
+    message: 'widgets.canvas.editRefusal.noSelectionEraseTargetMessage',
+    title: 'widgets.canvas.editRefusal.noSelectionEraseTarget',
+  },
 };
 
 /**
@@ -98,12 +82,13 @@ const paintOnNewLayer = (
 
 /**
  * Explains edits the engine refused without a caller to report to: a stroke too large to undo, a press on a layer
- * the tool cannot edit (hidden, locked, still loading), or a shape cutout with no paint layer or mask selected. A
- * brush press on a locked or hidden image offers a new paint layer above it rather than making one unasked; that
- * offer holds a closure, so it is a toast only, closed with this canvas or the account. Layer refusals are toasts
- * only, one per layer and reason: a repeated press (every eraser press on a transparency-locked layer, say) replaces
- * its toast instead of stacking another, and taking one offer closes the other offers. A cutout with nothing to cut
- * from keeps a single toast the same way. Keyed by engine.
+ * the tool cannot edit (hidden, hidden on the canvas, locked, still loading, one the eraser cannot erase, or a mask
+ * the gradient cannot go on), or an erase or shape cutout with no layer selected. A brush press on a locked or hidden
+ * image offers a new paint layer above it rather than making one unasked; that offer holds a closure, so it is a
+ * toast only, closed with this canvas or the account. Layer refusals are toasts only, one per layer and reason: a
+ * repeated press (every eraser press on a transparency-locked layer, say) replaces its toast instead of stacking
+ * another, and taking one offer closes the other offers. An erase or cutout with nothing to act on keeps a single
+ * toast the same way. Keyed by engine.
  */
 export const CanvasEditRefusalNotices = ({
   engine,
@@ -132,21 +117,22 @@ export const CanvasEditRefusalNotices = ({
         return;
       }
       const signal = AbortSignal.any([captureAccountScope().signal, mounted.signal]);
-      if (refusal.status === 'cutout-no-target') {
+      if (!('layerId' in refusal)) {
+        const keys = NO_TARGET_KEYS[refusal.status];
         createActionToast({
           actions: [],
-          description: t('widgets.canvas.editRefusal.noCutoutTargetMessage'),
+          description: t(keys.message),
           id: `${scope}:${refusal.status}`,
           signal,
-          title: t('widgets.canvas.editRefusal.noCutoutTarget'),
+          title: t(keys.title),
           type: 'info',
         });
         return;
       }
-      const { message, title } = describeLayerEditRefusal(refusal, t);
+      const { message, offersNewLayer, title } = describeLayerEditRefusal(refusal, t);
       // One toast per layer and reason: pressing again on the same layer replaces it rather than stacking another.
       const id = `${scope}:${refusal.status}:${refusal.layerId}`;
-      if (!refusal.canPaintNewLayer) {
+      if (!offersNewLayer) {
         createActionToast({ actions: [], description: message, id, signal, title, type: 'info' });
         return;
       }

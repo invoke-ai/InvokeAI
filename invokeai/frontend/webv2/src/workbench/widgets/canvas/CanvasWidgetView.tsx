@@ -10,6 +10,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useNativeFileDrag } from '@platform/react/useNativeFileDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
+import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlotRect, getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
@@ -33,7 +34,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
+import { copyCanvasSelection, decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
   cropAllLayersToFrame,
   resolveCanvasContextMenu,
@@ -59,7 +60,12 @@ import {
 import { CanvasStagedRegionsFeed } from './CanvasStagedRegionsFeed';
 import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
-import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCommands';
+import {
+  CANVAS_COMPANION_HOTKEYS,
+  reportMergeDownRefusal,
+  reportTransformRefusal,
+  showCanvasRefusalNotice,
+} from './canvasToolCommands';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
@@ -297,15 +303,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     }
     void (async () => {
       try {
-        const blob = await mountedEngine.selection.exportSelectionBlob();
-        if (!blob) {
-          return;
-        }
-        await copyImage(blob);
-        if (cut) {
-          // Only after the write succeeds — a failed copy must not destroy pixels.
-          mountedEngine.selection.eraseSelection();
-        }
+        await copyCanvasSelection(mountedEngine.selection, cut, copyImage);
       } catch (error) {
         notifications.add({
           kind: 'error',
@@ -487,7 +485,14 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
-      reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
+      reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),
+      reportTransformRefusal: (refusal, layerId) =>
+        reportTransformRefusal(
+          refusal,
+          { id: layerId, name: getDocumentNode(document, layerId)?.name ?? '' },
+          { error: notify.error, notice: showCanvasRefusalNotice },
+          t
+        ),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
