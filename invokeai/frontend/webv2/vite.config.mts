@@ -616,6 +616,14 @@ export default defineConfig({
                 /\/node_modules\/react-i18next\/dist\/es\/Trans(?:WithoutContext)?\.js$/.test(id),
             },
             {
+              // Only the lazy command palette uses Chakra's Command parts. The `chakra` group below would pull them in
+              // through the package barrel and load them at startup.
+              includeDependenciesRecursively: false,
+              name: 'chakra-command',
+              priority: 30,
+              test: (id) => /\/node_modules\/@chakra-ui\/react\/dist\/[^/]+\/components\/command\//.test(id),
+            },
+            {
               // ~1 MB, only the lazy Image Map plot needs it.
               name: 'plotly',
               priority: 30,

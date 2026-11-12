@@ -1,8 +1,9 @@
 import type { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 
+import { createListCollection } from '@chakra-ui/react';
 import { useCallback, useMemo } from 'react';
 
-import type { PaletteEntry, PaletteRow, PaletteStage } from './entries';
+import type { NavigablePaletteRow, PaletteEntry, PaletteRow, PaletteStage } from './entries';
 import type { PaletteState } from './paletteState';
 
 import { getNavigablePaletteRows, resolveActivePaletteRow, STAGE_ENTRY_ID_PREFIX } from './entries';
@@ -11,7 +12,13 @@ import { recordRecentEntry } from './recents';
 
 const PAGE_JUMP_ROWS = 8;
 
-export type ScrollToIndex = (index: number) => void;
+const getRowText = (row: NavigablePaletteRow): string => (row.kind === 'entry' ? row.entry.title : row.label);
+
+const moveCaretToEdge = (input: HTMLInputElement, key: 'End' | 'Home') => {
+  const position = key === 'Home' ? 0 : input.value.length;
+
+  input.setSelectionRange(position, position);
+};
 
 export const usePaletteNavigation = ({
   activeRowId,
@@ -41,6 +48,15 @@ export const usePaletteNavigation = ({
   stage: PaletteStage | null;
 }) => {
   const navigableRows = useMemo(() => getNavigablePaletteRows(rows), [rows]);
+  const collection = useMemo(
+    () =>
+      createListCollection({
+        itemToString: getRowText,
+        itemToValue: (row: NavigablePaletteRow) => row.id,
+        items: navigableRows.map((candidate) => candidate.row),
+      }),
+    [navigableRows]
+  );
   const effectiveActive = useMemo(
     () => resolveActivePaletteRow(navigableRows, activeRowId),
     [activeRowId, navigableRows]
@@ -48,11 +64,7 @@ export const usePaletteNavigation = ({
   const activeRow = effectiveActive?.row;
 
   const runRow = useCallback(
-    (row: PaletteRow) => {
-      if (row.kind === 'label') {
-        return;
-      }
-
+    (row: NavigablePaletteRow) => {
       if (row.kind === 'scope') {
         enterScope(row.providerKey);
         return;
@@ -107,30 +119,43 @@ export const usePaletteNavigation = ({
     [onClose]
   );
 
-  const moveActive = useCallback(
-    (offset: number, scrollToIndex: ScrollToIndex) => {
-      if (navigableRows.length === 0) {
+  /** Enter or a click on a row runs its primary action, whatever modifiers are held. */
+  const onSelectRow = useCallback(
+    (rowId: string) => {
+      const row = navigableRows.find((candidate) => candidate.row.id === rowId)?.row;
+
+      if (row) {
+        runRow(row);
+      }
+    },
+    [navigableRows, runRow]
+  );
+
+  const onRowActive = useCallback(
+    (rowId: string) => {
+      if (rowId === effectiveActive?.row.id) {
         return;
       }
 
+      const row = rows.find((candidate) => candidate.id === rowId);
+      setPaletteState((current) => changePaletteSelection(current, rowId));
+      previewRow(row);
+    },
+    [effectiveActive, previewRow, rows, setPaletteState]
+  );
+
+  const jumpActive = useCallback(
+    (offset: number) => {
       const position = effectiveActive
         ? navigableRows.findIndex((candidate) => candidate.row.id === effectiveActive.row.id)
         : -1;
-      const nextPosition =
-        Math.abs(offset) === 1
-          ? (position + offset + navigableRows.length) % navigableRows.length
-          : Math.min(Math.max(position + offset, 0), navigableRows.length - 1);
-      const next = navigableRows[nextPosition];
+      const next = navigableRows[Math.min(Math.max(position + offset, 0), navigableRows.length - 1)];
 
-      if (!next) {
-        return;
+      if (next) {
+        onRowActive(next.row.id);
       }
-
-      setPaletteState((current) => changePaletteSelection(current, next.row.id));
-      previewRow(next.row);
-      scrollToIndex(next.index);
     },
-    [effectiveActive, navigableRows, previewRow, setPaletteState]
+    [effectiveActive, navigableRows, onRowActive]
   );
 
   const onEscape = useCallback(() => {
@@ -153,64 +178,57 @@ export const usePaletteNavigation = ({
     [onEscape]
   );
 
+  /**
+   * Keys the combobox does not own; it handles arrows, plain Enter and pointer highlight. It runs after this handler
+   * and skips prevented events, so Home/End are prevented here and move the caret by hand: the combobox would move
+   * the highlight instead. Mod+Enter is the keyboard's only way to a secondary action; a modified click stays primary.
+   */
   const onSearchKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>, scrollToIndex: ScrollToIndex) => {
-      if (event.key === 'ArrowDown') {
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      // Keys that compose IME text belong to the composition; 229 is how some engines report them.
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        return;
+      }
+
+      if (
+        event.key === 'Enter' &&
+        (event.metaKey || event.ctrlKey) &&
+        activeRow?.kind === 'entry' &&
+        activeRow.entry.secondary
+      ) {
         event.preventDefault();
-        moveActive(1, scrollToIndex);
-      } else if (event.key === 'ArrowUp') {
+        runSecondary(activeRow.entry);
+      } else if (event.key === 'PageDown' || event.key === 'PageUp') {
         event.preventDefault();
-        moveActive(-1, scrollToIndex);
-      } else if (event.key === 'PageDown') {
+        jumpActive(event.key === 'PageDown' ? PAGE_JUMP_ROWS : -PAGE_JUMP_ROWS);
+      } else if (
+        (event.key === 'Home' || event.key === 'End') &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey
+      ) {
         event.preventDefault();
-        moveActive(PAGE_JUMP_ROWS, scrollToIndex);
-      } else if (event.key === 'PageUp') {
-        event.preventDefault();
-        moveActive(-PAGE_JUMP_ROWS, scrollToIndex);
+        moveCaretToEdge(event.currentTarget, event.key);
       } else if (event.key === 'Tab' && activeRow?.kind === 'scope') {
         event.preventDefault();
         enterScope(activeRow.providerKey);
       } else if (event.key === 'Backspace' && query.length === 0 && (stage || scopeProviderKey)) {
         event.preventDefault();
         popOverlay();
-      } else if (event.key === 'Enter') {
-        event.preventDefault();
-
-        if (!activeRow) {
-          return;
-        }
-
-        if ((event.metaKey || event.ctrlKey) && activeRow.kind === 'entry' && activeRow.entry.secondary) {
-          runSecondary(activeRow.entry);
-          return;
-        }
-
-        runRow(activeRow);
       }
     },
-    [activeRow, enterScope, moveActive, popOverlay, query.length, runRow, runSecondary, scopeProviderKey, stage]
-  );
-
-  const onRowActive = useCallback(
-    (rowId: string) => {
-      if (rowId === effectiveActive?.row.id) {
-        return;
-      }
-
-      const row = rows.find((candidate) => candidate.id === rowId);
-      setPaletteState((current) => changePaletteSelection(current, rowId));
-      previewRow(row);
-    },
-    [effectiveActive, previewRow, rows, setPaletteState]
+    [activeRow, enterScope, jumpActive, popOverlay, query.length, runSecondary, scopeProviderKey, stage]
   );
 
   return {
     activeRow,
     activeRowId: effectiveActive?.row.id ?? null,
+    collection,
     onContentKeyDown,
     onRowActive,
-    onRowRun: runRow,
     onSearchKeyDown,
+    onSelectRow,
     secondaryHint: activeRow?.kind === 'entry' ? activeRow.entry.secondary?.label : undefined,
   };
 };
