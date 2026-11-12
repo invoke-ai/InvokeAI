@@ -540,6 +540,7 @@ export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',
+  uberllm: 'uberllm_image_generation',
 };
 
 export const getExternalProviderNodeType = (providerId: unknown): string | null =>

@@ -3,5 +3,13 @@ from invokeai.app.services.external_generation.providers.atlascloud import Atlas
 from invokeai.app.services.external_generation.providers.gemini import GeminiProvider
 from invokeai.app.services.external_generation.providers.openai import OpenAIProvider
 from invokeai.app.services.external_generation.providers.seedream import SeedreamProvider
+from invokeai.app.services.external_generation.providers.uberllm import UberLLMProvider
 
-__all__ = ["AlibabaCloudProvider", "AtlasCloudProvider", "GeminiProvider", "OpenAIProvider", "SeedreamProvider"]
+__all__ = [
+    "AlibabaCloudProvider",
+    "AtlasCloudProvider",
+    "GeminiProvider",
+    "OpenAIProvider",
+    "SeedreamProvider",
+    "UberLLMProvider",
+]

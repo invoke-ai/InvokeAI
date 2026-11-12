@@ -28,6 +28,7 @@ const EXTERNAL_PROVIDER_NODE_TYPES = {
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',
+  uberllm: 'uberllm_image_generation',
 } as const;
 
 export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
