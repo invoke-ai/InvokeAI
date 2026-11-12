@@ -204,6 +204,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/generation/ui/promptFields/promptAttentionHotkeys.ts',
   '/platform/ui/ResizeHandle.tsx',
   '/platform/ui/SeedInput.tsx',
+  // The Generate form (editor boot) and the lazy quick-settings popovers share the scrubber; alone it costs a boot
+  // request.
+  '/platform/ui/ScrubberField.tsx',
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
