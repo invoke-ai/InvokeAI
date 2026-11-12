@@ -25,7 +25,14 @@ import {
   tooltipSlotRecipe,
 } from './recipes';
 import { CONTROL_HEIGHT_PX } from './scale';
-import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
+import {
+  DEFAULT_THEME,
+  DEFAULT_THEME_ID,
+  type NeutralStep,
+  SYSTEM_COLORS,
+  THEMES,
+  type ThemeDefinition,
+} from './themes';
 
 /**
  * Emit theme-varying ramps as semantic tokens; map component tokens and Chakra gray onto them. Root data-theme
@@ -44,7 +51,13 @@ type Compute = (theme: ThemeDefinition) => string;
 const colorToken = (compute: Compute): TokenValue => {
   const value: Record<string, string> = { base: compute(DEFAULT_THEME) };
   for (const theme of NON_DEFAULT_THEMES) {
-    value[`_${conditionName(theme.id)}`] = compute(theme);
+    if (theme.id === 'system') {
+      const light = compute({ ...theme, colorScheme: 'light' });
+      const dark = compute({ ...theme, colorScheme: 'dark' });
+      value._themeSystem = light === dark ? light : `light-dark(${light}, ${dark})`;
+    } else {
+      value[`_${conditionName(theme.id)}`] = compute(theme);
+    }
   }
   return { value };
 };
@@ -75,6 +88,14 @@ const stepRef = (darkStep: NeutralStep, lightStep: NeutralStep): TokenValue =>
 const withHighContrast = (token: TokenValue, darkStep: NeutralStep, lightStep: NeutralStep): TokenValue => {
   token.value._highContrastDark = ref(darkStep);
   token.value._highContrastLight = ref(lightStep);
+  token.value._highContrastSystem = `var(--invokeai-desktop-foreground, light-dark(${ref(lightStep)}, ${ref(darkStep)}))`;
+  return token;
+};
+
+/** Normal System lines blend over their actual surface; high-contrast keeps its solid outline. */
+const systemBorder = (token: TokenValue, lightPct: number, darkPct: number): TokenValue => {
+  const blend = (pct: number) => `color-mix(in oklab, ${SYSTEM_COLORS.foreground} ${pct}%, transparent)`;
+  token.value._themeSystem = `light-dark(${blend(lightPct)}, ${blend(darkPct)})`;
   return token;
 };
 
@@ -88,9 +109,13 @@ const contrastStepRef = (
 
 const STEPS: NeutralStep[] = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 
-/** The default panel surface of a theme — `bg.subtle`'s step. Used as the floor for tints. */
+/** Tint floor: browser Canvas for System, otherwise the theme's default panel surface (`bg.subtle`). */
 const surface: Compute = (theme) =>
-  theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
+  theme.id === 'system'
+    ? SYSTEM_COLORS.background
+    : theme.colorScheme === 'light'
+      ? theme.colors.neutral[50]
+      : theme.colors.neutral[900];
 
 // Seed accessors.
 const danger: Compute = (theme) => theme.colors.danger;
@@ -100,9 +125,11 @@ const brandSolid: Compute = (theme) => theme.colors.brand.solid;
 
 /** Darken brand.fg on light themes for contrast; keep bright brand.solid paired with brand.contrast. */
 const brandFg: Compute = (theme) =>
-  theme.colorScheme === 'light'
-    ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
-    : theme.colors.brand.solid;
+  theme.id === 'system'
+    ? SYSTEM_COLORS.accentForeground
+    : theme.colorScheme === 'light'
+      ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
+      : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
 /** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
 const hoverTint: Compute = (theme) =>
@@ -148,6 +175,12 @@ const categoricalPalettes = Object.fromEntries(
   })
 );
 
+// Desktop foregrounds need not span black-to-white; lifting them along a neutral ramp can lose text contrast.
+const mutedForeground = contrastStepRef(300, 700, 200, 800);
+mutedForeground.value._themeSystem = `var(--invokeai-desktop-foreground, ${mutedForeground.value._themeSystem})`;
+const subtleForeground = contrastStepRef(400, 500, 300, 700);
+subtleForeground.value._themeSystem = `var(--invokeai-desktop-foreground, ${subtleForeground.value._themeSystem})`;
+
 /**
  * Reuse Chakra token names so built-ins inherit themes; ramp references and explicit seeds form the semantic
  * contract.
@@ -157,10 +190,24 @@ const semanticColors = {
   neutral: neutralRamp,
 
   // Light panels are brighter than the app background, not a reversed dark ladder.
-  bg: stepRef(950, 200),
-  'bg.subtle': stepRef(900, 50),
-  'bg.muted': stepRef(800, 100),
-  'bg.panel': stepRef(800, 100),
+  bg: colorToken((theme) =>
+    theme.id === 'system' ? SYSTEM_COLORS.background : ref(theme.colorScheme === 'light' ? 200 : 950)
+  ),
+  'bg.subtle': colorToken((theme) =>
+    theme.id === 'system'
+      ? `var(--invokeai-desktop-background, ${ref(theme.colorScheme === 'light' ? 50 : 900)})`
+      : ref(theme.colorScheme === 'light' ? 50 : 900)
+  ),
+  'bg.muted': colorToken((theme) =>
+    theme.id === 'system'
+      ? `var(--invokeai-desktop-surface, ${ref(theme.colorScheme === 'light' ? 100 : 800)})`
+      : ref(theme.colorScheme === 'light' ? 100 : 800)
+  ),
+  'bg.panel': colorToken((theme) =>
+    theme.id === 'system'
+      ? `var(--invokeai-desktop-surface, ${ref(theme.colorScheme === 'light' ? 100 : 800)})`
+      : ref(theme.colorScheme === 'light' ? 100 : 800)
+  ),
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
   /**
@@ -176,18 +223,18 @@ const semanticColors = {
 
   // High contrast raises muted text toward fg while preserving its lower emphasis.
   fg: stepRef(50, 950),
-  'fg.muted': contrastStepRef(300, 700, 200, 800),
-  'fg.subtle': contrastStepRef(400, 500, 300, 700),
+  'fg.muted': mutedForeground,
+  'fg.subtle': subtleForeground,
   'fg.grid': colorToken((theme) => theme.colors.grid),
   'fg.error': colorToken(danger),
   'fg.success': colorToken(success),
   'fg.warning': colorToken(warning),
 
   // Borders.
-  border: contrastStepRef(600, 300, 300, 500),
-  'border.subtle': contrastStepRef(600, 300, 300, 500),
-  'border.muted': contrastStepRef(600, 300, 300, 500),
-  'border.emphasized': contrastStepRef(500, 400, 200, 600),
+  border: systemBorder(contrastStepRef(600, 300, 300, 500), 10, 18),
+  'border.subtle': systemBorder(contrastStepRef(600, 300, 300, 500), 10, 18),
+  'border.muted': systemBorder(contrastStepRef(600, 300, 300, 500), 10, 18),
+  'border.emphasized': systemBorder(contrastStepRef(500, 400, 200, 600), 18, 28),
   'border.error': colorToken(danger),
   'border.image': colorToken((theme) => (theme.colorScheme === 'light' ? 'oklch(0 0 0 / 0.1)' : 'oklch(1 0 0 / 0.1)')),
 
@@ -209,10 +256,14 @@ const semanticColors = {
     ),
     solid: grayToken((theme) => (theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50])),
     focusRing: grayToken(accentSolid),
-    border: withHighContrast(
-      grayToken((theme) => (theme.colorScheme === 'light' ? theme.colors.neutral[400] : theme.colors.neutral[500])),
-      300,
-      600
+    border: systemBorder(
+      withHighContrast(
+        grayToken((theme) => (theme.colorScheme === 'light' ? theme.colors.neutral[400] : theme.colors.neutral[500])),
+        300,
+        600
+      ),
+      10,
+      18
     ),
     /** Mix foreground toward accent for low-alpha interaction fills. */
     hoverTint: grayToken(hoverTint),
@@ -238,7 +289,7 @@ const semanticColors = {
   accent: {
     solid: colorToken(accentSolid),
     contrast: colorToken((theme) => theme.colors.accent.contrast),
-    fg: colorToken(accentSolid),
+    fg: colorToken((theme) => (theme.id === 'system' ? SYSTEM_COLORS.accentForeground : accentSolid(theme))),
     subtle: mix(accentSolid, 16, surface),
     muted: mix(accentSolid, 26, surface),
     emphasized: mix(accentSolid, 36, surface),
@@ -257,9 +308,32 @@ const lightThemeSelectors = THEMES.filter((theme) => theme.colorScheme === 'ligh
   .map((theme) => `[data-theme=${theme.id}]`)
   .join(', ');
 const highContrastConditions = {
-  highContrastDark: `:root[data-high-contrast=true]:not(${lightThemeSelectors})`,
+  highContrastDark: `:root[data-high-contrast=true]:not(${lightThemeSelectors}, [data-theme=system])`,
   highContrastLight: `:root[data-high-contrast=true]:is(${lightThemeSelectors})`,
+  highContrastSystem: ':root[data-high-contrast=true][data-theme=system]',
 };
+
+// Chakra's stock hue palettes use class-based modes. System has no fixed mode class, so project their
+// existing light/dark token values onto the same native color scheme as our workbench tokens.
+const systemStockColors = Object.fromEntries(
+  Object.entries(baseConfig.theme?.semanticTokens?.colors ?? {}).map(([palette, definitions]) => [
+    palette,
+    Object.fromEntries(
+      Object.entries(definitions).flatMap(([name, token]) => {
+        const value = token.value as Record<string, string> | undefined;
+        if (!value?._light || !value._dark) {
+          return [];
+        }
+        // These stock fills need black text; a tinted desktop foreground does not provide their contrast.
+        const color =
+          name === 'contrast' && (palette === 'green' || palette === 'orange')
+            ? 'black'
+            : `light-dark(${value._light}, ${value._dark})`;
+        return [[name, { value: { _themeSystem: color } }]];
+      })
+    ),
+  ])
+);
 
 const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
@@ -313,6 +387,13 @@ const config = defineConfig({
     },
     ':root[data-pointer-drag] iframe': {
       pointerEvents: 'none',
+    },
+    html: {
+      '--wb-system-light': `light-dark(${SYSTEM_COLORS.background}, ${SYSTEM_COLORS.foreground})`,
+      '--wb-system-dark': `light-dark(${SYSTEM_COLORS.foreground}, ${SYSTEM_COLORS.background})`,
+    },
+    ':root[data-theme=system], [data-system-theme-preview]': {
+      colorScheme: 'var(--invokeai-desktop-color-scheme, light dark) !important',
     },
     ':root': {
       '--wb-motion-duration-fast': '0.12s',
@@ -428,7 +509,7 @@ const config = defineConfig({
   },
 });
 
-export const system = createSystem(baseConfig, config);
+export const system = createSystem(baseConfig, { theme: { semanticTokens: { colors: systemStockColors } } }, config);
 
 /** Theme metadata re-exported so UI can import a single module. */
 export { THEMES, THEMES_BY_ID, DEFAULT_THEME, DEFAULT_THEME_ID, previewSwatches } from './themes';
