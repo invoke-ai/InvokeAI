@@ -105,9 +105,9 @@ const brandFg: Compute = (theme) =>
     ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
     : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
-/** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
+/** Foreground leaned toward accent by the theme's `interactionTint`: the colour interaction fills apply at low alpha. */
 const hoverTint: Compute = (theme) =>
-  `color-mix(in oklab, ${theme.colors.accent.solid} 55%, ${
+  `color-mix(in oklab, ${theme.colors.accent.solid} ${theme.interactionTint}%, ${
     theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
   })`;
 
@@ -165,7 +165,7 @@ const semanticColors = {
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
   /**
-   * The pointed or highlighted fill for rows, tabs, and options: a faint accent-tinted foreground, translucent so it
+   * The pointed or highlighted fill for rows, tabs, and options: a faint foreground leaned toward the accent, translucent so it
    * reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its
    * highlighted option share one fill.
    */
