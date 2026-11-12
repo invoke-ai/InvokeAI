@@ -360,14 +360,20 @@ describe('getLayerContextActions', () => {
     expect(Boolean(action)).toBe(expected);
   });
 
+  it.each(['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'exposes transform for %s layers',
+    (type) => {
+      const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
+      expect(action).toBeDefined();
+    }
+  );
+
   it.each([
-    ['raster', true],
-    ['control', true],
-    ['inpaint_mask', false],
-    ['regional_guidance', false],
-  ] as const)('exposes transform only for engine-supported %s layers', (type, expected) => {
-    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
-    expect(Boolean(action)).toBe(expected);
+    ['an empty mask', makeLayer('inpaint_mask'), { hasSupportedContent: false }],
+    ['a disabled mask', { ...makeLayer('inpaint_mask'), isEnabled: false }, {}],
+  ] as const)('disables transform for %s, which has nothing to transform', (_, layer, state) => {
+    const action = getLayerContextActions(makeState(layer, state)).find((item) => item.id === 'transform');
+    expect(action?.isDisabled).toBe(true);
   });
 
   it.each([

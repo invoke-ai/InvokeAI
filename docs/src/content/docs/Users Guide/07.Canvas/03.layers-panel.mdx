@@ -95,7 +95,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Remove from group** — for a layer inside a group: moves it out, directly above the group. With several layers selected, it appears when they are all in the same group, and moves them together in their current order. The emptied group stays.
   * **Delete layer**.
 * **Raster layers:**
-  * **Transform** (**Shift+T**) — shows the transform handles at once. It works on enabled raster and control layers with content.
+  * **Transform** (**Shift+T**) — shows the transform handles at once. It works on any enabled layer with content: raster and control layers, inpaint masks and regional guidance.
   * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert, Texture, Clarity, Dehaze or Noise. Adjustments are non-destructive and appear as child rows. Texture, Clarity and Dehaze change detail and contrast; Noise adds film grain.
   * **Add regenerate region** — regenerates where the layer has content, as a live inpaint mask: everything on the layer marks the area to regenerate, and it follows the layer as you keep editing it. The menu sums this up under the item as "Inpaint where this layer has content."
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
@@ -103,8 +103,8 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
   * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting a layer with adjustments to a control layer, or using it as one, bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
 * **Control layers:** **Transform**, **Select object**, **Run workflow**, **Enable transparent preview**, **Convert to raster layer**, and **Hide on canvas only**. A control layer's map comes from its **Detection** row in Properties, so it has no **Filter**.
-* **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas only**.
-* **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide on canvas only**.
+* **Inpaint masks:** **Transform**, **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas only**.
+* **Regional guidance:** **Transform**, **Enable auto-negative**, **Add reference image**, and **Hide on canvas only**.
 
 When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added. It covers everywhere any of the masks did, at full strength whatever each mask's opacity, and takes the topmost mask's fill color and style. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content, whose noise and denoise limit settings match, since the new mask applies one setting to all of its area. When the item is unavailable, highlighting it shows why. One undo brings the original masks back.
 

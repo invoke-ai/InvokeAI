@@ -126,12 +126,12 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
-      items: ['rename', 'fit-to-bbox', 'add-noise', 'add-denoise-limit', 'extract-masked-area'],
+      items: ['transform', 'rename', 'fit-to-bbox', 'add-noise', 'add-denoise-limit', 'extract-masked-area'],
       presentation: 'list',
     });
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
-      items: ['rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
+      items: ['transform', 'rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
       presentation: 'list',
     });
   });

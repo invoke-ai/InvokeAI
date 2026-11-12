@@ -528,7 +528,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
     order: 10,
     section: 'primary',
-    supportedLayerTypes: ['raster', 'control'],
+    supportedLayerTypes: ['raster', 'control', 'inpaint_mask', 'regional_guidance'],
   },
   {
     defaultLabel: 'Rename',
