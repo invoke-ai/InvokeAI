@@ -156,7 +156,7 @@ const PreviewImageFrame = ({
   });
   const { contentRefCallback, stageRefCallback } = loupe;
   const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
-  const isDragDisabled = !dragItem || isLive || loupe.isZoomed;
+  const isDragDisabled = !dragItem || isLive || loupe.isPannable;
   const disabledDragId = useId();
   const dragId = dragItem
     ? getGalleryItemDragId(dragItem, 'preview-frame')
@@ -176,7 +176,7 @@ const PreviewImageFrame = ({
     displayedSourceToken,
     dragId,
     enabled: isSwipeEnabled,
-    isZoomed: loupe.isZoomed,
+    isZoomed: loupe.isPannable,
     navigation: swipeNavigation ?? null,
   });
   const { contentTrackRef, onPointerDown: handleSwipePointerDown, stageRefCallback: swipeStageRefCallback } = swipe;
@@ -358,7 +358,7 @@ const PreviewImageFrame = ({
   return (
     <PreviewStage
       ref={setStageRef}
-      cursor={loupe.isZoomed ? 'grab' : undefined}
+      cursor={loupe.isPannable ? 'grab' : undefined}
       fill="flex"
       padding={padding}
       paddingBottom={paddingBottom}
