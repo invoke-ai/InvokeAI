@@ -50,6 +50,7 @@ describe('NodeContextMenu', () => {
               onCopy={vi.fn()}
               onDelete={vi.fn()}
               onDuplicate={vi.fn()}
+              onFitSelection={vi.fn()}
               onPaste={vi.fn()}
               onToggleOpen={vi.fn()}
               onUpdate={onUpdate}
@@ -84,6 +85,7 @@ describe('NodeContextMenu', () => {
     expect(hint('delete')).toBe('workflows.deleteSelection');
     expect(hint('duplicate')).toBe('workflows.duplicateSelection');
     expect(hint('toggle-open')).toBeNull();
+    expect(hint('fit-selection')).toBeNull();
   });
 
   it('offers both pastes on empty canvas, disabled with an empty clipboard, anchored where the menu opened', async () => {
@@ -101,6 +103,7 @@ describe('NodeContextMenu', () => {
                 onCopy={vi.fn()}
                 onDelete={vi.fn()}
                 onDuplicate={vi.fn()}
+                onFitSelection={vi.fn()}
                 onPaste={onPaste}
                 onToggleOpen={vi.fn()}
                 onUpdate={vi.fn()}
@@ -112,6 +115,7 @@ describe('NodeContextMenu', () => {
     const item = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`)!;
 
     await renderPane(false);
+    expect(item('fit-selection')).toBeNull();
     expect(item('paste').getAttribute('aria-disabled')).toBe('true');
     expect(item('paste-with-connections').getAttribute('aria-disabled')).toBe('true');
 

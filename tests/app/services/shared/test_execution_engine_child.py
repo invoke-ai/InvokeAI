@@ -72,15 +72,27 @@ def test_dependency_creation_does_not_leak_capacity_on_invalid_child() -> None:
     assert capability.remaining_capacity == 2
 
 
-def test_continue_policy_reports_terminal_failure_after_all_children_finish() -> None:
-    dependency = _capability(failure_policy="continue").create_dependency(["first", "second"])
+@pytest.mark.parametrize(
+    ("terminal_method", "expected_status"),
+    [("fail_child", "failed"), ("cancel_child", "canceled")],
+)
+def test_a_terminal_child_report_ends_the_dependency_before_siblings_finish(
+    terminal_method: str, expected_status: ChildTerminalStatus
+) -> None:
+    dependency = _capability().create_dependency(["first", "second", "third"], dependency_id="dependency")
+    report = getattr(dependency, terminal_method)
 
-    dependency.fail_child("first", "first failed")
-    update = dependency.complete_child("second", {"value": 2})
+    update = report("second", "child reported")
+    later = dependency.complete_child("third", {"value": 3})
+    duplicate = report("second", "child reported")
 
-    assert update.status == "failed"
-    assert update.terminal
-    assert dependency.error_message == "first failed"
+    assert update.status == expected_status
+    assert update.terminal is True
+    assert dependency.error_message == "child reported"
+    assert later.changed is False
+    assert later.status == expected_status
+    assert duplicate.changed is False
+    assert duplicate.terminal is True
 
 
 def test_dependency_rejects_duplicate_prebuilt_children() -> None:
@@ -132,22 +144,6 @@ def test_dependency_is_idempotent_and_rejects_conflicting_or_foreign_completion(
 
     with pytest.raises(ValueError, match="does not belong"):
         dependency.complete_child("other", {"value": 2})
-
-
-def test_failure_cancels_siblings_and_notifies_parent_once() -> None:
-    capability = _capability(failure_policy="cancel_siblings")
-    dependency = capability.create_dependency(["first", "second", "third"], dependency_id="dependency")
-
-    update = dependency.fail_child("second", "child failed")
-
-    assert update.status == "failed"
-    assert update.parent_action == "failed"
-    assert update.cancel_child_ids == ["first", "third"]
-    assert update.terminal is True
-
-    duplicate = dependency.fail_child("second", "child failed")
-    assert duplicate.changed is False
-    assert duplicate.terminal is True
 
 
 def test_child_records_are_json_safe_and_round_trip() -> None:

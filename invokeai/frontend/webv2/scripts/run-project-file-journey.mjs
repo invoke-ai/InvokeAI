@@ -8,6 +8,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
+import { observeBrowserDiagnostics, waitForRenderedMedia, withBrowserNavigation } from './browser-validation.mjs';
 import {
   collectCanvasLeaves,
   MOCK_BACKEND_PROFILE_COUNTS,
@@ -79,36 +80,23 @@ const waitForPreview = async (getPreviewExit) => {
   throw new Error(`Vite preview did not become ready at ${origin}.`);
 };
 
-const observeBrowserErrors = (page, phase, errors) => {
-  page.on('pageerror', (error) => {
-    errors.push(new Error(`${phase} page error: ${error.stack ?? error.message}`));
-  });
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      const location = message.location();
-
-      // The HTTP-only mock has no Socket.IO; ignore only its expected transport 404.
-      if (
-        location.url.includes('/ws/socket.io/') &&
-        message.text().includes('the server responded with a status of 404')
-      ) {
-        return;
-      }
-
-      // Import probes archived video names; this 404 triggers restoration.
-      if (
+export const observeBrowserErrors = async (page, phase, errors) => {
+  await observeBrowserDiagnostics(page, {
+    onError: (event) => errors.push(new Error(`${phase}: ${JSON.stringify(event)}`)),
+    expected: (event) => {
+      // Import probes an archived video DTO before restoring its binary under a new identity.
+      return (
         phase.endsWith('import') &&
-        location.url &&
-        new URL(location.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
-        message.text().includes('the server responded with a status of 404')
-      ) {
-        return;
-      }
-
-      const where = location.url ? ` (${location.url}:${String(location.lineNumber)})` : '';
-
-      errors.push(new Error(`${phase} console error${where}: ${message.text()}`));
-    }
+        event.url &&
+        new URL(event.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
+        (event.status === 404 ||
+          (event.kind === 'console' && /404/.test(event.message)) ||
+          // The existence probe explicitly cancels an unread missing-response body before restoring the archive.
+          (event.kind === 'requestfailed' &&
+            [403, 404].includes(event.responseStatus) &&
+            /^(?:net::)?ERR_ABORTED$/.test(event.message)))
+      );
+    },
   });
 };
 
@@ -280,7 +268,7 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, phase, errors);
+  await observeBrowserErrors(page, phase, errors);
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
 
@@ -290,6 +278,7 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
   await (await chooserPromise).setFiles(archivePath);
   await page.waitForURL(/#\/app$/);
   await page.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
+  await waitForRenderedMedia(page);
 
   return { context, page };
 };
@@ -309,7 +298,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   contexts.add(exportContext);
   const exportPage = await exportContext.newPage();
 
-  observeBrowserErrors(exportPage, 'export', errors);
+  await observeBrowserErrors(exportPage, 'export', errors);
   await exportPage.goto(`${origin}${sourceProjectPath}`, { waitUntil: 'domcontentloaded' });
   await exportPage.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
 
@@ -528,7 +517,7 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'duplicate', errors);
+  await observeBrowserErrors(page, 'duplicate', errors);
   // Enter through Home so authentication settles before opening the library.
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
@@ -624,7 +613,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'workflow-collection', errors);
+  await observeBrowserErrors(page, 'workflow-collection', errors);
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await page.goto(`${origin}/#/app?project=${encodeURIComponent(projectId)}`, { waitUntil: 'domcontentloaded' });
@@ -741,7 +730,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(record.workspace.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
 
   // Restart: both workflows and the active selection come back from the server.
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Workflow', 'Workflow');
   assert.equal(await currentWorkflowName(), 'Journey Saved');
@@ -801,7 +790,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   const context = await browser.newContext();
   contexts.add(context);
   const page = await context.newPage();
-  observeBrowserErrors(page, 'unload recovery', errors);
+  await observeBrowserErrors(page, 'unload recovery', errors);
   const main = page.getByRole('main', { exact: true, name: imported.name });
   const workflowName = page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
   const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
@@ -824,7 +813,9 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   const holdProjectSaves = (route) => (route.request().method() === 'PUT' ? new Promise(() => {}) : route.fallback());
   await page.route('**/api/v1/projects/**', holdProjectSaves);
   await rename('Unload navigate');
-  await page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () =>
+    page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' })
+  );
   assert.equal(await isRecoverable(page, 'Unload navigate'), true, 'browser recovery holds the rename after unload');
   await page.unroute('**/api/v1/projects/**', holdProjectSaves);
   await openEditor();
@@ -832,7 +823,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
 
   // Reloading the editor.
   await rename('Unload reload');
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await main.waitFor();
   assert.equal(await currentWorkflowName(), 'Unload reload');
 
@@ -844,7 +835,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
   await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
   await page.waitForURL(/#\/$/);
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await openEditor();
   assert.equal(await currentWorkflowName(), 'Unload home');
@@ -968,7 +959,7 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
   const requests = [];
 
   page.on('request', (request) => requests.push({ method: request.method(), url: request.url() }));
-  observeBrowserErrors(page, 'second origin', errors);
+  await observeBrowserErrors(page, 'second origin', errors);
   await page.goto(`${secondOrigin}/#/app?project=${encodeURIComponent(imported.project_id)}`, {
     waitUntil: 'domcontentloaded',
   });
@@ -1035,7 +1026,7 @@ const runPlainHttp = async ({ browser, contexts, errors }) => {
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'plain HTTP', errors);
+  await observeBrowserErrors(page, 'plain HTTP', errors);
   await page.goto(`${plainHttpOrigin}/#/projects`, { waitUntil: 'domcontentloaded' });
   assert.equal(await page.evaluate(() => window.isSecureContext), false);
 
@@ -1065,7 +1056,7 @@ const runPlainHttp = async ({ browser, contexts, errors }) => {
   // Dismissed, the notice stays dismissed on this origin.
   await notice.getByRole('button', { exact: true, name: 'Dismiss' }).click();
   await notice.waitFor({ state: 'detached' });
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page
     .getByRole('link', { exact: true, name: `Open ${sourceProjectName}` })
     .first()
