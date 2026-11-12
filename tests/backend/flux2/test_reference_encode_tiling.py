@@ -6,6 +6,7 @@ shared VAE's tiling settings survive the call.
 """
 
 from contextlib import contextmanager
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -26,6 +27,10 @@ class _LoadedVae:
 
     def __init__(self, vae: AutoencoderKLFlux2):
         self.model = vae
+
+    @property
+    def compute_device(self) -> torch.device:
+        return torch.device("cpu")
 
     @contextmanager
     def model_on_device(self, *, working_memory: WorkingMemoryEstimate):
@@ -79,6 +84,30 @@ def test_flux2_keeps_its_tiled_encode(vae, image, expected) -> None:
     assert torch.allclose(_encode(vae, image), expected["tiled"], atol=1e-5)
 
 
+@pytest.mark.parametrize("tiling", ["always", "if_attention_materializes"])
+def test_reference_encode_uses_the_vae_compute_device(vae, image, monkeypatch: pytest.MonkeyPatch, tiling: str) -> None:
+    image = image.resize((64, 64))
+    pixels = (T.ToTensor()(image) * 2.0 - 1.0).unsqueeze(0)
+    cpu = torch.device("cpu")
+    tiled = tiling == "always" or ref_image_extension.flux2_vae_attention_materializes(pixels, vae, cpu)
+    expected = _direct_encode(vae, image, tiled=tiled)
+    estimate = Mock(wraps=ref_image_extension.estimate_vae_working_memory_flux2)
+    attention = Mock(wraps=ref_image_extension.flux2_vae_attention_materializes)
+    monkeypatch.setattr(ref_image_extension, "estimate_vae_working_memory_flux2", estimate)
+    monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", attention)
+    monkeypatch.setattr(ref_image_extension.TorchDevice, "choose_torch_device", lambda: torch.device("cuda"))
+
+    latents = _encode(vae, image, tiling=tiling)
+
+    assert latents.device == cpu
+    assert latents.dtype == torch.float32
+    assert torch.isfinite(latents).all()
+    assert torch.allclose(latents, expected, atol=1e-5)
+    assert estimate.call_args.kwargs["device"] == cpu
+    if tiling == "if_attention_materializes":
+        assert attention.call_args.args[2] == cpu
+
+
 @pytest.mark.parametrize(("materializes", "kind"), [(False, "untiled"), (True, "tiled")])
 def test_the_conditional_mode_tiles_only_where_attention_would_materialize(
     vae, image, expected, monkeypatch: pytest.MonkeyPatch, materializes: bool, kind: str
@@ -98,6 +127,20 @@ def test_the_shared_vae_keeps_its_own_tiling_settings(vae, image, monkeypatch: p
     _encode(vae, image, tiling="if_attention_materializes")
     _encode(vae, image)
 
+    assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
+
+
+def test_the_shared_vae_keeps_its_tiling_settings_after_encode_failure(
+    vae, image, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+    error = RuntimeError("encode failed")
+    monkeypatch.setattr(vae, "encode", Mock(side_effect=error))
+
+    with pytest.raises(RuntimeError, match="encode failed") as exc_info:
+        _encode(vae, image.resize((64, 64)))
+
+    assert exc_info.value is error
     assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
 
 
