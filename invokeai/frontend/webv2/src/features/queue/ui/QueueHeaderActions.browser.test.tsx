@@ -157,7 +157,7 @@ describe('QueueHeaderActions', () => {
     const trigger = (await render())!;
 
     expect(host.querySelectorAll('button')).toHaveLength(1);
-    expect(trigger.getAttribute('aria-label')).toBe('widgets.queue.cache.title');
+    expect(trigger.textContent).toBe('widgets.queue.cache.title');
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
 
     await act(() => userEvent.click(trigger));
