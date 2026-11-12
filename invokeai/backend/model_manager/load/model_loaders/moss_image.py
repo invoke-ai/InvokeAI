@@ -29,7 +29,6 @@ from typing import Any, Mapping, Optional
 import accelerate
 import torch
 from safetensors import safe_open
-from safetensors.torch import load_file
 
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
@@ -45,7 +44,12 @@ from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import lo
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.moss_image.checkpoint_layout import drop_comfy_attention_config, split_fused_qkv
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    cast_state_dict,
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+    safetensors_backend,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -153,9 +157,9 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
     sd: dict[str, torch.Tensor] = {}
     for path, keys in moss_image_component_shards(directory).items():
         if keys is None:
-            sd.update(load_file(path))
+            sd.update(load_safetensors_checkpoint(path))
             continue
-        with safe_open(path, framework="pt", device="cpu") as f:
+        with safe_open(path, framework="pt", device="cpu", backend=safetensors_backend(path)) as f:
             for key in keys:
                 sd[key] = f.get_tensor(key)
     return sd
@@ -296,7 +300,7 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
                 "Select a standalone Qwen3.5 9B encoder and FLUX.2 VAE on the MOSS-Image model loader."
             )
         model_path = Path(config.path)
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         sd = split_fused_qkv(sd)
         return self._load_transformer(

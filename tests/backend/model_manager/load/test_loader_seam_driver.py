@@ -135,3 +135,36 @@ def test_a_seam_installs_no_stub_it_did_not_ask_for(monkeypatch: pytest.MonkeyPa
     # `read_safetensors_metadata` is left alone unless a test names it, so that a seam can be driven
     # against a real header.
     assert not hasattr(_stubbed, "read_safetensors_metadata")
+
+
+#: A loader module that reads through the shared helper and holds no ``load_file`` of its own.
+_helper_module = SimpleNamespace(load_safetensors_checkpoint=lambda _path: {}, widen=_widen)
+
+
+class _ReadsThroughTheHelper:
+    def _load_from_singlefile(self, _config):
+        state_dict = _helper_module.load_safetensors_checkpoint("ignored")
+        self._ram_cache.make_room(1)
+        _helper_module.widen(state_dict)
+        return torch.nn.Module()
+
+
+def test_a_module_with_the_shared_helper_is_served_through_the_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The helper is patched when the module has it, and no `load_file` is invented for a module without one:
+    patching that name would fail loudly, which is what keeps a wrong host from passing quietly."""
+    run = prepare(Seam(loader=_ReadsThroughTheHelper, module=_helper_module), monkeypatch, state_dict=PACKED)
+
+    run.load(None)
+
+    assert SEEN == [{"lin.weight": torch.float8_e4m3fn}]
+    assert run.dtypes_at_make_room == {"lin.weight": torch.float8_e4m3fn}
+    assert not hasattr(_helper_module, "load_file")
+
+
+def test_a_seam_declaring_a_raw_read_patches_that_host_as_well(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw_host = SimpleNamespace(load_file=lambda _path: {})
+    seam = Seam(loader=_ReadsThroughTheHelper, module=_helper_module, load_file_host=raw_host)
+
+    prepare(seam, monkeypatch, state_dict=PACKED)
+
+    assert raw_host.load_file("ignored") == PACKED

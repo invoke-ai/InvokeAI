@@ -348,3 +348,37 @@ def test_a_scaled_fp8_layer_is_refused_before_room_is_reserved(tmp_path: Path, l
     with pytest.raises(ValueError, match="quantization side channel"):
         load_qwen3_5_text_encoder(loader, [path], _config(), final_norm=True, keep_fp8=False, what="test")
     loader._ram_cache.make_room.assert_not_called()
+
+
+def test_a_shard_with_float8_weights_is_read_into_owned_storage_and_a_plain_shard_stays_mapped(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Anima-3.8B's encoder ships raw fp8: a view kept through the widening would pin its whole shard."""
+    weights = _reference(final_norm=False).state_dict()
+    fp8_keys = {key for key in weights if key.startswith("layers.0.") and key.endswith("proj.weight")}
+    assert fp8_keys
+    keys = sorted(weights)
+    first, second = keys[: len(keys) // 2], keys[len(keys) // 2 :]
+    fp8_shard, plain_shard = (
+        tmp_path / "model-00001-of-00002.safetensors",
+        tmp_path / "model-00002-of-00002.safetensors",
+    )
+    save_file({k: weights[k].to(torch.float8_e4m3fn) if k in fp8_keys else weights[k] for k in first}, fp8_shard)
+    save_file({k: weights[k] for k in second if k not in fp8_keys}, plain_shard)
+    assert fp8_keys <= set(first)
+
+    backends: dict[Path, str] = {}
+    real_safe_open = loader_module.safe_open
+
+    def recording_safe_open(path, **kwargs):
+        if "backend" in kwargs:
+            backends[Path(path)] = kwargs["backend"]
+        return real_safe_open(path, **kwargs)
+
+    monkeypatch.setattr(loader_module, "safe_open", recording_safe_open)
+
+    load_qwen3_5_text_encoder(
+        loader, [fp8_shard, plain_shard], _config(), final_norm=False, keep_fp8=False, what="test"
+    )
+
+    assert backends == {fp8_shard: "pread", plain_shard: "mmap"}

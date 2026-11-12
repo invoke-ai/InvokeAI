@@ -162,9 +162,11 @@ def read_qwen3vl_visual_tower_tensors(files: Iterable[Path]) -> dict[str, torch.
     """
     from safetensors import safe_open
 
+    from invokeai.backend.quantization.fp8_scaled import safetensors_backend
+
     tensors: dict[str, torch.Tensor] = {}
     for path in files:
-        with safe_open(str(path), framework="pt", device="cpu") as handle:
+        with safe_open(str(path), framework="pt", device="cpu", backend=safetensors_backend(path)) as handle:
             for key in handle.keys():
                 if is_qwen3vl_visual_key(key):
                     tensors[key] = handle.get_tensor(key)

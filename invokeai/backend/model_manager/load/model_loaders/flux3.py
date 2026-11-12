@@ -51,6 +51,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
@@ -130,7 +131,11 @@ def flux3_transformer_from_native(
     """
     log = logger or _logger
     make_room = reserve or _reserve_nothing
-    sd = CheckpointPrefix.detect(sd).strip(sd)
+    stripped = CheckpointPrefix.detect(sd).strip(sd)
+    if stripped is not sd:
+        # The caller still holds `sd`; emptied, it cannot keep the sources alive through the cast.
+        sd.clear()
+    sd = stripped
     header_layers = flux3_header_layers(metadata, sd)
     markers = {
         key[: -len(COMFY_QUANT_SUFFIX)]: parse_comfy_quant_marker(value)
@@ -274,12 +279,10 @@ class Flux3CheckpointModel(ModelLoader):
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A single-file FLUX.3 model holds only the transformer.")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         model = flux3_transformer_from_native(
-            load_file(model_path),
+            load_safetensors_checkpoint(model_path),
             model_dtype,
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),

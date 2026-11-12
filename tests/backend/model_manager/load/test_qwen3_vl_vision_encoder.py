@@ -422,3 +422,21 @@ def test_a_loaded_tower_lent_to_a_towerless_encoder_matches_the_intact_model(tmp
     assert len(actual) == len(expected)
     for index, (got, want) in enumerate(zip(actual, expected, strict=True)):
         assert torch.equal(got, want), f"hidden state {index} differs"
+
+
+def test_a_float8_files_visual_tower_does_not_pin_the_file(tmp_path):
+    """The tower of a scaled-fp8 build is bf16 beside fp8 language weights, and as views it would keep the whole
+    file mapped for as long as the tower lives."""
+    path = tmp_path / "qwen3vl_fp8.safetensors"
+    tower = {"model.visual.blocks.0.norm1.weight": torch.arange(65, dtype=torch.float32).to(torch.bfloat16)}
+    save_file(
+        {**tower, "model.language_model.layers.0.mlp.weight": torch.ones(256, 256).to(torch.float8_e4m3fn)},
+        str(path),
+        metadata={"format": "pt"},
+    )
+
+    tensors = read_qwen3vl_visual_tower_tensors([path])
+
+    assert list(tensors) == list(tower)
+    path.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
+    assert tensors["model.visual.blocks.0.norm1.weight"].tolist() == list(range(65))

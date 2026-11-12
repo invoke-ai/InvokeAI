@@ -111,6 +111,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     full_precision_hints_respected,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -409,7 +410,7 @@ class CLIPSingleFileLoader(ModelLoader):
         )
 
     def _load_text_encoder(self, config: CLIPEmbed_Checkpoint_Config_Base) -> AnyModel:
-        sd = load_file(Path(config.path))
+        sd = load_safetensors_checkpoint(Path(config.path))
         text_config = clip_text_config(config.variant)
         model: CLIPTextModel | CLIPTextModelWithProjection
         with accelerate.init_empty_weights():
@@ -738,7 +739,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
         model_path = Path(config.path)
         keep_fp8, model_dtype = self._storage_format(config, submodel_type)
 
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         # ComfyUI writes the token embedding twice, as `shared` and as the encoder's `embed_tokens`, which the
         # model ties to one parameter. Dropping the copy before anything is cast or reserved saves its size; a file
         # with only the encoder's copy has it renamed, with any scale beside it.
@@ -850,7 +851,7 @@ class FluxCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = Flux(get_flux_transformers_params(config.variant))
 
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
             sd = convert_bundle_to_flux_transformer_checkpoint(sd)
 
@@ -1247,7 +1248,7 @@ class Flux2CheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         # Load state dict
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
 
         # The `match` above admits only the transformer, so that is the submodel the cast will be
         # asked about too -- keep and cast therefore decide on the same input.
@@ -1278,6 +1279,8 @@ class Flux2CheckpointModel(ModelLoader):
             # -- including the three a fused `qkv` becomes, which each inherit the fused layer's
             # per-tensor scale and marker.
             converted_sd = convert_flux2_bfl_to_diffusers(sd, module_map=flux2_modules)
+            # The conversion built a new dict; the source would keep every source tensor alive through the widening.
+            sd.clear()
             int8_markers = extract_int8_convrot_markers(converted_sd)
             # The header is the other place a repack declares its scheme, and for FLUX.2 that is
             # not hypothetical: Comfy-Org's own fp8 build of this model carries *no* per-layer
@@ -1314,6 +1317,8 @@ class Flux2CheckpointModel(ModelLoader):
             # asked by name cannot see that a fused qkv whose rows are not divisible by three is
             # left unsplit, and would fan a hint onto three modules that do not exist.
             converted_sd = convert_flux2_bfl_to_diffusers(sd, module_map=flux2_modules)
+            # The conversion built a new dict; the source would keep every source tensor alive through the widening.
+            sd.clear()
 
             layer_hints = {
                 renamed: hints for name, hints in layer_hints.items() for renamed in (flux2_modules.get(name) or [name])

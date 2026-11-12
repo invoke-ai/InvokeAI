@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import torch
+from diffusers.models.modeling_utils import ModelMixin
 
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
@@ -49,7 +50,9 @@ from invokeai.backend.model_manager.util.llamacpp_t5 import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
+    iter_weight_scale_pairs,
     parse_quantization_metadata,
+    predict_cast_state_dict_size,
     read_safetensors_metadata,
     strip_layer_path_prefix,
 )
@@ -105,6 +108,10 @@ class WanDiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
+        # The weights are fp32 on disk and `_keep_in_fp32_modules` leaves some of them fp32, so those
+        # tensors would stay views into the mmap and each would pin its whole fp32 shard.
+        mmap_kwarg = {"disable_mmap": True} if issubclass(load_class, ModelMixin) else {}
+
         def _load_with_variant_fallback(dtype_kwarg: dict[str, torch.dtype]) -> AnyModel:
             # Some Wan repos ship without a fp16 variant suffix on every submodel.
             # If the requested variant isn't on disk, fall back to the default weights.
@@ -112,12 +119,13 @@ class WanDiffusersModel(GenericDiffusersLoader):
                 return load_class.from_pretrained(
                     model_path,
                     **dtype_kwarg,
+                    **mmap_kwarg,
                     variant=variant,
                     local_files_only=True,
                 )
             except OSError as e:
                 if variant and "no file named" in str(e):
-                    return load_class.from_pretrained(model_path, **dtype_kwarg, local_files_only=True)
+                    return load_class.from_pretrained(model_path, **dtype_kwarg, **mmap_kwarg, local_files_only=True)
                 raise
 
         # bfloat16 across the board: matches Diffusers WanPipeline reference and
@@ -427,6 +435,18 @@ class WanGGUFCheckpointModel(ModelLoader):
         return model
 
 
+def _predict_folded_cast_size(sd: dict, dtype: torch.dtype) -> int:
+    """Bytes the state dict occupies once the scale fold and the cast to ``dtype`` have run.
+
+    The fold consumes and strips the scale tensors, and it widens every weight that has a sibling
+    scale to ``dtype`` whatever its stored dtype, so those are charged at ``dtype`` too.
+    """
+    kept = {k: v for k, v in sd.items() if not is_scale_metadata_key(k)}
+    folded = {weight_key for weight_key, _ in iter_weight_scale_pairs(sd)}
+    total = predict_cast_state_dict_size({k: v for k, v in kept.items() if k not in folded}, dtype, keep_fp8=False)
+    return total + sum(kept[k].nelement() * dtype.itemsize for k in folded)
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class WanCheckpointModel(ModelLoader):
     """Loader for single-file Wan 2.2 transformer checkpoints (safetensors).
@@ -473,7 +493,9 @@ class WanCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(str(model_path))
+        # pread rather than mmap: with mmap every tensor is a slice of one file-wide mapping, so the
+        # source stays mapped through the fold and the cast until the last tensor is replaced.
+        sd = load_file(str(model_path), backend="pread")
         sd = CheckpointPrefix.detect(sd).strip(sd)
         _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
 
@@ -490,13 +512,17 @@ class WanCheckpointModel(ModelLoader):
         if int8_markers:
             sd = drop_unconsumed_quantization_sidecars(sd)
         else:
+            # Reserve before the fold and the cast widen anything. (The int8 branch reserves inside
+            # `install_int8_convrot_layers`, before its split.)
+            self._ram_cache.make_room(_predict_folded_cast_size(sd, model_dtype))
+
             dequantized = _dequantize_comfyui_fp8(sd, model_dtype, f"Wan checkpoint {model_path.name}")
             if dequantized > 0:
                 logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
             # Drop the scale tensors themselves — they've been folded into the weights
             # above and are not parameters of WanTransformer3DModel. load_state_dict
             # runs with strict=False and would ignore them anyway, but dropping them
-            # here keeps the dtype cast and the RAM-cache reservation below honest.
+            # keeps the dtype cast from widening them.
             _strip_quantization_metadata(sd)
 
         # Community releases ship the native upstream Wan key layout
@@ -538,13 +564,10 @@ class WanCheckpointModel(ModelLoader):
         else:
             # Cast every float tensor to the compute dtype. Dequantized fp8_scaled
             # weights are already there; this catches plain fp16/fp32/fp8 checkpoints
-            # and makes the cache reservation below reflect the post-cast sizes.
+            # and leaves the state the reservation above was sized for.
             for key in list(sd.keys()):
                 if sd[key].is_floating_point():
                     sd[key] = sd[key].to(model_dtype)
-
-            new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
-            self._ram_cache.make_room(new_sd_size)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")

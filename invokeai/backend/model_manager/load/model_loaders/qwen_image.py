@@ -40,6 +40,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     should_keep_fp8_weights,
@@ -282,7 +283,6 @@ class QwenImageCheckpointModel(ModelLoader):
 
     def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import QwenImageTransformer2DModel
-        from safetensors.torch import load_file
 
         from invokeai.backend.util.logging import InvokeAILogger
 
@@ -295,7 +295,7 @@ class QwenImageCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # Earlier versions identified InstantX's Qwen-Image ControlNet, a trimmed copy of this transformer, as a main
         # model. Such a record still exists; the file only needs identifying again.
@@ -490,7 +490,6 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
         from invokeai.backend.util.logging import InvokeAILogger
@@ -502,7 +501,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
 
         # Comfy's nvfp4 build keeps the language model's projections in nvfp4, beside scaled fp8 embeddings. Take those
         # layers out before the fold: `_dequantize_comfyui_fp8` multiplies every `.weight_scale` into its weight,

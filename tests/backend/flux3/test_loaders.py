@@ -36,15 +36,12 @@ def _variant(flow_map: bool) -> Flux3VariantType:
 @FLOW_MAP
 @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."], ids=["bfl", "comfy-prefixed"])
 def test_a_single_file_loads_as_the_model_it_was_written_from(monkeypatch, flow_map: bool, prefix: str) -> None:
-    import safetensors.torch
-
     reference = tiny_flux3_model(flow_map)
     native = {prefix + name: value for name, value in to_native(reference).items()}
     seam = Seam(
         loader=Flux3CheckpointModel,
         module=flux3_loaders,
         entry="_load_model",
-        load_file_host=safetensors.torch,
         patches_device=True,
     )
     run = prepare(seam, monkeypatch, state_dict=native, metadata=None)

@@ -12,9 +12,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import safetensors.torch
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.load.model_loaders import wan as wan_loader
 from invokeai.backend.model_manager.load.model_loaders.wan import (
     _WAN_NATIVE_TO_DIFFUSERS_RENAMES,
     WanCheckpointModel,
@@ -378,6 +380,73 @@ class TestSubmodelGuard:
     def test_wrong_config_class_is_rejected(self) -> None:
         with pytest.raises(TypeError, match="Main_Checkpoint_Wan_Config"):
             _make_loader()._load_model(MagicMock(), SubModelType.Transformer)
+
+
+class TestReservationAndReadBackend:
+    """The cache is asked for the post-cast size before the fold or the cast widens anything, and the
+    file is read without a file-wide mmap that would stay mapped through both."""
+
+    @staticmethod
+    def _load_recording(path: Path) -> tuple[list[int], list[set[torch.dtype]], list[str]]:
+        reserved: list[int] = []
+        dtypes_at_fold: list[set[torch.dtype]] = []
+        backends: list[str] = []
+        real_fold = wan_loader._dequantize_comfyui_fp8
+        real_load_file = safetensors.torch.load_file
+
+        def fold(sd, *args, **kwargs):
+            dtypes_at_fold.append({t.dtype for t in sd.values()})
+            assert reserved, "the fold ran before the cache was asked for room"
+            return real_fold(sd, *args, **kwargs)
+
+        def load_file(filename, *args, **kwargs):
+            backends.append(kwargs.get("backend"))
+            return real_load_file(filename, *args, **kwargs)
+
+        config = MagicMock()
+        config.path = str(path)
+        loader = _make_loader()
+        loader._ram_cache.make_room.side_effect = reserved.append
+        with (
+            patch.object(wan_loader, "_dequantize_comfyui_fp8", fold),
+            patch.object(safetensors.torch, "load_file", load_file),
+            patch.object(wan_loader.TorchDevice, "choose_torch_device"),
+            patch.object(wan_loader.TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16),
+        ):
+            model = loader._load_from_singlefile(config)
+        assert all(p.dtype == torch.bfloat16 for p in model.state_dict().values())
+        return reserved, dtypes_at_fold, backends
+
+    def test_fp16_file_reserves_its_bf16_size_before_the_cast(self, tmp_path: Path) -> None:
+        reference = _tiny_model()
+        path = tmp_path / "wan2.2-t2v-a14b-high_noise.safetensors"
+        sd = {k: v.half() for k, v in reference.state_dict().items()}
+        # Bundled components the loader drops first; reserving for them would inflate the number.
+        sd["vae.decoder.weight"] = torch.zeros(64, 64, dtype=torch.float16)
+        sd["text_encoders.umt5.weight"] = torch.zeros(64, 64, dtype=torch.float16)
+        save_file(sd, path)
+
+        reserved, dtypes_at_fold, backends = self._load_recording(path)
+
+        assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
+        assert dtypes_at_fold == [{torch.float16}]
+        assert backends == ["pread"]
+
+    def test_scaled_fp8_file_reserves_the_folded_size_not_the_scales(self, tmp_path: Path) -> None:
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+        target = "blocks.0.attn1.to_q.weight"
+        sd[target] = torch.full_like(sd[target], 0.5).to(torch.float8_e4m3fn)
+        sd["blocks.0.attn1.to_q.scale_weight"] = torch.full((128,), 4.0)
+        sd["blocks.0.attn1.to_q.scale_input"] = torch.tensor([1.0])
+        sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
+        path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
+        save_file(sd, path)
+
+        reserved, dtypes_at_fold, _ = self._load_recording(path)
+
+        assert reserved == [sum(v.numel() for v in reference.state_dict().values()) * 2]
+        assert torch.float8_e4m3fn in dtypes_at_fold[0]
 
 
 # --- ComfyUI int8_tensorwise (convrot) -------------------------------------------------------------------------

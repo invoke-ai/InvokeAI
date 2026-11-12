@@ -75,6 +75,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     full_precision_hints_respected,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
@@ -1147,14 +1148,12 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_text_encoder(self, config: MistralEncoder_Checkpoint_Config) -> AnyModel:
-        from safetensors.torch import load_file
-
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         model_path = Path(config.path)
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         sd = _strip_known_prefixes(sd)
 
         # Comfy-Org's Ministral 3B file ships the full multimodal stack: a Pixtral vision tower and

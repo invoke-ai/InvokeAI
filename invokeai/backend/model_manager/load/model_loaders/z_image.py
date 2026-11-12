@@ -55,6 +55,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     full_precision_hints_respected,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -484,7 +485,6 @@ class ZImageCheckpointModel(ModelLoader):
         config: AnyModelConfig,
     ) -> AnyModel:
         from diffusers import ZImageTransformer2DModel
-        from safetensors.torch import load_file
 
         if not isinstance(config, Main_Checkpoint_ZImage_Config):
             raise TypeError(
@@ -494,7 +494,7 @@ class ZImageCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         # Load the state dict from safetensors/checkpoint file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
 
         # Some Z-Image checkpoint files have keys prefixed with "diffusion_model." or
         # "model.diffusion_model." (ComfyUI-style format). Check if we need to strip this prefix.
@@ -1113,7 +1113,6 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
         from invokeai.backend.util.logging import InvokeAILogger
@@ -1132,7 +1131,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the state dict from safetensors file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         original_key_count = len(sd)
 
         # Three ComfyUI side channels reach this loader and a file carries one of them. int8 is

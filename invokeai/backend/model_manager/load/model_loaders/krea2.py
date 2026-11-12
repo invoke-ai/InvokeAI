@@ -57,6 +57,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
@@ -540,7 +541,6 @@ class Krea2CheckpointModel(ModelLoader):
 
     def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import Krea2Transformer2DModel
-        from safetensors.torch import load_file
 
         if not isinstance(config, Main_Checkpoint_Krea2_Config):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
@@ -549,7 +549,7 @@ class Krea2CheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         metadata = read_safetensors_metadata(model_path, self._logger)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # Discard what the key conversion below would discard anyway, before anything is spent on
@@ -1081,14 +1081,13 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
 
     def _load_text_encoder(self, config: Qwen3VLEncoder_Checkpoint_Config) -> AnyModel:
         import torch
-        from safetensors.torch import load_file
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
         # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
         # reserved for. (The file *header* is still read below for quantization metadata, which can
         # therefore still name visual layers; those hints match no surviving key and are ignored.)
