@@ -1,8 +1,10 @@
 """Building a transformers ``T5EncoderModel`` from a bare state dict.
 
-Shared by the single-file T5 loaders (GGUF and ComfyUI-style safetensors): neither format ships a
-``config.json``, so the architecture is read from tensor shapes, and both need the feed-forward
-workaround below because their ``wo`` weights may not be in the compute dtype.
+Neither single-file T5 format ships a ``config.json``, so the GGUF and the ComfyUI-style safetensors
+loaders both read the architecture from tensor shapes with ``infer_t5_encoder_config``. The
+feed-forward workaround below serves the safetensors loader, whose ``wo`` may be kept in float8; GGUF
+loaders use ``make_feed_forward_gguf_safe`` from ``model_manager/util/llamacpp_t5.py``, which also
+handles a ``GGMLTensor`` reporting a float storage dtype.
 """
 
 import types

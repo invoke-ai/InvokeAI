@@ -49,6 +49,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
     has_cosmos_dit_peft_keys_strict,
 )
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import (
+    has_ernie_image_markers,
+    is_ernie_image_lora,
+    split_ernie_image_lora_key,
+)
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
     describe_refusal,
     has_flux3_lora_keys,
@@ -57,6 +62,12 @@ from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
     read_flux3_lora_keys,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
+    has_ideogram4_lora_keys,
+    ideogram4_lora_refusal,
+    patches_ideogram4_width,
+    split_ideogram4_lora_key,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
@@ -814,6 +825,16 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         )
 
         state_dict = mod.load_state_dict()
+
+        # ERNIE-Image keeps its transformer blocks under `layers.N` as well, so the prefixes below admit its
+        # LoRAs too; its block names (`self_attention`, `mlp.linear_fc2`) are what tell the two apart.
+        if has_ernie_image_markers([k for k in state_dict.keys() if isinstance(k, str)]):
+            raise NotAMatchError("model looks like an ERNIE-Image LoRA, not a Z-Image LoRA")
+        # Ideogram 4 names its blocks like Z-Image (`layers.N.attention`, `feed_forward.w1..3`), so the prefixes
+        # below admit its LoRAs too; its widths (4608, not 3840) are what tell the two apart. Checked on the widths
+        # alone, so an Ideogram 4 file that Ideogram 4's probe does not recognise is not taken for Z-Image either.
+        if patches_ideogram4_width(state_dict):
+            raise NotAMatchError("model patches Ideogram 4 widths, not a Z-Image LoRA")
 
         # Check for Kohya format first
         if is_state_dict_likely_z_image_kohya_lora(state_dict):
@@ -1729,6 +1750,80 @@ class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like an LTX-2 LoRA")
 
 
+class LoRA_LyCORIS_ErnieImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for ERNIE-Image LoRA models (single file; PEFT, kohya-style or LyCORIS tensors).
+
+    ERNIE-Image LoRAs name the transformer's own modules behind a container prefix. `layers.N.self_attention.*` and
+    `layers.N.mlp.linear_fc2` exist in no other supported transformer, which is what makes the match exclusive;
+    `mlp.gate_proj` / `up_proj` are shared with LLM layers and only count once those identified the file. See
+    `ernie_image_lora_constants`.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        # Imported here: the layer classes the conversion builds import the model manager's loader package.
+        from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+            ernie_image_lora_defect,
+        )
+
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+        if not is_ernie_image_lora(str_keys):
+            raise NotAMatchError("model does not match ERNIE-Image LoRA heuristics")
+        # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
+        if not any(split_ernie_image_lora_key(k) is not None for k in str_keys):
+            raise NotAMatchError("model has ERNIE-Image module names but no LoRA tensors")
+        refusal = ernie_image_lora_defect(state_dict)
+        if refusal is not None:
+            # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the
+            # install instead.
+            raise InvalidMatchError(f"ERNIE-Image LoRA cannot be applied: {refusal}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        str_keys = [k for k in mod.load_state_dict().keys() if isinstance(k, str)]
+        if is_ernie_image_lora(str_keys):
+            return BaseModelType.ErnieImage
+        raise NotAMatchError("model does not look like an ERNIE-Image LoRA")
+
+
+def _raise_unless_ideogram4_lora(state_dict: dict[str | int, Any]) -> None:
+    """`NotAMatchError` for a file that is no Ideogram 4 LoRA; `InvalidMatchError` for one that would fail, or silently
+    do less, once a generation applies it."""
+    if not has_ideogram4_lora_keys(state_dict):
+        raise NotAMatchError("model does not match Ideogram 4 LoRA heuristics")
+    # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
+    if not any(isinstance(k, str) and split_ideogram4_lora_key(k) is not None for k in state_dict):
+        raise NotAMatchError("model has Ideogram 4 module names but no LoRA tensors")
+    refusal = ideogram4_lora_refusal(state_dict)
+    if refusal is not None:
+        raise InvalidMatchError(f"Ideogram 4 LoRA cannot be applied: {refusal}")
+
+
+class LoRA_LyCORIS_Ideogram4_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Ideogram 4 LoRA models (single file; PEFT, kohya-style or LoKR tensors).
+
+    Ideogram 4 LoRAs name the vendored transformer's modules (fused `attention.qkv`, `attention.o`,
+    `feed_forward.w1..3`, `adaln_modulation`) or diffusers' split ones behind a container prefix. Z-Image uses the
+    same block names, so the match also needs a patched weight at one of Ideogram 4's widths; see
+    `ideogram4_lora_constants`.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        _raise_unless_ideogram4_lora(mod.load_state_dict())
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if has_ideogram4_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Ideogram4
+        raise NotAMatchError("model does not look like an Ideogram 4 LoRA")
+
+
 class LoRA_LyCORIS_SD3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for SD 3 / 3.5 LoRA files: diffusers / ai-toolkit, PEFT, SimpleTuner LyCORIS and kohya MMDiT.
 
@@ -1953,6 +2048,21 @@ class LoRA_Diffusers_Flux3_Config(LoRA_Diffusers_Config_Base, Config_Base):
         raise_for_override_fields(cls, override_fields)
         path_to_weight_file = cls._get_weight_file_or_raise(mod)
         _raise_unless_flux3_lora(mod.load_state_dict(path_to_weight_file), mod.metadata(path_to_weight_file))
+        return cls(**override_fields)
+
+
+class LoRA_Diffusers_Ideogram4_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for an Ideogram 4 LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a
+    repository-id install of a diffusers trainer's output leaves it. The file is held to what
+    `LoRA_LyCORIS_Ideogram4_Config` holds a single file to."""
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        _raise_unless_ideogram4_lora(mod.load_state_dict(cls._get_weight_file_or_raise(mod)))
         return cls(**override_fields)
 
 

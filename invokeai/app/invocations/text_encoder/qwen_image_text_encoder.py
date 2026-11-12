@@ -408,7 +408,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         from transformers import Qwen2_5_VLForConditionalGeneration
 
         text_encoder_info = context.models.load(self.qwen_vl_encoder.text_encoder)
-        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
+        # An nvfp4, int8 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
         # cover. The cache holds back the larger of this and its default working memory, not their sum. Read from the
         # unlocked model, before the lock; zero for every other build.
         dequant_bytes = peak_dequant_transient_bytes(
@@ -491,8 +491,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
         model_root = context.models.get_absolute_path(encoder_config)
         if model_root.is_file():
-            # Single-file checkpoint (e.g. ComfyUI fp8_scaled or nvfp4): BnB can't load from a single file. Fall back
-            # to the cached path, which folds fp8 layers to bf16 and keeps nvfp4 layers packed.
+            # Single-file checkpoint (e.g. ComfyUI fp8_scaled, nvfp4 or int8): BnB can't load from a single file. Fall
+            # back to the cached path, which folds fp8 layers to bf16 and keeps nvfp4 and int8 layers packed.
             return self._load_cached_encoder(context)
         encoder_path = model_root / "text_encoder"
 
