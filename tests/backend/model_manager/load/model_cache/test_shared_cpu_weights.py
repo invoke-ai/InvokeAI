@@ -12,6 +12,27 @@ def _state_dict() -> dict[str, torch.Tensor]:
     }
 
 
+def test_admission_pin_survives_peer_release_and_invalidation():
+    store = SharedCpuWeightsStore()
+    canonical = store.acquire("k", _state_dict())
+    adopted = {name: tensor.detach() for name, tensor in canonical.items()}
+    pinned = store.acquire_matching("k", adopted, 420)
+    assert pinned is canonical
+
+    peer = threading.Thread(target=store.release, args=("k", canonical))
+    peer.start()
+    peer.join(timeout=10)
+    assert not peer.is_alive()
+    assert store.refcount("k") == 1
+    assert store.total_bytes_in_use() == 420
+
+    assert store.invalidate("k") == 1
+    assert store.retired_bytes() == 420
+    store.release("k", pinned)
+    assert store.total_bytes_in_use() == 0
+    assert store.acquire_matching("k", adopted, 420) is None
+
+
 def test_first_acquire_registers_and_returns_same_object():
     store = SharedCpuWeightsStore()
     sd = _state_dict()

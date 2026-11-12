@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.tensor_aliases import analyze_state_dict
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import analyze_state_dict, storage_key
 
 
 @dataclass
@@ -109,6 +109,23 @@ class SharedCpuWeightsStore:
             self._drain_deferred_locked()
             entry = self._entries.get(key)
             return entry.state_dict if entry is not None else None
+
+    def acquire_matching(
+        self, key: str, state_dict: dict[str, torch.Tensor], total_bytes: int
+    ) -> dict[str, torch.Tensor] | None:
+        """Pin an already-counted entry only when the entire model aliases its canonical tensors."""
+        with self._lock:
+            self._drain_deferred_locked()
+            entry = self._entries.get(key)
+            if entry is None or entry.total_bytes != total_bytes or entry.state_dict.keys() != state_dict.keys():
+                return None
+            if any(
+                tensor.device.type != "cpu" or storage_key(tensor) != storage_key(entry.state_dict[name])
+                for name, tensor in state_dict.items()
+            ):
+                return None
+            entry.refcount += 1
+            return entry.state_dict
 
     def set_shell(self, key: str, shell: object) -> None:
         """Register the empty (meta-weight) structural clone for `key`, if an entry exists and none
