@@ -42,18 +42,28 @@ type Props = {
 };
 
 /**
- * A section reads as a segment tab over its fields: the title is a chip with the `SegmentTabs` values (filled while
- * its section shows, muted while it is folded). The fields sit bare on the panel at the chip's inset, so the bordered
- * fields never nest in a second box, and a full-bleed hairline starts each section. Hairlines mean "section" only;
- * groups inside one use spacing and labels.
+ * An open section reads as one card: a title bar, dimmer than the panel, over a lighter tray holding the fields, the
+ * two a hair apart. A folded section is its title row alone, and hairlines separate the folded rows; the hairlines
+ * either side of an open or pointed section hide, since its card or hover fill already bounds it. The title bar
+ * spans the row, so its summary and badges sit inside it.
  */
+const POINTED = ':has(> [data-part="trigger"]:hover)';
 const SECTION_STYLES = {
   '&:last-child': { borderBottomWidth: '1px' },
+  // An open section is a card of its own (title bar over tray), and a pointed title fills its row as a list row
+  // does, so the hairlines either side of either go.
+  [`&:is([data-state="open"], ${POINTED}), .generate-section:is([data-state="open"], ${POINTED}) + &`]: {
+    borderTopColor: 'transparent',
+  },
+  [`&:last-child:is([data-state="open"], ${POINTED})`]: { borderBottomColor: 'transparent' },
   // Anything brought into view inside the fields (a focused control, a revealed issue) stops below the pinned title
   // rather than under it: the title's height plus a little air.
-  '& > [data-part="content"] *': { scrollMarginTop: 'calc(var(--chakra-sizes-7) + var(--chakra-spacing-7))' },
+  '& > [data-part="content"] *': { scrollMarginTop: 'calc(var(--chakra-sizes-9) + var(--chakra-spacing-7))' },
 } as const;
-const CHIP_SHOWN_BG = 'gray.hoverTint/15';
+// Dimmer than the panel while its section shows; the fields' tray below is the lighter surface.
+const CHIP_SHOWN_BG = 'color-mix(in oklab, {colors.bg} 50%, {colors.bg.subtle})';
+const SEAM_RADIUS = '2px';
+const TRAY_BG = 'bg.muted';
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 /**
  * The fields grow in by a fixed few pixels while the content opens, and back as it folds, on the recipe's duration
@@ -61,6 +71,9 @@ const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
  * leaves fields unpainted when one element does both that and a composited transform animation.
  */
 const FIELDS_STYLES = {
+  // Controls that back themselves with the surface they sit on (a row's weight, a reference image's fields) take
+  // the tray's here, not the widget's.
+  '--wb-field-surface': '{colors.bg.muted}',
   transformOrigin: 'top',
   '[data-part="content"][data-state="open"] > &': {
     animationDuration: 'moderate',
@@ -73,10 +86,12 @@ const FIELDS_STYLES = {
   },
 } as const;
 const TRIGGER_STYLES = {
-  '&[data-state="open"]': { color: 'fg' },
-  '&[data-state="open"] > [data-section-chip]': { bg: CHIP_SHOWN_BG },
+  // The open title bar nearly touches its tray, and both square off the corners that face the seam.
+  '&[data-state="open"]': { color: 'fg', pb: '2px' },
+  '&[data-state="open"] > [data-section-chip]': { bg: CHIP_SHOWN_BG, borderBottomRadius: SEAM_RADIUS },
+  // Pointed, the title takes the tray's surface, open or folded.
+  '&:hover > [data-section-chip]': { bg: TRAY_BG },
   '&:not([data-state="open"]):hover': { color: 'fg' },
-  '&:not([data-state="open"]):hover > [data-section-chip]': { bg: 'bg.hover' },
   // A section with issues says so on its chip, open or folded.
   '& > [data-section-chip][data-issues]': { bg: 'bg.error', color: 'fg.error' },
   '&:hover > [data-section-chip][data-issues]': { bg: 'red.hoverTint/20' },
@@ -88,7 +103,12 @@ const TRIGGER_STYLES = {
     outlineOffset: '-2px',
   },
   // Summaries say what a folded section holds; an open one shows its fields instead.
-  '&[data-state="open"] [data-section-summary]': { opacity: 0, visibility: 'hidden' },
+  // They leave downward, toward the fields that open in their place.
+  '&[data-state="open"] [data-section-summary]': {
+    opacity: 0,
+    transform: 'translateY(4px)',
+    visibility: 'hidden',
+  },
   // A hairline under the title only while it is pinned over the fields scrolling beneath it. Chromium resolves the
   // scroll-state query; elsewhere the title pins without the edge.
   containerType: 'scroll-state',
@@ -252,6 +272,7 @@ export const GenerateCollapsibleSection = ({
       css={SECTION_STYLES}
       data-generate-section={sectionId}
       borderTopWidth="1px"
+      transition="border-color var(--wb-motion-duration-medium)"
       open={isOpen}
       onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}
     >
@@ -262,11 +283,10 @@ export const GenerateCollapsibleSection = ({
         display="flex"
         gap={2}
         w="full"
-        // The chip sits the same distance from the hairlines above and below (when folded) as from the panel's edge.
-        pb="1.5"
-        ps="1.5"
-        pe={2}
-        pt="1.5"
+        // A pixel of air either side, so the hairline between two folded titles has the same room above and below.
+        pb="1px"
+        px="0.5"
+        pt="1px"
         alignItems="center"
         color="fg.muted"
         position="sticky"
@@ -276,97 +296,108 @@ export const GenerateCollapsibleSection = ({
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
       >
-        <Text
+        <Flex
           as="span"
+          alignItems="center"
           data-issues={issueCount > 0 ? '' : undefined}
           data-section-chip=""
-          display="inline-flex"
-          alignItems="center"
-          flexShrink={0}
-          fontSize="md"
-          fontWeight="medium"
-          gap="1"
-          h="7"
-          maxW="full"
+          gap={2}
+          h="9"
           minW="0"
           // Less on the chevron's side: its glyph is narrower than its box.
-          pe="2.5"
+          pe="2"
           ps="1.5"
           rounded="control"
           transition="background var(--wb-motion-duration-fast), color var(--wb-motion-duration-fast)"
+          w="full"
         >
-          <Collapsible.Indicator
-            _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}
+          <Text
+            as="span"
+            display="inline-flex"
+            alignItems="center"
             flexShrink={0}
-            transition="transform var(--wb-motion-duration-slow)"
+            fontSize="md"
+            fontWeight="medium"
+            gap="1"
+            maxW="full"
+            minW="0"
           >
-            <ChevronRightIcon size="14" />
-          </Collapsible.Indicator>
-          <Text as="span" truncate>
-            {label}
-          </Text>
-          {isChanged ? (
-            <Box as="span" bg="accent.solid" boxSize="1.5" data-section-changed="" flexShrink={0} rounded="full">
-              <Text as="span" srOnly>
-                {t('widgets.generate.sectionChanged')}
-              </Text>
-            </Box>
-          ) : null}
-          {/* A closed section never hides why Invoke is blocked. */}
-          {issueCount > 0 ? (
-            <Text
-              as="span"
-              alignItems="center"
-              data-section-issues=""
-              display="inline-flex"
+            <Collapsible.Indicator
+              _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}
               flexShrink={0}
-              fontVariantNumeric="tabular-nums"
-              gap="0.5"
-              ms="0.5"
+              transition="transform var(--wb-motion-duration-slow)"
             >
-              <Icon as={CircleAlertIcon} aria-hidden boxSize="3" />
-              <span aria-hidden>{issueCount}</span>
-              <Text as="span" srOnly>
-                {t('widgets.generate.issueCount', { count: issueCount })}
+              <ChevronRightIcon size="14" />
+            </Collapsible.Indicator>
+            <Text as="span" truncate>
+              {label}
+            </Text>
+            {isChanged ? (
+              <Box as="span" bg="accent.solid" boxSize="1.5" data-section-changed="" flexShrink={0} rounded="full">
+                <Text as="span" srOnly>
+                  {t('widgets.generate.sectionChanged')}
+                </Text>
+              </Box>
+            ) : null}
+            {/* A closed section never hides why Invoke is blocked. */}
+            {issueCount > 0 ? (
+              <Text
+                as="span"
+                alignItems="center"
+                data-section-issues=""
+                display="inline-flex"
+                flexShrink={0}
+                fontVariantNumeric="tabular-nums"
+                gap="0.5"
+                ms="0.5"
+              >
+                <Icon as={CircleAlertIcon} aria-hidden boxSize="3" />
+                <span aria-hidden>{issueCount}</span>
+                <Text as="span" srOnly>
+                  {t('widgets.generate.issueCount', { count: issueCount })}
+                </Text>
               </Text>
-            </Text>
-          ) : null}
-        </Text>
+            ) : null}
+          </Text>
 
-        <Flex alignItems="center" gap={2} minW="0" ml="auto">
-          {shownSummary.length > 0 ? (
-            <Text
-              as="span"
-              aria-hidden={isOpen || undefined}
-              color="fg.muted"
-              css={SUMMARY_STYLES}
-              data-section-summary=""
-              fontSize="sm"
-              fontVariantNumeric="tabular-nums"
-              minW="0"
-              transition="opacity var(--wb-motion-duration-fast), visibility var(--wb-motion-duration-fast)"
-              truncate
-            >
-              {shownSummary.map((item, index) => (
-                // oxlint-disable-next-line react/no-array-index-key -- positional values with no identity of their own.
-                <span key={index}>{item}</span>
-              ))}
-            </Text>
-          ) : null}
-          {status ? (
-            <Flex flexShrink={0} fontVariantNumeric="tabular-nums" gap={1}>
-              {status}
-            </Flex>
-          ) : null}
+          <Flex alignItems="center" gap={2} minW="0" ml="auto">
+            {shownSummary.length > 0 ? (
+              <Text
+                as="span"
+                aria-hidden={isOpen || undefined}
+                color="fg.muted"
+                css={SUMMARY_STYLES}
+                data-section-summary=""
+                fontSize="sm"
+                fontVariantNumeric="tabular-nums"
+                minW="0"
+                transition="opacity var(--wb-motion-duration-fast), transform var(--wb-motion-duration-fast), visibility var(--wb-motion-duration-fast)"
+                truncate
+              >
+                {shownSummary.map((item, index) => (
+                  // oxlint-disable-next-line react/no-array-index-key -- positional values with no identity of their own.
+                  <span key={index}>{item}</span>
+                ))}
+              </Text>
+            ) : null}
+            {status ? (
+              <Flex flexShrink={0} fontVariantNumeric="tabular-nums" gap={1}>
+                {status}
+              </Flex>
+            ) : null}
+          </Flex>
         </Flex>
       </Collapsible.Trigger>
 
       {/* Isolated, so a positioned field (a segment thumb, a textarea handle) never paints over the pinned title. */}
       <Collapsible.Content isolation="isolate">
         {/* The section owns its inset and rhythm, so every widget's sections space their fields alike. */}
-        <Stack css={FIELDS_STYLES} gap="2.5" px={2} pb={3}>
-          {children}
-        </Stack>
+        {/* The scaled box spans the content's full width, the width the scale is sized from; the tray sits inside. */}
+        <Box css={FIELDS_STYLES} px="0.5">
+          <Stack bg={TRAY_BG} gap="2.5" p="2" rounded="l2" borderTopRadius={SEAM_RADIUS}>
+            {children}
+          </Stack>
+        </Box>
       </Collapsible.Content>
 
       <Menu.Root

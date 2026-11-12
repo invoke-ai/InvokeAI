@@ -82,7 +82,14 @@ const STEPS_FIELD_DISABLED_CSS = { opacity: 0.5 } as const;
  * hover tint would otherwise wash out their transparent fills and faint borders, and their own hover fills with it.
  */
 export const ControlSurface = ({ children, ...props }: { children: ReactNode } & Record<`data-${string}`, string>) => (
-  <Box bg="bg.subtle" data-control-surface="" flex="1" minW="0" rounded="control" {...props}>
+  <Box
+    bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))"
+    data-control-surface=""
+    flex="1"
+    minW="0"
+    rounded="control"
+    {...props}
+  >
     {children}
   </Box>
 );
@@ -282,7 +289,7 @@ const ActiveStepsField = ({
   return (
     <HStack
       aria-disabled={disabled || undefined}
-      bg="bg.subtle"
+      bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))"
       borderColor="border"
       data-control-surface=""
       borderWidth="1px"

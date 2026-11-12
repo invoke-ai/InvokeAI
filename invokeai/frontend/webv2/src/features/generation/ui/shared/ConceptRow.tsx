@@ -263,7 +263,7 @@ const ConceptRowContent = ({
           }
           detail={
             // Backed with the widget's surface so the row's hover tint never washes out the track and fill.
-            <Box bg="bg.subtle" rounded="control">
+            <Box bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))" rounded="control">
               <GenerateFieldContextMenu
                 fieldLabel={t('widgets.generate.conceptWeightNamed', { name })}
                 copyValue={copyWeight}
