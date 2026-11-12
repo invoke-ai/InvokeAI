@@ -24,7 +24,12 @@ import { compileGenerateGraph } from '@features/generation/graph';
 import { normalizeReferenceImages } from '@features/generation/settings';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
+import {
+  buildImageRecallSettings,
+  getImageRecallCapabilities,
+  readMetadataReferenceImages,
+  type ImageRecallKind,
+} from './imageRecall';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
@@ -142,10 +147,13 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
+  qwen3VLVisionTowerModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
   animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
+  flux3PromptUpsamplerEnabled: false,
+  flux3PromptUpsamplerModel: null,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -352,11 +360,19 @@ describe('image recall', () => {
     expect(result?.fields).toContain('referenceImages');
   });
 
-  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
-  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
-    const recall = (model: MainModelConfig) =>
+  // The base decides what recall keeps; an encoder without a vision tower is flagged by validation, never recalled away.
+  it('recalls Qwen-Image-2.1 reference images whichever encoder sits in the slot', () => {
+    const encoder = (format: string) => ({
+      base: 'any',
+      format,
+      key: 'enc',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    });
+    const recall = (model: MainModelConfig, qwen3VLEncoderModel: ReturnType<typeof encoder> | null = null) =>
       buildImageRecallSettings({
-        currentValues: createValues({ model, modelKey: model.key }),
+        currentValues: createValues({ model, modelKey: model.key, qwen3VLEncoderModel }),
         image,
         kind: 'all',
         metadata: {
@@ -376,10 +392,7 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
-    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
-
-    expect(diffusers?.values.referenceImages).toEqual([
+    const kept = [
       {
         config: {
           image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
@@ -388,10 +401,28 @@ describe('image recall', () => {
         id: 'edit-1',
         isEnabled: true,
       },
-    ]);
-    expect(diffusers?.fields).toContain('referenceImages');
-    expect(gguf?.values.referenceImages).toEqual([]);
-    expect(gguf?.fields).not.toContain('referenceImages');
+    ];
+    const diffusers: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'q21',
+      name: 'Q21',
+      type: 'main',
+    };
+    const int8: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'q21-int8',
+      name: 'Int8',
+      type: 'main',
+    };
+
+    expect(recall(diffusers)?.values.referenceImages).toEqual(kept);
+    expect(recall(diffusers)?.fields).toContain('referenceImages');
+    expect(recall(int8, encoder('checkpoint'))?.values.referenceImages).toEqual(kept);
+    // A stale GGUF encoder left over from another model must not cost the recorded references.
+    expect(recall(diffusers, encoder('gguf_quantized'))?.values.referenceImages).toEqual(kept);
+    expect(recall(int8, null)?.values.referenceImages).toEqual(kept);
   });
 
   it('preserves canonical original and crop provenance from legacy metadata', () => {
@@ -600,6 +631,43 @@ describe('image recall', () => {
       hiDiffusionWindowAttentionEnabled: true,
     });
     expect(result?.fields).toContain('hiDiffusion');
+  });
+
+  it.each([null, undefined, 0])('recalls automatic or explicit zero ratios (%s)', (ratio) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_t1_ratio: ratio,
+        hidiffusion_t2_ratio: ratio,
+        model: { key: sd1Model.key },
+      },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(result?.values.hiDiffusionT1Ratio).toBe(ratio === undefined ? null : ratio);
+    expect(result?.values.hiDiffusionT2Ratio).toBe(ratio === undefined ? null : ratio);
+  });
+
+  it.each([
+    [{ hidiffusion_t1_ratio: 0.4, hidiffusion_t2_ratio: null }, 0.4, 0],
+    [{ hidiffusion_t1_ratio: null, hidiffusion_t2_ratio: 0.2 }, 0, 0.2],
+    [{ hidiffusion_auto_ratios: true, hidiffusion_t1_ratio: 0.4, hidiffusion_t2_ratio: 0 }, null, null],
+    [{ hidiffusion_auto_ratios: false, hidiffusion_t1_ratio: null, hidiffusion_t2_ratio: null }, 0, 0],
+  ] as const)('recalls a coherent pair with explicit mode taking precedence', (ratios, t1, t2) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { hidiffusion: true, ...ratios, model: { key: sd1Model.key } },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(result?.values).toMatchObject({ hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 });
   });
 
   it('ignores HiDiffusion metadata for unsupported models', () => {
@@ -819,6 +887,54 @@ describe('image recall', () => {
       getImageRecallCapabilities({ ...recallInput, metadata: { qwen3_vl_encoder: krea2Metadata.qwen3_vl_encoder } })
         .remix
     ).toBe(true);
+  });
+
+  it('remixes a Qwen-Image-2.1 image with its GGUF encoder and vision tower, judging the tower beside the recalled encoder', () => {
+    const qwen21: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'q21',
+      name: 'Q21',
+      type: 'main',
+    };
+    const ggufEncoder: ComponentModelConfig = { ...ideogram4Qwen3VL, format: 'gguf_quantized', key: 'gguf-enc' };
+    const tower = (variant: string): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const recall = (metadata: Record<string, unknown>, current: Partial<GenerateWidgetValues> = {}) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model: qwen21, modelKey: qwen21.key, ...current }),
+        image,
+        kind: 'remix',
+        metadata: { model: { key: qwen21.key }, ...metadata },
+        models: [ggufEncoder, tower('qwen3_vl_8b'), tower('qwen3_vl_4b')],
+        supportedModels: [qwen21],
+        vaeModels: [],
+      })?.values;
+    const recorded = { qwen3_vl_encoder: { key: 'gguf-enc' }, qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_8b' } };
+
+    expect(recall(recorded)).toMatchObject({
+      qwen3VLEncoderModel: { key: 'gguf-enc' },
+      qwen3VLVisionTowerModel: { key: 'mmproj-qwen3_vl_8b' },
+    });
+    // A tower the loader would reject is not restored.
+    expect(
+      recall({ ...recorded, qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_4b' } })?.qwen3VLVisionTowerModel
+    ).toBeNull();
+    // ... and the pick already in the slot stays when the recorded one is skipped.
+    const currentTower = tower('qwen3_vl_8b');
+
+    expect(
+      recall(
+        { qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_4b' } },
+        { qwen3VLEncoderModel: ggufEncoder, qwen3VLVisionTowerModel: currentTower }
+      )?.qwen3VLVisionTowerModel
+    ).toMatchObject({ key: currentTower.key });
   });
 
   it('keeps a fitting pick when the recorded component does not fit the current model', () => {
@@ -1713,6 +1829,56 @@ describe('model-family tuning recall', () => {
     expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
   });
 
+  describe('PiD decoding', () => {
+    const sdxlGeneration = (extra: Record<string, unknown> = {}) => ({
+      generation_mode: 'sdxl_txt2img',
+      model: { base: 'sdxl', key: sdxlModel.key, name: sdxlModel.name, type: 'main' },
+      ...extra,
+    });
+
+    it.each(['fit', 'native'] as const)('restores %s decoding with its steps', (pidMode) => {
+      const result = recall(sdxlGeneration({ pid_mode: pidMode, pid_steps: 8 }), sdxlModel);
+
+      expect(result?.values).toMatchObject({ pidMode, pidSteps: 8 });
+      expect(result?.fields).toContain('modelTuning');
+    });
+
+    it('turns PiD off for a generation of the family that decoded without it, and keeps the steps', () => {
+      const result = recall(sdxlGeneration(), sdxlModel, 'all', { pidMode: 'fit', pidSteps: 8 });
+      const { generation_mode: _mode, ...notAGeneration } = sdxlGeneration();
+
+      expect(result?.values).toMatchObject({ pidMode: 'off', pidSteps: 8 });
+      expect(result?.fields).toContain('modelTuning');
+      // A record that is no generation says nothing about how the image was decoded.
+      expect(recall(notAGeneration, sdxlModel, 'all', { pidMode: 'fit' })?.values.pidMode).toBe('fit');
+    });
+
+    it('clamps the steps to what the decoder takes and ignores an unknown mode', () => {
+      expect(recall({ pid_mode: 'turbo', pid_steps: 40 }, sdxlModel, 'all', { pidMode: 'fit' })?.values).toMatchObject({
+        pidMode: 'fit',
+        pidSteps: 16,
+      });
+      expect(recall({ pid_steps: 0.2 }, sdxlModel)?.values.pidSteps).toBe(1);
+    });
+
+    it('leaves PiD alone for a family that cannot decode with it', () => {
+      const result = recall(
+        {
+          generation_mode: 'txt2img',
+          model: { base: 'sd-1', key: sd1Model.key, name: sd1Model.name, type: 'main' },
+          pid_mode: 'native',
+          pid_steps: 8,
+        },
+        sd1Model,
+        'all',
+        { pidMode: 'fit' }
+      );
+
+      expect(result?.values).toMatchObject({ pidMode: 'fit', pidSteps: 4 });
+      expect(result?.fields).not.toContain('modelTuning');
+    });
+  });
+
   describe('over tuning the panel has since changed', () => {
     const changedTuning = {
       fluxDypePreset: '4k',
@@ -1763,9 +1929,9 @@ describe('model-family tuning recall', () => {
       expect(recallOverChanged(otherFamily, fluxModel)?.fluxDypePreset).toBe('4k');
     });
 
-    // What a graph records must bring the panel back to that recipe from either direction. A switch the graph stops
-    // recording still passes here, since recall reads a missing key as the default; graph.test.ts pins that FLUX
-    // records DyPE off.
+    // What a graph records at the defaults must bring a changed panel back to them; the recall contract covers changed
+    // tuning over the defaults. A switch the graph stops recording still passes here, since recall reads a missing key
+    // as the default; graph.test.ts pins that FLUX records DyPE off.
     const tunedBases = generateGraphCases.filter(({ base }) => ['flux', 'qwen-image', 'z-image'].includes(base));
     const defaultTuning = {
       fluxDypePreset: 'off',
@@ -1774,15 +1940,16 @@ describe('model-family tuning recall', () => {
       zImageSeedVarianceEnabled: false,
       zImageShift: null,
     } as const;
-    const roundTrip = ({ base, shape }: (typeof generateGraphCases)[number], recorded: object, current: object) => {
+
+    it.each(tunedBases)('$label restores its default tuning over changed settings', ({ base, shape }) => {
       const { model, settings } = fullyFilledSettingsFor(base, shape);
-      const graph = compileGenerateGraph({ ...settings, ...recorded }, model, 'gallery', {
+      const graph = compileGenerateGraph({ ...settings, ...defaultTuning }, model, 'gallery', {
         useCpuNoise: true,
         useNsfwChecker: false,
         useWatermark: false,
       }).backendGraph;
       const values = buildImageRecallSettings({
-        currentValues: createValues({ ...current, model }),
+        currentValues: createValues({ ...changedTuning, model }),
         image,
         kind: 'all',
         metadata: Object.values(graph.nodes).find((node) => node.type === 'core_metadata'),
@@ -1796,22 +1963,9 @@ describe('model-family tuning recall', () => {
         'z-image': ['zImageSeedVarianceEnabled', 'zImageShift'],
       }[base as 'flux' | 'qwen-image' | 'z-image'] as (keyof typeof defaultTuning)[];
 
-      return {
-        expected: Object.fromEntries(keys.map((key) => [key, (recorded as typeof defaultTuning)[key]])),
-        restored: Object.fromEntries(keys.map((key) => [key, values?.[key]])),
-      };
-    };
-
-    it.each(tunedBases)('$label restores its default tuning over changed settings', (graphCase) => {
-      const { expected, restored } = roundTrip(graphCase, defaultTuning, changedTuning);
-
-      expect(restored).toEqual(expected);
-    });
-
-    it.each(tunedBases)('$label restores its changed tuning over the defaults', (graphCase) => {
-      const { expected, restored } = roundTrip(graphCase, changedTuning, defaultTuning);
-
-      expect(restored).toEqual(expected);
+      expect(Object.fromEntries(keys.map((key) => [key, values?.[key]]))).toEqual(
+        Object.fromEntries(keys.map((key) => [key, defaultTuning[key]]))
+      );
     });
   });
 
@@ -2002,34 +2156,6 @@ describe('Anima IP-Adapter recall', () => {
   });
 });
 
-/** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
-const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
-  const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
-  const graph = compileGenerateGraph(settings, model, 'gallery', {
-    useCpuNoise: true,
-    useNsfwChecker: false,
-    useWatermark: false,
-  }).backendGraph;
-  const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
-  const serializedMetadata = JSON.stringify(recordedMetadata);
-  // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
-  const recorded = filled.filter((key) => serializedMetadata.includes(`"${settings[key]?.key}"`));
-  const components = recorded.map((key) => settings[key]).filter((component) => component !== null);
-  const result = buildImageRecallSettings({
-    currentValues: createValues(),
-    image,
-    kind: 'remix',
-    metadata: recordedMetadata,
-    models: components.filter((component) => component.type !== 'vae'),
-    supportedModels: [model],
-    vaeModels: components.filter((component): component is VaeModelConfig => component.type === 'vae'),
-  });
-  const keysOf = (values: GenerateWidgetValues | undefined) =>
-    Object.fromEntries(recorded.map((key) => [key, values?.[key]?.key ?? null]));
-
-  return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
-};
-
 describe('anima inpaint adapter', () => {
   const inpaintAdapter: ComponentModelConfig = {
     base: 'anima',
@@ -2205,33 +2331,105 @@ describe('anima inpaint adapter', () => {
   });
 });
 
-describe('remix round trip', () => {
-  // Every component a graph records must come back; one recorded under a key Remix does not know fails here.
-  it.each(generateGraphCases)('restores the components $label records', (graphCase) => {
-    const { expected, restored } = remixRoundTrip(graphCase);
+describe('FLUX.3 prompt upsampler recall', () => {
+  const flux3Model: MainModelConfig = {
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    type: 'main',
+    variant: 'flux3_klein',
+  };
+  const upsampler: ComponentModelConfig = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+  const models = [flux3Model, upsampler];
+  const recall = (
+    metadata: Record<string, unknown>,
+    currentValues: GenerateWidgetValues,
+    supportedModels = [flux3Model, sd1Model]
+  ) =>
+    buildImageRecallSettings({
+      currentValues,
+      image,
+      kind: 'all',
+      metadata,
+      models: [...models, sd1Model],
+      supportedModels,
+      vaeModels: [],
+    });
+  const recordedBy = (settings: Partial<GenerateWidgetValues>) => {
+    const generated = compileGenerateGraph(
+      {
+        ...createValues({ cfgScale: 1, model: flux3Model, modelKey: flux3Model.key }),
+        positivePrompt: 'a beach at noon',
+        ...settings,
+      },
+      flux3Model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
 
-    expect(restored).toEqual(expected);
+    return Object.values(generated.nodes).find((node) => node.type === 'core_metadata')!;
+  };
+
+  it('turns the switch on with the recorded model from what a graph that upsampled records, and restores the typed prompt', () => {
+    // At run time the edges add the typed prompt and the caption the upsampler wrote.
+    const metadata = {
+      ...recordedBy({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler }),
+      flux3_caption: 'A long caption. [{"id": "obj_1", "bbox": [0, 0, 500, 500], "desc": "a kite"}]',
+      positive_prompt: 'a beach at noon',
+    };
+    const result = recall(metadata, createValues());
+
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toBe(upsampler);
+    expect(result?.fields).toContain('components');
+    // The caption the upsampler wrote is never the recalled prompt.
+    expect(result?.values.positivePrompt).toBe('a beach at noon');
   });
 
-  it('exercises every component setting Remix restores', () => {
-    const recorded = new Set(generateGraphCases.flatMap((graphCase) => remixRoundTrip(graphCase).recorded));
+  it('switches it off but keeps the pick for a FLUX.3 record without it, which the backend persists for none', () => {
+    const metadata = recordedBy({ flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: upsampler });
+    const result = recall(
+      metadata,
+      createValues({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler })
+    );
 
-    expect([...recorded].sort()).toEqual([
-      'clipEmbedModel',
-      'componentSourceModel',
-      'gemma2EncoderModel',
-      'ideogram4UnconditionalModel',
-      'mistralEncoderModel',
-      'pidDecoderModel',
-      'qwen35EncoderModel',
-      'qwen3EncoderModel',
-      'qwen3VLEncoderModel',
-      'qwenVLEncoderModel',
-      't5EncoderModel',
-      'vae',
-      'wanLowNoiseModel',
-      'wanT5EncoderModel',
-    ]);
+    expect(metadata).not.toHaveProperty('flux3_prompt_upsampler');
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(false);
+    expect(result?.values.flux3PromptUpsamplerModel).toEqual(upsampler);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('keeps the current pick when the recorded model is not installed, yet still turns the switch on', () => {
+    const current: ComponentModelConfig = { ...upsampler, key: 'other', name: 'Other' };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ flux3PromptUpsamplerModel: current }),
+      image,
+      kind: 'all',
+      metadata: { ...recordedBy({}), flux3_prompt_upsampler: { key: 'gone' } },
+      models: [flux3Model, current],
+      supportedModels: [flux3Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toEqual(current);
+  });
+
+  it('says nothing about the upsampler for a record of another family', () => {
+    const current = createValues({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler });
+    const result = recall({ generation_mode: 'txt2img', model: { key: sd1Model.key } }, current);
+
+    expect(result?.values.model).toBe(sd1Model);
+    // The record leaves the switch alone; the new model has no such slot, so the pick goes like any component.
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toBeNull();
   });
 });
 
@@ -2760,3 +2958,272 @@ describe('legacy records', () => {
     });
   });
 });
+
+describe('legacy family metadata parity', () => {
+  it('restores recorded Ideogram sampler overrides and explicit preset defaults', () => {
+    const model: MainModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram',
+      name: 'Ideogram',
+      type: 'main',
+      format: 'diffusers',
+    };
+    const recall = (metadata: unknown) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key, ideogram4Steps: 70, ideogram4Mu: 3 }),
+        image,
+        kind: 'all',
+        metadata,
+        models: [model],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const metadata = {
+      model,
+      ideogram4_sampler_preset: 'V4_TURBO_12',
+      ideogram4_steps: 26,
+      ideogram4_guidance_scale: 4.5,
+      ideogram4_mu: -1.5,
+      ideogram4_color_palette: ['green', 'gold'],
+    };
+    expect(recall(metadata)?.values).toMatchObject({
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 26,
+      ideogram4GuidanceScale: 4.5,
+      ideogram4Mu: -1.5,
+      ideogram4ColorPalette: ['green', 'gold'],
+    });
+    expect(
+      recall({ model, ideogram4_steps: null, ideogram4_guidance_scale: null, ideogram4_mu: null })?.values
+    ).toMatchObject({ ideogram4Steps: null, ideogram4GuidanceScale: null, ideogram4Mu: null });
+    expect(recall({ model, generation_mode: 'ideogram4_txt2img' })?.values).toMatchObject({
+      ideogram4Steps: null,
+      ideogram4GuidanceScale: null,
+      ideogram4Mu: null,
+    });
+    expect(recall({ model, ideogram4_steps: 2.5, ideogram4_mu: 100 })?.values).toMatchObject({
+      ideogram4Steps: 70,
+      ideogram4Mu: 3,
+    });
+  });
+
+  it('restores legacy Wan VAE and low-noise guidance without applying them to another family', () => {
+    const model: MainModelConfig = { base: 'wan', key: 'wan', name: 'Wan', type: 'main', format: 'diffusers' };
+    const vae: VaeModelConfig = { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae', latent_channels: 16 };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model, modelKey: model.key }),
+      image,
+      kind: 'remix',
+      metadata: { model, wan_vae_model: vae, wan_guidance_scale_low_noise: 23.5 },
+      models: [model, vae],
+      supportedModels: [model],
+      vaeModels: [vae],
+    });
+    expect(result?.values).toMatchObject({ vae, wanGuidanceScaleLowNoise: 23.5 });
+  });
+});
+
+it.each(['controlnets', 't2iAdapters', 'ipAdapters'] as const)(
+  'enables All/Remix for standalone name-only %s before asset hydration',
+  (key) => {
+    const adapter = {
+      ip_adapter_model: { key: 'ip', name: 'IP', base: 'sdxl', type: 'ip_adapter' },
+      image: { image_name: 'portrait.png' },
+      weight: 0.5,
+      clip_vision_model: 'ViT-H',
+      method: 'full',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+    };
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues(),
+      image,
+      metadata: { [key]: [adapter] },
+      models: [sdxlModel],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+    expect(capabilities).toMatchObject({ all: true, remix: true });
+  }
+);
+
+it.each(['array', 'entities'] as const)(
+  'restores historical Canvas referenceImages %s through Generate recall',
+  (shape) => {
+    const ip = { base: 'sdxl', type: 'ip_adapter', key: 'ip', name: 'IP' } as ComponentModelConfig;
+    const entry = {
+      id: 'old',
+      isEnabled: false,
+      ipAdapter: {
+        type: 'ip_adapter',
+        model: ip,
+        image: { image_name: 'portrait.png', width: 320, height: 200 },
+        weight: 0.3,
+        method: 'composition',
+        clipVisionModel: 'ViT-L',
+        beginEndStepPct: [0.1, 0.8],
+      },
+    };
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { canvas_v2_metadata: { referenceImages: shape === 'array' ? [entry] : { entities: [entry] } } },
+      models: [sdxlModel, ip],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+    expect(result?.values.referenceImages).toEqual([
+      {
+        id: 'old',
+        isEnabled: false,
+        config: { ...entry.ipAdapter, image: { original: { image: entry.ipAdapter.image } } },
+      },
+    ]);
+  }
+);
+
+it.each([false, true])('keeps modern references authoritative over v4 aliases (empty=%s)', (empty) => {
+  const ip = { base: 'sdxl', type: 'ip_adapter', key: 'ip', name: 'IP' } as ComponentModelConfig;
+  const legacy = {
+    ip_adapter_model: ip,
+    image: [{ image_name: 'legacy.png', width: 200, height: 100 }],
+    weight: 0.5,
+    clip_vision_model: 'ViT-G',
+    method: 'style',
+    begin_step_percent: 0.2,
+    end_step_percent: 0.8,
+  };
+  const modern = {
+    id: 'modern',
+    isEnabled: true,
+    config: {
+      type: 'ip_adapter',
+      model: ip,
+      image: { image_name: 'modern.png', width: 400, height: 200 },
+      weight: 0.4,
+      clipVisionModel: 'ViT-H',
+      method: 'full',
+      beginEndStepPct: [0, 1],
+    },
+  };
+  const input = {
+    currentValues: createValues({ referenceImages: normalizeReferenceImages([modern]) }),
+    image,
+    kind: 'all' as const,
+    models: [sdxlModel, ip],
+    supportedModels: [sdxlModel],
+    vaeModels: [],
+  };
+  const result = buildImageRecallSettings({
+    ...input,
+    metadata: { ref_images: empty ? [] : [modern], ipAdapters: [legacy] },
+  });
+  expect(result?.values.referenceImages.map(({ id }) => id)).toEqual(empty ? [] : ['modern']);
+  const legacyResult = buildImageRecallSettings({ ...input, metadata: { ipAdapters: [legacy] } });
+  expect(legacyResult?.values.referenceImages).toEqual([
+    expect.objectContaining({
+      config: expect.objectContaining({
+        model: ip,
+        image: { original: { image: { image_name: 'legacy.png', width: 200, height: 100 } } },
+        clipVisionModel: 'ViT-G',
+        method: 'style',
+        weight: 0.5,
+        beginEndStepPct: [0.2, 0.8],
+      }),
+    }),
+  ]);
+});
+
+it('preserves a valid zero-width legacy IP step window instead of inventing a wider schedule', () => {
+  const adapter = { base: 'sdxl', key: 'ip', name: 'IP', type: 'ip_adapter' } as ComponentModelConfig;
+  const result = buildImageRecallSettings({
+    currentValues: createValues(),
+    image,
+    kind: 'all',
+    metadata: {
+      ipAdapters: [
+        {
+          ip_adapter_model: adapter,
+          image: { image_name: 'portrait.png', width: 100, height: 100 },
+          weight: -0.5,
+          clip_vision_model: 'ViT-H',
+          method: 'full',
+          begin_step_percent: 0.2,
+          end_step_percent: 0.2,
+        },
+      ],
+    },
+    models: [sdxlModel, adapter],
+    supportedModels: [sdxlModel],
+    vaeModels: [],
+  });
+  expect(result?.values.referenceImages[0]?.config).toMatchObject({
+    model: adapter,
+    weight: -0.5,
+    beginEndStepPct: [0.2, 0.2],
+  });
+});
+
+it.each(['array', 'entities'] as const)(
+  'reports refused historical %s references after fallback selection, preserving existing references',
+  (shape) => {
+    const adapter = { base: 'sdxl', key: 'ip', name: 'IP', type: 'ip_adapter' } as ComponentModelConfig;
+    const current = normalizeReferenceImages([
+      {
+        id: 'current',
+        config: {
+          type: 'ip_adapter',
+          model: adapter,
+          image: { image_name: 'current.png', width: 100, height: 100 },
+          weight: 0.5,
+        },
+      },
+    ]);
+    const reference = { id: 'old', ipAdapter: { type: 'ip_adapter', image: null } };
+    const metadata = {
+      positive_prompt: 'still recallable',
+      canvas_v2_metadata: {
+        rasterLayers: [],
+        controlLayers: [],
+        inpaintMasks: [],
+        regionalGuidance: [],
+        referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+      },
+    };
+    const input = {
+      currentValues: createValues({ referenceImages: current }),
+      image,
+      kind: 'all' as const,
+      models: [sdxlModel, adapter],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    };
+    expect(readMetadataReferenceImages(metadata)).toEqual({ images: null, names: [], partial: true });
+    const refused = buildImageRecallSettings({ ...input, metadata });
+    expect(refused?.values.referenceImages).toEqual(current);
+    expect(refused?.fields).not.toContain('referenceImages');
+    const fallback = {
+      ip_adapter_model: adapter,
+      image: { image_name: 'fallback.png', width: 100, height: 100 },
+      weight: 0.4,
+      clip_vision_model: 'ViT-H',
+      method: 'full',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+    };
+    const recovered = { ...metadata, ipAdapters: [fallback] };
+    expect(readMetadataReferenceImages(recovered).partial).toBe(false);
+    expect(
+      buildImageRecallSettings({ ...input, metadata: recovered })?.values.referenceImages[0]?.config.image
+    ).toEqual({ original: { image: fallback.image } });
+    expect(readMetadataReferenceImages({ ...recovered, ref_images: [] })).toEqual({
+      images: [],
+      names: [],
+      partial: false,
+    });
+    expect(
+      buildImageRecallSettings({ ...input, metadata: { ...recovered, ref_images: [] } })?.values.referenceImages
+    ).toEqual([]);
+  }
+);

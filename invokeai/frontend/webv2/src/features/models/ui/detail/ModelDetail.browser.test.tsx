@@ -39,6 +39,28 @@ const MAIN = {
   variant: 'normal',
 } as unknown as ModelConfig;
 
+// The backend serializes `cpu_only` and `trigger_phrases` only on configs that store them, whatever the type.
+const config = (key: string, type: string, fields: Partial<ModelConfig>) =>
+  ({
+    base: 'any',
+    file_size: 1024,
+    format: 'checkpoint',
+    hash: `hash-${key}`,
+    key,
+    name: key,
+    path: `/models/${key}.safetensors`,
+    source: `/models/${key}.safetensors`,
+    source_type: 'path',
+    type,
+    ...fields,
+  }) as unknown as ModelConfig;
+
+const GEMMA4_ENCODER = config('gemma4-encoder', 'gemma4_encoder', { cpu_only: null });
+const QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY = config('qwen3-vl-encoder', 'qwen3_vl_encoder', {});
+const LORA = config('lora-1', 'lora', { trigger_phrases: null });
+const EMBEDDING = config('embedding-1', 'embedding', {});
+const CONTROL_LORA = config('control-lora-1', 'control_lora', { trigger_phrases: null });
+
 const ignoreConfirm = () => undefined;
 
 const MANAGER: ModelsUiAdapter = {
@@ -70,18 +92,51 @@ describe('ModelDetail', () => {
     accountLifecycle.invalidate();
   });
 
-  it('places working memory last, after the trigger phrases', async () => {
-    await act(() =>
+  const renderDetail = (modelKey: string) =>
+    act(() =>
       root.render(
         <ChakraProvider value={system}>
           <ModelsUiProvider adapter={MANAGER}>
-            <ModelDetail modelKey={MAIN.key} onRequestConfirm={ignoreConfirm} />
+            <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={ignoreConfirm} />
           </ModelsUiProvider>
         </ChakraProvider>
       )
     );
 
+  it('places working memory last, after the trigger phrases', async () => {
+    await renderDetail(MAIN.key);
+
     const order = [...host.querySelectorAll('[data-section]')].map((element) => element.getAttribute('data-section'));
     expect(order).toEqual(['default-settings', 'related-models', 'trigger-phrases', 'working-memory']);
+  });
+
+  it('offers Run on CPU exactly when the config carries cpu_only', async () => {
+    setModelsSnapshotForTests({ models: [GEMMA4_ENCODER, QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY], status: 'loaded' });
+    // A checkbox named by its label, not merely the label text somewhere on the page.
+    const hasCpuSwitch = () =>
+      [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].some(
+        (input) => input.labels?.[0]?.textContent === 'models.runOnCpu'
+      );
+
+    await renderDetail(GEMMA4_ENCODER.key);
+    expect(hasCpuSwitch()).toBe(true);
+
+    await renderDetail(QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY.key);
+    expect(hasCpuSwitch()).toBe(false);
+  });
+
+  it('offers trigger phrases when the config carries trigger_phrases, except on Control LoRAs', async () => {
+    setModelsSnapshotForTests({ models: [LORA, EMBEDDING, CONTROL_LORA], status: 'loaded' });
+    const hasTriggerPhrases = () => host.querySelector('[data-section="trigger-phrases"]') !== null;
+
+    await renderDetail(LORA.key);
+    expect(hasTriggerPhrases()).toBe(true);
+
+    await renderDetail(EMBEDDING.key);
+    expect(hasTriggerPhrases()).toBe(false);
+
+    // Prompt triggers never read Control LoRAs, so phrases stored there would have no effect.
+    await renderDetail(CONTROL_LORA.key);
+    expect(hasTriggerPhrases()).toBe(false);
   });
 });

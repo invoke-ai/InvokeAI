@@ -45,7 +45,9 @@ const submitVideo = () => {
   state = workbenchReducer(state, {
     backendSupportsCancellation: true,
     models: [wanModel],
-    type: 'submitInvocationSnapshot',
+    projectId: state.activeProjectId,
+    route: state.projects.find((project) => project.id === state.activeProjectId)!.invocation,
+    type: 'submitResolvedInvocationSnapshot',
   });
 
   return state;

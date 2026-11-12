@@ -1,0 +1,9 @@
+title: Favorite Workflows (Stage & Pipeline Switcher)
+author: tschuelke
+repo: https://github.com/tschuelke/invoke_workflow_switcher
+summary: Inline workflow switcher form element for organizing and jumping between multi-stage production workflows in 1 click.
+description: >-
+  Adds a `Favorite Workflows` form element to the InvokeAI 7 workflow form builder and linear view. Organize related
+  workflows into named pipeline groups across Your Library, Built-in (`Browse`), and Node Pack templates, copy or
+  update workflows in `Yours` in one click, and preserve collapsible section states across workflow switches.
+categories: [utility]

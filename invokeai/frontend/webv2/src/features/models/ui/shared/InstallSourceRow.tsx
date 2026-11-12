@@ -46,6 +46,7 @@ export const InstallSourceRow = ({
     badges={badges}
     description={description}
     isMenuOpen={isMenuOpen}
+    itemKey={source}
     tabIndex={-1}
     title={title}
     onContextMenu={(anchor) => onOpenMenu(source, anchor)}

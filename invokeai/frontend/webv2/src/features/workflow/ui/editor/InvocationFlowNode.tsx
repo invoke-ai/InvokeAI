@@ -25,6 +25,11 @@ import {
   useWorkflowNodeExecutionState,
 } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  areHiDiffusionRatiosAutomatic,
+  getHiDiffusionRatioOrderIssue,
+  getHiDiffusionRatioTemplate,
+  isHiDiffusionNode,
+  isHiDiffusionRatioField,
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   cloneWorkflowFieldDefault,
   formatOutputFieldValue,
@@ -539,12 +544,14 @@ const ProvidedByConnectionNote = () => {
 };
 
 const InputFieldRow = ({
+  connectedFieldNames,
   isConnected,
   isExposed,
   isSkeleton,
   node,
   template,
 }: {
+  connectedFieldNames: ReadonlySet<string>;
   isConnected: boolean;
   isExposed: boolean;
   isSkeleton: boolean;
@@ -559,11 +566,15 @@ const InputFieldRow = ({
   const showsControl = !isConnected && isDirectInputField(template);
   const label = instance?.label || template.title;
   const description = getEffectiveWorkflowFieldDescription(instance, template);
-  const invalidReason = getWorkflowFieldInvalidReason({
-    isConnected,
-    template,
-    value: instance?.value,
-  });
+  const ratiosDisabled =
+    isHiDiffusionNode(node.data.type) && isHiDiffusionRatioField(template.name) && areHiDiffusionRatiosAutomatic(node);
+  const invalidReason =
+    (isHiDiffusionRatioField(template.name) ? getHiDiffusionRatioOrderIssue(node, connectedFieldNames) : null) ??
+    getWorkflowFieldInvalidReason({
+      isConnected,
+      template,
+      value: instance?.value,
+    });
   const isInvalid = invalidReason !== null;
   const showInvalid = isInvalid && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
@@ -722,12 +733,17 @@ const InputFieldRow = ({
           ) : (
             <Box mt="0.5" w="full">
               <WorkflowFieldInput
+                disabled={ratiosDisabled}
                 id={`${node.id}-${template.name}-value`}
                 invalid={isInvalid}
                 nodeId={node.id}
                 seedMode={getWorkflowFieldSeedMode(instance)}
-                template={template}
-                value={instance?.value}
+                template={getHiDiffusionRatioTemplate(node, template, connectedFieldNames)}
+                value={
+                  isHiDiffusionNode(node.data.type) && isHiDiffusionRatioField(template.name)
+                    ? (instance?.value ?? 0)
+                    : instance?.value
+                }
                 onChange={(value) =>
                   editGraph({ fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value })
                 }
@@ -1122,6 +1138,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           {inputTemplates.map((inputTemplate) => (
             <InputFieldRow
               key={inputTemplate.name}
+              connectedFieldNames={connectedFieldNames}
               isConnected={connectedFieldNames.has(inputTemplate.name)}
               isExposed={exposedFieldNames.has(inputTemplate.name)}
               isSkeleton={isZoomedOut}

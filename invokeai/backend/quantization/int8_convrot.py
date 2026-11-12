@@ -805,8 +805,9 @@ def reject_unmarked_int8_weights(
         else f" A build that names its quantization only in the safetensors header is not supported for {architecture}."
     )
     raise ValueError(
-        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no `comfy_quant` marker, "
-        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header}"
+        f"{architecture} checkpoint has {len(orphans)} int8 weight(s) with no readable int8_tensorwise marker, "
+        f"e.g. {orphans[:3]}. Loading them would produce a model that runs and generates noise.{unread_header} "
+        "Use another build of this model."
     )
 
 
@@ -1021,6 +1022,47 @@ def _pinned_quantized_keys(quantized: Mapping[str, Any]) -> set[str]:
     return {key for path in quantized for key in (f"{path}.weight", f"{path}.weight_scale")}
 
 
+def check_int8_layer_layout(
+    path: str, marker: Mapping[str, Any], weight: torch.Tensor | None, scale: torch.Tensor | None
+) -> ConvrotLayout:
+    """Refuse a marked layer the int8/int4 linears cannot be built from, and return its layout.
+
+    Both tensors present, a 2-D weight, a scale granularity the decode implements, a readable marker. Whether the
+    rotation fits the layer's width is :func:`check_int8_rotation_width`, kept apart so the swap can report a payload
+    that does not match the architecture first. Only shapes are read, so an installer can ask it of meta tensors.
+    """
+    fmt = marker.get("format")
+    if weight is None or scale is None:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
+        )
+    if weight.dim() != 2:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
+            "Only a Linear weight can be kept quantized; dequantize this one instead."
+        )
+    check_int8_scale_layout(path, weight, scale)
+    return marker_layout(marker)
+
+
+def check_int8_rotation_width(path: str, layout: ConvrotLayout, weight: torch.Tensor) -> None:
+    """Refuse a rotation group that is not a power of 4 or does not divide the decoded input width."""
+    if layout.convrot:
+        try:
+            check_hadamard_size(layout.group_size)
+        except ValueError:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}; a rotation is undone only in groups of a "
+                "power of 4 (256 in every release)."
+            ) from None
+        in_features = weight.shape[1] * (2 if layout.packed_int4 else 1)
+        if in_features % layout.group_size != 0:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}, which do not divide its input width "
+                f"{in_features}."
+            )
+
+
 def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: dict[str, dict[str, Any]]) -> None:
     """Replace each quantized ``nn.Linear`` with an ``Int8ConvrotLinear`` or, for a packed int4 marker, an
     ``Int4ConvrotLinear``, sized from the state dict.
@@ -1047,17 +1089,8 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
     for path, marker in quantized.items():
         fmt = marker.get("format")
         weight, scale = sd.get(f"{path}.weight"), sd.get(f"{path}.weight_scale")
-        if weight is None or scale is None:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
-            )
-        if weight.dim() != 2:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
-                "Only a Linear weight can be kept quantized; dequantize this one instead."
-            )
-        check_int8_scale_layout(path, weight, scale)
-        layout = marker_layout(marker)
+        layout = check_int8_layer_layout(path, marker, weight, scale)
+        assert weight is not None
         parent, attribute, target = _resolve_int8_target(model, path)
         decoded = (weight.shape[0], weight.shape[1] * (2 if layout.packed_int4 else 1))
         if decoded != (target.out_features, target.in_features):
@@ -1078,6 +1111,7 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
                 f"'{path}' is marked {fmt} and the {extra}'s Linear has a bias, but the "
                 f"{missing} has none. The checkpoint does not match this architecture."
             )
+        check_int8_rotation_width(path, layout, weight)
         layer: Int4ConvrotLinear | Int8ConvrotLinear
         if layout.packed_int4:
             layer = Int4ConvrotLinear(
@@ -1131,6 +1165,7 @@ def install_int8_convrot_layers(
     reserve: Callable[[int], None],
     skip_patterns: Iterable[str] = (),
     extra_reserved_bytes: int = 0,
+    read: Callable[[str], torch.Tensor] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
     ``Int4ConvrotLinear`` modules.
@@ -1157,12 +1192,24 @@ def install_int8_convrot_layers(
 
     ``reserve`` is the cache's ``make_room``; ``extra_reserved_bytes`` is for a loader whose file
     also holds layers of another scheme -- Krea-2 and Z-Image add what their nvfp4 layers will cost,
-    so the one reservation covers the whole load. Returns the layers that stayed int8.
+    so the one reservation covers the whole load. ``read`` is for a loader that hands over the file's header as
+    ``meta`` tensors: steps 1 and 2 need only keys, shapes and dtypes, so each ``meta`` entry is read through it after
+    the reservation, and no payload lands on an unreserved cache. Returns the layers that stayed int8.
     """
     reject_foreign_quantization_scales(sd, quantized, architecture, model)
     reserve(
         predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns) + extra_reserved_bytes
     )
+    if read is not None:
+        # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading
+        # an fp32 file's dense tensors first and casting them afterwards holds twice what was reserved, in anonymous
+        # memory. The marked layers' payloads stay as stored for the split to keep or decode. No local holds the payload:
+        # it would keep the stored tensor alive through the next read.
+        marked = _pinned_quantized_keys(quantized)
+        for key in [key for key, tensor in sd.items() if tensor.is_meta]:
+            sd[key] = read(key)
+            if key not in marked and is_castable_float(sd[key]):
+                sd[key] = sd[key].to(dtype)
     surviving = split_int8_convrot_layers(sd, quantized, dtype, model=model, skip_patterns=skip_patterns)
     cast_unquantized(sd, dtype, surviving)
     swap_in_int8_linears(model, sd, surviving)

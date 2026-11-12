@@ -57,7 +57,7 @@ def _write_gguf(
     """Write a minimal but structurally honest GGUF.
 
     `hidden_size=None` omits the embedding entirely; `last_layer=None` omits the final block, which
-    is what a multi-part quant's later shard or an interrupted download looks like.
+    is a file that carries all the metadata but not all of its tensors.
     """
     import gguf
 
@@ -109,23 +109,18 @@ def test_a_text_only_qwen3_gguf_still_identifies_as_a_qwen3_encoder(tmp_path: Pa
     assert isinstance(result.config, Qwen3Encoder_GGUF_Config)
 
 
-def test_the_companion_mmproj_file_is_turned_away_with_its_reason(tmp_path: Path) -> None:
-    """Installing the whole HuggingFace GGUF repo hands the user the visual tower too. Run at the
-    *default* `allow_unknown`, because that is what decides what the user sees: an unrecognised file
-    registers as an Unknown model and the install reports success, so a plain non-match here would
-    leave a dead entry in the model list with the explanation only in the server log."""
-    result = _identify(
-        _write_gguf(
-            tmp_path / "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
-            architecture="clip",
-            hidden_size=None,
-            projector_type="qwen3vl_merger",
-        ),
-        allow_unknown=True,
+def test_the_companion_mmproj_file_is_not_a_text_encoder(tmp_path: Path) -> None:
+    """Installing the whole HuggingFace GGUF repo hands the user the visual tower too. It must not install
+    as a language tower; `Qwen3VLVisionTower_GGUF_Config` claims it (see its own tests)."""
+    path = _write_gguf(
+        tmp_path / "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+        architecture="clip",
+        hidden_size=None,
+        projector_type="qwen3vl_merger",
     )
 
-    assert result.config is None
-    assert any("visual tower" in str(reason) for reason in result.invalid_matches)
+    with pytest.raises(NotAMatchError, match="'clip'"):
+        _config_from(path)
 
 
 # --- variant and completeness ---------------------------------------------------------------------
@@ -148,13 +143,13 @@ def test_variant_comes_from_the_embedding_tensor(
 
 
 def test_a_partial_quant_is_rejected_at_install_time(tmp_path: Path) -> None:
-    """A multi-part quant's later shard carries a complete KV block and only some tensors. Matching
-    on metadata alone would install it, offer it in the picker, and fail at the first generation.
+    """A file with a complete KV block and only some tensors. Matching on metadata alone would install
+    it, offer it in the picker, and fail at the first generation.
 
     Asserted through the factory at the default `allow_unknown`: once the architecture metadata has
     identified the file, the rejection has to be final (`InvalidMatchError`), or the file still
     installs -- as an Unknown model, with the reason nowhere the user looks."""
-    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0-00002-of-00003.gguf", last_layer=None)
+    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0.gguf", last_layer=None)
 
     result = _identify(path, allow_unknown=True)
 
@@ -165,7 +160,7 @@ def test_a_partial_quant_is_rejected_at_install_time(tmp_path: Path) -> None:
 def test_a_variant_override_does_not_skip_the_completeness_check(tmp_path: Path) -> None:
     """`variant` is an install-API override. It says which Qwen3-VL the file is, not that all of its
     tensors are present, so it must not buy the file past the one check that looks."""
-    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0-00002-of-00003.gguf", last_layer=None)
+    path = _write_gguf(tmp_path / "Qwen3VL-8B-Instruct-Q8_0.gguf", last_layer=None)
 
     with pytest.raises(InvalidMatchError, match="incomplete"):
         Qwen3VLEncoder_GGUF_Config.from_model_on_disk(

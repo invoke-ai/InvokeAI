@@ -188,6 +188,7 @@ const createStableGroups = () => ({
   CanvasGenerationSections: () => null,
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },
+  aspectRatioPresets: { isFull: false, presets: [], remove: noop, save: () => null, update: noop },
   capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
   gallery: { findImage: noop, getUploadBoardId: () => Promise.resolve('none'), selectedImage: null, touchImages: noop },
   models: {
@@ -456,6 +457,109 @@ describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
   });
 });
 
+describe('GenerateSettingsForm Qwen-Image-2.1 Vision Tower', () => {
+  const QWEN21 = { ...MODEL, base: 'qwen-image-2-1', format: 'checkpoint', key: 'qwen21', name: 'Qwen-Image-2.1' };
+  const encoder = (format: string) =>
+    ({
+      base: 'any',
+      format,
+      key: `enc-${format}`,
+      name: `Encoder ${format}`,
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    }) as const;
+  const tower = (variant: string) =>
+    ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: `mmproj ${variant}`,
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    }) as const;
+  const TOWER_8B = tower('qwen3_vl_8b');
+  const towerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="qwen3_vl_vision_tower"]');
+
+  const REFERENCES = [
+    {
+      config: {
+        image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
+        type: 'qwen_image_2_1_reference_image',
+      },
+      id: 'edit',
+      isEnabled: true,
+    },
+  ];
+  const towerField = () => towerSlot()?.closest('[data-scope="field"]');
+
+  const useEncoder = async (
+    qwen3VLEncoderModel: ReturnType<typeof encoder>,
+    { main = QWEN21, referenceImages = [] as unknown[] } = {}
+  ) => {
+    stableGroups.models.catalog = [
+      MODEL,
+      main,
+      encoder('gguf_quantized'),
+      encoder('checkpoint'),
+      TOWER_8B,
+      tower('qwen3_vl_4b'),
+    ] as GenerationModelCatalogItem[];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(main as never),
+        modelKey: main.key,
+        qwen3VLEncoderModel,
+        referenceImages,
+      })
+    );
+  };
+
+  it('shows the slot for a GGUF encoder only, and lists only 8B towers', async () => {
+    await useEncoder(encoder('gguf_quantized'));
+
+    expect(towerSlot()).not.toBeNull();
+    expect(
+      [...(towerSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([TOWER_8B.key]);
+
+    await settle(() => host!.querySelector<HTMLElement>(`[data-component-pick="${TOWER_8B.key}"]`)?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLVisionTowerModel: { key: TOWER_8B.key } });
+  });
+
+  it('shows the missing-tower issue under the slot, and the encoder fix beside it on a Diffusers main', async () => {
+    await useEncoder(encoder('gguf_quantized'), { referenceImages: REFERENCES });
+
+    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(towerField()?.querySelector('[role="alert"]')?.textContent).toContain('Vision Tower');
+    expect(towerField()?.closest('[data-issue-id]')).not.toBeNull();
+
+    await useEncoder(encoder('gguf_quantized'), {
+      main: { ...QWEN21, format: 'diffusers', key: 'qwen21-diffusers' },
+      referenceImages: REFERENCES,
+    });
+    const fix = towerField()?.parentElement?.querySelector<HTMLElement>('[data-issue-fix]');
+
+    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(fix).not.toBeNull();
+
+    await settle(() => fix?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLEncoderModel: null });
+  });
+
+  it('hides the slot for a safetensors encoder', async () => {
+    await useEncoder(encoder('checkpoint'));
+
+    expect(towerSlot()).toBeNull();
+  });
+});
+
 describe('GenerateSettingsForm required components', () => {
   const krea2 = (format: string) =>
     ({ ...MODEL, base: 'krea-2', format, key: `krea-2-${format}`, name: 'Krea-2' }) as GenerationModelCatalogItem;
@@ -495,6 +599,100 @@ describe('GenerateSettingsForm required components', () => {
       { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
       { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
     ]);
+  });
+});
+
+describe('GenerateSettingsForm FLUX.3 prompt upsampler', () => {
+  const KLEIN = {
+    ...MODEL,
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    variant: 'flux3_klein',
+  } as GenerationModelCatalogItem;
+  const VISION_LLM = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  } as unknown as GenerationModelCatalogItem;
+  const TEXT_ONLY_LLM = { ...VISION_LLM, key: 'qwen', name: 'Qwen', supports_images: false };
+  const switchLabel = 'widgets.generate.flux3PromptUpsampler';
+  const upsamplerSwitch = () =>
+    [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (input) => input.labels?.[0]?.textContent === switchLabel
+    );
+  const upsamplerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="text_llm"]');
+  const slotError = () =>
+    upsamplerSlot()?.closest('[data-scope="field"]')?.querySelector('[role="alert"]')?.textContent;
+  const useKlein = async () => {
+    stableGroups.models.catalog = [MODEL, KLEIN, VISION_LLM, TEXT_ONLY_LLM];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({ ...getDefaultGenerateSettings(KLEIN as never), modelKey: KLEIN.key })
+    );
+  };
+
+  it('is offered to FLUX.3 only, and off by default with its slot present but not asking for a model', async () => {
+    stableGroups.models.catalog = [MODEL, KLEIN, VISION_LLM];
+    await renderAdapter(buildAdapter());
+
+    expect(upsamplerSwitch()).toBeUndefined();
+
+    await useKlein();
+
+    expect(upsamplerSwitch()?.checked).toBe(false);
+    expect(upsamplerSlot()?.getAttribute('data-component-placeholder')).toBe('None');
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(slotError()).toBeUndefined();
+  });
+
+  it('makes the slot required when turned on, lists vision Text LLMs only, and clears its reason once one is picked', async () => {
+    await useKlein();
+
+    await userEvent.click(upsamplerSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerEnabled: true });
+    expect(upsamplerSlot()?.getAttribute('data-component-placeholder')).toBe('widgets.generate.selectComponent');
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(slotError()).toBe('Generate needs a Prompt Upsampler model while Prompt upsampler is on.');
+    expect(
+      [...upsamplerSlot()!.querySelectorAll('[data-component-pick]')].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([VISION_LLM.key]);
+
+    await settle(() => upsamplerSlot()!.querySelector<HTMLElement>('[data-component-pick="pup"]')?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerModel: { key: 'pup' } });
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(slotError()).toBeUndefined();
+  });
+
+  it('stops requiring the slot when switched off, keeping the pick for the next time', async () => {
+    await useKlein();
+    await settle(() =>
+      storedValues().patchSnapshot({
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: VISION_LLM as never,
+      })
+    );
+
+    expect(upsamplerSwitch()?.checked).toBe(true);
+    expect(upsamplerSlot()?.getAttribute('data-component-value')).toBe('pup');
+
+    await userEvent.click(upsamplerSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(upsamplerSlot()?.getAttribute('data-component-value')).toBe('pup');
+    expect(storedValues().getSnapshot()).toMatchObject({
+      flux3PromptUpsamplerEnabled: false,
+      flux3PromptUpsamplerModel: { key: 'pup' },
+    });
   });
 });
 
@@ -643,8 +841,12 @@ describe('GenerateSettingsForm render isolation', () => {
       host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.resetSize"]')?.click()
     );
     const menu = document.querySelector<HTMLElement>('[role="menu"]');
-    // Highlights the first choice, Square at native size.
-    await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    const highlighted = () => menu?.querySelector('[role="menuitemradio"][data-highlighted]')?.textContent ?? '';
+    // Arrows down to Square at native size by its name, wherever the menu lists it.
+    for (let step = 0; step < 3 && !highlighted().startsWith('widgets.generate.resetSizeSquareNative'); step += 1) {
+      await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    }
+    expect(highlighted()).toMatch(/^widgets\.generate\.resetSizeSquareNative/);
 
     // A width step still inside its debounce window, then the reset.
     await settle(() => {

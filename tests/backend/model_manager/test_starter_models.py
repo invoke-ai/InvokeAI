@@ -1,4 +1,4 @@
-"""Tests for the starter-model bundles and the LTX-2 GGUF transformers.
+"""Tests for the starter-model bundles, the LTX-2 GGUF transformers and the FLUX.3 single files.
 
 A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
@@ -7,6 +7,7 @@ two standalone dependencies so installing it also pulls the pieces needed to run
 one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -15,6 +16,7 @@ from invokeai.backend.model_manager.starter_models import (
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux3VariantType,
     Krea2VariantType,
     LTX2VariantType,
     ModelFormat,
@@ -109,6 +111,26 @@ def test_krea2_transformer_only_entries_declare_vae_and_encoder_dependencies() -
         assert ModelType.Qwen3VLEncoder in dep_types, f"{model.name} is missing a Qwen3-VL encoder dependency"
 
 
+def test_moss_image_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Single-file and GGUF MOSS-Image mains hold only the transformer; the loader requires a standalone FLUX.2 VAE and
+    # a Qwen3.5 encoder, so an entry without them installs but cannot generate.
+    transformer_only = [
+        m
+        for m in STARTER_MODELS
+        if m.type is ModelType.Main and m.base is BaseModelType.MossImage and m.source.startswith("https://")
+    ]
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert any(dep.type is ModelType.VAE and dep.base is BaseModelType.Flux2 for dep in dependencies), (
+            f"{model.name} is missing the FLUX.2 VAE dependency"
+        )
+        assert any(dep.type is ModelType.Qwen35Encoder for dep in dependencies), (
+            f"{model.name} is missing a Qwen3.5 encoder dependency"
+        )
+
+
 def test_krea2_bundle_models_are_registered_in_starter_models() -> None:
     starter_sources = {m.source for m in STARTER_MODELS}
     for model in STARTER_BUNDLES[BaseModelType.Krea2].models:
@@ -168,4 +190,64 @@ def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> Non
             (ModelType.Main, ModelFormat.Diffusers),
             (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
         }, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name
+
+
+def test_preview_decoders_list_the_bases_sharing_their_latent_space() -> None:
+    """A TAE is filed under one base but decodes for every base denoising in the same latents, so the starter-model
+    base filter can show it there too. A base with a different latent space must not be listed."""
+    taes = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+    taesd = next(m for m in taes if m.base is BaseModelType.StableDiffusion1)
+    taef1 = next(m for m in taes if m.base is BaseModelType.Flux)
+    taef2 = next(m for m in taes if m.base is BaseModelType.Flux2)
+
+    assert BaseModelType.StableDiffusion2 in taesd.compatible_bases
+    assert BaseModelType.StableDiffusionXL not in taesd.compatible_bases
+    assert BaseModelType.ZImage in taef1.compatible_bases
+    assert BaseModelType.Flux2 not in taef1.compatible_bases
+    assert {BaseModelType.Flux3, BaseModelType.ErnieImage, BaseModelType.Ideogram4} <= set(taef2.compatible_bases)
+    assert BaseModelType.Flux not in taef2.compatible_bases
+    for model in taes:
+        assert model.base not in model.compatible_bases, model.name
+
+
+def test_wan_preview_decoders_list_only_their_own_latent_space() -> None:
+    """Both Wan TAEs are filed under Wan, but only the 16-channel one shares latents with other families."""
+    taes = {m.name: m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder and m.base is BaseModelType.Wan}
+    taew2_1 = next(m for n, m in taes.items() if n.startswith("TAEW2.1"))
+    taew2_2 = next(m for n, m in taes.items() if n.startswith("TAEW2.2"))
+
+    assert {BaseModelType.QwenImage, BaseModelType.Krea2, BaseModelType.Anima} <= set(taew2_1.compatible_bases)
+    assert taew2_2.compatible_bases == []
+
+
+def test_every_preview_decoder_starter_resolves_to_a_latent_space() -> None:
+    """`compatible_bases` and the missing-TAE log both read the space from the TAE the source names: a starter whose
+    URL names no published TAE would silently drop out of the base filter, the bundle hint and the log."""
+    for model in STARTER_MODELS:
+        if model.type is ModelType.TinyAutoencoder:
+            assert named_tiny_autoencoder_space(model.base, model.source) is not None, model.name
+
+
+def test_only_preview_decoders_list_compatible_bases() -> None:
+    others = [m for m in STARTER_MODELS if m.type is not ModelType.TinyAutoencoder]
+    assert others and all(m.compatible_bases == [] for m in others)
+
+
+def test_every_flux3_transformer_only_starter_pulls_the_vae_and_the_encoder() -> None:
+    """The single files, quantized or not, and the GGUFs hold only the transformer: installing one has to pull the
+    FLUX.2 VAE and the Qwen3-VL encoder, both installable starters themselves. Klein and Klein Base both ship that way."""
+    transformer_only = [
+        m for m in STARTER_MODELS if m.base is BaseModelType.Flux3 and m.type is ModelType.Main and m.format is not None
+    ]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+    assert {m.variant for m in transformer_only if m.format is ModelFormat.Checkpoint} == {
+        Flux3VariantType.Klein,
+        Flux3VariantType.KleinBase,
+    }
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert {dep.type for dep in dependencies} == {ModelType.VAE, ModelType.Qwen3VLEncoder}, model.name
         assert all(dep.source in starter_sources for dep in dependencies), model.name

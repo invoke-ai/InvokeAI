@@ -19,7 +19,11 @@ const counts: QueueCounts = {
 
 describe('queue filters', () => {
   it('counts every tab the way its list filters: the same items, waiting ones among the active', () => {
-    expect(QUEUE_FILTERS.map(({ id }) => getFilterCount(counts, id))).toEqual([19, 13, 2, 3, 1]);
+    expect(QUEUE_FILTERS.map(({ id }) => getFilterCount(counts, id, 0))).toEqual([19, 13, 2, 3, 1]);
     expect(matchesFilter('waiting', 'active')).toBe(true);
+  });
+
+  it("counts this tab's runs the backend has not accepted under All and Active alone, where they are listed", () => {
+    expect(QUEUE_FILTERS.map(({ id }) => getFilterCount(counts, id, 2))).toEqual([21, 15, 2, 3, 1]);
   });
 });
