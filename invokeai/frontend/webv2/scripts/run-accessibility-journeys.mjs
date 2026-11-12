@@ -786,16 +786,22 @@ const runTopbarMenuJourney = async (browser) => {
     await invokeCard.waitFor({ state: 'hidden' });
     await expectFocused(invokeButton, 'Closing the Invoke card should return focus to Invoke.');
 
-    await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+    const appMenuButton = page.getByRole('button', { exact: true, name: 'Open menu' });
+    await appMenuButton.click();
     const appMenu = page.getByRole('menu', { exact: true, name: 'Open menu' });
-    const commandPaletteItem = page.getByRole('menuitem', { name: /^Command palette/ });
-    const settingsItem = appMenu.getByRole('menuitem', { name: /^Settings(?: \(.+\))?$/ });
+    // App-level items lead the menu as full rows; their keycaps stay out of the name, and aria-keyshortcuts says them.
+    const launchpadItem = appMenu.getByRole('menuitem', { exact: true, name: 'Launchpad' });
+    const settingsItem = appMenu.getByRole('menuitem', { exact: true, name: 'Settings' });
+    const commandPaletteItem = appMenu.getByRole('menuitem', { exact: true, name: 'Command palette' });
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
     const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to Invoke' });
+    await launchpadItem.waitFor();
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
+    assert.equal(await settingsItem.getAttribute('aria-keyshortcuts'), 'Control+,');
+    assert.equal(await commandPaletteItem.getAttribute('aria-keyshortcuts'), 'Control+K');
     await whatsNewItem.waitFor();
     await documentationItem.waitFor();
     await discordItem.waitFor();
@@ -805,42 +811,58 @@ const runTopbarMenuJourney = async (browser) => {
 
     const footerMetrics = await appMenu.evaluate((menu) => {
       const menuBounds = menu.getBoundingClientRect();
-      const footerValues = ['command-palette', 'settings', 'whats-new', 'documentation', 'discord'];
-      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].filter((item) =>
-        footerValues.includes(item.getAttribute('data-value'))
+      const items = [...menu.querySelectorAll('[role="menuitem"]')];
+      const footerValues = ['whats-new', 'documentation', 'discord'];
+      const footerItems = items.filter((item) => footerValues.includes(item.getAttribute('data-value')));
+      const leadingItems = items.filter((item) =>
+        ['launchpad', 'settings', 'command-palette'].includes(item.getAttribute('data-value'))
       );
+      const fits = (bounds) => bounds.left >= menuBounds.left && bounds.right <= menuBounds.right;
 
       return {
+        footerCount: footerItems.length,
         itemsFit: footerItems.every((item) => {
           const bounds = item.getBoundingClientRect();
 
-          return bounds.left >= menuBounds.left && bounds.right <= menuBounds.right && bounds.width <= 32.5;
+          return fits(bounds) && bounds.width <= 32.5;
+        }),
+        // Full rows: as wide as the menu's other items, label and keycaps inside.
+        leadingRowsFit: leadingItems.every((item) => {
+          const bounds = item.getBoundingClientRect();
+          const label = item.querySelector('[data-part="item-text"]')?.getBoundingClientRect();
+
+          return fits(bounds) && bounds.width > 32.5 && label !== undefined && label.right <= bounds.right;
         }),
         menuClientWidth: menu.clientWidth,
         menuScrollWidth: menu.scrollWidth,
       };
     });
+    assert.equal(footerMetrics.footerCount, 3);
     assert.equal(footerMetrics.itemsFit, true);
+    assert.equal(footerMetrics.leadingRowsFit, true);
     assert.equal(footerMetrics.menuScrollWidth, footerMetrics.menuClientWidth);
 
+    // Opening by pointer highlights nothing, so no footer tooltip shows on its own.
     await expectFocused(appMenu, 'Opening the app menu should focus its composite.');
-    assert.notEqual(await appMenu.getAttribute('aria-activedescendant'), await commandPaletteItem.getAttribute('id'));
+    assert.equal(await appMenu.locator('[role="menuitem"][data-highlighted]').count(), 0);
     await new Promise((resolveWait) => {
       setTimeout(resolveWait, 750);
     });
-    assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
+    assert.equal(
+      await page.getByRole('tooltip', { name: /^(?:What's New in Invoke|Documentation|Discord)$/ }).count(),
+      0
+    );
 
-    // Donate is its own group right after Manage (ending with Queue and Widgets), above the footer icon row; this mock journey
-    // is single-user, so no account section sits between them.
+    // Launchpad, Settings and the command palette lead; Donate is its own group right after Manage (ending with Queue
+    // and Widgets), directly above the footer icon row. The app menu holds no account section.
     const menuItemValues = await appMenu.evaluate((menu) =>
       [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
     );
+    assert.deepEqual(menuItemValues.slice(0, 3), ['launchpad', 'settings', 'command-palette']);
     assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
       'queue',
       'widgets',
       'donate',
-      'command-palette',
-      'settings',
       'whats-new',
       'documentation',
       'discord',
@@ -850,19 +872,41 @@ const runTopbarMenuJourney = async (browser) => {
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [
-      documentationItem,
-      whatsNewItem,
-      settingsItem,
-      commandPaletteItem,
-      donationItem,
-      widgetsItem,
-      queueItem,
-    ]) {
+    for (const item of [documentationItem, whatsNewItem, donationItem, widgetsItem, queueItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
+    await appMenu.press('Home');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await launchpadItem.getAttribute('id'));
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await settingsItem.getAttribute('id'));
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await commandPaletteItem.getAttribute('id'));
+
+    // Each opens from the keyboard and closes back to the menu's button: the item that opened it is gone by then.
+    await appMenu.press('Enter');
+    const paletteDialog = page.getByRole('dialog', { exact: true, name: 'Command palette' });
+    await paletteDialog.waitFor();
+    await expectFocused(
+      page.getByRole('combobox', { exact: true, name: 'Search commands and settings' }),
+      'Opening the command palette from the app menu should focus its search field.'
+    );
     await page.keyboard.press('Escape');
+    await paletteDialog.waitFor({ state: 'hidden' });
+    await expectFocused(appMenuButton, 'Closing the command palette should return focus to the app menu button.');
+
+    await appMenuButton.press('Enter');
+    await launchpadItem.waitFor();
+    await appMenu.press('Home');
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await settingsItem.getAttribute('id'));
+    await appMenu.press('Enter');
+    const settingsDialog = page.getByRole('dialog', { name: /^Settings:/ });
+    await settingsDialog.waitFor();
+    await waitForSettledDocument(page);
+    await page.keyboard.press('Escape');
+    await settingsDialog.waitFor({ state: 'hidden' });
+    await expectFocused(appMenuButton, 'Closing Settings should return focus to the app menu button.');
 
     const projectSwitcher = page.getByRole('button', { name: /^Switch project\./ });
     await projectSwitcher.click();

@@ -1,4 +1,5 @@
 import { Box, Flex, Heading, HStack, Stack, Text } from '@chakra-ui/react';
+import { logoutSession, useHasAccountMenu } from '@features/identity';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { Button } from '@platform/ui/Button';
 import { InvokeMark } from '@platform/ui/InvokeMark';
@@ -20,8 +21,10 @@ const formatErrorDetails = (error: unknown, location: string): string => {
 };
 
 /**
- * The screen a route that failed to render or load leaves behind: ways back (reload, Home) and the details for a
- * report. It sits in the router's eager chunk, so it reads only semantic tokens and small platform controls.
+ * The screen a route that failed to render or load leaves behind: ways back (reload, Home, and signing out of a
+ * multi-user session, whose only other control lives in the Launchpad that may be what failed) and the details for a
+ * report. It sits in the router's eager chunk, so it reads only semantic tokens and small platform controls. The
+ * session is a module store, so it reads the same with the route tree down.
  */
 export const RouterErrorScreen = ({ error, onGoHome }: { error: unknown; onGoHome: () => void }) => {
   const { t } = useTranslation();
@@ -42,6 +45,13 @@ export const RouterErrorScreen = ({ error, onGoHome }: { error: unknown; onGoHom
     window.setTimeout(() => setCopyStatus(null), COPY_STATUS_MS);
   }, [details]);
   const toggleDetails = useCallback(() => setIsShowingDetails((isShowing) => !isShowing), []);
+  const isSignedIn = useHasAccountMenu();
+  // The signed-out layout redirects to sign-in, but a failure above it leaves this screen up; leaving it reaches the
+  // authenticated route's guard, which does.
+  const signOut = useCallback(() => {
+    void logoutSession();
+    onGoHome();
+  }, [onGoHome]);
 
   return (
     <Flex align="center" bg="bg" color="fg" justify="center" minH="100dvh" p="6">
@@ -64,6 +74,11 @@ export const RouterErrorScreen = ({ error, onGoHome }: { error: unknown; onGoHom
           <Button size="lg" variant="outline" onClick={onGoHome}>
             {t('errorScreen.goHome')}
           </Button>
+          {isSignedIn ? (
+            <Button size="lg" variant="outline" onClick={signOut}>
+              {t('auth.signOut')}
+            </Button>
+          ) : null}
           {canCopyText() ? (
             <Button size="lg" variant="outline" onClick={copyDetails}>
               {t('errorScreen.copyDetails')}

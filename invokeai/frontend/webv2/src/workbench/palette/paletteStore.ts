@@ -23,21 +23,22 @@ registerAccountOwnedResource({
   name: 'command-palette',
 });
 
-const captureReturnFocusElement = (): void => {
-  const activeElement = document.activeElement;
-
-  returnFocusElement = activeElement instanceof HTMLElement ? activeElement : null;
-};
-
 export const getCommandPaletteReturnFocusElement = (): HTMLElement | null =>
   returnFocusElement?.isConnected ? returnFocusElement : null;
 
-export const openCommandPalette = (): void => {
+/**
+ * Closing focuses `returnFocus`, for a control that is gone by then (a menu item), or else whatever had focus when the
+ * palette opened.
+ */
+export const openCommandPaletteFrom = (returnFocus: HTMLElement | null): void => {
   if (!commandPaletteStore.getSnapshot().isOpen) {
-    captureReturnFocusElement();
+    const target = returnFocus ?? document.activeElement;
+    returnFocusElement = target instanceof HTMLElement ? target : null;
   }
   commandPaletteStore.setSnapshot({ isOpen: true });
 };
+
+export const openCommandPalette = (): void => openCommandPaletteFrom(null);
 
 export const closeCommandPalette = (): void => {
   commandPaletteStore.setSnapshot({ isOpen: false });

@@ -1,3 +1,5 @@
+import type * as SessionModule from '@features/identity/session';
+
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -6,6 +8,43 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+
+/** Single-user unless a test signs someone in; sign-out is the session's own, observed. */
+const auth = vi.hoisted(() => ({ logout: vi.fn(() => Promise.resolve()), signedIn: false }));
+vi.mock('@features/identity/session', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionModule>();
+  const singleUser: SessionModule.AuthSession = {
+    accountEpoch: 1,
+    expiredUserId: null,
+    multiuserEnabled: false,
+    phase: 'ready',
+    sessionExpired: false,
+    setupRequired: false,
+    strictPasswordChecking: false,
+    switchingAccount: false,
+    user: null,
+  };
+  const signedIn: SessionModule.AuthSession = {
+    ...singleUser,
+    multiuserEnabled: true,
+    user: {
+      created_at: '2026-01-01T00:00:00Z',
+      display_name: 'Ada',
+      email: 'ada@example.com',
+      is_active: true,
+      is_admin: false,
+      last_login_at: null,
+      updated_at: '2026-01-01T00:00:00Z',
+      user_id: 'ada',
+    },
+  };
+
+  return {
+    ...original,
+    logoutSession: auth.logout,
+    useAuthSession: () => (auth.signedIn ? signedIn : singleUser),
+  };
+});
 
 import { RouterErrorScreen } from './RouterErrorScreen';
 
@@ -50,6 +89,8 @@ const render = async (onGoHome = vi.fn()) => {
 };
 
 afterEach(() => {
+  auth.signedIn = false;
+  auth.logout.mockClear();
   act(() => root?.unmount());
   host?.remove();
   root = undefined;
@@ -76,6 +117,23 @@ describe('RouterErrorScreen', () => {
     await userEvent.click(page.getByRole('button', { name: 'Go to Home' }));
     expect(onGoHome).toHaveBeenCalledOnce();
     await expect.element(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+  });
+
+  it('offers Sign out to a signed-in account, which signs out and leaves the failed page', async () => {
+    auth.signedIn = true;
+    const onGoHome = await render();
+
+    await userEvent.click(page.getByRole('button', { name: 'Sign out' }));
+
+    expect(auth.logout).toHaveBeenCalledOnce();
+    expect(onGoHome).toHaveBeenCalledOnce();
+  });
+
+  it('offers no Sign out in single-user mode', async () => {
+    await render();
+
+    await expect.element(page.getByRole('button', { name: 'Go to Home' })).toBeVisible();
+    expect(page.getByRole('button', { name: 'Sign out' }).query()).toBeNull();
   });
 
   it('copies the error and where it happened', async () => {

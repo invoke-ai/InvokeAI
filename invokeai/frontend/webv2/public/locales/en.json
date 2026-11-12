@@ -272,7 +272,6 @@
     "save": "Save",
     "seed": "Seed",
     "settings": "Settings",
-    "settingsWithShortcut": "Settings ({{hotkey}})",
     "nextPage": "Next page",
     "somethingWentWrong": "Something went wrong.",
     "swap": "Swap",
@@ -343,6 +342,7 @@
   },
   "auth": {
     "account": "Account",
+    "accountMenu": "Account: {{name}}",
     "accountSettings": "Account settings",
     "accountUpdated": "Account updated",
     "administrator": "Administrator",
