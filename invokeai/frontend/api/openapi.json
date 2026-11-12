@@ -1704,6 +1704,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -1828,6 +1831,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -2294,6 +2300,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -2418,6 +2427,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -2884,6 +2896,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -3008,6 +3023,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -3518,6 +3536,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -3642,6 +3663,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -4179,6 +4203,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -4303,6 +4330,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -5715,6 +5745,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                     },
                     {
@@ -5839,6 +5872,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -6675,6 +6711,144 @@
           },
           "503": {
             "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/files/upload": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload File",
+        "description": "Uploads a managed file for node inputs.",
+        "operationId": "upload_file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The file was uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is too large or managed file storage is full"
+          },
+          "415": {
+            "description": "The file type is not supported"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/files/i/{file_id}": {
+      "get": {
+        "tags": ["files"],
+        "summary": "Get File Dto",
+        "description": "Gets metadata for a managed file.",
+        "operationId": "get_file_dto",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["files"],
+        "summary": "Delete File",
+        "description": "Deletes a managed file.",
+        "operationId": "delete_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The managed file ID.",
+              "title": "File Id"
+            },
+            "description": "The managed file ID."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -21554,6 +21728,9 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
           },
           {
@@ -21678,6 +21855,9 @@
           },
           {
             "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -23975,6 +24155,18 @@
         "required": ["is_public"],
         "title": "Body_update_workflow_is_public"
       },
+      "Body_upload_file": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": ["file"],
+        "title": "Body_upload_file"
+      },
       "Body_upload_font": {
         "properties": {
           "file": {
@@ -24010,8 +24202,8 @@
               }
             ],
             "title": "Resize To",
-            "description": "Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216",
-            "examples": ["\"[1024,1024]\""]
+            "description": "Dimensions to resize the image to, as a stringified JSON object with positive integer width and height. Max total pixel count: 16777216",
+            "examples": ["{\"width\": 1024, \"height\": 1024}"]
           },
           "metadata": {
             "anyOf": [
@@ -35531,10 +35723,272 @@
         "tags": ["latents", "denoise", "ernie-image"],
         "title": "Denoise - ERNIE-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "ErnieImageLoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to an ERNIE-Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["ernie-image"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ernie_image_lora_collection_loader",
+            "default": "ernie_image_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ernie-image"],
+        "title": "Apply LoRA Collection - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+        }
+      },
+      "ErnieImageLoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "ERNIE-Image LoRA collection loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_lora_collection_loader_output",
+            "default": "ernie_image_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "ErnieImageLoRACollectionLoaderOutput",
+        "type": "object"
+      },
+      "ErnieImageLoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to an ERNIE-Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["ernie-image"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "ernie_image_lora_loader",
+            "default": "ernie_image_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "ernie-image"],
+        "title": "Apply LoRA - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+        }
+      },
+      "ErnieImageLoRALoaderOutput": {
+        "class": "output",
+        "description": "ERNIE-Image LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_lora_loader_output",
+            "default": "ernie_image_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "ErnieImageLoRALoaderOutput",
+        "type": "object"
       },
       "ErnieImageModelLoaderInvocation": {
         "category": "model",
@@ -37854,6 +38308,53 @@
         "enum": ["input", "output", "internal", "node_attribute"],
         "title": "FieldKind",
         "type": "string"
+      },
+      "FileDTO": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "title": "File Id",
+            "description": "The managed file ID."
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name",
+            "description": "The original file name."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "The uploaded file content type."
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "description": "The size of the file in bytes."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the file was uploaded."
+          }
+        },
+        "type": "object",
+        "required": ["file_id", "file_name", "content_type", "size_bytes", "created_at"],
+        "title": "FileDTO"
+      },
+      "FileField": {
+        "description": "A managed file primitive field",
+        "properties": {
+          "file_id": {
+            "description": "The id of the managed file",
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": ["file_id"],
+        "title": "FileField",
+        "type": "object"
       },
       "FloatBatchInvocation": {
         "category": "batch",
@@ -41292,6 +41793,130 @@
         "required": ["output_meta", "transformer", "qwen3_vl_encoder", "vae", "type", "type"],
         "title": "Flux3ModelLoaderOutput",
         "type": "object"
+      },
+      "Flux3PromptUpsamplerInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Writes the caption FLUX.3 encodes with Black Forest Labs' prompt upsampler.\n\nThe upsampler sees what the generation sees: the prompt, the reference images of an edit and the canvas regions of\na layout. The mode follows the inputs (text-to-image, edit, and each with a layout). Regions replace the Layout\nPrompt node's: they and the rows of a box table that ends the prompt are kept exactly in the answer's box table.\nDecoding is greedy, so the same inputs give the same caption.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The request to expand into the caption, optionally ending with a box table of its own.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "upsampler_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.3 prompt upsampler: a Text LLM that can read images.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt Upsampler",
+            "ui_model_type": ["text_llm"]
+          },
+          "reference_images": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxKontextConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxKontextConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Reference images of an edit, in attachment order (up to 10), the ones the denoiser receives.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Images"
+          },
+          "regions": {
+            "default": [],
+            "description": "Boxes on the 0-1000 grid across the image, assembled from Canvas Regional Guidance layers. Object rows, or with reference images rows that place new content in the output.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/Flux3LayoutRegion"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "max_new_tokens": {
+            "default": 3584,
+            "description": "The most tokens the caption may take.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 3584,
+            "minimum": 64,
+            "orig_default": 3584,
+            "orig_required": false,
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux3_prompt_upsampler",
+            "default": "flux3_prompt_upsampler",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "upsampler", "layout", "flux3", "flux"],
+        "title": "Prompt Upsampler - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
       },
       "Flux3TextEncoderInvocation": {
         "category": "conditioning",
@@ -47152,6 +47777,12 @@
                   "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
                 },
                 {
@@ -47255,6 +47886,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -48197,6 +48831,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/ErnieImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
@@ -57899,6 +58539,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -58002,6 +58648,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -58942,6 +59591,12 @@
                 "$ref": "#/components/schemas/ErnieImageConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
               },
               {
@@ -59619,6 +60274,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -59722,6 +60383,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -60812,6 +61476,12 @@
           "ernie_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "ernie_image_lora_collection_loader": {
+            "$ref": "#/components/schemas/ErnieImageLoRACollectionLoaderOutput"
+          },
+          "ernie_image_lora_loader": {
+            "$ref": "#/components/schemas/ErnieImageLoRALoaderOutput"
+          },
           "ernie_image_model_loader": {
             "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
           },
@@ -60916,6 +61586,9 @@
           },
           "flux3_model_loader": {
             "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
+          },
+          "flux3_prompt_upsampler": {
+            "$ref": "#/components/schemas/StringOutput"
           },
           "flux3_text_encoder": {
             "$ref": "#/components/schemas/Flux3ConditioningOutput"
@@ -61807,6 +62480,8 @@
           "dw_openpose_detection",
           "dynamic_prompt",
           "ernie_image_denoise",
+          "ernie_image_lora_collection_loader",
+          "ernie_image_lora_loader",
           "ernie_image_model_loader",
           "ernie_image_prompt_enhancer",
           "ernie_image_text_encoder",
@@ -61842,6 +62517,7 @@
           "flux3_lora_collection_loader",
           "flux3_lora_loader",
           "flux3_model_loader",
+          "flux3_prompt_upsampler",
           "flux3_text_encoder",
           "flux_control_lora_loader",
           "flux_controlnet",
@@ -62384,6 +63060,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -62487,6 +63169,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -63695,6 +64380,12 @@
                 "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageLoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
@@ -63798,6 +64489,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -64904,6 +65598,22 @@
             "title": "Max Font Library Bytes",
             "description": "Maximum total size of uploaded custom fonts in bytes per account or shared library.",
             "default": 1073741824
+          },
+          "max_file_upload_size_bytes": {
+            "type": "integer",
+            "maximum": 1073741824.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Upload Size Bytes",
+            "description": "Maximum size in bytes of one managed file upload.",
+            "default": 52428800
+          },
+          "max_file_library_bytes": {
+            "type": "integer",
+            "maximum": 17179869184.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max File Library Bytes",
+            "description": "Maximum total size in bytes of all managed files.",
+            "default": 5368709120
           },
           "image_subfolder_strategy": {
             "type": "string",
@@ -74038,6 +74748,158 @@
         ],
         "title": "LoRA_LyCORIS_Anima_Config",
         "description": "Model config for Anima LoRA models in LyCORIS format."
+      },
+      "LoRA_LyCORIS_ErnieImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "ernie-image",
+            "title": "Base",
+            "default": "ernie-image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_ErnieImage_Config",
+        "description": "Model config for ERNIE-Image LoRA models (single file; PEFT, kohya-style or LyCORIS tensors).\n\nERNIE-Image LoRAs name the transformer's own modules behind a container prefix. `layers.N.self_attention.*` and\n`layers.N.mlp.linear_fc2` exist in no other supported transformer, which is what makes the match exclusive;\n`mlp.gate_proj` / `up_proj` are shared with LLM layers and only count once those identified the file. See\n`ernie_image_lora_constants`."
       },
       "LoRA_LyCORIS_FLUX_Config": {
         "properties": {
@@ -93897,6 +94759,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
               },
               {
@@ -94021,6 +94886,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -94733,6 +95601,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                   },
                   {
@@ -94857,6 +95728,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -95499,6 +96373,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
               },
               {
@@ -95623,6 +96500,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -96076,6 +96956,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
               },
               {
@@ -96200,6 +97083,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -97142,6 +98028,9 @@
                   "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
                 },
                 {
@@ -97266,6 +98155,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -113172,6 +114064,15 @@
             "title": "Previous Sources",
             "default": []
           },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -113377,6 +114278,15 @@
             },
             "type": "array",
             "title": "Previous Sources",
+            "default": []
+          },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
             "default": []
           }
         },
@@ -115871,7 +116781,7 @@
           "cpu_only"
         ],
         "title": "T5Encoder_GGUF_Config",
-        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."
+        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``). UMT5 files in\nthe same naming belong to ``WanT5Encoder_GGUF_Config``."
       },
       "T5Encoder_SDNQ_Config": {
         "properties": {
@@ -125713,6 +126623,155 @@
         "required": ["tokenizer", "text_encoder"],
         "title": "WanT5EncoderField",
         "type": "object"
+      },
+      "WanT5Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "wan_t5_encoder",
+            "title": "Type",
+            "default": "wan_t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "WanT5Encoder_GGUF_Config",
+        "description": "UMT5-XXL encoder in one llama.cpp ``t5encoder`` GGUF file, e.g. ``city96/umt5-xxl-encoder-gguf``.\n\nThe naming is the one FLUX's T5 v1.1 GGUFs use (see ``util/llamacpp_t5.py``); a relative attention\nbias in blocks past the first is what makes the file UMT5. Once it is UMT5, a file the loader would\nfail on is refused at install rather than at the first prompt: an encoder-decoder conversion,\nmissing tensors, or missing tokenizer metadata (a GGUF ships no tokenizer files beside it). Only the\ntokenizer's scalar fields are checked here; its vocabulary arrays, which ``ModelOnDisk.metadata``\nleaves out, are checked when the tokenizer is loaded."
       },
       "WanT5Encoder_WanT5Encoder_Config": {
         "properties": {

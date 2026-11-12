@@ -459,7 +459,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
             return _load_qwen3vl_visual_tower(
                 qwen3vl_visual_tower_files(encoder_path),
                 AutoConfig.from_pretrained(encoder_path, local_files_only=True).vision_config,
-                TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()),
+                self._decision(config, submodel_type).dtype,
                 reserve=self._ram_cache.make_room,
             )
 

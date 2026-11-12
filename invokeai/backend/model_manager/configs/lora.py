@@ -49,6 +49,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
     has_cosmos_dit_peft_keys_strict,
 )
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import (
+    has_ernie_image_markers,
+    is_ernie_image_lora,
+    split_ernie_image_lora_key,
+)
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
     describe_refusal,
     has_flux3_lora_keys,
@@ -78,6 +83,7 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import 
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
     unsupported_keys as qwen_image_21_unsupported_lora_keys,
 )
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import QWEN_IMAGE_ONLY_MODULE_RE
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
     group_sd3_lora_layers,
     is_sd3_lora,
@@ -820,6 +826,10 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
 
+        # ERNIE-Image keeps its transformer blocks under `layers.N` as well, so the prefixes below admit its
+        # LoRAs too; its block names (`self_attention`, `mlp.linear_fc2`) are what tell the two apart.
+        if has_ernie_image_markers([k for k in state_dict.keys() if isinstance(k, str)]):
+            raise NotAMatchError("model looks like an ERNIE-Image LoRA, not a Z-Image LoRA")
         # Ideogram 4 names its blocks like Z-Image (`layers.N.attention`, `feed_forward.w1..3`), so the prefixes
         # below admit its LoRAs too; its widths (4608, not 3840) are what tell the two apart. Checked on the widths
         # alone, so an Ideogram 4 file that Ideogram 4's probe does not recognise is not taken for Z-Image either.
@@ -900,11 +910,11 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 # ComfyUI's `diffusion_model.` and raw PEFT's `base_model.model.` also prefix other families' LoRAs, some of them on
 # `transformer_blocks.N` (LTX-2) or on Qwen-Image's attention names (FLUX in diffusers naming). Under these prefixes,
-# only low-rank weights on modules that Qwen-Image's dual-stream blocks alone have identify a Qwen-Image LoRA:
-# Qwen-Image-2.1 names its MLP `img_mlp.proj`, and the converter cannot group dotted LoKr keys.
+# only weights on modules that Qwen-Image's dual-stream blocks alone have identify a Qwen-Image LoRA:
+# Qwen-Image-2.1 names its MLP `img_mlp.proj`.
 _PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE = re.compile(
     r"^(?:diffusion_model|base_model\.model)\.transformer_blocks\.\d+\.(?:img_mod|txt_mod|img_mlp\.net|txt_mlp)\."
-    r".*\.(?:lora_A|lora_B|lora_down|lora_up)\.weight$"
+    r".*\.(?:(?:lora_A|lora_B|lora_down|lora_up)\.weight|lokr_w[12](?:_[ab])?|hada_w[12]_[ab])$"
 )
 
 
@@ -914,6 +924,35 @@ def _has_prefixed_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool
     if any(key.endswith(".lora_magnitude_vector") for key in keys):
         return False
     return any(_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in keys)
+
+
+# LyCORIS' own (`lycoris_`) and ai-toolkit's (`lora_transformer_`, also OneTrainer's FLUX spelling) flattened
+# spellings of the transformer, also used by FLUX (`lora_transformer_transformer_blocks_`, diffusers naming) and
+# others. Only a module of Qwen-Image's dual-stream blocks identifies a Qwen-Image LoRA under them.
+_FLATTENED_QWEN_IMAGE_BLOCK_KEY_RE = re.compile(
+    r"^(?:lycoris|lora_transformer)_transformer_blocks_\d+_(?:img_mod|txt_mod|img_mlp_net|txt_mlp)_"
+)
+
+
+def _has_flattened_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    return any(isinstance(key, str) and _FLATTENED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in state_dict)
+
+
+# LoKr and LoHa parameters `any_lora_layer_from_state_dict` reads that were not identification suffixes before. Other
+# families' LoRAs share the generic `transformer_blocks.` prefixes, so these count only beside a Qwen-Image-only module.
+_QWEN_IMAGE_LYCORIS_ONLY_SUFFIXES = {
+    "lokr_w1_a",
+    "lokr_w1_b",
+    "lokr_w2_a",
+    "lokr_w2_b",
+    "lokr_t2",
+    "hada_w1_a",
+    "hada_w1_b",
+    "hada_w2_a",
+    "hada_w2_b",
+    "hada_t1",
+    "hada_t2",
+}
 
 
 # Qwen-Image's transformer width (24 heads of 128).
@@ -964,7 +1003,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 "transformer.transformer_blocks.",
                 "lora_unet_transformer_blocks_",  # Kohya format
             },
-        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
+        ) or (_has_prefixed_qwen_image_lora_keys(state_dict) or _has_flattened_qwen_image_lora_keys(state_dict))
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
             {
@@ -974,8 +1013,11 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 "lora_up.weight",
                 "dora_scale",
                 "lokr_w1",
-                "lokr_w2",  # LoKR format
+                "lokr_w2",
             },
+        ) or (
+            state_dict_has_any_keys_ending_with(state_dict, _QWEN_IMAGE_LYCORIS_ONLY_SUFFIXES)
+            and any(isinstance(key, str) and QWEN_IMAGE_ONLY_MODULE_RE.search(key) for key in state_dict)
         )
         # Must NOT have diffusion_model.layers (Z-Image) or Flux-style keys.
         # Flux LoRAs can have transformer.single_transformer_blocks or transformer.transformer_blocks
@@ -1026,7 +1068,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
-        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
+        ) or (_has_prefixed_qwen_image_lora_keys(state_dict) or _has_flattened_qwen_image_lora_keys(state_dict))
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_krea2_keys = _has_krea2_lora_keys(state_dict)
         str_keys = [key for key in state_dict if isinstance(key, str)]
@@ -1089,9 +1131,6 @@ _QWEN_IMAGE21_MLP_MARKERS = (
 # `audio_to_video_attn.to_q` is as wide and would match the bare `attn.to_q`.
 _BLOCK_ATTENTION_PROJECTION = re.compile(r"transformer_blocks[._]\d+[._]attn[._]to_(?:[qkv]|out[._]0)[._]")
 _LOKR_FACTOR = re.compile(r"\.(lokr_w[12])(?:_b)?$")
-# Modules of Qwen Image's dual-stream blocks that no other family naming `transformer_blocks.N` has: its per-stream
-# modulation and MLPs, dotted or Kohya-flattened.
-_QWEN_IMAGE_ONLY_MODULE = re.compile(r"transformer_blocks[._]\d+[._](?:img_mod|txt_mod|img_mlp[._]net|txt_mlp)[._]")
 
 
 # The parameters that carry a layer's input width as their second dimension: the input-side matrix of a low-rank
@@ -1143,7 +1182,7 @@ def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     if _QWEN_IMAGE21_HIDDEN_SIZE in direct:
         return True
     return _QWEN_IMAGE21_HIDDEN_SIZE in factored and not any(
-        isinstance(key, str) and _QWEN_IMAGE_ONLY_MODULE.search(key) for key in state_dict
+        isinstance(key, str) and QWEN_IMAGE_ONLY_MODULE_RE.search(key) for key in state_dict
     )
 
 
@@ -1709,6 +1748,45 @@ class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             return BaseModelType.LTX2
 
         raise NotAMatchError("model does not look like an LTX-2 LoRA")
+
+
+class LoRA_LyCORIS_ErnieImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for ERNIE-Image LoRA models (single file; PEFT, kohya-style or LyCORIS tensors).
+
+    ERNIE-Image LoRAs name the transformer's own modules behind a container prefix. `layers.N.self_attention.*` and
+    `layers.N.mlp.linear_fc2` exist in no other supported transformer, which is what makes the match exclusive;
+    `mlp.gate_proj` / `up_proj` are shared with LLM layers and only count once those identified the file. See
+    `ernie_image_lora_constants`.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        # Imported here: the layer classes the conversion builds import the model manager's loader package.
+        from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+            ernie_image_lora_defect,
+        )
+
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+        if not is_ernie_image_lora(str_keys):
+            raise NotAMatchError("model does not match ERNIE-Image LoRA heuristics")
+        # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
+        if not any(split_ernie_image_lora_key(k) is not None for k in str_keys):
+            raise NotAMatchError("model has ERNIE-Image module names but no LoRA tensors")
+        refusal = ernie_image_lora_defect(state_dict)
+        if refusal is not None:
+            # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the
+            # install instead.
+            raise InvalidMatchError(f"ERNIE-Image LoRA cannot be applied: {refusal}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        str_keys = [k for k in mod.load_state_dict().keys() if isinstance(k, str)]
+        if is_ernie_image_lora(str_keys):
+            return BaseModelType.ErnieImage
+        raise NotAMatchError("model does not look like an ERNIE-Image LoRA")
 
 
 def _raise_unless_ideogram4_lora(state_dict: dict[str | int, Any]) -> None:

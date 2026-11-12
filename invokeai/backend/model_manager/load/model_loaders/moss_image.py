@@ -230,6 +230,13 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
 
     _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
 
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Diffusers_MossImage_Config):
             raise ValueError(f"Expected Main_Diffusers_MossImage_Config, got {type(config).__name__}.")
@@ -254,7 +261,7 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
 
                 # The FLUX.2 VAE loaders' dtype: never float16, in which the FLUX autoencoders break.
                 return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                    model_path / "vae", torch_dtype=self._decision(config, submodel_type).dtype, local_files_only=True
                 )
 
         raise ValueError(

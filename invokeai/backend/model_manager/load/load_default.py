@@ -397,6 +397,20 @@ class ModelLoader(ModelLoaderBase):
             and fp8_storage_verdict(config.base, config.type, config.format).supported
         ):
             keep, dtype = use_storage, decision.dtype
+        elif (
+            self._bfloat16_safe
+            and self._fixed_dtype is None
+            and submodel_type
+            not in {
+                SubModelType.Tokenizer,
+                SubModelType.Tokenizer2,
+                SubModelType.Tokenizer3,
+                SubModelType.PromptEnhancerTokenizer,
+                SubModelType.Processor,
+                SubModelType.Scheduler,
+            }
+        ):
+            keep, dtype = False, decision.dtype
         else:
             return ""
         return f"{'fp8' if keep else 'full'}-{str(dtype).removeprefix('torch.')}{'-layerwise' if use_storage else ''}"

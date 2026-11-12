@@ -71,6 +71,7 @@ from invokeai.backend.quantization.nvfp4 import (
     pop_nvfp4_layers,
     relayout_modelopt_nvfp4_payloads,
 )
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
@@ -209,6 +210,13 @@ class Flux3DiffusersModel(ModelLoader):
 
     _bfloat16_safe = True
 
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -238,9 +246,7 @@ class Flux3DiffusersModel(ModelLoader):
             case SubModelType.VAE:
                 from diffusers import AutoencoderKLFlux2
 
-                return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
-                )
+                return AutoencoderKLFlux2.from_pretrained(model_path / "vae", torch_dtype=dtype, local_files_only=True)
             case SubModelType.TextEncoder:
                 encoder_path = model_path / "text_encoder"
                 encoder_config = normalize_qwen3vl_rope_config(

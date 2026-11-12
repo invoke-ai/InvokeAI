@@ -236,10 +236,9 @@ class _LTX2ComponentLoading:
             model = factory()
         return _assign_state_dict(model, sd, what)
 
-    def _load_video_vae(self, path: Path) -> AnyModel:
+    def _load_video_vae(self, path: Path, dtype: torch.dtype) -> AnyModel:
         from diffusers import AutoencoderKLLTX2Video
 
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         sd = cc.convert_video_vae_keys(_read_dense_component(path, "LTX-2 video VAE", self._logger))
         return self._build_dense(
             lambda: AutoencoderKLLTX2Video(**cc.LTX2_5_VIDEO_VAE_CONFIG), sd, "LTX-2 video VAE", dtype
@@ -269,7 +268,7 @@ class _LTX2ComponentLoading:
     def _load_connectors(self, config: Main_Diffusers_LTX2_Config) -> AnyModel:
         from diffusers.pipelines.ltx2.connectors import LTX2TextConnectors
 
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, SubModelType.Connectors).dtype
         sd: dict[str, torch.Tensor] = {}
         for role in _SUBMODEL_ROLES[SubModelType.Connectors]:
             path = _component_path(config, role)
@@ -284,10 +283,9 @@ class _LTX2ComponentLoading:
             lambda: LTX2TextConnectors(**cc.LTX2_5_CONNECTORS_CONFIG), sd, "LTX-2 text connectors", dtype
         )
 
-    def _load_upsampler(self, path: Path, temporal: bool) -> AnyModel:
+    def _load_upsampler(self, path: Path, temporal: bool, dtype: torch.dtype) -> AnyModel:
         from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
 
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         what = "LTX-2 temporal latent upsampler" if temporal else "LTX-2 spatial latent upsampler"
         params = cc.LTX2_5_TEMPORAL_UPSAMPLER_CONFIG if temporal else cc.LTX2_5_SPATIAL_UPSAMPLER_CONFIG
         sd = _read_dense_component(path, what, self._logger)
@@ -407,6 +405,13 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
 
     _bfloat16_safe = True
 
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type in (SubModelType.AudioVAE, SubModelType.Vocoder):
+            return torch.float32
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -436,7 +441,9 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
                     )
                 return self._load_transformer_from_file(_component_path(config, layout.ROLE_TRANSFORMER), config)
             case SubModelType.VAE:
-                return self._load_video_vae(_component_path(config, layout.ROLE_VIDEO_VAE))
+                return self._load_video_vae(
+                    _component_path(config, layout.ROLE_VIDEO_VAE), self._decision(config, submodel_type).dtype
+                )
             case SubModelType.AudioVAE:
                 return self._load_audio_vae(_component_path(config, layout.ROLE_AUDIO_VAE))
             case SubModelType.Vocoder:
@@ -444,9 +451,17 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
             case SubModelType.Connectors:
                 return self._load_connectors(config)
             case SubModelType.LatentUpsampler:
-                return self._load_upsampler(_component_path(config, layout.ROLE_SPATIAL_UPSAMPLER), temporal=False)
+                return self._load_upsampler(
+                    _component_path(config, layout.ROLE_SPATIAL_UPSAMPLER),
+                    temporal=False,
+                    dtype=self._decision(config, submodel_type).dtype,
+                )
             case SubModelType.TemporalLatentUpsampler:
-                return self._load_upsampler(_component_path(config, layout.ROLE_TEMPORAL_UPSAMPLER), temporal=True)
+                return self._load_upsampler(
+                    _component_path(config, layout.ROLE_TEMPORAL_UPSAMPLER),
+                    temporal=True,
+                    dtype=self._decision(config, submodel_type).dtype,
+                )
             case SubModelType.TextEncoder | SubModelType.Tokenizer:
                 raise ValueError(
                     "LTX-2 component folders carry no text encoder. The Gemma-4 encoder is its own model record; "

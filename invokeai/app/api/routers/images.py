@@ -114,8 +114,11 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
     resize_to: Optional[str] = Body(
         default=None,
-        description=f"Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: {ResizeToDimensions.MAX_SIZE}",
-        examples=['"[1024,1024]"'],
+        description=(
+            "Dimensions to resize the image to, as a stringified JSON object with positive integer width and height."
+            f" Max total pixel count: {ResizeToDimensions.MAX_SIZE}"
+        ),
+        examples=['{"width": 1024, "height": 1024}'],
     ),
     metadata: Optional[str] = Body(
         default=None,

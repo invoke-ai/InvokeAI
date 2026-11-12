@@ -287,7 +287,7 @@ export const claimQueueItemDelivery = async (
   const result = await apiFetchJson<QueueItemDeliveryResultDTO>(buildQueueUrl(`i/${itemId}/delivery`), {
     body: JSON.stringify({ action, claimant }),
     method: 'POST',
-    signal: owner.signal,
+    signal: AbortSignal.any([owner.signal, AbortSignal.timeout(10_000)]),
   });
 
   assertAccountScopeCurrent(owner);

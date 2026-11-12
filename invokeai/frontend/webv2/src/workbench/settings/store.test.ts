@@ -507,6 +507,11 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all-projects' }).queueJobsScope).toBe('all');
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'current-project' }).queueJobsScope).toBe('all');
   });
+
+  it('treats a dismissed alpha notice as a dismissed beta notice', () => {
+    expect(store.normalizeWorkbenchPreferences({ alphaNoticeAcknowledged: true }).betaNoticeAcknowledged).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({}).betaNoticeAcknowledged).toBe(false);
+  });
 });
 
 describe('normalizeWorkbenchPreferences startup destination', () => {
