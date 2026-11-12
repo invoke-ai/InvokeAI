@@ -98,6 +98,30 @@ const refinerCase = () => {
   };
 };
 
+/** The same shape with one concept applied, for bases that load LoRAs; `null` for the rest. */
+const compileWithLoraForShape = (
+  base: SupportedGenerateBase,
+  shape: ModelShape
+): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } | null => {
+  const { filled, model, settings } = satisfiedSettingsFor(base, shape);
+
+  if (!isLoraSupported(model)) {
+    return null;
+  }
+
+  const lora = { base, key: 'concept', name: 'concept', type: 'lora' as const };
+
+  return {
+    filled,
+    graph: compileGenerateGraph(
+      { ...settings, loras: [{ isEnabled: true, model: lora, weight: 0.75 }] },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph,
+  };
+};
+
 // Canvas owns image encoding; both toggle values must reach the backend-validated literal contract.
 const sdxlCanvasCase = (colorCompensation: boolean) => {
   const shape: ModelShape = {
@@ -327,10 +351,16 @@ describe('generate graph coverage', () => {
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
     // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
+    // Bases that load LoRAs compile it once more with a concept, whose loader nodes the backend has to provide as well.
     const compilations = [
-      ...generateGraphCases.flatMap(({ base, shape }) =>
-        [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
-      ),
+      ...generateGraphCases.flatMap(({ base, shape }) => {
+        const withLora = compileWithLoraForShape(base, shape);
+
+        return [
+          ...[false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) })),
+          ...(withLora ? [{ base, shape, ...withLora }] : []),
+        ];
+      }),
       refinerCase(),
       sdxlCanvasCase(false),
       sdxlCanvasCase(true),

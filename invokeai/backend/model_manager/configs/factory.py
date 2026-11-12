@@ -72,6 +72,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_SDXL_Config,
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
+    LoRA_LyCORIS_ErnieImage_Config,
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_Flux3_Config,
     LoRA_LyCORIS_FLUX_Config,
@@ -582,6 +583,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # ERNIE-Image keys on its `self_attention` / `mlp` block names and top-level modules, which Z-Image's probe now
+        # rejects, so the two are mutually exclusive regardless of order (locked in by
+        # `test_ernie_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_ErnieImage_Config, LoRA_LyCORIS_ErnieImage_Config.get_tag()],
         # Ideogram 4 shares Z-Image's block names; it needs a patched weight at an Ideogram 4 width, which
         # Z-Image's probe now rejects, so the two are mutually exclusive regardless of order (locked in by
         # `test_ideogram4_lora_probe_independence.py`).

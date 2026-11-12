@@ -1987,6 +1987,101 @@ describe('FLUX.3 graphs', () => {
     expect(getEdge(withDisabledReference, 'denoise_latents', 'kontext_conditioning')).toBeUndefined();
     expect(withDisabledReference.nodes.layout_prompt).not.toHaveProperty('edit_targets');
   });
+
+  describe('with the prompt upsampler on', () => {
+    const upsampler = {
+      base: 'any',
+      key: 'pup',
+      name: 'FLUX.3 Prompt Upsampler',
+      supports_images: true,
+      type: 'text_llm',
+    };
+    const upsample = (model: MainModelConfig, overrides: Partial<GenerateSettings> = {}) =>
+      compile(model, { flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler, ...overrides });
+
+    it('replaces the layout node and sends the typed prompt through the upsampler to the encoder', () => {
+      const graph = upsample(kleinModel);
+      const metadata = getNodeByType(graph, 'core_metadata')!;
+
+      expect(graph.nodes.layout_prompt).toBeUndefined();
+      expect(graph.nodes.prompt_upsampler).toMatchObject({
+        type: 'flux3_prompt_upsampler',
+        upsampler_model: { key: 'pup', name: 'FLUX.3 Prompt Upsampler', type: 'text_llm' },
+      });
+      // The node derives edit targets from its reference images and keeps its default token budget.
+      expect(graph.nodes.prompt_upsampler).not.toHaveProperty('edit_targets');
+      expect(graph.nodes.prompt_upsampler).not.toHaveProperty('max_new_tokens');
+      expect(getEdge(graph, 'prompt_upsampler', 'prompt')?.source).toEqual({
+        field: 'value',
+        node_id: 'positive_prompt',
+      });
+      expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'prompt_upsampler' });
+      // Metadata records the caption encoded and the model that wrote it; the prompt as typed stays in
+      // `positive_prompt`, which recall restores.
+      expect(getEdge(graph, metadata.id, 'flux3_caption')?.source).toEqual({
+        field: 'value',
+        node_id: 'prompt_upsampler',
+      });
+      expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+      expect(metadata.flux3_prompt_upsampler).toMatchObject({ key: 'pup' });
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')).toBeUndefined();
+    });
+
+    it('feeds the collect that reaches the denoiser to the upsampler as well', () => {
+      const graph = upsample(kleinModel, {
+        referenceImages: [reference('a'), reference('off', false), reference('b')],
+      });
+      const toDenoiser = getEdge(graph, 'denoise_latents', 'kontext_conditioning');
+
+      expect(toDenoiser).toBeDefined();
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')?.source).toEqual(toDenoiser?.source);
+      expect(denoiserReferenceOrder(graph)).toEqual(['a.png', 'b.png']);
+    });
+
+    it('does not read a disabled reference', () => {
+      const graph = upsample(kleinModel, { referenceImages: [reference('off', false)] });
+
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')).toBeUndefined();
+    });
+
+    it('upsamples only the positive prompt of Klein Base, whose negative branch is untouched', () => {
+      const graph = upsample(kleinBaseModel);
+
+      expect(getEdge(graph, 'neg_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'negative_prompt' });
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+      expect(graph.edges.filter((edge) => edge.source.node_id === 'prompt_upsampler')).toHaveLength(2);
+    });
+
+    it('builds the layout graph while switched off, keeping the pick', () => {
+      // Pin the minted ids so the two graphs compare whole.
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      try {
+        const off = compile(kleinModel, { flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: upsampler });
+
+        expect(off).toEqual(compile(kleinModel));
+      } finally {
+        clock.mockRestore();
+        random.mockRestore();
+      }
+    });
+
+    it('refuses to compile without a model that reads images', () => {
+      expect(() => upsample(kleinModel, { flux3PromptUpsamplerModel: null })).toThrow(/prompt upsampler/i);
+      expect(() =>
+        upsample(kleinModel, { flux3PromptUpsamplerModel: { ...upsampler, supports_images: false } })
+      ).toThrow(/prompt upsampler/i);
+    });
+
+    it('is not run for another family', () => {
+      const graph = compile({ ...kleinModel, base: 'flux2', key: 'k2', variant: 'klein_4b' } as MainModelConfig, {
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: upsampler,
+      });
+
+      expect(getNodeByType(graph, 'flux3_prompt_upsampler')).toBeUndefined();
+    });
+  });
 });
 
 describe('ERNIE-Image graphs', () => {
@@ -2032,6 +2127,32 @@ describe('ERNIE-Image graphs', () => {
     const graph = compile(ernieModel, { mistralEncoderModel: mistralEncoder });
 
     expect(graph.nodes.model_loader?.text_encoder_model).toBeUndefined();
+  });
+
+  it('routes the transformer through ERNIE-Image LoRAs and records only those it applied', () => {
+    const ernieLora: LoraModelConfig = { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' };
+    // Same `layers.N` container, different family: it must not reach the ERNIE-Image loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(ernieModel, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: ernieLora, weight: 0.7 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'ernie_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // The Ministral encoder carries no LoRA layers, so both prompts keep reading it from the model loader.
+    expect(getEdge(graph, 'pos_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' }, weight: 0.7 },
+    ]);
   });
 
   it('builds the rest of the graph out of the one bundled pipeline', () => {

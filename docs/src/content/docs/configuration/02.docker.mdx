@@ -33,6 +33,20 @@ docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/inv
 
 Once the container starts up, open [http://localhost:9090](http://localhost:9090) in your browser, install some models, and start generating.
 
+### AMD GPUs (ROCm)
+
+Use a `-rocm` image: `main-rocm`, or `<version>-rocm` for a release. Pass both GPU devices and your host's `render` group ID:
+
+```bash
+docker run --device /dev/kfd --device /dev/dri \
+  --env RENDER_GROUP_ID=$(getent group render | cut -d: -f3) \
+  --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
+```
+
+- `/dev/kfd` is the ROCm compute interface and `/dev/dri` holds the GPU's render nodes. Invoke needs both.
+- Invoke runs as an unprivileged user inside the container, and the devices keep their host group. The entrypoint adds that user to a `render` group with the ID from `RENDER_GROUP_ID`. Without it, PyTorch can't open the GPU and Invoke runs on the CPU.
+- The image includes kernels for every GPU that AMD's ROCm 10 PyTorch build supports (see [AMD](/start-here/system-requirements/#amd)). Those GPUs don't need `HSA_OVERRIDE_GFX_VERSION`.
+
 ## Build-It-Yourself
 
 All the docker materials are located inside the [docker](https://github.com/invoke-ai/InvokeAI/tree/main/docker) directory in the Git repo.
@@ -67,6 +81,7 @@ The image includes the driver for a [MySQL or MariaDB database](/configuration/e
 | `INVOKEAI_ROOT` | `~/invokeai` | **Required** - the location of your InvokeAI root directory. It will be created if it does not exist. |
 | `HUGGING_FACE_HUB_TOKEN` |  | InvokeAI will work without it, but some of the integrations with HuggingFace (like downloading from models from private repositories) may not work |
 | `GPU_DRIVER` | `cuda` | Optionally change this to `rocm` to build the image for AMD GPUs, or `cpu` for CPU-only builds (required on ARM64 / `aarch64` hosts such as the Raspberry Pi 5). NOTE: Use the `build.sh` script to build the image for this to take effect. |
+| `RENDER_GROUP_ID` |  | AMD GPUs only. The ID of the host's `render` group, from `getent group render`. Without it, Invoke can't access the GPU. |
 
 #### Build the Image
 
