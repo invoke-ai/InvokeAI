@@ -1,7 +1,7 @@
 ---
 title: Qwen Image
 description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF and fp8 installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
-lastUpdated: 2026-11-02
+lastUpdated: 2026-11-10
 sidebar:
   order: 9
 ---
@@ -161,7 +161,7 @@ Image**; connect an **Image to Latents - Qwen Image** node to the **Reference La
 
 ## LoRA
 
-Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer and,
+Qwen Image LoRAs (diffusers PEFT, Kohya, LoKR and LoHA formats) are supported and apply to the transformer and,
 when the file has text-encoder layers, to the Qwen2.5-VL encoder too. This holds for every encoder build,
 including the **Encoder quantization** setting. DoRA layers on the encoder need unpacked weights: they fail
 with int8 or nf4 quantization and with packed nvfp4 encoders, so set **Encoder quantization** to **None** and
@@ -171,11 +171,20 @@ In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collectio
 encoder through the LoRA node as well as the transformer: connect the node's **Qwen VL Encoder** output to
 the prompt nodes, otherwise the LoRA's text-encoder layers stay unused. The LoRA node logs a warning when it sees this.
 
-Plain LoRAs saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw PEFT adapters
-(`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers (`img_mod`,
-`txt_mod`, `img_mlp`, `txt_mlp`), as LoRAs in these layouts usually do. Other model families use the same key
-prefixes, so a LoRA in these layouts that trains only attention layers is not recognized and installs as an
-unknown model, and so do LoKR, LoHA and DoRA files in these layouts. A raw PEFT adapter's strength is set in
+Plain LoRAs, LoKR and LoHA files saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw
+PEFT adapters (`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers
+(`img_mod`, `txt_mod`, `img_mlp`, `txt_mlp`), as files in these layouts usually do. Other model families use the
+same key prefixes, so a file in these layouts that trains only attention layers is not recognized and installs as
+an unknown model, and so do PEFT DoRA files. LyCORIS and ai-toolkit files whose keys start with
+`lycoris_transformer_blocks_` or `lora_transformer_transformer_blocks_` are recognized only when they train those
+modules. Without them, a `lycoris_` file installs as an unknown model, and a `lora_transformer_transformer_blocks_`
+file installs as a FLUX LoRA, the spelling OneTrainer uses for FLUX. A learned `scalar` in a LoRA, LoKR or LoHA
+layer is applied. In the plain dotted layout (`transformer_blocks.` or `transformer.transformer_blocks.`) and
+in the Kohya layout (`lora_unet_transformer_blocks_`), LoHA files and LoKR files with factorized matrices
+(`lokr_w1_a`, `lokr_w2_a`) are recognized under that condition too, while LoRAs and LoKR files with whole matrices
+(`lokr_w1`, `lokr_w2`) are recognized as before. A LoHA or LoKR that also carries DoRA magnitudes
+(`dora_scale`) applies without them, as a plain LoHA or LoKR, so it can look different from the trainer's samples.
+A raw PEFT adapter's strength is set in
 its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
 with rsLoRA, applies at a different strength.
 

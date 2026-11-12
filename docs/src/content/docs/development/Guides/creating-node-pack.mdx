@@ -73,6 +73,14 @@ from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
 Legacy root-level import paths remain available through forwarding shims until
 a separately approved cleanup. Use canonical paths for new node packs.
 
+Node packs extend InvokeAI through registered invocation classes. Before importing
+custom nodes, InvokeAI captures its core routes and frontend/static serving
+configuration. HTTP and other ASGI routes added by a pack are not served, while
+registered invocation classes remain available and appear in the OpenAPI schema.
+Requests to unregistered API paths return `404 Not Found`. This route boundary is
+not a Python sandbox: node-pack code runs in-process and can access Python objects
+and resources available to InvokeAI.
+
 ## Dependencies (`requirements.txt` or `pyproject.toml`)
 
 If your nodes require additional Python packages, list them in a `requirements.txt` (or `pyproject.toml`) at the repository root:
