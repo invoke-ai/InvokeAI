@@ -264,12 +264,15 @@ export const createIndexedDbQueueRunJournal = (
       try {
         const transaction = observeTransaction(database.transaction(WORKBENCH_QUEUE_RUN_STORE));
         const projectIds: string[] = [];
-        let cursor = await transaction.store.index('byProject').openKeyCursor(undefined, 'nextunique');
+        // iOS WebKit fails 'nextunique' index cursors ("Unable to open cursor"), so skip each project's
+        // remaining runs by continuing to the smallest string after its id.
+        let cursor = await transaction.store.index('byProject').openKeyCursor();
         while (cursor) {
-          if (isNonEmptyString(cursor.key)) {
-            projectIds.push(cursor.key);
+          const { key } = cursor;
+          if (isNonEmptyString(key)) {
+            projectIds.push(key);
           }
-          cursor = await cursor.continue();
+          cursor = await (typeof key === 'string' ? cursor.continue(`${key}\u0000`) : cursor.continue());
         }
         await transaction.done;
         return { kind: 'available', projectIds };
