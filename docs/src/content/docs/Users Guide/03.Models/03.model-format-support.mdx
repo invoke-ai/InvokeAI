@@ -238,5 +238,9 @@ Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` 
 
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
 
+On Z-Image, Qwen-Image and Anima, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
+`lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
+on bitsandbytes NF4/LLM.int8 bases.
+
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.
