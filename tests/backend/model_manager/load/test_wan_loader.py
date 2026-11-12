@@ -1,6 +1,7 @@
 """Tests for Wan loader helpers (native -> diffusers key conversion)."""
 
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -8,13 +9,16 @@ import gguf
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.load.model_loaders.wan import (
+    WanDiffusersModel,
     WanGGUFCheckpointModel,
     _convert_wan_native_to_diffusers,
     _unwrap_unquantized_to_compute_dtype,
 )
-from invokeai.backend.model_manager.taxonomy import WanVariantType
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SubModelType, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, overwrite_payloads
 
 
 def test_converts_text_and_time_embedders():
@@ -337,3 +341,101 @@ def test_gguf_loader_rejects_missing_model_parameter() -> None:
         pytest.raises(RuntimeError, match="missing"),
     ):
         loader._load_from_singlefile(config)
+
+
+class TestDiffusersFolderLoad:
+    """`WanDiffusersModel` against real tiny transformer folders, read through diffusers' own memory mapping."""
+
+    @staticmethod
+    def _model():
+        from diffusers import WanTransformer3DModel
+
+        return WanTransformer3DModel(
+            patch_size=(1, 2, 2),
+            in_channels=16,
+            out_channels=16,
+            num_layers=1,
+            attention_head_dim=128,
+            num_attention_heads=1,
+            ffn_dim=64,
+            text_dim=32,
+        )
+
+    @staticmethod
+    def _config(root: Path, repo_variant: ModelRepoVariant | None = None) -> Diffusers_Config_Base:
+        config = MagicMock(spec=Diffusers_Config_Base)
+        config.path = str(root)
+        config.repo_variant = repo_variant
+        return config
+
+    @staticmethod
+    def _load(config: Diffusers_Config_Base) -> tuple[torch.nn.Module, dict[str, int]]:
+        """The loaded model, and where each of its tensors lived when `from_pretrained` handed it over."""
+        from diffusers import WanTransformer3DModel
+
+        as_loaded: dict[str, int] = {}
+
+        class Recorded(WanTransformer3DModel):
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                model = WanTransformer3DModel.from_pretrained(*args, **kwargs)
+                as_loaded.update({name: value.data_ptr() for name, value in model.state_dict().items()})
+                return model
+
+        loader = object.__new__(WanDiffusersModel)
+        loader.get_hf_load_class = lambda *_args, **_kwargs: Recorded
+        loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+        return loader._load_model(config, SubModelType.Transformer), as_loaded
+
+    @staticmethod
+    def _tensors_reading_the_file(root: Path, model: torch.nn.Module) -> set[str]:
+        """The state dict entries that change when the folder's weight files are rewritten underneath them."""
+        loaded = {name: value.clone() for name, value in model.state_dict().items()}
+        for file in (root / "transformer").glob("*.safetensors"):
+            overwrite_payloads(file)
+        return {name for name, value in model.state_dict().items() if not torch.equal(value, loaded[name])}
+
+    @needs_mapping_that_shows_file_writes
+    @pytest.mark.parametrize("repo_variant", [None, ModelRepoVariant.FP16], ids=["default", "fp16-variant-fallback"])
+    def test_an_fp32_folder_leaves_nothing_reading_the_file(
+        self, tmp_path: Path, repo_variant: ModelRepoVariant | None
+    ) -> None:
+        """Wan ships fp32. Everything is cast to bf16 except `_keep_in_fp32_modules`, whose cast is a no-op: left as
+        they come out of `from_pretrained`, those tensors are views of the mapping and hold every shard mapped.
+
+        The fp16 variant is absent, so with it requested the fallback does the loading."""
+        from diffusers import WanTransformer3DModel
+
+        self._model().save_pretrained(tmp_path / "transformer")
+
+        model, _ = self._load(self._config(tmp_path, repo_variant))
+
+        keep_fp32 = set(WanTransformer3DModel._keep_in_fp32_modules)
+        for name, value in model.state_dict().items():
+            expected = torch.float32 if keep_fp32 & set(name.split(".")) else torch.bfloat16
+            assert value.dtype == expected, name
+        assert self._tensors_reading_the_file(tmp_path, model) == set()
+
+    @needs_mapping_that_shows_file_writes
+    @pytest.mark.parametrize("norms_on_disk", ["bf16", "fp32"])
+    def test_a_bf16_folder_keeps_its_weights_on_the_mapping(self, tmp_path: Path, norms_on_disk: str) -> None:
+        """A bf16 file needs no cast: its weights stay on the file's pages, as upstream loads them, with no second copy.
+        Only what is kept in fp32 gets memory of its own -- cast from a bf16 norm, or copied off an fp32 one, the way
+        `save_pretrained` writes a model loaded in bf16."""
+        from diffusers import WanTransformer3DModel
+
+        if norms_on_disk == "bf16":
+            self._model().to(torch.bfloat16).save_pretrained(tmp_path / "transformer")
+        else:
+            self._model().save_pretrained(tmp_path / "fp32")
+            mixed = WanTransformer3DModel.from_pretrained(tmp_path / "fp32", torch_dtype=torch.bfloat16)
+            mixed.save_pretrained(tmp_path / "transformer")
+
+        model, as_loaded = self._load(self._config(tmp_path))
+
+        bf16 = {name for name, value in model.state_dict().items() if value.dtype == torch.bfloat16}
+        assert bf16 and len(bf16) < len(model.state_dict())
+        assert self._tensors_reading_the_file(tmp_path, model) == bf16
+        # Upcast from a bf16 norm, the fp32 tensors already have memory of their own and are not copied again.
+        copied = {name for name, value in model.state_dict().items() if value.data_ptr() != as_loaded[name]}
+        assert copied == (set() if norms_on_disk == "bf16" else set(model.state_dict()) - bf16)

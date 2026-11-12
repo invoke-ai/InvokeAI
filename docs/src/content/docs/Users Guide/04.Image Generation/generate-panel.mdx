@@ -62,6 +62,7 @@ Some families add their own controls to the Render section:
 * **Shift** (Z-Image, Qwen Image) — an override for the sampling schedule's timestep shift, from 0.1 to 10. Left on auto, the model derives it from the image size; Qwen Image's Lightning LoRAs are trained for `3`.
 * **Seed variance** (Krea-2, Z-Image) — perturbs the prompt conditioning so nearby seeds give more varied images; **Variance strength** and **Randomized channels** set how much.
 * **Conditioning rebalance** (Krea-2) — see [Krea-2](/users-guide/models/local-models/krea-2/).
+* **Prompt upsampler** (FLUX.3) — rewrites the prompt into a detailed caption before each generation, reading reference images and Regional Guidance boxes; see [FLUX.3](/users-guide/models/local-models/flux-3/#prompt-upsampler-in-generation).
 * **Low-noise guidance** (Wan) — guidance for the low-noise expert; left unset, it reuses the main guidance.
 * **Skip layers (negative branch)** (MOSS-Image) — the transformer blocks the negative-prompt pass leaves out; see [MOSS-Image](/users-guide/models/local-models/moss-image/#skip-layers).
 

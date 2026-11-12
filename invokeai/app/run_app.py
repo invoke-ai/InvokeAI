@@ -178,6 +178,11 @@ def run_app() -> None:
     # Initialize the app and event loop.
     app, loop = get_app()
 
+    from invokeai.app.api.trusted_routes import TrustedRouteGuard, get_original_frontend, snapshot_core_routes
+
+    trusted_routes = snapshot_core_routes(app)
+    trusted_frontend = get_original_frontend(app)
+
     # Load custom nodes. This must be done after importing the Graph class, which itself imports all modules from the
     # invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
     # core nodes have been imported so that we can catch when a custom node clobbers a core node.
@@ -203,10 +208,10 @@ def run_app() -> None:
     # are unaffected.
     from invokeai.app.api_app import SubPathASGIMiddleware
 
-    asgi_app: Any = app
+    asgi_app: Any = TrustedRouteGuard(app=app, routes=trusted_routes, frontend=trusted_frontend)
     proxy_kwargs: dict[str, Any] = {}
     if app_config.base_url:
-        asgi_app = SubPathASGIMiddleware(app, app_config.base_url)
+        asgi_app = SubPathASGIMiddleware(asgi_app, app_config.base_url)
         # `proxy_headers=True` is already uvicorn's default; we only need to widen the trusted proxies.
         proxy_kwargs = {"forwarded_allow_ips": app_config.forwarded_allow_ips}
 

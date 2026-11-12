@@ -184,6 +184,13 @@ def test_fifo_quarantines_future_snapshot_and_dequeues_later_work(
         "{not valid json",
         json.dumps({"execution_state_version": "invalid", "graph": {}}),
         json.dumps({"execution_state_version": CURRENT_EXECUTION_STATE_VERSION, "graph": "invalid"}),
+        json.dumps(
+            {
+                "execution_state_version": CURRENT_EXECUTION_STATE_VERSION,
+                "graph": {},
+                "execution_child_dependencies": "garbage",
+            }
+        ),
     ],
 )
 def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(

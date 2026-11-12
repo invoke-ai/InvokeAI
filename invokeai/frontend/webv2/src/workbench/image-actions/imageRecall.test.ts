@@ -152,6 +152,8 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   animaInpaintAdapterModel: null,
   animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
+  flux3PromptUpsamplerEnabled: false,
+  flux3PromptUpsamplerModel: null,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -2326,6 +2328,108 @@ describe('anima inpaint adapter', () => {
       vaeModels: [qwenImageVae],
     });
     expect(wrongChannels?.values.animaInpaintAdapterModel).toBeNull();
+  });
+});
+
+describe('FLUX.3 prompt upsampler recall', () => {
+  const flux3Model: MainModelConfig = {
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    type: 'main',
+    variant: 'flux3_klein',
+  };
+  const upsampler: ComponentModelConfig = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+  const models = [flux3Model, upsampler];
+  const recall = (
+    metadata: Record<string, unknown>,
+    currentValues: GenerateWidgetValues,
+    supportedModels = [flux3Model, sd1Model]
+  ) =>
+    buildImageRecallSettings({
+      currentValues,
+      image,
+      kind: 'all',
+      metadata,
+      models: [...models, sd1Model],
+      supportedModels,
+      vaeModels: [],
+    });
+  const recordedBy = (settings: Partial<GenerateWidgetValues>) => {
+    const generated = compileGenerateGraph(
+      {
+        ...createValues({ cfgScale: 1, model: flux3Model, modelKey: flux3Model.key }),
+        positivePrompt: 'a beach at noon',
+        ...settings,
+      },
+      flux3Model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+
+    return Object.values(generated.nodes).find((node) => node.type === 'core_metadata')!;
+  };
+
+  it('turns the switch on with the recorded model from what a graph that upsampled records, and restores the typed prompt', () => {
+    // At run time the edges add the typed prompt and the caption the upsampler wrote.
+    const metadata = {
+      ...recordedBy({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler }),
+      flux3_caption: 'A long caption. [{"id": "obj_1", "bbox": [0, 0, 500, 500], "desc": "a kite"}]',
+      positive_prompt: 'a beach at noon',
+    };
+    const result = recall(metadata, createValues());
+
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toBe(upsampler);
+    expect(result?.fields).toContain('components');
+    // The caption the upsampler wrote is never the recalled prompt.
+    expect(result?.values.positivePrompt).toBe('a beach at noon');
+  });
+
+  it('switches it off but keeps the pick for a FLUX.3 record without it, which the backend persists for none', () => {
+    const metadata = recordedBy({ flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: upsampler });
+    const result = recall(
+      metadata,
+      createValues({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler })
+    );
+
+    expect(metadata).not.toHaveProperty('flux3_prompt_upsampler');
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(false);
+    expect(result?.values.flux3PromptUpsamplerModel).toEqual(upsampler);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('keeps the current pick when the recorded model is not installed, yet still turns the switch on', () => {
+    const current: ComponentModelConfig = { ...upsampler, key: 'other', name: 'Other' };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ flux3PromptUpsamplerModel: current }),
+      image,
+      kind: 'all',
+      metadata: { ...recordedBy({}), flux3_prompt_upsampler: { key: 'gone' } },
+      models: [flux3Model, current],
+      supportedModels: [flux3Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toEqual(current);
+  });
+
+  it('says nothing about the upsampler for a record of another family', () => {
+    const current = createValues({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler });
+    const result = recall({ generation_mode: 'txt2img', model: { key: sd1Model.key } }, current);
+
+    expect(result?.values.model).toBe(sd1Model);
+    // The record leaves the switch alone; the new model has no such slot, so the pick goes like any component.
+    expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
+    expect(result?.values.flux3PromptUpsamplerModel).toBeNull();
   });
 });
 

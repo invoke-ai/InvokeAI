@@ -121,6 +121,7 @@ export const candidatesForSlot = (slot: ComponentSlotPolicy): ModelIdentifierCon
               type,
               variant: variant ?? null,
               ...(branch ? { branch } : {}),
+              ...(type === 'text_llm' ? { supports_images: true } : {}),
               ...(latentChannels ? { latent_channels: latentChannels } : {}),
             });
           }
@@ -288,13 +289,24 @@ const tunedReferenceImagesFor = (
 export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const { filled, model, settings } = satisfiedSettingsFor(base, shape);
   const image = { original: { image: { height: 1024, image_name: 'style-reference.png', width: 1024 } } };
+  // Only a graph with the FLUX.3 prompt upsampler switched on contains its node, so switch it on and pick a model.
+  const upsamplerOn = { ...settings, flux3PromptUpsamplerEnabled: base === 'flux3' };
+  const upsamplerSlot = getComponentSectionPolicy(model, upsamplerOn).slots.find(
+    (slot) => slot.key === 'flux3PromptUpsamplerModel'
+  );
+  const upsamplerModel =
+    upsamplerSlot &&
+    candidatesForSlot(upsamplerSlot).find((c) =>
+      upsamplerSlot.filter?.(c, buildContext(model, upsamplerOn, [upsamplerSlot]))
+    );
 
   return {
     filled,
     model,
     projectSettings: { useCpuNoise: true, useNsfwChecker: true, useWatermark: true },
     settings: {
-      ...settings,
+      ...upsamplerOn,
+      flux3PromptUpsamplerModel: upsamplerModel ?? null,
       // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
       cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
       // Exercise explicit zero overrides as well as the default automatic metadata contract.

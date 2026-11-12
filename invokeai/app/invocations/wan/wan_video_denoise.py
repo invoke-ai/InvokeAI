@@ -335,6 +335,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     active_label = _ExpertSwapper.HIGH
                     active_cfg = self.guidance_scale
 
+                # The previous expert must be unreferenced by the time `get` loads the next one.
+                transformer = None
                 transformer = swapper.get(active_label)
 
                 latent_model_input = latents.to(dtype=inference_dtype)
