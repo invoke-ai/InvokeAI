@@ -43,6 +43,18 @@ describe('generateDocsId', () => {
   });
 });
 
+describe('makeHrefToId', () => {
+  it('maps a homepage href to the empty id with or without a base path', () => {
+    assert.equal(hrefToId('/'), '');
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/'), '');
+  });
+
+  it('strips the base path from deeper hrefs but leaves unrelated paths alone', () => {
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/video/wan/'), 'video/wan');
+    assert.equal(makeHrefToId('/InvokeAI/')('/other/page/'), 'other/page');
+  });
+});
+
 describe('sortAndRelabel', () => {
   it('orders prefixed siblings by prefix, keeps unprefixed ones after them in order, and strips group labels', () => {
     const fileNames = new Map([
@@ -183,6 +195,26 @@ describe('addCrossListings', () => {
     ];
     addCrossListings(sidebar, [{ id: 'video/wan', directory: 'models/local' }], directories, baseHrefToId);
     assert.deepEqual(labels(sidebar[0].entries), ['SDXL', 'Wan']);
+  });
+
+  it('cross-lists the homepage when a base path deploys its link at the base itself', () => {
+    const baseHrefToId = makeHrefToId('/InvokeAI/');
+    const sidebar = [
+      group('Docs', 'docs', [{ ...link('docs/intro', 'Intro'), href: '/InvokeAI/docs/intro/' }]),
+      group('Home', '', [
+        { ...link('', 'Home'), href: '/InvokeAI/' },
+        { ...link('video/wan', 'Wan'), href: '/InvokeAI/video/wan/' },
+      ]),
+    ];
+    const dirs = new Map([
+      ['docs/intro', 'docs'],
+      ['', ''],
+      ['video/wan', ''],
+    ]);
+    // The index page (id '') is listed twice in the sidebar; a copy belongs in 'docs' too.
+    addCrossListings(sidebar, [{ id: '', directory: 'docs' }], dirs, baseHrefToId);
+    assert.deepEqual(labels(sidebar[0].entries), ['Home', 'Intro']);
+    assert.ok(CROSS_LISTED_ATTR in sidebar[0].entries[0].attrs);
   });
 });
 

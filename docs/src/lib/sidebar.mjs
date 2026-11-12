@@ -30,6 +30,8 @@ export const makeHrefToId = (baseUrl) => {
   const basePath = trimSlashes(baseUrl);
   return (href) => {
     const path = trimSlashes(href);
+    // An href equal to the base (e.g. the homepage '/InvokeAI/') maps to the empty id, as '/' does without a base.
+    if (path === basePath) return '';
     return basePath && path.startsWith(`${basePath}/`) ? path.slice(basePath.length + 1) : path;
   };
 };
