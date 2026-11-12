@@ -41,6 +41,7 @@ const renderControls = async (size?: ControlSize): Promise<Record<string, HTMLEl
         </Button>
         <Input aria-label="Input" data-testid="input" size={size} />
         <NumberInput.Root size={size}>
+          <NumberInput.Control data-testid="number-steppers" />
           <NumberInput.Input aria-label="Number" data-testid="number" />
         </NumberInput.Root>
         <SegmentGroup.Root data-testid="segments" size={size} value="a">
@@ -76,6 +77,13 @@ const renderControls = async (size?: ControlSize): Promise<Record<string, HTMLEl
   );
 };
 
+/** The number field's steppers fill the field inside its 1px border, so they never stick out of it. */
+const expectStepperFitsNumberField = (height: number) => {
+  const steppers = host!.querySelector<HTMLElement>('[data-testid="number-steppers"]')!;
+
+  expect(steppers.getBoundingClientRect().height).toBeCloseTo(height - 2, 1);
+};
+
 describe('control heights', () => {
   // Same-named control sizes share the scale's outer height, so mixed rows of controls align.
   (Object.entries(CONTROL_HEIGHT_PX) as [ControlSize, number][]).forEach(([size, height]) => {
@@ -85,7 +93,26 @@ describe('control heights', () => {
       for (const [id, element] of Object.entries(controls)) {
         expect(element.getBoundingClientRect().height, id).toBeCloseTo(height, 1);
       }
+      expectStepperFitsNumberField(height);
     });
+  });
+
+  it('fits the number steppers to a field sized apart from its root', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <NumberInput.Root size="lg">
+            <NumberInput.Control data-testid="number-steppers" />
+            <NumberInput.Input aria-label="Number" h="control.md" />
+          </NumberInput.Root>
+        </ChakraProvider>
+      );
+    });
+
+    expectStepperFitsNumberField(CONTROL_HEIGHT_PX.md);
   });
 
   it('renders controls that name no size at md', async () => {
@@ -94,5 +121,6 @@ describe('control heights', () => {
     for (const [id, element] of Object.entries(controls)) {
       expect(element.getBoundingClientRect().height, id).toBeCloseTo(CONTROL_HEIGHT_PX.md, 1);
     }
+    expectStepperFitsNumberField(CONTROL_HEIGHT_PX.md);
   });
 });
