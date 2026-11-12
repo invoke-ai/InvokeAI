@@ -289,8 +289,8 @@ export const GenerateSettingsForm = ({
   return (
     <GenerateIssuesProvider applyFix={applyIssueFix} issues={issues}>
       <Stack gap={0}>
-        {/* The same inset as a section's chip and fields. */}
-        <Stack gap={1} px={2} pt={2} pb={2}>
+        {/* The prompt fields carry their own space below, which matches the side inset here. */}
+        <Stack gap={1} px={2} pt={2}>
           <GenerateModelCard
             draft={draft}
             isLoadingModels={isLoadingModels}

@@ -216,6 +216,7 @@ export const ProjectSwitcher = () => {
               { name: activeProjectName }
             )}
             className="group"
+            px="2"
             size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
