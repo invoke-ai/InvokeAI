@@ -121,11 +121,16 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("qwen3_source", T.MODEL),
     ("qwen3_5_encoder", T.MODEL),
     ("qwen3_vl_encoder", T.MODEL),
+    ("qwen3_vl_vision_tower", T.MODEL),
     ("qwen_vl_encoder", T.MODEL),
     ("glm_encoder", T.MODEL),
     # 3. Architecture-specific keys (grouped alphabetically by model prefix)
+    # Anima
+    ("anima_inpaint_adapter", T.MODEL),
+    ("anima_inpaint_adapter_weight", T.FLOAT),
     # Flux
     ("flux3_caption", T.STRING),
+    ("flux3_prompt_upsampler", T.MODEL),
     # Ideogram
     ("ideogram4_caption", T.STRING),
     ("ideogram4_color_palette", T.STRING),

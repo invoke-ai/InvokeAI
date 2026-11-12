@@ -34,14 +34,28 @@ from invokeai.app.invocations.metadata import (
     unwrap_metadata_value,
 )
 from invokeai.app.invocations.metadata_constants import (
-    CORE_LABELS,
-    CORE_LABELS_BOOL,
-    CORE_LABELS_FLOAT,
-    CORE_LABELS_INTEGER,
-    CORE_LABELS_MODEL,
-    CORE_LABELS_SCHEDULER,
-    CORE_LABELS_STRING,
-    CORE_LABELS_VAE,
+    CORE_LABELS as CORE_LABELS,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_BOOL as CORE_LABELS_BOOL,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_FLOAT as CORE_LABELS_FLOAT,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_INTEGER as CORE_LABELS_INTEGER,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_MODEL as CORE_LABELS_MODEL,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_SCHEDULER as CORE_LABELS_SCHEDULER,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_STRING as CORE_LABELS_STRING,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_VAE as CORE_LABELS_VAE,
 )
 from invokeai.app.invocations.metadata_constants import (
     CUSTOM_LABEL as CUSTOM_LABEL,
