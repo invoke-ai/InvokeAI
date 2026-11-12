@@ -157,9 +157,10 @@ def dump_execution_state(state: GraphExecutionState) -> dict[str, Any]:
     return snapshot
 
 
-# Child dependency records used to persist per-child failure/cancellation policies that no writer ever set and
-# no engine branch honored. The fields are gone, but rows written before their removal still carry the keys and
-# the records are `extra="forbid"`, so the keys are dropped on load instead of rejecting the session.
+# Child dependency records used to persist per-child failure/cancellation policies. Every dependency was created
+# with the defaults and no caller consumed the policy-derived update fields, so the fields are gone. Rows written
+# before their removal still carry the keys and child records are `extra="forbid"`, so the keys are dropped on
+# load instead of rejecting the session.
 LEGACY_CHILD_POLICY_KEYS: Final[frozenset[str]] = frozenset({"failure_policy", "cancellation_policy"})
 
 

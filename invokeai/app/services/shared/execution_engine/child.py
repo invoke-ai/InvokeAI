@@ -616,30 +616,8 @@ class ChildDependencyRecord(_ChildModel):
             self.transition_terminal("canceled", completion.error_message)
             return self._result(changed=True)
         if len(self.completions) == len(self.children):
-            final_status: ChildTerminalStatus = "completed"
-            final_message: str | None = None
-            if any(item.status == "failed" for item in self.completions.values()):
-                final_status = "failed"
-                final_message = next(
-                    (
-                        item.error_message
-                        for item in self.completions.values()
-                        if item.status == "failed" and item.error_message
-                    ),
-                    "child failed",
-                )
-            elif any(item.status == "canceled" for item in self.completions.values()):
-                final_status = "canceled"
-                final_message = next(
-                    (
-                        item.error_message
-                        for item in self.completions.values()
-                        if item.status == "canceled" and item.error_message
-                    ),
-                    "child canceled",
-                )
-            self.transition_terminal(final_status, final_message)
-            return self._result(changed=True)
+            # Failed and canceled children returned above, so a full ledger holds only successes.
+            self.transition_terminal("completed", None)
         return self._result(changed=True)
 
     def record_completion(self, completion: ChildCompletion) -> ChildDependencyUpdate:

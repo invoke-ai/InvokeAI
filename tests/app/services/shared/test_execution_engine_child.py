@@ -72,17 +72,27 @@ def test_dependency_creation_does_not_leak_capacity_on_invalid_child() -> None:
     assert capability.remaining_capacity == 2
 
 
-def test_failed_child_makes_the_dependency_terminal_before_siblings_finish() -> None:
-    dependency = _capability().create_dependency(["first", "second"])
+@pytest.mark.parametrize(
+    ("terminal_method", "expected_status"),
+    [("fail_child", "failed"), ("cancel_child", "canceled")],
+)
+def test_a_terminal_child_report_ends_the_dependency_before_siblings_finish(
+    terminal_method: str, expected_status: ChildTerminalStatus
+) -> None:
+    dependency = _capability().create_dependency(["first", "second", "third"], dependency_id="dependency")
+    report = getattr(dependency, terminal_method)
 
-    update = dependency.fail_child("first", "first failed")
-    later = dependency.complete_child("second", {"value": 2})
+    update = report("second", "child reported")
+    later = dependency.complete_child("third", {"value": 3})
+    duplicate = report("second", "child reported")
 
-    assert update.status == "failed"
-    assert update.terminal
-    assert dependency.error_message == "first failed"
+    assert update.status == expected_status
+    assert update.terminal is True
+    assert dependency.error_message == "child reported"
     assert later.changed is False
-    assert later.status == "failed"
+    assert later.status == expected_status
+    assert duplicate.changed is False
+    assert duplicate.terminal is True
 
 
 def test_dependency_rejects_duplicate_prebuilt_children() -> None:
@@ -134,19 +144,6 @@ def test_dependency_is_idempotent_and_rejects_conflicting_or_foreign_completion(
 
     with pytest.raises(ValueError, match="does not belong"):
         dependency.complete_child("other", {"value": 2})
-
-
-def test_failure_is_terminal_once_and_repeated_reports_change_nothing() -> None:
-    dependency = _capability().create_dependency(["first", "second", "third"], dependency_id="dependency")
-
-    update = dependency.fail_child("second", "child failed")
-
-    assert update.status == "failed"
-    assert update.terminal is True
-
-    duplicate = dependency.fail_child("second", "child failed")
-    assert duplicate.changed is False
-    assert duplicate.terminal is True
 
 
 def test_child_records_are_json_safe_and_round_trip() -> None:

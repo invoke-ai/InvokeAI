@@ -376,8 +376,9 @@ class TestServiceReads:
 
         snapshot = dump_execution_state(state)
         dependency_id = next(iter(snapshot["execution_child_dependencies"]))
+        # Real rows written before removal carry the policies as their defaults.
         snapshot["execution_child_dependencies"][dependency_id].update(
-            {"failure_policy": "continue", "cancellation_policy": "continue"}
+            {"failure_policy": "fail_parent", "cancellation_policy": "cancel_parent"}
         )
         item_id = _item(database, status="in_progress", session_payload=snapshot)
 
@@ -387,7 +388,7 @@ class TestServiceReads:
         assert item.status == "in_progress"
         assert item.error_message is None
         assert "source-call" in item.session.graph.nodes
-        assert item.session.execution_child_dependencies
+        assert set(item.session.execution_child_dependencies) == {dependency_id}
 
     def test_a_row_with_a_malformed_child_ledger_reads_as_unreadable(
         self, database: Database, service: SessionQueue

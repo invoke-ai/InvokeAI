@@ -347,12 +347,13 @@ def test_loads_persisted_child_dependency_after_dropping_legacy_policy_keys() ->
     snapshot = dump_execution_state(state)
     dependency_id = next(iter(snapshot["execution_child_dependencies"]))
     persisted = snapshot["execution_child_dependencies"][dependency_id]
-    persisted.update({"failure_policy": "continue", "cancellation_policy": "continue"})
+    # Real rows written before removal carry the policies as their defaults.
+    persisted.update({"failure_policy": "fail_parent", "cancellation_policy": "cancel_parent"})
 
     restored = load_execution_state(snapshot)
 
     assert restored.execution_child_dependencies[dependency_id].status == "running"
-    assert "failure_policy" not in dump_execution_state(restored)["execution_child_dependencies"][dependency_id]
+    assert restored._generic_child_dependencies[dependency_id].completions.keys() == {"10"}
 
     with pytest.raises(ValidationError):
         load_execution_state(
