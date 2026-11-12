@@ -213,6 +213,12 @@
       "editValue": "Edit {{label}}: {{value}}"
     },
     "list": {
+      "reorderCancelled": "Reorder cancelled. {{name}} is back at position {{position}} of {{count}}.",
+      "reorderDropped": "{{name}} dropped at position {{position}} of {{count}}.",
+      "reorderInstructions": "To pick up a row, press Space or Enter. Use the Up and Down arrow keys to move it, then press Space or Enter to drop it, or Escape to cancel.",
+      "reorderMoved": "{{name}} moved to position {{position}} of {{count}}.",
+      "reorderPickedUp": "Picked up {{name}} at position {{position}} of {{count}}.",
+      "reorderRole": "sortable",
       "selectItem": "Select {{name}}"
     },
     "configure": "Configure",
@@ -545,6 +551,7 @@
       "icon": "Icon",
       "iconPicker": "Layout preset icon",
       "layoutPreset": "Layout preset",
+      "list": "Layout presets",
       "manage": "Manage presets",
       "more": "More layout presets",
       "moreAvailable": "More layout presets, {{count}} available",
