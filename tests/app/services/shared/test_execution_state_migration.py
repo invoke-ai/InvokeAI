@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+from pydantic import ValidationError
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.invocations.collections import RangeInvocation
@@ -328,6 +329,39 @@ def test_round_trips_pending_generic_child_dependency_and_partial_completion() -
     assert dependency.enqueue_order == ["20", "10"]
     assert dependency.completed_child_execution_ids == ["10"]
     assert dependency.completions["10"].outputs == {"value": "ten"}
+
+
+def test_loads_persisted_child_dependency_after_dropping_legacy_policy_keys() -> None:
+    """Session rows written while the child policy knobs existed must still hydrate after removal."""
+    graph = Graph()
+    graph.add_node(AddInvocation(id="source-call", a=1, b=2))
+    state = GraphExecutionState(graph=graph)
+    state.execution_graph.add_node(AddInvocation(id="prepared-call", a=1, b=2))
+    state.prepared_source_mapping["prepared-call"] = "source-call"
+    frame = state.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="saved-workflow")
+    state.begin_waiting_on_workflow_call(frame)
+    state.attach_waiting_workflow_call_child_sessions([GraphExecutionState(graph=Graph()) for _ in range(2)])
+    state.set_waiting_workflow_call_child_item_ids([20, 10])
+    state.record_generic_child_completion(10, {"value": "ten"})
+
+    snapshot = dump_execution_state(state)
+    dependency_id = next(iter(snapshot["execution_child_dependencies"]))
+    persisted = snapshot["execution_child_dependencies"][dependency_id]
+    # Real rows written before removal carry the policies as their defaults.
+    persisted.update({"failure_policy": "fail_parent", "cancellation_policy": "cancel_parent"})
+
+    restored = load_execution_state(snapshot)
+
+    assert restored.execution_child_dependencies[dependency_id].status == "running"
+    assert restored._generic_child_dependencies[dependency_id].completions.keys() == {"10"}
+
+    with pytest.raises(ValidationError):
+        load_execution_state(
+            {
+                **snapshot,
+                "execution_child_dependencies": {dependency_id: {**persisted, "not_a_field": 1}},
+            }
+        )
 
 
 @pytest.mark.parametrize(

@@ -216,7 +216,7 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR, and for Qwen-Image LoHA, where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
@@ -231,8 +231,9 @@ Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 
-Plain Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
-(`base_model.model.`) when they train the blocks' modulation or MLP layers; see the
+Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` key layout, as raw PEFT adapters
+(`base_model.model.`), and in the LyCORIS `lycoris_transformer_blocks_…` and ai-toolkit
+`lora_transformer_transformer_blocks_…` layouts, when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
