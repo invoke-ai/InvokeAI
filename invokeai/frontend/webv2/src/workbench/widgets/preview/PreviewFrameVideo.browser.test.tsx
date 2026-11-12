@@ -61,6 +61,45 @@ const videoSource: VideoSource = {
   src: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
 };
 const invalidVideoSource: VideoSource = { ...videoSource, src: 'data:video/mp4;base64,AAAA' };
+
+/**
+ * The stand-in clip is real, playable media, and the browser loads it within the render that mounts the player. Tests
+ * on it stub the element and dispatch its media events themselves; a real `loadedmetadata` landing before the stubs
+ * would act on the real one-sample clip instead, so its loading events never reach the component.
+ */
+const STAND_IN_LOADING_EVENTS = [
+  'abort',
+  'canplay',
+  'canplaythrough',
+  'durationchange',
+  'emptied',
+  'error',
+  'loadeddata',
+  'loadedmetadata',
+  'loadstart',
+  'progress',
+  'resize',
+  'seeked',
+  'seeking',
+  'stalled',
+  'suspend',
+  'timeupdate',
+  'waiting',
+];
+const blockStandInLoading = (event: Event): void => {
+  if (
+    event.isTrusted &&
+    event.target instanceof HTMLMediaElement &&
+    event.target.getAttribute('src') === videoSource.src
+  ) {
+    event.stopImmediatePropagation();
+  }
+};
+
+for (const type of STAND_IN_LOADING_EVENTS) {
+  // Capturing at the document runs before any listener on the element itself.
+  document.addEventListener(type, blockStandInLoading, true);
+}
 const fixtureVideoSource: VideoSource = {
   ...videoSource,
   fps: 10,
