@@ -2,6 +2,7 @@ import type { ModelConfig } from '@features/models';
 
 import { ChakraProvider, Field as ChakraField } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
 import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { getModelsUiSnapshotForTests } from '@features/models/ui/uiStore';
 import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
@@ -16,7 +17,11 @@ import { ModelSelect } from './ModelSelect';
 
 // Browser tests run without an i18n provider, so translated copy renders as
 // the raw key (e.g. 'models.compactRows'); assertions below match the keys.
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { name?: string }) => (options?.name ? `${key}:${options.name}` : key),
+  }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -483,5 +488,70 @@ describe('ModelSelect loading states', () => {
       await expect.poll(() => document.activeElement).toBe(trigger());
       expect(onChange).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe('ModelSelect related-model ranking', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const vaeA = { ...model, key: 'vae-a', name: 'Alpha VAE', type: 'vae' } as ModelConfig;
+  const vaeB = { ...model, key: 'vae-b', name: 'Beta VAE', type: 'vae' } as ModelConfig;
+  const vaeTypes = ['vae'] as const;
+
+  const renderVaePicker = async (props: { relatedTo?: string | null; value: string | null }) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+            <ModelSelect modelTypes={vaeTypes} showManagerButton={false} onChange={vi.fn()} {...props} />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+    await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(2);
+  };
+  const optionNames = () => [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    setModelsSnapshotForTests({ error: null, models: [model, vaeA, vaeB], status: 'loaded' });
+    // Beta VAE links to the main model; the picker's own value (Alpha) links to Beta too, which must not rank.
+    setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { 'sdxl-main': ['vae-b'], 'vae-a': ['vae-b'] } });
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [], status: 'idle' });
+    setRelationshipsSnapshotForTests({ relatedKeysByModelKey: {} });
+  });
+
+  it('ranks models linked to the anchor first and names the anchor on the link icon', async () => {
+    await renderVaePicker({ relatedTo: 'sdxl-main', value: null });
+
+    await expect.poll(() => optionNames()[0]).toContain('Beta VAE');
+    expect(optionNames()[1]).toContain('Alpha VAE');
+    const icons = document.querySelectorAll('[role="option"] [aria-label]');
+    expect([...icons].map((icon) => icon.getAttribute('aria-label'))).toEqual(['models.linkedToModel:SDXL Main']);
+  });
+
+  it('falls back to a generic link label when the anchor is not in the catalog', async () => {
+    setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { 'missing-main': ['vae-b'] } });
+    await renderVaePicker({ relatedTo: 'missing-main', value: null });
+
+    await expect.poll(() => optionNames()[0]).toContain('Beta VAE');
+    const icons = document.querySelectorAll('[role="option"] [aria-label]');
+    expect([...icons].map((icon) => icon.getAttribute('aria-label'))).toEqual(['models.linkedModel']);
+  });
+
+  it('ignores the value of the picker itself when no anchor is given', async () => {
+    await renderVaePicker({ value: 'vae-a' });
+
+    expect(optionNames()[0]).toContain('Alpha VAE');
+    expect(document.querySelectorAll('[role="option"] [aria-label]')).toHaveLength(0);
   });
 });

@@ -51,6 +51,8 @@ interface FieldControlProps {
   label: string;
   /** Base of the model being edited, for same-base model pickers. */
   modelBase: string;
+  /** Key of the model being edited; its links rank the model pickers. */
+  modelKey: string;
   setValue: (value: unknown) => void;
   value: unknown;
 }
@@ -59,7 +61,7 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
-const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: FieldControlProps) => {
+const FieldControl = ({ control, disabled, label, modelBase, modelKey, setValue, value }: FieldControlProps) => {
   const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
@@ -144,6 +146,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         isClearable
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
+        relatedTo={modelKey}
         showManagerButton={false}
         size="lg"
         // The 'default' sentinel renders as the placeholder: the toggle is on
@@ -344,6 +347,7 @@ export const DefaultSettingsSection = ({
                   disabled={!isEnabled || field.pending !== undefined}
                   label={t(field.labelKey)}
                   modelBase={String(model.base)}
+                  modelKey={model.key}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
                   value={isEnabled ? value : field.defaultValue}
                 />
