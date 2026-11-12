@@ -68,8 +68,8 @@ export interface CanvasRenderSizeProps {
 
 /** What the canvas adds to the Render section. */
 export interface CanvasDenoisingStrength {
-  /** The strength summary, shown with the section's header badges. */
-  badges: ReactNode;
+  /** The strength summary, shown in the section's title row while it is folded. */
+  summary: ReactNode;
   /** The strength control, laid out under guidance. */
   field: ReactNode;
 }
@@ -194,7 +194,8 @@ export interface GenerationUiAdapter {
   sectionPreferences: {
     /** Persisted per-user open/closed overrides for panel sections; absent = section default. */
     sectionsOpen: Readonly<Record<string, boolean>>;
-    setSectionOpen(sectionId: string, open: boolean): void;
+    /** Records several sections' open states as one preference write (a panel-wide fold or expand). */
+    setSectionsOpen(changes: Readonly<Record<string, boolean>>): void;
   };
   settings: {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;

@@ -7,7 +7,7 @@ import type {
 } from '@features/generation/core/types';
 import type { ReactNode } from 'react';
 
-import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
@@ -284,7 +284,8 @@ const MossImageSkipLayersField = ({
     <GenerateFieldContextMenu
       copyValue={() => formatSkipLayers(stored)}
       fieldLabel={label}
-      isAtDefault={isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
+      // Disabled while CFG is off, when the layers are not used: no change to undo then.
+      isAtDefault={isCfgOff || isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
       onReset={() => {
         setDraft(null);
         onCommitImmediate({ mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS] });
@@ -621,18 +622,28 @@ export const GenerateRenderSection = ({
     onCommit({ [key]: value });
   };
 
-  const seedBadge = uiPolicy.seedVisible ? (
-    <Badge>
-      {settings.seedMode === 'random'
-        ? t('common.seedMode.random')
-        : settings.seedMode === 'fixed'
-          ? settings.seed
-          : t('widgets.generate.seedSummary', {
-              mode: t(`common.seedMode.${settings.seedMode}`),
-              seed: settings.seed,
-            })}
-    </Badge>
-  ) : null;
+  const seedSummary = uiPolicy.seedVisible
+    ? settings.seedMode === 'random'
+      ? t('common.seedMode.random')
+      : settings.seedMode === 'fixed'
+        ? settings.seed
+        : t('widgets.generate.seedSummary', {
+            mode: t(`common.seedMode.${settings.seedMode}`),
+            seed: settings.seed,
+          })
+    : null;
+
+  // The model-governed values this section shows, as the header's reset-all restores them.
+  const modelDefaultsPatch: Partial<GenerateSettings> | null = modelDefaults
+    ? {
+        cfgScale: modelDefaults.cfgScale,
+        steps: modelDefaults.steps,
+        ...(uiPolicy.schedulerVisible ? { scheduler: modelDefaults.scheduler } : {}),
+      }
+    : null;
+  const isAtModelDefaults =
+    modelDefaultsPatch !== null &&
+    Object.entries(modelDefaultsPatch).every(([key, value]) => settings[key as keyof typeof settings] === value);
 
   const renderFields = (strengthField: ReactNode) => (
     <>
@@ -682,14 +693,11 @@ export const GenerateRenderSection = ({
         <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
       ) : null}
       {familyBase === 'krea-2' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <GenerateConditioningRebalanceField
-            settings={settings}
-            onCommit={onCommit}
-            onCommitImmediate={onCommitImmediate}
-          />
-        </>
+        <GenerateConditioningRebalanceField
+          settings={settings}
+          onCommit={onCommit}
+          onCommitImmediate={onCommitImmediate}
+        />
       ) : null}
       {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'z-image' ? (
@@ -725,20 +733,9 @@ export const GenerateRenderSection = ({
         </GenerateFieldContextMenu>
       ) : null}
       {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
-      <Separator borderColor="border.subtle" />
       {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
-      {familyBase === 'krea-2' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
-        </>
-      ) : null}
-      {familyBase === 'z-image' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} />
-        </>
-      ) : null}
+      {familyBase === 'krea-2' ? <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'z-image' ? <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
     </>
   );
 
@@ -746,18 +743,18 @@ export const GenerateRenderSection = ({
     <GenerateCollapsibleSection
       label={t('widgets.generate.render')}
       defaultOpen={false}
-      badges={
-        <>
-          <Badge>
-            {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
-          </Badge>
-          {canvas?.badges}
-          {seedBadge}
-        </>
-      }
+      isChanged={modelDefaultsPatch !== null && !isAtModelDefaults}
       sectionId="render"
+      summary={[settings.steps, `${uiPolicy.guidanceLabel} ${settings.cfgScale}`, canvas?.summary, seedSummary]}
+      onReset={modelDefaultsPatch ? () => onCommit(modelDefaultsPatch) : undefined}
+      // The seed, strength and family fields keep their values: only these have model defaults to return to.
+      resetLabel={t(
+        uiPolicy.schedulerVisible
+          ? 'widgets.generate.sectionMenu.resetStepsCfgAndScheduler'
+          : 'widgets.generate.sectionMenu.resetStepsAndCfg'
+      )}
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         <GenerateIssueNotes section="render" />
         {renderFields(canvas?.field ?? null)}
       </Stack>

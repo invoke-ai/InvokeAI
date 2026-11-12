@@ -1050,7 +1050,7 @@ const ReferenceModelSelect = ({
         </Field>
       </ControlSurface>
       {config.type === 'ip_adapter' && !strengthOnly ? (
-        <Box bg="bg.muted" data-control-surface="" flexShrink={0} rounded="control">
+        <Box bg="bg.subtle" data-control-surface="" flexShrink={0} rounded="control">
           <ClipVisionSelect
             key={config.model?.key ?? 'no-model'}
             config={config}

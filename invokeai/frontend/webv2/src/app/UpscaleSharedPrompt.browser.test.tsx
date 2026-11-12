@@ -94,8 +94,8 @@ const GenerationUi = ({ children }: { children: ReactNode }) => {
         ...generationAdapterBase,
         sectionPreferences: {
           sectionsOpen,
-          setSectionOpen: (sectionId: string, open: boolean) =>
-            void patchWorkbenchPreferences({ generateSectionsOpen: { ...sectionsOpen, [sectionId]: open } }),
+          setSectionsOpen: (changes: Readonly<Record<string, boolean>>) =>
+            void patchWorkbenchPreferences({ generateSectionsOpen: { ...sectionsOpen, ...changes } }),
         },
       }) as unknown as GenerationUiAdapter,
     [sectionsOpen]

@@ -243,7 +243,7 @@ export const UpscalePromptFields = memo(
     );
 
     return (
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         <Text color="fg.muted" fontSize="xs" textWrap="pretty">
           {t('widgets.upscale.sharedPromptDescription')}
         </Text>

@@ -1,7 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, createListCollection, Stack } from '@chakra-ui/react';
+import { createListCollection, Stack } from '@chakra-ui/react';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import {
   DEFAULT_GEMINI_TEMPERATURE,
   GEMINI_TEMPERATURE_MAX,
@@ -95,30 +96,23 @@ export const GenerateProviderOptionsSection = ({
     return null;
   }
 
-  // Count decisions away from the provider defaults, as the Advanced section does.
-  const overrideCount = optionKeys.filter((key) => {
-    switch (key) {
-      case 'openaiQuality':
-      case 'openaiBackground':
-        return settings[key] !== 'auto';
-      case 'seedreamWatermark':
-      case 'seedreamOptimizePrompt':
-        return settings[key];
-      default:
-        return settings[key] !== null;
-    }
-  }).length;
+  // Count decisions away from the provider defaults (what the options hold while the provider decides), as the
+  // Advanced section does.
+  const defaults = getDefaultGenerateSettings(selectedModel);
+  const overrideCount = optionKeys.filter((key) => settings[key] !== defaults[key]).length;
+  const resetToProviderDefaults = () => onCommit(Object.fromEntries(optionKeys.map((key) => [key, defaults[key]])));
 
   return (
     <GenerateCollapsibleSection
       label={t('widgets.generate.providerOptions.title')}
       defaultOpen
-      badges={
-        overrideCount > 0 ? <Badge>{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge> : null
-      }
+      isChanged={overrideCount > 0}
       sectionId="providerOptions"
+      summary={overrideCount > 0 ? [t('widgets.generate.overridesCount', { count: overrideCount })] : undefined}
+      resetLabel={t('widgets.generate.sectionMenu.resetProviderOptions')}
+      onReset={resetToProviderDefaults}
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         {optionKeys.includes('openaiQuality') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiQuality')}

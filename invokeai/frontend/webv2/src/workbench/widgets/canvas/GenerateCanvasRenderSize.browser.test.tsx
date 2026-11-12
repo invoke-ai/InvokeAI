@@ -72,7 +72,7 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
     },
     CanvasRenderSize: harness.slot,
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: () => undefined },
+    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionsOpen: () => undefined },
   }),
 }));
 

@@ -170,7 +170,7 @@ const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
   });
 
   return (
-    <HStack bg="bg.subtle" borderColor="fg.warning" borderWidth="1px" gap="2" p="2" rounded="md">
+    <HStack bg="bg.muted" borderColor="fg.warning" borderWidth="1px" gap="2" p="2" rounded="md">
       <Text color="fg.warning" flex="1" fontSize="xs" textWrap="pretty">
         {message}
       </Text>
@@ -207,7 +207,7 @@ export const VideoComponentsSection = memo(function VideoComponentsSection({
       label={t('widgets.video.components')}
       sectionId="video-components"
     >
-      <Stack gap="3" p="2">
+      <Stack gap="2.5">
         {policy.slots.map((slot) => (
           <Fragment key={slot.key}>
             <ComponentSlotRow

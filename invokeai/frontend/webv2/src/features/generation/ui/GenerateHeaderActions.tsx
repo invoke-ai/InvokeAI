@@ -14,13 +14,14 @@ import { flushGenerateDrafts } from './generateDraftRegistry';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
 import { offerGenerateUndo } from './generateUndo';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
+import { GenerationSectionJumpMenu } from './shared/GenerationSectionJumpMenu';
 import {
   getModelDefaultsPatch,
   getModelDefaultSettings,
   settingsMatchModelDefaults,
 } from './shared/modelDefaultSettings';
 
-export const GenerateHeaderActions = () => {
+export const GenerateHeaderActions = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const ui = useGenerationUi();
   const models = ui.models.catalog;
@@ -78,6 +79,7 @@ export const GenerateHeaderActions = () => {
 
   return (
     <>
+      <GenerationSectionJumpMenu panelId={instance?.id} />
       <GeneratePresetsPopover />
       <Tooltip content={resetLabel}>
         <IconButton

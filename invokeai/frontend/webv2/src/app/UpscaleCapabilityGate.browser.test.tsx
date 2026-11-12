@@ -41,7 +41,7 @@ const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilities
 const modelManager = vi.hoisted(() => ({ open: null as ((modelKey: string) => void) | null }));
 const noop = () => undefined;
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: noop },
 } as unknown as GenerationUiAdapter;
 
 let store: WorkbenchInternalStore;

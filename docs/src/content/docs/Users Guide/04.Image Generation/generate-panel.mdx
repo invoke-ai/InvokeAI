@@ -1,7 +1,7 @@
 ---
 title: Generate Panel Reference
 description: Every section of the Generate panel in detail — size, render settings, negative prompts, advanced options, resetting to defaults, concepts, reference images and the prompt tools.
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-12
 sidebar:
   order: 1
 ---
@@ -9,6 +9,20 @@ sidebar:
 import { Steps } from '@astrojs/starlight/components';
 
 This page describes each section of the **Generate** panel in detail. For a first walkthrough — choosing a model, generating a first image, and sending results to the Gallery or the Canvas — see [Generating and modifying still images](/users-guide/image-generation/introduction/).
+
+## Working with sections
+
+Below the model and prompt, the panel's settings are grouped into sections, such as **Size**, **Guidance**, **Render** and **Advanced**. The **Upscale** and **Video** panels use the same sections.
+
+* **Open and fold** a section by clicking its title, the tab with the chevron. The panel remembers which sections you keep open. While you scroll through an open section, its title stays pinned at the top of the panel.
+* **Alt-click** a title to open that section and fold every other section in the panel. **Shift-click** a title to open every section, or to fold them all when they are all open already.
+* With a title focused, **↑** and **↓** move to the previous and next title, **Home** and **End** to the first and last, **→** opens the section, **←** folds it, and **Enter** or **Space** toggles it.
+* A folded section shows a summary of its values after its title, such as the size, or the steps, CFG and seed. Open, it shows its fields instead. Badges that flag something, such as **Incompatible** in Guidance or **Shared** in Upscale, show either way.
+* A section whose settings differ from their defaults has a dot on its title. A section holding a problem that stops Invoke from running turns its title red and shows how many problems it holds.
+* **Right-click** a title (or press the menu key or Shift+F10 while it has focus) for **Fold others**, **Expand all** or **Fold all**, **Copy summary**, which copies the title and its summary, and, where the section can reset its settings, a reset item that names what it resets: **Reset size to model defaults** in Size, **Reset steps, CFG and scheduler to model defaults** in Render, **Reset to provider defaults** in a hosted model's options, and **Reset section to defaults** in the Canvas compositing section.
+* **Jump to section**, the list button in the panel's title bar, lists the sections in order. Choosing one opens it and brings it to the top of the panel.
+
+A field whose value differs from its default shows a small dot in the margin to its left. Click the dot to reset the field; the field keeps the keyboard focus. You can also right-click the field (or press the menu key or Shift+F10 while it has focus) and choose its reset item, or **Copy value**. Fields show the dot in Size, Render, Refiner and Advanced, including the VAE, VAE precision and the on/off settings there; a setting that is switched off or not used shows no dot.
 
 ## Setting the image size
 
@@ -32,7 +46,7 @@ Models produce their best results near their optimal size. Much larger images ca
 
 ## Render settings
 
-The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. A field you have changed shows a small dot to its left; click the dot to reset the field to the model default. You can also double-click the field, or open its menu by right-clicking it (or with the menu key or Shift+F10 while it has focus) and choose **Reset to model default**.
+The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. A field you have changed shows the reset dot to its left (see [Working with sections](#working-with-sections)); you can also double-click a slider to reset it.
 
 ### Steps
 
@@ -77,7 +91,7 @@ The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model 
 
 ### Advanced settings
 
-The **Advanced** section appears for models with extra options, and its header counts the settings you have changed. Depending on the model it can include:
+The **Advanced** section appears for models with extra options. Each setting you have changed from the model's default shows the reset dot, and while the section is folded its title shows how many of them there are. Depending on the model it can include:
 
 * **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. Other families set their VAE in the Components section.
 * **CLIP skip** and **CFG rescale** — SD 1.5 and SD 2.x only.

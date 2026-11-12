@@ -2,6 +2,7 @@
 import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { normalizeGenerateSettings } from '@features/generation/core/settings';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
@@ -18,7 +19,7 @@ import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 vi.mock('./GenerationUiContext', () => ({
   GenerationModelSelect: () => null,
   useGenerationUi: () => ({
-    sectionPreferences: { sectionsOpen: { advanced: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { advanced: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -32,6 +33,7 @@ await i18n.use(initReactI18next).init({
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2', name: 'SD 2', type: 'main' };
+const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux', name: 'FLUX.1 dev', type: 'main' };
 const qwenImageModel: MainModelConfig = {
   base: 'qwen-image',
@@ -48,6 +50,7 @@ const krea2Model: MainModelConfig = {
   type: 'main',
 };
 let host: HTMLDivElement | null = null;
+let onCommitImmediate = vi.fn();
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -70,12 +73,18 @@ const render = async (
   const settings = { ...getDefaultGenerateSettings(model), hiDiffusionEnabled, ...overrides };
   const draft = createExternalStoreCore(settings);
   const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
+  onCommitImmediate = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
 
   await settle(() => {
     root?.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
-          <GenerateAdvancedFields draft={draft} selectedModel={model} onCommit={onCommit} onCommitImmediate={vi.fn()} />
+          <GenerateAdvancedFields
+            draft={draft}
+            selectedModel={model}
+            onCommit={onCommit}
+            onCommitImmediate={onCommitImmediate}
+          />
         </I18nextProvider>
       </ChakraProvider>
     );
@@ -171,100 +180,88 @@ describe('GenerateAdvancedFields HiDiffusion controls', () => {
     expect(sliderByLabel('HiDiffusion: T1 Ratio')?.getAttribute('aria-disabled')).toBe('true');
   });
 
-  it.each(
-    [1, 2].flatMap((ratio) =>
-      ['manual', 'automatic', 'mixed'].flatMap((mode) => ['menu', 'dot'].map((action) => ({ action, mode, ratio })))
-    )
-  )('resets only T$ratio through its $action in $mode mode', async ({ action, mode, ratio }) => {
-    const t1 = mode === 'automatic' || (mode === 'mixed' && ratio === 1) ? null : 0.7;
-    const t2 = mode === 'automatic' || (mode === 'mixed' && ratio === 2) ? null : 0.2;
-    const onCommit = await render(sd1Model, true, {
-      hiDiffusionManualRatios: { t1: 0.8, t2: 0.3 },
-      hiDiffusionT1Ratio: t1,
-      hiDiffusionT2Ratio: t2,
-    });
-    const label = `HiDiffusion: T${ratio} Ratio`;
-    const dot = () => host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label$="${label}"]`);
-    expect(dot()).not.toBeNull();
-    if (action === 'menu') {
-      await settle(() =>
-        sliderByLabel(label)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
-      );
-      const reset = document.querySelector<HTMLElement>('[data-scope="menu"][data-part="item"][data-value="reset"]');
-      expect(reset).not.toBeNull();
-      await settle(() => reset?.click());
-    } else {
-      await settle(() => dot()?.click());
-    }
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(
-      mode === 'manual'
-        ? ratio === 1
-          ? { hiDiffusionT1Ratio: 0.4 }
-          : { hiDiffusionT2Ratio: 0 }
-        : { hiDiffusionManualRatios: ratio === 1 ? { t1: 0.4, t2: 0.3 } : { t1: 0.8, t2: 0 } }
-    );
-    expect(sliderByLabel(label)?.getAttribute('aria-valuenow')).toBe(ratio === 1 ? '0.4' : '0');
-    expect(sliderByLabel(`HiDiffusion: T${ratio === 1 ? 2 : 1} Ratio`)?.getAttribute('aria-valuenow')).toBe(
-      mode === 'automatic' ? (ratio === 1 ? '0.3' : '0.8') : ratio === 1 ? '0.2' : '0.7'
-    );
-    expect(sliderByLabel(label)?.getAttribute('aria-disabled') === 'true').toBe(mode !== 'manual');
-    expect(switchByLabel('HiDiffusion: Automatic ratios')?.querySelector<HTMLInputElement>('input')?.checked).toBe(
-      mode === 'automatic'
-    );
-    expect(dot()).toBeNull();
+  const ratioDot = (ratio: number) =>
+    host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label$="HiDiffusion: T${ratio} Ratio"]`) ?? null;
+  const ratioMenuReset = async (ratio: number) => {
     await settle(() =>
-      sliderByLabel(label)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+      sliderByLabel(`HiDiffusion: T${ratio} Ratio`)?.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      )
     );
-    expect(
-      document.querySelector('[data-scope="menu"][data-part="item"][data-value="reset"]')?.hasAttribute('data-disabled')
-    ).toBe(true);
-  });
+    return document.querySelector<HTMLElement>('[data-scope="menu"][data-part="item"][data-value="reset"]');
+  };
 
-  it.each(['manual', 'automatic'].flatMap((mode) => ['menu', 'dot'].map((action) => ({ mode, action }))))(
-    'keeps the manual pair ordered when resetting T1 through its $action in $mode mode',
-    async ({ mode, action }) => {
-      const automatic = mode === 'automatic';
+  it.each([1, 2].flatMap((ratio) => ['menu', 'dot'].map((action) => ({ action, ratio }))))(
+    'resets only a manual T$ratio through its $action',
+    async ({ action, ratio }) => {
       const onCommit = await render(sd1Model, true, {
-        hiDiffusionT1Ratio: automatic ? null : 0.8,
-        hiDiffusionT2Ratio: automatic ? null : 0.6,
-        hiDiffusionManualRatios: { t1: 0.8, t2: 0.6 },
+        hiDiffusionManualRatios: { t1: 0.8, t2: 0.3 },
+        hiDiffusionT1Ratio: 0.7,
+        hiDiffusionT2Ratio: 0.2,
       });
-      const label = 'HiDiffusion: T1 Ratio';
-      const dot = () => host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label$="${label}"]`);
-      expect(dot()).not.toBeNull();
+      const label = `HiDiffusion: T${ratio} Ratio`;
+
+      expect(ratioDot(ratio)).not.toBeNull();
       if (action === 'menu') {
-        await settle(() =>
-          sliderByLabel(label)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
-        );
-        const reset = document.querySelector<HTMLElement>('[data-scope="menu"][data-part="item"][data-value="reset"]');
+        const reset = await ratioMenuReset(ratio);
         expect(reset).not.toBeNull();
         await settle(() => reset?.click());
       } else {
-        await settle(() => dot()?.click());
+        await settle(() => ratioDot(ratio)?.click());
       }
+
       expect(onCommit).toHaveBeenCalledExactlyOnceWith(
-        automatic ? { hiDiffusionManualRatios: { t1: 0.6, t2: 0.6 } } : { hiDiffusionT1Ratio: 0.6 }
+        ratio === 1 ? { hiDiffusionT1Ratio: 0.4 } : { hiDiffusionT2Ratio: 0 }
       );
-      expect(sliderByLabel(label)?.getAttribute('aria-valuenow')).toBe('0.6');
-      expect(sliderByLabel('HiDiffusion: T2 Ratio')?.getAttribute('aria-valuenow')).toBe('0.6');
-      const automaticSwitch = switchByLabel('HiDiffusion: Automatic ratios');
-      expect(automaticSwitch?.querySelector<HTMLInputElement>('input')?.checked).toBe(automatic);
-      expect(dot()).toBeNull();
-      if (automatic) {
-        await settle(() => automaticSwitch?.querySelector<HTMLElement>('[data-part="control"]')?.click());
-        expect(onCommit).toHaveBeenLastCalledWith({ hiDiffusionT1Ratio: 0.6, hiDiffusionT2Ratio: 0.6 });
-        expect(sliderByLabel(label)?.getAttribute('aria-disabled')).not.toBe('true');
-      }
-      await settle(() =>
-        sliderByLabel(label)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+      expect(sliderByLabel(label)?.getAttribute('aria-valuenow')).toBe(ratio === 1 ? '0.4' : '0');
+      expect(sliderByLabel(`HiDiffusion: T${ratio === 1 ? 2 : 1} Ratio`)?.getAttribute('aria-valuenow')).toBe(
+        ratio === 1 ? '0.2' : '0.7'
       );
-      expect(
-        document
-          .querySelector('[data-scope="menu"][data-part="item"][data-value="reset"]')
-          ?.hasAttribute('data-disabled')
-      ).toBe(true);
+      expect(ratioDot(ratio)).toBeNull();
+      expect((await ratioMenuReset(ratio))?.hasAttribute('data-disabled')).toBe(true);
     }
   );
+
+  // A disabled ratio is not sent, so it shows no dot and its menu offers no reset, whatever value it keeps.
+  it.each([
+    ['automatic ratios', { hiDiffusionT1Ratio: null, hiDiffusionT2Ratio: null }, [1, 2]],
+    ['an automatic T1 beside a manual T2', { hiDiffusionT1Ratio: null, hiDiffusionT2Ratio: 0.2 }, [1]],
+    ['RAU-Net off', { hiDiffusionRauNetEnabled: false, hiDiffusionT1Ratio: 0.7, hiDiffusionT2Ratio: 0.2 }, [1, 2]],
+    ['HiDiffusion off', { hiDiffusionEnabled: false, hiDiffusionT1Ratio: 0.7, hiDiffusionT2Ratio: 0.2 }, [1, 2]],
+  ] as const)('marks no disabled ratio with %s', async (_case, overrides, disabledRatios) => {
+    await render(sd1Model, true, { hiDiffusionManualRatios: { t1: 0.8, t2: 0.3 }, ...overrides });
+
+    for (const ratio of disabledRatios) {
+      expect(sliderByLabel(`HiDiffusion: T${ratio} Ratio`)?.getAttribute('aria-disabled')).toBe('true');
+      expect(ratioDot(ratio)).toBeNull();
+      expect((await ratioMenuReset(ratio))?.hasAttribute('data-disabled')).toBe(true);
+      await settle(() => document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    }
+  });
+
+  it.each(['menu', 'dot'])('keeps the manual pair ordered when resetting T1 through its %s', async (action) => {
+    const onCommit = await render(sd1Model, true, {
+      hiDiffusionT1Ratio: 0.8,
+      hiDiffusionT2Ratio: 0.6,
+      hiDiffusionManualRatios: { t1: 0.8, t2: 0.6 },
+    });
+    const label = 'HiDiffusion: T1 Ratio';
+
+    expect(ratioDot(1)).not.toBeNull();
+    if (action === 'menu') {
+      const reset = await ratioMenuReset(1);
+      expect(reset).not.toBeNull();
+      await settle(() => reset?.click());
+    } else {
+      await settle(() => ratioDot(1)?.click());
+    }
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({ hiDiffusionT1Ratio: 0.6 });
+    expect(sliderByLabel(label)?.getAttribute('aria-valuenow')).toBe('0.6');
+    expect(sliderByLabel('HiDiffusion: T2 Ratio')?.getAttribute('aria-valuenow')).toBe('0.6');
+    expect(ratioDot(1)).toBeNull();
+    expect((await ratioMenuReset(1))?.hasAttribute('data-disabled')).toBe(true);
+  });
 
   it.each([1, 2])(
     'keeps a recalled automatic T%s slider disabled without changing its manual companion',
@@ -387,6 +384,31 @@ describe('GenerateAdvancedFields Krea-2 reference K/V cache', () => {
   };
   const kvCacheInput = () => switchByLabel('Reference K/V cache')?.querySelector<HTMLInputElement>('input') ?? null;
 
+  const kvCacheDot = () =>
+    host?.querySelector<HTMLElement>('[data-modified-dot][aria-label="Reset to model default: Reference K/V cache"]') ??
+    null;
+
+  it('marks the switch with the dot while it applies and is on, and resets it', async () => {
+    const onCommit = await render(krea2Model, false, {
+      krea2ReferenceKvCache: true,
+      loras: [poseLora],
+      referenceImages: [editReference],
+    });
+
+    expect(kvCacheDot()).not.toBeNull();
+    await settle(() => kvCacheDot()?.click());
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({ krea2ReferenceKvCache: false });
+    expect(kvCacheDot()).toBeNull();
+  });
+
+  it('shows no dot while the switch does not apply, even with the stored value on', async () => {
+    await render(krea2Model, false, { krea2ReferenceKvCache: true });
+
+    expect(kvCacheInput()?.disabled).toBe(true);
+    expect(kvCacheDot()).toBeNull();
+  });
+
   // Krea-2 has no other advanced field, so the section must not hide itself.
   it('offers the switch with edit references and a LoRA, and commits it', async () => {
     const onCommit = await render(krea2Model, false, { loras: [poseLora], referenceImages: [editReference] });
@@ -438,5 +460,181 @@ describe('GenerateAdvancedFields Krea-2 reference K/V cache', () => {
     await render(qwenImageModel, false);
 
     expect(switchByLabel('Reference K/V cache')).toBeNull();
+  });
+});
+
+describe('GenerateAdvancedFields alignment', () => {
+  // A field that pads itself sits inside the others' edges; the section owns the inset.
+  it.each([
+    ['SD 1.5', sd1Model, {}],
+    ['Qwen Image', qwenImageModel, {}],
+    ['Krea-2', krea2Model, {}],
+  ] as const)('starts every %s control on the same left edge', async (_name, model, overrides) => {
+    await render(model, true, overrides);
+    await settle(() => host?.querySelector<HTMLElement>('.generate-section [data-part="trigger"]')?.click());
+
+    // The controls themselves: a wrapper that pads its content still spans the full width.
+    const controls = [
+      ...(host?.querySelectorAll<HTMLElement>(
+        '[data-part="content"] :is([data-scope="select"][data-part="trigger"], [data-scope="scrubber"][data-part="root"], [data-scope="switch"][data-part="label"])'
+      ) ?? []),
+    ]
+      .map((control) => control.getBoundingClientRect())
+      .filter((rect) => rect.width > 0);
+
+    expect(controls.length).toBeGreaterThan(0);
+    expect(new Set(controls.map((rect) => Math.round(rect.left))).size).toBe(1);
+  });
+});
+
+describe('GenerateAdvancedFields reset dots', () => {
+  // VAE, VAE precision and seamless tiling show per the architecture capabilities.
+  seedArchitectureCapabilities();
+
+  const dot = (field: string) =>
+    host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label="Reset to model default: ${field}"]`) ?? null;
+
+  it('resets VAE precision from its dot, not a separate button, and hands focus to the select', async () => {
+    const defaults = getDefaultGenerateSettings(sd1Model);
+    const onCommit = await render(sd1Model, false, {
+      vaePrecision: defaults.vaePrecision === 'fp16' ? 'fp32' : 'fp16',
+    });
+
+    expect(host?.querySelector('button[aria-label="Use model default VAE precision"]')).toBeNull();
+    await settle(() => dot('VAE precision')?.click());
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({ vaePrecision: defaults.vaePrecision });
+    expect(dot('VAE precision')).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(selectByLabel('VAE precision')));
+  });
+
+  it('resets a chosen VAE to the bundled one from its dot', async () => {
+    const vae = { base: 'sd-1', key: 'vae-1', name: 'Custom VAE', type: 'vae' } as unknown as GenerateSettings['vae'];
+    await render(sd1Model, false, { vae });
+
+    expect(host?.querySelector('button[aria-label="Use model default VAE"]')).toBeNull();
+    await settle(() => dot('VAE')?.click());
+
+    expect(onCommitImmediate).toHaveBeenCalledExactlyOnceWith({ vae: null });
+    expect(dot('VAE')).toBeNull();
+  });
+
+  it.each([
+    ['HiDiffusion', sd1Model, { hiDiffusionEnabled: true }, { hiDiffusionEnabled: false }, false],
+    [
+      'HiDiffusion: RAU-Net',
+      sd1Model,
+      { hiDiffusionEnabled: true, hiDiffusionRauNetEnabled: false },
+      { hiDiffusionRauNetEnabled: true },
+      true,
+    ],
+    [
+      'HiDiffusion: Window Attention',
+      sd1Model,
+      { hiDiffusionEnabled: true, hiDiffusionWindowAttentionEnabled: false },
+      { hiDiffusionWindowAttentionEnabled: true },
+      true,
+    ],
+    ['Color compensation', sdxlModel, { colorCompensation: true }, { colorCompensation: false }, false],
+    ['X axis', sd1Model, { seamlessXAxis: true }, { seamlessXAxis: false }, false],
+    ['Y axis', sd1Model, { seamlessYAxis: true }, { seamlessYAxis: false }, false],
+  ] as const)(
+    'marks the %s switch off its default and resets it from the dot',
+    async (label, model, changed, reset, on) => {
+      const onCommit = await render(model, false, changed);
+      const input = () => switchByLabel(label)?.querySelector<HTMLInputElement>('input') ?? null;
+
+      expect(dot(label)).not.toBeNull();
+      await settle(() => dot(label)?.click());
+
+      expect(onCommit).toHaveBeenCalledExactlyOnceWith(reset);
+      expect(input()?.checked).toBe(on);
+      expect(dot(label)).toBeNull();
+      await vi.waitFor(() => expect(document.activeElement).toBe(input()));
+    }
+  );
+
+  it('shows no dot on a switch at its default or one that is not sent', async () => {
+    // HiDiffusion off: its sub-switches are disabled, so even changed ones are not marked.
+    await render(sd1Model, false, { hiDiffusionRauNetEnabled: false });
+
+    expect(dot('HiDiffusion')).toBeNull();
+    expect(dot('X axis')).toBeNull();
+    expect(dot('HiDiffusion: RAU-Net')).toBeNull();
+  });
+
+  it('keeps a switch row dot and its target in the gutter, centred on the first line, clear of the label', async () => {
+    await render(sd1Model, true);
+    const button = dot('HiDiffusion')!;
+    const label = switchByLabel('HiDiffusion')!.querySelector<HTMLElement>('[data-part="label"]')!;
+    const control = switchByLabel('HiDiffusion')!.querySelector<HTMLElement>('[data-part="control"]')!;
+    const rowLeft = label.getBoundingClientRect().left;
+    const buttonRect = button.getBoundingClientRect();
+    const dotRect = () => button.querySelector<HTMLElement>('[data-part="dot"]')!.getBoundingClientRect();
+    const controlRect = control.getBoundingClientRect();
+
+    expect(Math.abs((dotRect().top + dotRect().bottom) / 2 - (controlRect.top + controlRect.bottom) / 2)).toBeLessThan(
+      0.5
+    );
+    // The whole target sits in the 8px gutter, so a click on the label's first letter toggles rather than resets.
+    expect(buttonRect.left).toBeGreaterThanOrEqual(rowLeft - 8);
+    expect(buttonRect.right).toBeLessThanOrEqual(rowLeft);
+    expect(rowLeft - dotRect().right).toBe(3);
+
+    await userEvent.hover(button);
+    await vi.waitFor(() => expect(Math.round(dotRect().width)).toBe(6));
+    expect(dotRect().left).toBeGreaterThanOrEqual(rowLeft - 8);
+    expect(dotRect().right).toBeLessThanOrEqual(rowLeft - 2);
+  });
+
+  it('turns manual ratios back to automatic from the dot, keeping the manual values for later', async () => {
+    const onCommit = await render(sd1Model, true, {
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 },
+      hiDiffusionT1Ratio: 0.7,
+      hiDiffusionT2Ratio: 0.2,
+    });
+
+    await settle(() => dot('HiDiffusion: Automatic ratios')?.click());
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 },
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+    });
+    expect(dot('HiDiffusion: Automatic ratios')).toBeNull();
+  });
+
+  it('resets PiD steps to the model default from its dot', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    const onCommit = await render(qwenImageModel, false, { pidMode: 'fit', pidSteps: defaults.pidSteps + 1 });
+
+    await settle(() => dot('PiD steps')?.click());
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({ pidSteps: defaults.pidSteps });
+    expect(dot('PiD steps')).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(sliderByLabel('PiD steps')));
+  });
+
+  it('counts only what the section shows: a hidden VAE precision is no override', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    await render(qwenImageModel, false, { vaePrecision: defaults.vaePrecision === 'fp16' ? 'fp32' : 'fp16' });
+
+    expect(selectByLabel('VAE precision')).toBeNull();
+    expect(host?.textContent).not.toContain('override');
+    expect(host?.querySelector('.generate-section [data-section-changed]')).toBeNull();
+  });
+
+  it('resets PiD and encoder quantization to the model defaults from their dots', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    const onCommit = await render(qwenImageModel, false, { pidMode: 'fit', qwenImageEncoderQuantization: 'int8' });
+
+    await settle(() => dot('Encoder quantization')?.click());
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({
+      qwenImageEncoderQuantization: defaults.qwenImageEncoderQuantization,
+    });
+
+    await settle(() => dot('PiD Decode')?.click());
+    expect(onCommitImmediate).toHaveBeenCalledExactlyOnceWith({ pidMode: defaults.pidMode });
+    expect(dot('PiD Decode')).toBeNull();
   });
 });

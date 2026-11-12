@@ -30,6 +30,7 @@ export const revealGenerateIssue = (issue: Pick<GenerationIssue, 'id' | 'target'
       return;
     }
 
+    // A section's fields carry a scroll margin, so an anchor above the view stops below its pinned section title.
     anchor.scrollIntoView({ block: 'nearest' });
 
     if (icon) {

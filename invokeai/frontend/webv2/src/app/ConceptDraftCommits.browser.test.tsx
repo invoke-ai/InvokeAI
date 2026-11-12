@@ -51,7 +51,7 @@ const modelSnapshot = { models, status: 'loaded' };
 const { notify, picker } = vi.hoisted(() => ({ notify: vi.fn(), picker: { pick: null as unknown } }));
 const noop = () => undefined;
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: noop },
 } as unknown as GenerationUiAdapter;
 
 let store: WorkbenchInternalStore;

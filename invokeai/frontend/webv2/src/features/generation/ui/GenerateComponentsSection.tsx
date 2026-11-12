@@ -182,7 +182,7 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
       defaultOpen={policy.defaultOpen}
       sectionId="components"
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}

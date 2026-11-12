@@ -261,6 +261,14 @@ const highContrastConditions = {
   highContrastLight: `:root[data-high-contrast=true]:is(${lightThemeSelectors})`,
 };
 
+/**
+ * `inset / size` as a number (tan(atan2(a, b)) is a / b), and 0 while the collapsible has not measured the size yet
+ * (0px): the scale is then 1, never infinite or negative.
+ */
+const insetRatio = (inset: string, size: string): string =>
+  `tan(atan2(min(${inset}, ${size} * 1000), max(${size}, ${inset})))`;
+const SECTION_SCALE_INSET = `scale(calc(1 - ${insetRatio('8px', 'var(--width)')}), calc(1 - ${insetRatio('4px', 'var(--height)')}))`;
+
 const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
 
@@ -344,6 +352,21 @@ const config = defineConfig({
       'wb-status-sweep': {
         from: { transform: 'translateX(-100%)' },
         to: { transform: 'translateX(300%)' },
+      },
+      // A settings section's fields growing into place as it opens (and back as it folds), beside the collapsible's own
+      // height and fade. The start is a fixed inset, not a percentage, so every section's edges travel alike whatever
+      // its size: 4px in from each side and 4px up from the bottom, scaled from the top centre. The ratios come from
+      // the `--width` and `--height` the collapsible measures for its height animation. Neither is held after it ends,
+      // so no transform stays on the fields; the fold ends with the content faded out. They run on the fields inside
+      // the collapsible's content, never on the content itself: Chromium leaves fields unpainted when one element both
+      // runs a composited transform animation and animates its height under `overflow: hidden`.
+      'wb-section-scale-in': {
+        from: { transform: SECTION_SCALE_INSET },
+        to: { transform: 'scale(1)' },
+      },
+      'wb-section-scale-out': {
+        from: { transform: 'scale(1)' },
+        to: { transform: SECTION_SCALE_INSET },
       },
     },
     layerStyles: {

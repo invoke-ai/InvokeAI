@@ -161,4 +161,55 @@ describe('GenerateFieldContextMenu', () => {
     await expect.poll(() => openMenus()).toHaveLength(0);
     expect(document.activeElement).toBe(cfg);
   });
+
+  it('keeps the changed dot inside the 8px gutter at rest, on hover and with its focus ring', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <I18nextProvider i18n={i18n}>
+            {/* The panel and its 8px field inset, as a section lays fields out. */}
+            <Box data-testid="panel" overflow="hidden" px="2" w="30rem">
+              <GenerateFieldContextMenu copyValue={FIELDS[0]!.copyValue} fieldLabel="Steps" onReset={onReset}>
+                <Box as="button" borderWidth="1px" data-field="Steps" h="7" w="full">
+                  Steps
+                </Box>
+              </GenerateFieldContextMenu>
+            </Box>
+          </I18nextProvider>
+        </ChakraProvider>
+      )
+    );
+    const panel = host.querySelector<HTMLElement>('[data-testid="panel"]')!.getBoundingClientRect();
+    const fieldLeft = field('Steps').getBoundingClientRect().left;
+    const button = host.querySelector<HTMLElement>('[data-modified-dot]')!;
+    const dot = () => button.querySelector<HTMLElement>('[data-part="dot"]')!.getBoundingClientRect();
+    /** The dot's extent, with `ring` px of focus ring around it, must clear the panel edge and the field's border. */
+    const expectInGutter = (ring: number) => {
+      const rect = dot();
+      expect(rect.left - ring).toBeGreaterThanOrEqual(panel.left);
+      expect(rect.right + ring).toBeLessThanOrEqual(fieldLeft);
+    };
+
+    expect(fieldLeft - panel.left).toBe(8);
+    expect(dot().width).toBe(4);
+    expectInGutter(1);
+
+    await userEvent.hover(button);
+    await expect.poll(() => Math.round(dot().width)).toBe(6);
+    expectInGutter(0);
+
+    await userEvent.unhover(button);
+    // From the keyboard: the ring is drawn on the dot itself, not the 16px button.
+    host.querySelector<HTMLElement>('[data-testid="panel"]')!.focus();
+    await userEvent.keyboard('{Tab}');
+    expect(document.activeElement).toBe(button);
+    await expect.poll(() => Math.round(dot().width)).toBe(6);
+    // A real outline, which stays in forced colors, 1px around the dot and still inside the gutter.
+    const dotStyle = getComputedStyle(button.querySelector<HTMLElement>('[data-part="dot"]')!);
+    expect([dotStyle.outlineStyle, dotStyle.outlineWidth, dotStyle.outlineOffset]).toEqual(['solid', '1px', '0px']);
+    expectInGutter(1);
+  });
 });

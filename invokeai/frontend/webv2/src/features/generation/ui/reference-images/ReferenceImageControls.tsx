@@ -78,11 +78,11 @@ export const DEFAULT_REFERENCE_WEIGHT = 1;
 const STEPS_FIELD_DISABLED_CSS = { opacity: 0.5 } as const;
 
 /**
- * Controls on a list row are backed with the settings section's surface, as a concept row backs its weight: the row's
+ * Controls on a list row are backed with the widget's surface, as a concept row backs its weight: the row's
  * hover tint would otherwise wash out their transparent fills and faint borders, and their own hover fills with it.
  */
 export const ControlSurface = ({ children, ...props }: { children: ReactNode } & Record<`data-${string}`, string>) => (
-  <Box bg="bg.muted" data-control-surface="" flex="1" minW="0" rounded="control" {...props}>
+  <Box bg="bg.subtle" data-control-surface="" flex="1" minW="0" rounded="control" {...props}>
     {children}
   </Box>
 );
@@ -282,7 +282,7 @@ const ActiveStepsField = ({
   return (
     <HStack
       aria-disabled={disabled || undefined}
-      bg="bg.muted"
+      bg="bg.subtle"
       borderColor="border"
       data-control-surface=""
       borderWidth="1px"

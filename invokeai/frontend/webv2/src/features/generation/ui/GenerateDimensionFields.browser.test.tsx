@@ -44,7 +44,7 @@ vi.mock('./GenerationUiContext', () => ({
       update: vi.fn(),
     },
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -107,11 +107,12 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (settings: Partial<GenerateSettings>, model: GenerateModelConfig = sd1Model) => {
+/** `null` renders the section with no model selected, so with no model defaults. */
+const render = async (settings: Partial<GenerateSettings>, model: GenerateModelConfig | null = sd1Model) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings });
+  const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model ?? undefined), ...settings });
   // Commits and resets land in the draft, as the panel's draft would show them.
   const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
   const onResetSize = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
@@ -123,7 +124,7 @@ const render = async (settings: Partial<GenerateSettings>, model: GenerateModelC
           <GenerateDimensionFields
             draft={draft}
             projectId="project"
-            selectedModel={model}
+            selectedModel={model ?? undefined}
             onCommit={onCommit}
             onResetSize={onResetSize}
           />
@@ -700,5 +701,37 @@ describe('GenerateDimensionFields Reset size', () => {
     await render({ aspectRatioId: 'Free', aspectRatioIsLocked: false, height: 384, width: 384 });
 
     expect(host?.textContent).not.toContain('Set optimal size');
+  });
+});
+
+describe('GenerateDimensionFields title defaults', () => {
+  const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+  const isMarked = () => title().querySelector('[data-section-changed]') !== null;
+  const openMenu = async () => {
+    await act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await expect.element(page.getByRole('menu')).toBeVisible();
+  };
+  const resetItem = () => page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetSize' });
+
+  it('marks a size off the model default and resets it from the title menu', async () => {
+    const portraitModel: MainModelConfig = { ...sd1Model, default_settings: { height: 768, width: 640 } };
+    const { onResetSize } = await render({ height: 512, width: 512 }, portraitModel);
+
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await userEvent.click(resetItem());
+
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ height: 768, width: 640 }));
+    await vi.waitFor(() => expect(isMarked()).toBe(false));
+  });
+
+  it('neither marks nor offers a reset without a model to take defaults from', async () => {
+    await render({ height: 512, width: 768 }, null);
+
+    expect(isMarked()).toBe(false);
+    await openMenu();
+    await expect.element(resetItem()).not.toBeInTheDocument();
   });
 });

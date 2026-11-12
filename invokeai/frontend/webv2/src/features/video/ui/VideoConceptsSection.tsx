@@ -72,7 +72,7 @@ export const VideoConceptsSection = memo(
 
     return (
       <GenerationSettingsSection label={t('widgets.video.concepts')} sectionId="video-concepts" defaultOpen>
-        <Stack gap="2" p="2">
+        <Stack gap="2.5">
           <ModelSelect
             disabled={!model}
             excludeKeys={selectedLoraKeys}

@@ -262,8 +262,8 @@ const ConceptRowContent = ({
             </Flex>
           }
           detail={
-            // Backed with the settings section's surface so the row's hover tint never washes out the track and fill.
-            <Box bg="bg.muted" rounded="control">
+            // Backed with the widget's surface so the row's hover tint never washes out the track and fill.
+            <Box bg="bg.subtle" rounded="control">
               <GenerateFieldContextMenu
                 fieldLabel={t('widgets.generate.conceptWeightNamed', { name })}
                 copyValue={copyWeight}

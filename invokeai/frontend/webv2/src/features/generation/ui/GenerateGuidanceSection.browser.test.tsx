@@ -16,7 +16,7 @@ import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 vi.mock('./GenerationUiContext', () => ({
   useGenerationUi: () => ({
     models: { status: 'loaded' },
-    sectionPreferences: { sectionsOpen: { guidance: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { guidance: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 // The lists have their own tests; this one covers the note the section shows between them.

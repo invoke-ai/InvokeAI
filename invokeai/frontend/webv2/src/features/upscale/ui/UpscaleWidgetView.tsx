@@ -5,17 +5,7 @@ import type { UpscaleComponentField, UpscaleComponentSlot } from '@features/upsc
 import type { UpscaleMode, UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { FeatureHintId } from '@platform/ui/hints/hintRegistry';
 
-import {
-  Badge,
-  Box,
-  createListCollection,
-  DataList,
-  SegmentGroup,
-  Separator,
-  SimpleGrid,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import {
   addConcept,
   CapabilitiesGate,
@@ -23,6 +13,7 @@ import {
   type ConceptModelPort,
   ConceptRow,
   type ConceptUpdate,
+  GenerationSectionPanel,
   GenerationSettingsSection,
   removeConcept,
   SeedField,
@@ -270,7 +261,7 @@ const UpscaleOutputPreflight = memo(
     const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
     return (
-      <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
+      <Stack bg="bg.muted" gap="2" px="2.5" py="2" rounded="md">
         <DataList.Root gap="1.5" orientation="horizontal">
           <DataList.Item>
             <DataList.ItemLabel color="fg.subtle" fontSize="xs">
@@ -421,7 +412,8 @@ const UpscaleModelReconciler = ({
   return null;
 };
 
-export const UpscaleWidgetView = () => {
+/** `instance` ties the sections to the header's jump menu; a view rendered outside a widget frame has none. */
+export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const openInModelManager = useOpenModelInManager();
   const conceptModels = useMemo<ConceptModelPort>(
@@ -674,7 +666,7 @@ export const UpscaleWidgetView = () => {
     [t]
   );
 
-  const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
+  const sharedBadge = useMemo(() => <Badge>{t('widgets.upscale.shared')}</Badge>, [t]);
   const modeOptions = useMemo(
     () =>
       [
@@ -693,7 +685,7 @@ export const UpscaleWidgetView = () => {
     getSpandrelNativeScale(values.upscaleModel) === null;
 
   const form = (
-    <Stack gap={1} minW={0}>
+    <Stack gap={0} minW={0}>
       <UpscaleModelReconciler
         key={`${projectId}:${modelsStatus}:${capabilitiesRevision}:${modelsFingerprint}`}
         rawValues={rawValues}
@@ -705,7 +697,7 @@ export const UpscaleWidgetView = () => {
         label={t('widgets.upscale.sourceAndTreatment')}
         sectionId={UPSCALE_SECTION_IDS.source}
       >
-        <Stack gap="3" p="2">
+        <Stack gap="2.5">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
           <UpscaleOutputPreflight
             inputImage={values.inputImage}
@@ -818,7 +810,7 @@ export const UpscaleWidgetView = () => {
 
       {isRefine ? (
         <GenerationSettingsSection
-          badges={sharedBadge}
+          status={sharedBadge}
           label={t('widgets.upscale.detailGuidance')}
           sectionId={UPSCALE_SECTION_IDS.detailGuidance}
         >
@@ -840,7 +832,7 @@ export const UpscaleWidgetView = () => {
 
       {isRefine ? (
         <GenerationSettingsSection label={t('widgets.upscale.generation')} sectionId={UPSCALE_SECTION_IDS.generation}>
-          <Stack gap="3" p="2">
+          <Stack gap="2.5">
             <Field
               error={
                 values.model
@@ -862,7 +854,6 @@ export const UpscaleWidgetView = () => {
                 onChange={selectMainModel}
               />
             </Field>
-            <Separator borderColor="border.subtle" />
             {/* Iterations live in the top bar's invoke cluster, which edits this widget's batch count directly. */}
             <ScrubberField
               error={errors.steps}
@@ -896,7 +887,6 @@ export const UpscaleWidgetView = () => {
                 />
               </Field>
             ) : null}
-            <Separator borderColor="border.subtle" />
             <SeedField
               batchCount={values.batchCount}
               error={errors.seed}
@@ -905,7 +895,6 @@ export const UpscaleWidgetView = () => {
               seedMode={values.seedMode}
               onCommit={patch}
             />
-            <Separator borderColor="border.subtle" />
             <Field hint="concepts" label={t('widgets.upscale.concepts')}>
               <ModelSelect
                 excludeKeys={selectedLoraKeys}
@@ -938,7 +927,7 @@ export const UpscaleWidgetView = () => {
 
       {isRefine ? (
         <GenerationSettingsSection label={t('widgets.upscale.advanced')} sectionId={UPSCALE_SECTION_IDS.advanced}>
-          <Stack gap="3" p="2">
+          <Stack gap="2.5">
             {tileControlNet?.required && (
               <Field
                 error={
@@ -1051,20 +1040,22 @@ export const UpscaleWidgetView = () => {
   // The mode sits above the gate: Model only reads no main-model capabilities, so it stays reachable and usable while
   // the table is loading or has failed, which holds back only Refine's form.
   return (
-    <Stack gap={1} minW={0} p="1">
-      <Box px="2" pt="2">
-        <Field helpText={t('widgets.upscale.modeHelp')} label={t('widgets.upscale.mode')}>
-          <SegmentedControl
-            ariaLabel={t('widgets.upscale.mode')}
-            options={modeOptions}
-            value={values.mode}
-            onChange={set.mode}
-          />
-        </Field>
-      </Box>
-      <CapabilitiesGate isReady={hasCapabilities || !isRefine} labels={gateLabels}>
-        {form}
-      </CapabilitiesGate>
-    </Stack>
+    <GenerationSectionPanel id={instance?.id}>
+      <Stack gap={0} minW={0}>
+        <Box px="2" pt="3" pb="3">
+          <Field helpText={t('widgets.upscale.modeHelp')} label={t('widgets.upscale.mode')}>
+            <SegmentedControl
+              ariaLabel={t('widgets.upscale.mode')}
+              options={modeOptions}
+              value={values.mode}
+              onChange={set.mode}
+            />
+          </Field>
+        </Box>
+        <CapabilitiesGate isReady={hasCapabilities || !isRefine} labels={gateLabels}>
+          {form}
+        </CapabilitiesGate>
+      </Stack>
+    </GenerationSectionPanel>
   );
 };

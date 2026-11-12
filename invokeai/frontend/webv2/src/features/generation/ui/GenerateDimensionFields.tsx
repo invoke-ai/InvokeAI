@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   formatAspectRatio,
   getLockedAspectRatioSettings,
@@ -627,6 +627,10 @@ export const GenerateDimensionFields = ({
     dimensionGrid
   );
   const frameLabel = `${displayDimensions.width}×${displayDimensions.height}`;
+  // Without model defaults there is nothing to differ from.
+  const isAtModelDefaultSize =
+    modelDefaults === null ||
+    (displayDimensions.width === modelDefaults.width && displayDimensions.height === modelDefaults.height);
 
   // The optimal-side stop is scalar; recommended dimensions preserve the live ratio.
   const dimensionField = (key: 'height' | 'width') => (
@@ -670,31 +674,31 @@ export const GenerateDimensionFields = ({
     return (
       <GenerateCollapsibleSection
         label={t('widgets.generate.size')}
-        badges={
-          <>
-            <Badge>{isResized ? `${frameLabel} → ${renderSize.width}×${renderSize.height}` : frameLabel}</Badge>
-            {isRatioConstrained && (
-              <Badge>
-                <Icon as={LockIcon} boxSize="3" />
-              </Badge>
-            )}
-          </>
-        }
+        summary={[
+          isResized ? `${frameLabel} → ${renderSize.width}×${renderSize.height}` : frameLabel,
+          isRatioConstrained ? (
+            <>
+              <Icon as={LockIcon} aria-hidden boxSize="3" verticalAlign="-0.125em" />
+              <Text as="span" srOnly>
+                {t('widgets.generate.aspectRatioLocked')}
+              </Text>
+            </>
+          ) : null,
+        ]}
         defaultOpen
+        isChanged={!isAtModelDefaultSize}
         sectionId="dimensions"
+        resetLabel={t('widgets.generate.sectionMenu.resetSize')}
+        onReset={modelDefaults ? resetToModelDefaults : undefined}
       >
-        <Stack gap="2" p="2">
+        <Stack gap="2.5">
           <HStack alignItems="stretch" gap="2">
             <Stack flex="1" gap="2" minW="0">
               {/* The lock binds width to height, so it sits between the two values it couples. */}
               <GenerateFieldContextMenu
                 fieldLabel={t('widgets.generate.size')}
                 copyValue={() => `${displayDimensions.width}x${displayDimensions.height}`}
-                isAtDefault={
-                  modelDefaults !== null &&
-                  displayDimensions.width === modelDefaults.width &&
-                  displayDimensions.height === modelDefaults.height
-                }
+                isAtDefault={isAtModelDefaultSize}
                 onReset={modelDefaults ? resetToModelDefaults : undefined}
               >
                 <HStack alignItems="center" gap="1">

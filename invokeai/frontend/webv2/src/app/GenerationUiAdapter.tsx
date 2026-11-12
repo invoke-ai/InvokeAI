@@ -451,9 +451,9 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
     () => ({
       sectionsOpen: generateSectionsOpen,
-      setSectionOpen: (sectionId, open) => {
+      setSectionsOpen: (changes) => {
         void patchWorkbenchPreferences({
-          generateSectionsOpen: { ...getWorkbenchPreferences().generateSectionsOpen, [sectionId]: open },
+          generateSectionsOpen: { ...getWorkbenchPreferences().generateSectionsOpen, ...changes },
         });
       },
     }),

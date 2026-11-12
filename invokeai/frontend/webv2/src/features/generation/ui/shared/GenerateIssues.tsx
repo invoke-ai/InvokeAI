@@ -7,7 +7,7 @@ import type {
 } from '@features/generation/core/generationIssues';
 import type { ReactNode } from 'react';
 
-import { Badge, HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { describeGenerationIssue, describeGenerationIssueFix } from '@features/generation/core/generationIssues';
 import { Button, IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
@@ -49,18 +49,11 @@ export const areGenerationIssuesEqual = (
       JSON.stringify(issue.fix) === JSON.stringify(right[index]?.fix)
   );
 
-/** A collapsed section names how many problems it holds, so a closed section never hides why Invoke is blocked. */
-export const GenerateSectionIssueBadge = ({ section }: { section: string }) => {
-  const { t } = useTranslation();
+/** How many issues a section holds, for its title's count. */
+export const useGenerateSectionIssueCount = (section: string | undefined): number => {
   const issues = use(GenerateIssuesContext)?.issues ?? NO_ISSUES;
-  const count = issues.filter((issue) => issue.target.section === section).length;
 
-  return count > 0 ? (
-    <Badge colorPalette="red" variant="surface">
-      <Icon as={CircleAlertIcon} boxSize="3" />
-      {t('widgets.generate.issueCount', { count })}
-    </Badge>
-  ) : null;
+  return section === undefined ? 0 : issues.filter((issue) => issue.target.section === section).length;
 };
 
 /**

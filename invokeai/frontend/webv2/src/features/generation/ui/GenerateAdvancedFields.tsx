@@ -5,7 +5,7 @@ import type {
   QwenImageEncoderQuantization,
 } from '@features/generation/core/types';
 
-import { Badge, Box, chakra, createListCollection, HStack, Stack, useRecipe } from '@chakra-ui/react';
+import { chakra, createListCollection, Stack, useRecipe } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
@@ -20,8 +20,7 @@ import {
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
-import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
-import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint, type FeatureHintId } from '@platform/ui/hints';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { fieldLabelRecipe } from '@theme/recipes';
 import { useId, useMemo } from 'react';
@@ -73,6 +72,16 @@ const selectAdvancedSettings = pickGenerateSettings([
   'vae',
   'vaePrecision',
 ]);
+
+/** On/off settings whose model default is their reset. */
+type DefaultedSwitchKey =
+  | 'colorCompensation'
+  | 'hiDiffusionEnabled'
+  | 'hiDiffusionRauNetEnabled'
+  | 'hiDiffusionWindowAttentionEnabled'
+  | 'krea2ReferenceKvCache'
+  | 'seamlessXAxis'
+  | 'seamlessYAxis';
 
 const KREA2_REFERENCE_KV_CACHE_HELP_KEYS = {
   noEditReferences: 'widgets.generate.krea2ReferenceKvCacheNeedsEditReferences',
@@ -162,6 +171,46 @@ export const GenerateAdvancedFields = ({
     );
   };
 
+  const hiDiffusionRatiosAutomatic = settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null;
+  const hiDiffusionRatiosDisabled = !settings.hiDiffusionEnabled || !settings.hiDiffusionRauNetEnabled;
+  const hiDiffusionT1Disabled = hiDiffusionRatiosDisabled || settings.hiDiffusionT1Ratio === null;
+  const hiDiffusionT2Disabled = hiDiffusionRatiosDisabled || settings.hiDiffusionT2Ratio === null;
+  const onOff = (value: boolean) => t(value ? 'commandPalette.settings.on' : 'commandPalette.settings.off');
+  /** An on/off setting with the model's default value: a changed one shows the dot that puts it back. */
+  const defaultedSwitch = ({
+    key,
+    checked = settings[key],
+    disabled = false,
+    helpText,
+    hint,
+    label,
+  }: {
+    checked?: boolean;
+    disabled?: boolean;
+    helpText?: string;
+    hint?: FeatureHintId;
+    key: DefaultedSwitchKey;
+    label: string;
+  }) => (
+    <GenerateFieldContextMenu
+      fieldLabel={label}
+      copyValue={() => onOff(checked)}
+      // A disabled switch is not sent, so it is no change to undo.
+      isAtDefault={disabled || modelDefaults === null || checked === modelDefaults[key]}
+      placement="switch"
+      onReset={modelDefaults ? () => onCommit({ [key]: modelDefaults[key] }) : undefined}
+    >
+      <GenerateToggleSwitch
+        checked={checked}
+        disabled={disabled}
+        helpText={helpText}
+        hint={hint}
+        label={label}
+        onCheckedChange={(next) => onCommit({ [key]: next })}
+      />
+    </GenerateFieldContextMenu>
+  );
+
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
 
   if (
@@ -179,10 +228,10 @@ export const GenerateAdvancedFields = ({
     return null;
   }
 
-  // Count user decisions, not modified settings keys.
+  // Count user decisions, not modified settings keys, and only those the section shows (and so can reset).
   const overrideCount = [
     customVae,
-    modelDefaults !== null && settings.vaePrecision !== modelDefaults.vaePrecision,
+    policy.vaePrecisionVisible && modelDefaults !== null && settings.vaePrecision !== modelDefaults.vaePrecision,
     clipSkipMax > 0 && settings.clipSkip !== (modelDefaults?.clipSkip ?? 0),
     policy.cfgRescaleVisible && settings.cfgRescaleMultiplier !== (modelDefaults?.cfgRescaleMultiplier ?? 0),
     policy.seamlessVisible && (settings.seamlessXAxis || settings.seamlessYAxis),
@@ -194,30 +243,33 @@ export const GenerateAdvancedFields = ({
     policy.krea2ReferenceKvCacheVisible && krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache,
   ].filter(Boolean).length;
 
-  const badges =
-    overrideCount > 0 ? <Badge>{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge> : null;
-
   return (
     <GenerateCollapsibleSection
       label={t('widgets.generate.advanced')}
       defaultOpen={false}
-      badges={badges}
+      isChanged={overrideCount > 0}
       sectionId="advanced"
+      summary={overrideCount > 0 ? [t('widgets.generate.overridesCount', { count: overrideCount })] : undefined}
     >
-      <Stack _empty={{ display: 'none' }} p="2" pb="0">
+      <Stack _empty={{ display: 'none' }}>
         <GenerateIssueNotes section="advanced" />
       </Stack>
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
         // Stacked: side by side, two inside labels would leave each value too little room.
-        <Stack gap="2" p="2">
+        <Stack gap="2.5">
           {policy.sdVaeVisible ? (
-            <Field
-              hint="vae"
-              label={t('widgets.generate.vae')}
-              labelPlacement="inside"
-              helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
+            <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.vae')}
+              copyValue={() => settings.vae?.name ?? t('widgets.generate.modelDefault')}
+              isAtDefault={!settings.vae}
+              onReset={() => onCommitImmediate({ vae: null })}
             >
-              <HStack gap="1">
+              <Field
+                hint="vae"
+                label={t('widgets.generate.vae')}
+                labelPlacement="inside"
+                helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
+              >
                 <ModelSelect
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
@@ -225,22 +277,20 @@ export const GenerateAdvancedFields = ({
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
                 />
-                {settings.vae ? (
-                  <ModelDefaultButton
-                    label={t('widgets.generate.useModelDefaultVae')}
-                    onClick={() => onCommitImmediate({ vae: null })}
-                  />
-                ) : null}
-              </HStack>
-            </Field>
+              </Field>
+            </GenerateFieldContextMenu>
           ) : null}
           {policy.vaePrecisionVisible ? (
-            <Field hint="vaePrecision" label={t('widgets.generate.vaePrecision')} labelPlacement="inside">
-              <HStack gap="1">
+            <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.vaePrecision')}
+              copyValue={() => settings.vaePrecision.toUpperCase()}
+              isAtDefault={modelDefaults !== null && settings.vaePrecision === modelDefaults.vaePrecision}
+              onReset={modelDefaults ? () => onCommit({ vaePrecision: modelDefaults.vaePrecision }) : undefined}
+            >
+              <Field hint="vaePrecision" label={t('widgets.generate.vaePrecision')} labelPlacement="inside">
                 <Select
                   aria-label={t('widgets.generate.vaePrecision')}
                   collection={VAE_PRECISION_COLLECTION}
-                  flex="1"
                   value={[settings.vaePrecision]}
                   onValueChange={({ value }) => {
                     const vaePrecision = value[0];
@@ -250,20 +300,14 @@ export const GenerateAdvancedFields = ({
                     }
                   }}
                 />
-                {modelDefaults && settings.vaePrecision !== modelDefaults.vaePrecision ? (
-                  <ModelDefaultButton
-                    label={t('widgets.generate.useModelDefaultVaePrecision')}
-                    onClick={() => onCommit({ vaePrecision: modelDefaults.vaePrecision })}
-                  />
-                ) : null}
-              </HStack>
-            </Field>
+              </Field>
+            </GenerateFieldContextMenu>
           ) : null}
         </Stack>
       ) : null}
 
       {policy.clipSkipMax || policy.cfgRescaleVisible ? (
-        <Stack gap="2" p="2">
+        <Stack gap="2.5">
           {policy.clipSkipMax ? (
             <GenerateFieldContextMenu
               fieldLabel={t('widgets.generate.clipSkip')}
@@ -310,58 +354,50 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.hiDiffusionVisible ? (
-        <Stack gap="2" p="2">
-          <GenerateToggleSwitch
-            checked={settings.hiDiffusionEnabled}
-            hint="hidiffusion"
-            label={t('widgets.generate.hiDiffusion')}
-            onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
-          />
-          <GenerateToggleSwitch
-            checked={settings.hiDiffusionRauNetEnabled}
-            disabled={!settings.hiDiffusionEnabled}
-            hint="hidiffusionRauNet"
-            label={t('widgets.generate.hiDiffusionRauNet')}
-            onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
-          />
-          <GenerateToggleSwitch
-            checked={settings.hiDiffusionWindowAttentionEnabled}
-            disabled={!settings.hiDiffusionEnabled}
-            hint="hidiffusionWindowAttn"
-            label={t('widgets.generate.hiDiffusionWindowAttn')}
-            onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
-          />
-          <GenerateToggleSwitch
-            checked={settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null}
-            disabled={!settings.hiDiffusionEnabled || !settings.hiDiffusionRauNetEnabled}
-            hint="hidiffusionRatiosAuto"
-            label={t('widgets.generate.hiDiffusionRatiosAuto')}
-            onCheckedChange={setHiDiffusionRatiosAutomatic}
-          />
+        <Stack gap="2.5">
+          {defaultedSwitch({
+            hint: 'hidiffusion',
+            key: 'hiDiffusionEnabled',
+            label: t('widgets.generate.hiDiffusion'),
+          })}
+          {defaultedSwitch({
+            disabled: !settings.hiDiffusionEnabled,
+            hint: 'hidiffusionRauNet',
+            key: 'hiDiffusionRauNetEnabled',
+            label: t('widgets.generate.hiDiffusionRauNet'),
+          })}
+          {defaultedSwitch({
+            disabled: !settings.hiDiffusionEnabled,
+            hint: 'hidiffusionWindowAttn',
+            key: 'hiDiffusionWindowAttentionEnabled',
+            label: t('widgets.generate.hiDiffusionWindowAttn'),
+          })}
+          {/* Automatic is the default: no manual ratios. */}
+          <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.hiDiffusionRatiosAuto')}
+            copyValue={() => onOff(hiDiffusionRatiosAutomatic)}
+            isAtDefault={hiDiffusionRatiosAutomatic || hiDiffusionRatiosDisabled}
+            placement="switch"
+            onReset={() => setHiDiffusionRatiosAutomatic(true)}
+          >
+            <GenerateToggleSwitch
+              checked={hiDiffusionRatiosAutomatic}
+              disabled={hiDiffusionRatiosDisabled}
+              hint="hidiffusionRatiosAuto"
+              label={t('widgets.generate.hiDiffusionRatiosAuto')}
+              onCheckedChange={setHiDiffusionRatiosAutomatic}
+            />
+          </GenerateFieldContextMenu>
           <GenerateFieldContextMenu
             fieldLabel={t('widgets.generate.hiDiffusionT1Ratio')}
             copyValue={() => String(settings.hiDiffusionT1Ratio ?? t('widgets.generate.hiDiffusionRatioAutoValue'))}
-            isAtDefault={manualHiDiffusionRatios.t1 === defaultHiDiffusionT1Ratio}
-            onReset={() =>
-              onCommit(
-                settings.hiDiffusionT1Ratio === null
-                  ? {
-                      hiDiffusionManualRatios: {
-                        ...(settings.hiDiffusionManualRatios ?? manualHiDiffusionRatios),
-                        t1: defaultHiDiffusionT1Ratio,
-                      },
-                    }
-                  : { hiDiffusionT1Ratio: defaultHiDiffusionT1Ratio }
-              )
-            }
+            // A disabled ratio is not sent (HiDiffusion or RAU-Net off, or automatic ratios), so it is no change to undo.
+            isAtDefault={hiDiffusionT1Disabled || manualHiDiffusionRatios.t1 === defaultHiDiffusionT1Ratio}
+            onReset={() => onCommit({ hiDiffusionT1Ratio: defaultHiDiffusionT1Ratio })}
           >
             <ScrubberField
               defaultValue={defaultHiDiffusionT1Ratio}
-              disabled={
-                !settings.hiDiffusionEnabled ||
-                !settings.hiDiffusionRauNetEnabled ||
-                settings.hiDiffusionT1Ratio === null
-              }
+              disabled={hiDiffusionT1Disabled}
               hint="hidiffusionT1Ratio"
               label={t('widgets.generate.hiDiffusionT1Ratio')}
               max={MAX_HIDIFFUSION_RATIO}
@@ -374,27 +410,12 @@ export const GenerateAdvancedFields = ({
           <GenerateFieldContextMenu
             fieldLabel={t('widgets.generate.hiDiffusionT2Ratio')}
             copyValue={() => String(settings.hiDiffusionT2Ratio ?? t('widgets.generate.hiDiffusionRatioAutoValue'))}
-            isAtDefault={manualHiDiffusionRatios.t2 === 0}
-            onReset={() =>
-              onCommit(
-                settings.hiDiffusionT2Ratio === null
-                  ? {
-                      hiDiffusionManualRatios: {
-                        ...(settings.hiDiffusionManualRatios ?? manualHiDiffusionRatios),
-                        t2: 0,
-                      },
-                    }
-                  : { hiDiffusionT2Ratio: 0 }
-              )
-            }
+            isAtDefault={hiDiffusionT2Disabled || manualHiDiffusionRatios.t2 === 0}
+            onReset={() => onCommit({ hiDiffusionT2Ratio: 0 })}
           >
             <ScrubberField
               defaultValue={0}
-              disabled={
-                !settings.hiDiffusionEnabled ||
-                !settings.hiDiffusionRauNetEnabled ||
-                settings.hiDiffusionT2Ratio === null
-              }
+              disabled={hiDiffusionT2Disabled}
               hint="hidiffusionT2Ratio"
               label={t('widgets.generate.hiDiffusionT2Ratio')}
               max={manualHiDiffusionRatios.t1}
@@ -407,104 +428,123 @@ export const GenerateAdvancedFields = ({
         </Stack>
       ) : null}
 
-      {policy.colorCompensationVisible ? (
-        <Box p="2">
-          <GenerateToggleSwitch
-            checked={settings.colorCompensation}
-            hint="colorCompensation"
-            label={t('widgets.generate.colorCompensation')}
-            onCheckedChange={(checked) => onCommit({ colorCompensation: checked })}
-          />
-        </Box>
-      ) : null}
+      {policy.colorCompensationVisible
+        ? defaultedSwitch({
+            hint: 'colorCompensation',
+            key: 'colorCompensation',
+            label: t('widgets.generate.colorCompensation'),
+          })
+        : null}
 
       {policy.pidVisible ? (
-        <Stack gap="2" p="2">
-          <Field hint="pidMode" label={t('widgets.generate.pid')} labelPlacement="inside" helpText={pidHelpText}>
-            <Select
-              aria-label={t('widgets.generate.pid')}
-              collection={pidModeCollection}
-              value={[settings.pidMode]}
-              onValueChange={({ value }) => {
-                const mode = value[0];
+        <Stack gap="2.5">
+          <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.pid')}
+            copyValue={() => pidModeCollection.items.find((item) => item.value === settings.pidMode)?.label ?? ''}
+            isAtDefault={modelDefaults !== null && settings.pidMode === modelDefaults.pidMode}
+            // Immediately, as a pick does: native mode changes the valid dimension grid.
+            onReset={modelDefaults ? () => onCommitImmediate({ pidMode: modelDefaults.pidMode }) : undefined}
+          >
+            <Field hint="pidMode" label={t('widgets.generate.pid')} labelPlacement="inside" helpText={pidHelpText}>
+              <Select
+                aria-label={t('widgets.generate.pid')}
+                collection={pidModeCollection}
+                value={[settings.pidMode]}
+                onValueChange={({ value }) => {
+                  const mode = value[0];
 
-                if (isPidMode(mode)) {
-                  // Commit immediately because native mode changes the valid dimension grid.
-                  onCommitImmediate({ pidMode: mode });
-                }
-              }}
-            />
-          </Field>
+                  if (isPidMode(mode)) {
+                    // Commit immediately because native mode changes the valid dimension grid.
+                    onCommitImmediate({ pidMode: mode });
+                  }
+                }}
+              />
+            </Field>
+          </GenerateFieldContextMenu>
           {settings.pidMode === 'off' ? null : (
-            <ScrubberField
-              label={t('widgets.generate.pidSteps')}
-              max={MAX_PID_STEPS}
-              min={MIN_PID_STEPS}
-              step={1}
-              value={settings.pidSteps}
-              onChange={(value) => onCommit({ pidSteps: value })}
-            />
+            <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.pidSteps')}
+              copyValue={() => String(settings.pidSteps)}
+              isAtDefault={modelDefaults !== null && settings.pidSteps === modelDefaults.pidSteps}
+              onReset={modelDefaults ? () => onCommit({ pidSteps: modelDefaults.pidSteps }) : undefined}
+            >
+              <ScrubberField
+                defaultValue={modelDefaults?.pidSteps}
+                label={t('widgets.generate.pidSteps')}
+                max={MAX_PID_STEPS}
+                min={MIN_PID_STEPS}
+                step={1}
+                value={settings.pidSteps}
+                onChange={(value) => onCommit({ pidSteps: value })}
+              />
+            </GenerateFieldContextMenu>
           )}
         </Stack>
       ) : null}
 
       {policy.encoderQuantizationVisible ? (
-        <Field
-          hint="encoderQuantization"
-          label={t('widgets.generate.encoderQuantization')}
-          labelPlacement="inside"
-          helpText={t('widgets.generate.encoderQuantizationHelp')}
-          p="2"
+        <GenerateFieldContextMenu
+          fieldLabel={t('widgets.generate.encoderQuantization')}
+          copyValue={() =>
+            encoderQuantizationCollection.items.find((item) => item.value === settings.qwenImageEncoderQuantization)
+              ?.label ?? ''
+          }
+          isAtDefault={
+            modelDefaults !== null &&
+            settings.qwenImageEncoderQuantization === modelDefaults.qwenImageEncoderQuantization
+          }
+          onReset={
+            modelDefaults
+              ? () => onCommit({ qwenImageEncoderQuantization: modelDefaults.qwenImageEncoderQuantization })
+              : undefined
+          }
         >
-          <Select
-            aria-label={t('widgets.generate.encoderQuantization')}
-            collection={encoderQuantizationCollection}
-            value={[settings.qwenImageEncoderQuantization]}
-            onValueChange={({ value }) => {
-              const quantization = value[0];
+          <Field
+            hint="encoderQuantization"
+            label={t('widgets.generate.encoderQuantization')}
+            labelPlacement="inside"
+            helpText={t('widgets.generate.encoderQuantizationHelp')}
+          >
+            <Select
+              aria-label={t('widgets.generate.encoderQuantization')}
+              collection={encoderQuantizationCollection}
+              value={[settings.qwenImageEncoderQuantization]}
+              onValueChange={({ value }) => {
+                const quantization = value[0];
 
-              if (isQwenImageEncoderQuantization(quantization)) {
-                onCommit({ qwenImageEncoderQuantization: quantization });
-              }
-            }}
-          />
-        </Field>
+                if (isQwenImageEncoderQuantization(quantization)) {
+                  onCommit({ qwenImageEncoderQuantization: quantization });
+                }
+              }}
+            />
+          </Field>
+        </GenerateFieldContextMenu>
       ) : null}
 
-      {policy.krea2ReferenceKvCacheVisible ? (
-        <Box p="2">
-          {/* Shown off while it is not sent; the stored value stays and is back once it applies again. */}
-          <GenerateToggleSwitch
-            checked={krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache}
-            disabled={!krea2ReferenceKvCacheApplies}
-            helpText={t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState])}
-            hint="krea2ReferenceKvCache"
-            label={t('widgets.generate.krea2ReferenceKvCache')}
-            onCheckedChange={(checked) => onCommit({ krea2ReferenceKvCache: checked })}
-          />
-        </Box>
-      ) : null}
+      {policy.krea2ReferenceKvCacheVisible
+        ? // Shown off while it is not sent; the stored value stays and is back once it applies again.
+          defaultedSwitch({
+            checked: krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache,
+            disabled: !krea2ReferenceKvCacheApplies,
+            helpText: t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState]),
+            hint: 'krea2ReferenceKvCache',
+            key: 'krea2ReferenceKvCache',
+            label: t('widgets.generate.krea2ReferenceKvCache'),
+          })
+        : null}
 
       {policy.seamlessVisible ? (
         // A heading over its rows: more room below it than between the rows, so it does not read as a third row.
-        <Stack aria-labelledby={seamlessLabelId} gap="3" p="2" role="group" {...FEATURE_HINT_FIELD_PROPS}>
+        <Stack aria-labelledby={seamlessLabelId} gap="3" role="group" {...FEATURE_HINT_FIELD_PROPS}>
           {/* The hint trigger takes over its child's id, so it wraps the text inside the named heading. */}
           <chakra.span css={fieldLabel()} id={seamlessLabelId}>
             <FeatureHint hint="seamlessTiling">
               <chakra.span>{t('widgets.generate.seamlessTiling')}</chakra.span>
             </FeatureHint>
           </chakra.span>
-          <Stack gap="2">
-            <GenerateToggleSwitch
-              checked={settings.seamlessXAxis}
-              label={t('widgets.generate.xAxis')}
-              onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
-            />
-            <GenerateToggleSwitch
-              checked={settings.seamlessYAxis}
-              label={t('widgets.generate.yAxis')}
-              onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
-            />
+          <Stack gap="2.5">
+            {defaultedSwitch({ key: 'seamlessXAxis', label: t('widgets.generate.xAxis') })}
+            {defaultedSwitch({ key: 'seamlessYAxis', label: t('widgets.generate.yAxis') })}
           </Stack>
         </Stack>
       ) : null}

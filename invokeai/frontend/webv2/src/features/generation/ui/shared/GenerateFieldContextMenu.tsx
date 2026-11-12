@@ -18,24 +18,63 @@ interface GenerateFieldContextMenuProps {
   onReset?: () => void;
   /** Reset entry text; defaults to "Reset to model default". */
   resetLabel?: string;
+  /**
+   * What the dot lines up with: a field's control (28px tall), or a switch row's first line (the switch's height).
+   * Either way it stays in the gutter left of the row.
+   */
+  placement?: 'field' | 'switch';
 }
+
+/**
+ * The dot's button, centred on the first line of what it marks: a control is 28px (`sizes.7`), and a switch row's first
+ * line is the height of Generate's switch (16px, `sizes.4`), which its label's line height matches.
+ *
+ * Beside a field the button is a 16px target centred in the gutter; it may overlap the field's border. A switch row's
+ * label is text from its first pixel and a click on it toggles, so there the button stays within the 8px gutter (8x16)
+ * and sets the dot 1px further from the text: 4px at rest 3px clear of it, 6px on hover, and on focus the 4px dot with
+ * its 1px ring, both ending at the gutter's outer edge.
+ */
+const DOT_BUTTON_PROPS = {
+  field: {
+    h: '4',
+    insetInlineStart: '-3',
+    justifyContent: 'center',
+    top: 'calc(var(--chakra-sizes-7) / 2 - var(--chakra-sizes-2))',
+    w: '4',
+  },
+  switch: {
+    h: '4',
+    insetInlineStart: '-2',
+    justifyContent: 'flex-start',
+    ps: '1px',
+    top: 'calc(var(--chakra-sizes-4) / 2 - var(--chakra-sizes-2))',
+    w: '2',
+  },
+} as const;
 
 const FIELD_CONTROL_SELECTOR =
   '[role="slider"]:not([aria-disabled="true"]), input:not([type="hidden"]):not(:disabled), button:not([data-modified-dot]):not(:disabled), [role="combobox"]';
 
-/** The dot is drawn small; its button keeps a 16px target in the gutter left of the field. */
+/**
+ * Fields sit 8px in from the panel's edge, and the dot lives in that gutter: 4px at rest, 6px on hover or focus,
+ * centred 4px left of the field so it keeps 1px clear of both the panel's edge and the field's border. Its button keeps
+ * a 16px target, which may overlap both, so the button draws nothing itself: focus shows on the dot, as a 1px outline
+ * that ends exactly at the gutter's edges (6px dot + 1px either side), where nothing clips it. An outline, not a
+ * shadow, so it stays in forced colors.
+ */
 const MODIFIED_DOT_CSS = {
-  '&::after': {
+  '& > [data-part="dot"]': {
     bg: 'accent.solid',
-    content: '""',
-    h: '1.5',
+    boxSize: '1',
     rounded: 'full',
     transitionDuration: 'var(--wb-motion-duration-fast)',
-    transitionProperty: 'transform',
-    w: '1.5',
+    transitionProperty: 'transform, width, height',
   },
-  '&:hover::after, &:focus-visible::after': { transform: 'scale(1.5)' },
-  '&:focus-visible': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+  '&:hover:not(:focus-visible) > [data-part="dot"]': { transform: 'scale(1.5)' },
+  '&:focus-visible': { outline: 'none' },
+  '&:focus-visible > [data-part="dot"]': { boxSize: '1.5', outline: '1px solid', outlineColor: 'fg', outlineOffset: 0 },
+  // On a switch row the focused dot keeps its 4px, so with its ring it fits the 7px between the text and the edge.
+  '&[data-placement="switch"]:focus-visible > [data-part="dot"]': { boxSize: '1' },
 } as const;
 
 /**
@@ -49,6 +88,7 @@ export const GenerateFieldContextMenu = ({
   fieldLabel,
   isAtDefault = false,
   onReset,
+  placement = 'field',
   resetLabel,
 }: GenerateFieldContextMenuProps) => {
   const { t } = useTranslation();
@@ -94,19 +134,18 @@ export const GenerateFieldContextMenu = ({
             alignItems="center"
             aria-label={dotLabel}
             data-modified-dot=""
+            data-placement={placement}
             css={MODIFIED_DOT_CSS}
             cursor="pointer"
             display="flex"
-            h="4"
-            insetInlineStart="-3"
-            justifyContent="center"
             position="absolute"
             rounded="full"
-            top="1.5"
             type="button"
-            w="4"
+            {...DOT_BUTTON_PROPS[placement]}
             onClick={resetFromDot}
-          />
+          >
+            <chakra.span aria-hidden data-part="dot" />
+          </chakra.button>
         </Tooltip>
       ) : null}
       {children}

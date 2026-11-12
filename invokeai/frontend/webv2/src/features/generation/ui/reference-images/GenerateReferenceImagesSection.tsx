@@ -442,6 +442,7 @@ export const GenerateReferenceImagesContent = ({
       {label}
       {/* Issues about the references as a group (their count); each row shows its own. */}
       <GenerateIssueNotes field="referenceImages" section="guidance" />
+      {/* The same bleed as the concept list below it, so both lists' rows share their edges and inner padding. */}
       <Box mx={-1}>
         <ListStack dividers label={t('widgets.generate.referenceImages')}>
           {rows}

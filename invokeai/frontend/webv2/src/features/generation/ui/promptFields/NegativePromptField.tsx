@@ -2,7 +2,7 @@
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
-import { HStack, Text } from '@chakra-ui/react';
+import { chakra, HStack, Text } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
 import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
@@ -132,7 +132,8 @@ export const NegativePromptField = ({
 
   const labelEnd = useMemo(
     () => (
-      <HStack gap="0.5">
+      // Pulled out by the last icon button's inset, so its glyph ends on the prompt box's right edge.
+      <HStack gap="0.5" me="-1.5">
         <AddPromptTriggerButton
           isOpen={triggerPicker.isOpen || isViewingMerged}
           onOpenPromptTriggerPicker={triggerPicker.open}
@@ -166,17 +167,20 @@ export const NegativePromptField = ({
         aria-label={t('widgets.generate.enableNegativePrompt')}
         color="fg.muted"
         justifyContent="flex-start"
-        size="sm"
-        variant="ghost"
+        px="2"
+        variant="outline"
         onClick={() => onEnabledChange(true)}
       >
         <PlusIcon />
-        {t('widgets.generate.negativePromptAdd')}
-        {value.trim() !== '' ? (
-          <Text as="span" color="fg.subtle" fontSize="xs" fontWeight="normal" minW="0" truncate>
-            {value}
-          </Text>
-        ) : null}
+        {/* On one baseline: the preview is smaller than the label, so centring their boxes would leave it high. */}
+        <chakra.span alignItems="baseline" display="flex" gap="2" minW="0">
+          <span>{t('widgets.generate.negativePromptAdd')}</span>
+          {value.trim() !== '' ? (
+            <Text as="span" color="fg.subtle" fontSize="xs" fontWeight="normal" minW="0" truncate>
+              {value}
+            </Text>
+          ) : null}
+        </chakra.span>
       </Button>
     );
   }

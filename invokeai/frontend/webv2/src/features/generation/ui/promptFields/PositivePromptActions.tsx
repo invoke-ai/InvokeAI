@@ -71,8 +71,6 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
-/** Beside the trigger, so the prompt the request rewrites stays in view while it runs. */
-const POPOVER_POSITIONING_BESIDE = { placement: 'right-start' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 /** Keep triggers available so missing-model states can explain recovery. */
@@ -204,7 +202,8 @@ export const PositivePromptActions = ({
   template,
 }: PositivePromptActionsProps) => {
   return (
-    <HStack gap="0.5">
+    // Pulled out by the last icon button's inset, so its glyph ends on the prompt box's right edge.
+    <HStack gap="0.5" me="-1.5">
       <PromptTemplateControls showSyntaxHighlighting={showSyntaxHighlighting} template={template} />
       {dynamicPrompts ? (
         <DynamicPromptsButton
@@ -648,7 +647,12 @@ const usePromptRewritePopover = ({
     isOpen,
     open,
     rewrite,
-    rootProps: { finalFocusEl, onOpenChange: handleOpenChange, open: isOpen, positioning: POPOVER_POSITIONING_BESIDE },
+    rootProps: {
+      finalFocusEl,
+      onOpenChange: handleOpenChange,
+      open: isOpen,
+      positioning: POPOVER_POSITIONING_BOTTOM_END,
+    },
   };
 };
 
