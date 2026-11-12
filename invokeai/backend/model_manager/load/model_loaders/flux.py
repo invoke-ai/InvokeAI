@@ -1,5 +1,7 @@
 """Class for Flux model loading in InvokeAI."""
 
+import json
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -80,6 +82,7 @@ from invokeai.backend.model_manager.load.model_loaders.flux2_state_dict_utils im
     convert_flux2_vae_bfl_to_diffusers,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -88,6 +91,11 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     SubModelType,
+)
+from invokeai.backend.model_manager.util.llamacpp_t5 import (
+    convert_llamacpp_t5_keys,
+    has_per_layer_relative_bias,
+    make_feed_forward_gguf_safe,
 )
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
@@ -127,8 +135,11 @@ from invokeai.backend.quantization.int8_convrot import (
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
-from invokeai.backend.t5.t5_encoder import infer_t5_encoder_config, make_t5_feed_forward_safe
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.t5.t5_encoder import (
+    infer_t5_encoder_config,
+    make_t5_feed_forward_safe,
+    t5_dtype_for_device,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
@@ -485,9 +496,53 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         model.tie_weights()
 
 
+class _T5DtypeByDevice(ModelLoader):
+    """Holds a T5 encoder in the dtype of the device it runs on (`t5_dtype_for_device`) and keys the cache by it.
+
+    The dtype is decided once per loader (a fresh one serves each load), so the cache key and the built model
+    agree. Device caches share one canonical CPU copy per key: a device must not adopt weights of a dtype it
+    would not have built itself.
+    """
+
+    def _t5_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        decisions: dict[torch.device, torch.dtype] = self.__dict__.setdefault("_t5_dtype_decisions", {})
+        if device not in decisions:
+            decisions[device] = t5_dtype_for_device(device)
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
+            return str(self._t5_dtype(config, submodel_type)).removeprefix("torch.")
+        return ""
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
-class T5EncoderCheckpointModel(ModelLoader):
-    """Class to load main models."""
+class T5EncoderCheckpointModel(_T5DtypeByDevice):
+    """Load a T5 encoder from a Diffusers folder, in float32 on the CPU and `choose_bfloat16_safe_dtype`'s dtype
+    elsewhere, whatever dtype the folder stores."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
+            # The cache makes room for this size before the build, so it is sized at the dtype the encoder is built in
+            # (`_t5_dtype`), whatever the folder stores: a bf16 folder built in float32 on the CPU is twice its size on
+            # disk. The headers give the element counts.
+            folder = model_path / "text_encoder_2"
+            index = folder / "model.safetensors.index.json"
+            if index.is_file():
+                shards = sorted(set(json.loads(index.read_text(encoding="utf-8"))["weight_map"].values()))
+            else:
+                shards = ["model.safetensors"]
+            if all((folder / shard).is_file() for shard in shards):
+                elements = sum(
+                    math.prod(info["shape"])
+                    for shard in shards
+                    for info in read_safetensors_header(folder / shard).values()
+                )
+                return elements * self._t5_dtype(config, submodel_type).itemsize
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -505,7 +560,7 @@ class T5EncoderCheckpointModel(ModelLoader):
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 return T5EncoderModel.from_pretrained(
                     Path(config.path) / "text_encoder_2",
-                    torch_dtype="auto",
+                    torch_dtype=self._t5_dtype(config, submodel_type),
                     low_cpu_mem_usage=True,
                     local_files_only=True,
                 )
@@ -569,12 +624,13 @@ class T5EncoderSDNQLoader(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.GGUFQuantized)
-class T5EncoderGGUFModel(ModelLoader):
+class T5EncoderGGUFModel(_T5DtypeByDevice):
     """Class to load GGUF-quantized T5 text encoders (single .gguf file, llama.cpp naming).
 
     The transformer weights are kept as GGMLTensors so the model cache's quantized-autocast layers can
-    dequantize them on-the-fly during inference. Embedding weights (token embeddings and the relative
-    attention bias) are dequantized eagerly since embedding lookups can't operate on quantized tensors.
+    dequantize them on-the-fly during inference, into float32 on the CPU and `choose_bfloat16_safe_dtype`'s dtype
+    elsewhere. Embedding weights (token embeddings and the relative attention bias) are dequantized eagerly, in
+    that dtype, since embedding lookups can't operate on quantized tensors.
     """
 
     def _load_model(
@@ -589,7 +645,7 @@ class T5EncoderGGUFModel(ModelLoader):
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
                 return self._load_tokenizer()
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
-                return self._load_from_gguf(config)
+                return self._load_from_gguf(config, submodel_type)
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -604,15 +660,23 @@ class T5EncoderGGUFModel(ModelLoader):
         tokenizer.model_max_length = 512
         return tokenizer
 
-    def _load_from_gguf(self, config: T5Encoder_GGUF_Config) -> AnyModel:
+    def _load_from_gguf(self, config: T5Encoder_GGUF_Config, submodel_type: SubModelType) -> AnyModel:
         from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
         model_path = Path(config.path)
 
-        # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
-        sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
+        sd = gguf_sd_loader(model_path, compute_dtype=self._t5_dtype(config, submodel_type))
 
-        sd = self._convert_t5_gguf_to_transformers(sd)
+        if has_per_layer_relative_bias(sd):
+            # Identification files these under Wan, but a record made by an earlier version can still point
+            # here, and T5 v1.1 would run every block on block 0's bias.
+            raise ValueError(
+                f"'{config.name}' is a UMT5-XXL text encoder (Wan 2.2), not a T5-XXL encoder for FLUX or SD3. "
+                "Re-identify it in the Model Manager (the model's menu, 'Re-identify model') or reinstall it, "
+                "and it becomes a Wan T5 Encoder."
+            )
+
+        sd = convert_llamacpp_t5_keys(sd)
 
         t5_config = infer_t5_encoder_config(sd)
 
@@ -638,7 +702,7 @@ class T5EncoderGGUFModel(ModelLoader):
                 rel_bias.get_dequantized_tensor(), requires_grad=False
             )
 
-        make_t5_feed_forward_safe(model)
+        make_feed_forward_gguf_safe(model)
 
         # Fail loudly if anything was left unloaded (meta tensors).
         meta_params = [name for name, p in model.named_parameters() if p.is_meta]
@@ -649,71 +713,6 @@ class T5EncoderGGUFModel(ModelLoader):
             )
 
         return model
-
-    def _convert_t5_gguf_to_transformers(self, sd: dict[str, Any]) -> dict[str, Any]:
-        """Convert llama.cpp T5 encoder GGUF keys to HuggingFace transformers T5 naming.
-
-        llama.cpp T5 encoder format:
-        - token_embd.weight                  -> shared.weight
-        - enc.output_norm.weight             -> encoder.final_layer_norm.weight
-        - enc.blk.N.attn_q/k/v/o.weight      -> encoder.block.N.layer.0.SelfAttention.q/k/v/o.weight
-        - enc.blk.0.attn_rel_b.weight        -> encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight
-        - enc.blk.N.attn_norm.weight         -> encoder.block.N.layer.0.layer_norm.weight
-        - enc.blk.N.ffn_gate.weight          -> encoder.block.N.layer.1.DenseReluDense.wi_0.weight (gated/activated)
-        - enc.blk.N.ffn_up.weight            -> encoder.block.N.layer.1.DenseReluDense.wi_1.weight (linear)
-        - enc.blk.N.ffn_down.weight          -> encoder.block.N.layer.1.DenseReluDense.wo.weight
-        - enc.blk.N.ffn_norm.weight          -> encoder.block.N.layer.1.layer_norm.weight
-        """
-        import re
-
-        attn_map = {
-            "attn_q": "SelfAttention.q",
-            "attn_k": "SelfAttention.k",
-            "attn_v": "SelfAttention.v",
-            "attn_o": "SelfAttention.o",
-            "attn_rel_b": "SelfAttention.relative_attention_bias",
-            "attn_norm": "layer_norm",
-        }
-        ffn_map = {
-            "ffn_gate": "DenseReluDense.wi_0",
-            "ffn_up": "DenseReluDense.wi_1",
-            "ffn_down": "DenseReluDense.wo",
-            "ffn_norm": "layer_norm",
-        }
-
-        new_sd: dict[str, Any] = {}
-        blk_pattern = re.compile(r"^enc\.blk\.(\d+)\.(.+)$")
-
-        for key, value in sd.items():
-            if not isinstance(key, str):
-                new_sd[key] = value
-                continue
-
-            if key == "token_embd.weight":
-                new_sd["shared.weight"] = value
-                continue
-            if key == "enc.output_norm.weight":
-                new_sd["encoder.final_layer_norm.weight"] = value
-                continue
-
-            match = blk_pattern.match(key)
-            if match:
-                layer_idx = match.group(1)
-                rest = match.group(2)
-                component = rest.split(".", 1)[0]
-
-                if component in attn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.0.{attn_map[component]}.weight"] = value
-                elif component in ffn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.1.{ffn_map[component]}.weight"] = value
-                else:
-                    # Unknown component - keep as-is so the meta-tensor check surfaces it.
-                    new_sd[key] = value
-                continue
-
-            new_sd[key] = value
-
-        return new_sd
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.Checkpoint)
@@ -726,8 +725,8 @@ class T5EncoderSingleFileLoader(ModelLoader):
     elsewhere the scales are folded and everything is cast, as on a device without float8. Kept weights are
     dequantized per forward and never multiplied in fp8, whatever `fp8_compute` says.
 
-    Everything else is held in `choose_bfloat16_safe_dtype`'s dtype, except on CPU, which holds float32 (twice the
-    bf16 size): CPU bf16 GEMM is unreliable on part of the Windows fleet.
+    Everything else is held in `t5_dtype_for_device`'s dtype: float32 on the CPU, `choose_bfloat16_safe_dtype`'s
+    elsewhere.
     """
 
     def get_size_fs(
@@ -746,15 +745,12 @@ class T5EncoderSingleFileLoader(ModelLoader):
 
         Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
         and the capability probes can flip between the key computation and the build under the load lock.
-        CPU holds float32: bf16 GEMM on CPU faults with an illegal instruction on part of the Windows fleet, and
-        `choose_bfloat16_safe_dtype` only checks that a bf16 tensor can be allocated.
         """
         device = self._get_execution_device(config, submodel_type) or self._torch_device
         decisions = self.__dict__.setdefault("_storage_format_decisions", {})
         if device not in decisions:
             keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
-            dtype = torch.float32 if device.type == "cpu" else TorchDevice.choose_bfloat16_safe_dtype(device)
-            decisions[device] = (keep_fp8, dtype)
+            decisions[device] = (keep_fp8, t5_dtype_for_device(device))
         return decisions[device]
 
     def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:

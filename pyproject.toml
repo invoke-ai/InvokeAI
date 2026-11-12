@@ -59,7 +59,7 @@ dependencies = [
   "imageio>=2.37; sys_platform == 'win32' and platform_machine == 'ARM64'",
   "imageio-ffmpeg>=0.6; sys_platform == 'win32' and platform_machine == 'ARM64'",
   "psutil>=6",                             # video decode worker process-tree termination
-  "safetensors",
+  "safetensors>=0.8.0",
   "sentencepiece==0.2.2",                 # 0.2.0 has a heap overflow; 0.2.1 coredumped on windows loading the t5 tokenizer
   "spandrel",
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow

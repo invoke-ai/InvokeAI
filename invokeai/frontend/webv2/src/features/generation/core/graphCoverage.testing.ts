@@ -8,6 +8,10 @@ import type {
   SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import type {
+  ComponentModelConfig,
+  ExternalImageGeneratorModelConfig,
+  ExternalImageSize,
+  GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
   GenerateSettings,
@@ -16,12 +20,19 @@ import type {
 } from './types';
 
 import {
+  GENERATE_COMPONENT_VALUE_KEYS,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
+  getGenerationDimensions,
+  getGenerationUiPolicy,
+  getSchedulerOptions,
+  isLoraSupported,
   isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { getIsPidSupportedBase } from './pid';
+import { clampDimension, deriveAspectRatioId } from './settings';
 
 /** Compile both bundled and standalone component paths. */
 export interface ModelShape {
@@ -110,6 +121,7 @@ export const candidatesForSlot = (slot: ComponentSlotPolicy): ModelIdentifierCon
               type,
               variant: variant ?? null,
               ...(branch ? { branch } : {}),
+              ...(type === 'text_llm' ? { supports_images: true } : {}),
               ...(latentChannels ? { latent_channels: latentChannels } : {}),
             });
           }
@@ -277,13 +289,24 @@ const tunedReferenceImagesFor = (
 export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const { filled, model, settings } = satisfiedSettingsFor(base, shape);
   const image = { original: { image: { height: 1024, image_name: 'style-reference.png', width: 1024 } } };
+  // Only a graph with the FLUX.3 prompt upsampler switched on contains its node, so switch it on and pick a model.
+  const upsamplerOn = { ...settings, flux3PromptUpsamplerEnabled: base === 'flux3' };
+  const upsamplerSlot = getComponentSectionPolicy(model, upsamplerOn).slots.find(
+    (slot) => slot.key === 'flux3PromptUpsamplerModel'
+  );
+  const upsamplerModel =
+    upsamplerSlot &&
+    candidatesForSlot(upsamplerSlot).find((c) =>
+      upsamplerSlot.filter?.(c, buildContext(model, upsamplerOn, [upsamplerSlot]))
+    );
 
   return {
     filled,
     model,
     projectSettings: { useCpuNoise: true, useNsfwChecker: true, useWatermark: true },
     settings: {
-      ...settings,
+      ...upsamplerOn,
+      flux3PromptUpsamplerModel: upsamplerModel ?? null,
       // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
       cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
       // Exercise explicit zero overrides as well as the default automatic metadata contract.
@@ -302,3 +325,307 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
     },
   };
 };
+
+const RECALL_REFERENCE_IMAGE: GenerateReferenceImageAsset = {
+  original: { image: { height: 512, image_name: 'recall-reference.png', width: 512 } },
+};
+
+/**
+ * Every setting image recall restores, at a value the policy accepts and no default holds, so a round trip that drops
+ * one shows. Values a family does not record are harmless to carry. Seamless tiling and CFG rescale stay at their
+ * defaults where the panel hides them: recall restores them on every family.
+ */
+const withRecallTuning = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  size: ExternalImageSize
+): GenerateSettings => {
+  const defaults = getDefaultGenerateSettings(model);
+  const policy = getGenerationUiPolicy(model);
+
+  return {
+    ...settings,
+    // Canvas inpainting then runs without the adapter in the filled slot, so its record shows the switch off.
+    animaInpaintAdapterEnabled: false,
+    aspectRatioId: deriveAspectRatioId(size.width, size.height),
+    aspectRatioValue: size.width / size.height,
+    cfgRescaleMultiplier: policy.cfgRescaleVisible ? 0.3 : defaults.cfgRescaleMultiplier,
+    // FLUX.3 Klein samples without CFG: validation refuses any scale but its default.
+    cfgScale:
+      model.base === 'flux3' && model.variant === 'flux3_klein'
+        ? defaults.cfgScale
+        : Math.min(policy.guidanceMax ?? Number.POSITIVE_INFINITY, defaults.cfgScale + 0.5),
+    clipSkip: policy.clipSkipMax === null ? defaults.clipSkip : 2,
+    fluxDypeExponent: 1,
+    fluxDypePreset: 'manual',
+    fluxDypeScale: 3,
+    height: size.height,
+    ...(policy.hiDiffusionVisible
+      ? {
+          hiDiffusionEnabled: true,
+          hiDiffusionRauNetEnabled: false,
+          hiDiffusionT1Ratio: 0.6,
+          hiDiffusionT2Ratio: 0.2,
+          hiDiffusionWindowAttentionEnabled: false,
+        }
+      : {}),
+    ideogram4ColorPalette: ['teal', 'amber'],
+    ideogram4GuidanceScale: 5,
+    ideogram4Mu: 1,
+    ideogram4SamplerPreset: 'V4_TURBO_12',
+    ideogram4Steps: 30,
+    krea2RebalanceEnabled: true,
+    krea2RebalanceMultiplier: 3,
+    krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,4.0,1.0,3.0,1.0',
+    krea2SeedVarianceEnabled: true,
+    krea2SeedVarianceRandomizePercent: 40,
+    krea2SeedVarianceStrength: 0.3,
+    loras: isLoraSupported(model)
+      ? [
+          {
+            isEnabled: true,
+            model: { base: model.base, key: `${model.base}-recall-lora`, name: `${model.base} LoRA`, type: 'lora' },
+            weight: 0.75,
+          },
+        ]
+      : [],
+    mossImageUncondSkipLayers: [10, 22],
+    negativePrompt: 'a recall-tuned negative prompt',
+    pidSteps: 6,
+    qwenImageEncoderQuantization: 'nf4',
+    qwenImageShift: 2,
+    scheduler: getSchedulerOptions(model)[1]!.value,
+    seamlessXAxis: policy.seamlessVisible,
+    seamlessYAxis: policy.seamlessVisible,
+    steps: defaults.steps + 1,
+    wanGuidanceScaleLowNoise: 3.5,
+    width: size.width,
+    zImageSeedVarianceEnabled: true,
+    zImageSeedVarianceRandomizePercent: 40,
+    zImageSeedVarianceStrength: 0.3,
+    zImageShift: 2,
+  };
+};
+
+/** The reference the family reads: an adapter where the base takes one, otherwise the base's own reference type. */
+const recallReferenceImagesFor = (model: MainModelConfig, settings: GenerateSettings): GenerateReferenceImage[] => {
+  if (model.base === 'krea-2') {
+    return [
+      {
+        config: { image: RECALL_REFERENCE_IMAGE, styleStrength: 1.5, type: 'krea2_reference_image' },
+        id: 'style',
+        isEnabled: true,
+      },
+    ];
+  }
+
+  return isReferenceImageSupported(model, settings)
+    ? withAddedReferenceImages(
+        model,
+        [{ base: model.base, key: `${model.base}-ip-adapter`, name: `${model.base} IP Adapter`, type: 'ip_adapter' }],
+        [],
+        [{ id: 'reference', image: RECALL_REFERENCE_IMAGE }]
+      )
+    : [];
+};
+
+/**
+ * A shape with every component filled and every recalled setting tuned off its default, PiD decoding included, and
+ * the family's reference where it reads one. The size is off the model's default and not square. Z-Image decodes in
+ * native PiD, which generates at a quarter of the recorded size, and the other PiD families in fit.
+ */
+export const recallTunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
+  const { model, settings: fullyFilled } = fullyFilledSettingsFor(base, shape);
+  const filled: GenerateSettings =
+    base === 'z-image' && fullyFilled.pidMode === 'fit' ? { ...fullyFilled, pidMode: 'native' } : fullyFilled;
+  const defaults = getDefaultGenerateSettings(model);
+  const { grid } = getGenerationDimensions(model, filled.pidMode);
+  const settings = withRecallTuning(model, filled, {
+    height: clampDimension(defaults.height * 0.75, grid),
+    width: clampDimension(defaults.width + grid, grid),
+  });
+
+  return {
+    label: `${base} / ${shape.label}`,
+    model,
+    settings: { ...settings, referenceImages: recallReferenceImagesFor(model, settings) },
+  };
+};
+
+/** The installed models a recall resolves the record against, the way the gallery hands them over. */
+export const recallCatalogFor = (model: GenerateModelConfig, settings: GenerateSettings) => ({
+  models: [
+    model,
+    ...GENERATE_COMPONENT_VALUE_KEYS.flatMap((key): ComponentModelConfig[] => {
+      const component = settings[key];
+
+      return component ? [component] : [];
+    }),
+    ...settings.loras.map((lora) => lora.model),
+    ...(settings.refinerModel ? [settings.refinerModel] : []),
+    ...settings.referenceImages.flatMap(({ config }): ComponentModelConfig[] =>
+      'model' in config && config.model ? [config.model] : []
+    ),
+  ],
+  supportedModels: [model],
+  vaeModels: settings.vae ? [settings.vae] : [],
+});
+
+/** SDXL finishing with its refiner, tuned off every refiner default; PiD, which replaces the decode it feeds, is off. */
+export const sdxlRefinerRecallCase = () => {
+  const { model, settings } = recallTunedSettingsFor('sdxl', {
+    label: 'diffusers-with-refiner',
+    overrides: { format: 'diffusers' },
+  });
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'sdxl-refiner', name: 'SDXL Refiner', type: 'main' };
+
+  return {
+    label: 'sdxl / diffusers-with-refiner',
+    model,
+    settings: {
+      ...settings,
+      pidMode: 'off' as const,
+      refinerCfgScale: 6,
+      refinerModel: refiner,
+      refinerNegativeAestheticScore: 2,
+      refinerPositiveAestheticScore: 7,
+      refinerScheduler: 'dpmpp_2m',
+      refinerStart: 0.7,
+      refinerSteps: 21,
+    },
+  };
+};
+
+/** FLUX with a Redux reference in place of the IP-Adapter the tuned recipe carries. */
+export const fluxReduxRecallCase = () => {
+  const { model, settings } = recallTunedSettingsFor('flux', {
+    label: 'diffusers-with-redux',
+    overrides: { format: 'diffusers' },
+  });
+  const redux: ComponentModelConfig = { base: 'flux', key: 'flux-redux', name: 'FLUX Redux', type: 'flux_redux' };
+
+  return {
+    label: 'flux / diffusers-with-redux',
+    model,
+    settings: {
+      ...settings,
+      referenceImages: [
+        {
+          config: {
+            image: RECALL_REFERENCE_IMAGE,
+            imageInfluence: 'high' as const,
+            model: redux,
+            type: 'flux_redux' as const,
+          },
+          id: 'redux',
+          isEnabled: true,
+        },
+      ],
+    },
+  };
+};
+
+/** Krea-2 edit references in place of the style reference, read by the tuned LoRA, with the reference K/V cache on. */
+export const krea2EditRecallCase = () => {
+  const { model, settings } = recallTunedSettingsFor('krea-2', {
+    label: 'diffusers-with-edit-references',
+    overrides: { format: 'diffusers' },
+  });
+
+  return {
+    label: 'krea-2 / diffusers-with-edit-references',
+    model,
+    settings: {
+      ...settings,
+      krea2ReferenceKvCache: true,
+      referenceImages: ['edit-1', 'edit-2'].map((id) => ({
+        config: { image: RECALL_REFERENCE_IMAGE, type: 'krea2_edit_reference_image' as const },
+        id,
+        isEnabled: true,
+      })),
+    },
+  };
+};
+
+const externalRecallCase = (
+  model: ExternalImageGeneratorModelConfig,
+  size: ExternalImageSize,
+  options: Partial<GenerateSettings>
+) => ({
+  label: `external / ${model.provider_id}`,
+  model,
+  settings: {
+    ...withRecallTuning(
+      model,
+      { ...getDefaultGenerateSettings(model), positivePrompt: 'a test prompt', seed: 1, seedMode: 'fixed' },
+      size
+    ),
+    ...options,
+  },
+});
+
+/**
+ * One model per hosted provider, each with its own options: GPT Image with a reference image, Gemini at one of its
+ * named sizes, Seedream.
+ */
+export const externalRecallCases = () => [
+  externalRecallCase(
+    {
+      base: 'external',
+      capabilities: { max_reference_images: 4, modes: ['txt2img', 'img2img'], supports_reference_images: true },
+      format: 'external_api',
+      key: 'openai-gpt-image-1',
+      name: 'GPT Image 1',
+      provider_id: 'openai',
+      provider_model_id: 'gpt-image-1',
+      type: 'external_image_generator',
+    },
+    { height: 1536, width: 1152 },
+    {
+      openaiBackground: 'transparent',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'high',
+      referenceImages: [
+        {
+          config: { image: RECALL_REFERENCE_IMAGE, type: 'external_reference_image' },
+          id: 'reference',
+          isEnabled: true,
+        },
+      ],
+    }
+  ),
+  externalRecallCase(
+    {
+      base: 'external',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: 'Square', width: 1024 },
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: 'Landscape', width: 2048 },
+        ],
+      },
+      format: 'external_api',
+      key: 'gemini-image',
+      name: 'Gemini Image',
+      provider_id: 'gemini',
+      provider_model_id: 'gemini-3-pro-image-preview',
+      type: 'external_image_generator',
+    },
+    { height: 1152, width: 2048 },
+    { externalImageSize: '2K', geminiTemperature: 0.7, geminiThinkingLevel: 'high' }
+  ),
+  externalRecallCase(
+    {
+      base: 'external',
+      capabilities: { modes: ['txt2img'], supports_seed: true },
+      format: 'external_api',
+      key: 'seedream-4-5',
+      name: 'Seedream 4.5',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      type: 'external_image_generator',
+    },
+    { height: 1536, width: 2048 },
+    { seedreamOptimizePrompt: true, seedreamWatermark: true }
+  ),
+];

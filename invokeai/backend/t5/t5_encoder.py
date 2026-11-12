@@ -1,8 +1,10 @@
 """Building a transformers ``T5EncoderModel`` from a bare state dict.
 
-Shared by the single-file T5 loaders (GGUF and ComfyUI-style safetensors): neither format ships a
-``config.json``, so the architecture is read from tensor shapes, and both need the feed-forward
-workaround below because their ``wo`` weights may not be in the compute dtype.
+Neither single-file T5 format ships a ``config.json``, so the GGUF and the ComfyUI-style safetensors
+loaders both read the architecture from tensor shapes with ``infer_t5_encoder_config``. The
+feed-forward workaround below serves the safetensors loader, whose ``wo`` may be kept in float8; GGUF
+loaders use ``make_feed_forward_gguf_safe`` from ``model_manager/util/llamacpp_t5.py``, which also
+handles a ``GGMLTensor`` reporting a float storage dtype.
 """
 
 import types
@@ -12,6 +14,17 @@ import torch
 from transformers import T5Config
 
 from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES
+from invokeai.backend.util.devices import TorchDevice
+
+
+def t5_dtype_for_device(device: torch.device) -> torch.dtype:
+    """The dtype a T5 encoder is held and computed in on ``device``.
+
+    float32 on the CPU, twice the bf16 size: bf16 GEMM on the CPU faults with an illegal instruction on part of
+    the Windows fleet and is emulated slowly without a native bf16 unit, and ``choose_bfloat16_safe_dtype`` only
+    checks that a bf16 tensor can be allocated there. Any other device takes ``choose_bfloat16_safe_dtype``.
+    """
+    return torch.float32 if device.type == "cpu" else TorchDevice.choose_bfloat16_safe_dtype(device)
 
 
 def infer_t5_encoder_config(sd: dict[str, Any]) -> T5Config:

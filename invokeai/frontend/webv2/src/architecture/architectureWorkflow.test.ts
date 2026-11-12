@@ -120,6 +120,7 @@ describe('architecture workflow', () => {
       /scripts\/measure-architecture-performance.mjs$/,
       /scripts\/run-project-file-journey.mjs$/,
       /scripts\/run-accessibility-journeys.mjs$/,
+      /scripts\/run-browser-smoke.mjs$/,
     ];
     for (const [name, commands] of [
       ['local release', expand('pnpm check:release')],
@@ -140,6 +141,10 @@ describe('architecture workflow', () => {
       const patterns = Object.values(parse(filter) as Record<string, string[]>).flat();
       for (const [workflowPath] of workflows) {
         expect(patterns, path).toContain(workflowPath.replace('../../../../../', ''));
+      }
+      // A backend change regenerates the API types the type check reads, so it has to run the check too.
+      if (path.endsWith('/frontend-checks.yml')) {
+        expect(patterns, path).toContain('invokeai/frontend/api/schema.ts');
       }
     }
   });

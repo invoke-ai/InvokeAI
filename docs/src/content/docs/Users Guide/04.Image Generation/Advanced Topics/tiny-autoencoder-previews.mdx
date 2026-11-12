@@ -28,13 +28,10 @@ always and is identical with the setting on or off.
    It is a server setting and is off by default. See [All Settings](/configuration/invokeai-yaml/#all-settings).
 
 2. In **Model Manager → Starter Models**, install the Tiny AutoEncoder for the families you generate with
-   (search for *preview decoder*). Each one is 5 to 31 MB.
+   (search for *preview decoder*). Each one is 5 to 31 MB. Filtering by your model's family also shows its
+   decoder, even when the decoder is filed under another family, and a selected bundle names its missing decoder
+   in its summary line.
 </Steps>
-
-<Aside type="tip">
-TAEW2.1 is filed under Wan. Filtering the starter models by Qwen-Image, Krea-2 or Anima hides it; searching for
-*TAEW2.1* or *preview decoder* finds it.
-</Aside>
 
 | Starter model | Previews for |
 |---|---|
@@ -42,7 +39,7 @@ TAEW2.1 is filed under Wan. Filtering the starter models by Qwen-Image, Krea-2 o
 | TAESDXL (SDXL preview decoder) | SDXL, SDXL Refiner |
 | TAESD3 (SD3 preview decoder) | SD 3 |
 | TAEF1 (FLUX.1 preview decoder) | FLUX.1, Z-Image |
-| TAEF2 (FLUX.2 preview decoder) | FLUX.2, FLUX.3, ERNIE-Image |
+| TAEF2 (FLUX.2 preview decoder) | FLUX.2, FLUX.3, ERNIE-Image, Ideogram 4, MOSS-Image |
 | TAEQI2.1 (Qwen-Image-2.1 preview decoder) | Qwen-Image-2.1 |
 | TAEW2.1 (Wan 2.1 VAE preview decoder) | Wan 2.2 T2V and I2V A14B, Qwen-Image, Qwen-Image Edit, Krea-2, Anima |
 | TAEW2.2 (Wan 2.2 TI2V-5B preview decoder) | Wan 2.2 TI2V-5B |
@@ -52,16 +49,17 @@ A TAE serves every family that denoises in its latent space, so you need only on
 you already have, see [Preview decoders](/users-guide/models/model-format-support/#preview-decoders-tiny-autoencoders)
 for the files InvokeAI accepts.
 
-FLUX.1, FLUX.2, FLUX.3, ERNIE-Image, Anima and LTX-2.5 preview the image the model predicts, so the preview is clean from
-the first step. Z-Image, SD 3, Qwen-Image-2.1, Qwen-Image, Krea-2 and Wan 2.2 preview the current noisy latent:
-early previews show sharp noise, which clears as denoising proceeds. SD 1.x/2.x and SDXL depend on the scheduler:
-DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2, KDPM2 a and DPM++ SDE report their prediction and preview cleanly;
-DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM, LCM, TCD and ER-SDE preview the noisy latent.
+FLUX.1, FLUX.2, FLUX.3, ERNIE-Image, MOSS-Image, Anima and LTX-2.5 preview the image the model predicts, so the
+preview is clean from the first step. Z-Image, SD 3, Qwen-Image-2.1, Qwen-Image, Krea-2, Wan 2.2 and Ideogram 4
+preview the current noisy latent: early previews show sharp noise, which clears as denoising proceeds. SD 1.x/2.x and
+SDXL depend on the scheduler: DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2, KDPM2 a and DPM++ SDE report their
+prediction and preview cleanly; DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM, LCM, TCD and ER-SDE preview the noisy
+latent.
 
 A video preview shows the middle frame of the clip. For Wan 2.2 the TAE decodes it together with the frame before
 it, which it needs as context for a sharp result; LTX-2.5 decodes the middle frame alone.
 
-CogView4 and Ideogram 4 keep the linear preview. MiniMax H3 always previews with its own built-in decoder, whatever
+CogView4 keeps the linear preview. MiniMax H3 always previews with its own built-in decoder, whatever
 this setting says.
 
 ## Cost and fallback

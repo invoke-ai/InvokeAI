@@ -2,6 +2,7 @@ import type { FoundModel, ModelConfig } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
@@ -50,11 +51,14 @@ const INSTALLED_STARTERS = [
   },
 ];
 
+const DEFAULT_STARTER_RESPONSE = { starter_bundles: {}, starter_models: INSTALLED_STARTERS };
+let starterResponse: object = DEFAULT_STARTER_RESPONSE;
+
 vi.mock('@features/models/data/startersStore', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureStartersLoaded: vi.fn(),
   useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ error: null, response: { starter_bundles: {}, starter_models: INSTALLED_STARTERS }, status: 'loaded' }),
+    selector({ error: null, response: starterResponse, status: 'loaded' }),
 }));
 
 vi.mock('@features/models/data/externalProvidersStore', async (importOriginal) => ({
@@ -603,5 +607,188 @@ describe('AddModelsView models folder scan', () => {
 
     expect(scanModelsFolder()).toBeDisabled();
     expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+describe('AddModelsView bundle preview decoder', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const TAEF1 = {
+    base: 'flux',
+    compatible_bases: ['z-image'],
+    description: 'Preview decoder.',
+    is_installed: false,
+    name: 'TAEF1 (FLUX.1 preview decoder)',
+    source: 'https://example/taef1.safetensors',
+    type: 'tiny_autoencoder',
+  };
+  // Decoders the reveal must leave out: another family's, and one filed under TAEF1's base that Z-Image cannot use.
+  const TAESDXL = { ...TAEF1, base: 'sdxl', compatible_bases: [], name: 'TAESDXL', source: 'https://example/taesdxl' };
+  const FLUX_ONLY_DECODER = { ...TAEF1, compatible_bases: [], name: 'FLUX-only decoder', source: 'https://example/fo' };
+  const Z_IMAGE = {
+    base: 'z-image',
+    description: 'Z-Image main model.',
+    is_installed: false,
+    name: 'Z-Image Turbo',
+    source: 'https://example/z-image-turbo',
+    type: 'main',
+  };
+  const Z_IMAGE_ENCODER = {
+    ...Z_IMAGE,
+    name: 'Z-Image encoder',
+    source: 'https://example/qwen3',
+    type: 'qwen3_encoder',
+  };
+
+  const useCatalog = (decoderInstalled: boolean) => {
+    const decoder = { ...TAEF1, is_installed: decoderInstalled };
+    starterResponse = {
+      starter_bundles: { 'z-image': { models: [Z_IMAGE, Z_IMAGE_ENCODER], name: 'Z-Image' } },
+      starter_models: [...INSTALLED_STARTERS, Z_IMAGE, Z_IMAGE_ENCODER, decoder, TAESDXL, FLUX_ONLY_DECODER],
+    };
+  };
+
+  const mount = async () => {
+    root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WithAccountPreferences>
+            <AddModelsView />
+          </WithAccountPreferences>
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  };
+  const selectBundle = () =>
+    act(() =>
+      userEvent.click(
+        [...document.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Z-Image'))!
+      )
+    );
+  const hint = () => document.querySelector<HTMLButtonElement>('button[aria-label="models.showStarterModel"]');
+  const listedNames = () => [...document.querySelectorAll('[title]')].map((element) => element.getAttribute('title'));
+  const pickFilter = async (submenu: string, item: string) => {
+    const menuItem = (startsWith: string) =>
+      vi.waitFor(() => {
+        const item = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((element) =>
+          element.textContent?.startsWith(startsWith)
+        );
+        expect(item).toBeDefined();
+        return item!;
+      });
+    await act(() =>
+      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
+    );
+    await act(async () => userEvent.click(await menuItem(submenu)));
+    await act(async () => userEvent.click(await menuItem(item)));
+    await act(() => userEvent.keyboard('{Escape}'));
+  };
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    starterResponse = DEFAULT_STARTER_RESPONSE;
+    updateModelsUi({ selectedBundleName: null });
+    resetSessionAndPreferences();
+  });
+
+  it('points a bundle at its missing decoder, and reveals it in the starters filtered to the family', async () => {
+    useCatalog(false);
+    // A type filter and search text that would each hide the decoder; revealing it replaces both.
+    updateModelsUi({ addModelsTypeSeed: 'main' });
+    setAddModelsQuery('turbo');
+    await mount();
+    await selectBundle();
+
+    // The decoder is a hint in the bundle's summary, not one of its rows.
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(listedNames()).not.toContain(TAEF1.name);
+    expect(hint()?.textContent).toBe(TAEF1.name);
+
+    hint()!.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBeNull();
+    expect(hint()).toBeNull();
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    // Only the decoder: the family's other starters and the rest of the catalog stay out.
+    expect(listedNames()).not.toContain(Z_IMAGE.name);
+    expect(listedNames()).not.toContain(Z_IMAGE_ENCODER.name);
+    expect(listedNames()).not.toContain(INSTALLED_STARTERS[0]!.name);
+    expect(listedNames()).not.toContain(TAESDXL.name);
+    expect(listedNames()).not.toContain(FLUX_ONLY_DECODER.name);
+    expect(getModelsUiSnapshotForTests().addModelsQuery).toBe('');
+    // The hint left with the bar; focus moves on to the revealed decoder's own install button.
+    await expect
+      .poll(() => document.activeElement?.closest('[data-list-row]')?.getAttribute('data-list-row'))
+      .toBe(TAEF1.source);
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+    expect(installActions.installMany).not.toHaveBeenCalled();
+  });
+
+  it('drops the revealed decoder filter when a bundle is picked again', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+
+    // The Launchpad selects a bundle through the store, not the chip.
+    act(() => updateModelsUi({ selectedBundleName: 'Z-Image' }));
+
+    // No bundle holds a decoder, so keeping the reveal's type filter would empty every bundle.
+    await expect.poll(listedNames).toContain(Z_IMAGE.name);
+    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
+  });
+
+  it('drops the revealed type even when the user changed only the base', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    act(() => updateModelsUi({ selectedBundleName: null }));
+    await pickFilter('models.baseArchitecture', 'models.allBases');
+
+    await selectBundle();
+
+    // The reveal's type filter alone would still hide every member of the bundle.
+    await expect.poll(listedNames).toContain(Z_IMAGE.name);
+    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
+  });
+
+  it('keeps a filter the user picked after the reveal', async () => {
+    useCatalog(false);
+    await mount();
+    await selectBundle();
+    await act(() => userEvent.click(hint()!));
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    // The user's own choice replaces the reveal's type, then they come back to the bundle.
+    act(() => updateModelsUi({ selectedBundleName: null }));
+    await pickFilter('models.modelType', getModelTypeLabel('qwen3_encoder'));
+
+    await selectBundle();
+
+    await expect.poll(listedNames).toContain(Z_IMAGE_ENCODER.name);
+    expect(listedNames()).not.toContain(Z_IMAGE.name);
+  });
+
+  it('gives no hint when the decoder is already installed', async () => {
+    useCatalog(true);
+    await mount();
+    await selectBundle();
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(hint()).toBeNull();
   });
 });

@@ -63,6 +63,9 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // The eager Generate and Gallery surfaces and the lazily loaded managed-file field share it; alone it costs both
+  // routes a startup request.
+  '/platform/ui/DropZone.tsx',
   // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together;
   // splitting by the new importer sets would add a startup request on both routes.
   '/features/identity/core/schemas.ts',
@@ -257,6 +260,7 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/queue/runtime.ts',
   '/features/queue/runtime/cancelRequests.ts',
   '/features/queue/runtime/coordinator.ts',
+  '/features/queue/runtime/deliveryClaims.ts',
   '/features/queue/runtime/receiptAcknowledgements.ts',
   '/features/queue/ui/useDeviceLabel.ts',
   '/features/upscale/core/settings.ts',

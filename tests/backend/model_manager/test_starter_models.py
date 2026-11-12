@@ -7,6 +7,7 @@ two standalone dependencies so installing it also pulls the pieces needed to run
 one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -190,6 +191,47 @@ def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> Non
             (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
         }, model.name
         assert all(dep.source in starter_sources for dep in dependencies), model.name
+
+
+def test_preview_decoders_list_the_bases_sharing_their_latent_space() -> None:
+    """A TAE is filed under one base but decodes for every base denoising in the same latents, so the starter-model
+    base filter can show it there too. A base with a different latent space must not be listed."""
+    taes = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+    taesd = next(m for m in taes if m.base is BaseModelType.StableDiffusion1)
+    taef1 = next(m for m in taes if m.base is BaseModelType.Flux)
+    taef2 = next(m for m in taes if m.base is BaseModelType.Flux2)
+
+    assert BaseModelType.StableDiffusion2 in taesd.compatible_bases
+    assert BaseModelType.StableDiffusionXL not in taesd.compatible_bases
+    assert BaseModelType.ZImage in taef1.compatible_bases
+    assert BaseModelType.Flux2 not in taef1.compatible_bases
+    assert {BaseModelType.Flux3, BaseModelType.ErnieImage, BaseModelType.Ideogram4} <= set(taef2.compatible_bases)
+    assert BaseModelType.Flux not in taef2.compatible_bases
+    for model in taes:
+        assert model.base not in model.compatible_bases, model.name
+
+
+def test_wan_preview_decoders_list_only_their_own_latent_space() -> None:
+    """Both Wan TAEs are filed under Wan, but only the 16-channel one shares latents with other families."""
+    taes = {m.name: m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder and m.base is BaseModelType.Wan}
+    taew2_1 = next(m for n, m in taes.items() if n.startswith("TAEW2.1"))
+    taew2_2 = next(m for n, m in taes.items() if n.startswith("TAEW2.2"))
+
+    assert {BaseModelType.QwenImage, BaseModelType.Krea2, BaseModelType.Anima} <= set(taew2_1.compatible_bases)
+    assert taew2_2.compatible_bases == []
+
+
+def test_every_preview_decoder_starter_resolves_to_a_latent_space() -> None:
+    """`compatible_bases` and the missing-TAE log both read the space from the TAE the source names: a starter whose
+    URL names no published TAE would silently drop out of the base filter, the bundle hint and the log."""
+    for model in STARTER_MODELS:
+        if model.type is ModelType.TinyAutoencoder:
+            assert named_tiny_autoencoder_space(model.base, model.source) is not None, model.name
+
+
+def test_only_preview_decoders_list_compatible_bases() -> None:
+    others = [m for m in STARTER_MODELS if m.type is not ModelType.TinyAutoencoder]
+    assert others and all(m.compatible_bases == [] for m in others)
 
 
 def test_every_flux3_transformer_only_starter_pulls_the_vae_and_the_encoder() -> None:

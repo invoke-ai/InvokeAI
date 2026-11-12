@@ -1104,8 +1104,6 @@ const LayerMenu = ({
         onExitComplete={onDialogExitComplete}
         onSubmit={submitRename}
       />
-      {/* Mounted before it opens, like the rename dialog: a dialog that mounts open while the menu is closing is
-          dismissed as nested above the menu's departing layer. */}
       <RunLayerWorkflowDialog
         key={runWorkflowGeneration}
         availability={workflowAvailability}
