@@ -8,6 +8,7 @@ import {
   getNodeFieldFormSettings,
   getResolvedWorkflowEdges,
   getWorkflowFieldInvalidReason,
+  isFormContainerElement,
 } from '@features/workflow/utility';
 
 /** Reuse the same field/template validation as NodeFieldControl, including connected inputs and authored bounds. */
@@ -39,7 +40,7 @@ export const sectionHasInvalidField = (
     if (element.type === 'node-field') {
       return invalidIds.has(element.id);
     }
-    return element.type === 'container'
+    return isFormContainerElement(element)
       ? sectionHasInvalidField(getFormChildren(projectGraph.form, element.id), projectGraph, invalidIds)
       : false;
   });

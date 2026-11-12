@@ -191,6 +191,16 @@ export interface ContainerFormElement {
   };
 }
 
+export interface CollapsibleFormElement {
+  id: string;
+  type: 'collapsible';
+  parentId?: string;
+  data: {
+    content: string;
+    children: string[];
+  };
+}
+
 export interface NodeFieldFormElement {
   id: string;
   type: 'node-field';
@@ -211,8 +221,6 @@ export interface HeadingFormElement {
   parentId?: string;
   data: {
     content: string;
-    /** Groups following sibling elements into a collapsible section until the next heading or divider. */
-    collapsible?: boolean;
   };
 }
 
@@ -233,10 +241,16 @@ export interface DividerFormElement {
 
 export type WorkflowFormElement =
   | ContainerFormElement
+  | CollapsibleFormElement
   | NodeFieldFormElement
   | HeadingFormElement
   | TextFormElement
   | DividerFormElement;
+
+export const isFormContainerElement = (
+  element: WorkflowFormElement | undefined
+): element is ContainerFormElement | CollapsibleFormElement =>
+  element?.type === 'container' || element?.type === 'collapsible';
 
 /** The Linear UI description: a tree of form elements rooted in a column container. */
 export interface WorkflowForm {

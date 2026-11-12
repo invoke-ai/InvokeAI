@@ -1,4 +1,4 @@
-import { Box, Checkbox, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
+import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import {
   DndContext,
@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/core';
 import {
   isInvocationNode,
+  type CollapsibleFormElement,
   type ContainerFormElement,
   type InvocationTemplates,
   type NodeFieldFormElement,
@@ -280,7 +281,13 @@ const ContainerDropZoneBody = ({
 };
 
 /** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
-const ContainerDropZoneBase = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
+const ContainerDropZoneBase = ({
+  container,
+  isEmpty,
+}: {
+  container: ContainerFormElement | CollapsibleFormElement;
+  isEmpty: boolean;
+}) => {
   const { activeElementId, form } = use(BuilderDndContext);
   const canDrop = activeElementId !== null && !isFormDescendantOrSelf(form, activeElementId, container.id);
   const { setNodeRef } = useDroppable({
@@ -421,6 +428,36 @@ const BuilderElementBase = ({
         </BuilderCard>
       );
     }
+    case 'collapsible': {
+      return (
+        <BuilderCard element={element} title={title}>
+          <Stack gap="2" w="full">
+            <Input
+              aria-label={t('widgets.workflow.formBuilder.collapsibleLabel')}
+              fontSize="sm"
+              fontWeight="600"
+              placeholder={t('widgets.workflow.formBuilder.collapsiblePlaceholder')}
+              value={element.data.content}
+              variant="flushed"
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                editGraph({ content: event.currentTarget.value, elementId: element.id, type: 'setFormElementContent' })
+              }
+            />
+            {getFormChildren(projectGraph.form, element.id).map((child) => (
+              <BuilderElement
+                key={child.id}
+                element={child}
+                hoveredNodeId={hoveredNodeId}
+                invalidElementIds={invalidElementIds}
+                projectGraph={projectGraph}
+                selectedNodeIds={selectedNodeIds}
+              />
+            ))}
+            <ContainerDropZone container={element} isEmpty={element.data.children.length === 0} />
+          </Stack>
+        </BuilderCard>
+      );
+    }
     case 'node-field': {
       return (
         <BuilderCard
@@ -479,35 +516,8 @@ const BuilderElementBase = ({
       );
     }
     case 'heading': {
-      const collapsible = Boolean(element.data.collapsible);
-
       return (
-        <BuilderCard
-          element={element}
-          extraActions={
-            <Checkbox.Root
-              checked={collapsible}
-              colorPalette="accent"
-              mr="1.5"
-              size="sm"
-              onCheckedChange={(details) =>
-                editGraph({
-                  collapsible: Boolean(details.checked),
-                  content: element.data.content,
-                  elementId: element.id,
-                  type: 'setFormElementContent',
-                })
-              }
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-              <Checkbox.Label color="fg.muted" fontSize="xs">
-                {t('widgets.workflow.formBuilder.collapsibleSection')}
-              </Checkbox.Label>
-            </Checkbox.Root>
-          }
-          title={title}
-        >
+        <BuilderCard element={element} title={title}>
           <Input
             aria-label={t('widgets.workflow.formBuilder.headingLabel')}
             fontSize="lg"
@@ -768,7 +778,7 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
     >
       <BuilderDndContext value={dndContextValue}>
         <BuilderDropTargetContext value={dropTarget}>
-          <Stack gap="2" p="3" w="full">
+          <Stack gap="2" p="1.5" w="full">
             {rootChildren.length === 0 ? (
               <Text color="fg.muted" fontSize="xs">
                 {t('widgets.workflow.formBuilder.empty')}

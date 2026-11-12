@@ -1,4 +1,4 @@
-import type { ProjectGraphState, WorkflowFormElement } from '@features/workflow/contracts';
+import type { CollapsibleFormElement, ProjectGraphState, WorkflowFormElement } from '@features/workflow/contracts';
 
 import { Collapsible, Separator, Stack, Text } from '@chakra-ui/react';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
@@ -13,12 +13,7 @@ import { ChevronRightIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  getFormSectionOpenState,
-  groupFormSections,
-  updateFormSectionOpenState,
-  type FormSectionItem,
-} from './formSections';
+import { getFormSectionOpenState, updateFormSectionOpenState } from './formSections';
 import { getInvalidFormFieldIds, sectionHasInvalidField } from './formSectionStatus';
 import { LinkifiedText } from './LinkifiedText';
 import { NodeFieldControl } from './NodeFieldControl';
@@ -59,14 +54,11 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
   const rootChildren = getFormChildren(projectGraph.form);
   const root = projectGraph.form.elements[projectGraph.form.rootElementId];
   const layout = root?.type === 'container' ? root.data.layout : 'column';
-  const hasCollapsibleHeadings = useMemo(
-    () =>
-      Object.values(projectGraph.form.elements).some(
-        (element) => element.type === 'heading' && element.data.collapsible === true
-      ),
+  const hasCollapsibleSections = useMemo(
+    () => Object.values(projectGraph.form.elements).some((element) => element.type === 'collapsible'),
     [projectGraph.form.elements]
   );
-  const columnGap: '1' | '3' = hasCollapsibleHeadings ? '1' : '3';
+  const columnGap: '1' | '3' = hasCollapsibleSections ? '1' : '3';
   const invalidFieldIds = useMemo(() => getInvalidFormFieldIds(projectGraph, templates), [projectGraph, templates]);
   const openSections = useMemo(
     () => getFormSectionOpenState({ formSectionsOpen: storedOpenSections }, projectGraph.id),
@@ -108,7 +100,7 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
   }
 
   return (
-    <Stack direction={layout} gap={layout === 'row' ? '3' : columnGap} p="3" minW="0">
+    <Stack direction={layout} gap={layout === 'row' ? '3' : columnGap} px="1" py="3" minW="0">
       <ViewChildren context={context} elements={rootChildren} layout={layout} />
     </Stack>
   );
@@ -124,51 +116,41 @@ const ViewChildren = ({
   elements: readonly WorkflowFormElement[];
   layout: FormLayout;
   gap?: string;
-}) => {
-  const items = groupFormSections(elements);
-  return items.map((item, index) => {
+}) =>
+  elements.map((element, index) => {
     const showBoundary =
       layout === 'column' &&
-      isClosedSectionEdge(items[index - 1], 'end', context) &&
-      isClosedSectionEdge(item, 'start', context);
-    return item.kind === 'section' ? (
-      <FormSection
-        key={item.heading.id}
-        context={context}
-        section={item}
-        layout={layout}
-        showBoundary={showBoundary}
-        boundaryGap={gap}
-      />
-    ) : (
+      isClosedSectionEdge(elements[index - 1], 'end', context) &&
+      isClosedSectionEdge(element, 'start', context);
+    return (
       <ViewElement
-        key={item.element.id}
+        key={element.id}
         context={context}
-        element={item.element}
+        element={element}
+        layout={layout}
         showBoundary={showBoundary}
         boundaryGap={gap}
       />
     );
   });
-};
 
 const isClosedSectionEdge = (
-  item: FormSectionItem | undefined,
+  element: WorkflowFormElement | undefined,
   edge: 'start' | 'end',
   context: FormViewContext
 ): boolean => {
-  if (!item) {
+  if (!element) {
     return false;
   }
-  if (item.kind === 'section') {
-    return context.openSections[item.heading.id] === false;
+  if (element.type === 'collapsible') {
+    return context.openSections[element.id] === false;
   }
-  if (item.element.type !== 'container') {
+  if (element.type !== 'container') {
     return false;
   }
   // Layout-only wrappers do not break visual adjacency; multi-item rows have no single vertical edge.
-  const children = groupFormSections(getFormChildren(context.projectGraph.form, item.element.id));
-  if (item.element.data.layout === 'row' && children.length !== 1) {
+  const children = getFormChildren(context.projectGraph.form, element.id);
+  if (element.data.layout === 'row' && children.length !== 1) {
     return false;
   }
   return isClosedSectionEdge(edge === 'start' ? children[0] : children.at(-1), edge, context);
@@ -176,28 +158,28 @@ const isClosedSectionEdge = (
 
 const FormSection = ({
   context,
-  section,
+  element,
   layout,
   showBoundary,
   boundaryGap,
 }: {
   context: FormViewContext;
-  section: Extract<FormSectionItem, { kind: 'section' }>;
+  element: CollapsibleFormElement;
   layout: FormLayout;
   showBoundary: boolean;
   boundaryGap: string;
 }) => {
   const { t } = useTranslation();
-  const { heading, body } = section;
-  const open = context.openSections[heading.id] ?? true;
-  const hasInvalidField = sectionHasInvalidField(body, context.projectGraph, context.invalidFieldIds);
+  const children = getFormChildren(context.projectGraph.form, element.id);
+  const open = context.openSections[element.id] ?? true;
+  const hasInvalidField = sectionHasInvalidField(children, context.projectGraph, context.invalidFieldIds);
   const boundaryStyles = useMemo(
     () => ({ ...SECTION_SEPARATOR_STYLES, '--workflow-form-section-gap': boundaryGap }),
     [boundaryGap]
   );
   const onOpenChange = useCallback(
-    ({ open: nextOpen }: { open: boolean }) => context.onSectionOpenChange(heading.id, nextOpen),
-    [context, heading.id]
+    ({ open: nextOpen }: { open: boolean }) => context.onSectionOpenChange(element.id, nextOpen),
+    [context, element.id]
   );
 
   return (
@@ -228,7 +210,7 @@ const FormSection = ({
           textTransform="uppercase"
           truncate
         >
-          {heading.data.content || t('widgets.workflow.formView.unnamedSection', { defaultValue: 'Section' })}
+          {element.data.content || t('widgets.workflow.formView.unnamedSection', { defaultValue: 'Section' })}
         </Text>
         {!open && hasInvalidField ? (
           <Text as="span" color="fg.error" fontSize="xs" flexShrink="0">
@@ -237,8 +219,8 @@ const FormSection = ({
         ) : null}
       </Collapsible.Trigger>
       <Collapsible.Content>
-        <Stack borderColor="bg.subtle" borderTopWidth="1px" direction={layout} gap="3" p="2" minW="0">
-          <ViewChildren context={context} elements={body} layout={layout} gap="var(--chakra-spacing-3)" />
+        <Stack borderColor="bg.subtle" borderTopWidth="1px" direction="column" gap="3" p="2" minW="0">
+          <ViewChildren context={context} elements={children} layout="column" gap="var(--chakra-spacing-3)" />
         </Stack>
       </Collapsible.Content>
     </Collapsible.Root>
@@ -248,11 +230,13 @@ const FormSection = ({
 const ViewElement = ({
   element,
   context,
+  layout,
   showBoundary,
   boundaryGap,
 }: {
-  element: Extract<FormSectionItem, { kind: 'element' }>['element'];
+  element: WorkflowFormElement;
   context: FormViewContext;
+  layout: FormLayout;
   showBoundary: boolean;
   boundaryGap: string;
 }) => {
@@ -261,6 +245,16 @@ const ViewElement = ({
     [boundaryGap]
   );
   switch (element.type) {
+    case 'collapsible':
+      return (
+        <FormSection
+          context={context}
+          element={element}
+          layout={layout}
+          showBoundary={showBoundary}
+          boundaryGap={boundaryGap}
+        />
+      );
     case 'container':
       return (
         <Stack

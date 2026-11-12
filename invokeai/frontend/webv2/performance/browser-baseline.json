@@ -235,12 +235,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 216897,
+        "largestAssetRawBytes": 218415,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 465456,
+        "scriptRawBytes": 466974,
         "scriptRequestCount": 5,
-        "totalRawBytes": 480869
+        "totalRawBytes": 482387
       },
       "domContentLoadedMedianMs": 87.90000009536743,
       "id": "editor-workflow",
@@ -258,11 +258,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751079,
-        "otherRawBytes": 315348,
+        "otherRawBytes": 315451,
         "requestCount": 90,
-        "scriptRawBytes": 5113476,
+        "scriptRawBytes": 5114994,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5514458
+        "totalRawBytes": 5516079
       },
       "routeReadyMedianMs": 1043.1999998092651,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -273,12 +273,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 216897,
+        "largestAssetRawBytes": 218415,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 465456,
+        "scriptRawBytes": 466974,
         "scriptRequestCount": 5,
-        "totalRawBytes": 480869
+        "totalRawBytes": 482387
       },
       "domContentLoadedMedianMs": 92.19999980926514,
       "id": "editor-workflow",
@@ -296,11 +296,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751079,
-        "otherRawBytes": 315348,
+        "otherRawBytes": 315451,
         "requestCount": 90,
-        "scriptRawBytes": 5113476,
+        "scriptRawBytes": 5114994,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5514458
+        "totalRawBytes": 5516079
       },
       "routeReadyMedianMs": 1105.4000000953674,
       "scriptSourceOwnerSet": "editor-workflow-static",

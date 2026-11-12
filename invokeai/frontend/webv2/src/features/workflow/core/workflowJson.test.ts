@@ -344,32 +344,49 @@ describe('parseWorkflowJson tolerance', () => {
     });
   });
 
-  it('preserves collapsible heading flags while keeping static headings free of default flags', () => {
+  it('round-trips collapsible container elements with nested containers and drops fields for missing nodes', () => {
     const { document, warnings } = parseWorkflowJson({
       edges: [],
       form: {
         elements: {
-          h1: { data: { collapsible: true, content: 'Collapsible' }, id: 'h1', parentId: 'root', type: 'heading' },
-          h2: { data: { collapsible: false, content: 'Static' }, id: 'h2', parentId: 'root', type: 'heading' },
-          root: { data: { children: ['h1', 'h2'], layout: 'column' }, id: 'root', type: 'container' },
+          c1: {
+            data: { children: ['r1', 'missing_field'], content: 'Section 1' },
+            id: 'c1',
+            parentId: 'root',
+            type: 'collapsible',
+          },
+          r1: {
+            data: { children: [], layout: 'row' },
+            id: 'r1',
+            parentId: 'c1',
+            type: 'container',
+          },
+          missing_field: {
+            data: { fieldIdentifier: { fieldName: 'steps', nodeId: 'missing' } },
+            id: 'missing_field',
+            parentId: 'c1',
+            type: 'node-field',
+          },
+          h1: { data: { content: 'Static' }, id: 'h1', parentId: 'root', type: 'heading' },
+          root: { data: { children: ['c1', 'h1'], layout: 'column' }, id: 'root', type: 'container' },
         },
         rootElementId: 'root',
       },
-      name: 'Headings',
+      name: 'Collapsible Form',
       nodes: [],
       version: '1.0.0',
     });
 
-    expect(warnings).toEqual([]);
-    expect(document.form.elements.h1).toEqual({
-      data: { collapsible: true, content: 'Collapsible' },
-      id: 'h1',
+    expect(warnings).toEqual(['Removed a form field that referenced a missing node.']);
+    expect(document.form.elements.c1).toEqual({
+      data: { children: ['r1'], content: 'Section 1' },
+      id: 'c1',
       parentId: 'root',
-      type: 'heading',
+      type: 'collapsible',
     });
-    expect(document.form.elements.h2).toEqual({
+    expect(document.form.elements.h1).toEqual({
       data: { content: 'Static' },
-      id: 'h2',
+      id: 'h1',
       parentId: 'root',
       type: 'heading',
     });

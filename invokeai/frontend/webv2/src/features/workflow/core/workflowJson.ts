@@ -13,7 +13,7 @@ import type {
 
 import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
-import { isInvocationNode } from './types';
+import { isFormContainerElement, isInvocationNode } from './types';
 
 /**
  * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges
@@ -144,6 +144,15 @@ const zFormElement = z.discriminatedUnion('type', [
     type: z.literal('container'),
   }),
   z.object({
+    data: z.looseObject({
+      children: z.array(z.string()).catch([]),
+      content: z.string().catch(''),
+    }),
+    id: z.string(),
+    parentId: z.string().optional(),
+    type: z.literal('collapsible'),
+  }),
+  z.object({
     data: z
       .looseObject({
         fieldIdentifier: zFieldIdentifier,
@@ -163,15 +172,7 @@ const zFormElement = z.discriminatedUnion('type', [
     type: z.literal('node-field'),
   }),
   z.object({
-    data: z
-      .looseObject({
-        collapsible: z.boolean().optional().catch(undefined),
-        content: z.string().catch(''),
-      })
-      .transform(({ collapsible, content }) => ({
-        content,
-        ...(collapsible ? { collapsible: true } : {}),
-      })),
+    data: z.looseObject({ content: z.string().catch('') }),
     id: z.string(),
     parentId: z.string().optional(),
     type: z.literal('heading'),
@@ -278,7 +279,7 @@ const parseForm = (
 
     const parent = element.parentId ? form.elements[element.parentId] : undefined;
 
-    if (parent?.type === 'container') {
+    if (isFormContainerElement(parent)) {
       parent.data.children = parent.data.children.filter((childId) => childId !== element.id);
     }
 

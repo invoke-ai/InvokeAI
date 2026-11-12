@@ -88,20 +88,20 @@ const graph: ProjectGraphState = {
         type: 'container',
         data: {
           layout: 'column',
-          children: ['intro', 'input', 'missing', 'divider', 'between', 'output', 'result', 'boundary', 'tail', 'end'],
+          children: ['intro', 'input', 'divider', 'between', 'output', 'tail'],
         },
       },
       intro: { id: 'intro', type: 'text', parentId: 'root', data: { content: 'Always visible' } },
       input: {
         id: 'input',
-        type: 'heading',
+        type: 'collapsible',
         parentId: 'root',
-        data: { collapsible: true, content: 'Input section' },
+        data: { content: 'Input section', children: ['missing'] },
       },
       missing: {
         id: 'missing',
         type: 'node-field',
-        parentId: 'root',
+        parentId: 'input',
         data: {
           fieldIdentifier: { nodeId: 'missing-node', fieldName: 'value' },
           showDescription: false,
@@ -112,21 +112,25 @@ const graph: ProjectGraphState = {
       between: { id: 'between', type: 'text', parentId: 'root', data: { content: 'Between sections' } },
       output: {
         id: 'output',
-        type: 'heading',
+        type: 'collapsible',
         parentId: 'root',
-        data: { collapsible: true, content: 'Output section' },
+        data: { content: 'Output section', children: ['result'] },
       },
-      result: { id: 'result', type: 'text', parentId: 'root', data: { content: 'A retained value' } },
-      boundary: { id: 'boundary', type: 'divider', parentId: 'root' },
-      tail: { id: 'tail', type: 'heading', parentId: 'root', data: { collapsible: true, content: 'Final section' } },
-      end: { id: 'end', type: 'text', parentId: 'root', data: { content: 'Final value' } },
+      result: { id: 'result', type: 'text', parentId: 'output', data: { content: 'A retained value' } },
+      tail: {
+        id: 'tail',
+        type: 'collapsible',
+        parentId: 'root',
+        data: { content: 'Final section', children: ['end'] },
+      },
+      end: { id: 'end', type: 'text', parentId: 'tail', data: { content: 'Final value' } },
     },
   },
 };
 
 const layoutGraph = (layout: 'row' | 'column', atRoot = false): ProjectGraphState => {
   const node = { ...buildInvocationNode(numericTemplate, { x: 0, y: 0 }), id: 'numeric-node' };
-  const containerId = atRoot ? 'root' : 'group';
+  const innerParentId = layout === 'row' ? 'row-inner' : 'section';
   return {
     ...createProjectGraph(`layout-${layout}-${atRoot}`),
     nodes: [node],
@@ -137,8 +141,8 @@ const layoutGraph = (layout: 'row' | 'column', atRoot = false): ProjectGraphStat
           id: 'root',
           type: 'container',
           data: {
-            layout: atRoot ? layout : 'column',
-            children: atRoot ? ['heading', 'first', 'second'] : ['before', 'group', 'after'],
+            layout: 'column',
+            children: atRoot ? ['section'] : ['before', 'group', 'after'],
           },
         },
         ...(!atRoot
@@ -148,21 +152,34 @@ const layoutGraph = (layout: 'row' | 'column', atRoot = false): ProjectGraphStat
                 id: 'group',
                 type: 'container' as const,
                 parentId: 'root',
-                data: { layout, children: ['heading', 'first', 'second'] },
+                data: { layout: 'column' as const, children: ['section'] },
               },
               after: { id: 'after', type: 'text' as const, parentId: 'root', data: { content: 'After row' } },
             }
           : {}),
-        heading: {
-          id: 'heading',
-          type: 'heading',
-          parentId: containerId,
-          data: { collapsible: true, content: 'Numeric section' },
+        section: {
+          id: 'section',
+          type: 'collapsible',
+          parentId: atRoot ? 'root' : 'group',
+          data: {
+            content: 'Numeric section',
+            children: layout === 'row' ? ['row-inner'] : ['first', 'second'],
+          },
         },
+        ...(layout === 'row'
+          ? {
+              'row-inner': {
+                id: 'row-inner',
+                type: 'container' as const,
+                parentId: 'section',
+                data: { layout: 'row' as const, children: ['first', 'second'] },
+              },
+            }
+          : {}),
         first: {
           id: 'first',
           type: 'node-field',
-          parentId: containerId,
+          parentId: innerParentId,
           data: {
             fieldIdentifier: { nodeId: node.id, fieldName: 'first' },
             showDescription: false,
@@ -172,7 +189,7 @@ const layoutGraph = (layout: 'row' | 'column', atRoot = false): ProjectGraphStat
         second: {
           id: 'second',
           type: 'node-field',
-          parentId: containerId,
+          parentId: innerParentId,
           data: {
             fieldIdentifier: { nodeId: node.id, fieldName: 'second' },
             showDescription: false,
@@ -258,7 +275,7 @@ afterEach(async () => {
 
 describe('native workflow-form accordion', () => {
   it.each([false, true])(
-    'preserves side-by-side fields in a headed row (root: %s), including after reopening',
+    'preserves side-by-side fields in a row container nested inside a collapsible section (root: %s)',
     async (atRoot) => {
       const projectGraph = layoutGraph('row', atRoot);
       await renderForm(projectGraph);
@@ -289,12 +306,14 @@ describe('native workflow-form accordion', () => {
     }
   );
 
-  it('preserves a root row without headings', async () => {
+  it('preserves a root row without collapsible sections', async () => {
     const projectGraph = layoutGraph('row', true);
     const rootElement = projectGraph.form.elements.root!;
     if (rootElement.type === 'container') {
+      rootElement.data.layout = 'row';
       rootElement.data.children = ['first', 'second'];
     }
+    delete projectGraph.form.elements.section;
     await renderForm(projectGraph);
     const first = host.querySelector<HTMLInputElement>('input[aria-label="First value"]')!;
     const second = host.querySelector<HTMLInputElement>('input[aria-label="Second value"]')!;
@@ -310,24 +329,18 @@ describe('native workflow-form accordion', () => {
     expect(second.getBoundingClientRect().left).toBe(first.getBoundingClientRect().left);
   });
 
-  it('keeps a nested column independent from its parent row and reports descendant errors when closed', async () => {
+  it('keeps a nested collapsible independent and reports descendant errors when closed', async () => {
     const projectGraph = layoutGraph('row');
-    const group = projectGraph.form.elements.group!;
-    if (group.type === 'container') {
-      group.data.children.push('inner');
+    const section = projectGraph.form.elements.section!;
+    if (section.type === 'collapsible') {
+      section.data.children.push('inner');
     }
     Object.assign(projectGraph.form.elements, {
       inner: {
         id: 'inner',
-        type: 'container',
-        parentId: 'group',
-        data: { layout: 'column', children: ['inner-title', 'inner-a', 'inner-b', 'missing'] },
-      },
-      'inner-title': {
-        id: 'inner-title',
-        type: 'heading',
-        parentId: 'inner',
-        data: { collapsible: true, content: 'Inner column' },
+        type: 'collapsible',
+        parentId: 'section',
+        data: { content: 'Inner column', children: ['inner-a', 'inner-b', 'missing'] },
       },
       'inner-a': { id: 'inner-a', type: 'text', parentId: 'inner', data: { content: 'Nested first' } },
       'inner-b': { id: 'inner-b', type: 'text', parentId: 'inner', data: { content: 'Nested second' } },
@@ -347,12 +360,12 @@ describe('native workflow-form accordion', () => {
     expect(outer.element().textContent).toContain('Needs attention');
   });
 
-  it('toggles equal heading titles by identity without closing the other section', async () => {
+  it('toggles equal section titles by identity without closing the other section', async () => {
     const projectGraph = structuredClone(graph);
     for (const id of ['input', 'output']) {
-      const heading = projectGraph.form.elements[id]!;
-      if (heading.type === 'heading') {
-        heading.data.content = 'Repeated section';
+      const section = projectGraph.form.elements[id]!;
+      if (section.type === 'collapsible') {
+        section.data.content = 'Repeated section';
       }
     }
     await renderForm(projectGraph);
@@ -366,7 +379,7 @@ describe('native workflow-form accordion', () => {
     expect(triggers[1]!.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('restores expansion separately when two workflows reuse the same heading ids', async () => {
+  it('restores expansion separately when two workflows reuse the same section ids', async () => {
     const other = { ...structuredClone(graph), id: 'other-workflow' };
     await renderForm();
     await act(() => userEvent.click(page.getByRole('button', { name: 'Output section' })));
@@ -379,12 +392,12 @@ describe('native workflow-form accordion', () => {
     expect(snapshot.workflowValues.formSectionsOpen).toEqual({ [graph.id]: { output: false } });
   });
 
-  it('keeps long heading labels usable without widening a narrow form', async () => {
+  it('keeps long section labels usable without widening a narrow form', async () => {
     const projectGraph = layoutGraph('column', true);
-    const heading = projectGraph.form.elements.heading!;
+    const section = projectGraph.form.elements.section!;
     const label = 'A long heading that must fit the workflow panel '.repeat(6);
-    if (heading.type === 'heading') {
-      heading.data.content = label;
+    if (section.type === 'collapsible') {
+      section.data.content = label;
     }
     host.style.width = '280px';
     await renderForm(projectGraph);
@@ -423,17 +436,16 @@ describe('native workflow-form accordion', () => {
     const projectGraph = layoutGraph('column', true);
     const rootElement = projectGraph.form.elements.root!;
     if (rootElement.type === 'container') {
-      rootElement.data.children.push('boundary', 'additional', 'extra');
+      rootElement.data.children.push('additional');
     }
     Object.assign(projectGraph.form.elements, {
-      boundary: { id: 'boundary', type: 'divider', parentId: 'root' },
       additional: {
         id: 'additional',
-        type: 'heading',
+        type: 'collapsible',
         parentId: 'root',
-        data: { collapsible: true, content: 'Additional section' },
+        data: { content: 'Additional section', children: ['extra'] },
       },
-      extra: { id: 'extra', type: 'text', parentId: 'root', data: { content: 'Second section content' } },
+      extra: { id: 'extra', type: 'text', parentId: 'additional', data: { content: 'Second section content' } },
     });
     await renderForm(projectGraph, true);
     const first = page.getByRole('button', { name: 'Numeric section' });
@@ -461,156 +473,38 @@ describe('native workflow-form accordion', () => {
     expect(boundary().borderTopColor).toBe(getComputedStyle(nativeRoot, '::before').borderTopColor);
     await act(() => userEvent.click(first));
     await expect.poll(() => boundary().opacity).toBe('0');
-    await renderForm(layoutGraph('row', true));
-    const rowRoot = page
-      .getByRole('button', { name: 'Numeric section' })
-      .element()
-      .closest<HTMLElement>('[data-part="root"]')!;
-    expect(getComputedStyle(rowRoot, '::before').content).toBe('none');
   });
 
-  it.each([false, true])(
-    'keeps a single boundary across column wrappers (both wrapped: %s), including after moving a heading',
-    async (bothWrapped) => {
-      const projectGraph = layoutGraph('column');
-      const elements = projectGraph.form.elements;
-      const rootElement = elements.root!;
-      if (rootElement.type === 'container') {
-        rootElement.data.children = ['outer', ...(bothWrapped ? ['next'] : ['additional', 'extra'])];
-      }
-      elements.group!.parentId = 'outer';
-      Object.assign(elements, {
-        outer: {
-          id: 'outer',
-          type: 'container',
-          parentId: 'root',
-          data: { layout: 'column', children: ['group'] },
-        },
-        next: {
-          id: 'next',
-          type: 'container',
-          parentId: 'root',
-          data: { layout: 'column', children: ['additional', 'extra'] },
-        },
-        additional: {
-          id: 'additional',
-          type: 'heading',
-          parentId: bothWrapped ? 'next' : 'root',
-          data: { collapsible: true, content: 'Additional section' },
-        },
-        extra: {
-          id: 'extra',
-          type: 'text',
-          parentId: bothWrapped ? 'next' : 'root',
-          data: { content: 'Second section content' },
-        },
-      });
-      await renderForm(projectGraph);
-      const first = page.getByRole('button', { name: 'Numeric section' });
-      const second = page.getByRole('button', { name: 'Additional section' });
-      await act(() => userEvent.click(first));
-      expect(visibleBoundaries()).toHaveLength(0);
-      await act(() => userEvent.click(second));
-      await expect.poll(() => visibleBoundaries().length).toBe(1);
-      const expectCenteredBoundary = () => {
-        const boundary = visibleBoundaries()[0]!;
-        const top =
-          boundary.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(boundary, '::before').top);
-        const midpoint =
-          (first.element().getBoundingClientRect().bottom + second.element().getBoundingClientRect().top) / 2;
-        expect(Math.abs(top - midpoint)).toBeLessThanOrEqual(1);
-      };
-      expectCenteredBoundary();
-      await act(() => userEvent.click(first));
-      await expect.poll(() => visibleBoundaries().length).toBe(0);
-      await act(() => userEvent.click(first));
-      await expect.poll(() => visibleBoundaries().length).toBe(1);
-      await act(() => userEvent.click(second));
-      await expect.poll(() => visibleBoundaries().length).toBe(0);
-      await act(() => userEvent.click(second));
-      await expect.poll(() => visibleBoundaries().length).toBe(1);
-      if (rootElement.type === 'container') {
-        rootElement.data.layout = 'row';
-      }
-      await renderForm(structuredClone(projectGraph));
-      await expect.poll(() => visibleBoundaries().length).toBe(0);
-      if (rootElement.type === 'container') {
-        rootElement.data.layout = 'column';
-        rootElement.data.children.splice(1, 0, 'between');
-      }
-      elements.between = { id: 'between', type: 'text', parentId: 'root', data: { content: 'Visible interruption' } };
-      await renderForm(structuredClone(projectGraph));
-      await expect.poll(() => visibleBoundaries().length).toBe(0);
-      await expect.element(page.getByText('Visible interruption')).toBeVisible();
-      if (!bothWrapped && rootElement.type === 'container') {
-        rootElement.data.children = ['heading', 'outer', 'additional', 'extra'];
-        elements.heading!.parentId = 'root';
-        const group = elements.group!;
-        if (group.type === 'container') {
-          group.data.children = ['first', 'second'];
-        }
-        await renderForm(structuredClone(projectGraph));
-        await expect.poll(() => visibleBoundaries().length).toBe(1);
-        expectCenteredBoundary();
-      }
-    }
-  );
-
-  it('centers nested boundaries in their own body gap and does not leak through open or multi-item row wrappers', async () => {
+  it('keeps a single boundary across layout-only column wrappers and hides it when interrupted', async () => {
     const projectGraph = layoutGraph('column');
     const elements = projectGraph.form.elements;
     const rootElement = elements.root!;
     if (rootElement.type === 'container') {
-      rootElement.data.children = ['outer-heading', 'group', 'next'];
+      rootElement.data.children = ['group', 'additional'];
     }
     Object.assign(elements, {
-      'outer-heading': {
-        id: 'outer-heading',
-        type: 'heading',
-        parentId: 'root',
-        data: { collapsible: true, content: 'Outer section' },
-      },
-      next: {
-        id: 'next',
-        type: 'container',
-        parentId: 'root',
-        data: { layout: 'column', children: ['additional', 'extra'] },
-      },
       additional: {
         id: 'additional',
-        type: 'heading',
-        parentId: 'next',
-        data: { collapsible: true, content: 'Additional section' },
+        type: 'collapsible',
+        parentId: 'root',
+        data: { content: 'Additional section', children: ['extra'] },
       },
-      extra: { id: 'extra', type: 'text', parentId: 'next', data: { content: 'Second section content' } },
+      extra: { id: 'extra', type: 'text', parentId: 'additional', data: { content: 'Second section content' } },
     });
     await renderForm(projectGraph);
     await act(() => userEvent.click(page.getByRole('button', { name: 'Numeric section' })));
+    expect(visibleBoundaries()).toHaveLength(0);
     await act(() => userEvent.click(page.getByRole('button', { name: 'Additional section' })));
     await expect.poll(() => visibleBoundaries().length).toBe(1);
-    const boundary = visibleBoundaries()[0]!;
-    const first = page.getByRole('button', { name: 'Numeric section' }).element().getBoundingClientRect();
-    const second = page.getByRole('button', { name: 'Additional section' }).element().getBoundingClientRect();
-    const top = boundary.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(boundary, '::before').top);
-    expect(Math.abs(top - (first.bottom + second.top) / 2)).toBeLessThanOrEqual(1);
-    expect(getComputedStyle(boundary, '::before').top).toBe('-6px');
-    const outer = page.getByRole('button', { name: 'Outer section' });
-    await act(() => userEvent.click(outer));
-    await expect.poll(() => visibleBoundaries().length).toBe(0);
-    await act(() => userEvent.click(outer));
-    await expect.poll(() => visibleBoundaries().length).toBe(1);
-    const group = elements.group!;
-    if (group.type === 'container') {
-      group.data.layout = 'row';
-      group.data.children.unshift('before');
+    if (rootElement.type === 'container') {
+      rootElement.data.children.splice(1, 0, 'between');
     }
-    elements.before!.parentId = 'group';
+    elements.between = { id: 'between', type: 'text', parentId: 'root', data: { content: 'Visible interruption' } };
     await renderForm(structuredClone(projectGraph));
     await expect.poll(() => visibleBoundaries().length).toBe(0);
-    await expect.element(page.getByText('Before row')).toBeVisible();
   });
 
-  it('collapses only fields under the clicked heading, preserving errors and later siblings', async () => {
+  it('collapses only children of the clicked collapsible section, preserving errors and siblings outside it', async () => {
     await renderForm();
     expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
     const input = page.getByRole('button', { name: /^Input section/ });
@@ -624,7 +518,7 @@ describe('native workflow-form accordion', () => {
     expect(snapshot.workflowValues.formSectionsOpen).toEqual({ [graph.id]: { input: false } });
   });
 
-  it('restores the same heading state after remount and reopens from the keyboard', async () => {
+  it('restores the same section state after remount and reopens from the keyboard', async () => {
     await renderForm();
     const output = page.getByRole('button', { name: 'Output section' });
     await act(() => userEvent.click(output));
@@ -641,24 +535,8 @@ describe('native workflow-form accordion', () => {
     expect(snapshot.workflowValues.formSectionsOpen).toEqual({ [graph.id]: { output: true } });
   });
 
-  it('hides only inter-section dividers, leaves collapsed headers unfilled, and toggles headings between static and collapsible in Edit', async () => {
-    await renderForm();
-    const stack = host.querySelector<HTMLElement>('.chakra-stack')!;
-    expect(getComputedStyle(stack).gap).toBe('4px');
-    expect(host.querySelectorAll('[role="separator"]')).toHaveLength(1);
-
-    const input = page.getByRole('button', { name: /^Input section/ });
-    await act(() => userEvent.click(input));
-    await expect.element(input).toHaveAttribute('aria-expanded', 'false');
-    const section = input.element().closest<HTMLElement>('[data-scope="collapsible"][data-part="root"]')!;
-    expect(getComputedStyle(section).backgroundColor).toBe('rgba(0, 0, 0, 0)');
-
-    // Verify FormBuilderTab checkbox opts a static heading into and out of a collapsible section.
-    const initial = layoutGraph('column', true);
-    const heading = initial.form.elements.heading!;
-    if (heading.type === 'heading') {
-      delete heading.data.collapsible;
-    }
+  it('adds a collapsible container in FormBuilderTab and edits its title live in LinearFormView', async () => {
+    const initial = createProjectGraph('builder-collapsible-test');
     snapshot = { ...snapshot, projectGraph: initial };
 
     const BuilderAndView = () => {
@@ -698,16 +576,18 @@ describe('native workflow-form accordion', () => {
       root.render(<BuilderAndView />);
     });
 
-    const viewHost = host.querySelector<HTMLElement>('[data-testid="live-view"]')!;
-    expect(viewHost.querySelector('[data-scope="collapsible"]')).toBeNull();
-    expect(viewHost.textContent).toContain('Numeric section');
-    expect(getComputedStyle(viewHost.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('12px');
+    const addBtn = page.getByRole('button', { name: 'Add form element' });
+    await act(() => userEvent.click(addBtn));
+    const collapsibleItem = page.getByRole('menuitem', { name: 'Collapsible' });
+    await act(() => userEvent.click(collapsibleItem));
 
-    const checkbox = page.getByRole('checkbox', { name: 'Collapsible section' });
-    await expect.element(checkbox).not.toBeChecked();
-    await act(() => userEvent.click(checkbox));
-    await expect.element(checkbox).toBeChecked();
+    const viewHost = host.querySelector<HTMLElement>('[data-testid="live-view"]')!;
     expect(viewHost.querySelector('[data-scope="collapsible"]')).not.toBeNull();
     expect(getComputedStyle(viewHost.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
+
+    const titleInput = host.querySelector<HTMLInputElement>('input[aria-label="Section title"]')!;
+    expect(titleInput).not.toBeNull();
+    await act(() => userEvent.type(titleInput, 'Advanced settings'));
+    expect(viewHost.textContent).toContain('Advanced settings');
   });
 });

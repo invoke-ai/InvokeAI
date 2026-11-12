@@ -4797,6 +4797,7 @@
         "containerEmpty": "Empty container — drag cards here",
         "dropHere": "Drop here",
         "elements": {
+          "collapsible": "Collapsible",
           "containerColumn": "Container (column)",
           "containerRow": "Container (row)",
           "divider": "Divider",
@@ -4805,7 +4806,8 @@
           "text": "Text"
         },
         "empty": "The form is empty. Pin fields on nodes in the workflow editor to add them here, then drag cards by their title bars to arrange them.",
-        "collapsibleSection": "Collapsible section",
+        "collapsibleLabel": "Section title",
+        "collapsiblePlaceholder": "Section",
         "headingLabel": "Form heading",
         "headingPlaceholder": "Heading",
         "hideDescription": "Hide field description",
