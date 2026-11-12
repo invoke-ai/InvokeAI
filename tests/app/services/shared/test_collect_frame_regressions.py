@@ -1881,3 +1881,114 @@ def test_if_after_three_level_sibling_reiterate_keeps_sibling_value_once(
     runs = _collect_runs(graph, compatibility_scheduler, "out2")["out2"]
 
     assert runs == [((), ["rnp"]), ((0, 0), ["ra:['c']"])]
+
+
+def _values(runs: Runs) -> list[AnyValue]:
+    return _sorted_items([value for _, items in runs for value in items])
+
+
+def _sibling_reiterate_through_second_iterate(src: list[AnyValue], condition: str) -> Graph:
+    """`out` holds each `src` list plus the sibling's `["p"]`; it is re-iterated twice (`rit`, then `rit2` over each
+    list) and passed through an If whose condition is literal True or truthy per `rit2` item. (A root Boolean
+    condition is rejected here: the false branch has no `rit2` axis.)"""
+    per_item = condition == "per-item"
+    condition_nodes: list[BaseInvocation] = [Truthy(id="cond")] if per_item else []
+    condition_edges = "rit2.item -> cond.value\ncond.condition -> if.condition" if per_item else ""
+    return _graph(
+        src,
+        1,
+        [
+            Value(id="item"),
+            Concat(id="sibling_src", first=[["p"]]),
+            Iterate(id="sibling"),
+            Value(id="sibling_value"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Concat(id="rcc"),
+            Iterate(id="rit2"),
+            Marked(id="re", marker="r"),
+            Value(id="other", value="RR"),
+            If(id="if", condition=True),
+            Collect(id="out2"),
+            *condition_nodes,
+        ],
+        """
+        it0.item -> item.value
+        item.value -> out.item
+        sibling_src.collection -> sibling.collection
+        sibling.item -> sibling_value.value
+        sibling_value.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rcc.first
+        rcc.collection -> rit2.collection
+        rit2.item -> re.value
+        re.value -> if.true_input
+        other.value -> if.false_input
+        if.value -> out2.item
+        """
+        + condition_edges,
+    )
+
+
+@pytest.mark.parametrize(
+    ("src", "expected"),
+    [([["a", "b"], ["c"]], ["ra", "rb", "rc", "rp"]), ([[], ["c"]], ["rc", "rp"])],
+    ids=["filled-lists", "empty-list"],
+)
+@pytest.mark.parametrize("condition", ["literal", "per-item"])
+def test_if_after_sibling_reiterate_through_second_iterate_keeps_every_item(
+    src: list[AnyValue], expected: list[AnyValue], condition: str, compatibility_scheduler: bool
+) -> None:
+    """The If always selects `rit2`'s item, so out2 holds what it would without the If. The empty-list case stalled or
+    emptied every frame in some runs only (it depends on generated node ids), so it runs several times."""
+    for _ in range(10):
+        runs = _collect_runs(
+            _sibling_reiterate_through_second_iterate(src, condition), compatibility_scheduler, "out2"
+        )["out2"]
+
+        assert _values(runs) == expected
+
+
+def _outer_and_nested_frames_into_root_if(computed_condition: bool) -> Graph:
+    """`out` collects `it0`'s item and each nested `it1` item per `it0` frame (3 values, then 2); an If after
+    re-iterating it selects the root `RR` value."""
+    condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=False)] if computed_condition else []
+    return _graph(
+        [["x", "y"], ["z"]],
+        2,
+        [
+            Marked(id="outer", marker="o:"),
+            Marked(id="inner", marker="i:"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Marked(id="re", marker="r"),
+            Value(id="other", value="RR"),
+            If(id="if", condition=False),
+            Collect(id="out2"),
+            *condition_node,
+        ],
+        """
+        it0.item -> outer.value
+        outer.value -> out.item
+        it1.item -> inner.value
+        inner.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> re.value
+        re.value -> if.true_input
+        other.value -> if.false_input
+        if.value -> out2.item
+        """
+        + ("cond.value -> if.condition" if computed_condition else ""),
+    )
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_root_if_after_reiterating_outer_and_nested_frames_runs_once_per_item(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    """`rit` yields 5 items in all, so the If selects `RR` exactly 5 times."""
+    runs = _collect_runs(_outer_and_nested_frames_into_root_if(computed_condition), compatibility_scheduler, "out2")[
+        "out2"
+    ]
+
+    assert _values(runs) == ["RR"] * 5
