@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
 
-import { executeProjectFileJourney } from './run-project-file-journey.mjs';
+import { executeProjectFileJourney, observeBrowserErrors } from './run-project-file-journey.mjs';
 
 const delay = (durationMs) =>
   new Promise((resolve) => {
@@ -165,4 +165,25 @@ test('a browser error raised during teardown prevents a success result', async (
   );
 
   assert.equal(events.at(-1), 'temp:remove');
+});
+
+test('import waives only a missing archived video probe body cancellation after that request received its expected response', async () => {
+  const page = new EventEmitter();
+  const errors = [];
+  await observeBrowserErrors(page, 'import', errors);
+  const url = 'http://localhost/api/v1/videos/i/fixture-video-001.mp4';
+  const request = (target, errorText) => ({
+    url: () => target,
+    failure: () => ({ errorText }),
+  });
+  const missing = request(url, 'net::ERR_ABORTED');
+  page.emit('requestfailed', missing);
+  assert.equal(errors.length, 1, 'An abort without a known missing response remains critical');
+  page.emit('response', { url: () => url, status: () => 404, request: () => missing });
+  page.emit('requestfailed', missing);
+  assert.equal(errors.length, 1);
+  page.emit('requestfailed', request(url, 'net::ERR_ABORTED'));
+  page.emit('requestfailed', request(url, 'net::ERR_CONNECTION_REFUSED'));
+  page.emit('requestfailed', request(`${url}/full`, 'net::ERR_ABORTED'));
+  assert.equal(errors.length, 4, 'Another request, transport failure and media-content cancellation remain critical');
 });

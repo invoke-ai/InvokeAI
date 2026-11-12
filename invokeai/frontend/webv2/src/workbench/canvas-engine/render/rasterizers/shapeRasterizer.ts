@@ -1,6 +1,6 @@
 /**
- * Parametric shapes rasterize at source width/height; compositing applies transforms. Inset strokes by half-width
- * to contain outlines. Polygons with fewer than three vertices are refused.
+ * Parametric shapes rasterize at source width/height; compositing applies transforms. Fill and inside-only strokes
+ * share one silhouette mask, so acute and concave outlines contain the fill without color fringes.
  */
 
 import type { CanvasLayerSourceContract, ParametricShapeKind } from '@workbench/canvas-engine/contracts';
@@ -15,10 +15,7 @@ type Ctx = RasterSurface['ctx'];
 const STAR_INNER_RATIO = 0.382;
 const STAR_SPIKES = 5;
 
-/**
- * Shared raster/preview path inside an inset box, with round joins for sharp corners. Inset rescales the box
- * rather than uniformly offsetting edges, so slanted thick outlines may drift slightly beyond the fill silhouette.
- */
+/** The original shape silhouette, shared by rasterized fill, its clipped outline and the tool preview. */
 export const buildParametricShapePath = (
   ctx: Ctx,
   kind: ParametricShapeKind | 'polygon',
@@ -26,22 +23,15 @@ export const buildParametricShapePath = (
   y: number,
   width: number,
   height: number,
-  inset: number,
   points?: readonly { x: number; y: number }[]
 ): void => {
-  const w = Math.max(0, width - inset * 2);
-  const h = Math.max(0, height - inset * 2);
   const cx = x + width / 2;
   const cy = y + height / 2;
   ctx.beginPath();
   if (kind === 'polygon') {
-    // Vertices are stored across the un-inset box; rescale them into the
-    // inset one (the same box rescale the other kinds get).
-    const sx = width > 0 ? w / width : 1;
-    const sy = height > 0 ? h / height : 1;
     (points ?? []).forEach((point, index) => {
-      const px = x + inset + point.x * sx;
-      const py = y + inset + point.y * sy;
+      const px = x + point.x;
+      const py = y + point.y;
       if (index === 0) {
         ctx.moveTo(px, py);
       } else {
@@ -52,19 +42,19 @@ export const buildParametricShapePath = (
     return;
   }
   if (kind === 'ellipse') {
-    ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, width / 2, height / 2, 0, 0, Math.PI * 2);
     return;
   }
   if (kind === 'triangle') {
-    ctx.moveTo(cx, cy - h / 2);
-    ctx.lineTo(cx + w / 2, cy + h / 2);
-    ctx.lineTo(cx - w / 2, cy + h / 2);
+    ctx.moveTo(cx, cy - height / 2);
+    ctx.lineTo(cx + width / 2, cy + height / 2);
+    ctx.lineTo(cx - width / 2, cy + height / 2);
     ctx.closePath();
     return;
   }
   if (kind === 'star') {
-    const rx = w / 2;
-    const ry = h / 2;
+    const rx = width / 2;
+    const ry = height / 2;
     for (let i = 0; i < STAR_SPIKES * 2; i += 1) {
       const radius = i % 2 === 0 ? 1 : STAR_INNER_RATIO;
       const angle = -Math.PI / 2 + (i * Math.PI) / STAR_SPIKES;
@@ -79,10 +69,15 @@ export const buildParametricShapePath = (
     ctx.closePath();
     return;
   }
-  ctx.rect(x + inset, y + inset, w, h);
+  ctx.rect(x, y, width, height);
 };
 
-/** Shared fill-then-stroke drawing keeps shape rasterization and pixel placement consistent. */
+/**
+ * Draw into an isolated transparent target: the shape rasterizer clears it, and the Shape tool supplies fresh
+ * scratch pixels. With an outline, compose the styles first and mask them to the silhouette once; clipping the
+ * stroke over an already-antialiased fill would expose fill color along the exterior edge. The final mask clears
+ * everything outside the shape, so this must never draw directly over existing layer pixels.
+ */
 export const drawShapeSource = (
   ctx: Ctx,
   source: ShapeSource,
@@ -91,22 +86,36 @@ export const drawShapeSource = (
   width: number,
   height: number
 ): void => {
-  if (source.fill) {
+  const stroke = source.strokeWidth > 0 ? source.stroke : null;
+  if (!source.fill && !stroke) {
+    return;
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  buildParametricShapePath(ctx, source.kind, x, y, width, height, source.points);
+  if (stroke) {
+    if (source.fill) {
+      // Cover the target, not the transformed shape bounds: the silhouette must be its only antialiased edge.
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = source.fill;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = source.strokeWidth * 2;
+    ctx.lineJoin = source.kind === 'rect' || source.kind === 'ellipse' ? 'miter' : 'round';
+    ctx.stroke();
+    // Canvas strokes are centered; one mask keeps the inside half at the configured width and applies coverage once.
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#000000';
+    ctx.fill();
+  } else if (source.fill) {
     ctx.fillStyle = source.fill;
-    buildParametricShapePath(ctx, source.kind, x, y, width, height, 0, source.points);
     ctx.fill();
   }
-  if (source.stroke && source.strokeWidth > 0) {
-    ctx.strokeStyle = source.stroke;
-    ctx.lineWidth = source.strokeWidth;
-    // Round joins keep sharp vertices within the half-stroke inset (a miter
-    // would spike past it); a rect keeps its miter — the 90° tip lands exactly
-    // on the extent corner, and rounding it would re-render every stored rect.
-    ctx.lineJoin = source.kind === 'rect' || source.kind === 'ellipse' ? 'miter' : 'round';
-    // Inset by half the stroke width so the (centered) stroke stays inside the extent.
-    buildParametricShapePath(ctx, source.kind, x, y, width, height, source.strokeWidth / 2, source.points);
-    ctx.stroke();
-  }
+  ctx.restore();
 };
 
 export const rasterizeShapeSource = (

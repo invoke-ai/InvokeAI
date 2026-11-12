@@ -33,6 +33,7 @@ import {
   type SavedWorkflowDynamicField,
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
+import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
 import { isInvocationNode, isNotesNode } from './types';
 
 const now = (): string => new Date().toISOString();
@@ -536,6 +537,10 @@ const updateInvocationNodeToTemplate = (
     } else {
       droppedInputNames.push(name);
     }
+  }
+
+  if (isHiDiffusionNode(node.data.type) && template.inputs.hidiffusion_auto_ratios) {
+    normalizeHiDiffusionInputs(inputs, node.data.inputs, connectedInputNames);
   }
 
   const sourceVersion = parseVersion(node.data.version);
@@ -1097,7 +1102,14 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
 
       return setFieldInstance(nextDocument, action.nodeId, action.fieldName, (instance) => ({
         ...instance,
-        value: action.value,
+        value:
+          node &&
+          isInvocationNode(node) &&
+          isHiDiffusionNode(node.data.type) &&
+          isHiDiffusionRatioField(action.fieldName) &&
+          (action.value ?? null) === null
+            ? 0
+            : action.value,
       }));
     }
     case 'syncCallSavedWorkflowFields': {

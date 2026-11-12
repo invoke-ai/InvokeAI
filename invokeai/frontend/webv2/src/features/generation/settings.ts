@@ -11,11 +11,14 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
+  getDynamicPromptsConfig,
+  getDynamicPromptsSettingsPatch,
   getGenerateValuesRevertPatch,
   getModelDefaultVae,
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -38,6 +41,7 @@ export {
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeDynamicPromptsSettings,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
@@ -59,6 +63,7 @@ export {
   getGenerationUiPolicy,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
+  getReferenceImageLimit,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   isArchitectureDescribed,
@@ -67,6 +72,7 @@ export {
   isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  takesReferenceImages,
   NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
@@ -105,6 +111,7 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
@@ -114,6 +121,11 @@ export {
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
+export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
@@ -133,6 +145,7 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
   describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,

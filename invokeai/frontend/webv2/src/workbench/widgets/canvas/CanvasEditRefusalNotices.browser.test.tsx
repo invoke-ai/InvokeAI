@@ -75,7 +75,7 @@ const mount = async (layers: readonly CanvasNodeContract[], selectedLayerId: str
       </ChakraProvider>
     )
   );
-  const emit = (refusal: CanvasLayerEditRefusal) => act(() => listeners.forEach((listener) => listener(refusal)));
+  const emit = (refusal: CanvasEditRefusal) => act(() => listeners.forEach((listener) => listener(refusal)));
   return { emit, stub };
 };
 
@@ -90,16 +90,25 @@ describe('CanvasEditRefusalNotices', () => {
   it.each([
     ['layer-hidden', '“Sky” is hidden', 'Show the layer to edit it.'],
     ['layer-locked', '“Sky” is locked', 'Unlock the layer to edit it.'],
-    [
-      'layer-alpha-locked',
-      '“Sky” has its transparency locked',
-      'The eraser can’t remove pixels while transparency is locked.',
-    ],
+    ['layer-alpha-locked', '“Sky” has its transparency locked', 'Unlock its transparency to remove pixels from it.'],
     ['layer-loading', '“Sky” is still loading', 'Its pixels are on their way. Try again in a moment.'],
   ] as const)('explains a %s refusal with no offer', async (status, title, message) => {
     const { emit } = await mount([layerContract('sky', 'raster', { name: 'Sky' })], 'sky');
     await emit(refusal(status, 'sky', 'Sky'));
     await expect.poll(toastTexts).toEqual([{ actions: [], message, title }]);
+  });
+
+  it('explains a shape cutout with nothing to cut from, once however often it is pressed', async () => {
+    const { emit } = await mount([], null);
+    await emit({ status: 'cutout-no-target' });
+    await emit({ status: 'cutout-no-target' });
+    await expect.poll(toastTexts).toEqual([
+      {
+        actions: [],
+        message: 'Select a paint layer or mask to cut the shape out of it.',
+        title: 'Nothing to cut the shape out of',
+      },
+    ]);
   });
 
   it('replaces a repeated refusal without an offer, one toast per layer and reason', async () => {

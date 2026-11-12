@@ -75,11 +75,13 @@ export const createTextTool = (): Tool => ({
     ctx.cancelTextEdit?.();
   },
   onKeyCommand: (ctx, command) => {
-    // Direct harness cancellation is a backstop; production Escape uses the engine ladder. Apply needs portal
-    // content and does nothing here.
-    if (command === 'cancel') {
-      ctx.cancelTextEdit?.();
+    // The engine ladder's text rung cancels an open session before the tool is asked, so this is a backstop. Apply
+    // needs portal content and does nothing here.
+    if (command !== 'cancel' || !ctx.stores.textEditSession.get()) {
+      return false;
     }
+    ctx.cancelTextEdit?.();
+    return true;
   },
   onPointerDown: (ctx, input) => {
     if ((input.buttons & PRIMARY_BUTTON) === 0) {

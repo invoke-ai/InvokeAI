@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.auth.token_service import TokenData
@@ -52,6 +52,15 @@ def test_download_images_from_board_id_empty_image_name_list(
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"board_id": "test"})
+    json_response = response.json()
+    assert response.status_code == 202
+    assert json_response["bulk_download_item_name"] == "test.zip"
+
+
+def test_download_uncategorized_board(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_download_images_test(monkeypatch, mock_invoker)
+
+    response = client.post("/api/v1/images/download", json={"board_id": "none"})
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
@@ -840,6 +849,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/gallery/usage",
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",

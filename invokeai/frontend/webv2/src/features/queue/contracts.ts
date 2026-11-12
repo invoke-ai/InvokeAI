@@ -5,7 +5,9 @@
 export type {
   QueueHistoryItemStatus,
   QueueItem,
+  QueueRunErrorCode,
   QueueState,
+  QueueSubmissionRetry,
   QueueSubmissionSnapshot,
   RunRecord,
 } from './core/historyTypes';

@@ -9,8 +9,12 @@ import type { LayerStackRows, LayerStackRowsByKind, LayerTreeRow } from './layer
 export const LAYER_ROW_HEIGHT_PX = 40;
 export const LAYER_CHILD_ROW_HEIGHT_PX = 32;
 export const LAYER_HEADER_HEIGHT_PX = 28;
-/** Horizontal offset per nesting level, in CSS pixels; the drag projection uses the same step. */
-export const LAYER_TREE_INDENT_PX = 16;
+/**
+ * Horizontal offset per nesting level, in CSS pixels; the drag projection uses the same step. A level's guide line
+ * runs under the centre of its rows' 32px leading box, 22px past their edge, so this step leaves the branch into the
+ * next level a short straight run after its rounded corner.
+ */
+export const LAYER_TREE_INDENT_PX = 28;
 /** Above this many nodes the panel drops thumbnails and drag reordering to stay deterministic. */
 export const LAYER_PANEL_DEGRADE_THRESHOLD = 2_000;
 
@@ -35,6 +39,8 @@ export type PanelRow =
       /** Position among the parent group's COMBINED children (modifier rows first, then nodes). */
       readonly ariaPosInSet: number;
       readonly ariaSetSize: number;
+      /** The connector lines this row draws, as `TREE_GUIDE` glyphs. */
+      readonly guides: string;
     }
   | {
       readonly kind: 'child';
@@ -43,7 +49,47 @@ export type PanelRow =
       readonly child: ProjectedChildRow;
       /** The owner's combined child count (rows + node children) for a group owner. */
       readonly ariaSetSize: number;
+      /** The connector lines this row draws, as `TREE_GUIDE` glyphs. */
+      readonly guides: string;
     };
+
+/**
+ * Tree guide glyphs, one per nesting column from the outermost in. A row at depth `d` fills columns `0..d-1`:
+ * `TREE_GUIDE.pass` where an ancestor's line runs on past it, a space where that ancestor's visible children
+ * already ended, then `tee` or `elbow` for the branch from its parent (more visible siblings follow, or none do).
+ * Column `d` holds `stem` when the row's own visible children follow it. Stack headers are headings, not
+ * parents: top-level rows get no branch.
+ */
+export const TREE_GUIDE = { elbow: '└', pass: '│', stem: '╷', tee: '├' } as const;
+
+/** Guides for one stack's visible rows in order, from their depths, in two linear passes. */
+const treeGuides = (depths: readonly number[]): string[] => {
+  const last: boolean[] = [];
+  // Whether a row at each depth sits below the current one under the same parent, scanning upward.
+  const siblingBelow: boolean[] = [];
+  for (let index = depths.length - 1; index >= 0; index -= 1) {
+    const depth = depths[index]!;
+    last[index] = !siblingBelow[depth];
+    siblingBelow.length = depth + 1;
+    siblingBelow[depth] = true;
+  }
+  // Whether each column's line continues below the most recent row branching from it, scanning downward.
+  const continues: boolean[] = [];
+  return depths.map((depth, index) => {
+    let guides = '';
+    for (let column = 0; column < depth - 1; column += 1) {
+      guides += continues[column] ? TREE_GUIDE.pass : ' ';
+    }
+    if (depth > 0) {
+      guides += last[index] ? TREE_GUIDE.elbow : TREE_GUIDE.tee;
+      continues[depth - 1] = !last[index];
+    }
+    if ((depths[index + 1] ?? -1) > depth) {
+      guides += TREE_GUIDE.stem;
+    }
+    return guides;
+  });
+};
 
 /** How a flattening projects child rows beneath the layers that own them. */
 export interface PanelChildRowsSource {
@@ -82,6 +128,8 @@ export const flattenPanelRows = (
       stack,
     });
     if (!collapsed) {
+      const stackRows: Exclude<PanelRow, { kind: 'header' }>[] = [];
+      const depths: number[] = [];
       const rowOffsetByParent = new Map<string, number>();
       for (const row of stack.rows) {
         const isGroup = row.vm.kind === 'group';
@@ -92,23 +140,30 @@ export const flattenPanelRows = (
         if (isGroup && childrenExpanded) {
           rowOffsetByParent.set(row.id, children.length);
         }
-        rows.push({
+        stackRows.push({
           ariaPosInSet: row.posInSet + offset,
           ariaSetSize: row.setSize + offset,
           childCount: children.length,
           childrenExpanded,
+          guides: '',
           key: row.id,
           kind: 'node',
           row,
           stack: kind,
         });
+        depths.push(row.vm.depth);
         if (childrenExpanded) {
           const combined = isGroup ? children.length + row.vm.childCount : children.length;
           for (const child of children) {
-            rows.push({ ariaSetSize: combined, child, key: child.key, kind: 'child', stack: kind });
+            stackRows.push({ ariaSetSize: combined, child, guides: '', key: child.key, kind: 'child', stack: kind });
+            depths.push(child.depth);
           }
         }
       }
+      const guides = treeGuides(depths);
+      stackRows.forEach((row, index) => {
+        rows.push(guides[index] ? { ...row, guides: guides[index] } : row);
+      });
     }
   }
   return rows;

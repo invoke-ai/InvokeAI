@@ -11,7 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
-import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
+import type { ExpandedPositivePrompts, InvocationSourceId } from '@workbench/invocationContracts';
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
@@ -26,12 +26,14 @@ import { galleryKeys } from '@features/gallery/queries';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { getWorkflowGeneratorKey } from '@features/workflow/utility';
 import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
+import { createInstance } from 'i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
@@ -39,6 +41,8 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { createEmptyCanvasDocument } from './canvasMigration';
 import { MAX_CANVAS_SNAPSHOTS } from './canvasProjectMutations';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
+import { getDynamicPromptsExpansionSource } from './invocation';
+import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import {
   createLayoutPresetSnapshot,
@@ -65,6 +69,15 @@ import {
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
+
+/** What the caller would have expanded the project's prompt from, as it hands that to the resolved submission. */
+const preparedExpansionSource = (state: WorkbenchState, sourceId: InvocationSourceId) => {
+  const source = getDynamicPromptsExpansionSource(getActiveProject(state), sourceId);
+
+  return source
+    ? { combinatorial: source.combinatorial, maxPrompts: source.maxPrompts, positivePrompt: source.positivePrompt }
+    : undefined;
+};
 
 const generationDeviceMock = vi.hoisted(() => ({
   options: [] as { device: string; name: string }[],
@@ -260,6 +273,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
+  qwen3VLVisionTowerModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
   animaInpaintAdapterEnabled: true,
@@ -483,7 +497,12 @@ const primeGenerate = (
 ) => workbenchReducer(state, { type: 'setGenerateSettings', values: createGenerateValues(overrides) });
 
 const submitGenerate = (state: WorkbenchState) =>
-  workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
+  workbenchReducer(state, {
+    backendSupportsCancellation: true,
+    projectId: state.activeProjectId,
+    route: getActiveProject(state).invocation,
+    type: 'submitResolvedInvocationSnapshot',
+  });
 
 describe('Invoke Front', () => {
   const getQueuedSnapshot = (state: WorkbenchState) => getActiveProject(state).queue.items[0]?.snapshot;
@@ -587,6 +606,67 @@ const listGalleryBoardsInCache = (...boardIds: string[]) =>
       videoCount: 0,
     }))
   );
+
+describe('explicit submission runtime inputs', () => {
+  it('keeps graph, device, destination and seed planning independent of later cache changes', () => {
+    let state = primeGenerate(undefined, { batchCount: 3, seed: 42, seedMode: 'increment' });
+    state = workbenchReducer(state, { settings: { useCpuNoise: false }, type: 'setActiveProjectSettings' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'captured-board' }, type: 'updateGallerySettings' });
+    listGalleryBoardsInCache('captured-board');
+    generationDeviceMock.options = [{ device: 'xpu:0', name: 'Arc' }];
+    const runtime = captureInvocationRuntimeInputs('generate');
+    const action = {
+      backendSupportsCancellation: true,
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
+      runtime,
+      type: 'submitResolvedInvocationSnapshot' as const,
+    };
+    // Hold incidental graph identities stable; stepping seeds still come from the project.
+    const time = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.25);
+    let before: WorkbenchState;
+    let after: WorkbenchState;
+    try {
+      before = workbenchReducer(state, action);
+      generationDeviceMock.options = [{ device: 'cuda:0', name: 'RTX' }];
+      listGalleryBoardsInCache('different-board');
+      after = workbenchReducer(state, action);
+    } finally {
+      time.mockRestore();
+      random.mockRestore();
+    }
+
+    expect(getQueuedRandDevice(after)).toBe('xpu');
+    const first = getActiveProject(before).queue.items[0]!.snapshot;
+    const second = getActiveProject(after).queue.items[0]!.snapshot;
+    expect(second.galleryBoardId).toBe('captured-board');
+    expect(second.backendSubmission).toEqual(first.backendSubmission);
+    expect(second.backendSubmission).toMatchObject({ kind: 'generate', seed: 42, seedStep: 1, batchCount: 3 });
+    expect(getProjectWidgetValues(getActiveProject(after), 'generate').seed).toBe(45);
+    expect(getActiveProject(after).queue.items).toHaveLength(1);
+
+    // A later submission captures the refreshed cache rather than retaining permission indefinitely.
+    const refreshed = workbenchReducer(after, { ...action, runtime: captureInvocationRuntimeInputs('generate') });
+    expect(getQueuedRandDevice(refreshed)).toBe('cuda');
+    expect(getActiveProject(refreshed).queue.items[0]!.snapshot.galleryBoardId).toBe('none');
+    expect(getProjectWidgetValues(getActiveProject(refreshed), 'generate').seed).toBe(48);
+  });
+
+  it('applies the current project CPU-noise preference to the captured GPU device', () => {
+    let state = primeGenerate();
+    const runtime = { ...captureInvocationRuntimeInputs('generate'), noiseDevice: 'xpu' };
+    state = workbenchReducer(state, { settings: { useCpuNoise: true }, type: 'setActiveProjectSettings' });
+    const next = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
+      runtime,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+    expect(getQueuedRandDevice(next)).toBe('cpu');
+  });
+});
 
 describe('project output filters', () => {
   it('queues the NSFW checker as the generate output when the project turns it on', () => {
@@ -1521,6 +1601,60 @@ describe('adopting a project from another realm', () => {
     const normalized = normalizeWorkbenchProject(project, { isArriving: false });
 
     expect(normalized.queue).toBe(project.queue);
+  });
+
+  it('keeps the failed submission of a run until the backend accepts it or the run ends', () => {
+    let state = submitGenerate(primeGenerate());
+    const projectId = state.activeProjectId;
+    const queueItemId = getActiveProject(state).queue.items[0]!.id;
+    const recordRetry = (current: WorkbenchState) =>
+      workbenchReducer(current, {
+        projectId,
+        queueItemId,
+        retry: {
+          failedAt: 2_000,
+          failureCount: 1,
+          message: 'unavailable',
+          reason: 'unavailable',
+          serverErrorCount: 0,
+          serverErrorSince: null,
+          status: 503,
+        },
+        type: 'recordQueueItemSubmissionRetry',
+      });
+
+    state = recordRetry(state);
+    expect(getActiveProject(state).queue.items[0]?.submissionRetry).toMatchObject({
+      reason: 'unavailable',
+      status: 503,
+    });
+    expect(recordRetry(state)).toBe(state);
+
+    const accepted = workbenchReducer(state, {
+      backendItemIds: [42],
+      projectId,
+      queueItemId,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    expect(getActiveProject(accepted).queue.items[0]).not.toHaveProperty('submissionRetry');
+    // A late answer to an earlier attempt does not bring it back.
+    expect(recordRetry(accepted)).toBe(accepted);
+
+    const failed = workbenchReducer(state, {
+      error: 'graph validation crashed',
+      projectId,
+      queueItemId,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    const cancelled = workbenchReducer(state, { notice: null, projectId, queueItemId, type: 'cancelQueueItem' });
+    for (const [ended, status] of [
+      [failed, 'failed'],
+      [cancelled, 'cancelled'],
+    ] as const) {
+      expect(getActiveProject(ended).queue.items[0]).toMatchObject({ status });
+      expect(getActiveProject(ended).queue.items[0]).not.toHaveProperty('submissionRetry');
+    }
   });
 
   it('preserves and routes live queue work when server content replaces a project', () => {
@@ -3982,6 +4116,53 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications[0]).not.toHaveProperty('actions');
   });
 
+  it.each([
+    ['invalid-submission', 'Queue item has malformed workflow seed metadata.', 'invalidSubmissionMessage'],
+    ['not-accepted', 'The backend queue did not accept this generation. The queue may be full.', 'notAcceptedMessage'],
+    ['project-not-saved', 'This run was not submitted because its project cannot be saved.', 'projectNotSavedMessage'],
+    ['server-error', 'graph validation crashed', 'serverErrorMessage'],
+  ] as const)(
+    'words a %s failure through a translation key, quoting the error as its reason',
+    (errorCode, error, key) => {
+      const englishCatalog = import.meta.glob('../../public/locales/en.json', { eager: true, import: 'default' });
+      const english = createInstance();
+      void english.init({
+        initAsync: false,
+        interpolation: { escapeValue: false },
+        lng: 'en',
+        resources: { en: { translation: Object.values(englishCatalog)[0] as Record<string, unknown> } },
+      });
+      const messageKey = `notifications.runOutcome.${key}`;
+      let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+      const project = getActiveProject(state);
+      const failRun = (queueItemId: string) =>
+        workbenchReducer(state, {
+          error,
+          errorCode,
+          projectId: project.id,
+          queueItemId,
+          status: 'failed',
+          type: 'setQueueItemStatus',
+        });
+
+      state = failRun(project.queue.items[0]!.id);
+      const labeled = state.notifications[0]!;
+      expect(labeled).toMatchObject({
+        messageKey,
+        messageValues: { label: 'A lighthouse in a storm', reason: error },
+        titleKey: 'notifications.runOutcome.failed',
+      });
+      // The English stand-in is what the catalog says, so the notice reads the same before and after translation.
+      expect(english.t(messageKey, labeled.messageValues)).toBe(labeled.message);
+
+      // A run that already left the project's queue has no prompt to name.
+      state = failRun('run-no-longer-in-the-queue');
+      const unlabeled = state.notifications[0]!;
+      expect(unlabeled).toMatchObject({ messageKey: `${messageKey}Unlabeled`, messageValues: { reason: error } });
+      expect(english.t(`${messageKey}Unlabeled`, unlabeled.messageValues)).toBe(unlabeled.message);
+    }
+  );
+
   it('reports a failure no backend item explains without follow-ups it cannot offer', () => {
     let state = submitGenerate(primeGenerate());
     const project = getActiveProject(state);
@@ -4366,6 +4547,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const submitResolvedTo = (primed: WorkbenchState, positivePrompts?: string[]) =>
       workbenchReducer(primed, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(primed, 'generate'),
         positivePrompts,
         projectId: primed.activeProjectId,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -4418,6 +4600,105 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
         positivePrompts: ['a cat, red tint', 'a cat, green tint'],
       });
+    });
+  });
+
+  describe('expanded Video prompts on the compiled submission', () => {
+    const wanModel: ModelConfig = {
+      base: 'wan',
+      file_size: 1,
+      format: 'diffusers',
+      hash: 'wan-t2v-hash',
+      key: 'wan-t2v_a14b-diffusers',
+      name: 'Wan 2.2 t2v_a14b',
+      path: 'wan-t2v_a14b-diffusers',
+      source: 'wan-t2v_a14b-diffusers',
+      source_type: 'path',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const submitVideo = (
+      values: Record<string, unknown>,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed: number | null = null
+    ) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        region: 'left',
+        type: 'toggleRegionWidget',
+        widgetId: 'video',
+      });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { model: wanModel, positivePrompt: 'a {red|green} fox', ...values },
+        widgetId: 'video',
+      });
+
+      return workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'video'),
+        models: [wanModel],
+        positivePrompts,
+        positivePromptsSampleSeed,
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+    };
+
+    it('queues one video per expanded prompt', () => {
+      const queueItem = getActiveProject(submitVideo({}, ['a red fox', 'a green fox'])).queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+        kind: 'generate',
+        positivePrompts: ['a red fox', 'a green fox'],
+      });
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(2);
+    });
+
+    it('drops an expansion and queues the prompt as typed with dynamic prompts off', () => {
+      const queueItem = getActiveProject(submitVideo({ dynamicPromptsEnabled: false }, ['a red fox', 'a green fox']))
+        .queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({ positivePrompt: 'a {red|green} fox' });
+      expect(queueItem?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(1);
+    });
+
+    it('recalls the random sample the expansion drew and rotates the widget to a new one', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: 7 },
+          ['a green fox'],
+          7
+        );
+        const project = getActiveProject(state);
+
+        expect(project.queue.items[0]?.snapshot.recall?.videoValues?.dynamicPromptsSampleSeed).toBe(7);
+        expect(getProjectWidgetValues(project, 'video').dynamicPromptsSampleSeed).toBe(Math.floor(0.5 * 4_294_967_295));
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    // A project saved before Video stored a sample seed draws with 0, the seed it normalizes to.
+    it('rotates a sample seed the stored values never held', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: undefined },
+          ['a green fox'],
+          0
+        );
+
+        expect(getProjectWidgetValues(getActiveProject(state), 'video').dynamicPromptsSampleSeed).toBe(
+          Math.floor(0.5 * 4_294_967_295)
+        );
+      } finally {
+        random.mockRestore();
+      }
     });
   });
 
@@ -4507,6 +4788,147 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
+
+    it('validates and compiles with captured templates after the template store changes', () => {
+      const state = primeWorkflow(42, 'increment');
+      const runtime = captureInvocationRuntimeInputs('workflow');
+      workflowTemplatesMock.snapshot = { error: 'reloading', status: 'error', templates: {} };
+      const next = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'workflow', sourceLocked: false },
+        runtime,
+        type: 'submitResolvedInvocationSnapshot',
+      });
+      expect(readSubmission(next)).toMatchObject({
+        kind: 'workflow',
+        batchCount: 3,
+        graph: { nodes: { 'noise-1': { seed: 42 } } },
+        seeds: [{ fieldName: 'seed', nodeId: 'noise-1', seed: 42, seedStep: 1 }],
+      });
+      expect(readNodeSeed(next)).toBe(45);
+      expect(getActiveProject(next).queue.items).toHaveLength(1);
+
+      const rejected = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        projectId: state.activeProjectId,
+        route: getActiveProject(state).invocation,
+        runtime: { ...runtime, templates: { error: null, status: 'loading', templates: {} } },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+      expect(getActiveProject(rejected).queue.items).toEqual([]);
+      expect(readNodeSeed(rejected)).toBe(42);
+    });
+
+    it('does not enqueue or advance seeds when a workflow generator changed during preparation', () => {
+      let state = primeWorkflow(42, 'increment');
+      const field = (name: string, typeName: string) => ({
+        ...seedTemplate.inputs.seed,
+        default: undefined,
+        maximum: null,
+        minimum: null,
+        name,
+        title: name,
+        type: { batch: false, cardinality: 'SINGLE' as const, name: typeName },
+      });
+      const template = (type: string, inputs: Record<string, unknown>) => ({ ...seedTemplate, inputs, type });
+      workflowTemplatesMock.snapshot = {
+        error: null,
+        status: 'loaded',
+        templates: {
+          noise: seedTemplate,
+          string: template('string', { value: field('value', 'StringField') }),
+          string_batch: template('string_batch', {
+            batch_group_id: { ...field('batch_group_id', 'EnumField'), default: 'None', options: ['None'] },
+            strings: {
+              ...field('strings', 'StringField'),
+              default: [],
+              type: { batch: true, cardinality: 'COLLECTION', name: 'StringField' },
+            },
+          }),
+          string_generator: template('string_generator', { generator: field('generator', 'StringGeneratorField') }),
+        },
+      };
+      const generator = {
+        input: 'a {red|green} cat',
+        maxPrompts: 4,
+        type: 'string_generator_dynamic_prompts_combinatorial' as const,
+      };
+      for (const [id, type, inputs] of [
+        ['generator-1', 'string_generator', { generator }],
+        ['batch-1', 'string_batch', { batch_group_id: 'None' }],
+        ['string-1', 'string', { value: 'static' }],
+      ] as const) {
+        state = workbenchReducer(state, {
+          action: {
+            node: {
+              data: {
+                inputs: Object.fromEntries(
+                  Object.entries(inputs).map(([name, value]) => [name, { label: '', name, value }])
+                ),
+                isIntermediate: true,
+                isOpen: true,
+                label: '',
+                nodePack: 'invokeai',
+                notes: '',
+                type,
+                useCache: true,
+                version: '1.0.0',
+              },
+              id,
+              position: { x: 0, y: 0 },
+              type: 'invocation',
+            },
+            type: 'addNode',
+          },
+          type: 'applyWorkflowAction',
+        });
+      }
+      for (const [source, sourceHandle, target, targetHandle] of [
+        ['generator-1', 'strings', 'batch-1', 'strings'],
+        ['batch-1', 'value', 'string-1', 'value'],
+      ] as const) {
+        state = workbenchReducer(state, {
+          action: {
+            edge: { id: `${source}->${target}`, source, sourceHandle, target, targetHandle, type: 'default' },
+            type: 'addEdge',
+          },
+          type: 'applyWorkflowAction',
+        });
+      }
+      const submission = {
+        backendSupportsCancellation: true,
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'workflow', sourceLocked: false },
+        runtime: captureInvocationRuntimeInputs('workflow'),
+        type: 'submitResolvedInvocationSnapshot',
+        workflowGenerators: {
+          'generator-1': { items: ['a red cat', 'a green cat'], key: getWorkflowGeneratorKey(generator) },
+        },
+        workflowId: getActiveProject(state).workflows.activeWorkflowId,
+      } satisfies WorkbenchAction;
+      const valid = workbenchReducer(state, submission);
+      expect(readSubmission(valid)).toMatchObject({
+        batchData: [[{ fieldName: 'value', items: ['a red cat', 'a green cat'], nodeId: 'string-1' }]],
+        kind: 'workflow',
+      });
+      expect(getActiveProject(valid).queue.items).toHaveLength(1);
+      expect(readNodeSeed(valid)).toBe(48);
+
+      state = workbenchReducer(state, {
+        action: {
+          fieldName: 'generator',
+          nodeId: 'generator-1',
+          type: 'setFieldValue',
+          value: { ...generator, input: 'a {black|white} dog' },
+        },
+        type: 'applyWorkflowAction',
+        workflowId: submission.workflowId,
+      });
+      const rejected = workbenchReducer(state, submission);
+      expect(getActiveProject(rejected).queue.items).toEqual([]);
+      expect(readNodeSeed(rejected)).toBe(42);
+    });
 
     it('compiles Auto boards to the auto-add board, leaves None unboarded, and keeps results off the selection', () => {
       const boardTemplate = {
@@ -4996,6 +5418,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'generate'),
         positivePrompts,
         positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -5229,7 +5652,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       state = workbenchReducer(state, {
         backendSupportsCancellation: true,
         models: [wanModel],
-        type: 'submitInvocationSnapshot',
+        projectId: state.activeProjectId,
+        route: getActiveProject(state).invocation,
+        type: 'submitResolvedInvocationSnapshot',
       });
 
       expect(readSubmission(state)).toMatchObject({ batchCount: 3, seed: 7, seedStep: -1 });
@@ -5293,7 +5718,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             positivePrompt: 'a {red|green} cat',
           });
           // Canvas is told the sample its expansion drew, as Generate is.
-          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const drawn = {
+            expandedFrom: { combinatorial: false, maxPrompts: 100, positivePrompt: 'a {red|green} cat' },
+            positivePrompts: ['a green cat'],
+            positivePromptsSampleSeed: 7,
+          };
           const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
           const rotated = Math.floor(0.5 * SEED_MAX);
 
@@ -5505,7 +5934,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       models: [wanModel],
-      type: 'submitInvocationSnapshot',
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
+      type: 'submitResolvedInvocationSnapshot',
     });
 
     const submission = getActiveProject(state).queue.items[0]?.snapshot.recall?.videoValues;
@@ -9581,9 +10012,22 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(getActiveProject(state).queue.items[0]?.status).toBe('completed');
   });
 
-  it('submitCanvasInvocationSnapshot enqueues a pre-compiled graph bound for the canvas', () => {
+  it('enqueues a Canvas expansion with detached authored metadata and the actual sample seed for recall', () => {
+    const initial = createInitialWorkbenchState();
+    const canvas = structuredClone(getCanvas(initial));
+    canvas.document.bbox = { height: 48, width: 32, x: 17, y: 23 };
+    const recordedCanvas = {
+      controlModels: {},
+      document: canvas.document,
+      settings: { strength: 0.75 },
+      version: 1,
+    };
     const graph: GraphContract = {
-      backendGraph: { edges: [], id: 'canvas-backend-graph', nodes: {} },
+      backendGraph: {
+        edges: [],
+        id: 'canvas-backend-graph',
+        nodes: { metadata: { canvas_v3_metadata: recordedCanvas, id: 'metadata', type: 'core_metadata' } },
+      },
       edges: [],
       id: 'canvas-graph',
       label: 'Canvas',
@@ -9592,23 +10036,27 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       version: 1,
     };
 
-    const initial = createInitialWorkbenchState();
+    const values = createGenerateValues({
+      dynamicPromptsCombinatorial: false,
+      dynamicPromptsSampleSeed: 99,
+      negativePrompt: 'avoid blur',
+      positivePrompt: 'inpaint {red|green} cat',
+      seed: 42,
+      seedMode: 'fixed',
+    });
     const state = workbenchReducer(initial, {
       backendSupportsCancellation: true,
-      canvas: structuredClone(getCanvas(initial)),
+      canvas,
       destination: 'canvas',
       generate: {
         negativePromptNodeId: 'negative_prompt',
         positivePromptNodeId: 'positive_prompt',
         seedNodeId: 'seed',
-        values: createGenerateValues({
-          negativePrompt: 'avoid blur',
-          positivePrompt: 'inpaint prompt',
-          seed: 42,
-          seedMode: 'fixed',
-        }),
+        values,
       },
       graph,
+      positivePrompts: ['inpaint green cat'],
+      positivePromptsSampleSeed: 7,
       projectId: initial.activeProjectId,
       type: 'submitCanvasInvocationSnapshot',
     });
@@ -9618,9 +10066,12 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(queueItem?.snapshot.sourceId).toBe('canvas');
     expect(queueItem?.snapshot.destination).toBe('canvas');
     expect(queueItem?.snapshot.graph).toEqual({ id: 'canvas-graph', label: 'Canvas' });
+    expect(queueItem?.snapshot.recall?.canvasMetadata).toEqual({ canvas_v3_metadata: recordedCanvas });
+    expect(queueItem?.snapshot.recall?.canvasMetadata?.canvas_v3_metadata).not.toBe(recordedCanvas);
     expect(queueItem?.snapshot.recall?.generateValues).toMatchObject({
+      dynamicPromptsSampleSeed: 7,
       negativePrompt: 'avoid blur',
-      positivePrompt: 'inpaint prompt',
+      positivePrompt: 'inpaint {red|green} cat',
       seed: 42,
       seedMode: 'fixed',
     });
@@ -9632,14 +10083,30 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       kind: 'generate',
       negativePrompt: 'avoid blur',
       negativePromptNodeId: 'negative_prompt',
-      positivePrompt: 'inpaint prompt',
+      positivePrompt: 'inpaint {red|green} cat',
       positivePromptNodeId: 'positive_prompt',
+      positivePrompts: ['inpaint green cat'],
       seed: 42,
       seedNodeId: 'seed',
       seedStep: 0,
     });
     expect(queueItem?.snapshot.resultNodeIds).toEqual(['canvas_output']);
     expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
+
+    canvas.document.bbox.x = 999;
+    recordedCanvas.settings.strength = 0.1;
+    values.positivePrompt = 'later prompt';
+    values.dynamicPromptsSampleSeed = 101;
+
+    expect(queueItem?.snapshot.recall?.canvasMetadata?.canvas_v3_metadata).toMatchObject({
+      document: { bbox: { height: 48, width: 32, x: 17, y: 23 } },
+      settings: { strength: 0.75 },
+      version: 1,
+    });
+    expect(queueItem?.snapshot.recall?.generateValues).toMatchObject({
+      dynamicPromptsSampleSeed: 7,
+      positivePrompt: 'inpaint {red|green} cat',
+    });
   });
 
   it('queues the frozen canvas supplied by an immutable canvas invocation instead of cloning live state', () => {

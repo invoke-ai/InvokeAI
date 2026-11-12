@@ -2,8 +2,9 @@ import gc
 import json
 import mmap
 import traceback
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Iterator, Literal
 
 import torch
 from PIL import Image as PILImage
@@ -20,9 +21,18 @@ from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    AUTOCAST_MODULE_TYPE_MAPPING,
+    BNB_LINEAR_TYPE_MAPPING,
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.model_manager.taxonomy import ModelFormat
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import QWEN_IMAGE_LORA_QWEN_VL_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_preprocessor_config_dict,
     tokenizer_can_encode,
@@ -64,6 +74,18 @@ _IMAGE_PLACEHOLDER = "<|vision_start|><|image_pad|><|vision_end|>"
 # The encoder as handed from a loader to `_encode`: the model, the device to run it on, and a callback that releases
 # it when `_encode` is done.
 _LoadedEncoder = tuple[torch.nn.Module, torch.device, Callable[[], None]]
+
+
+def _make_bnb_layers_patchable(text_encoder: torch.nn.Module) -> None:
+    """Give the BitsAndBytes Linears of a `from_pretrained`-built encoder the sidecar-patch API.
+
+    transformers builds plain `bnb.nn.Linear8bitLt` / `Linear4bit` layers, which cannot hold a LoRA. Only this model is
+    converted (the layers share state with the originals), and unconverted Linears such as `lm_head` come along through
+    the standard mapping. Layers without a patch behave as before.
+    Must run before the model's first forward: the plain int8 forward moves CB/SCB off the weight, where the custom
+    layer reads them.
+    """
+    apply_custom_layers_to_model(text_encoder, type_mapping={**AUTOCAST_MODULE_TYPE_MAPPING, **BNB_LINEAR_TYPE_MAPPING})
 
 
 def _read_checkpoint(encoder_path: Path) -> dict[str, torch.Tensor] | None:
@@ -168,6 +190,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> QwenImageConditioningOutput:
+        if self.reference_images:
+            self._raise_if_encoder_cannot_see_images(context)
+
         # Load and resize reference images to ~1M pixels (matching diffusers pipeline)
         pil_images: list[PILImage.Image] = []
         for img_field in self.reference_images:
@@ -184,6 +209,22 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return QwenImageConditioningOutput.build(conditioning_name)
+
+    def _raise_if_encoder_cannot_see_images(self, context: InvocationContext) -> None:
+        """Refuse reference images for an encoder without a vision tower, before anything is loaded.
+
+        A GGUF encoder is the language model alone: llama.cpp keeps the vision tower in a separate mmproj file,
+        which InvokeAI does not load. Failing later would mean a multi-GB load and then an error from inside the
+        vision branch that names neither the encoder nor the fix.
+        """
+        encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
+        if encoder_config.format is not ModelFormat.GGUFQuantized:
+            return
+        raise ValueError(
+            f"The Qwen VL encoder '{encoder_config.name}' is a GGUF build, which holds only the language model, so "
+            "it cannot read reference images. For Qwen-Image Edit with reference images, select a safetensors or "
+            "Diffusers Qwen2.5-VL encoder (e.g. 'Qwen2.5-VL Encoder (fp8 scaled)'), or remove the reference images."
+        )
 
     @staticmethod
     def _build_processor(tokenizer: Any, model_root: Path) -> Any:
@@ -290,11 +331,10 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             prompt_embeds, encoder_attention_mask = self._run_encoder(text_encoder, model_inputs, bool(images))
         except BaseException as exc:
             # The in-flight traceback references the forward's frames, and through their locals the activations
-            # (the full-vocabulary logits and every layer's hidden states, hundreds of MB at prompt length) and,
-            # on the quantized path, the model itself - so the release below would otherwise be a no-op exactly
-            # when VRAM is scarcest (an OOM inside the forward is the likeliest error here). Clearing the finished
-            # frames drops those references while keeping the traceback's line information, which is all the
-            # error report uses. This applies to the cache-owned encoder too: the cache keeps the model, but the
+            # and, on the quantized path, the model itself - so the release below would otherwise be a no-op
+            # exactly when VRAM is scarcest (an OOM inside the forward is the likeliest error here). Clearing the
+            # finished frames drops those references while keeping the traceback's line information, which is all
+            # the error report uses. This applies to the cache-owned encoder too: the cache keeps the model, but the
             # activations are the forward's alone.
             traceback.clear_frames(exc.__traceback__)
             raise
@@ -320,23 +360,25 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the encoder and build the padded embeddings + mask.
 
-        Kept out of `_encode` on purpose: the full-vocabulary logits and per-layer hidden states the forward returns
-        are only referenced by this frame, so they are released as soon as it returns (or is cleared on error),
-        before `_encode` empties the CUDA cache.
+        Runs the inner model rather than the full causal-LM forward: its `last_hidden_state` is the tensor the
+        diffusers pipeline reads as `hidden_states[-1]`, and the LM head would only add a full-vocabulary logits
+        tensor nothing reads (and is absent on a GGUF encoder). No KV cache either: Qwen2.5-VL's config enables it for
+        generation, and one encode never reuses it.
+
+        Kept out of `_encode` on purpose: the hidden states the forward returns are only referenced by this frame, so
+        they are released as soon as it returns (or is cleared on error), before `_encode` empties the CUDA cache.
         """
         device = model_inputs.input_ids.device
-        outputs = text_encoder(
+        outputs = text_encoder.model(
             input_ids=model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
             pixel_values=getattr(model_inputs, "pixel_values", None),
             image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
             # Transformers 5 needs the processor's token types to build 3-D positions for image tokens.
             mm_token_type_ids=getattr(model_inputs, "mm_token_type_ids", None),
-            output_hidden_states=True,
+            use_cache=False,
         )
-
-        # Use last hidden state (matching diffusers pipeline)
-        hidden_states = outputs.hidden_states[-1]
+        hidden_states = outputs.last_hidden_state
 
         # Extract valid (non-padding) tokens using the attention mask,
         # then drop the system prompt prefix tokens.
@@ -366,23 +408,69 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         from transformers import Qwen2_5_VLForConditionalGeneration
 
         text_encoder_info = context.models.load(self.qwen_vl_encoder.text_encoder)
-        # An nvfp4 build dequantizes each packed Linear per forward, a transient its resident size does not cover. The
-        # cache holds back the larger of this and its default working memory, not their sum. Read from the unlocked
-        # model, before the lock; zero for every other build.
+        # An nvfp4, int8 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
+        # cover. The cache holds back the larger of this and its default working memory, not their sum. Read from the
+        # unlocked model, before the lock; zero for every other build.
         dequant_bytes = peak_dequant_transient_bytes(
             text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
         )
-        ctx = text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes)
-        _, text_encoder = ctx.__enter__()
-        # Use the encoder's intended compute device, not its current parameter residency: partial loading may have
-        # temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
-        device = text_encoder_info.compute_device
-        assert isinstance(text_encoder, Qwen2_5_VLForConditionalGeneration)
-
-        def release() -> None:
-            ctx.__exit__(None, None, None)
+        encoder_format = context.models.get_config(self.qwen_vl_encoder.text_encoder).format
+        # The stack holds the model lock and then the patches, so closing it undoes the patches before the lock is
+        # released. `pop_all` hands that over to the caller only once everything succeeded; a failure while patching
+        # still releases the lock here.
+        with ExitStack() as stack:
+            cached_weights, text_encoder = stack.enter_context(
+                text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes)
+            )
+            # Use the encoder's intended compute device, not its current parameter residency: partial loading may have
+            # temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
+            device = text_encoder_info.compute_device
+            assert isinstance(text_encoder, Qwen2_5_VLForConditionalGeneration)
+            # A packed build (nvfp4, GGUF) cannot be patched in place, so its LoRA goes in as a sidecar.
+            self._apply_lora_patches(
+                context,
+                stack,
+                text_encoder,
+                device,
+                cached_weights=cached_weights,
+                force_sidecar_patching=requires_sidecar_patching(text_encoder, encoder_format),
+            )
+            release = stack.pop_all().close
 
         return text_encoder, device, release
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        """Iterate over the LoRA models to apply to the Qwen2.5-VL text encoder."""
+        for lora in self.qwen_vl_encoder.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
+
+    def _apply_lora_patches(
+        self,
+        context: InvocationContext,
+        stack: ExitStack,
+        text_encoder: torch.nn.Module,
+        device: torch.device,
+        *,
+        cached_weights: dict[str, torch.Tensor] | None,
+        force_sidecar_patching: bool,
+    ) -> None:
+        """Patch the encoder with the connected LoRAs until `stack` closes. The caller says whether the layers are
+        quantized (`force_sidecar_patching`): the patcher does not detect that itself."""
+        stack.enter_context(
+            LayerPatcher.apply_smart_model_patches(
+                model=text_encoder,
+                patches=self._lora_iterator(context),
+                prefix=QWEN_IMAGE_LORA_QWEN_VL_PREFIX,
+                dtype=TorchDevice.choose_bfloat16_safe_dtype(device),
+                cached_weights=cached_weights,
+                force_sidecar_patching=force_sidecar_patching,
+            )
+        )
 
     def _load_quantized_encoder(self, context: InvocationContext) -> _LoadedEncoder:
         """Load the text encoder with BitsAndBytes quantization, bypassing the model cache.
@@ -403,8 +491,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
         model_root = context.models.get_absolute_path(encoder_config)
         if model_root.is_file():
-            # Single-file checkpoint (e.g. ComfyUI fp8_scaled or nvfp4): BnB can't load from a single file. Fall back
-            # to the cached path, which folds fp8 layers to bf16 and keeps nvfp4 layers packed.
+            # Single-file checkpoint (e.g. ComfyUI fp8_scaled, nvfp4 or int8): BnB can't load from a single file. Fall
+            # back to the cached path, which folds fp8 layers to bf16 and keeps nvfp4 and int8 layers packed.
             return self._load_cached_encoder(context)
         encoder_path = model_root / "text_encoder"
 
@@ -451,6 +539,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         #    installed transformers.
         vram_available: int | None = None
         state_dict: dict[str, torch.Tensor] | None = None
+        text_encoder: torch.nn.Module | None = None
+        patches = ExitStack()
         try:
             # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
             if quantized_bytes > 0 and device.type != "cpu":
@@ -476,6 +566,13 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                     dtype=torch.bfloat16,
                     local_files_only=True,
                 )
+
+            if self.qwen_vl_encoder.loras:
+                _make_bnb_layers_patchable(text_encoder)
+                # Quantized layers cannot be patched in place, and there are no cached weights to restore from.
+                self._apply_lora_patches(
+                    context, patches, text_encoder, device, cached_weights=None, force_sidecar_patching=True
+                )
         except BaseException as exc:
             # A failed load (an OOM is the expected way) leaves the partially built model referenced only by the
             # in-flight traceback's frames. Without releasing it here its weights stay allocated until the session
@@ -483,20 +580,27 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             # the very leak `_encode` guards against on the success path. This frame is still executing and is
             # skipped by `clear_frames`, hence the explicit drop of the checkpoint.
             traceback.clear_frames(exc.__traceback__)
+            load_failed = text_encoder is None
             state_dict = None
+            text_encoder = None
             gc.collect()
             try:
                 TorchDevice.empty_cache()
             except Exception as cache_exc:
                 # A sick device context fails here too; the original error is the one worth reporting.
                 context.logger.warning(f"Could not empty the device cache after the failed load: {cache_exc}")
-            if isinstance(exc, torch.OutOfMemoryError):
+            # Only a failed load is reported as the encoder not fitting; an OOM while patching is not that.
+            if load_failed and isinstance(exc, torch.OutOfMemoryError):
                 raise torch.OutOfMemoryError(self._oom_message(device, quantized_bytes, vram_available)) from exc
             raise
 
+        assert text_encoder is not None
+
         # Hand the model out without keeping a reference in this closure, so that once `_encode` drops its own the
-        # weights are actually free by the time empty_cache() runs.
+        # weights are actually free by the time empty_cache() runs. The patches are undone first: their generators
+        # hold the model, and are finished once the stack is closed.
         def cleanup() -> None:
+            patches.close()
             gc.collect()
             TorchDevice.empty_cache()
 

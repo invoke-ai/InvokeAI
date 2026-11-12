@@ -124,6 +124,7 @@ vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
     ensureImageMapLoaded: vi.fn(),
     refreshImageIndexStatus: vi.fn(),
     refreshImageMapPoints: vi.fn(),
+    requestImageMapRecompute: vi.fn(),
     setClusterLabelsEnabled: vi.fn(),
     setImageMapMediaKind: vi.fn(),
   };
@@ -135,6 +136,7 @@ import {
   imageMapStore,
   refreshImageIndexStatus,
   refreshImageMapPoints,
+  requestImageMapRecompute,
   setImageMapMediaKind,
 } from '@workbench/image-map/imageMapStore';
 
@@ -182,7 +184,7 @@ const viewProps = makeViewProps('project-a');
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const dataFor = (
-  state: Extract<ImageMapState, 'disabled' | 'model_missing'>,
+  state: Extract<ImageMapState, 'computing' | 'disabled' | 'model_missing'>,
   modelName = 'clip-vit-large-patch14'
 ) => ({
   clusterEps: null,
@@ -196,7 +198,10 @@ const dataFor = (
   visibleHash: null,
 });
 
-const renderState = async (state: Extract<ImageMapState, 'disabled' | 'model_missing'>, modelName?: string) => {
+const renderState = async (
+  state: Extract<ImageMapState, 'computing' | 'disabled' | 'model_missing'>,
+  modelName?: string
+) => {
   imageMapStore.setSnapshot({
     clusterLabels: null,
     clusterLabelsEps: null,
@@ -283,6 +288,21 @@ describe('Image Map unavailable states', () => {
       expect(buttonLabels()).toEqual(['Retry']);
     }
   );
+});
+
+describe('Image Map computing state', () => {
+  it('lets Check again bypass the refit cooldown a failed fit waits behind', async () => {
+    await renderState('computing');
+
+    await act(() => {
+      Array.from(host?.querySelectorAll('button') ?? [])
+        .find((button) => button.textContent === 'Check again')
+        ?.click();
+    });
+
+    expect(requestImageMapRecompute).toHaveBeenCalledTimes(1);
+    expect(refreshImageIndexStatus).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Image Map for a session that cannot change the server', () => {
@@ -456,6 +476,8 @@ describe('Image Map missing-model link', () => {
     // what starts indexing without a restart.
     expect(refreshImageMapPoints).toHaveBeenCalledTimes(1);
     expect(refreshImageIndexStatus).toHaveBeenCalledTimes(1);
+    // An automatic refresh must never bypass the refit cooldown.
+    expect(requestImageMapRecompute).not.toHaveBeenCalled();
   });
 
   it('keeps the message and the in-flight install mounted while a refresh runs', async () => {

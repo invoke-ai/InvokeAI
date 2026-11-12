@@ -23,7 +23,13 @@ import torch
 from invokeai.backend.quantization.fp8_scaled import dequantize_fp8_scaled, extract_fp8_scaled_layers
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
-from tests.fixtures.quantized_payloads import mxfp8_tensors, nvfp4_signed_tensors, quantize_convrot, quantize_scaled_fp8
+from tests.fixtures.quantized_payloads import (
+    mxfp8_tensors,
+    nvfp4_signed_tensors,
+    quantize_convrot,
+    quantize_per_row_fp8,
+    quantize_scaled_fp8,
+)
 
 CPU = torch.device("cpu")
 
@@ -112,6 +118,22 @@ def test_the_scaled_fp8_codes_reach_the_top_of_e4m3() -> None:
 
     assert payload.codes.float().abs().max().item() == torch.finfo(torch.float8_e4m3fn).max
     assert payload.codes.float().isfinite().all(), "the scale let a weight overflow e4m3"
+
+
+def test_the_per_row_fp8_payload_dequantizes_through_the_real_extraction() -> None:
+    """The `[N]` scale must reach the weight's rows: broadcast like any trailing axis it would scale the columns of a
+    square layer instead, at the right shape and magnitude."""
+    torch.manual_seed(5)
+    original = torch.randn(16, 16) * torch.logspace(-2, 1, 16).unsqueeze(1)
+    payload = quantize_per_row_fp8(original)
+    state_dict = {"lin.weight": payload.codes, "lin.weight_scale": payload.scale}
+
+    layers = extract_fp8_scaled_layers(state_dict)
+    dequantize_fp8_scaled(state_dict, layers, torch.float32)
+
+    assert set(state_dict) == {"lin.weight"}
+    assert torch.equal(state_dict["lin.weight"], payload.dequantized)
+    assert torch.corrcoef(torch.stack([state_dict["lin.weight"].flatten(), original.flatten()]))[0, 1] > 0.999
 
 
 def test_the_nvfp4_payload_unpacks_to_the_exact_weights_it_claims() -> None:

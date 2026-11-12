@@ -1,7 +1,8 @@
 import type { ModelConfig } from '@features/models';
-import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { InvocationTemplatesSnapshot, ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasLayerContract, CanvasRegionalGuidanceLayerContract } from '@workbench/canvas-engine/api';
 import type {
+  DynamicPromptsExpansionSource,
   InvocationMode,
   InvocationRoute,
   InvocationValidationReason,
@@ -17,12 +18,14 @@ import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@
 import {
   describeExternalCanvasRefusal,
   describeGenerationIssue,
+  expandsDynamicPrompts,
   getEffectivePrompts,
   getGenerateInvocationIssues,
   isExternalTextOnlyCanvasModel,
   isGenerateModelConfig,
   isSupportedGenerateModel,
   NO_GENERATE_MODEL_ISSUE,
+  normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -49,6 +52,52 @@ import {
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
+
+/**
+ * What the route's positive prompt expands from, with the sample seed to draw with, or null when the route sends its
+ * prompt as typed: Upscale and workflows never expand, and dynamic prompts may be off or the prompt plain. Canvas
+ * expands Generate's prompt.
+ */
+export const getDynamicPromptsExpansionSource = (
+  project: Project,
+  sourceId: InvocationSourceId
+): (DynamicPromptsExpansionSource & { sampleSeed: number }) | null => {
+  if (sourceId === 'upscale' || sourceId === 'workflow') {
+    return null;
+  }
+
+  const settings =
+    sourceId === 'video'
+      ? normalizeVideoWidgetValues(getProjectWidgetValues(project, 'video'))
+      : normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
+
+  if (!settings) {
+    return null;
+  }
+
+  const positivePrompt =
+    'promptTemplate' in settings ? getEffectivePrompts(settings).positivePrompt : settings.positivePrompt;
+
+  return expandsDynamicPrompts(positivePrompt, settings.dynamicPromptsEnabled)
+    ? {
+        combinatorial: settings.dynamicPromptsCombinatorial,
+        maxPrompts: settings.dynamicPromptsMaxPrompts,
+        positivePrompt,
+        sampleSeed: settings.dynamicPromptsSampleSeed,
+      }
+    : null;
+};
+
+/** Whether a submission prepared from `prepared` (null: not expanded) still describes what `current` compiles. */
+export const isSameDynamicPromptsExpansionSource = (
+  prepared: DynamicPromptsExpansionSource | null,
+  current: DynamicPromptsExpansionSource | null
+): boolean =>
+  prepared === null || current === null
+    ? prepared === current
+    : prepared.positivePrompt === current.positivePrompt &&
+      prepared.combinatorial === current.combinatorial &&
+      prepared.maxPrompts === current.maxPrompts;
 
 export interface InvocationSourceMeta {
   id: InvocationSourceId;
@@ -310,7 +359,8 @@ export const resolveInvocationRoute = (
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[],
   /** Validate a specific project workflow (a captured submission target) instead of the active one. */
-  workflowDocument?: ProjectGraphState
+  workflowDocument?: ProjectGraphState,
+  templates?: Readonly<InvocationTemplatesSnapshot>
 ): ResolvedInvocationRoute =>
   resolveInvocationRouteInput(
     workflowDocument
@@ -318,14 +368,16 @@ export const resolveInvocationRoute = (
       : getInvocationRouteInput(project),
     mode,
     route,
-    models
+    models,
+    templates
   );
 
 export const resolveInvocationRouteInput = (
   input: InvocationRouteInput,
   mode: InvocationMode = 'global',
   route: InvocationRoute = input.invocation,
-  models?: readonly ModelConfig[]
+  models?: readonly ModelConfig[],
+  templates?: Readonly<InvocationTemplatesSnapshot>
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
@@ -333,7 +385,7 @@ export const resolveInvocationRouteInput = (
   // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
-      ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
+      ? getProjectGraphReadiness(input.projectGraph, templates ?? getInvocationTemplatesSnapshot(), {
           batchCount: sanitizeBatchCount(input.workflowValues.batchCount),
         })
       : null;
