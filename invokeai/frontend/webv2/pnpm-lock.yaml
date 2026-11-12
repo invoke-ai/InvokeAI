@@ -8,9 +8,15 @@ patchedDependencies:
   '@zag-js/menu@1.43.3':
     hash: 53908275123b086ad52831e6cdb0d7ca9287a8d5c6ce4ef0db32325fdcb702a5
     path: patches/@zag-js__menu@1.43.3.patch
+  '@zag-js/presence@1.43.3':
+    hash: b319eca1789a28218bc00f5f40d956f34051458f8c17c3567b9a24e6419bcf72
+    path: patches/@zag-js__presence@1.43.3.patch
   '@zag-js/react@1.43.3':
     hash: a0448ebf0273ebd3cc9b57d2f1421568477fd5e4c673fa13180dfe6e8de2d3b5
     path: patches/@zag-js__react@1.43.3.patch
+  '@zag-js/tooltip@1.43.3':
+    hash: 182087e83699346544bb4068991997edc5e0424f807a9c7e0abf759e4f41eea0
+    path: patches/@zag-js__tooltip@1.43.3.patch
   react-hook-tanstack-virtual:
     hash: a650424c322ec56178110e945f70d9e11d270c144f2c0df5527ba7d327ccb285
     path: patches/react-hook-tanstack-virtual.patch
@@ -2434,7 +2440,7 @@ snapshots:
       '@zag-js/password-input': 1.43.3
       '@zag-js/pin-input': 1.43.3
       '@zag-js/popover': 1.43.3
-      '@zag-js/presence': 1.43.3
+      '@zag-js/presence': 1.43.3(patch_hash=b319eca1789a28218bc00f5f40d956f34051458f8c17c3567b9a24e6419bcf72)
       '@zag-js/progress': 1.43.3
       '@zag-js/qr-code': 1.43.3
       '@zag-js/radio-group': 1.43.3
@@ -2454,7 +2460,7 @@ snapshots:
       '@zag-js/toc': 1.43.3
       '@zag-js/toggle': 1.43.3
       '@zag-js/toggle-group': 1.43.3
-      '@zag-js/tooltip': 1.43.3
+      '@zag-js/tooltip': 1.43.3(patch_hash=182087e83699346544bb4068991997edc5e0424f807a9c7e0abf759e4f41eea0)
       '@zag-js/tour': 1.43.3
       '@zag-js/tree-view': 1.43.3
       '@zag-js/types': 1.43.3
@@ -3731,7 +3737,7 @@ snapshots:
       '@zag-js/dom-query': 1.43.3
       '@zag-js/utils': 1.43.3
 
-  '@zag-js/presence@1.43.3':
+  '@zag-js/presence@1.43.3(patch_hash=b319eca1789a28218bc00f5f40d956f34051458f8c17c3567b9a24e6419bcf72)':
     dependencies:
       '@zag-js/core': 1.43.3
       '@zag-js/dom-query': 1.43.3
@@ -3917,7 +3923,7 @@ snapshots:
       '@zag-js/types': 1.43.3
       '@zag-js/utils': 1.43.3
 
-  '@zag-js/tooltip@1.43.3':
+  '@zag-js/tooltip@1.43.3(patch_hash=182087e83699346544bb4068991997edc5e0424f807a9c7e0abf759e4f41eea0)':
     dependencies:
       '@zag-js/anatomy': 1.43.3
       '@zag-js/core': 1.43.3

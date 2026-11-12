@@ -1,0 +1,54 @@
+diff --git a/dist/tooltip.machine.js b/dist/tooltip.machine.js
+index 7ed1884..2a3e4de 100644
+--- a/dist/tooltip.machine.js
++++ b/dist/tooltip.machine.js
+@@ -67,6 +67,10 @@ var machine = (0, import_core.createMachine)({
+     };
+   },
+   effects: ["trackFocusVisible", "trackStore"],
++  // Starting again after React Activity hid the subtree resumes the stored state, but the machine was stopped while
++  // hidden and dropped what was sent meanwhile, such as the pointer leaving as the trigger was hidden. A tip left open
++  // would then show with nothing to close it, and a pointer open still on record would ignore the next hover.
++  entry: ["reconcileReconnect"],
+   context: ({ bindable, prop, scope }) => ({
+     currentPlacement: bindable(() => ({ defaultValue: void 0 })),
+     hasPointerMoveOpened: bindable(() => ({ defaultValue: null })),
+@@ -357,6 +361,11 @@ var machine = (0, import_core.createMachine)({
+       clearPointerMoveOpened: ({ context }) => {
+         context.set("hasPointerMoveOpened", null);
+       },
++      reconcileReconnect: ({ context, prop, send, state }) => {
++        context.set("hasPointerMoveOpened", null);
++        if (prop("open") !== void 0 || prop("defaultOpen") || state.matches("closed")) return;
++        send({ type: "close", src: "reconnect" });
++      },
+       setTriggerValue: ({ context, event }) => {
+         if (event.value === void 0) return;
+         context.set("triggerValue", event.value);
+diff --git a/dist/tooltip.machine.mjs b/dist/tooltip.machine.mjs
+index 03c6f04..188679d 100644
+--- a/dist/tooltip.machine.mjs
++++ b/dist/tooltip.machine.mjs
+@@ -33,6 +33,10 @@ var machine = createMachine({
+     };
+   },
+   effects: ["trackFocusVisible", "trackStore"],
++  // Starting again after React Activity hid the subtree resumes the stored state, but the machine was stopped while
++  // hidden and dropped what was sent meanwhile, such as the pointer leaving as the trigger was hidden. A tip left open
++  // would then show with nothing to close it, and a pointer open still on record would ignore the next hover.
++  entry: ["reconcileReconnect"],
+   context: ({ bindable, prop, scope }) => ({
+     currentPlacement: bindable(() => ({ defaultValue: void 0 })),
+     hasPointerMoveOpened: bindable(() => ({ defaultValue: null })),
+@@ -323,6 +327,11 @@ var machine = createMachine({
+       clearPointerMoveOpened: ({ context }) => {
+         context.set("hasPointerMoveOpened", null);
+       },
++      reconcileReconnect: ({ context, prop, send, state }) => {
++        context.set("hasPointerMoveOpened", null);
++        if (prop("open") !== void 0 || prop("defaultOpen") || state.matches("closed")) return;
++        send({ type: "close", src: "reconnect" });
++      },
+       setTriggerValue: ({ context, event }) => {
+         if (event.value === void 0) return;
+         context.set("triggerValue", event.value);

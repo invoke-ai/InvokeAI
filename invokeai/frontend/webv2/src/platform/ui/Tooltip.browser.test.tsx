@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { CameraIcon } from 'lucide-react';
-import { act, useCallback, useRef, useState } from 'react';
+import { Activity, act, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -170,4 +170,53 @@ it('lets a click through an open tip to the control under it, such as the next r
   await userEvent.click(next!);
 
   expect(onNextClick).toHaveBeenCalledOnce();
+});
+
+/** Two sections kept alive by Activity, like the launchpad's pages: the tooltipped button switches to the other one. */
+const Sections = () => {
+  const [isOtherShown, setIsOtherShown] = useState(false);
+  const showOther = useCallback(() => setIsOtherShown(true), []);
+  const showFirst = useCallback(() => setIsOtherShown(false), []);
+
+  return (
+    <>
+      <button type="button" onClick={showFirst}>
+        First section
+      </button>
+      <Activity mode={isOtherShown ? 'hidden' : 'visible'}>
+        <Tooltip content="Open the other section">
+          <button aria-label="Other section" type="button" onClick={showOther}>
+            Go
+          </button>
+        </Tooltip>
+      </Activity>
+    </>
+  );
+};
+
+it('shows a tip again only when hovered after its section was hidden mid-fade', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <Sections />
+      </ChakraProvider>
+    )
+  );
+  const shownTip = () =>
+    [...document.querySelectorAll<HTMLElement>('[role="tooltip"]')].find((tip) => tip.checkVisibility());
+  const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Other section"]')!;
+
+  await userEvent.hover(trigger);
+  await expect.poll(() => shownTip()?.textContent).toBe('Open the other section');
+  // The press closes the tip and the click hides its section before the fade ends.
+  await act(() => userEvent.click(trigger));
+  await act(() => userEvent.click(host!.querySelector('button')!));
+
+  await expect.poll(shownTip).toBeUndefined();
+  // The pointer left while the section was hidden; the next hover still opens the tip.
+  await userEvent.hover(trigger);
+  await expect.poll(() => shownTip()?.textContent).toBe('Open the other section');
 });
