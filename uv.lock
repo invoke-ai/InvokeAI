@@ -2239,7 +2239,7 @@ requires-dist = [
     { name = "rocm-sdk-libraries", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm') or (platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'rocm')", specifier = "==10.0.0", index = "https://stable.repo.amd.com/rocm/whl-next/" },
     { name = "ruff", marker = "extra == 'test'", specifier = "~=0.11.2" },
     { name = "ruff-lsp", marker = "extra == 'test'", specifier = "~=0.0.62" },
-    { name = "safetensors" },
+    { name = "safetensors", specifier = ">=0.8.0" },
     { name = "scikit-learn", specifier = "~=1.5" },
     { name = "semver", specifier = "~=3.0.1" },
     { name = "sentencepiece", specifier = "==0.2.2" },
