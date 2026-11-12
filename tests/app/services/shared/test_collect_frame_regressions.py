@@ -1949,6 +1949,22 @@ def test_if_after_sibling_reiterate_through_second_iterate_keeps_every_item(
         assert _values(runs) == expected
 
 
+@pytest.mark.parametrize(
+    ("src", "expected"),
+    [([["a", "b"], ["c"]], ["ra", "rb", "rc", "rp"]), ([[], ["c"]], ["rc", "rp"])],
+    ids=["filled-lists", "empty-list"],
+)
+@pytest.mark.parametrize("condition", ["literal", "per-item"])
+def test_if_after_sibling_reiterate_through_second_iterate_keeps_every_item_after_reload(
+    src: list[AnyValue], expected: list[AnyValue], condition: str, compatibility_scheduler: bool
+) -> None:
+    runs = _run_with_reload(
+        _sibling_reiterate_through_second_iterate(src, condition), compatibility_scheduler, 12, "out2"
+    )["out2"]
+
+    assert _values(runs) == expected
+
+
 def _outer_and_nested_frames_into_root_if(computed_condition: bool) -> Graph:
     """`out` collects `it0`'s item and each nested `it1` item per `it0` frame (3 values, then 2); an If after
     re-iterating it selects the root `RR` value."""
@@ -1990,5 +2006,16 @@ def test_root_if_after_reiterating_outer_and_nested_frames_runs_once_per_item(
     runs = _collect_runs(_outer_and_nested_frames_into_root_if(computed_condition), compatibility_scheduler, "out2")[
         "out2"
     ]
+
+    assert _values(runs) == ["RR"] * 5
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_root_if_after_reiterating_outer_and_nested_frames_runs_once_per_item_after_reload(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    runs = _run_with_reload(
+        _outer_and_nested_frames_into_root_if(computed_condition), compatibility_scheduler, 12, "out2"
+    )["out2"]
 
     assert _values(runs) == ["RR"] * 5

@@ -186,6 +186,7 @@ def _get_sibling_collect_iterate_axes_to_project(
         if isinstance(state.graph.get_node(axis_id), IterateInvocation)
         and _is_sibling_collect_iterate_axis(state, iterator_ancestry, axis_id)
     }
+    reiterated_axes.intersection_update(axis_ids[-1:])
     if not reiterated_axes:
         return cache_result(set())
 
