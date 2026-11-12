@@ -174,6 +174,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     # Qwen Image
     ("qwen_image_2_1_prefix_kv_cache", T.BOOLEAN),
     ("qwen_image_component_source", T.MODEL),
+    ("component_source", T.MODEL),
     ("qwen_image_quantization", T.STRING),
     ("qwen_image_qwen_vl_encoder", T.MODEL),
     ("qwen_image_shift", (T.STRING, T.FLOAT)),

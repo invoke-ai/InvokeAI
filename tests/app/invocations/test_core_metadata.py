@@ -147,7 +147,7 @@ def test_unwrap_metadata_value_for_new_core_model_labels() -> None:
         "loras": [{"lora": lora_id.model_dump(), "weight": 0.75}],
     }
 
-    for core_label in ("anima_inpaint_adapter", "qwen3_vl_vision_tower", "flux3_prompt_upsampler"):
+    for core_label in ("anima_inpaint_adapter", "qwen3_vl_vision_tower", "flux3_prompt_upsampler", "component_source"):
         assert core_label in CORE_MODEL_LABELS
         unwrapped_field = unwrap_metadata_value(wrapper_field, label=core_label)
         assert isinstance(unwrapped_field, ModelIdentifierField)
@@ -209,6 +209,13 @@ def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
             "FLUX.3 Prompt Upsampler",
             BaseModelType.Flux3,
             ModelType.PromptEnhancer,
+        ),
+        (
+            "component_source",
+            "component-source-key",
+            "Qwen Image Component Source",
+            BaseModelType.QwenImage,
+            ModelType.Main,
         ),
     )
 
