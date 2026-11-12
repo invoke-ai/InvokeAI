@@ -18,7 +18,12 @@ import {
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createSocketHub, type BackendSocket } from '@platform/transport/socketHub';
+import { toaster } from '@platform/ui/toaster';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@platform/ui/toaster', () => ({
+  toaster: { create: vi.fn(), dismiss: vi.fn(), update: vi.fn() },
+}));
 
 import {
   createQueueCoordinator,
@@ -292,6 +297,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     nodeExecution,
     progress,
     progressImage,
+    remoteModelTransferToaster: toaster,
   });
 
   return {
@@ -579,6 +585,83 @@ describe('queueCoordinator', () => {
       itemIds: [1],
       requested: 2,
     });
+  });
+
+  it('does not duplicate Gallery realtime refreshes for a burst of completions', async () => {
+    vi.useFakeTimers();
+    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 10,
+      itemIds: Array.from({ length: 10 }, (_, index) => index + 1),
+      requested: 10,
+    });
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
+    harness.callbacks.onGalleryRefresh.mockClear();
+
+    for (let itemId = 1; itemId <= 10; itemId += 1) {
+      harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: itemId }));
+    }
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh the gallery for failed or canceled items', async () => {
+    vi.useFakeTimers();
+    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
+    harness.callbacks.onGalleryRefresh.mockClear();
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'failed' }));
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2, status: 'canceled' }));
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
+  });
+
+  it('ignores model-transfer progress from another account', () => {
+    harness.coordinator.dispose();
+    harness.hub.disconnect();
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-1');
+    harness = createHarness();
+    harness.coordinator.connect();
+
+    vi.mocked(toaster.create).mockClear();
+
+    const message = `[[IRW_MODEL_TRANSFER]]${JSON.stringify({
+      backend_item_id: 10,
+      remote_index: 2,
+      model_hash: 'hash',
+      name: 'Example',
+      directory: true,
+      phase: 'downloading',
+      bytes: 40,
+      total_bytes: 100,
+    })}`;
+
+    harness.socket.fire('invocation_progress', { message, user_id: 'user-2' });
+    expect(toaster.create).not.toHaveBeenCalled();
+
+    harness.socket.fire('invocation_progress', { message, user_id: 'user-1' });
+    expect(toaster.create).toHaveBeenCalledTimes(1);
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('single-user');
   });
 
   it('routes progress events to the tracked item and clears them on completion', async () => {

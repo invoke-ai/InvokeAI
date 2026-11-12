@@ -1310,6 +1310,36 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._resume_event.clear()
         return self.get_status()
 
+    def get_generation_worker_capacity(self) -> int:
+        """Configured concurrent generation workers, including currently busy ones.
+
+        The remote dispatcher must not use the *idle* count as its lane capacity:
+        direct queue submissions and other clients share this processor.
+        """
+        return max(1, len(self._workers) or len(self._devices or ()))
+
+    def get_available_local_worker_count(self) -> int:
+        """Advisory number of local workers able to claim a queued generation now.
+
+        Remote Workers use this only to prefer free Local GPUs in Distributed mode.
+        Dequeue's atomic database claim remains authoritative; this snapshot is not a lock.
+        """
+        if not self._resume_event.is_set() or self._stop_event.is_set():
+            return 0
+        if self._is_image_move_maintenance_active():
+            return 0
+
+        available = 0
+        for worker in self._workers:
+            # Bind the thread before checking: stop() may change worker state.
+            thread = worker.thread
+            if worker.queue_item is not None or thread is None or not thread.is_alive():
+                continue
+            if GENERATION_DEVICE_POOL.is_lent(worker.device):
+                continue
+            available += 1
+        return available
+
     def get_status(self) -> SessionProcessorStatus:
         return SessionProcessorStatus(
             is_started=self._resume_event.is_set(),

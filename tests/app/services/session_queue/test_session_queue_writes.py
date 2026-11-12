@@ -10,13 +10,15 @@ import asyncio
 import json
 import logging
 from types import SimpleNamespace
-from typing import Any, Optional, cast
+from typing import Any, Literal, Optional, cast
 
 import pytest
 from pydantic_core import to_jsonable_python
 from sqlalchemy import insert, select, update
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.remote_worker.remote_nodes import AAARemoteWorkerDispatchInvocation
+from invokeai.app.invocations.remote_worker.worker_pool import WorkerSpec, _claim_for_worker
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
@@ -82,6 +84,19 @@ def _batch(prompt: str = "test", runs: int = 1, *, key: Optional[str] = None, or
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt=prompt))
     return Batch(graph=graph, runs=runs, idempotency_key=key, origin=origin)
+
+
+def _remote_worker_batch(mode: Literal["Distributed", "Remote Only"], runs: int = 1) -> Batch:
+    graph = Graph()
+    graph.add_node(
+        AAARemoteWorkerDispatchInvocation(
+            id="__irw_remote_worker_dispatch__",
+            dispatch_mode=mode,
+            remote_url="http://remote-worker.test:9090",
+        )
+    )
+    graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
+    return Batch(graph=graph, runs=runs)
 
 
 def _item(
@@ -183,6 +198,44 @@ class TestEnqueue:
 
 
 class TestDequeue:
+    def test_remote_only_never_claims_either_local_gpu(
+        self, database: Database, queue: SessionQueue, events: TestEventService
+    ) -> None:
+        result = asyncio.run(queue.enqueue_batch(QUEUE, _remote_worker_batch("Remote Only", runs=2), False, "alice"))
+
+        # Both local worker threads observe Remote Only items but must NOT claim them.
+        assert queue.dequeue(device="cuda:0") is None
+        assert queue.dequeue(device="cuda:1") is None
+        assert _status_events(events) == [(item_id, "waiting") for item_id in result.item_ids]
+        for item_id in result.item_ids:
+            row = _row(database, item_id)
+            assert row is not None and row["status"] == "waiting" and row["device"] is None
+
+        # The first waiting item remains claimable by a real remote lane.
+        worker = WorkerSpec(url="http://remote-worker.test:9090", name="Remote 1", slot=1)
+        # The pool uses the queue service directly; no actual GPU or HTTP worker is required here.
+        services = SimpleNamespace(session_queue=queue)
+        claimed = _claim_for_worker(services, queue_id=QUEUE, user_id="alice", worker=worker, excluded=set())
+        assert claimed is not None and claimed[0].item_id == result.item_ids[0]
+        row = _row(database, result.item_ids[0])
+        assert row is not None and row["status"] == "in_progress" and row["device"] == "remote:Remote 1"
+
+    def test_remote_only_does_not_block_an_ordinary_local_job(self, database: Database, queue: SessionQueue) -> None:
+        remote = asyncio.run(queue.enqueue_batch(QUEUE, _remote_worker_batch("Remote Only"), False, "alice"))
+        local = asyncio.run(queue.enqueue_batch(QUEUE, _batch(), False, "alice"))
+
+        claimed = queue.dequeue(device="cuda:1")
+        assert claimed is not None and claimed.item_id == local.item_ids[0]
+        assert claimed.device == "cuda:1"
+        parked = _row(database, remote.item_ids[0])
+        assert parked is not None and parked["status"] == "waiting" and parked["device"] is None
+
+    def test_distributed_work_is_still_claimable_locally(self, queue: SessionQueue) -> None:
+        result = asyncio.run(queue.enqueue_batch(QUEUE, _remote_worker_batch("Distributed"), False, "alice"))
+        claimed = queue.dequeue(device="cuda:0")
+        assert claimed is not None and claimed.item_id == result.item_ids[0]
+        assert claimed.device == "cuda:0"
+
     def test_a_claim_records_its_start_and_device_and_signals_once(
         self, database: Database, queue: SessionQueue, events: TestEventService
     ) -> None:
@@ -763,3 +816,55 @@ class TestScopes:
 
         (event,) = [event for event in events.events if isinstance(event, BatchEnqueuedEvent)]
         assert event.user_id == "bob"
+
+
+class TestExtraExecutionLanes:
+    """Worker-pool database queries/claims must preserve the normal queue's concurrency rules."""
+
+    def test_root_candidates_are_user_and_status_scoped(self, database: Database, queue: SessionQueue) -> None:
+        first = _item(database, user_id="alice", priority=3)
+        second = _item(database, user_id="alice", status="waiting")
+        _item(database, user_id="bob", priority=9)
+        _item(database, user_id="alice", status="completed")
+        _item(database, user_id="alice", parent_item_id=first, root_item_id=first)
+        assert queue.get_root_queue_item_ids("default", "alice", ("pending", "waiting")) == [first, second]
+        assert queue.get_root_queue_item_ids("default", "alice", ()) == []
+
+    def test_parking_and_claiming_waiting_item(self, database: Database, queue: SessionQueue) -> None:
+        item_id = _item(database)
+        assert queue.transition_queue_item_if_status(item_id, "waiting", ("pending",)) is not None
+        assert queue.dequeue() is None  # Remote Only waiting items are not local work.
+        claimed = queue.transition_queue_item_if_status(item_id, "in_progress", ("waiting",), device="remote:R1")
+        assert claimed is not None and claimed.status == "in_progress" and claimed.device == "remote:R1"
+        queue.cancel_queue_item(item_id)
+        assert queue.transition_queue_item_if_status(item_id, "pending", ("in_progress",)) is None
+        assert queue.get_queue_item(item_id).status == "canceled"
+
+    def test_two_lanes_claim_same_item_once(
+        self, database: Database, queue: SessionQueue, events: TestEventService
+    ) -> None:
+        import threading
+
+        item_id = _item(database)
+        barrier = threading.Barrier(6)
+        results: list[bool] = []
+        errors: list[Exception] = []
+
+        def attempt() -> None:
+            try:
+                barrier.wait(timeout=10)
+                claimed = queue.transition_queue_item_if_status(
+                    item_id, "in_progress", ("pending",), device="remote:R1"
+                )
+                results.append(claimed is not None)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=attempt) for _ in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=20)
+        assert not errors
+        assert len(results) == 6 and results.count(True) == 1
+        assert _status_events(events).count((item_id, "in_progress")) == 1

@@ -1,0 +1,145 @@
+---
+title: Remote Workers
+description: Configure other InvokeAI instances on your network to render alongside, or instead of, the primary server.
+lastUpdated: 2026-11-09
+---
+
+Remote Workers let one InvokeAI instance (the **primary**) dispatch generation work to other InvokeAI instances (the **workers**) on your network. You can use remote GPUs alongside the primary GPU(s), or reserve a queue item exclusively for remote execution. Jobs remain in the primary's normal queue, and completed media is imported back into the primary.
+
+Remote Workers are optional. When disabled, InvokeAI continues rendering locally as usual.
+
+## Before you begin
+
+- Run compatible InvokeAI builds on the primary and every worker. Any custom nodes used by the workflow must also be installed on the workers.
+- Ensure the primary can reach each worker over your network. For automatic model transfers, workers must also be able to reach the primary.
+- Configure each worker's generation devices and model storage as needed. A worker can use one GPU or several GPUs.
+- Keep the worker services on a trusted LAN or behind appropriate network access controls. Do not expose an unauthenticated InvokeAI worker directly to the public internet.
+
+A worker is a complete InvokeAI instance, not a separate node pack.
+
+### Prepare a worker
+
+In the worker's `invokeai.yaml` configuration file, listen on a network-accessible interface rather than only localhost:
+
+```yaml
+host: 0.0.0.0
+```
+
+Restart InvokeAI after changing its configuration. If the worker is running in Docker, make sure the container's InvokeAI port is published to the host and permitted through the host firewall. See [Docker configuration](/configuration/docker/) and [InvokeAI settings](/configuration/invokeai-yaml/).
+
+For a worker with two CUDA GPUs, InvokeAI's built-in multi-GPU configuration can enable a generation session on each:
+
+```yaml
+generation_devices: [cuda:0, cuda:1]
+```
+
+Alternatively, `generation_devices: auto` uses the available CUDA generation devices unless a legacy device override restricts it. See [Multi-GPU Generation](/configuration/invokeai-yaml/#multi-gpu-generation). Remote Workers detect the worker's configured generation-session capacity; a dual-GPU worker can process two queue items concurrently.
+
+## Add workers on the primary
+
+1. Open the workbench's **Widgets** list and add **Distributed rendering** (the Remote Workers panel).
+2. Turn on **Enable distributed rendering**.
+3. Click **Edit worker addresses** and enter the full URL of each worker, one per line, for example:
+
+   ```text
+   http://192.168.1.100:9090
+   http://192.168.1.101:9090
+   ```
+
+4. Click **Done editing addresses**. Each configured worker appears with its address and availability status.
+5. Expand a worker's settings to give it a recognizable name, and, if that worker requires multi-user authentication, enter **your account's email and password on that worker** and click **Save login**.
+6. Choose a **Dispatch** mode and submit generations normally.
+
+![Remote Workers panel showing configured worker settings](https://github.com/user-attachments/assets/2cb29e51-fab4-43e5-8337-d5b4d2f499d0)
+
+:::caution
+Do not put passwords in worker URLs. The panel saves each user's worker login on the primary server in encrypted storage, rather than embedding it in a workflow. Protect the primary's data directory and use HTTPS when connections cross untrusted networks.
+:::
+
+### Worker availability and pause controls
+
+Each worker row shows one of these states:
+
+| State | Meaning |
+| --- | --- |
+| **Online** | The primary can currently reach and authenticate with the worker. |
+| **Offline** | The worker is not currently reachable. |
+| **Login required** | The worker is reachable but needs valid login credentials. |
+| **Checking** | The primary is checking availability. |
+| **Paused** | Distributed rendering is turned off, so worker availability checks are paused. |
+| **Disabled** | This particular worker is excluded from new jobs. |
+
+The badges are informational. The backend checks reachability and eligibility again before claiming a job. An offline worker stays configured and can accept eligible pending work after it reconnects.
+
+Use the **power** icon beside a worker to exclude it from **new** jobs without removing its configuration or interrupting jobs it has already started.
+
+## Dispatch modes
+
+| Mode | Behavior |
+| --- | --- |
+| **Distributed** | Local GPUs and enabled Remote Workers share the primary's queue. Available local GPUs are favored for eligible work, while other jobs can run on remote GPUs concurrently. |
+| **Remote Only** | Eligible jobs are reserved for Remote Workers. Local GPUs do not execute those jobs or remain occupied while waiting for remote capacity. |
+
+If a Remote Only job has no available eligible worker, it must wait for remote capacity instead of falling back to local rendering. For Distributed jobs, local rendering can continue even when a worker is offline.
+
+Workers with multiple configured generation sessions can execute more than one remote queue item at a time. For example, a primary may render locally while a single worker with two GPUs runs two other jobs in parallel.
+
+![Queue displaying jobs assigned to local and remote execution](https://github.com/user-attachments/assets/ae782491-a20d-42f9-bb36-c0b4ce555deb)
+
+## Models and automatic transfer
+
+Workers may already have the required models installed. When **Transfer missing models** is enabled (the default), the primary can automatically transfer supported missing single-file models and complete Diffusers model directories to a worker before that job renders.
+
+- Transfers are served from a temporary endpoint on the primary over the LAN; the receiving worker installs the model using its normal model installation service.
+- Transfer progress and cancellation are surfaced through the primary's normal job notifications.
+- Concurrent jobs needing the same model on the same worker share a transfer rather than downloading duplicate copies.
+- A job waiting on a missing model does not prevent unrelated GPU jobs and newly submitted work from proceeding.
+
+On **each receiving worker** where LAN model transfer is required, the following setting may be necessary in `invokeai.yaml`:
+
+```yaml
+allow_private_download_urls: true
+```
+
+Only enable this in a trusted network environment: it permits the worker's model installer to fetch private-network URLs. If the primary's network address is not detected correctly (for example, with Docker or multiple network adapters), open **Advanced model transfer settings** on the primary and set **Primary host address for model transfers** to an address workers can reach.
+
+Automatic transfer does not install custom nodes and cannot transfer every model format. Install unsupported models manually on the worker.
+
+**Keep copies on remote workers** controls whether successful results are retained on workers after import. It is off by default, so the primary can clean up imported remote media.
+
+## Results, previews and cancellation
+
+Remote jobs keep their original primary queue items and device labels. Progress can appear in the normal Queue, Preview, Gallery and Canvas flows. After a job completes, supported image and video results are imported to the primary rather than requiring users to browse the worker's Gallery.
+
+Results follow the destination selected when the job was submitted:
+
+- **Gallery** outputs go to the board selected at submission time.
+- **Canvas** outputs appear as normal staging candidates for review and acceptance.
+
+Remote cancellation is coordinated through the original primary queue item. Cancel the generation from the primary; it will attempt to cancel the corresponding worker job and any associated in-progress model transfer.
+
+## Troubleshooting
+
+### A worker shows Offline
+
+Check that InvokeAI is running on the worker, the configured URL and port are correct, `host: 0.0.0.0` (or another accessible bind address) is configured, and the firewall or Docker port mapping permits access. The primary must reach the worker directly.
+
+### A worker shows Login required
+
+Expand its settings and save valid credentials for your account on that worker. Credentials are saved separately for each primary user; another user's saved login is not reused.
+
+### A worker cannot run a workflow
+
+Ensure it has a compatible InvokeAI build, the required custom nodes and sufficient GPU memory. If a model is missing, check whether it can be transferred automatically or install it manually. A remote out-of-memory failure is reported on the primary rather than endlessly retrying the same impossible workload.
+
+### A model transfer does not start or finish
+
+Check that **Transfer missing models** is on, the receiving worker allows the required private-network model download URLs, and the worker can reach the primary's advertised transfer host. For Docker or multi-network hosts, try the advanced primary-host override.
+
+### A Remote Only job stays waiting
+
+Confirm that distributed rendering is enabled, at least one configured worker is enabled and reachable, and that worker has available generation capacity. Remote Only intentionally does not render waiting jobs on local GPUs.
+
+### Missing or unexpected results
+
+Confirm the chosen Gallery or Canvas destination at submission time. Check the primary queue item and logs for worker execution or result-import failures. If the workflow relies on custom node outputs, ensure the same nodes and compatible versions are installed on the worker.

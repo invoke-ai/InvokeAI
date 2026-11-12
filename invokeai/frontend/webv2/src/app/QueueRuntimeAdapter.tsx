@@ -11,6 +11,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import { getOpenProject, getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import {
@@ -155,6 +156,7 @@ export const QueueRuntimeAdapter = () => {
         locks: createQueueRunLockPort(owner.storageSuffix),
         modelLoads: modelLoadActivitySink,
         nodeExecution: nodeExecutionStore,
+        remoteModelTransferToaster: toaster,
         viewerUserId: session.multiuserEnabled ? (session.user?.user_id ?? null) : null,
       });
       runtime.start();
