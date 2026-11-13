@@ -6,7 +6,12 @@ import {
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
 } from '@features/generation/runtime';
-import { getDefaultGenerateSettings, getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/settings';
+import {
+  getDefaultGenerateSettings,
+  getGenerationUiPolicy,
+  getSchedulerOptions,
+  isVaeAcceptedByBase,
+} from '@features/generation/settings';
 
 type GenerateMainModel = Parameters<typeof getDefaultGenerateSettings>[0] & { type: 'main' };
 
@@ -23,7 +28,11 @@ const readSchedulerPolicy: SchedulerPolicyReader = (model, currentValue) => {
 
 const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): SchedulerPolicyState => {
   if (snapshot.status === 'loaded' && snapshot.revision > 0) {
-    return { read: (model, currentValue) => readSchedulerPolicy(model, currentValue), status: 'ready' };
+    return {
+      getVaeFilter: (model) => isVaeAcceptedByBase(model.base, model.variant),
+      read: (model, currentValue) => readSchedulerPolicy(model, currentValue),
+      status: 'ready',
+    };
   }
   return snapshot.status === 'error' ? { status: 'unavailable' } : { status: 'loading' };
 };

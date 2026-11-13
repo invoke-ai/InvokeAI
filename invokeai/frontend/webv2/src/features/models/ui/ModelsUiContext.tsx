@@ -33,7 +33,11 @@ export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: 
 export type SchedulerPolicyState =
   | { status: 'loading' }
   | { status: 'unavailable' }
-  | { read: SchedulerPolicyReader; status: 'ready' };
+  | {
+      getVaeFilter: (model: SchedulerPolicyModel) => (candidate: ModelConfig) => boolean;
+      read: SchedulerPolicyReader;
+      status: 'ready';
+    };
 
 /** Generate's scheduler rules, loaded on first use so the Model Manager carries no Generation code at startup. */
 export interface SchedulerPolicySource {

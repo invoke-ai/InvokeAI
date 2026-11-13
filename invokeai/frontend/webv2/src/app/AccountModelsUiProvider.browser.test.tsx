@@ -183,6 +183,36 @@ describe('Account Models port on the Launchpad', () => {
       expect(await openOptions()).toEqual(['Euler', 'Heun (2nd order)', 'DPM++ 2M', 'DPM++ 2M SDE', 'ER-SDE', 'LCM']);
     });
 
+    it('offers compatible cross-base VAEs in the default settings picker', async () => {
+      const vae = (base: ModelConfig['base'], name: string, latentChannels: number): ModelConfig => ({
+        base,
+        file_size: 0,
+        format: 'checkpoint',
+        hash: base,
+        key: base,
+        latent_channels: latentChannels,
+        name,
+        path: name,
+        source: name,
+        source_type: 'path',
+        type: 'vae',
+      });
+      setModelsSnapshotForTests({
+        models: [vae('wan', 'Wan VAE', 16), vae('sdxl', 'SDXL VAE', 4)],
+        status: 'loaded',
+      });
+      await renderDefaults(settingsModel({ default_settings: { vae: 'default' } }));
+
+      const trigger = () =>
+        [...host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')].find((button) =>
+          button.textContent?.includes('models.defaultVae')
+        );
+      await expect.poll(() => trigger()?.disabled).toBe(false);
+      await act(() => trigger()!.click());
+      await expect.poll(() => document.querySelector('[role="option"]')?.textContent).toContain('Wan VAE');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+    });
+
     it('saves ER-SDE chosen for an SDXL model', async () => {
       await renderDefaults(settingsModel({ base: 'sdxl' }));
       await expect.poll(() => schedulerSwitch(host)?.disabled).toBe(false);

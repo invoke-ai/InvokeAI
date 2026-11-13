@@ -1,9 +1,8 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { AnyModelDefaultSettings } from '@features/models/core/types';
+import type { AnyModelDefaultSettings, ModelConfig } from '@features/models/core/types';
 import type { SchedulerPolicyState } from '@features/models/ui/ModelsUiContext';
 
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
-import { isVaeAcceptedByBase } from '@features/generation/settings';
 import { updateModel } from '@features/models/data/api';
 import {
   ensureFp8StorageSupportLoaded,
@@ -44,15 +43,15 @@ import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
  */
 
 const EMPTY_SETTINGS: AnyModelDefaultSettings = {};
+const rejectVae = () => false;
 const selectDefaultsDraft = (draft: ModelDraft | undefined) => draft?.defaults;
 
 interface FieldControlProps {
   control: DefaultSettingsControl;
   disabled: boolean;
   label: string;
-  /** The model being edited, for pickers restricted to what it accepts. */
-  model: DefaultSettingsModel;
   setValue: (value: unknown) => void;
+  vaeFilter: (candidate: ModelConfig) => boolean;
   value: unknown;
 }
 
@@ -60,7 +59,7 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
-const FieldControl = ({ control, disabled, label, model, setValue, value }: FieldControlProps) => {
+const FieldControl = ({ control, disabled, label, setValue, vaeFilter, value }: FieldControlProps) => {
   const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
@@ -141,9 +140,7 @@ const FieldControl = ({ control, disabled, label, model, setValue, value }: Fiel
     return (
       <ModelSelect
         disabled={disabled}
-        filter={(candidate) =>
-          !control.compatibleVae || isVaeAcceptedByBase(String(model.base), model.variant)(candidate)
-        }
+        filter={control.compatibleVae ? vaeFilter : undefined}
         isClearable
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
@@ -178,7 +175,7 @@ export const DefaultSettingsSection = ({
     void ensureFp8StorageSupportLoaded();
   });
   const fp8StorageSupported = useFp8StorageSupportSelector((snapshot) => isFp8StorageSupported(snapshot, model));
-  // Generate's scheduler rules load with the section, as the FP8 answer does; the row shows disabled until they do.
+  // Load Generate's scheduler and VAE compatibility rules with the section.
   const { schedulerPolicy: schedulerPolicySource } = useModelsUi();
   useMountEffect(() => {
     schedulerPolicySource.load();
@@ -187,6 +184,10 @@ export const DefaultSettingsSection = ({
     schedulerPolicySource.subscribe,
     schedulerPolicySource.getSnapshot,
     schedulerPolicySource.getSnapshot
+  );
+  const vaeFilter = useMemo(
+    () => (schedulerPolicyState.status === 'ready' ? schedulerPolicyState.getVaeFilter(model) : rejectVae),
+    [model, schedulerPolicyState]
   );
   const schedulerRules = useMemo((): SchedulerFieldRules | null => {
     if (model.type !== 'main') {
@@ -346,8 +347,8 @@ export const DefaultSettingsSection = ({
                   control={field.control}
                   disabled={!isEnabled || field.pending !== undefined}
                   label={t(field.labelKey)}
-                  model={model}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
+                  vaeFilter={vaeFilter}
                   value={isEnabled ? value : field.defaultValue}
                 />
               ) : null}
