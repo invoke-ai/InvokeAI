@@ -107,8 +107,13 @@ const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback,
   return () => clearTimeout(timer);
 };
 
+/** Non-terminal states observed on this utility's backend items. */
+export type UtilityGraphExecutionStatus = 'pending' | 'in_progress';
+
 /** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
 export interface RunUtilityGraphOptions {
+  /** Observed execution state for this utility only; never an inferred state before enqueue acceptance. */
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
   /** Runs an interactive utility ahead of queued generation items when requested. */
   prepend?: boolean;
   /** The graph to enqueue and await. */
@@ -273,12 +278,14 @@ interface UtilityItemWatch {
 const watchUtilityItems = ({
   hub,
   onOutcome,
+  onStatus,
   origin,
   readItemStatus,
   signal,
 }: {
   hub: UtilityHub;
   onOutcome: (error: UtilityQueueError | null) => void;
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
   origin: string;
   readItemStatus: UtilityItemStatusReader;
   signal?: AbortSignal;
@@ -306,6 +313,9 @@ const watchUtilityItems = ({
       }
       try {
         const item = await readItemStatus(itemId, signal);
+        if (!detached && (item.status === 'pending' || item.status === 'in_progress')) {
+          onStatus?.(item.status);
+        }
         const outcome = detached ? undefined : toTerminalUtilityOutcome(item.status, item.errorMessage, item.errorType);
         if (outcome !== undefined) {
           onOutcome(outcome);
@@ -336,6 +346,9 @@ const watchUtilityItems = ({
       hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
         if (event.origin !== origin) {
           return;
+        }
+        if (!detached && (event.status === 'pending' || event.status === 'in_progress')) {
+          onStatus?.(event.status);
         }
         const outcome = toTerminalUtilityOutcome(event.status, event.error_message, event.error_type);
         if (outcome !== undefined) {
@@ -578,6 +591,28 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     const detachers: Array<() => void> = [];
     let watch: UtilityItemWatch | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let progressTimer: ReturnType<typeof setTimeout> | null = null;
+    let executionStatus: UtilityGraphExecutionStatus | null = null;
+    const publishStatus = (status: UtilityGraphExecutionStatus): void => {
+      if (settled || completionReceived || status === executionStatus || executionStatus === 'in_progress') {
+        return;
+      }
+      executionStatus = status;
+      try {
+        options.onStatus?.(status);
+      } catch {
+        // A progress observer must not interrupt queue settlement or cancellation.
+      }
+    };
+    const armProgressPoll = (): void => {
+      if (settled || completionReceived || !options.onStatus) {
+        return;
+      }
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
+        void watch?.read().then(armProgressPoll);
+      }, 2000);
+    };
 
     const cancelAcceptedItems = (): void => {
       if (
@@ -605,6 +640,10 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     };
 
     const cleanup = (): void => {
+      if (progressTimer !== null) {
+        clearTimeout(progressTimer);
+        progressTimer = null;
+      }
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
@@ -781,6 +820,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           completionReceived = true;
           reconcileCompletion();
         },
+        onStatus: options.onStatus ? publishStatus : undefined,
         origin,
         readItemStatus,
         signal,
@@ -837,6 +877,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         cancelAcceptedItems();
         if (!settled) {
           reconcileCompletion();
+          if (options.onStatus && !completionReceived) {
+            void watch?.read().then(armProgressPoll);
+          }
         }
       })
       .catch((error: unknown) => {

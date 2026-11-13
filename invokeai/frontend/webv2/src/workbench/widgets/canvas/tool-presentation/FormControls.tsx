@@ -176,6 +176,7 @@ export const useSliderGesture = (
 export const ApplyCancelBar = ({
   applyDisabled = true,
   applyLoading = false,
+  applyLabel,
   cancelDisabled = true,
   children,
   onApply,
@@ -183,6 +184,7 @@ export const ApplyCancelBar = ({
 }: {
   applyDisabled?: boolean;
   applyLoading?: boolean;
+  applyLabel?: ReactNode;
   cancelDisabled?: boolean;
   children?: ReactNode;
   onApply?: () => void;
@@ -202,7 +204,7 @@ export const ApplyCancelBar = ({
         variant="solid"
         onClick={onApply}
       >
-        {t('common.apply')}
+        {applyLabel ?? t('common.apply')}
       </Button>
       <Button data-pane-action="cancel" disabled={cancelDisabled} flexShrink={0} variant="ghost" onClick={onCancel}>
         {t('common.cancel')}

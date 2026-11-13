@@ -33,7 +33,7 @@ import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
 import { isTransformEligible } from '@workbench/canvas-engine/tools/transformTool';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
-import type { CanvasMutationContext, EditStep } from './mutationContext';
+import type { CanvasMutationContext, EditPublishResult, EditStep } from './mutationContext';
 
 import { replaceLayerStep, rgbaBytes, withReplayReservation } from './editSteps';
 
@@ -41,7 +41,8 @@ export type TransformResampler = (
   surface: RasterSurface,
   target: { width: number; height: number },
   mode: TransformOptions['resampleMode'],
-  signal: AbortSignal
+  signal: AbortSignal,
+  onProgress?: (phase: 'queued' | 'resampling') => void
 ) => Promise<ImageData>;
 
 export interface TransformEditingControllerOptions {
@@ -113,6 +114,7 @@ const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>
  */
 export class TransformEditingController {
   private disposed = false;
+  private publishingResampled = false;
   private processing: { abort: AbortController; layer: CanvasLayerContract } | null = null;
 
   constructor(private readonly deps: TransformEditingControllerOptions) {}
@@ -182,7 +184,7 @@ export class TransformEditingController {
       const document = this.deps.getDocument();
       const layer = this.processing.layer;
       if (
-        getDocumentLayer(document, layer.id) !== layer ||
+        (!this.publishingResampled && getDocumentLayer(document, layer.id) !== layer) ||
         document?.selectedLayerId !== layer.id ||
         !isLeafEditable(lookupDocumentLeaf(document, layer.id))
       ) {
@@ -255,7 +257,7 @@ export class TransformEditingController {
     if (this.disposed || !session || this.processing) {
       return;
     }
-    this.deps.session.set({ ...session, transform });
+    this.deps.session.set({ ...session, transform, applyFailed: false });
     this.deps.setOverride(session.layerId, transform);
     this.deps.invalidate({ layers: [session.layerId], overlay: true });
   }
@@ -420,6 +422,13 @@ export class TransformEditingController {
     }
   }
 
+  private markApplyFailed(): void {
+    const session = this.deps.session.get();
+    if (session) {
+      this.deps.session.set({ ...session, applyFailed: true });
+    }
+  }
+
   /** Snapshot before the network wait; no transaction or mutable cache is held across it. */
   private async applyRasterized(
     session: TransformSession,
@@ -434,6 +443,7 @@ export class TransformEditingController {
       isEmpty(cache.rect) ||
       (mode !== null && !this.deps.resample)
     ) {
+      this.markApplyFailed();
       this.deps.reportRefusal('not-ready');
       return;
     }
@@ -448,13 +458,14 @@ export class TransformEditingController {
       rgbaBytes(beforeRect) * (bakesAdjustments ? 3 : 1) + rgbaBytes(afterRect) * (mode === null ? 4 : 8)
     );
     if (!lease) {
+      this.markApplyFailed();
       this.deps.reportRefusal('over-budget');
       return;
     }
     const version = cache.version;
     const pending = { abort: new AbortController(), layer };
     this.processing = pending;
-    this.deps.session.set({ ...session, processing: true });
+    this.deps.session.set({ ...session, processing: true, processingPhase: 'preparing', applyFailed: false });
     const current = () =>
       !this.disposed &&
       this.processing === pending &&
@@ -480,6 +491,7 @@ export class TransformEditingController {
         }
         if (adjusted.status !== 'ok') {
           if (adjusted.status !== 'aborted') {
+            this.markApplyFailed();
             this.deps.reportRefusal(adjustmentRefusal(this.deps.getDocument(), layer.id, adjusted.status));
           }
           return;
@@ -506,7 +518,14 @@ export class TransformEditingController {
       const after =
         mode === null
           ? surface.ctx.getImageData(0, 0, afterRect.width, afterRect.height)
-          : await this.deps.resample!(surface, afterRect, mode, pending.abort.signal);
+          : await this.deps.resample!(surface, afterRect, mode, pending.abort.signal, (phase) => {
+              if (current()) {
+                const active = this.deps.session.get();
+                if (active) {
+                  this.deps.session.set({ ...active, processingPhase: phase });
+                }
+              }
+            });
       if (!current()) {
         return;
       }
@@ -517,6 +536,7 @@ export class TransformEditingController {
         historyBytes: before.data.byteLength + after.data.byteLength + HISTORY_ENTRY_OVERHEAD_BYTES,
       });
       if (!('publish' in txn)) {
+        this.markApplyFailed();
         this.deps.reportRefusal(txn.status);
         return;
       }
@@ -535,21 +555,31 @@ export class TransformEditingController {
         const change: BakeChange = { from: layer, kind: 'contract', to: paint };
         const forward = () => this.bakeStep(layer.id, change, afterRect, after);
         const backward = () => this.bakeStep(layer.id, reversed(change), beforeRect, before);
-        const result = txn.publish('Transform layer', forward(), {
-          bytes: before.data.byteLength + after.data.byteLength + HISTORY_ENTRY_OVERHEAD_BYTES,
-          heldAssetRefs: collectHistoryMediaRefs(layer, paint),
-          redo: () => this.replay(forward, afterRect),
-          undo: () => this.replay(backward, beforeRect),
-        });
+        const preparedStep = forward();
+        let result: EditPublishResult;
+        // The mirror notifies synchronously for both our replacement and its possible rollback.
+        // Only the layer-identity check waits for publication's verified outcome; selection/locks still cancel.
+        this.publishingResampled = true;
+        try {
+          result = txn.publish('Transform layer', preparedStep, {
+            bytes: before.data.byteLength + after.data.byteLength + HISTORY_ENTRY_OVERHEAD_BYTES,
+            heldAssetRefs: collectHistoryMediaRefs(layer, paint),
+            redo: () => this.replay(forward, afterRect),
+            undo: () => this.replay(backward, beforeRect),
+          });
+        } finally {
+          this.publishingResampled = false;
+        }
         if (result.status === 'committed') {
           this.deps.rebaseLineEnd(layer.id, session.transform);
         }
-        this.settle(result.status);
+        this.settleResampled(result);
       } finally {
         txn.end();
       }
     } catch (error) {
       if (current()) {
+        this.markApplyFailed();
         if (this.deps.reportFailure) {
           this.deps.reportFailure(layer.id, error);
         } else {
@@ -562,7 +592,7 @@ export class TransformEditingController {
         this.processing = null;
         const active = this.deps.session.get();
         if (active) {
-          this.deps.session.set({ ...active, processing: false });
+          this.deps.session.set({ ...active, processing: false, processingPhase: undefined });
         }
       }
     }
@@ -571,6 +601,20 @@ export class TransformEditingController {
   /** Replays a bake step, reserving the whole-layer pixels it installs; throws, leaving it in place, when they do not fit. */
   private replay(step: () => EditStep, rect: Rect): void {
     withReplayReservation(this.deps.ctx, rgbaBytes(rect) * 2, () => this.deps.ctx.applyStep(step()));
+  }
+
+  private settleResampled(result: EditPublishResult): void {
+    if (result.status === 'committed') {
+      this.cancel();
+      return;
+    }
+    if (result.status === 'postcondition-failed' && result.recovered !== 'reverted') {
+      // The mutation context reports unsafe rollback failures; its document can no longer support this preview.
+      this.cancel();
+      return;
+    }
+    this.markApplyFailed();
+    this.deps.reportRefusal(isRefusal(result.status) ? result.status : 'not-ready');
   }
 
   private settle(status: StructuralCommitResult['status']): void {

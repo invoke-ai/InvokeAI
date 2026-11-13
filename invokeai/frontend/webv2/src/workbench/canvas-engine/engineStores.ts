@@ -286,6 +286,8 @@ export interface TransformOptions {
 
 export interface TransformSession {
   processing?: boolean;
+  processingPhase?: 'preparing' | 'queued' | 'resampling';
+  applyFailed?: boolean;
   layerId: string;
   startTransform: LayerTransform;
   transform: LayerTransform;
@@ -646,6 +648,8 @@ const transformSessionEqual = (a: TransformSession | null, b: TransformSession |
   }
   return (
     a.processing === b.processing &&
+    a.processingPhase === b.processingPhase &&
+    a.applyFailed === b.applyFailed &&
     a.layerId === b.layerId &&
     transformEqual(a.startTransform, b.startTransform) &&
     transformEqual(a.transform, b.transform)

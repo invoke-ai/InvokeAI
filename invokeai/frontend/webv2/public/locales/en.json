@@ -2980,6 +2980,10 @@
       }
     },
     "transform": {
+      "waitingProcessing": "Waiting for processing…",
+      "resamplingProgress": "Resampling…",
+      "preparingProgress": "Preparing transform…",
+      "applyFailed": "Transform could not be applied. Try again.",
       "smoothing": "Smoothing",
       "resampleMode": "Resample Mode",
       "resampling": "Resampling",

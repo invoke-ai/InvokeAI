@@ -458,19 +458,30 @@ const TransformFooter = ({ engine }: ToolFormProps) => {
   const disabled = !session && !hasFloat;
   const onApply = useCallback(() => engine.layers.applyTransform(), [engine]);
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
-  const pendingText = t('widgets.canvas.transformPending');
+  const pendingText = session?.processing
+    ? session.processingPhase === 'queued'
+      ? t('widgets.transform.waitingProcessing')
+      : session.processingPhase === 'resampling'
+        ? t('widgets.transform.resamplingProgress')
+        : t('widgets.transform.preparingProgress')
+    : session?.applyFailed
+      ? t('widgets.transform.applyFailed')
+      : isPending
+        ? t('widgets.canvas.transformPending')
+        : '';
   return (
     <ApplyCancelBar
       applyDisabled={disabled || session?.processing === true}
       applyLoading={session?.processing}
+      applyLabel={session?.applyFailed ? t('common.retry') : undefined}
       cancelDisabled={disabled}
       onApply={onApply}
       onCancel={onCancel}
     >
       {/* Always mounted, so screen readers hear the wait start and end as the live region's text changes. The
           tooltip shows the whole line where a narrow pane truncates it. */}
-      <Text color="fg.muted" role="status" truncate>
-        {isPending ? (
+      <Text color={session?.applyFailed ? 'fg.error' : 'fg.muted'} role="status" truncate>
+        {pendingText ? (
           <Tooltip content={pendingText}>
             <span>{pendingText}</span>
           </Tooltip>

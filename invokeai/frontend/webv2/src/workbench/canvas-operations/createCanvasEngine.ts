@@ -149,7 +149,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   const composition = createCanvasEngineCore({
     ...coreOptions,
     getMainModelBase: options.getMainModelBase,
-    resampleTransform: async (surface, target, mode, signal) => {
+    resampleTransform: async (surface, target, mode, signal, onProgress) => {
       const lifetime = AbortSignal.any([owner.signal, uploadLifetime.signal]);
       signal.throwIfAborted();
       lifetime.throwIfAborted();
@@ -165,7 +165,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
         resolveImage: options.imageResolver,
         upload: (blob, uploadSignal) => uploadImage(blob, { isIntermediate: true, signal: uploadSignal }),
         runGraph: (runOptions) => canvasApplicationPort.runGraph(runOptions),
-      })(surface, target, mode, signal);
+      })(surface, target, mode, signal, onProgress);
     },
     uploadImage: (blob) => uploadImage(blob),
     uploadIntermediateImage: (blob) => uploadImage(blob, { isIntermediate: true }),

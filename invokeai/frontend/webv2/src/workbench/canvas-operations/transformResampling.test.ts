@@ -88,3 +88,26 @@ describe('transform resampling adapter', () => {
     expect(h.resolveImage).not.toHaveBeenCalled();
   });
 });
+
+it('maps observed queue states and fences late progress after the lifetime ends', async () => {
+  const h = harness();
+  const onProgress = vi.fn();
+  let onStatus: ((status: 'pending' | 'in_progress') => void) | undefined;
+  h.runGraph.mockImplementation((options) => {
+    onStatus = options.onStatus;
+    onStatus?.('pending');
+    onStatus?.('in_progress');
+    return Promise.resolve({ imageName: 'resized.png', width: 3, height: 2 });
+  });
+  await h.resample(
+    h.backend.createSurface(6, 4),
+    { width: 3, height: 2 },
+    'lanczos',
+    new AbortController().signal,
+    onProgress
+  );
+  expect(onProgress.mock.calls).toEqual([['queued'], ['resampling']]);
+  h.lifetime.abort();
+  onStatus?.('pending');
+  expect(onProgress.mock.calls).toEqual([['queued'], ['resampling']]);
+});

@@ -5,5 +5,6 @@ export {
   UtilityQueueError,
   type RunUtilityGraphOptions,
   type UtilityGraphResult,
+  type UtilityGraphExecutionStatus,
   type UtilityGraphSubmission,
 } from './runtime/utilityGraph';

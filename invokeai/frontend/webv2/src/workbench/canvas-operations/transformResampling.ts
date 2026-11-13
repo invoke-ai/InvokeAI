@@ -1,3 +1,4 @@
+import type { UtilityGraphExecutionStatus } from '@features/queue/utility';
 import type { ImageResolver, TransformOptions } from '@workbench/canvas-engine/api';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { BackendGraphContract } from '@workbench/graphContracts';
@@ -8,6 +9,7 @@ export interface TransformResamplingDeps {
   resolveImage: ImageResolver;
   upload(blob: Blob, signal: AbortSignal): Promise<{ imageName: string }>;
   runGraph(options: {
+    onStatus?: (status: UtilityGraphExecutionStatus) => void;
     prepend: boolean;
     graph: BackendGraphContract;
     outputNodeId: string;
@@ -22,7 +24,8 @@ export const createTransformResampler =
     surface: RasterSurface,
     target: { width: number; height: number },
     mode: TransformOptions['resampleMode'],
-    signal: AbortSignal
+    signal: AbortSignal,
+    onProgress?: (phase: 'queued' | 'resampling') => void
   ): Promise<ImageData> => {
     signal = AbortSignal.any([signal, deps.lifetime]);
     signal.throwIfAborted();
@@ -31,6 +34,7 @@ export const createTransformResampler =
     const image = await deps.upload(blob, signal);
     signal.throwIfAborted();
     const id = 'transform_resample';
+    let resamplingObserved = false;
     const output = await deps.runGraph({
       graph: {
         id,
@@ -49,11 +53,24 @@ export const createTransformResampler =
       },
       outputNodeId: id,
       prepend: true,
+      onStatus: onProgress
+        ? (status) => {
+            if (!signal.aborted) {
+              if (status === 'in_progress') {
+                resamplingObserved = true;
+              }
+              onProgress(status === 'pending' ? 'queued' : 'resampling');
+            }
+          }
+        : undefined,
       signal,
     });
     signal.throwIfAborted();
     if (output.width !== target.width || output.height !== target.height) {
       throw new Error('Transform resize returned unexpected dimensions');
+    }
+    if (!resamplingObserved) {
+      onProgress?.('resampling');
     }
     const result = await deps.resolveImage(output.imageName, signal);
     signal.throwIfAborted();

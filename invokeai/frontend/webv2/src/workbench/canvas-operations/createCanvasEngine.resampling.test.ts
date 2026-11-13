@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => {
     release,
     loads: 0,
     resample: undefined as CoreOptions['resampleTransform'],
-    run: vi.fn(() => Promise.resolve({ width: 3, height: 2 } as ImageData)),
+    run: vi.fn<NonNullable<CoreOptions['resampleTransform']>>(() =>
+      Promise.resolve({ width: 3, height: 2 } as ImageData)
+    ),
     create: vi.fn(),
   };
 });
@@ -86,7 +88,18 @@ describe('canvas transform resampling loading', () => {
     const signal = new AbortController().signal;
     await expect(resample(surface, target, 'bicubic', signal)).resolves.toMatchObject(target);
     expect(mocks.loads).toBe(1);
-    expect(mocks.run).toHaveBeenCalledExactlyOnceWith(surface, target, 'bicubic', signal);
+    expect(mocks.run).toHaveBeenCalledExactlyOnceWith(surface, target, 'bicubic', signal, undefined);
+    const onProgress = vi.fn();
+    mocks.run.mockImplementationOnce((_surface, _target, _mode, _signal, progress) => {
+      progress?.('queued');
+      progress?.('resampling');
+      return Promise.resolve({ width: 3, height: 2 } as ImageData);
+    });
+    await expect(resample(surface, target, 'lanczos', signal, onProgress)).resolves.toMatchObject(target);
+    expect(mocks.run).toHaveBeenCalledTimes(2);
+    expect(mocks.run).toHaveBeenNthCalledWith(2, surface, target, 'lanczos', signal, onProgress);
+    expect(onProgress.mock.calls).toEqual([['queued'], ['resampling']]);
+    expect(mocks.loads).toBe(1);
     engine.lifecycle.dispose();
   });
 });

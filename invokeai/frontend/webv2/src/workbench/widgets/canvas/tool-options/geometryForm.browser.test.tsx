@@ -1,4 +1,4 @@
-import type { CanvasInteractionState, Rect } from '@workbench/canvas-engine/api';
+import type { CanvasInteractionState, Rect, TransformSession } from '@workbench/canvas-engine/api';
 import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -80,7 +80,12 @@ const createEngine = () => {
       state.pendingTransformLayerId = layerId;
       listeners.get('pendingTransformLayerId')?.forEach((listener) => listener());
     });
-  return { engine: engine as unknown as ToolFormProps['engine'], setPending };
+  const setSession = (session: TransformSession | null) =>
+    act(() => {
+      state.transformSession = session;
+      listeners.get('transformSession')?.forEach((listener) => listener());
+    });
+  return { engine: engine as unknown as ToolFormProps['engine'], setPending, setSession };
 };
 
 /** Renders the footer `width` px wide. */
@@ -102,6 +107,38 @@ const renderFooter = async (engine: ToolFormProps['engine'], width = 320) => {
 };
 
 describe('Transform footer', () => {
+  const transform = { rotation: 0, scaleX: 2, scaleY: 2, x: 40, y: 10 };
+  const session = { layerId: 'layer-1', startTransform: { ...transform, scaleX: 1, scaleY: 1 }, transform };
+
+  it('announces queued and running resampling with Cancel available throughout', async () => {
+    const h = createEngine();
+    await renderFooter(h.engine);
+    await h.setSession({ ...session, processing: true, processingPhase: 'preparing' });
+    await expect.element(page.getByRole('status')).toHaveTextContent('Preparing transform…');
+    await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
+    await h.setSession({ ...session, processing: true, processingPhase: 'queued' });
+    await expect.element(page.getByRole('status')).toHaveTextContent('Waiting for processing…');
+    await expect.element(page.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+    await h.setSession({ ...session, processing: true, processingPhase: 'resampling' });
+    await expect.element(page.getByRole('status')).toHaveTextContent('Resampling…');
+    await userEvent.click(page.getByRole('button', { name: 'Cancel', exact: true }));
+    expect(h.engine.layers.cancelTransform).toHaveBeenCalledOnce();
+  });
+
+  it('offers Retry after a failed apply, and returns to progress for the next attempt', async () => {
+    const h = createEngine();
+    await renderFooter(h.engine);
+    await h.setSession({ ...session, processing: false, applyFailed: true });
+    await expect.element(page.getByRole('status')).toHaveTextContent('Transform could not be applied. Try again.');
+    await expect.element(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();
+    await expect.element(page.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+    await userEvent.click(page.getByRole('button', { name: 'Retry', exact: true }));
+    expect(h.engine.layers.applyTransform).toHaveBeenCalledOnce();
+    await h.setSession({ ...session, processing: true, processingPhase: 'preparing', applyFailed: false });
+    await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
+    await expect.element(page.getByRole('status')).toHaveTextContent('Preparing transform…');
+  });
+
   it('says while a transform waits for its stroke to save, in a polite live region, and clears after', async () => {
     const { engine, setPending } = createEngine();
     await renderFooter(engine);
