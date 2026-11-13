@@ -10,7 +10,7 @@ export const getNodeSubtitle = (
     const { cfg_scale: cfg, steps } = node.inputs;
 
     if (typeof cfg === 'number' && typeof steps === 'number') {
-      return t('graphPreview.nodeSummary.denoise', { cfg, steps });
+      return t('graphPreview.nodeSummary.denoise', { cfg, count: steps });
     }
 
     return null;
@@ -63,9 +63,12 @@ export const getWorkflowNodeSummary = (values: Readonly<Record<string, unknown>>
     const cfg = getNumber(values, 'cfg_scale');
 
     return frames !== null
-      ? t('workflowLibrary.preview.summaryFramesSteps', { frames, steps })
+      ? t('workflowLibrary.preview.summaryFramesSteps', {
+          frames: t('workflowLibrary.preview.summaryFrames', { count: frames }),
+          steps: t('workflowLibrary.preview.summarySteps', { count: steps }),
+        })
       : cfg !== null
-        ? t('graphPreview.nodeSummary.denoise', { cfg, steps })
+        ? t('graphPreview.nodeSummary.denoise', { cfg, count: steps })
         : t('workflowLibrary.preview.summarySteps', { count: steps });
   }
 
@@ -87,7 +90,7 @@ export const formatWorkflowPreviewValue = (value: WorkflowPreviewValue, t: TFunc
     case 'list':
       return t('workflowLibrary.preview.valueItems', { count: value.count });
     case 'number':
-      return value.value.toLocaleString();
+      return t('workflowLibrary.preview.valueNumber', { value: value.value });
     case 'image':
     case 'model':
       return value.name;
