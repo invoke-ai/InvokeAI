@@ -6,7 +6,7 @@ import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/
 
 export type DefaultSettingsModel = Pick<
   ModelConfig,
-  'base' | 'default_settings' | 'format' | 'key' | 'type' | 'variant'
+  'base' | 'default_settings' | 'format' | 'key' | 'name' | 'submodels' | 'type' | 'variant'
 >;
 
 const CONTROL_ADAPTER_TYPES = new Set(['controlnet', 't2i_adapter', 'control_lora']);
@@ -38,8 +38,11 @@ export type DefaultSettingsControl =
   | {
       kind: 'model';
       modelTypes: readonly ModelTaxonomyType[];
-      /** Restrict candidates to the edited model's base. */
-      sameBase: boolean;
+      /**
+       * Candidates are the VAEs Generate accepts for the edited model, which can be of another base. Until Generate's
+       * rules arrive, only VAEs of the model's own base are offered.
+       */
+      generateVaeRule: boolean;
       /** Placeholder shown for the backend's 'default' sentinel. */
       placeholderKey: string;
     };
@@ -75,7 +78,7 @@ const FP8_STORAGE_FIELD: FieldSpec = {
 };
 
 const VAE_FIELD: FieldSpec = {
-  control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
+  control: { kind: 'model', modelTypes: ['vae'], generateVaeRule: true, placeholderKey: 'models.defaultVae' },
   // The backend sentinel for "the compatible default VAE" — what legacy
   // writes when the toggle is on but no specific model is picked.
   defaultValue: 'default',
@@ -232,6 +235,7 @@ export const validateDefaults = (
     const result = mainDefaultSettingsSchema.safeParse({
       cfgRescaleMultiplier: settings.cfg_rescale_multiplier ?? null,
       cfgScale: settings.cfg_scale ?? null,
+      components: settings.components ?? null,
       guidance: settings.guidance ?? null,
       height: settings.height ?? null,
       scheduler: settings.scheduler ?? null,

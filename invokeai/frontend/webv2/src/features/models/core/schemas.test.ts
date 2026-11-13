@@ -92,6 +92,36 @@ describe('mainDefaultSettingsSchema', () => {
   });
 });
 
+describe('mainDefaultSettingsSchema default components', () => {
+  const parse = (components: Record<string, string> | null) =>
+    mainDefaultSettingsSchema.safeParse({
+      cfgRescaleMultiplier: null,
+      cfgScale: null,
+      components,
+      guidance: null,
+      height: null,
+      scheduler: null,
+      steps: null,
+      vae: null,
+      vaePrecision: null,
+      width: null,
+    });
+
+  it('accepts slot names with a model key each, or none', () => {
+    expect(parse({ qwen3_5_encoder: 'key-1', t5_encoder: 'key-2' }).success).toBe(true);
+    expect(parse(null).success).toBe(true);
+  });
+
+  it.each([
+    ['the VAE, which has its own field', { vae: 'key' }],
+    ['a slot name outside a-z, 0-9 and _', { 'T5-Encoder': 'key' }],
+    ['a blank model key', { t5_encoder: '  ' }],
+    ['more than sixteen entries', Object.fromEntries(Array.from({ length: 17 }, (_, index) => [`slot_${index}`, 'k']))],
+  ])('rejects %s', (_label, components) => {
+    expect(parse(components).success).toBe(false);
+  });
+});
+
 describe('canonicalLocalPath', () => {
   it.each([
     ['C:\\Users\\Me\\x.safetensors', 'c:/users/me/x.safetensors'],

@@ -1,16 +1,25 @@
-import type { GenerateModelConfig, GenerateSettings, VaeModelConfig } from '@features/generation/core/types';
+import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
+import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 import type { TFunction } from 'i18next';
 
 import { formatAspectRatio } from '@features/generation/core/aspectRatioPresets';
 import {
   getDefaultGenerateSettings,
+  getComponentSectionPolicy,
   getGenerationDimensions,
   getGenerationUiPolicy,
+  getModelDefaultComponents,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   resolveModelDefaultVae,
 } from '@features/generation/core/baseGenerationPolicies';
-import { clampDimension, getActiveAspectRatio, isAspectRatioLocked } from '@features/generation/core/settings';
+import { DEFAULT_COMPONENT_SLOTS, type DefaultComponentSlot } from '@features/generation/core/componentDefaults';
+import {
+  clampDimension,
+  getActiveAspectRatio,
+  isAspectRatioLocked,
+  isVaeModelConfig,
+} from '@features/generation/core/settings';
 
 import {
   doesModelSetDefault,
@@ -22,10 +31,18 @@ import {
 // The Generate reset menu's plan and wording. Only that menu reads them, and it loads with the menu, off the editor's
 // startup; the fields' reset labels read `modelDefaultSettings`.
 
-/** What a reset is described by: the settings, plus the aspect ratio lock a size change can set or release. */
-export type DescribedSetting = ModelDefaultSetting | 'aspectRatio';
+/** A component slot a main model can store a default model for. */
+type ComponentSetting = DefaultComponentSlot['setting'];
 
-/** In the order the form shows them: Size, then Render, then Advanced. */
+/** What a reset is described by: the settings, the aspect ratio lock a size change can set or release, components. */
+export type DescribedSetting = ModelDefaultSetting | 'aspectRatio' | ComponentSetting;
+
+const COMPONENT_SETTINGS: readonly ComponentSetting[] = DEFAULT_COMPONENT_SLOTS.map(({ setting }) => setting);
+
+const isComponentSetting = (setting: DescribedSetting): setting is ComponentSetting =>
+  (COMPONENT_SETTINGS as readonly DescribedSetting[]).includes(setting);
+
+/** In the order the form shows them: Size, then Render, then Components, then Advanced. */
 const DESCRIBED_SETTINGS: readonly DescribedSetting[] = [
   'size',
   'aspectRatio',
@@ -33,12 +50,20 @@ const DESCRIBED_SETTINGS: readonly DescribedSetting[] = [
   'cfgScale',
   'scheduler',
   'vae',
+  ...COMPONENT_SETTINGS,
   'vaePrecision',
   'cfgRescaleMultiplier',
 ];
 
-/** Whether the form shows the setting for this family, so a value its graph ignores is neither applied nor told. */
+/**
+ * Whether the form shows the setting for this family, so a value its graph ignores is neither applied nor told. A
+ * component changes only to a default for a slot the family offers, so its change is always told.
+ */
 const isShown = (setting: DescribedSetting, model: GenerateModelConfig): boolean => {
+  if (isComponentSetting(setting)) {
+    return true;
+  }
+
   const policy = getGenerationUiPolicy(model);
 
   switch (setting) {
@@ -95,7 +120,9 @@ const isSettingChanged = (setting: DescribedSetting, before: GenerateSettings, a
     case 'vae':
       return (before.vae?.key ?? null) !== (after.vae?.key ?? null);
     default:
-      return !Object.is(before[setting], after[setting]);
+      return isComponentSetting(setting)
+        ? (before[setting]?.key ?? null) !== (after[setting]?.key ?? null)
+        : !Object.is(before[setting], after[setting]);
   }
 };
 
@@ -114,8 +141,8 @@ export interface ApplyModelDefaultsPlan {
   /** Only the settings that change; empty when the model's defaults already hold. */
   patch: Partial<GenerateSettings>;
   changed: readonly DescribedSetting[];
-  /** Shown settings the model sets a default for, changed or not. */
-  defined: readonly ModelDefaultSetting[];
+  /** Shown settings and component slots the model sets a usable default for, changed or not. */
+  defined: readonly (ModelDefaultSetting | ComponentSetting)[];
   /** Shown settings the model sets no default for, which applying leaves as they are. */
   unset: readonly ModelDefaultSetting[];
   /** The model names a VAE that is not installed or does not fit; the user's VAE stays. */
@@ -124,22 +151,38 @@ export interface ApplyModelDefaultsPlan {
 
 /**
  * Apply model defaults: only the values the model's own defaults set, as the legacy "Use default settings" did. A
- * setting the model leaves unset keeps its value, and a set one that already matches is left out of the patch.
+ * setting the model leaves unset keeps its value, and a set one that already matches is left out of the patch. A
+ * default component replaces the slot's selection; one that is not installed or does not fit is skipped, and the
+ * slots the model stores no default for are not listed as unset.
  */
 export const getApplyModelDefaultsPlan = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  vaeModels: readonly VaeModelConfig[]
+  models: readonly ModelConfig[]
 ): ApplyModelDefaultsPlan => {
   const defaults = getDefaultGenerateSettings(model);
-  const defaultVae = resolveModelDefaultVae(model, settings, vaeModels);
+  const components = getModelDefaultComponents(model, settings, models, { replace: true });
+  const withComponents = { ...settings, ...components };
+  // A default component source can bundle the VAE, so the VAE is judged beside the default components.
+  const defaultVae = resolveModelDefaultVae(model, withComponents, models.filter(isVaeModelConfig));
   // Where the VAE has no field of its own, a default the model sets is still applied and told.
   const isVaeShown = getGenerationUiPolicy(model).sdVaeVisible || defaultVae.kind !== 'none';
   const patch: Partial<GenerateSettings> = {};
-  const defined: ModelDefaultSetting[] = [];
+  const defined: (ModelDefaultSetting | ComponentSetting)[] = [];
   const unset: ModelDefaultSetting[] = [];
 
   for (const setting of DESCRIBED_SETTINGS) {
+    if (isComponentSetting(setting)) {
+      if (setting in components) {
+        defined.push(setting);
+
+        if (isSettingChanged(setting, settings, withComponents)) {
+          Object.assign(patch, { [setting]: components[setting] });
+        }
+      }
+      continue;
+    }
+
     if (setting === 'aspectRatio' || !isShown(setting, model) || (setting === 'vae' && !isVaeShown)) {
       continue;
     }
@@ -177,16 +220,22 @@ export const getApplyModelDefaultsPlan = (
 };
 
 /**
- * Settings with every model-governed value reset: the model's where it sets one, the base's otherwise. The VAE changes
- * only to one the model's defaults can apply; otherwise the user's stays, since the base has no VAE to return to.
+ * Settings with every model-governed value reset: the model's where it sets one, the base's otherwise. The VAE and
+ * each component change only to a default the model can apply; otherwise the user's stays, since the base has none
+ * to return to.
  */
 export const getModelDefaultSettings = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  vaeModels: readonly VaeModelConfig[]
+  models: readonly ModelConfig[]
 ): GenerateSettings => {
-  const nextSettings = getSettingsWithModelDefaults(settings, model);
-  const defaultVae = resolveModelDefaultVae(model, settings, vaeModels);
+  const withDefaults = getSettingsWithModelDefaults(settings, model);
+  // Components first: a default component source can bundle the VAE.
+  const nextSettings = {
+    ...withDefaults,
+    ...getModelDefaultComponents(model, withDefaults, models, { replace: true }),
+  };
+  const defaultVae = resolveModelDefaultVae(model, nextSettings, models.filter(isVaeModelConfig));
 
   // The menu's policy for a default VAE that cannot apply: the user's VAE stays, and the menu says so.
   return defaultVae.kind === 'apply' ? { ...nextSettings, vae: defaultVae.vae } : nextSettings;
@@ -214,20 +263,44 @@ const MODEL_DEFAULT_VALUE_KEYS = [
 export const getModelDefaultsPatch = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  vaeModels: readonly VaeModelConfig[]
+  models: readonly ModelConfig[]
 ): Partial<GenerateSettings> => {
-  const defaults = getModelDefaultSettings(settings, model, vaeModels);
+  const defaults = getModelDefaultSettings(settings, model, models);
   const patch: Partial<GenerateSettings> = { vae: defaults.vae };
 
   for (const key of MODEL_DEFAULT_VALUE_KEYS) {
     (patch as Record<string, unknown>)[key] = defaults[key];
   }
 
+  // Only the component slots a default changes; the others keep their selection untouched.
+  for (const setting of COMPONENT_SETTINGS) {
+    if (defaults[setting] !== settings[setting]) {
+      Object.assign(patch, { [setting]: defaults[setting] });
+    }
+  }
+
   return patch;
 };
 
+/**
+ * A component slot's name as the Components section shows it. A slot can depend on another (the vision tower on a GGUF
+ * encoder), so it is looked up beside the settings the change leads to.
+ */
+const getComponentLabel = (
+  setting: ComponentSetting,
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  t: TFunction
+): string =>
+  getComponentSectionPolicy(model, settings).slots.find((slot) => slot.key === setting)?.label ??
+  t('widgets.generate.components');
+
 /** The setting's name as its field shows it: CFG or Guidance per family. */
-const getSettingLabel = (setting: DescribedSetting, model: GenerateModelConfig, t: TFunction): string => {
+const getSettingLabel = (
+  setting: Exclude<DescribedSetting, ComponentSetting>,
+  model: GenerateModelConfig,
+  t: TFunction
+): string => {
   switch (setting) {
     case 'aspectRatio':
       return t('widgets.generate.aspectRatio');
@@ -276,7 +349,7 @@ const formatSettingValue = (
       return settings.vaePrecision.toUpperCase();
     // Exactly as the fields show them, so two values that differ there never read the same here.
     default:
-      return String(settings[setting]);
+      return isComponentSetting(setting) ? (settings[setting]?.name ?? t('common.none')) : String(settings[setting]);
   }
 };
 
@@ -307,7 +380,9 @@ export const describeChanges = (
     changed.map((setting) =>
       t('widgets.generate.modelDefaultsChange', {
         from: formatSettingValue(setting, before, model, t, locale),
-        setting: getSettingLabel(setting, model, t),
+        setting: isComponentSetting(setting)
+          ? getComponentLabel(setting, model, after, t)
+          : getSettingLabel(setting, model, t),
         to: formatSettingValue(setting, after, model, t, locale),
       })
     ),

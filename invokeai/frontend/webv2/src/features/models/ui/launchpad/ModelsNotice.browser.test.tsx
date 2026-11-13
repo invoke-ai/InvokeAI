@@ -84,7 +84,7 @@ const adapter = (canManageModels: boolean): ModelsUiAdapter => ({
   installInPlace: true,
   isProjectActive: () => false,
   managerProjectId: null,
-  schedulerPolicy: {
+  defaultsRules: {
     getSnapshot: () => ({ status: 'loading' }),
     load: () => undefined,
     subscribe: () => () => undefined,

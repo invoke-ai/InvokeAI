@@ -3,6 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { toExternalModelValues } from '@features/models/core/externalModelFields';
 import { getModelsSnapshot, subscribeModels } from '@features/models/data/modelsStore';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
@@ -77,8 +78,10 @@ const SERVER_VALUES: Record<ModelDraftSurface, (model: ModelConfig) => object> =
 
 const FIELD_SURFACES = ['identity', 'defaults', 'external'] as const satisfies readonly ModelDraftSurface[];
 
-// Unset and null are the same "no value" to the backend and to every form here.
-const isSameValue = (left: unknown, right: unknown): boolean => Object.is(left ?? null, right ?? null);
+// Unset and null are the same "no value" to the backend and to every form here. Structural, so an edited map of
+// default components that is back to the saved one stops being an edit.
+const isSameValue = (left: unknown, right: unknown): boolean =>
+  areJsonValuesStructurallyEqual(left ?? null, right ?? null);
 
 export const hasDraftFields = (draft: ModelFieldsDraft | undefined): boolean =>
   draft !== undefined && Object.keys(draft.fields).length > 0;

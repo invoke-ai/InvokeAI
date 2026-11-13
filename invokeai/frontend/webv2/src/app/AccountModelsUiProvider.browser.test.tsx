@@ -76,6 +76,7 @@ const settingsModel = (overrides: Partial<DefaultSettingsModel>): DefaultSetting
   default_settings: null,
   format: 'checkpoint',
   key: 'model-key',
+  name: 'Model',
   type: 'main',
   variant: null,
   ...overrides,
@@ -158,7 +159,7 @@ describe('Account Models port on the Launchpad', () => {
     // The rules are a lazy chunk (the reader and the Generation modules it imports); load it up front so the first
     // test is not timing a cold transform. Importing it starts nothing: the section's load does.
     beforeAll(async () => {
-      await import('./modelSchedulerPolicyReader');
+      await import('./modelDefaultsRulesReader');
     });
 
     it('loads Generate’s rules on demand and offers its Anima schedulers once the table arrives', async () => {

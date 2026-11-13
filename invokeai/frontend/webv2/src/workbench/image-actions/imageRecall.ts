@@ -14,6 +14,8 @@ import {
   clampAnimaInpaintAdapterWeight,
   clampDimension,
   clampPidSteps,
+  DEFAULT_COMPONENT_SLOTS,
+  type DefaultComponentSlot,
   cloneGenerateWidgetValues,
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
@@ -24,6 +26,7 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
+  getModelDefaultComponents,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
   isKnownScheduler,
@@ -902,27 +905,8 @@ const getMetadataFlux3PromptUpsampler = (
   return getString(metadata, 'generation_mode')?.startsWith('flux3_') ? { flux3PromptUpsamplerEnabled: false } : {};
 };
 
-type RecalledComponentSetting = keyof Pick<
-  GenerateWidgetValues,
-  | 'animaInpaintAdapterModel'
-  | 'clipEmbedModel'
-  | 'clipGEmbedModel'
-  | 'clipLEmbedModel'
-  | 'componentSourceModel'
-  | 'flux3PromptUpsamplerModel'
-  | 'gemma2EncoderModel'
-  | 'ideogram4UnconditionalModel'
-  | 'mistralEncoderModel'
-  | 'pidDecoderModel'
-  | 'qwen3EncoderModel'
-  | 'qwen3VLEncoderModel'
-  | 'qwen3VLVisionTowerModel'
-  | 'qwen35EncoderModel'
-  | 'qwenVLEncoderModel'
-  | 't5EncoderModel'
-  | 'wanLowNoiseModel'
-  | 'wanT5EncoderModel'
->;
+/** The component source is not recalled by its slot key: only its per-family names below recall it. */
+type RecalledComponentSetting = DefaultComponentSlot['setting'];
 
 interface RecalledComponent {
   metadataKey: string;
@@ -933,29 +917,20 @@ interface RecalledComponent {
 
 /**
  * The component keys the generation graphs record; a key missing here is silently dropped by Remix. The first
- * recorded key wins for a shared setting.
+ * recorded key wins for a shared setting. The slots a model can store defaults for share their metadata key with
+ * those defaults; the component source is recorded under per-family names instead, listed first.
  */
 const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
-  { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
-  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
-  { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
-  { metadataKey: 'clip_g_model', setting: 'clipGEmbedModel' },
-  { metadataKey: 'clip_l_model', setting: 'clipLEmbedModel' },
-  { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
-  { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
-  { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
-  { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
-  { metadataKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
-  { metadataKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
-  { metadataKey: 'qwen3_vl_vision_tower', setting: 'qwen3VLVisionTowerModel' },
-  { metadataKey: 'qwen3_5_encoder', setting: 'qwen35EncoderModel' },
-  { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
-  { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
-  { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },
+  ...DEFAULT_COMPONENT_SLOTS.filter((slot) => slot.setting !== 'componentSourceModel').map(
+    ({ isMainModel, persistenceKey, setting }) => ({
+      ...(isMainModel ? { isMainModel } : {}),
+      metadataKey: persistenceKey,
+      setting,
+    })
+  ),
 ];
 
 const getRecalledComponent = (
@@ -1540,8 +1515,15 @@ export const buildImageRecallSettings = ({
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, valuesWithModelDefaults, vaeModels));
-      values = { ...valuesWithModelDefaults, model, ...(vae === undefined ? {} : { vae }) };
+      // Components first: a default component source can bundle the VAE the default VAE then falls back to. The
+      // recorded components below override these.
+      const withComponents = {
+        ...valuesWithModelDefaults,
+        model,
+        ...getModelDefaultComponents(model, valuesWithModelDefaults, models, { replace: true }),
+      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, vaeModels));
+      values = { ...withComponents, ...(vae === undefined ? {} : { vae }) };
       fields.push('model');
     }
 

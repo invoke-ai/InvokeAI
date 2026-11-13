@@ -1,9 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type { GenerateModelConfig, GenerateSettings, VaeModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { MenuActionItem } from '@platform/ui/Menu';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
@@ -41,10 +39,6 @@ export const GenerateResetMenuItems = ({
   const ui = useGenerationUi();
   const models = ui.models.catalog;
   const projectId = ui.project.activeProjectId;
-  const vaeModels = useMemo(
-    () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
-    [models]
-  );
   const items = useGenerateValues(
     (values): { apply: MenuItemState; reset: MenuItemState } | null => {
       const resolved = resolve(values);
@@ -55,7 +49,7 @@ export const GenerateResetMenuItems = ({
 
       const { selectedModel, settings } = resolved;
       const name = selectedModel.name;
-      const plan = getApplyModelDefaultsPlan(settings, selectedModel, vaeModels);
+      const plan = getApplyModelDefaultsPlan(settings, selectedModel, models);
       const applyChanges = describeChanges(
         plan.changed,
         settings,
@@ -74,7 +68,7 @@ export const GenerateResetMenuItems = ({
           : hint
             ? t('widgets.generate.modelDefaultsWithVaeMissing', { hint })
             : t('widgets.generate.modelDefaultsVaeMissing');
-      const resetAfter = { ...settings, ...getModelDefaultsPatch(settings, selectedModel, vaeModels) };
+      const resetAfter = { ...settings, ...getModelDefaultsPatch(settings, selectedModel, models) };
       const resetChanged = getChangedSettings(settings, resetAfter, selectedModel);
 
       const applyUnavailableReason = setsNothing
@@ -156,12 +150,12 @@ export const GenerateResetMenuItems = ({
 
   const applyModelDefaults = () =>
     commitReset(
-      (settings, model) => getApplyModelDefaultsPlan(settings, model, vaeModels).patch,
+      (settings, model) => getApplyModelDefaultsPlan(settings, model, models).patch,
       (model) => t('widgets.generate.applyModelDefaultsDone', { name: model.name })
     );
   const resetEverything = () =>
     commitReset(
-      (settings, model) => getModelDefaultsPatch(settings, model, vaeModels),
+      (settings, model) => getModelDefaultsPatch(settings, model, models),
       () => t('widgets.generate.resetEverythingToDefaultsDone')
     );
 

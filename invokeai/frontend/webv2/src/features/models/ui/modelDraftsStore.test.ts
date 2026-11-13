@@ -69,6 +69,16 @@ describe('model drafts store', () => {
     expect(getModelDraft('m')).toBeUndefined();
   });
 
+  it('compares default components by content, so a map edited back to the saved one is no edit', () => {
+    const saved = { components: { t5_encoder: 'a' } };
+
+    recordModelDraftFields('m', 'defaults', { components: { t5_encoder: 'b' } }, saved);
+    expect(getModelDraft('m')?.defaults).toBeDefined();
+
+    recordModelDraftFields('m', 'defaults', { components: { t5_encoder: 'a' } }, saved);
+    expect(getModelDraft('m')).toBeUndefined();
+  });
+
   it('rebases untouched fields onto the server and flags only edited fields the server changed differently', () => {
     const draft = { baseline: { name: 'Server' }, fields: { name: 'Mine' } };
 

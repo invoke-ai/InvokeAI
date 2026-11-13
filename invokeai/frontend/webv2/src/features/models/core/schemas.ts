@@ -23,10 +23,25 @@ const optionalBoundedNumber = (min: number, max: number, label: string) =>
     .max(max, `${label} must be at most ${max}.`)
     .nullable();
 
+/** Mirrors the backend's rules for `default_settings.components`: the VAE has its own field. */
+const MAX_DEFAULT_COMPONENTS = 16;
+const defaultComponentsSchema = z
+  .record(
+    z.string().regex(/^[a-z0-9_]+$/, 'A component slot name may only hold a-z, 0-9 and _.'),
+    trimmed.min(1, 'Choose a model or clear the component.')
+  )
+  .refine((components) => !('vae' in components), 'Set the VAE in its own field.')
+  .refine(
+    (components) => Object.keys(components).length <= MAX_DEFAULT_COMPONENTS,
+    `At most ${MAX_DEFAULT_COMPONENTS} default components are allowed.`
+  );
+
 /** Null means inherit the app default and corresponds to an unchecked field toggle. */
 export const mainDefaultSettingsSchema = z.object({
   cfgRescaleMultiplier: optionalBoundedNumber(0, 0.99, 'CFG rescale multiplier'),
   cfgScale: optionalBoundedNumber(1, 200, 'CFG scale'),
+  // Model keys by slot; null or unset stores none.
+  components: defaultComponentsSchema.nullish(),
   // Record validation permits guidance >=1 without an architecture ceiling; generation owns guidance_max. Accept
   // FLUX Fill's stored default of 30.
   guidance: optionalBoundedNumber(1, 200, 'Guidance'),

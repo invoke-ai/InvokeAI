@@ -23,6 +23,7 @@ import {
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
+  getModelDefaultComponents,
   getReferenceImageUnavailableReason,
   getSchedulerOptions,
   isArchitectureDescribed,
@@ -153,16 +154,21 @@ const getSelectableModel = (key: string, models: readonly ModelConfig[]): Genera
   return model;
 };
 
-/** Selecting the model, then its default VAE by recall's policy (`getRecallDefaultVae`); otherwise the selection's. */
+/**
+ * Selecting the model, then its default components and its default VAE by recall's policy (`getRecallDefaultVae`);
+ * otherwise the selection's VAE.
+ */
 const getModelDefaultValues = (model: GenerateModelConfig, models: readonly ModelConfig[]): GenerateWidgetValues => {
   const { settings } = getGenerateModelSelectionResult({
     currentValues: getDefaultGenerateSettings(model),
     model,
     models,
   });
-  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, models.filter(isVaeModelConfig)));
+  // Components first: a default component source can bundle the VAE the default VAE then falls back to.
+  const withComponents = { ...settings, ...getModelDefaultComponents(model, settings, models, { replace: true }) };
+  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, models.filter(isVaeModelConfig)));
 
-  return { ...settings, model, vae: vae === undefined ? settings.vae : vae };
+  return { ...withComponents, model, vae: vae === undefined ? withComponents.vae : vae };
 };
 
 const withCaseValues = (values: GenerateWidgetValues, input: GraphExportCase): GenerateWidgetValues => ({

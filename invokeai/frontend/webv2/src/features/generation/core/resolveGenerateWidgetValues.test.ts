@@ -8,7 +8,7 @@ import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
 } from './architectureCapabilities';
-import { getDefaultGenerateSettings } from './baseGenerationPolicies';
+import { getDefaultGenerateSettings, getGenerateModelSelectionResult } from './baseGenerationPolicies';
 import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
 
 const createModel = (key: string, overrides: Partial<MainModelConfig> = {}): MainModelConfig => ({
@@ -364,5 +364,41 @@ describe('resolveGenerateWidgetValues and an architecture the table omits', () =
     });
 
     expect(resolved?.values.modelKey).toBe('sdxl-model');
+  });
+});
+
+describe('default components through the resolver', () => {
+  const t5 = { base: 'any', key: 't5-default', name: 'T5', type: 't5_encoder' };
+  const withDefaults = createModel('flux-default', {
+    base: 'flux',
+    default_settings: { components: { t5_encoder: t5.key } },
+    format: 'checkpoint',
+  });
+  const plain = createModel('sdxl-plain');
+  const catalog = [plain, withDefaults, t5];
+
+  it('keeps the components a model switch filled in', () => {
+    const { settings } = getGenerateModelSelectionResult({
+      currentValues: createValues(plain),
+      model: withDefaults,
+      models: catalog,
+    });
+    const stored = { ...settings, model: withDefaults };
+
+    expect(settings.t5EncoderModel).toEqual(t5);
+    expect(resolveGenerateWidgetValues({ models: catalog, storedValues: stored })?.values.t5EncoderModel).toEqual(t5);
+  });
+
+  it('applies them to the initial model only, never to an ordinary resolve', () => {
+    const initial = resolveGenerateWidgetValues({ models: [withDefaults, t5], storedValues: {} });
+
+    expect(initial?.values.model.key).toBe(withDefaults.key);
+    expect(initial?.values.t5EncoderModel).toEqual(t5);
+
+    const cleared = { ...initial!.values, t5EncoderModel: null };
+
+    expect(
+      resolveGenerateWidgetValues({ models: [withDefaults, t5], storedValues: cleared })?.values.t5EncoderModel
+    ).toBeNull();
   });
 });

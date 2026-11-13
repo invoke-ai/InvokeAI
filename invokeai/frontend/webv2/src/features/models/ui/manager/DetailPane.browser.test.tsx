@@ -2,7 +2,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsSnapshot, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { getModelsUiSnapshotForTests, openModelDetail } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
@@ -131,7 +131,7 @@ describe('models DetailPane for a model installed before the probe recorded a fa
     installInPlace: true,
     isProjectActive: () => true,
     managerProjectId: null,
-    schedulerPolicy: NO_SCHEDULER_POLICY,
+    defaultsRules: NO_DEFAULTS_RULES,
     setInstallInPlace: () => undefined,
   });
   let host: HTMLDivElement;

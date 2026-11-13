@@ -274,6 +274,39 @@ def test_cached_instances_are_dropped_under_the_model_load_write_lock(harness: _
     assert drops_under_write_lock == [True, True]
 
 
+def test_update_round_trips_default_components_from_a_request_body(harness: _Harness) -> None:
+    """A PATCH body that carries `components` parses as main-model settings and survives the record store."""
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(vae="vae-key", steps=20)))
+    body = {"default_settings": {"vae": "vae-key", "steps": 20, "components": {"t5_encoder": "t5-key"}}}
+
+    changes = ModelRecordChanges.model_validate(body)
+    assert isinstance(changes.default_settings, MainModelDefaultSettings)
+    harness.manager.update_model_record(KEY, changes)
+
+    stored = harness.store.get_model(KEY)
+    assert stored.default_settings == MainModelDefaultSettings(
+        vae="vae-key", steps=20, components={"t5_encoder": "t5-key"}
+    )
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"vae": "vae-key", "steps": 20, "components": {}}})
+    )
+    cleared = harness.store.get_model(KEY).default_settings
+    assert cleared is not None and cleared.components is None
+
+
+def test_a_body_with_only_components_resolves_to_main_model_settings() -> None:
+    changes = ModelRecordChanges.model_validate({"default_settings": {"components": {"t5_encoder": "t5-key"}}})
+
+    assert isinstance(changes.default_settings, MainModelDefaultSettings)
+    assert changes.default_settings.components == {"t5_encoder": "t5-key"}
+
+
+def test_a_request_body_with_an_invalid_default_component_is_rejected() -> None:
+    with pytest.raises(ValueError, match="`vae` field"):
+        ModelRecordChanges.model_validate({"default_settings": {"components": {"vae": "x"}}})
+
+
 def test_update_that_the_store_rejects_changes_nothing(harness: _Harness) -> None:
     record = _sd1_record()
     harness.store.add_model(record)
@@ -331,6 +364,73 @@ def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
     later_install = _identify(harness.models_path / MODEL_PATH)
     assert later_install.default_settings is not None
     assert (later_install.default_settings.cpu_only, later_install.default_settings.fp8_storage) == (None, None)
+
+
+def test_reidentify_keeps_the_default_vae_and_default_components_while_the_base_is_unchanged(
+    harness: _Harness,
+) -> None:
+    """The default VAE and component models are the user's choice; the probe cannot derive them, and the
+    recommended generation parameters (steps) are still replaced."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    components = {"t5_encoder": "t5-key", "clip_embed": "clip-key"}
+    harness.store.add_model(
+        _sd1_record(default_settings=MainModelDefaultSettings(vae="vae-key", components=components, steps=12))
+    )
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert updated.default_settings is not None
+    assert updated.default_settings.vae == "vae-key"
+    assert updated.default_settings.components == components
+    assert updated.default_settings.steps != 12
+    assert harness.store.get_model(KEY).default_settings == updated.default_settings
+
+
+def test_reidentify_into_another_base_drops_the_default_vae_and_components_but_keeps_load_preferences(
+    harness: _Harness,
+) -> None:
+    """The keys name models of the old base, which the new base cannot use."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    harness.store.add_model(
+        _sd1_record(
+            default_settings=MainModelDefaultSettings(cpu_only=True, vae="vae-key", components={"t5_encoder": "t5-key"})
+        )
+    )
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Main_Checkpoint_SDXL_Config)
+    assert updated.default_settings is not None
+    assert (updated.default_settings.vae, updated.default_settings.components) == (None, None)
+    assert updated.default_settings.cpu_only is True
+
+
+def test_reidentify_whose_probe_has_no_defaults_keeps_the_curated_fields(
+    harness: _Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    harness.store.add_model(
+        _sd1_record(
+            default_settings=MainModelDefaultSettings(
+                fp8_storage=True, vae="vae-key", components={"t5_encoder": "t5-key"}, steps=12
+            )
+        )
+    )
+    from_model_on_disk = ModelConfigFactory.from_model_on_disk
+
+    def without_defaults(*args, **kwargs):
+        result = from_model_on_disk(*args, **kwargs)
+        assert result.config is not None
+        result.config.default_settings = None
+        return result
+
+    monkeypatch.setattr(ModelConfigFactory, "from_model_on_disk", without_defaults)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert updated.default_settings == MainModelDefaultSettings(
+        fp8_storage=True, vae="vae-key", components={"t5_encoder": "t5-key"}
+    )
 
 
 def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(harness: _Harness) -> None:
