@@ -228,7 +228,12 @@ const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
   ({
     ...stableGroups,
     generateValues: storedValues(activeProjectId),
-    project: { activeProjectId, invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
+    project: {
+      activeProjectId,
+      canvasRasterInFrame: false,
+      invocationSourceId: 'generate',
+      showPromptSyntaxHighlighting: false,
+    },
   }) as unknown as GenerationUiAdapter;
 
 const settle = (run: () => void = noop, ms = 0) =>
@@ -330,6 +335,50 @@ afterEach(async () => {
   root = null;
   commits.clear();
   accountLifecycle.invalidate();
+});
+
+describe('Canvas hosted-provider preflight', () => {
+  it('updates the reference budget when raster content enters or leaves the frame', async () => {
+    const model = {
+      ...MODEL,
+      base: 'external',
+      type: 'external_image_generator',
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    } as unknown as GenerationModelCatalogItem;
+    stableGroups.models.catalog = [model];
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(model as never),
+        modelKey: model.key,
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `ref-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: {
+              imageName: `ref-${i}.png`,
+              width: 512,
+              height: 512,
+              original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+            },
+          },
+        })),
+      })
+    );
+    const adapter = buildAdapter();
+    adapter.project = { ...adapter.project, invocationSourceId: 'canvas', canvasRasterInFrame: false };
+    await renderAdapter(adapter);
+    const message = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
+    expect(host!.textContent).not.toContain(message);
+    await renderAdapter({ ...adapter, project: { ...adapter.project, canvasRasterInFrame: true } });
+    expect(host!.textContent).toContain(message);
+    await renderAdapter(adapter);
+    expect(host!.textContent).not.toContain(message);
+  });
 });
 
 describe('GenerateSettingsForm Anima inpaint adapter', () => {
@@ -957,6 +1006,7 @@ describe('GenerateSettingsForm render isolation', () => {
       ...buildAdapter('next-account-project'),
       project: {
         activeProjectId: 'next-account-project',
+        canvasRasterInFrame: false,
         invocationSourceId: 'generate',
         showPromptSyntaxHighlighting: false,
       },

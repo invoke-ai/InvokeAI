@@ -474,6 +474,40 @@ describe('resolveInvocationRoute — canvas source', () => {
     ).toBe(true);
   });
 
+  it('counts the Canvas source image before accepting a hosted-provider reference budget', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const generateValues = createGenerateValues(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `ref-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `ref-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    const input = canvasInputFor({ generateValues, rasterInFrame: true });
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).validationReasons.map(reasonText)).toContain(
+      'Unknown External Provider supports at most 15 images total (reference + init + output), got 16.'
+    );
+    expect(
+      resolveInvocationRouteInput({ ...input, canvasRasterInFrame: false }, 'global', canvasRoute).sourceValid
+    ).toBe(true);
+    expect(resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).sourceValid).toBe(
+      true
+    );
+  });
+
   const textOnlyModel: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
   const raster = (
     x: number,
@@ -568,7 +602,9 @@ describe('resolveInvocationRoute — canvas source', () => {
 
     // A graph preview can ask for the Canvas route while Generate is selected, so the source does not matter.
     expect(withRaster([raster(250, 50)], 'generate')).toBe(true);
-    // Other models never measure.
+    model = { ...textOnlyModel, capabilities: { modes: ['txt2img', 'img2img'] } };
+    expect(withRaster([raster(250, 50)])).toBe(true);
+    // Local models never measure.
     model = animaModel;
     expect(withRaster([raster(250, 50)])).toBe(false);
   });

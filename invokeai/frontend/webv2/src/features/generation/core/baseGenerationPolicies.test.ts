@@ -1004,6 +1004,14 @@ describe('component policies', () => {
     expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
       'External Model supports at most 15 images total (reference + init + output), got 16.',
     ]);
+    const canvasFrame = { height: 512, width: 512 };
+    const values = { ...settings, model };
+    expect(getGenerateInvocationIssues(values, { canvasFrame, canvasRasterInFrame: false })).toEqual([]);
+    expect(
+      getGenerateInvocationIssues(values, { canvasFrame, canvasRasterInFrame: true }).map(({ message }) => message)
+    ).toEqual(['External Model supports at most 15 images total (reference + init + output), got 16.']);
+    // Canvas state must not change a Compose request.
+    expect(getGenerateInvocationIssues(values, { canvasRasterInFrame: true })).toEqual([]);
     settings.referenceImages[0]!.isEnabled = false;
     expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
     settings.referenceImages[0]!.isEnabled = true;
