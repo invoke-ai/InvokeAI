@@ -1,17 +1,9 @@
 import type { ReactNode } from 'react';
 
-import { Component, lazy, Suspense, useState } from 'react';
+import { createLogger } from '@platform/logging/logger';
+import { lazy, Suspense, useState } from 'react';
 
-/** A deferred view that failed to load shows its fallback rather than taking its host down. */
-class DeferredModuleBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
+const logger = createLogger({ area: 'deferred-module', namespace: 'app' });
 
 export interface DeferredModule<Module> {
   /** Starts the load if none is running or done; resolves to the module. A failed load is tried again on the next call. */
@@ -21,7 +13,8 @@ export interface DeferredModule<Module> {
   /**
    * Renders `render(module)`. Once the module has loaded it renders directly. Before that, each mount owns its own
    * lazy load, so a load that failed is tried again on the next mount, where a module-level `lazy` would keep its first
-   * failure for the page's lifetime. While loading, and if the load fails, it shows `fallback`.
+   * failure for the page's lifetime. While loading, and if the load fails, it shows `fallback`; an error the loaded
+   * module throws while rendering reaches the host's error boundary instead.
    */
   Deferred: (props: { fallback: ReactNode; render: (module: Module) => ReactNode }) => ReactNode;
 }
@@ -33,6 +26,11 @@ interface DeferredSource<Module> {
 
 type RenderModule<Module> = (module: Module) => ReactNode;
 
+interface LazyViewProps<Module> {
+  fallback: ReactNode;
+  renderModule: RenderModule<Module>;
+}
+
 // A top-level component, so it closes over nothing: the module's state is read through `source` on each mount.
 const DeferredView = <Module,>({
   fallback,
@@ -43,26 +41,32 @@ const DeferredView = <Module,>({
   render: RenderModule<Module>;
   source: DeferredSource<Module>;
 }) => {
+  // A failed load resolves to a view of the fallback rather than rejecting, so it never reaches an error boundary;
+  // errors the loaded module throws while rendering still do.
   const [LazyView] = useState(() =>
     source.getLoaded() === null
       ? lazy(() =>
-          source.load().then((module) => ({
-            default: ({ renderModule }: { renderModule: RenderModule<Module> }) => renderModule(module),
-          }))
+          source.load().then(
+            (module) => ({ default: ({ renderModule }: LazyViewProps<Module>) => renderModule(module) }),
+            (error: unknown) => {
+              logger.warn({
+                error,
+                message: 'A view loaded on demand failed to load; showing its fallback',
+                name: 'deferred-module.load-failed',
+              });
+              return { default: ({ fallback: failed }: LazyViewProps<Module>) => failed };
+            }
+          )
         )
       : null
   );
-  return (
-    <DeferredModuleBoundary fallback={fallback}>
-      {LazyView ? (
-        <Suspense fallback={fallback}>
-          <LazyView renderModule={render} />
-        </Suspense>
-      ) : (
-        // Mounted without a lazy view only once the module had loaded, and a loaded module stays loaded.
-        render(source.getLoaded()!)
-      )}
-    </DeferredModuleBoundary>
+  return LazyView ? (
+    <Suspense fallback={fallback}>
+      <LazyView fallback={fallback} renderModule={render} />
+    </Suspense>
+  ) : (
+    // Mounted without a lazy view only once the module had loaded, and a loaded module stays loaded.
+    render(source.getLoaded()!)
   );
 };
 

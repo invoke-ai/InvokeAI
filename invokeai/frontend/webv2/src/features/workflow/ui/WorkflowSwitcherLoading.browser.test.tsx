@@ -1,6 +1,5 @@
 import type { ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
-import type * as ScrollableMenuModule from '@platform/ui/ScrollableMenuContent';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { createProjectGraph } from '@features/workflow/utility';
@@ -15,30 +14,18 @@ import { WorkflowUiProvider } from './WorkflowUiContext';
 import { setWorkflowLibraryOpen, workflowUiStore } from './workflowUiStore';
 import { WorkflowWidgetLabel } from './WorkflowWidgetChrome';
 
-// The switcher's scrolling list loads on first use. Here it is held back until a test releases it, and once loaded it
-// can fail as a stale chunk would; the menu must open whole and work either way.
+// The switcher's scrolling list loads on first use. Here it is held back until a test releases it; the menu must open
+// whole and work before and as it arrives. A list that fails to load: WorkflowSwitcherLoadFailure.browser.test.tsx.
 const scrollableChunk = vi.hoisted(() => {
   let release = () => {};
   const loaded = new Promise<void>((resolve) => {
     release = resolve;
   });
-  return { fails: false, loaded, release: () => release() };
+  return { loaded, release: () => release() };
 });
 vi.mock('@platform/ui/ScrollableMenuContent', async (importOriginal) => {
   await scrollableChunk.loaded;
-  const original = await importOriginal<typeof ScrollableMenuModule>();
-  // No JSX here: the hoisted factory runs before the module's own JSX runtime import is bound.
-  const { createElement } = await import('react');
-
-  return {
-    ...original,
-    ScrollableMenuList: (props: Parameters<typeof original.ScrollableMenuList>[0]) => {
-      if (scrollableChunk.fails) {
-        throw new Error('Failed to fetch dynamically imported module');
-      }
-      return createElement(original.ScrollableMenuList, props);
-    },
-  };
+  return importOriginal();
 });
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -75,7 +62,7 @@ const SNAPSHOT = {
   workflows: WORKFLOWS,
 };
 
-describe('the workflow switcher while its scrolling list loads or fails to', () => {
+describe('the workflow switcher while its scrolling list loads', () => {
   let host: HTMLDivElement;
   let root: Root;
   const commands = { createWorkflow: vi.fn(() => 'workflow-3'), selectWorkflow: vi.fn() };
@@ -151,25 +138,5 @@ describe('the workflow switcher while its scrolling list loads or fails to', () 
     expect(menu()!.contains(document.activeElement)).toBe(true);
     await act(() => userEvent.click(library()));
     expectLibraryOnThisProject();
-  });
-
-  it('keeps every row and both actions when the list fails, and uses it on a later open', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    scrollableChunk.fails = true;
-    await openMenu();
-    expect(choices()).toEqual(['Text 2 Image', 'Upscale']);
-    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'New workflow' })));
-    expect(commands.createWorkflow).toHaveBeenCalledOnce();
-    await vi.waitFor(() => expect(menu()).toBeNull());
-
-    await openMenu();
-    await act(() => userEvent.click(library()));
-    expectLibraryOnThisProject();
-    await vi.waitFor(() => expect(menu()).toBeNull());
-
-    scrollableChunk.fails = false;
-    await openMenu();
-    expect(themedList()).not.toBeNull();
-    consoleError.mockRestore();
   });
 });

@@ -1,5 +1,6 @@
 import type { InvocationTemplate, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
+import type * as DeferredModuleModule from '@platform/react/deferredModule';
 
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each test mounts a fresh flow */
 import { ChakraProvider } from '@chakra-ui/react';
@@ -12,29 +13,32 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import type * as NodePanelsModule from './NodePanels';
-
 import { toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode } from './InvocationFlowNode';
 
 import '@xyflow/react/dist/style.css';
 
-// The panel body fails for the first open, as a body whose chunk will not load does: `lazy` throws the failed import where the body
-// renders, so the boundary and fallback meet the same error. (A factory that rejects is reported by Vitest's mocker
-// as an unhandled error of its own, so the failure is raised at render.)
-const panelLoad = vi.hoisted(() => ({ fails: false }));
-vi.mock('./NodePanels', async (importOriginal) => {
-  const actual = await importOriginal<typeof NodePanelsModule>();
+// The later open's real import resolves from the module cache rather than an on-demand transform under suite load.
+await import('./NodePanels');
+
+// The panel body's chunk fails to load for the first open, as a stale or dropped chunk does: its import rejects. The
+// rejection comes from the deferred module's import seam, because a `vi.mock` factory that rejects is not an import
+// failure in browser mode: Vitest's module interception reports it as an unhandled error and never answers the request.
+const panelLoad = vi.hoisted(() => ({ fails: false, rejected: 0 }));
+vi.mock('@platform/react/deferredModule', async (importOriginal) => {
+  const actual = await importOriginal<typeof DeferredModuleModule>();
 
   return {
     ...actual,
-    NodeStatusPanel: (props: Parameters<typeof actual.NodeStatusPanel>[0]) => {
-      if (panelLoad.fails) {
-        throw new Error('Failed to fetch dynamically imported module');
-      }
-
-      return actual.NodeStatusPanel(props);
-    },
+    // The node's panels are the only deferred module this view renders.
+    createDeferredModule: <Module,>(importModule: () => Promise<Module>) =>
+      actual.createDeferredModule(() => {
+        if (!panelLoad.fails) {
+          return importModule();
+        }
+        panelLoad.rejected += 1;
+        return Promise.reject(new TypeError('Failed to fetch dynamically imported module'));
+      }),
   };
 });
 vi.mock('react-i18next', () => ({
@@ -107,8 +111,6 @@ describe('node header panels when their body fails', () => {
   });
 
   it('shows the button’s label instead of crashing the editor, and the full panel on a later open', async () => {
-    // React reports the error the boundary caught.
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     panelLoad.fails = true;
     await act(() =>
       root.render(
@@ -127,6 +129,8 @@ describe('node header panels when their body fails', () => {
     const label = statusButton().getAttribute('aria-label')!;
 
     await act(() => userEvent.hover(statusButton()));
+    // The label shows while loading too; this is it standing in for a load that failed.
+    await vi.waitFor(() => expect(panelLoad.rejected).toBeGreaterThan(0));
     await vi.waitFor(() => expect(panel()?.textContent).toBe(label));
     // The node is still there and still answers.
     expect(host.querySelector('.react-flow__node[data-id="node"]')).not.toBeNull();
@@ -137,6 +141,5 @@ describe('node header panels when their body fails', () => {
     await act(() => userEvent.hover(statusButton()));
     // The panel body: the version line on its own, not the button's "Status: …" label.
     await vi.waitFor(() => expect(panel()?.textContent).toBe('nodes.nodeUpdateAvailable'));
-    consoleError.mockRestore();
   });
 });
