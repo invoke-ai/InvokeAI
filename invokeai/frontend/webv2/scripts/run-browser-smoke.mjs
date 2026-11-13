@@ -13,6 +13,8 @@ import { executeProjectFileJourney } from './run-project-file-journey.mjs';
 const artifacts = resolve(import.meta.dirname, '../artifacts/browser-smoke');
 const origin = `http://127.0.0.1:${process.env.INVOKEAI_PROJECT_FILE_PORT ?? 4180}`;
 const path = '/#/app?project=fixture-project-002';
+const initialSavePath = '/api/v1/projects/fixture-project-002';
+const isInitialSaveUrl = (url) => url.origin === origin && url.pathname === initialSavePath;
 const sessionKey = 'invokeai:v7:webv2:editor-session';
 const lockPrefix = `${sessionKey}:`;
 await mkdir(artifacts, { recursive: true });
@@ -96,13 +98,6 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
           try {
             report.status = 'failed';
             // The legacy fixture's initial split save stages B before its PUT. Keep it in flight through unload.
-            const initialSaveStarted = page.waitForRequest(
-              (request) =>
-                request.method() === 'PUT' && new URL(request.url()).pathname.startsWith('/api/v1/projects/'),
-              { timeout: 20_000 }
-            );
-            // Setup can fail before the later await; retain its rejection without abandoning an unhandled waiter.
-            void initialSaveStarted.catch(() => {});
             const heldPuts = [];
             const holdSaves = (route) => {
               if (route.request().method() !== 'PUT') {
@@ -111,7 +106,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               heldPuts.push(route.request().postData());
               return new Promise(() => {});
             };
-            await page.route('**/api/v1/projects/**', holdSaves);
+            await page.route(isInitialSaveUrl, holdSaves);
             await open();
             report.capabilities = await page.evaluate(() => ({
               webLocks: Boolean(navigator.locks),
@@ -122,7 +117,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               throw new Error('Required Web Locks and IndexedDB must exist on localhost');
             }
             await waitForRenderedMedia(page);
-            await initialSaveStarted;
+            await expect.poll(() => heldPuts.length, { timeout: 20_000 }).toBeGreaterThan(0);
             // No blur/debounce/save wait after A: the actual unload must checkpoint the held field over B.
             let marker = `smoke held prompt ${engine}`;
             await prompt.fill(marker);
@@ -181,7 +176,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             assert.ok(server.ok);
             assert.ok(!(await server.text()).includes(marker), 'Server must not explain A recovery');
             report.journalAttribution = recovery;
-            await page.unroute('**/api/v1/projects/**', holdSaves);
+            await page.unroute(isInitialSaveUrl, holdSaves);
             await open();
             await expect(prompt, 'Journal-only held field must survive actual unload').toHaveValue(marker);
             report.heldFieldRecovery = 'passed';
