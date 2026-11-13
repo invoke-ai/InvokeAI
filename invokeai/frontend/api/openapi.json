@@ -41794,6 +41794,130 @@
         "title": "Flux3ModelLoaderOutput",
         "type": "object"
       },
+      "Flux3PromptUpsamplerInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Writes the caption FLUX.3 encodes with Black Forest Labs' prompt upsampler.\n\nThe upsampler sees what the generation sees: the prompt, the reference images of an edit and the canvas regions of\na layout. The mode follows the inputs (text-to-image, edit, and each with a layout). Regions replace the Layout\nPrompt node's: they and the rows of a box table that ends the prompt are kept exactly in the answer's box table.\nDecoding is greedy, so the same inputs give the same caption.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The request to expand into the caption, optionally ending with a box table of its own.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "upsampler_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.3 prompt upsampler: a Text LLM that can read images.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt Upsampler",
+            "ui_model_type": ["text_llm"]
+          },
+          "reference_images": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxKontextConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxKontextConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Reference images of an edit, in attachment order (up to 10), the ones the denoiser receives.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Images"
+          },
+          "regions": {
+            "default": [],
+            "description": "Boxes on the 0-1000 grid across the image, assembled from Canvas Regional Guidance layers. Object rows, or with reference images rows that place new content in the output.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/Flux3LayoutRegion"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "max_new_tokens": {
+            "default": 3584,
+            "description": "The most tokens the caption may take.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 3584,
+            "minimum": 64,
+            "orig_default": 3584,
+            "orig_required": false,
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux3_prompt_upsampler",
+            "default": "flux3_prompt_upsampler",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "upsampler", "layout", "flux3", "flux"],
+        "title": "Prompt Upsampler - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
       "Flux3TextEncoderInvocation": {
         "category": "conditioning",
         "class": "invocation",
@@ -47762,6 +47886,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -58523,6 +58650,9 @@
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
               },
               {
@@ -60255,6 +60385,9 @@
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
               },
               {
@@ -61454,6 +61587,9 @@
           "flux3_model_loader": {
             "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
           },
+          "flux3_prompt_upsampler": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "flux3_text_encoder": {
             "$ref": "#/components/schemas/Flux3ConditioningOutput"
           },
@@ -62381,6 +62517,7 @@
           "flux3_lora_collection_loader",
           "flux3_lora_loader",
           "flux3_model_loader",
+          "flux3_prompt_upsampler",
           "flux3_text_encoder",
           "flux_control_lora_loader",
           "flux_controlnet",
@@ -63032,6 +63169,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
@@ -64349,6 +64489,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3PromptUpsamplerInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
