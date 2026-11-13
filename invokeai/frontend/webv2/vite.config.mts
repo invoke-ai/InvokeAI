@@ -413,9 +413,6 @@ const WIDGET_HOST_MODULES = [
   '/platform/react/focusIfUnclaimed.ts',
   '/features/queue/ui/QueueDataRuntime.tsx',
   '/features/workflow/ui/WorkflowWidgetChrome.tsx',
-  // The graph preview and the lazy library dialog share the workflow menu rows; alone they cost the workflow widget's
-  // activation a request.
-  '/features/workflow/ui/MenuActionItem.tsx',
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
