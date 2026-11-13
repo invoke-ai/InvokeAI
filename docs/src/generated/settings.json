@@ -649,6 +649,17 @@
     },
     {
       "category": "CACHE",
+      "default": false,
+      "description": "When a model is only partially loaded into VRAM, copy the weights it streams from RAM to the GPU asynchronously from page-locked RAM on a separate stream, overlapping with the computation, instead of one blocking copy per layer. Speeds up partially loaded models; images stay identical. Requires an NVIDIA or AMD (ROCm) GPU and keep_ram_copy_of_weights; falls back to the blocking copy automatically otherwise (Apple and Intel GPUs, the CPU, and GGUF or other specially quantized weights, which gain nothing from it). Copies in flight take up to about 384MB of VRAM; the model cache keeps that much free for them, so slightly less of such a model stays in VRAM. The RAM copy of the streamed weights is page-locked (not swappable; at most 40% of physical RAM); weights loaded from a file mapping are read into RAM when they are first locked. Has no effect on models that fit fully in VRAM.",
+      "env_var": "INVOKEAI_ASYNC_WEIGHT_STREAMING",
+      "literal_values": [],
+      "name": "async_weight_streaming",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": null,
       "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
       "env_var": "INVOKEAI_RAM",

@@ -1,7 +1,7 @@
 ---
 title: Low-VRAM mode
 description: How Invoke runs models larger than your GPU's memory, the invokeai.yaml settings that tune it, and what to do when you still run out of memory.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-13
 sidebar:
   order: 2
 ---
@@ -84,6 +84,7 @@ none of them.
 | `max_cache_vram_gb` | unset: measured | You want Invoke to use less VRAM than it could. | Invoke stops measuring the GPU, so VRAM other programs use is not seen. |
 | `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits | You want more inactive models kept in RAM, or Invoke to use less RAM. | More: faster reloads, more RAM in use. |
 | `keep_ram_copy_of_weights` | `true` | RAM is consistently tight. | Off: lower average RAM use, slower model switching and LoRA patching. |
+| [`async_weight_streaming`](/configuration/optimization/async-weight-streaming/) | `false` | A model runs partially loaded on an NVIDIA or AMD (ROCm) GPU. | On: faster steps, identical images; about 384MB of VRAM kept free for copies, so slightly less of the model in VRAM, and the streamed layers' RAM is page-locked. |
 | `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | Off: other architectures' models stay in VRAM until a load needs the room. |
 | `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. | A few seconds per queue item to reload models from RAM. |
 | `pytorch_cuda_alloc_conf` | unset | You want to tune peak reserved VRAM, for example with `backend:cudaMallocAsync`. | The best value depends on the GPU, driver and CUDA version: test it. |
@@ -98,8 +99,10 @@ The details of each:
 <summary><span>`enable_partial_loading`: partial model loading</span></summary>
 
 Invoke streams a model's layers between RAM and VRAM as they are needed. When a step needs layers that are not in
-VRAM and there is no room for them, inactive layers are moved to RAM. To load every model whole instead, for example
-on a GPU with plenty of VRAM where that is faster:
+VRAM and there is no room for them, inactive layers are moved to RAM. Each layer in RAM is copied to the GPU for every
+step, and the GPU waits for the copy; on NVIDIA and AMD (ROCm) GPUs,
+[Async Weight Streaming](/configuration/optimization/async-weight-streaming/) overlaps those copies with the
+computation. To load every model whole instead, for example on a GPU with plenty of VRAM where that is faster:
 
 ```yaml
 enable_partial_loading: false
@@ -166,6 +169,21 @@ once.
 
 ```yaml
 keep_ram_copy_of_weights: false
+```
+
+</details>
+
+<details>
+<summary><span>`async_weight_streaming`: copy streamed layers while the GPU computes</span></summary>
+
+Off by default. With a model partially loaded on an NVIDIA or AMD (ROCm) GPU, Invoke page-locks the layers in RAM and
+copies each one to the GPU while the layers before it compute, instead of stopping the GPU for every copy. Images stay
+bit-identical. Up to about 384MB of VRAM is kept free for the copies in flight, so slightly less of the model stays
+in VRAM; it needs `keep_ram_copy_of_weights: true`, and GGUF and SDNQ layers keep the blocking copy. Details in
+[Async Weight Streaming](/configuration/optimization/async-weight-streaming/).
+
+```yaml
+async_weight_streaming: true
 ```
 
 </details>

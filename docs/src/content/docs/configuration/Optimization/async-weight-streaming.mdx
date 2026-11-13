@@ -1,0 +1,81 @@
+---
+title: Async Weight Streaming
+description: Copy the layers of a partially loaded model from RAM to the GPU while the previous layers compute, with identical images.
+lastUpdated: 2026-11-13
+sidebar:
+  order: 8
+---
+
+import BenchmarkChart from '@components/memory/BenchmarkChart.astro';
+import BenchmarkRow from '@components/memory/BenchmarkRow.astro';
+
+When a model does not fit in VRAM, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) keeps part of its layers
+in RAM and copies each of them to the GPU every time a step needs it. By default each of those copies blocks: the GPU
+finishes its queued work, the layer is copied, then the computation continues. The GPU waits for every copy, and the
+copy waits for the GPU.
+
+`async_weight_streaming` is a global setting that overlaps the two. The layers in RAM are page-locked, so the GPU can
+read them directly, and each copy runs on a separate stream while the GPU is still computing the layers before it.
+A step then takes closer to the time of a fully loaded model.
+
+It only changes anything while a model is **partially loaded**. The log line for a model load shows how much of it is in
+VRAM, for example `VRAM: 12000.00MB (50.0%)`; at 100% nothing is copied per step, and the setting has no effect.
+
+Images are **bit-identical** to the default path: the same weights reach the same computations, only earlier.
+
+Measured end to end with the VRAM cache capped at 8 GB (`max_cache_vram_gb: 8`), so the transformer loads only partly:
+1024², 8 steps, the mean of warm runs from interleaved pairs, pixel-identical images. The gain depends on how much of
+the model streams and on the GPU's PCIe link; a model fully in VRAM sees no change. The process's peak VRAM with the
+setting was at or below the peak without it in these runs.
+
+<BenchmarkChart title="Time per image on an RTX 4090 (PCIe 4.0 x16), BF16, transformer partly in VRAM" setting="async_weight_streaming">
+  <BenchmarkRow label="ERNIE-Image Turbo, about 18% in VRAM" before={16.6} after={8.5} />
+  <BenchmarkRow label="Z-Image Turbo, about 24% in VRAM" before={12.8} after={6.7} />
+</BenchmarkChart>
+
+<BenchmarkChart title="Time per image on an RX 9060 XT (PCIe 4.0 x4, ROCm 10), transformer partly in VRAM" setting="async_weight_streaming">
+  <BenchmarkRow label="Krea-2 Turbo, scaled FP8, about 38% in VRAM" before={61.3} after={33.8} />
+</BenchmarkChart>
+
+## Requirements
+
+- **An NVIDIA GPU, or an AMD GPU with ROCm.** On Apple silicon and the CPU, models load whole, so there is nothing to
+  stream. Intel GPUs keep the blocking copy, and the log says so once: `async_weight_streaming is enabled, but not used
+  on <device>: it needs an NVIDIA or AMD (ROCm) GPU.`
+- **`keep_ram_copy_of_weights: true`**, the default. Without the RAM copy, the layers in RAM are new allocations after
+  every unload and are not page-locked, so they keep the blocking copy. The log says so once.
+- **`enable_partial_loading: true`**, the default.
+
+Layers whose weights use a special tensor format, such as GGUF and SDNQ, keep the blocking copy, so the setting does
+not speed up those models; it keeps VRAM free only for their few plain layers. Full-precision, FP8 and int8 layers
+stream.
+
+## Turning it on
+
+Set it in your [`invokeai.yaml`](/configuration/invokeai-yaml/) and restart InvokeAI:
+
+```yaml
+async_weight_streaming: true
+```
+
+The first layer that streams logs, once per GPU:
+
+```
+async_weight_streaming: weights in RAM stream to cuda:0 asynchronously.
+```
+
+## Memory
+
+- **VRAM.** Copies that the GPU has not reached yet take up to about 384MB of VRAM. Invoke keeps that much free for a
+  model it loads partially with this setting on (less for a model with fewer layers to stream), so slightly less of
+  the model stays in VRAM. A model that fits in VRAM is loaded whole as before. When the model is released, Invoke
+  hands that memory back to the driver; on a system with several GPUs this waits while another GPU is mid-generation,
+  so the memory stays reserved a little longer there.
+- **RAM.** Page-locking needs no extra RAM: the existing RAM copy of the layers that are not in VRAM is locked in place.
+  Locked memory cannot be moved to the page file or swap, so at most 40% of your physical RAM is locked; layers beyond
+  that keep the blocking copy. A model moved entirely back to RAM is unlocked, and so is a model removed from the cache.
+- **Loading.** Locking and unlocking the layers adds a short moment to a partial load, each time the share of the model
+  in VRAM changes. Most models are read from their files lazily, so locking them the first time also reads those
+  layers into RAM: about 0.5 seconds per GiB when the file is already in RAM (the system's file cache), up to about
+  2.5 seconds per GiB when it is read from an NVMe SSD. It is a one-time cost per load that the first step would
+  otherwise pay while it runs. Other models keep loading meanwhile.

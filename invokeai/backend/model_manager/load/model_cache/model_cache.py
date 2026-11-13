@@ -2153,11 +2153,19 @@ class ModelCache:
             f"After unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
 
+        # A model that will run partially loaded with async weight streaming holds copies in flight on top of its
+        # resident weights and the working memory. Plan for them by loading that much less of it; a model that fits
+        # streams nothing and needs no reserve. Other models are already offloaded at this point (it did not fit).
+        streaming_reserve = 0
+        if model_vram_needed > vram_available + MB and isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            streaming_reserve = cache_entry.cached_model.weight_streaming_reserve_bytes()
+            vram_available -= streaming_reserve
+
         if vram_available < 0:
             # There is insufficient VRAM available. As a last resort, try to unload the model being locked from VRAM,
             # as it may still be loaded from a previous use.
             vram_bytes_freed_from_own_model = self._move_model_to_ram(cache_entry, -vram_available)
-            vram_available = self._get_vram_available(working_mem_bytes)
+            vram_available = self._get_vram_available(working_mem_bytes) - streaming_reserve
             self._logger.debug(
                 f"Unloaded {vram_bytes_freed_from_own_model / MB:.2f}MB from the model being locked ({cache_entry.key})."
             )
@@ -2177,7 +2185,7 @@ class ModelCache:
             # The reservation _get_vram_available actually applied: callers passing None (the
             # majority) get the configured default, and smaller values are clamped up to it —
             # printing the raw argument would report 0MB for the very number being diagnosed.
-            effective_working_mem = self._working_mem_reserve(working_mem_bytes)
+            effective_working_mem = self._working_mem_reserve(working_mem_bytes) + streaming_reserve
             self._logger.warning(
                 f"VRAM budget for '{cache_entry.key}' is short by {-vram_available / MB:.0f}MB even after "
                 f"offloading (working memory reservation: {effective_working_mem / MB:.0f}MB); the model will "
@@ -2205,7 +2213,7 @@ class ModelCache:
             return False
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
-        vram_available = self._get_vram_available(working_mem_bytes)
+        vram_available = self._get_vram_available(working_mem_bytes) - streaming_reserve
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
@@ -2233,7 +2241,9 @@ class ModelCache:
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
-        self._release_allocator_blocks_for_reserve(working_mem_bytes)
+        self._release_allocator_blocks_for_reserve(
+            self._working_mem_reserve(working_mem_bytes) + streaming_reserve if streaming_reserve else working_mem_bytes
+        )
         return True
 
     def _working_mem_reserve(self, working_mem_bytes: Optional[int]) -> int:
@@ -3046,6 +3056,10 @@ class ModelCache:
         # released via the store above). Captured before release_shared_weights() flips the flag.
         if self._ram_budget is not None and not uses_shared:
             self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # Last, after the bookkeeping above: it waits for the device. It does not raise, but a hang or
+        # an interrupt there must not leave the record half removed.
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.release_pinned_weights()
 
     def _notify_models_cleared(
         self,
