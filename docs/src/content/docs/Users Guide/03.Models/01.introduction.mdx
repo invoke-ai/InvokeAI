@@ -146,6 +146,7 @@ Click a model in the library to open it. Its **⋯** menu, and right-clicking it
 | --- | --- | --- |
 | Rename, describe, reclassify | **Edit** | Change the name, description, base, type, variant, format and **Source URL**. Changing the format reclassifies the model; invalid combinations are rejected. |
 | Default settings | **Default Settings**, then **Save Defaults** (main models, LoRAs, control adapters) | Applied when the model is selected; a setting left off uses the app default. |
+| Default components | **Default Components** in **Default Settings** (main models whose family takes components, such as text encoders or a component source) | Switching to the model in Generate or Canvas fills each empty or incompatible slot, and the default VAE, with the model's default; a component that already fits stays. **Reset all to model defaults** and recalling an image's parameters apply them all, and a component the image recorded wins. |
 | Trigger phrases | **Trigger Phrases** (main models, LoRAs, embeddings) | Offered in the prompt editor. |
 | Cover image | Click the model's image | Shown in the library and pickers. PNG, JPEG or WebP. |
 | Related models | **Related Models** | Linked models are suggested together elsewhere in the app. |
@@ -159,7 +160,7 @@ Click a model in the library to open it. Its **⋯** menu, and right-clicking it
 **Source URL** records where a model came from, such as its Civitai or HuggingFace page, and shows as a link in the model's details. It doesn't affect loading or updates.
 
 :::caution[Re-identify resets settings]
-Re-identify keeps the name, description, cover image, trigger phrases, install source and the CPU and FP8 storage choices. It resets the custom variant and the other default settings, and clears the **Source URL**: note it first. Re-identifying several models asks for confirmation first; the single-model action runs at once.
+Re-identify keeps the name, description, cover image, trigger phrases, install source and the CPU and FP8 storage choices, and the default VAE and default components while the base stays the same. It resets the custom variant and the other default settings, and clears the **Source URL**: note it first. Re-identifying several models asks for confirmation first; the single-model action runs at once.
 :::
 
 ## Maintenance
