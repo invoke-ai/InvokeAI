@@ -154,6 +154,7 @@ const previewAdapter = {
 let root: Root;
 let host: HTMLDivElement;
 let count = 1000;
+let activeDeepScroll: { abort: AbortController; done: Promise<void> } | null = null;
 const item = (index: number): WorkflowLibraryListItem => ({
   workflow_id: `wf-${index}`,
   name: `Workflow ${index}`,
@@ -220,6 +221,12 @@ beforeEach(async () => {
   root = createRoot(host);
 });
 afterEach(async () => {
+  // A test timeout does not cancel its async body. End it before unmounting this root or starting the next test.
+  const active = activeDeepScroll;
+  if (active) {
+    active.abort.abort();
+    await active.done.catch(() => undefined);
+  }
   await act(() => root.unmount());
   host.remove();
   accountLifecycle.invalidate();
@@ -428,17 +435,28 @@ const settle = () =>
         setTimeout(resolve, 250);
       })
   );
-const scrollTo = async (scroll: HTMLElement, top: number) => {
-  await act(() => {
+const scrollTo = async (scroll: HTMLElement, top: number, signal?: AbortSignal) => {
+  signal?.throwIfAborted();
+  await act(async () => {
     scroll.scrollTop = top;
     scroll.dispatchEvent(new Event('scroll'));
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(signal?.reason);
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, 120);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) {
+        onAbort();
+      }
+    });
   });
-  await act(
-    () =>
-      new Promise((resolve) => {
-        setTimeout(resolve, 120);
-      })
-  );
+  signal?.throwIfAborted();
 };
 it.each([
   [1280, 800, 3],
@@ -447,48 +465,69 @@ it.each([
 ])(
   'returns to the measured deep row at %ix%i (%i columns) through the real browse owner',
   async (width, height, columns) => {
-    // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
-    const freshAt = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
-    onTestFinished(() => clock.mockRestore());
-    await open();
-    const scroll = viewport()!;
-    for (let top = 0; top <= 39600; top += 1200) {
-      await scrollTo(scroll, top);
+    const abort = new AbortController();
+    const done = (async () => {
+      // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
+      const freshAt = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
+      onTestFinished(() => clock.mockRestore());
+      await open();
+      abort.signal.throwIfAborted();
+      const scroll = viewport()!;
+      for (let top = 0; top <= 39600; top += 1200) {
+        await scrollTo(scroll, top, abort.signal);
+        expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
+        expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
+      }
+      await settle();
+      abort.signal.throwIfAborted();
+      const before = firstVisibleRow(scroll);
+      expect(Number(before.id?.slice(3))).toBeGreaterThan(400);
+      expect(before.offset).toBeGreaterThan(10);
+      const requests = transport.list.mock.calls.length;
+      await act(() => userEvent.click(page.getByRole('button', { name: 'fixture1000', exact: false })));
+      abort.signal.throwIfAborted();
+      await settle();
+      abort.signal.throwIfAborted();
+      await page.viewport(width!, height!);
+      abort.signal.throwIfAborted();
+      await settle();
+      abort.signal.throwIfAborted();
+      const all = page.getByRole('button', { name: 'workflowLibrary.allTag', exact: false });
+      const modal = document.querySelector<HTMLElement>('[role=dialog]')!;
+      const outerOffset = modal.scrollTop;
+      await act(() => userEvent.click(all));
+      abort.signal.throwIfAborted();
+      await settle();
+      abort.signal.throwIfAborted();
+      const restored = viewport()!;
+      const expectedIndex = Math.floor(Number(before.id?.slice(3)) / columns!) * columns!;
+      await waitFor(() => expect(firstVisibleRow(restored).id).toBe(`wf-${expectedIndex}`));
+      abort.signal.throwIfAborted();
+      expect(firstVisibleRow(restored).columns).toBe(columns);
+      expect(Math.abs(firstVisibleRow(restored).fraction - before.fraction)).toBeLessThan(0.01);
+      if (width === 1280) {
+        expect(Math.abs(firstVisibleRow(restored).offset - before.offset)).toBeLessThan(3);
+      }
+      expect(document.activeElement).toBe(all.element());
+      expect(modal.scrollTop).toBe(outerOffset);
       expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
-      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
+      expect(browse.getWorkflowLibraryBrowseRetention().metadataEntries).toBeLessThanOrEqual(540);
+      // Only the new tag view needs a listing; returning must not replace its cached deep window with page zero.
+      expect(transport.list.mock.calls.length - requests).toBe(1);
+      await scrollTo(restored, 0, abort.signal);
+      await waitFor(() => expect(card(0)).not.toBeNull());
+      abort.signal.throwIfAborted();
+      expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
+    })();
+    activeDeepScroll = { abort, done };
+    try {
+      await done;
+    } finally {
+      if (activeDeepScroll?.done === done) {
+        activeDeepScroll = null;
+      }
     }
-    await settle();
-    const before = firstVisibleRow(scroll);
-    expect(Number(before.id?.slice(3))).toBeGreaterThan(400);
-    expect(before.offset).toBeGreaterThan(10);
-    const requests = transport.list.mock.calls.length;
-    await act(() => userEvent.click(page.getByRole('button', { name: 'fixture1000', exact: false })));
-    await settle();
-    await page.viewport(width!, height!);
-    await settle();
-    const all = page.getByRole('button', { name: 'workflowLibrary.allTag', exact: false });
-    const modal = document.querySelector<HTMLElement>('[role=dialog]')!;
-    const outerOffset = modal.scrollTop;
-    await act(() => userEvent.click(all));
-    await settle();
-    const restored = viewport()!;
-    const expectedIndex = Math.floor(Number(before.id?.slice(3)) / columns!) * columns!;
-    await waitFor(() => expect(firstVisibleRow(restored).id).toBe(`wf-${expectedIndex}`));
-    expect(firstVisibleRow(restored).columns).toBe(columns);
-    expect(Math.abs(firstVisibleRow(restored).fraction - before.fraction)).toBeLessThan(0.01);
-    if (width === 1280) {
-      expect(Math.abs(firstVisibleRow(restored).offset - before.offset)).toBeLessThan(3);
-    }
-    expect(document.activeElement).toBe(all.element());
-    expect(modal.scrollTop).toBe(outerOffset);
-    expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
-    expect(browse.getWorkflowLibraryBrowseRetention().metadataEntries).toBeLessThanOrEqual(540);
-    // Only the new tag view needs a listing; returning must not replace its cached deep window with page zero.
-    expect(transport.list.mock.calls.length - requests).toBe(1);
-    await scrollTo(restored, 0);
-    await waitFor(() => expect(card(0)).not.toBeNull());
-    expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
   },
   30000
 );
