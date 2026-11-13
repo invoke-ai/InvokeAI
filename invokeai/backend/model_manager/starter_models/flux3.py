@@ -158,17 +158,21 @@ flux3_klein_gguf_q8_0 = StarterModel(
 )
 
 # The prompt upsampler: a Qwen3.5-9B vision-language fine-tune that rewrites a short request into the caption FLUX.3 is
-# trained on. A Text LLM, so it serves Expand Prompt, which sends it the system prompt the user picks. Its own
+# trained on. A Text LLM, so it serves Expand Prompt (with the seeded "FLUX.3 Prompt Upsampler" system prompt) and the
+# FLUX.3 prompt upsampler switch in generation. Its own
 # repository is Apache-2.0 and not gated; the int8 file comes from the gated Comfy repository, under that repository's
 # license.
-_UPSAMPLER_SYSTEM_PROMPT = "Use it with the 't2i' system prompt from the model's system_prompts.json."
+_UPSAMPLER_USE = (
+    'Serves Expand Prompt with the built-in "FLUX.3 Prompt Upsampler" system prompt, and the FLUX.3 prompt upsampler '
+    "switch in generation."
+)
 
 flux3_prompt_upsampler = StarterModel(
     name="FLUX.3 Prompt Upsampler",
     base=BaseModelType.Any,
     source="black-forest-labs/flux-3-image-klein-pup",
-    description="FLUX.3 Image Klein's prompt upsampler (Qwen3.5-9B): a Text LLM for Expand Prompt that rewrites a "
-    f"short prompt into a detailed FLUX.3 caption. {_UPSAMPLER_SYSTEM_PROMPT} bf16, ~17.5GB. Apache-2.0.",
+    description="FLUX.3 Image Klein's prompt upsampler (Qwen3.5-9B): a Text LLM that rewrites a "
+    f"short prompt into a detailed FLUX.3 caption. {_UPSAMPLER_USE} bf16, ~17.5GB. Apache-2.0.",
     type=ModelType.TextLLM,
 )
 
@@ -180,10 +184,10 @@ flux3_prompt_upsampler_int8 = StarterModel(
     base=BaseModelType.Any,
     source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/"
     "feef60b0aaf63a4773ace96636ebbcf43b881312/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
-    description="The FLUX.3 prompt upsampler as one ComfyUI int8_convrot file, a Text LLM for Expand Prompt. It "
+    description="The FLUX.3 prompt upsampler as one ComfyUI int8_convrot file, a Text LLM. It "
     "needs about 10.7GB of memory instead of 17.5GB, but dequantizes its int8 language-model weights for every generated "
     "token unless int8 Compute runs them on int8 kernels; use the bf16 model where it fits. "
-    f"{_UPSAMPLER_SYSTEM_PROMPT} ~9.1GB. The Comfy repository is gated under the FLUX Kommunity License: accept it on "
+    f"{_UPSAMPLER_USE} ~9.1GB. The Comfy repository is gated under the FLUX Kommunity License: accept it on "
     "Hugging Face first.",
     type=ModelType.TextLLM,
     format=ModelFormat.Checkpoint,

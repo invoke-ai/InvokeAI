@@ -602,6 +602,100 @@ describe('GenerateSettingsForm required components', () => {
   });
 });
 
+describe('GenerateSettingsForm FLUX.3 prompt upsampler', () => {
+  const KLEIN = {
+    ...MODEL,
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    variant: 'flux3_klein',
+  } as GenerationModelCatalogItem;
+  const VISION_LLM = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  } as unknown as GenerationModelCatalogItem;
+  const TEXT_ONLY_LLM = { ...VISION_LLM, key: 'qwen', name: 'Qwen', supports_images: false };
+  const switchLabel = 'widgets.generate.flux3PromptUpsampler';
+  const upsamplerSwitch = () =>
+    [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (input) => input.labels?.[0]?.textContent === switchLabel
+    );
+  const upsamplerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="text_llm"]');
+  const slotError = () =>
+    upsamplerSlot()?.closest('[data-scope="field"]')?.querySelector('[role="alert"]')?.textContent;
+  const useKlein = async () => {
+    stableGroups.models.catalog = [MODEL, KLEIN, VISION_LLM, TEXT_ONLY_LLM];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({ ...getDefaultGenerateSettings(KLEIN as never), modelKey: KLEIN.key })
+    );
+  };
+
+  it('is offered to FLUX.3 only, and off by default with its slot present but not asking for a model', async () => {
+    stableGroups.models.catalog = [MODEL, KLEIN, VISION_LLM];
+    await renderAdapter(buildAdapter());
+
+    expect(upsamplerSwitch()).toBeUndefined();
+
+    await useKlein();
+
+    expect(upsamplerSwitch()?.checked).toBe(false);
+    expect(upsamplerSlot()?.getAttribute('data-component-placeholder')).toBe('None');
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(slotError()).toBeUndefined();
+  });
+
+  it('makes the slot required when turned on, lists vision Text LLMs only, and clears its reason once one is picked', async () => {
+    await useKlein();
+
+    await userEvent.click(upsamplerSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerEnabled: true });
+    expect(upsamplerSlot()?.getAttribute('data-component-placeholder')).toBe('widgets.generate.selectComponent');
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(slotError()).toBe('Generate needs a Prompt Upsampler model while Prompt upsampler is on.');
+    expect(
+      [...upsamplerSlot()!.querySelectorAll('[data-component-pick]')].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([VISION_LLM.key]);
+
+    await settle(() => upsamplerSlot()!.querySelector<HTMLElement>('[data-component-pick="pup"]')?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerModel: { key: 'pup' } });
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(slotError()).toBeUndefined();
+  });
+
+  it('stops requiring the slot when switched off, keeping the pick for the next time', async () => {
+    await useKlein();
+    await settle(() =>
+      storedValues().patchSnapshot({
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: VISION_LLM as never,
+      })
+    );
+
+    expect(upsamplerSwitch()?.checked).toBe(true);
+    expect(upsamplerSlot()?.getAttribute('data-component-value')).toBe('pup');
+
+    await userEvent.click(upsamplerSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(upsamplerSlot()?.getAttribute('data-component-value')).toBe('pup');
+    expect(storedValues().getSnapshot()).toMatchObject({
+      flux3PromptUpsamplerEnabled: false,
+      flux3PromptUpsamplerModel: { key: 'pup' },
+    });
+  });
+});
+
 describe('GenerateSettingsForm render isolation', () => {
   it('preserves a settled weight draft when removing another concept from an already open menu', async () => {
     const first: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };

@@ -213,7 +213,8 @@ disabled with *FLUX.3 needs a prompt to place regional guidance in its layout. E
 guidance layers.*
 
 The boxes are added when the generation runs, as the box table described below, so dynamic prompts and batches vary
-the prompt in front of them. The caption FLUX.3 encoded is saved in the image's metadata as `flux3_caption`; recalling
+the prompt in front of them. With the [prompt upsampler](#prompt-upsampler-in-generation) on, the upsampler receives
+the boxes instead and keeps them in the box table it writes. The caption FLUX.3 encoded is saved in the image's metadata as `flux3_caption`; recalling
 the image restores the prompt you typed.
 
 ## Layout and box edits in the prompt
@@ -255,9 +256,11 @@ a 9B vision-language model, fine-tuned from Qwen3.5-9B and released under Apache
 | **FLUX.3 Prompt Upsampler** | ≈ 17.5 GiB (bf16) | `black-forest-labs/flux-3-image-klein-pup`, not gated |
 | **FLUX.3 Prompt Upsampler (int8)** | ≈ 9.1 GiB | ComfyUI's `int8_convrot` file from the gated `flux-3-image-klein-comfy` repository |
 
-Use it in [Expand Prompt](/users-guide/image-generation/prompt-tools/#the-flux3-prompt-upsampler) with Black Forest
-Labs' `t2i` system prompt. It rewrites your text prompt in the prompt box before you generate; generation does not
-run it on its own, and in the Generate panel Expand Prompt does not send it your reference images.
+Use it in two places. [Expand Prompt](/users-guide/image-generation/prompt-tools/#the-flux3-prompt-upsampler) has a
+built-in system prompt for it and rewrites your text prompt in the prompt box before you generate; in the Generate
+panel it does not send the upsampler your reference images. The
+[prompt upsampler in generation](#prompt-upsampler-in-generation) runs it inside every generation, with the reference
+images and Regional Guidance boxes.
 
 The int8 file takes about 10.7 GiB once loaded, against 17.5 GiB for the bf16 model, because its language model keeps
 its weights in int8; it dequantizes them for every token it generates. With
@@ -293,6 +296,95 @@ Before this release, InvokeAI did not install the upsampler as a Text LLM: the f
 ComfyUI single files, bf16 and int8, were identified as Qwen3.5 encoders. Use **Re-identify model** in the Model
 Manager on such an install.
 
+## Prompt upsampler in generation
+
+The prompt upsampler can run as part of every FLUX.3 generation. It rewrites your prompt into the long caption FLUX.3
+is trained on, and the text encoder then encodes that caption. Install one of the
+[upsampler models](#prompt-upsampler-model) first.
+
+**How to use:** switch on **Prompt upsampler** in the **Render** section of the Generate panel for a FLUX.3 model. It
+is off by default. The **Prompt Upsampler** slot is always part of **Components** for FLUX.3 models and is required
+only while the switch is on: Invoke is blocked until you pick a Text LLM that reads images there. Choosing another
+model family clears the pick like any other component; the switch setting is kept. The slot lists every installed Text
+LLM that reads images, but the system prompts are the ones the Black Forest Labs upsampler was trained with, so pick
+**FLUX.3 Prompt Upsampler** or **FLUX.3 Prompt Upsampler (int8)**. The switch works in Generate and on the Canvas.
+
+Only the positive prompt is rewritten. The negative prompt of Klein Base with CFG is encoded as you wrote it.
+
+### What the upsampler sees
+
+The upsampler gets what the generation has, and the mode follows:
+
+- **Prompt only**: it expands the prompt into a caption.
+- **Prompt and reference images**: an edit. It writes the edit instruction from the images, which it sees in the
+  order they are attached. They are prepared as Black Forest Labs does: over white, 1 MP for one image, 724² each for
+  two, 512² each from three, saved as JPEG at quality 92.
+- **Either of these with a layout**: there are Regional Guidance layers on the Canvas, or the prompt ends with a
+  [box table](#layout-and-box-edits-in-the-prompt).
+
+With a layout, the ids and boxes of the regions, and of the rows of a box table you typed at the end of the prompt, are
+kept exactly in the box table the upsampler returns. The descriptions are the upsampler's: the text you typed for a
+region tells it what goes there, but the row's description in the caption is what it wrote. It may add rows of its own
+for other elements of the scene. Without reference images the regions are object rows; with reference images they are
+rows that place new content in the output, the same rule as without the upsampler. A blank prompt with regions is
+refused, as it is without the upsampler.
+
+### Metadata and recall
+
+The caption that was encoded is saved in the image's metadata as `flux3_caption`, and the upsampler model as
+`flux3_prompt_upsampler`. Recalling the image restores the prompt you typed, not the caption, turns the switch on and
+selects the model if it is installed. Recalling a FLUX.3 image made without the upsampler turns the switch off and
+keeps your model pick.
+
+### Repeatability and cost
+
+Decoding is greedy, so on the same machine and settings the same prompt, images, regions and model give the same
+caption. Another GPU, driver or torch version, or another `attention_backend`, can change a caption after some tokens,
+and so the image that the recalled settings give. When only the seed, or another setting outside the upsampler's
+inputs, changes, the caption comes from the node cache and the upsampler does not run again. Every new prompt is one
+upsampler run, each [Dynamic Prompts](/users-guide/image-generation/prompting-guide/#dynamic-prompts) variant
+included.
+
+The upsampler is moved out of VRAM when its run is over, so the text encoder and the transformer do not share VRAM with
+it. It stays in RAM if the RAM cache has room. Once the upsampler is writing, a cancel stops it between two tokens; a
+cancel while its model is still loading takes effect when the load is done.
+
+Measured on an RTX 4090 (24 GB) on Windows with Klein bf16 as a single file at 1024 × 1024 and 16 steps, the fp8
+Qwen3-VL 4B encoder, the default working memory, `reserve_vram_gb: 1` and no other program computing on the GPU (its
+utilization was 0-6 % before each run). The desktop and other open programs still held some VRAM. Each figure is the
+median of three runs after one warm-up.
+
+- **The upsampler node alone, bf16 model already in the RAM cache:** 15.9 s for a text prompt (a caption of 300
+  tokens), 13.6 s with one reference image (224 tokens), 14.0 s with two (228 tokens), 27.0 s for a layout with two
+  regions (649 tokens) and 16.2 s for a layout with one reference image and one region (287 tokens). Each includes
+  about 2.5 s to move the model from RAM into VRAM. VRAM peaked at 19.5-20.3 GiB by `nvidia-smi`, of which about 1.8
+  GiB was held by the desktop.
+- **The upsampler node alone, int8 file, without int8 Compute:** 34.5 s for the text prompt, 32.8 s with one reference
+  image and 64.0 s for the layout with two regions. VRAM peaked at 13.5-14.3 GiB, of which about 2.4 GiB was held by the
+  desktop and other open programs.
+- **A whole generation with the bf16 upsampler** and `max_cache_ram_gb: 40`: a text prompt took 8.4 s without the
+  upsampler and 28.6 s with it; an edit of one reference image took 15.6 s without and 33.7 s with it. The upsampler
+  added about 18-20 s per new prompt.
+- A cancel took effect 0.5 s after it was requested. A repeat with unchanged inputs came from the node cache in under a
+  second, without loading the model.
+
+The models you use together should fit in the RAM cache. Unset, `max_cache_ram_gb` is half the system RAM minus 2 GB,
+but with a dedicated GPU it is capped at the GPU's VRAM minus `device_working_mem_gb`: about 21 GB on a 24 GB card with
+the default working memory. On such a card the default holds neither of the sets given next, and models are read from
+disk again for every new prompt until you set `max_cache_ram_gb` higher, system RAM permitting. Loaded, the bf16
+upsampler is 17.5 GiB, the bf16 transformer 10.3 GiB, the fp8 text encoder 4.1 GiB and the VAE 0.2 GiB: 32.1 GiB
+together, or 25.3 GiB with the int8 upsampler (10.7 GiB). With `max_cache_ram_gb: 24` the bf16 set did not fit: models
+were dropped from the RAM cache and read from disk again for every new prompt, and the same text-prompt generation took
+40.5 s instead of 28.6 s. Size [`max_cache_ram_gb`](/configuration/optimization/low-vram-mode/#settings) for the models
+you use together, or use the int8 upsampler or a smaller transformer build.
+
+### Fidelity to the reference
+
+The node follows diffusers' implementation: greedy decoding and no presence penalty, which Black Forest Labs' own
+reference applies for text-to-image. For a text prompt, one and two reference images, and a layout with and without a
+reference image, the caption matched diffusers' token for token when diffusers ran with the same attention kernel
+order as InvokeAI.
+
 ## PiD super-resolution decode
 
 FLUX.3 latents are FLUX.2 latents, so the FLUX.2 PiD decoders decode them. See
@@ -304,6 +396,7 @@ FLUX.3 latents are FLUX.2 latents, so the FLUX.2 PiD decoders decode them. See
 | --- | --- |
 | **Main Model - FLUX.3** | Loads the transformer, encoder and VAE |
 | **Apply LoRA - FLUX.3** / **Apply LoRA Collection - FLUX.3** | Apply one LoRA, or a collection of them, to the transformer |
+| **Prompt Upsampler - FLUX.3** | Writes the caption FLUX.3 encodes with the [prompt upsampler](#prompt-upsampler-in-generation). Takes the prompt, the upsampler model, optional reference images and optional regions. It takes the place of **Layout Prompt - FLUX.3**, and its **Reference Images** input takes the same collection as the denoise node's |
 | **Layout Prompt - FLUX.3** | Adds boxes to a prompt as its box table, or to the table it already ends with: object rows, or with **Edit Targets** on, rows that place new content in the output of an edit. Each region is a description and a box `[y_min, x_min, y_max, x_max]` from 0 to 1000. Generate and Canvas graphs pass the prompt through it, turn on Edit Targets when reference images are attached, and fill its regions from regional guidance on the Canvas; the regions input has no editor widget |
 | **Prompt - FLUX.3** | Encodes the prompt |
 | **Denoise - FLUX.3** | Runs the diffusion; takes the VAE, optional reference images and, for Klein Base, CFG and a negative prompt |

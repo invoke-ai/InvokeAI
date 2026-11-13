@@ -453,12 +453,20 @@ it.each([
     onTestFinished(() => clock.mockRestore());
     await open();
     const scroll = viewport()!;
-    for (let top = 0; top <= 39600; top += 1200) {
+    // Cross enough listing windows to exercise eviction without repeating every intermediate scroll.
+    for (let top = 0; top <= 43200; top += 3600) {
       await scrollTo(scroll, top);
       expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
     }
+    await scrollTo(scroll, 39600);
     await settle();
+    const listedPositions = new Set(
+      transport.list.mock.calls.flatMap(([{ page, perPage = 20 }]) =>
+        Array.from({ length: perPage }, (_, index) => page * perPage + index)
+      )
+    );
+    expect(listedPositions.size).toBeGreaterThan(540);
     const before = firstVisibleRow(scroll);
     expect(Number(before.id?.slice(3))).toBeGreaterThan(400);
     expect(before.offset).toBeGreaterThan(10);

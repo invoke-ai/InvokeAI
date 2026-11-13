@@ -10,6 +10,9 @@ import { defineConfig } from 'vitest/config';
 
 import viteConfig from './vite.config.mts';
 
+// Keep the initial Playwright page and Vitest iframe the same size before either can receive focus.
+const TEST_VIEWPORT = { width: 414, height: 896 };
+
 /** A previous test's pointer must not hover controls mounted by the next test. */
 const resetBrowserPointer: BrowserCommand<[]> = async ({ page }) => {
   await page.mouse.move(-1, -1);
@@ -338,7 +341,15 @@ export default mergeConfig(
         enabled: true,
         headless: true,
         instances: [{ browser: 'chromium' }],
-        provider: playwright(),
+        // Focus must not scroll the runner while its iframe and outer viewport resize independently.
+        orchestratorScripts: [
+          {
+            content: "document.head.insertAdjacentHTML('beforeend', '<style>body { overflow: clip }</style>')",
+            type: 'text/javascript',
+          },
+        ],
+        provider: playwright({ contextOptions: { viewport: TEST_VIEWPORT } }),
+        viewport: TEST_VIEWPORT,
       },
       include: ['src/**/*.browser.test.{ts,tsx}'],
       setupFiles: ['./scripts/browser-test-console.ts', './scripts/browser-test-pointer.ts'],

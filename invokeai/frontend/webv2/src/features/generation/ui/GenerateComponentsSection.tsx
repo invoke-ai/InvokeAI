@@ -46,6 +46,8 @@ const selectComponentSettings = pickGenerateSettings([
   'clipGEmbedModel',
   'clipLEmbedModel',
   'componentSourceModel',
+  'flux3PromptUpsamplerEnabled',
+  'flux3PromptUpsamplerModel',
   'gemma2EncoderModel',
   'ideogram4UnconditionalModel',
   'mistralEncoderModel',
@@ -82,6 +84,7 @@ const getComponentPolicyContext = (
     qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
+    flux3PromptUpsamplerModel: settings.flux3PromptUpsamplerModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -129,8 +132,9 @@ const ComponentPicker = ({
           isClearable
           modelTypes={modelTypes}
           placeholder={
-            slot.placeholder ??
-            (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+            isRequired
+              ? t('widgets.generate.selectComponent')
+              : (slot.placeholder ?? t('widgets.generate.modelDefault'))
           }
           value={selectedValue}
           onChange={onChange}
