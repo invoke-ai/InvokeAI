@@ -120,9 +120,8 @@ const compareText = (left: string, right: string) => left.localeCompare(right, u
 const compareInstants = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
 
 /**
- * The project's workflows filtered and ordered like the library places, but locally. A workflow that never ran counts
- * as the oldest run, as the server orders a missing `last_run_at` lowest: first oldest-first, last newest-first. Ties
- * keep project order.
+ * The project's workflows filtered and ordered like the library places, but locally. Workflows that never ran come
+ * after the runs in either direction, as the server orders a missing `last_run_at`. Ties keep project order.
  */
 export const queryProjectWorkflowEntries = <Entry extends ProjectWorkflowLibraryEntry>(
   entries: readonly Entry[],
@@ -153,8 +152,8 @@ export const queryProjectWorkflowEntries = <Entry extends ProjectWorkflowLibrary
         (left, right) => sign * compareInstants(left.item.updated_at ?? '', right.item.updated_at ?? '')
       );
     case 'lastRun':
-      return [...filtered].sort(
-        (left, right) => sign * compareInstants(left.item.last_run_at ?? '', right.item.last_run_at ?? '')
+      return [...filtered].sort(({ item: { last_run_at: left } }, { item: { last_run_at: right } }) =>
+        left && right ? sign * compareInstants(left, right) : Number(!left) - Number(!right)
       );
   }
 };

@@ -3665,13 +3665,15 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
-        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs last in both directions, the id
+        // breaking ties.
         const sortKey = (workflow) =>
           orderBy === 'name'
             ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
             : (workflow[orderBy] ?? null);
-        const compare = (left, right) =>
-          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const compare = (left, right) => (left === right ? 0 : left < right ? -1 : 1);
+        const compareKeys = (left, right) =>
+          left === right ? 0 : left === null ? 1 : right === null ? -1 : sign * compare(left, right);
         const items = [...state.workflows.values()]
           .filter(
             (workflow) =>
@@ -3683,7 +3685,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           )
           .sort(
             (left, right) =>
-              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+              compareKeys(sortKey(left), sortKey(right)) || sign * compare(left.workflow_id, right.workflow_id)
           );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);

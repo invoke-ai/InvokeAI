@@ -126,15 +126,14 @@ describe('queryProjectWorkflowEntries', () => {
       'background',
       'portrait',
     ]);
-    // Never-run workflows are the oldest runs, as the server orders them: last newest-first, first oldest-first, in
-    // project order among themselves.
+    // Never-run workflows come last either way, as the server orders them, in project order among themselves.
     expect(ids('', [], { direction: 'desc', sort: 'lastRun' })).toEqual([
       'background',
       'portrait',
       'upscale',
       'sketch',
     ]);
-    expect(ids('', [], { direction: 'asc', sort: 'lastRun' })).toEqual(['upscale', 'sketch', 'portrait', 'background']);
+    expect(ids('', [], { direction: 'asc', sort: 'lastRun' })).toEqual(['portrait', 'background', 'upscale', 'sketch']);
   });
 });
 
