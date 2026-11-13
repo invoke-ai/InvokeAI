@@ -182,8 +182,36 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             assert.ok(!(await server.text()).includes(marker), 'Server must not explain A recovery');
             report.journalAttribution = recovery;
             await page.unroute('**/api/v1/projects/**', holdSaves);
+            // Wait for the recovered document's Gallery bodies, not just Preview's ready prompt, before Edit
+            // unmounts Gallery. Its lazy grid can otherwise begin and cancel both reads during the layout change.
+            const initialGalleryReads = Promise.all(
+              [
+                page.waitForResponse((response) => {
+                  const url = new URL(response.url());
+                  return (
+                    response.request().method() === 'GET' &&
+                    url.origin === origin &&
+                    url.pathname === '/api/v1/gallery/items/' &&
+                    url.searchParams.get('board_id') === 'fixture-project-board-02' &&
+                    url.searchParams.get('limit') === '60'
+                  );
+                }),
+                page.waitForResponse(
+                  (response) =>
+                    response.request().method() === 'GET' && response.url() === `${origin}/api/v1/image_map/status`
+                ),
+              ].map(async (pending) => {
+                const response = await pending;
+                assert.equal(await response.finished(), null, `Gallery startup body failed: ${response.url()}`);
+              })
+            );
+            void initialGalleryReads.catch(() => {});
             await open();
             await expect(prompt, 'Journal-only held field must survive actual unload').toHaveValue(marker);
+            await initialGalleryReads;
+            await waitForRenderedMedia(page, {
+              allImagesSelector: '[data-hotkey-widget-type-id="gallery"] [data-gallery-tile-media] img',
+            });
             report.heldFieldRecovery = 'passed';
             // Canvas and layer thumbnails must contain fixture colour, in all three engines.
             await page
