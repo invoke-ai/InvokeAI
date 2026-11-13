@@ -35,6 +35,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
   isAnimaInpaintAdapter,
+  isVisionTextLlm,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
@@ -400,10 +401,29 @@ export const isModelFromRepo = (source: string | null | undefined, repoId: strin
   return folder.toLowerCase() === wanted.split('/').pop();
 };
 
+/**
+ * Whether an installed model's source is the single file `fileName`: a Hugging Face file URL or a local path ending in
+ * it. Case-insensitive.
+ */
+const isModelFromFile = (source: string | null | undefined, fileName: string): boolean => {
+  const file = source?.split('::')[0]!.split(/[?#]/)[0]!.split(/[/\\]/).pop();
+  return Boolean(file) && file!.toLowerCase() === fileName.toLowerCase();
+};
+
+/** Whether an installed model's source is the model Expand Prompt suggests, in any of its builds. */
+export const isSuggestedExpandPromptModel = (
+  source: string | null | undefined,
+  suggestion: Pick<ExpandPromptSuggestion, 'modelFileNames' | 'modelSource'>
+): boolean =>
+  (suggestion.modelSource !== null && isModelFromRepo(source, suggestion.modelSource)) ||
+  (suggestion.modelFileNames ?? []).some((fileName) => isModelFromFile(source, fileName));
+
 /** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
 interface ImagePromptEnhancer {
   /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
   modelSource: string;
+  /** Single-file builds of the same model, which Expand Prompt preselects too. */
+  modelFileNames?: readonly string[];
   /** The starter model's name, for the hint shown when it is not installed. */
   modelName: string;
   /** Seeded public system prompt. */
@@ -417,6 +437,17 @@ const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
     modelSource: 'google/gemma-4-E4B-it',
     systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
   },
+  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node.
+  // The bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
+  flux3: {
+    modelFileNames: [
+      'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
+      'qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors',
+    ],
+    modelName: 'FLUX.3 Prompt Upsampler',
+    modelSource: 'black-forest-labs/flux-3-image-klein-pup',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012',
+  },
 };
 
 /** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
@@ -428,6 +459,7 @@ export const getImageExpandPromptSuggestion = (
     ? {
         image: null,
         imageSystemPromptId: null,
+        modelFileNames: enhancer.modelFileNames,
         modelName: enhancer.modelName,
         modelSource: enhancer.modelSource,
         systemPromptId: enhancer.systemPromptId,
@@ -560,6 +592,8 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
+    flux3PromptUpsamplerEnabled: false,
+    flux3PromptUpsamplerModel: null,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -655,6 +689,7 @@ export type GenerateComponentValueKey =
   | 'qwen3VLVisionTowerModel'
   | 'qwen35EncoderModel'
   | 'animaInpaintAdapterModel'
+  | 'flux3PromptUpsamplerModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -666,7 +701,11 @@ export type GenerateComponentValueKey =
 /** The settings component slot rules read beyond the selected components themselves. */
 export type ComponentPolicySettings = Pick<
   GenerateSettings,
-  'componentSourceModel' | 'pidMode' | 'qwen3VLEncoderModel'
+  | 'animaInpaintAdapterEnabled'
+  | 'componentSourceModel'
+  | 'flux3PromptUpsamplerEnabled'
+  | 'pidMode'
+  | 'qwen3VLEncoderModel'
 >;
 
 export interface ComponentPolicyContext {
@@ -681,10 +720,17 @@ export interface ComponentSlotPolicy {
   modelTypes: readonly ModelTaxonomyType[];
   valueKind: 'component' | 'vae' | 'main';
   helpText?: string;
+  /** Shown while the slot is empty and not required; a required slot always asks for a component. */
   placeholder?: string;
   defaultOpen?: boolean;
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
+  /**
+   * Whether a generation may load the selection. A slot behind a switch keeps its selection while the switch is off,
+   * and nothing loads it then, so a kept selection that is no longer installed does not block Invoke. Absent, a set
+   * selection is always in use.
+   */
+  inUse?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
   /**
    * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
@@ -748,6 +794,7 @@ const TYPE_QWEN3_VL_VISION_TOWER: ModelTaxonomyType[] = ['qwen3_vl_vision_tower'
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
+const TYPE_TEXT_LLM: ModelTaxonomyType[] = ['text_llm'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
@@ -843,7 +890,28 @@ const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
     helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
     placeholder: 'None',
     filter: wrapFilter(isAnimaInpaintAdapter),
+    inUse: (ctx) => ctx.settings.animaInpaintAdapterEnabled,
   });
+
+const isFlux3PromptUpsamplerOn = (ctx: ComponentPolicyContext): boolean => ctx.settings.flux3PromptUpsamplerEnabled;
+
+/** Exposed before the switch is on, like PiD's; required only while it is. The node reads images, so the model must see them. */
+const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
+  slot({
+    key: 'flux3PromptUpsamplerModel',
+    label: 'Prompt Upsampler',
+    modelTypes: TYPE_TEXT_LLM,
+    valueKind: 'component',
+    placeholder: 'None',
+    helpText:
+      'The FLUX.3 Prompt Upsampler starter model (bf16 or int8), used while Prompt upsampler is on. Other Text LLMs that read images run, but are not trained for its instructions.',
+    filter: (candidate) => isVisionTextLlm(candidate),
+    required: isFlux3PromptUpsamplerOn,
+    inUse: isFlux3PromptUpsamplerOn,
+    missingMessage: 'Generate needs a Prompt Upsampler model while Prompt upsampler is on.',
+  });
+
+const isPidOn = (ctx: ComponentPolicyContext): boolean => getIsPidActive(ctx.settings.pidMode, ctx.model.base);
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
 const pidDecoderSlot = (): ComponentSlotPolicy =>
@@ -855,7 +923,8 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     helpText: 'Required while PiD is on. Must match the main model’s base.',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a PiD decoder while PiD is on.',
   });
 
@@ -867,7 +936,8 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a Gemma-2 encoder while PiD is on.',
   });
 
@@ -1212,6 +1282,7 @@ const getBaseComponentSectionPolicy = (
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers FLUX.3 models.',
         },
+        flux3PromptUpsamplerSlot(),
       ]);
     case 'krea-2':
       // Bundled Krea models supply components; standalone models need a separate encoder and VAE.
@@ -1422,6 +1493,7 @@ export const getComponentPolicyContext = (
     qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
+    flux3PromptUpsamplerModel: settings.flux3PromptUpsamplerModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1444,6 +1516,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwen3VLVisionTowerModel: 'Qwen3-VL vision tower',
   qwen35EncoderModel: 'Qwen3.5 encoder',
   animaInpaintAdapterModel: 'Inpaint adapter',
+  flux3PromptUpsamplerModel: 'Prompt upsampler',
   wanT5EncoderModel: 'Wan T5 encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Unconditional transformer',
@@ -2238,7 +2311,10 @@ const referenceImageTarget = (referenceImageId: string): GenerationIssue['target
   section: 'guidance',
 });
 
-/** Installed-model checks: the main model, its components, concepts and enabled references must all be installed. */
+/**
+ * Installed-model checks: the main model, the components the generation can load, concepts and enabled references must
+ * all be installed.
+ */
 export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -2258,10 +2334,20 @@ export const getGenerationModelAvailabilityIssues = (
     );
   }
 
+  const componentContext = getComponentPolicyContext(model, settings);
+  const slotsByKey = new Map(
+    getComponentSectionPolicy(model, settings).slots.map((slotPolicy) => [slotPolicy.key, slotPolicy])
+  );
+
   for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
-    if (value && !hasModelKey(models, value.key, value.type)) {
+    // A selection nothing loads (its switch is off) may stay uninstalled; turning the switch on asks for it again.
+    if (!value || slotsByKey.get(key)?.inUse?.(componentContext) === false) {
+      continue;
+    }
+
+    if (!hasModelKey(models, value.key, value.type)) {
       issues.push(
         issue(
           `components:notInstalled:${key}`,
