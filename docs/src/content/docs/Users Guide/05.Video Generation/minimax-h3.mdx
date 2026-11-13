@@ -30,9 +30,13 @@ What makes it different from Wan in practice:
 * **Fixed 24 fps** and a fixed frame grid: 90–345 frames
     in steps of 17 (about 3.8 to 14.4 seconds), default 124.
 
-* **Two fixed resolutions** "768 highres" pins the short edge to 768
+* **Resolution presets** "768 highres" pins the short edge to 768
   (native quality); "768 lowres" pins the *long* edge to 768 for fast
-  previews.
+  previews. **480p** and **544p** target a shorter edge for drafts; at 16:9
+  they produce 864×480 and 960×544. All presets keep the 32-pixel grid and
+  native area cap, so extreme aspect ratios may reduce the target short edge.
+  Drafts run below the training resolution and may lose detail; speed and
+  memory use depend on the model, hardware, and conditioning.
 
 * **Aspect ratios** from 1:4 to 4:1 are supported, wider than the
  preset list.

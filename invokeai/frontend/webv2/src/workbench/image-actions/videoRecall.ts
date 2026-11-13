@@ -469,23 +469,25 @@ export const getVideoSizeRecalls = (
   return recalls;
 };
 
-/** The one target resolution at which `media` size the canvas to exactly `width` x `height`; null when none or several do. */
+/** Resolve equivalent canvas presets without changing the recorded size; retain the current choice when it fits. */
 const getMediaSizedResolution = (
   model: MainModelConfig,
   media: Pick<
     VideoWidgetValues,
-    'aspectRatioId' | 'conditioningClip' | 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo'
+    'aspectRatioId' | 'conditioningClip' | 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo' | 'targetResolution'
   >,
   width: number,
   height: number
 ): Pick<VideoSizePreset, 'targetResolution'> | null => {
-  const [match, ...others] = getVideoTargetResolutionOptions(model).filter((option) => {
+  const matches = getVideoTargetResolutionOptions(model).filter((option) => {
     const canvas = getVideoDimensions(model, { ...media, targetResolution: option.id });
 
     return canvas?.width === width && canvas.height === height;
   });
 
-  return match && others.length === 0 ? { targetResolution: match.id } : null;
+  const match = matches.find((option) => option.id === media.targetResolution) ?? matches[0];
+
+  return match ? { targetResolution: match.id } : null;
 };
 
 /** Whether a frame, the source video or a clip's picture sized the recorded canvas, rather than a preset. */

@@ -19,6 +19,7 @@ import { SEED_MAX } from '@platform/core/seed';
 
 import type {
   Ltx2TargetResolution,
+  MiniMaxH3TargetResolution,
   VideoAspectRatioId,
   VideoGenerationMode,
   VideoSettings,
@@ -242,6 +243,8 @@ const WAN_TARGET_RESOLUTION_OPTIONS: readonly VideoTargetResolutionOption[] = [
 const MINIMAX_H3_TARGET_RESOLUTION_OPTIONS: readonly VideoTargetResolutionOption[] = [
   { id: '768 highres', label: '768 highres (H3 native)' },
   { id: '768 lowres', label: '768 lowres (fast preview)' },
+  { id: '480p', label: '480p draft (short edge 480)' },
+  { id: '544p', label: '544p draft (short edge 544)' },
 ];
 
 const WAN_FRAMES: VideoFramesGridPolicy = {
@@ -609,7 +612,7 @@ export const getVideoDimensions = (
 
   const dimensions =
     model?.base === 'minimax-h3'
-      ? resolveMiniMaxH3Canvas(inputs.width, inputs.height, targetResolution as '768 highres' | '768 lowres')
+      ? resolveMiniMaxH3Canvas(inputs.width, inputs.height, targetResolution as MiniMaxH3TargetResolution)
       : model?.base === 'ltx-2'
         ? resolveLtx2Canvas(inputs.width, inputs.height, targetResolution as Ltx2TargetResolution)
         : scaleAndSnapWanDimensions(

@@ -95,6 +95,24 @@ describe('resolveMiniMaxH3Canvas', () => {
     expect(resolveMiniMaxH3Canvas(1, 1, '768 lowres')).toEqual({ height: 768, width: 768 });
   });
 
+  it.each([
+    ['480p', 864, 480],
+    ['544p', 960, 544],
+  ] as const)('resolves %s drafts without changing aspect or the 32-pixel grid', (preset, width, height) => {
+    expect(resolveMiniMaxH3Canvas(16, 9, preset)).toEqual({ width, height });
+    expect(resolveMiniMaxH3Canvas(9, 16, preset)).toEqual({ width: height, height: width });
+    expect(resolveMiniMaxH3Canvas(1, 1, preset)).toEqual({ width: height, height });
+    expect(resolveMiniMaxH3Canvas(5, 1, preset)).toBeNull();
+    expect(resolveMiniMaxH3Canvas(0, 1, preset)).toBeNull();
+    expect(resolveMiniMaxH3Canvas(Number.NaN, 1, preset)).toBeNull();
+  });
+
+  it('keeps extreme draft ratios under the native area cap before snapping', () => {
+    expect(resolveMiniMaxH3Canvas(4, 1, '544p')).toEqual({ width: 2016, height: 512 });
+    expect(resolveMiniMaxH3Canvas(1, 4, '544p')).toEqual({ width: 512, height: 2016 });
+    expect(resolveMiniMaxH3Canvas(4, 1, '480p')).toEqual({ width: 1920, height: 480 });
+  });
+
   it('only the ratio matters, not the absolute pixels', () => {
     expect(resolveMiniMaxH3Canvas(1920, 1080, '768 highres')).toEqual(resolveMiniMaxH3Canvas(16, 9, '768 highres'));
   });
