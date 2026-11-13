@@ -14,7 +14,7 @@ Currently covers:
 
 from itertools import chain
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 import torch
 
@@ -30,11 +30,6 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_GGUF_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
-    _strip_quantization_metadata,
-    fold_comfyui_fp8_scale,
-    reject_layers_the_fold_cannot_decode,
-)
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
 from invokeai.backend.model_manager.taxonomy import (
@@ -52,12 +47,23 @@ from invokeai.backend.model_manager.util.llamacpp_t5 import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     COMFY_QUANT_SUFFIX,
+    FP8_WEIGHT_DTYPES,
+    INPUT_SCALE_SUFFIXES,
+    Fp8ScaledLayer,
+    attach_fp8_scales,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
+    reject_undecoded_mx_scale,
+    split_fp8_scaled_layers,
     strip_layer_path_prefix,
+    unparsed_fp8_scale_keys,
+    warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
@@ -69,6 +75,8 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_unmarked_int8_weights,
     resolve_quantized_module_paths,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
+from invokeai.backend.quantization.nvfp4 import reject_nvfp4_layers_a_plain_fold_cannot_decode
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
@@ -457,35 +465,75 @@ class WanGGUFCheckpointModel(ModelLoader):
         return model
 
 
-def _predict_folded_cast_size(sd: dict, dtype: torch.dtype) -> int:
-    """Bytes the state dict occupies once the scale fold and the cast to ``dtype`` have run.
+def _planned_fp8_layers(
+    layer_keys: Mapping[str, list[str]], side_channel: Mapping[str, torch.Tensor]
+) -> dict[str, Fp8ScaledLayer]:
+    """The scaled layers as the header describes them, for a reservation made before any scale is read.
 
-    The fold consumes and strips the scale tensors, and it widens every weight that has a sibling
-    scale to ``dtype`` whatever its stored dtype, so those are charged at ``dtype`` too.
+    Each scale is a float32 ``meta`` tensor in its stored layout, which is all `reserve_for_load` reads of a layer: the
+    layout decides whether the split keeps it fp8 (`is_matmul_usable_scale` answers the same for the stored and the
+    normalized shape), and float32 is the width `extract_fp8_scaled_layers` gives every scale, a decoded MXFP8 grid
+    included. A one-element input scale is counted even where the extraction drops it as an uncalibrated placeholder:
+    four bytes over rather than under.
     """
-    kept = {k: v for k, v in sd.items() if not is_scale_metadata_key(k)}
-    folded = {weight_key for weight_key, _ in iter_weight_scale_pairs(sd)}
-    total = predict_cast_state_dict_size({k: v for k, v in kept.items() if k not in folded}, dtype, keep_fp8=False)
-    return total + sum(kept[k].nelement() * dtype.itemsize for k in folded)
+    planned: dict[str, Fp8ScaledLayer] = {}
+    for path, (scale_key, *input_keys) in layer_keys.items():
+        inputs = [side_channel[key] for key in input_keys if side_channel[key].numel() == 1]
+        planned[path] = Fp8ScaledLayer(
+            weight_scale=side_channel[scale_key].to(torch.float32),
+            input_scale=inputs[0].to(torch.float32).reshape(()) if inputs else None,
+        )
+    return planned
 
 
-def _read_folded_and_cast(sd: dict[str, torch.Tensor], read: Callable[[str], torch.Tensor], dtype: torch.dtype) -> int:
+def _read_converted(
+    sd: dict[str, torch.Tensor],
+    read: Callable[[str], torch.Tensor],
+    layer_keys: Mapping[str, list[str]],
+    hints: Mapping[str, Mapping[str, Any]],
+    dtype: torch.dtype,
+    *,
+    keep_fp8: bool,
+    model: torch.nn.Module,
+    skip_patterns: Iterable[str],
+) -> dict[str, Fp8ScaledLayer]:
     """Fill ``sd``'s header entries from ``read`` one tensor at a time, each converted as it arrives.
 
-    A ComfyUI weight scale is folded into its weight and dropped with the rest of the quantization metadata;
-    every other float tensor is cast to ``dtype``. Converted on arrival, the peak is the finished state dict plus
-    the tensor in flight rather than the whole source. Returns the number of folds.
+    A scaled weight arrives with the side-channel keys ``layer_keys`` names for its module. An fp8 one goes through the
+    shared extraction: where ``keep_fp8`` holds and the split lets it, it stays as stored with its float32 scale;
+    otherwise it is folded with its scale applied. One that is not fp8 is always folded. Every other float tensor is
+    cast to ``dtype``, except a plain fp8 weight the cast keeps under ``keep_fp8``. Each runs as a one-entry state
+    dict, so the shared split and cast decide a tensor exactly as they would over the whole dict, and the peak is the
+    finished state dict plus the layer in flight rather than the whole source. Returns the layers kept fp8, keyed by
+    module path.
     """
-    scales = dict(iter_weight_scale_pairs(sd))
-    _strip_quantization_metadata(sd)
+    kept: dict[str, Fp8ScaledLayer] = {}
     for key in sd:
-        tensor = read(key)
-        if key in scales:
-            tensor = fold_comfyui_fp8_scale(tensor, read(scales[key]), key, dtype)
-        elif tensor.is_floating_point():
-            tensor = tensor.to(dtype)
-        sd[key] = tensor
-    return len(scales)
+        path = key[: -len(".weight")] if key.endswith(".weight") else None
+        one = {key: read(key)}
+        layers: dict[str, Fp8ScaledLayer] = {}
+        if path in layer_keys:
+            one.update({side_key: read(side_key) for side_key in layer_keys[path]})
+            if one[key].dtype not in FP8_WEIGHT_DTYPES:
+                # Scaled all the same: ComfyUI's legacy `scaled_fp8` ops apply `scale_weight` whatever the weight's
+                # dtype, so "scaled" checkpoints are not all fp8. The extraction would drop such a scale, so it is
+                # folded here, through the same fold, and never kept.
+                scale = one.pop(layer_keys[path][0])
+                reject_undecoded_mx_scale(path, scale)
+                dequantize_fp8_scaled(one, {path: Fp8ScaledLayer(weight_scale=scale.float())}, dtype)
+                del scale
+            else:
+                layers = extract_fp8_scaled_layers(one, layer_hints={path: hints[path]} if path in hints else {})
+                if keep_fp8:
+                    layers = split_fp8_scaled_layers(one, layers, dtype, model=model, skip_patterns=skip_patterns)
+                else:
+                    dequantize_fp8_scaled(one, layers, dtype)
+                    layers = {}
+        cast_state_dict(one, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+        kept.update(layers)
+        # No local keeps the stored tensor: it would stay alive through the next read.
+        sd[key] = one.pop(key)
+    return kept
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -493,13 +541,12 @@ class WanCheckpointModel(ModelLoader):
     """Loader for single-file Wan 2.2 transformer checkpoints (safetensors).
 
     This is what CivitAI fine-tunes and ComfyUI-oriented Hugging Face repos ship.
-    Handles the full matrix of community conventions: the optional
-    ``model.diffusion_model.`` key prefix, the native upstream key layout as well
-    as the diffusers one, ComfyUI ``fp8_scaled`` weights (dequantized to the
-    compute dtype at load time), and plain ``float8_e4m3fn`` weights with no
-    scales (cast the same way as any other non-bf16 dtype). ComfyUI ``int8_tensorwise`` (convrot) builds keep
-    their marked layers in int8 as ``Int8ConvrotLinear`` and dequantize them per forward; layers the model
-    reads outside a matmul (``condition_embedder``) are widened at load instead.
+    Handles the full matrix of community conventions: the optional ``model.diffusion_model.`` key prefix, the native
+    upstream key layout as well as the diffusers one, ComfyUI ``fp8_scaled`` weights (kept packed with their own scale
+    when FP8 Storage or the fp8 matmul uses them, folded into the compute dtype otherwise), and plain
+    ``float8_e4m3fn`` weights with no scales (cast the same way as any other non-bf16 dtype). ComfyUI
+    ``int8_tensorwise`` (convrot) builds keep their marked layers in int8 as ``Int8ConvrotLinear`` and dequantize
+    them per forward; layers the model reads outside a matmul (``condition_embedder``) are widened at load instead.
 
     Like the GGUF loader, one file is one expert; A14B pairing happens at the
     WanModelLoaderInvocation layer.
@@ -563,17 +610,22 @@ class WanCheckpointModel(ModelLoader):
             int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
             reject_unmarked_int8_weights(sd, int8_markers, f"Wan 2.2 ({model_path.name})", header_layers=header_layers)
 
-            dequantized = 0
+            hints: dict[str, dict[str, Any]] = {}
             if int8_markers:
                 # Still the header's tensors: `install_int8_convrot_layers` reads them once it has reserved.
                 sd = drop_unconsumed_quantization_sidecars(sd)
             else:
-                reject_layers_the_fold_cannot_decode(sd, f"Wan checkpoint {model_path.name}")
-                # Before the first read: the reservation is the state dict after the fold and the cast.
-                self._ram_cache.make_room(_predict_folded_cast_size(sd, model_dtype))
-                dequantized = _read_folded_and_cast(sd, read, model_dtype)
-                if dequantized > 0:
-                    logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
+                reject_nvfp4_layers_a_plain_fold_cannot_decode(sd, f"Wan checkpoint {model_path.name}")
+                # Asked before the rename, in the namespace the scales were written in (see `unparsed_fp8_scale_keys`).
+                unparsed = unparsed_fp8_scale_keys(sd)
+                if unparsed:
+                    raise NotImplementedError(
+                        f"Wan checkpoint {model_path.name}: {len(unparsed)} fp8 weight scale(s) use a spelling "
+                        f"InvokeAI does not read (e.g. '{unparsed[0]}'), so their weights would load unscaled. Use "
+                        "the scaled-fp8 or bf16 build of this checkpoint."
+                    )
+                # ComfyUI 'scaled fp8' hints, from the marker tensors and the header, named as the file names them.
+                hints = {**extract_comfy_quant_hints(sd), **header_layers}
 
             # Community releases ship the native upstream Wan key layout
             # (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
@@ -584,11 +636,15 @@ class WanCheckpointModel(ModelLoader):
                 key_map = {key: _rename_wan_native_key(key) for key in sd if isinstance(key, str)}
                 sd = _convert_wan_native_to_diffusers(sd)
                 file_keys = _convert_wan_native_to_diffusers(file_keys)
+            # The hints follow their weight's rename, as the int8 markers do. The rename replaces substrings of whole
+            # keys, so a layer's scales are renamed with its weight.
+            hints = resolve_quantized_module_paths(hints, key_map)
 
             model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
 
             with accelerate.init_empty_weights():
                 model = WanTransformer3DModel(**model_config)
+            skip_patterns = _model_declared_skip_patterns(model)
 
             if int8_markers:
                 # Casts only the dense tensors: the blanket cast below would also cast the fp32 scales. The skip
@@ -601,7 +657,7 @@ class WanCheckpointModel(ModelLoader):
                     model_dtype,
                     architecture="Wan 2.2",
                     reserve=self._ram_cache.make_room,
-                    skip_patterns=_model_declared_skip_patterns(model),
+                    skip_patterns=skip_patterns,
                     read=read,
                 )
                 # Metadata the fp8 branch strips: a stray `scaled_fp8` flag, or a weight scale beside a dense weight.
@@ -613,37 +669,95 @@ class WanCheckpointModel(ModelLoader):
                     f"Wan 2.2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
                     "(int8_tensorwise checkpoint, dequantized per forward)"
                 )
+                fp8_layers: dict[str, Fp8ScaledLayer] = {}
+                scaled_paths: set[str] = set()
+                use_fp8_storage = False
+            else:
+                # Every module whose weight has a scale beside it, fp8 or not, including the ones the split will fold.
+                # Under FP8 Storage none of them may take the layerwise cast: a folded weight has no scale to re-encode
+                # it with, and a weight stored scaled is one whose producer needed the scale for its range.
+                weight_scales = {
+                    weight_key[: -len(".weight")]: scale_key for weight_key, scale_key in iter_weight_scale_pairs(sd)
+                }
+                scaled_paths = set(weight_scales)
+                fp8_scaled = {path for path in weight_scales if sd[f"{path}.weight"].dtype in FP8_WEIGHT_DTYPES}
+                # Kept fp8 only when something uses it: the fp8 matmul, or fp8 storage the user asked of this model,
+                # where the checkpoint's own scale is exact and the layerwise cast of a folded weight has none.
+                use_fp8_storage = bool(scaled_paths) and self._should_use_fp8(config, SubModelType.Transformer)
+                keep_fp8 = bool(fp8_scaled) and self._keep_fp8_weights(config, SubModelType.Transformer)
+                # The side channel leaves `sd`, so the reservation and the read cover the layers' own tensors. A scale
+                # is read with its weight, an input scale only where an fp8 layer may stay fp8: a folded one has no use
+                # for it. The rest, such as the `scaled_fp8` flag, is never read.
+                side_channel = {key: sd.pop(key) for key in [k for k in sd if is_scale_metadata_key(k)]}
+                layer_keys = {
+                    path: [scale_key]
+                    + [
+                        f"{path}{suffix}"
+                        for suffix in INPUT_SCALE_SUFFIXES
+                        if keep_fp8 and path in fp8_scaled and f"{path}{suffix}" in side_channel
+                    ]
+                    for path, scale_key in weight_scales.items()
+                }
+                # One reservation, before the first read: kept layers at their stored width plus their float32
+                # scales, everything else at the compute dtype.
+                reserve_for_load(
+                    self._ram_cache.make_room,
+                    sd,
+                    model_dtype,
+                    keep_fp8=keep_fp8,
+                    model=model,
+                    fp8_layers=_planned_fp8_layers({p: layer_keys[p] for p in fp8_scaled}, side_channel)
+                    if keep_fp8
+                    else {},
+                    nvfp4_payloads={},
+                    skip_patterns=skip_patterns,
+                )
+                fp8_layers = _read_converted(
+                    sd,
+                    read,
+                    layer_keys,
+                    hints,
+                    model_dtype,
+                    keep_fp8=keep_fp8,
+                    model=model,
+                    skip_patterns=skip_patterns,
+                )
+                if weight_scales and not keep_fp8:
+                    logger.info(f"Wan 2.2: folded {len(weight_scales)} scaled layer(s) into {model_dtype}.")
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
-
-        # A checkpoint that shipped per-tensor scales must not take the cast. The fold above consumed
-        # those scales and `_strip_quantization_metadata` dropped them, so re-encoding the result as
-        # *unscaled* fp8 would flush the low end of every tensor to zero -- 3.4% of the weights on
-        # `flux-2-klein-4b-fp8`, for the byte count the file already had. `configs/factory.py` enables
-        # FP8 Storage by itself for a float8 denoiser, on the stated grounds that the loaders keep such
-        # a file in its own scaled form; this loader does not do that yet (the scaled-fp8 treatment the
-        # FLUX and Krea-2 paths received never reached here), so it declines rather than quietly
-        # trading quality the user did not offer. A plain fp8 checkpoint with no scales is unaffected:
-        # its round trip through the compute dtype and back is exact.
-        if dequantized > 0:
-            if self._should_use_fp8(config, SubModelType.Transformer):
-                logger.info(
-                    f"FP8 Storage not applied to {model_path.name}: its {dequantized} scaled weight(s) were folded "
-                    "with the per-tensor scales the file shipped, and re-encoding them as unscaled fp8 would lose "
-                    "the low end of every tensor. Keeping them packed instead is the fix, and this loader does not "
-                    "implement it yet."
-                )
-            return model
 
         # `assign=True` aliases every param to its `sd` tensor; drop the dict's references before the
         # FP8 cast or each original stays reachable while its fp8 copy is allocated (see `ltx2.py`,
         # which learned this the same way).
         sd.clear()
 
-        # FP8 Storage, which this path ignored until now although the control was offered for it and
-        # identification switched it on by itself for any float8 denoiser -- a 14B transformer loaded
-        # at bf16 size while the record said it was halved.
+        attached = 0
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            warn_on_unattached_scales(logger, "Wan 2.2", attached, fp8_layers)
+        if use_fp8_storage:
+            # The dense remainder goes to fp8 storage. Scaled layers are left alone, kept or folded: the cast hooks
+            # would upcast a kept one without its scale, and re-encode a folded one (float8_e5m2, block-wise scales,
+            # the embedders) as unscaled fp8. Entered whenever the file was scaled, so that a file whose layers were
+            # all folded does not fall through to the generic cast either.
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=torch.float8_e4m3fn,
+                compute_dtype=model_dtype,
+                extra_skip_patterns=skip_patterns,
+                skip=lambda name, module: name in scaled_paths or getattr(module, "weight_scale", None) is not None,
+            )
+            logger.info(
+                f"FP8 layerwise casting enabled for {config.name} (storage=float8_e4m3fn, compute={model_dtype}); "
+                f"kept {attached} of {len(scaled_paths)} scaled layer(s) fp8 with their own scale."
+            )
+            return model
+        if attached:
+            logger.info(f"Wan 2.2: kept {attached} scaled fp8 layer(s) fp8 for fp8 compute.")
+            return model
+
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 
 
