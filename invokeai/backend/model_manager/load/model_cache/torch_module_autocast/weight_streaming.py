@@ -196,6 +196,8 @@ def _find_runtime() -> _Runtime | None:
 
 # Chosen by the self-test (`_registration_self_test`); every registration goes through it.
 _runtime: _Runtime | None = None
+# Self-test buffers that could not be unregistered; never freed (see `_registration_self_test`).
+_self_test_stranded: list[torch.Tensor] = []
 
 
 def _fault_in(storage: torch.UntypedStorage) -> None:
@@ -243,16 +245,26 @@ def _registration_self_test() -> str | None:
         return torch.equal(t.to("cuda", non_blocking=True).cpu(), t)
 
     exact_ranges = "this driver does not page-lock memory by exact ranges, so neighbouring weights could not be copied"
+    # Torch must see what the runtime registers: a copy of the runtime that torch does not use (ROCm has no
+    # driver/runtime split) would leave every copy pageable. `is_pinned` asks about a tensor's storage, so this
+    # registers one storage whole.
+    whole = torch.empty(2 * page, dtype=torch.uint8)
+    # Every address registered and not yet unregistered: the `finally` unregisters what is left.
     registered: list[int] = []
+
+    def unregister_last() -> bool:
+        if runtime.unregister(registered[-1]) != 0:
+            return False
+        registered.pop()
+        return True
+
     try:
-        # Torch must see what the runtime registers: a copy of the runtime that torch does not use (ROCm has no
-        # driver/runtime split) would leave every copy pageable. `is_pinned` asks about a tensor's storage, so this
-        # registers one storage whole.
-        whole = torch.empty(2 * page, dtype=torch.uint8)
         if runtime.register(whole.data_ptr(), whole.nbytes) != 0:
             return "page-locking a test buffer failed"
+        registered.append(whole.data_ptr())
         visible = whole.is_pinned()
-        runtime.unregister(whole.data_ptr())
+        if not unregister_last():
+            return "unpinning a test buffer failed"
         if not visible:
             return "the GPU runtime library found is not the one torch uses"
         for lo, hi in ((first, boundary), (boundary, last)):
@@ -261,7 +273,7 @@ def _registration_self_test() -> str | None:
             registered.append(lo)
         if not all(copies_intact(t) for t in (view(first + 50, boundary), view(boundary, last))):
             return exact_ranges
-        if runtime.unregister(registered.pop()) != 0:
+        if not unregister_last():
             return exact_ranges
         # Now pageable, starting in the last page of a registration.
         if not copies_intact(view(boundary, last)):
@@ -271,8 +283,10 @@ def _registration_self_test() -> str | None:
     except RuntimeError as error:
         return f"its self-test failed ({error})"
     finally:
-        for lo in registered:
-            runtime.unregister(lo)
+        # A registration that outlived its buffer would cover whatever the allocator puts there next, and copies from
+        # that would fail. Buffers that cannot be unregistered are kept for the process lifetime instead.
+        if [lo for lo in registered if runtime.unregister(lo) != 0]:
+            _self_test_stranded.extend((buffer, whole))
 
 
 @dataclass(eq=False)

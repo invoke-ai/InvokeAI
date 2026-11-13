@@ -630,19 +630,23 @@ def test_a_lock_after_an_unload_that_moved_nothing_pins_again(streaming):
 
 class _PageRoundingRuntime:
     """Refuses the second registration of the self-test's neighbouring pair, as a driver that rounds registrations to
-    pages would: by really registering an overlapping range, so the refusal is a real error of the real runtime."""
+    pages would: by really registering over the range it still holds, so the refusal is a real error of the real
+    runtime. Tracks what it holds, so the test can check that the self-test leaves nothing registered."""
 
     def __init__(self, real) -> None:
         self._real = real
-        self._first: int | None = None
+        self.held: set[int] = set()
 
     def register(self, ptr: int, nbytes: int) -> int:
-        if self._first is None:
-            self._first = ptr
-            return self._real.register(ptr, nbytes)
-        return self._real.register(self._first, nbytes)
+        if self.held:
+            return self._real.register(next(iter(self.held)), nbytes)
+        error = self._real.register(ptr, nbytes)
+        if error == 0:
+            self.held.add(ptr)
+        return error
 
     def unregister(self, ptr: int) -> int:
+        self.held.discard(ptr)
         return self._real.unregister(ptr)
 
 
@@ -651,7 +655,9 @@ class _PageRoundingRuntime:
 def test_a_failing_self_test_leaves_no_error_for_the_next_allocation(
     streaming, monkeypatch: pytest.MonkeyPatch, failure: str
 ):
-    """The self-test runs inside a model load; an error it left would fail that load's next allocation."""
+    """The self-test runs inside a model load; an error it left would fail that load's next allocation, and a
+    registration it left would outlive its buffer and break copies from whatever the allocator puts there next."""
+    runtime = None
     if failure == "page-rounding driver":
         runtime = _PageRoundingRuntime(weight_streaming._find_runtime())
         monkeypatch.setattr(weight_streaming, "_find_runtime", lambda: runtime)
@@ -667,6 +673,7 @@ def test_a_failing_self_test_leaves_no_error_for_the_next_allocation(
 
     assert weight_streaming._registration_self_test() is not None
     assert weight_streaming._runtime is None
+    assert runtime is None or not runtime.held
 
     torch.empty(64 * 2**20, dtype=torch.uint8, device=DEVICE).fill_(1)
     torch.empty(256 * 2**20, dtype=torch.uint8, device=DEVICE).fill_(1)
@@ -702,6 +709,27 @@ class _InvisibleRuntime:
 
     def unregister(self, ptr: int) -> int:
         return 0
+
+
+class _StuckRuntime:
+    """Registrations it reports cannot be undone. Registers nothing for real, so no memory stays page-locked."""
+
+    def register(self, ptr: int, nbytes: int) -> int:
+        return 0
+
+    def unregister(self, ptr: int) -> int:
+        return 1
+
+
+def test_a_self_test_buffer_that_cannot_be_unpinned_is_never_freed(monkeypatch: pytest.MonkeyPatch):
+    stranded: list[torch.Tensor] = []
+    monkeypatch.setattr(weight_streaming, "_self_test_stranded", stranded)
+    monkeypatch.setattr(weight_streaming, "_find_runtime", _StuckRuntime)
+    monkeypatch.setattr(weight_streaming, "_runtime", None)
+
+    assert weight_streaming._registration_self_test() == "unpinning a test buffer failed"
+
+    assert stranded and all(t.device.type == "cpu" and t.nbytes > 0 for t in stranded)
 
 
 @requires_cuda
