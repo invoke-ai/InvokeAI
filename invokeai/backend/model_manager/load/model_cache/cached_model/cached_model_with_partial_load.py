@@ -301,8 +301,9 @@ class CachedModelWithPartialLoad:
         return min(weight_streaming.STREAM_BUDGET_BYTES, self._streamable_bytes)
 
     def pin_streamed_weights(self) -> None:
-        """Page-lock exactly the CPU-resident weights the custom modules stream, so `cast_to_device` copies them
-        asynchronously (`async_weight_streaming`).
+        """Page-lock the CPU-resident weights the custom modules stream, so `cast_to_device` copies them
+        asynchronously (`async_weight_streaming`), and mark them as streamed by this lock. What earlier locks pinned
+        stays pinned (see `PinnedStorageRegistry`): models that take turns in VRAM pay for registration once.
 
         Called by the holder of a settled lock, outside the global load lock and the cache's lock: page-locking
         weights that are still only mapped from their file reads them into RAM (about 2.5 s/GiB measured), which
@@ -314,6 +315,13 @@ class CachedModelWithPartialLoad:
         with self._pin_lock:
             self._pin_streamed_weights_locked()
 
+    def mark_streamed_weights_idle(self) -> None:
+        """Called by the cache when the model's last lock ends: its pins stay, but another model's registration may
+        reclaim them under the pinned-RAM cap."""
+        holder = self._pin_holder
+        if holder is not None:
+            weight_streaming.PINNED_STORAGES.idle(holder)
+
     def _pin_streamed_weights_locked(self) -> None:
         registry = weight_streaming.PINNED_STORAGES
         if not self._streams_weights():
@@ -323,9 +331,9 @@ class CachedModelWithPartialLoad:
                 registry.release(holder)
                 self._pins_stale = True
             return
-        if not self._pins_stale:
-            return
         holder = self._pin_holder
+        if not self._pins_stale and holder is not None and registry.activate(holder):
+            return  # Nothing moved since the last lock, and all it streams is still pinned.
         if holder is None:
             holder = weight_streaming.PinHolder()
             # Like the shared-weights finalizer: must not reference `self`, and only enqueues (GC context).
@@ -333,17 +341,21 @@ class CachedModelWithPartialLoad:
             finalizer.atexit = False
             self._pin_holder, self._pin_release_finalizer = holder, finalizer
         self._pins_stale = False
+        ram_copy = self._cpu_state_dict
+        assert ram_copy is not None  # `_streams_weights` requires it.
+        # Only storages of the RAM copy: they live as long as this wrapper, so the registry holding them keeps nothing
+        # alive that would otherwise be freed (a holder may have cast weights in place, see `restore_counted_dtypes`).
+        streamed = [
+            tensor.untyped_storage()
+            for key, tensor in self._model.state_dict().items()
+            if tensor.device.type == "cpu"
+            and key not in self._keys_in_modules_that_do_not_support_autocast
+            and weight_streaming.is_streamable_tensor(tensor)
+            and key in ram_copy
+            and ram_copy[key].untyped_storage().data_ptr() == tensor.untyped_storage().data_ptr()
+        ]
         try:
-            registry.update(
-                holder,
-                (
-                    tensor.untyped_storage()
-                    for key, tensor in self._model.state_dict().items()
-                    if tensor.device.type == "cpu"
-                    and key not in self._keys_in_modules_that_do_not_support_autocast
-                    and weight_streaming.is_streamable_tensor(tensor)
-                ),
-            )
+            registry.update(holder, streamed)
         except BaseException:
             self._pins_stale = True
             raise
@@ -653,12 +665,5 @@ class CachedModelWithPartialLoad:
             self._set_autocast_enabled_in_all_modules(True)
 
         if keys_to_offload:
-            self._pins_stale = True
-        # A model moved entirely to RAM is idle: nothing of it needs to stay page-locked. One left partly resident
-        # keeps its pins; the next lock pins the weights offloaded here.
-        holder = self._pin_holder
-        if holder is not None and self.cur_vram_bytes() == 0:
-            weight_streaming.PINNED_STORAGES.release(holder)
-            # Even when this call moved nothing: the next lock must pin again, whatever it moves.
             self._pins_stale = True
         return vram_bytes_freed

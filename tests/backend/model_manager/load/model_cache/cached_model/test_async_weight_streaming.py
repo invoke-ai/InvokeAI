@@ -167,6 +167,9 @@ def streaming(monkeypatch: pytest.MonkeyPatch):
     for holder in holders:
         registry.release(holder)
     assert not leaked, "a test left storages registered"
+    assert not registry.holds_registrations(), "a storage stayed registered after every holder released it"
+    # Counters a later registration decides by; a leak here would refuse or over-reclaim.
+    assert registry._pinned_bytes == 0 and registry._reclaimable_bytes == 0 and not registry._reclaimable
 
 
 def test_a_device_without_streaming_pins_nothing_and_says_so_once(streaming, caplog: pytest.LogCaptureFixture):
@@ -238,26 +241,38 @@ def test_bytes_in_flight_stay_within_the_budget_while_the_gpu_lags(streaming, mo
     cached.release_pinned_weights()
 
 
+def _counting_registrations(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Runs the self-test, then records the size of every registration the driver gets."""
+    assert weight_streaming.PINNED_STORAGES.can_register()
+    runtime = weight_streaming._runtime
+    assert runtime is not None
+    sizes: list[int] = []
+    register = runtime.register
+
+    def counting(ptr: int, nbytes: int) -> int:
+        sizes.append(nbytes)
+        return register(ptr, nbytes)
+
+    monkeypatch.setattr(runtime, "register", counting)
+    return sizes
+
+
 @requires_cuda
-def test_pins_follow_residency_and_are_released_with_the_model(streaming):
+def test_pins_outlast_unloads_and_are_released_with_the_model(streaming):
     model = _build_model()
     cached = _half_loaded(model)
     offloaded = _cpu_storages(model)
-    # A second lock with nothing to move must not count the holder twice: one release still unpins everything.
+    # A second lock, which brings back only the root buffer, keeps the same pins: one release still unpins everything.
     cached.partial_unload_from_vram(1)  # The root buffer, which the next load brings back first.
     _settle(cached, model.scale.nbytes)
     assert [s.data_ptr() for s in _cpu_storages(model)] == [s.data_ptr() for s in offloaded]
     assert all(s.is_pinned() for s in offloaded)
 
     cached.full_unload_from_vram()
-    assert not streaming.holds_anything(), "an idle model in RAM keeps nothing page-locked"
-    assert not any(s.is_pinned() for s in offloaded)
-
-    _settle(cached, cached.total_bytes() // 2)
-    assert streaming.holds_anything()
+    assert all(s.is_pinned() for s in offloaded), "a model moved to RAM keeps its pins for its next lock"
     cached.full_load_to_vram()
     cached.pin_streamed_weights()
-    assert not streaming.holds_anything(), "a fully resident model streams nothing"
+    assert all(s.is_pinned() for s in offloaded), "and so does a fully resident one, for its next unload"
 
     cached.partial_unload_from_vram(cached.total_bytes() // 2)
     _settle(cached, 0)
@@ -609,22 +624,229 @@ def test_weights_an_unload_left_in_ram_stream_after_the_next_lock(streaming):
 
 
 @requires_cuda
-def test_a_lock_after_an_unload_that_moved_nothing_pins_again(streaming):
-    """A model without required weights can be entirely in RAM while it runs: an unload then moves nothing, but its
-    release of the pins must still make the next lock pin them again."""
+def test_models_taking_turns_in_vram_register_their_weights_once(streaming, monkeypatch: pytest.MonkeyPatch):
+    """A text encoder and a transformer that do not fit together evict each other on every generation."""
+    sizes = _counting_registrations(monkeypatch)
+    turns = [
+        (model, CachedModelWithPartialLoad(model=model, compute_device=DEVICE, keep_ram_copy=True))
+        for model in (_build_model(), _build_model())
+    ]
+    streamed: list[torch.UntypedStorage] = []
+    first_pins = 0
+
+    for turn in range(3):
+        for model, cached in turns:
+            for _, other in turns:
+                other.full_unload_from_vram()
+            _settle(cached, cached.total_bytes() // 2)
+            _forward(model, streaming=True)
+            cached.mark_streamed_weights_idle()  # What the cache does when the lock ends.
+            if turn == 0:
+                streamed += _cpu_storages(model)
+        if turn == 0:
+            first_pins = len(sizes)
+
+    assert first_pins > 0 and len(sizes) == first_pins
+    assert all(s.is_pinned() for s in streamed)
+    for _, cached in turns:
+        cached.release_pinned_weights()
+
+
+@requires_cuda
+def test_an_idle_model_gives_a_streaming_one_only_the_room_it_lacks(streaming, monkeypatch: pytest.MonkeyPatch):
+    sizes = _counting_registrations(monkeypatch)
+    idle_model, busy_model = _build_model(), _build_model()
+    cache = _cache_with_room_for_half_of(idle_model)
+    try:
+        cache.put("idle", idle_model)
+        record = cache.get("idle")
+        # The streaming reserve takes the half the cap leaves, so only the root buffer stays resident.
+        with LoadedModelWithoutConfig(record, cache):
+            resident = record.cached_model.cur_vram_bytes()
+        # The end of that lock marked its weights idle.
+        idle_streamed = _cpu_storages(idle_model)
+        idle_bytes = sum(s.nbytes() for s in idle_streamed)
+        largest = max(s.nbytes() for s in idle_streamed)
+        assert all(s.is_pinned() for s in idle_streamed)
+        busy = CachedModelWithPartialLoad(model=busy_model, compute_device=DEVICE, keep_ram_copy=True)
+        busy.partial_load_to_vram(busy.total_bytes() // 2)
+        busy_streamed = _cpu_storages(busy_model)
+        busy_bytes = sum(s.nbytes() for s in busy_streamed)
+        monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", idle_bytes + busy_bytes // 2)
+
+        busy.pin_streamed_weights()
+
+        assert all(s.is_pinned() for s in busy_streamed), "the streaming model gets the room it lacks"
+        kept = sum(s.nbytes() for s in idle_streamed if s.is_pinned())
+        assert idle_bytes - busy_bytes // 2 - largest <= kept <= idle_bytes - busy_bytes // 2, "and only that much"
+
+        busy.mark_streamed_weights_idle()
+        busy.full_unload_from_vram()  # Gives the cache back the VRAM it saw.
+        registered_before = sum(sizes)
+        with LoadedModelWithoutConfig(record, cache):
+            assert record.cached_model.cur_vram_bytes() == resident
+            assert all(s.is_pinned() for s in idle_streamed), "its next lock pins again"
+        assert sum(sizes) - registered_before == idle_bytes - kept, "paying only for what it gave"
+        busy.release_pinned_weights()
+        cache.drop_model("idle")
+    finally:
+        cache.shutdown()
+
+
+@requires_cuda
+def test_only_the_last_unlock_makes_the_pins_reclaimable(streaming, monkeypatch: pytest.MonkeyPatch):
+    """Two holders of one record at once, as a session and the image index worker."""
+    model = _build_model()
+    cache = _cache_with_room_for_half_of(model)
+    other = weight_streaming.PinHolder()
+    taker = torch.empty(2 * 2**20, dtype=torch.uint8)
+    try:
+        cache.put("m", model)
+        record = cache.get("m")
+        with LoadedModelWithoutConfig(record, cache):
+            streamed = _cpu_storages(model)
+            monkeypatch.setattr(
+                weight_streaming, "PINNED_RAM_CAP_BYTES", sum(s.nbytes() for s in streamed) + taker.nbytes // 2
+            )
+            with LoadedModelWithoutConfig(record, cache):
+                pass
+            streaming.registry.update(other, [taker.untyped_storage()])
+            assert all(s.is_pinned() for s in streamed) and not taker.is_pinned(), "the model is still locked"
+
+        streaming.registry.update(other, [taker.untyped_storage()])
+
+        assert taker.is_pinned(), "after the last unlock its pins make room"
+        streaming.registry.release(other)
+        cache.drop_model("m")
+    finally:
+        cache.shutdown()
+
+
+@requires_cuda
+def test_shared_weights_one_device_still_streams_stay_pinned_when_the_other_goes_idle(
+    streaming, monkeypatch: pytest.MonkeyPatch
+):
+    store = SharedCpuWeightsStore()
+    model_a, model_b = _build_model(), _build_model()
+    cached_a = _half_loaded(model_a, shared_store=store, cache_key="k")
+    cached_b = _half_loaded(model_b, shared_store=store, cache_key="k")
+    shared = _cpu_storages(model_b)
+    assert {s.data_ptr() for s in shared} == {s.data_ptr() for s in _cpu_storages(model_a)}
+    other = weight_streaming.PinHolder()
+    taker = torch.empty(2 * 2**20, dtype=torch.uint8)
+    monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", sum(s.nbytes() for s in shared) + taker.nbytes // 2)
+
+    cached_a.mark_streamed_weights_idle()
+    streaming.registry.update(other, [taker.untyped_storage()])
+
+    assert all(s.is_pinned() for s in shared) and not taker.is_pinned()
+    streaming.registry.release(other)
+    for cached in (cached_a, cached_b):
+        cached.release_pinned_weights()
+        cached.release_shared_weights()
+
+
+@requires_cuda
+def test_weights_a_lock_moves_to_ram_stream_for_the_rest_of_it(streaming, monkeypatch: pytest.MonkeyPatch):
+    """A node that makes room within its lock, as Wan's second expert and Ideogram 4's second branch do."""
+    monkeypatch.setattr(weight_streaming, "STREAM_BUDGET_BYTES", 2 * 2**20)  # Leaves weights resident.
+    model = _build_model()
+    cache = _cache_with_room_for_half_of(model)
+    try:
+        cache.put("m", model)
+        loaded = LoadedModelWithoutConfig(cache.get("m"), cache)
+        with loaded:
+            resident = sum(p.nbytes for p in model.parameters() if p.device.type == "cuda")
+            assert resident > 0
+
+            loaded.unload_from_vram(resident, keep_required_weights_in_vram=True)
+
+            assert all(p.device.type == "cpu" for p in model.parameters())
+            assert all(s.is_pinned() for s in _cpu_storages(model))
+        cache.drop_model("m")
+    finally:
+        cache.shutdown()
+
+
+@requires_cuda
+def test_a_model_locked_again_keeps_its_pins_when_another_reaches_the_cap(streaming, monkeypatch: pytest.MonkeyPatch):
+    running, other = _build_model(), _build_model()
+    cached_running = _half_loaded(running)
+    cached_running.mark_streamed_weights_idle()
+    _settle(cached_running, 0)  # Its next lock, which moves nothing.
+    streamed = _cpu_storages(running)
+    streamed_bytes = sum(s.nbytes() for s in streamed)
+    monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", streamed_bytes + streamed_bytes // 2)
+
+    cached_other = _half_loaded(other)
+
+    assert all(s.is_pinned() for s in streamed)
+    assert not all(s.is_pinned() for s in _cpu_storages(other)), "what does not fit copies synchronously"
+    cached_running.release_pinned_weights()
+    cached_other.release_pinned_weights()
+
+
+@requires_cuda
+def test_a_model_reuses_the_room_of_its_own_pins_that_moved_to_vram(streaming, monkeypatch: pytest.MonkeyPatch):
+    model = _build_model()
+    cached = CachedModelWithPartialLoad(model=model, compute_device=DEVICE, keep_ram_copy=True)
+    cached.partial_load_to_vram(cached.total_bytes() // 2)
+    first = _cpu_storages(model)
+    monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", sum(s.nbytes() for s in first) * 2 // 3)
+    cached.pin_streamed_weights()
+    assert not all(s.is_pinned() for s in first), "the cap leaves part of it pageable"
+
+    _settle(cached, cached.total_bytes() // 4)  # More of it in VRAM: a shorter tail streams.
+
+    tail = _cpu_storages(model)
+    assert sum(s.nbytes() for s in tail) <= weight_streaming.PINNED_RAM_CAP_BYTES, "the tail fits by itself"
+    assert all(s.is_pinned() for s in tail), "the pins now in VRAM made room for it"
+    cached.release_pinned_weights()
+
+
+@requires_cuda
+def test_only_weights_of_the_ram_copy_are_pinned(streaming):
+    model = _build_model()
+    cached = _half_loaded(model)
+    layer = model.layers[-1]
+    assert layer.weight.device.type == "cpu" and layer.weight.is_pinned()
+    # A holder casting a layer in place, as the SD VAE nodes upcast the VAE.
+    layer.weight.data = layer.weight.data.float()
+    cast = layer.weight.untyped_storage()
+    cached.partial_unload_from_vram(1)  # The root buffer: the next lock pins again.
+
+    _settle(cached, model.scale.nbytes)
+
+    assert not streaming.registry.is_registered(cast)
+    assert all(streaming.registry.is_registered(s) for s in _cpu_storages(model) if s.data_ptr() != cast.data_ptr())
+    cached.restore_counted_dtypes()
+    cached.release_pinned_weights()
+
+
+@requires_cuda
+def test_a_lock_that_moves_nothing_pins_again_what_was_reclaimed(streaming, monkeypatch: pytest.MonkeyPatch):
+    """A lock that moves nothing must still pin again what another model reclaimed since the last one."""
     torch.manual_seed(0)
     model = torch.nn.Sequential(torch.nn.Linear(64, 256), torch.nn.Linear(256, 64))
     apply_custom_layers_to_model(model)
     cached = CachedModelWithPartialLoad(model=model, compute_device=DEVICE, keep_ram_copy=True)
     _settle(cached, 0)
-    assert cached.cur_vram_bytes() == 0 and streaming.holds_anything()
+    storages = _cpu_storages(model)
+    assert cached.cur_vram_bytes() == 0 and all(s.is_pinned() for s in storages)
+    cached.mark_streamed_weights_idle()
+    monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", 256 * 2**10)
+    other = weight_streaming.PinHolder()
+    taker = torch.empty(200 * 2**10, dtype=torch.uint8)
+    streaming.registry.update(other, [taker.untyped_storage()])
+    assert taker.is_pinned() and not all(s.is_pinned() for s in storages)
+    streaming.registry.idle(other)
 
-    assert cached.partial_unload_from_vram(1) == 0
-    assert not streaming.holds_anything()
     _settle(cached, 0)
+    _forward(model, streaming=True, x=torch.randn(4, 64, device=DEVICE))
 
-    assert streaming.holds_anything()
-    assert all(s.is_pinned() for s in _cpu_storages(model))
+    assert all(s.is_pinned() for s in storages)
+    assert _stats().streamed_tensors == len(storages)
+    streaming.registry.release(other)
     cached.release_pinned_weights()
 
 
@@ -729,7 +951,34 @@ def test_a_self_test_buffer_that_cannot_be_unpinned_is_never_freed(monkeypatch: 
 
     assert weight_streaming._registration_self_test() == "unpinning a test buffer failed"
 
-    assert stranded and all(t.device.type == "cpu" and t.nbytes > 0 for t in stranded)
+    # The whole-storage buffer is the one left registered.
+    assert any(t.nbytes == 2 * weight_streaming._PAGE_SIZE for t in stranded)
+
+
+class _LastUnpinFailsRuntime:
+    """Unregisters for real, but reports the self-test's last unregistration, on its success path, as failed."""
+
+    def __init__(self, real) -> None:
+        self._real = real
+        self._unregistered = 0
+
+    def register(self, ptr: int, nbytes: int) -> int:
+        return self._real.register(ptr, nbytes)
+
+    def unregister(self, ptr: int) -> int:
+        self._unregistered += 1
+        error = self._real.unregister(ptr)
+        return 1 if self._unregistered == 3 else error
+
+
+@requires_cuda
+def test_a_self_test_whose_last_unpin_fails_does_not_pass(streaming, monkeypatch: pytest.MonkeyPatch):
+    runtime = _LastUnpinFailsRuntime(weight_streaming._find_runtime())
+    monkeypatch.setattr(weight_streaming, "_find_runtime", lambda: runtime)
+    monkeypatch.setattr(weight_streaming, "_self_test_stranded", [])
+
+    assert weight_streaming._registration_self_test() == "unpinning a test buffer failed"
+    assert weight_streaming._runtime is None
 
 
 @requires_cuda

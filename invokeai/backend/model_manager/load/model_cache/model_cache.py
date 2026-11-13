@@ -1882,17 +1882,19 @@ class ModelCache:
         """Release a lock `_pin` took. Caller holds the lock. The record refuses an unlock it has no lock for before
         either count changes, so a double unlock leaves `locks_held` right.
 
-        The last release, an unlock or a failed `lock`/`continue_lock` alike, returns weights a holder cast in place to
-        their counted dtypes (see `_restore_counted_dtypes`). A record that is detached or stale is skipped: it leaves
-        the cache, and a restore would only allocate on the device outside any reservation.
+        The last release, an unlock or a failed `lock`/`continue_lock` alike, marks the weights the model streamed as
+        idle: they stay page-locked, but another model may reclaim them (`PinnedStorageRegistry`). It also returns
+        weights a holder cast in place to their counted dtypes (see `_restore_counted_dtypes`), except on a record that
+        is detached or stale: it leaves the cache, and a restore would only allocate on the device outside any
+        reservation.
         """
         cache_entry.unlock()
         self._locks_held -= 1
-        if (
-            not cache_entry.is_locked
-            and not cache_entry.is_stale
-            and self._cached_models.get(cache_entry.key) is cache_entry
-        ):
+        if cache_entry.is_locked:
+            return
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.mark_streamed_weights_idle()
+        if not cache_entry.is_stale and self._cached_models.get(cache_entry.key) is cache_entry:
             self._restore_counted_dtypes(cache_entry)
 
     @synchronized
