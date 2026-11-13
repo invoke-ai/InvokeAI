@@ -14,6 +14,7 @@ import {
   Stack,
   Text,
   useFieldContext,
+  VisuallyHidden,
 } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
@@ -577,10 +578,13 @@ const ModelOptionContent = ({
         <HStack gap="1.5" minW="0">
           {isRelated ? (
             <Tooltip content={linkedLabel}>
-              <Icon as={LinkIcon} aria-label={linkedLabel} boxSize="3" color="accent.solid" flexShrink={0} />
+              <Icon as={LinkIcon} aria-hidden boxSize="3" color="accent.solid" flexShrink={0} />
             </Tooltip>
           ) : null}
           <MiddleTruncate fontSize="md" minW="0" text={model.name} />
+          {/* Options take their accessible name from their text, and focus stays in the search field, so the tooltip
+              alone never reaches screen readers or keyboard users. */}
+          {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
               {getModelTypeLabel(model.type)}

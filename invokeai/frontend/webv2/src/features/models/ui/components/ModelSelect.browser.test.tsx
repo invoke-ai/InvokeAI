@@ -511,7 +511,8 @@ describe('ModelSelect related-model ranking', () => {
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
     await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(2);
   };
-  const optionNames = () => [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
+  const options = () => [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  const optionNames = () => options().map((option) => option.textContent ?? '');
 
   beforeEach(() => {
     host = document.createElement('div');
@@ -530,13 +531,13 @@ describe('ModelSelect related-model ranking', () => {
     setRelationshipsSnapshotForTests({ relatedKeysByModelKey: {} });
   });
 
-  it('ranks models linked to the anchor first and names the anchor on the link icon', async () => {
+  it('ranks models linked to the anchor first and names the anchor in the option', async () => {
     await renderVaePicker({ relatedTo: 'sdxl-main', value: null });
 
     await expect.poll(() => optionNames()[0]).toContain('Beta VAE');
-    expect(optionNames()[1]).toContain('Alpha VAE');
-    const icons = document.querySelectorAll('[role="option"] [aria-label]');
-    expect([...icons].map((icon) => icon.getAttribute('aria-label'))).toEqual(['models.linkedToModel:SDXL Main']);
+    await expect.element(options()[0]!).toHaveAccessibleName(/^Beta VAE\s*, models\.linkedToModel:SDXL Main/);
+    await expect.element(options()[1]!).toHaveAccessibleName(/^Alpha VAE/);
+    await expect.element(options()[1]!).not.toHaveAccessibleName(/linked/i);
   });
 
   it('falls back to a generic link label when the anchor is not in the catalog', async () => {
@@ -544,14 +545,13 @@ describe('ModelSelect related-model ranking', () => {
     await renderVaePicker({ relatedTo: 'missing-main', value: null });
 
     await expect.poll(() => optionNames()[0]).toContain('Beta VAE');
-    const icons = document.querySelectorAll('[role="option"] [aria-label]');
-    expect([...icons].map((icon) => icon.getAttribute('aria-label'))).toEqual(['models.linkedModel']);
+    await expect.element(options()[0]!).toHaveAccessibleName(/^Beta VAE\s*, models\.linkedModel/);
   });
 
   it('ignores the value of the picker itself when no anchor is given', async () => {
     await renderVaePicker({ value: 'vae-a' });
 
     expect(optionNames()[0]).toContain('Alpha VAE');
-    expect(document.querySelectorAll('[role="option"] [aria-label]')).toHaveLength(0);
+    expect(optionNames().join(' ')).not.toMatch(/linked/i);
   });
 });
