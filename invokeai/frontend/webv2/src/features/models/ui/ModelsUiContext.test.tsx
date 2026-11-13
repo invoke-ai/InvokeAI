@@ -2,12 +2,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ModelsUiProvider,
-  NO_SCHEDULER_POLICY,
-  useOpenAddModelsSearch,
-  useOpenModelInManager,
-} from './ModelsUiContext';
+import { ModelsUiProvider, NO_DEFAULTS_RULES, useOpenAddModelsSearch, useOpenModelInManager } from './ModelsUiContext';
 import { getModelsUiSnapshotForTests } from './uiStore';
 
 const { navigate, router } = vi.hoisted(() => ({
@@ -24,7 +19,7 @@ const adapter = {
   installInPlace: true,
   isProjectActive: (projectId: string) => activeProjectId === projectId,
   managerProjectId: 'project-a',
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
 

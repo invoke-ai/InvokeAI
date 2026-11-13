@@ -22,6 +22,7 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getReferenceImageLimit,
+  getModelDefaultComponents,
   getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
@@ -238,6 +239,7 @@ export const buildRecallParametersSettings = ({
         model,
         ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
       };
+      values = { ...values, ...getModelDefaultComponents(model, values, models, { replace: true }) };
       fields.add('model');
     }
   }

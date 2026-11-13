@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models';
 import { ChakraProvider, Field as ChakraField } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
-import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { getModelsUiSnapshotForTests } from '@features/models/ui/uiStore';
 import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
 import { Field } from '@platform/ui/Field';
@@ -50,7 +50,7 @@ const MODELS_UI_ADAPTER = {
   installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
 const MANAGER_ADAPTER = { ...MODELS_UI_ADAPTER, managerProjectId: 'project-1' };

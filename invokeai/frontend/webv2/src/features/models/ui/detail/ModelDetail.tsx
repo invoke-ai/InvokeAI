@@ -136,13 +136,16 @@ const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string):
 
   // `base` and `format` are projected too: together with the type they are the loader key the backend
   // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
-  // for Generate's scheduler rules, which differ by variant within a base.
+  // for Generate's scheduler rules, which differ by variant within a base; `name` and `submodels` join them for its
+  // component rules.
   return model
     ? {
         base: model.base,
         default_settings: model.default_settings,
         format: model.format,
         key: model.key,
+        name: model.name,
+        submodels: model.submodels,
         type: model.type,
         variant: model.variant,
       }

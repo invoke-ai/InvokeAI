@@ -22,6 +22,7 @@ from invokeai.app.services.model_records.model_records_base import (
     ModelRecordChanges,
     ModelRecordServiceBase,
 )
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -29,8 +30,15 @@ from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+
+# Default settings a user chooses, which identification cannot derive and so must not replace on re-identify. The load
+# preferences always carry over. The default VAE and component models name models of the base they were chosen for, so
+# they carry over only while the base is unchanged. The rest are the architecture's recommendations.
+_USER_CURATED_LOAD_SETTINGS = ("cpu_only", "fp8_storage")
+_USER_CURATED_BASE_BOUND_SETTINGS = ("vae", "components")
 
 
 class ModelManagerService(ModelManagerServiceBase):
@@ -111,11 +119,22 @@ class ModelManagerService(ModelManagerServiceBase):
             identified.cpu_only = config.cpu_only
         previous_settings = getattr(config, "default_settings", None)
         updated_settings = getattr(identified, "default_settings", None)
-        if previous_settings is not None and updated_settings is not None:
+        if (
+            updated_settings is None
+            and isinstance(previous_settings, MainModelDefaultSettings)
+            and identified.type == ModelType.Main
+        ):
+            # The probe has no recommendations for this config; the user's curated fields still carry over.
+            updated_settings = MainModelDefaultSettings()
+        elif updated_settings is not None:
             # The probe may hand back an architecture's shared defaults object; copy it before writing to it.
             updated_settings = deepcopy(updated_settings)
+        if previous_settings is not None and updated_settings is not None:
             identified.default_settings = updated_settings
-            for field in ("cpu_only", "fp8_storage"):
+            carried = _USER_CURATED_LOAD_SETTINGS
+            if identified.base == config.base:
+                carried += _USER_CURATED_BASE_BOUND_SETTINGS
+            for field in carried:
                 if hasattr(previous_settings, field) and hasattr(updated_settings, field):
                     setattr(updated_settings, field, getattr(previous_settings, field))
 

@@ -5,7 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { getModelsUiSnapshotForTests, setAddModelsQuery, updateModelsUi } from '@features/models/ui/uiStore';
 import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
@@ -102,7 +102,7 @@ const WithAccountPreferences = ({ children }: { children: ReactNode }) => {
       installInPlace,
       isProjectActive: () => true,
       managerProjectId: null,
-      schedulerPolicy: NO_SCHEDULER_POLICY,
+      defaultsRules: NO_DEFAULTS_RULES,
       setInstallInPlace,
     }),
     [installInPlace]

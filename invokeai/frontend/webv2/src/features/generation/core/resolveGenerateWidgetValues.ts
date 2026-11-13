@@ -8,6 +8,7 @@ import type { GenerateWidgetValues } from './types';
 import {
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
+  getModelDefaultFills,
   isArchitectureDescribed,
   isGenerateModelSelectable,
 } from './baseGenerationPolicies';
@@ -92,7 +93,7 @@ export const resolveGenerateWidgetValues = ({
   // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash
   // (and its type, base and variant).
   // Only values with no runnable choice (first run, an unknown family) take the default.
-  const selectedModel =
+  const chosenModel =
     supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ??
     (storedModel ? supportedModels.find((model) => isSameModelFile(model, storedModel)) : undefined) ??
     (storedModel &&
@@ -100,7 +101,8 @@ export const resolveGenerateWidgetValues = ({
     isGenerateModelSelectable(storedModel) &&
     isArchitectureDescribed(storedModel)
       ? storedModel
-      : supportedModels[0]!);
+      : undefined);
+  const selectedModel = chosenModel ?? supportedModels[0]!;
   const canReuseStoredValues =
     isGenerateWidgetValues(storedValues) && normalizedWidgetValues?.batchCount === storedValues.batchCount;
   const baseValues: GenerateWidgetValues = canReuseStoredValues
@@ -114,6 +116,11 @@ export const resolveGenerateWidgetValues = ({
 
   if (values.model.key !== selectedModel.key || values.modelKey !== selectedModel.key) {
     values = { ...values, model: selectedModel, modelKey: selectedModel.key };
+  }
+
+  // Only the initial choice takes the model's default components and VAE; an ordinary resolve leaves them as chosen.
+  if (chosenModel === undefined) {
+    values = { ...values, ...getModelDefaultFills(selectedModel, values, models) };
   }
 
   if (promptTemplates !== undefined) {

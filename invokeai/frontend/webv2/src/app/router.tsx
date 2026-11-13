@@ -21,8 +21,8 @@ import {
   ModelsUiProvider,
   type CalibrationGraphCompiler,
   type ModelsUiAdapter,
-  type SchedulerPolicySource,
-  type SchedulerPolicyState,
+  type ModelDefaultsRulesSource,
+  type ModelDefaultsRulesState,
 } from '@features/models';
 import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
@@ -59,7 +59,7 @@ import i18next from 'i18next';
 import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type * as SchedulerRules from './modelSchedulerPolicyReader';
+import type * as DefaultsRulesModule from './modelDefaultsRulesReader';
 
 import { RouterErrorScreen } from './RouterErrorScreen';
 import { SocketHubRuntime } from './SocketHubRuntime';
@@ -89,43 +89,43 @@ const RouterError = ({ error, reset }: ErrorComponentProps) => {
 
 const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
-const SCHEDULER_RULES_LOADING: SchedulerPolicyState = { status: 'loading' };
-const SCHEDULER_RULES_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
-let schedulerPolicyState: SchedulerPolicyState = SCHEDULER_RULES_LOADING;
-let schedulerRules: Promise<typeof SchedulerRules> | null = null;
-const schedulerPolicyChannel = createListenerChannel();
+const DEFAULTS_RULES_LOADING: ModelDefaultsRulesState = { status: 'loading' };
+const DEFAULTS_RULES_UNAVAILABLE: ModelDefaultsRulesState = { status: 'unavailable' };
+let defaultsRulesState: ModelDefaultsRulesState = DEFAULTS_RULES_LOADING;
+let defaultsRulesModule: Promise<typeof DefaultsRulesModule> | null = null;
+const defaultsRulesChannel = createListenerChannel();
 
-const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
-  schedulerPolicyState = next;
-  schedulerPolicyChannel.notify();
+const publishDefaultsRules = (next: ModelDefaultsRulesState): void => {
+  defaultsRulesState = next;
+  defaultsRulesChannel.notify();
 };
 
 /**
- * Generate's scheduler rules for the Model Manager's defaults. They and the architecture table they read live in
+ * Generate's rules for the Model Manager's defaults (scheduler, component slots). They and the architecture table they read live in
  * Generation, which the Launchpad does not load at startup, so they arrive with the first Default settings section.
  */
-const schedulerPolicySource: SchedulerPolicySource = {
-  getSnapshot: () => schedulerPolicyState,
+const defaultsRulesSource: ModelDefaultsRulesSource = {
+  getSnapshot: () => defaultsRulesState,
   load: () => {
-    if (!schedulerRules) {
-      if (schedulerPolicyState.status === 'unavailable') {
-        publishSchedulerPolicy(SCHEDULER_RULES_LOADING);
+    if (!defaultsRulesModule) {
+      if (defaultsRulesState.status === 'unavailable') {
+        publishDefaultsRules(DEFAULTS_RULES_LOADING);
       }
-      schedulerRules = import('./modelSchedulerPolicyReader').then((rules) => {
-        rules.startSchedulerPolicyReader(publishSchedulerPolicy);
+      defaultsRulesModule = import('./modelDefaultsRulesReader').then((rules) => {
+        rules.startModelDefaultsRulesReader(publishDefaultsRules);
         return rules;
       });
     }
     // Asked on every load: it retries a failed table, and an account change clears the table.
-    schedulerRules
-      .then((rules) => rules.ensureSchedulerRulesLoaded())
+    defaultsRulesModule
+      .then((rules) => rules.ensureDefaultsRulesLoaded())
       .catch(() => {
         // The rules' chunk failed to load; the next load (Retry, or another section) imports it again.
-        schedulerRules = null;
-        publishSchedulerPolicy(SCHEDULER_RULES_UNAVAILABLE);
+        defaultsRulesModule = null;
+        publishDefaultsRules(DEFAULTS_RULES_UNAVAILABLE);
       });
   },
-  subscribe: schedulerPolicyChannel.subscribe,
+  subscribe: defaultsRulesChannel.subscribe,
 };
 
 const setInstallInPlace = (installInPlace: boolean) => void patchWorkbenchPreferences({ installInPlace });
@@ -146,7 +146,7 @@ export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) =
       installInPlace,
       isProjectActive: NO_ACTIVE_PROJECT,
       managerProjectId: null,
-      schedulerPolicy: schedulerPolicySource,
+      defaultsRules: defaultsRulesSource,
       setInstallInPlace,
     }),
     [canManageModels, enableModelDescriptions, installInPlace]

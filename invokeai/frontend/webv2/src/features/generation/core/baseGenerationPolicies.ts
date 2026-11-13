@@ -20,6 +20,7 @@ import { SEED_MAX } from '@platform/core/seed';
 
 import type {
   ExpandPromptSuggestion,
+  ComponentModelConfig,
   ExternalGenerationMode,
   GenerateLora,
   GenerateModelConfig,
@@ -58,6 +59,7 @@ import {
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import { DEFAULT_COMPONENT_SLOTS, type DefaultComponentSlot, getDefaultComponentSlot } from './componentDefaults';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { DEFAULT_DYNAMIC_PROMPTS_SETTINGS } from './dynamicPrompts';
 import {
@@ -106,6 +108,8 @@ import {
   DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
   deriveAspectRatioId,
+  getModelDefaultVae,
+  hasModelDefaultVae,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
   IDEOGRAM4_MU_MAX,
@@ -116,6 +120,9 @@ import {
   isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isMainModelConfig,
+  isModelIdentifierConfig,
+  isVaeModelConfig,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
@@ -1566,6 +1573,131 @@ export const isComponentCompatibleWithModel = (
   return isSelectedComponentCompatible(slotPolicy, model, nextSettings, key);
 };
 
+export type ModelDefaultComponents = Partial<Pick<GenerateSettings, DefaultComponentSlot['setting']>>;
+
+/**
+ * The model's default components that fill a slot of `settings`: one that is empty, or whose selection does not fit
+ * `model`. A selection that fits stays, unless `replace` (a reset to the model's defaults) takes the default over it.
+ * Defaults naming an unknown slot, a model that is not installed or one the slot
+ * rejects are skipped. A slot that depends on another (the vision tower follows a GGUF encoder) is judged beside the
+ * defaults already taken, whatever order they are stored in.
+ */
+export const getModelDefaultComponents = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[],
+  { replace = false }: { replace?: boolean } = {}
+): ModelDefaultComponents => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const patch: Partial<Record<DefaultComponentSlot['setting'], ComponentModelConfig>> = {};
+  let next = settings;
+  let pending = Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
+    const slot = getDefaultComponentSlot(persistenceKey);
+    const candidate = models.find((installed) => installed.key === modelKey);
+
+    return slot && candidate && (slot.isMainModel ? isMainModelConfig(candidate) : isModelIdentifierConfig(candidate))
+      ? [{ candidate, setting: slot.setting }]
+      : [];
+  });
+  let progressed = true;
+
+  while (progressed && pending.length > 0) {
+    progressed = false;
+    pending = pending.filter(({ candidate, setting }) => {
+      const current = next[setting];
+
+      if (!replace && current && isComponentCompatibleWithModel(model, next, setting, current)) {
+        return false;
+      }
+
+      // Only a slot the family offers (the Model Manager lists the same ones); a dependent slot waits for the one it
+      // hangs on.
+      if (
+        !getComponentSectionPolicy(model, next).slots.some((slotPolicy) => slotPolicy.key === setting) ||
+        !isComponentCompatibleWithModel(model, next, setting, candidate)
+      ) {
+        return true;
+      }
+
+      patch[setting] = candidate;
+      next = { ...next, [setting]: candidate };
+      progressed = true;
+      return false;
+    });
+  }
+
+  // A slot that holds a main model only took a main model above.
+  return patch as ModelDefaultComponents;
+};
+
+/** A component slot Generate offers `model`, as the Model Manager lists it among the model's default components. */
+export interface DefaultComponentSlotPolicy {
+  helpText?: string;
+  filter: (candidate: ModelConfig) => boolean;
+  label: string;
+  modelTypes: readonly ModelTaxonomyType[];
+  persistenceKey: string;
+}
+
+/**
+ * The slots Generate offers a model for its family, given the default components it stores: resolved like a model
+ * switch resolves them, so a slot that depends on another opens once that one is set. The VAE has its own default.
+ */
+export const getDefaultComponentSlotPolicies = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): DefaultComponentSlotPolicy[] => {
+  const defaults = getDefaultGenerateSettings(model);
+  const settings = { ...defaults, ...getModelDefaultComponents(model, defaults, models) };
+  const context = getComponentPolicyContext(model, settings);
+
+  return getComponentSectionPolicy(model, settings).slots.flatMap((slot) => {
+    const persistenceKey = DEFAULT_COMPONENT_SLOTS.find(({ setting }) => setting === slot.key)?.persistenceKey;
+
+    return persistenceKey
+      ? [
+          {
+            filter: (candidate) =>
+              slot.modelTypes.includes(candidate.type as ModelTaxonomyType) &&
+              (!slot.filter || slot.filter(candidate, context)),
+            helpText: slot.helpText,
+            label: slot.label,
+            modelTypes: slot.modelTypes,
+            persistenceKey,
+          },
+        ]
+      : [];
+  });
+};
+
+/**
+ * What a model's defaults fill into the slots of `settings` that are empty: its default components, and its default
+ * VAE where the model has a VAE picker the VAE fits. A selection that fits stays.
+ */
+export const getModelDefaultFills = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): Partial<GenerateSettings> => {
+  const components = getModelDefaultComponents(model, settings, models);
+
+  if (settings.vae || !hasModelDefaultVae(model)) {
+    return components;
+  }
+
+  const vae = getModelDefaultVae(model, models.filter(isVaeModelConfig));
+  const filled = { ...settings, ...components };
+  const hasVaeSlot = getComponentSectionPolicy(model, filled).slots.some((slotPolicy) => slotPolicy.key === 'vae');
+  const fits =
+    vae &&
+    (hasVaeSlot
+      ? isComponentCompatibleWithModel(model, filled, 'vae', vae)
+      : getGenerationUiPolicy(model).sdVaeVisible);
+
+  return fits ? { ...components, vae } : components;
+};
+
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
 const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
@@ -2037,7 +2169,7 @@ export const getCompatibleReferenceImages = (
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  models: readonly ReferenceModelCandidate[],
+  models: readonly ModelConfig[],
   isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
@@ -2187,6 +2319,12 @@ const getSettingsWithCompatibleModelSelections = (
     }
   }
 
+  // The new model's defaults fill the slots left empty, which the confirmation does not count as a loss. A pick that
+  // fits stays, and picking the same model again changes nothing.
+  if (settings.modelKey !== model.key) {
+    Object.assign(nextSettings, getModelDefaultFills(model, nextSettings, models));
+  }
+
   // Clamp and report during selection; validation remains the backstop for other write paths.
   const clampedGuidance = clampGuidance(nextSettings.cfgScale, getBaseGenerationConfig(model).guidance);
 
@@ -2263,10 +2401,17 @@ export const getGenerateModelSelectionResult = ({
   model: GenerateModelConfig;
   models: readonly ModelConfig[];
 }): GenerateModelSelectionResult => {
-  const currentSettings = isGenerateSettings(currentValues)
-    ? currentValues
-    : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
-  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models, isCanvasFrame);
+  const stored = isGenerateSettings(currentValues) ? currentValues : normalizeGenerateSettings(currentValues);
+  const computed = getSettingsWithCompatibleModelSelections(
+    stored ?? getDefaultGenerateSettings(model),
+    model,
+    models,
+    isCanvasFrame
+  );
+  // Nothing chosen before (an initial model): the model's defaults fill in as they do on a switch.
+  const result = stored
+    ? computed
+    : { ...computed, settings: { ...computed.settings, ...getModelDefaultFills(model, computed.settings, models) } };
   const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
 
   if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {

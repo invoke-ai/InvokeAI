@@ -1,7 +1,17 @@
+import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
+import type {
+  DefaultComponentSlotPolicy,
+  DefaultComponentSlotReader,
+  ModelDefaultsRulesSource,
+  ModelDefaultsRulesState,
+  ModelsUiAdapter,
+} from '@features/models/ui/ModelsUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getFp8StorageSupportSnapshot } from '@features/models/data/fp8StorageSupportStore';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -219,5 +229,305 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
     });
 
     expect(api.getFp8StorageSupport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DefaultSettingsSection default components', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const component = (key: string, name: string, type: string) => ({ base: 'any', key, name, type }) as ModelConfig;
+  const catalog = [
+    component('t5-a', 'T5 A', 't5_encoder'),
+    component('t5-b', 'T5 B', 't5_encoder'),
+    component('qwen3-a', 'Qwen3 A', 'qwen3_encoder'),
+    component('tower-a', 'Tower A', 'qwen3_vl_vision_tower'),
+    { ...component('flux2-vae', 'FLUX.2 VAE', 'vae'), base: 'flux2' },
+    { ...component('sdxl-vae', 'SDXL VAE', 'vae'), base: 'sdxl' },
+    { ...component('moss-vae', 'MOSS VAE', 'vae'), base: 'moss-image' },
+  ];
+  // The `vae.accepted` bases of the served rows these tests read: MOSS-Image decodes with FLUX.2's VAE as well as
+  // its own; a row without the facet accepts its own base only. The real rule is covered beside the reader.
+  const ACCEPTED_VAE_BASES: Record<string, string[]> = { 'moss-image': ['flux2', 'moss-image'] };
+  const acceptsDefaultVae: Extract<ModelDefaultsRulesState, { status: 'ready' }>['acceptsDefaultVae'] = (
+    model,
+    candidate
+  ) => (ACCEPTED_VAE_BASES[String(model.base)] ?? [String(model.base)]).includes(String(candidate.base));
+  const slot = (persistenceKey: string, label: string, type: string): DefaultComponentSlotPolicy => ({
+    filter: (candidate) => candidate.type === type,
+    label,
+    modelTypes: [type as ModelTaxonomyType],
+    persistenceKey,
+  });
+  // Generation's rules are the app's to supply; this stands in for them with a family whose vision tower is offered
+  // only beside a Qwen3 encoder, and whose PiD decoder has no installed model.
+  const readComponentSlots: DefaultComponentSlotReader = (_model, components) => [
+    slot('t5_encoder', 'T5 Encoder', 't5_encoder'),
+    slot('qwen3_encoder', 'Qwen3 Encoder', 'qwen3_encoder'),
+    ...(components.qwen3_encoder ? [slot('qwen3_vl_vision_tower', 'Vision Tower', 'qwen3_vl_vision_tower')] : []),
+    slot('pid_decoder', 'PiD Decoder', 'pid_decoder'),
+  ];
+  const readyState: ModelDefaultsRulesState = {
+    acceptsDefaultVae,
+    read: () => ({ appliesToGraph: false, defaultValue: 'euler', options: [] }),
+    readComponentSlots,
+    status: 'ready',
+  };
+  /** A rules source whose state a test moves, as the lazy loader does. */
+  const createSource = (initial: ModelDefaultsRulesState) => {
+    let state = initial;
+    const listeners = new Set<() => void>();
+    const source: ModelDefaultsRulesSource = {
+      getSnapshot: () => state,
+      load: () => undefined,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+
+    return {
+      set: (next: ModelDefaultsRulesState) => {
+        state = next;
+        listeners.forEach((listener) => listener());
+      },
+      source,
+    };
+  };
+  const adapterFor = (source: ModelDefaultsRulesSource): ModelsUiAdapter => ({
+    canManageModels: true,
+    defaultsRules: source,
+    enableModelDescriptions: true,
+    installInPlace: true,
+    isProjectActive: () => true,
+    managerProjectId: null,
+    setInstallInPlace: () => undefined,
+  });
+  const readyAdapter = adapterFor(createSource(readyState).source);
+  const unavailableAdapter = adapterFor(NO_DEFAULTS_RULES);
+
+  const render = async (model: DefaultSettingsModel, uiAdapter: ModelsUiAdapter = readyAdapter) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={uiAdapter}>
+            <DefaultSettingsSection model={model} onError={vi.fn()} onSaved={vi.fn()} />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+
+  /** The picker's trigger, found from the slot's label. */
+  const pickerOf = (label: string): HTMLElement => {
+    let node: HTMLElement | null =
+      [...host.querySelectorAll<HTMLElement>('label, span, p')].find((candidate) => candidate.textContent === label) ??
+      null;
+
+    while (node && !node.querySelector('[aria-haspopup="listbox"]')) {
+      node = node.parentElement;
+    }
+
+    return node!.querySelector<HTMLElement>('[aria-haspopup="listbox"]')!;
+  };
+  const choose = async (label: string, name: string) => {
+    await act(() => pickerOf(label).click());
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+    await act(() =>
+      [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+        .find((option) => option.textContent?.includes(name))!
+        .click()
+    );
+  };
+  const clear = (label: string) =>
+    act(() => {
+      let node: HTMLElement | null = pickerOf(label);
+
+      while (node && !node.querySelector('[aria-label="models.clearSelectedModel"]')) {
+        node = node.parentElement;
+      }
+      node!.querySelector<HTMLElement>('[aria-label="models.clearSelectedModel"]')!.click();
+    });
+  const saveButton = () =>
+    [...host.querySelectorAll('button')].find((candidate) => candidate.textContent === 'models.saveDefaults')!;
+  const save = async () => {
+    await act(async () => {
+      saveButton().click();
+      await Promise.resolve();
+    });
+  };
+  const savedDefaults = () => api.updateModel.mock.calls[0]?.[1]?.default_settings;
+
+  beforeEach(() => {
+    api.getFp8StorageSupport.mockReset();
+    api.getFp8StorageSupport.mockResolvedValue([]);
+    api.updateModel.mockReset();
+    api.updateModel.mockImplementation((_key, body) => Promise.resolve({ ...settingsModel({}), ...body }));
+    accountLifecycle.activate('default-components-test', ':user:default-components-test');
+    setModelsSnapshotForTests({ error: null, models: catalog, status: 'loaded' });
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [], status: 'idle' });
+    accountLifecycle.invalidate();
+  });
+
+  it('offers a picker for each component slot with a candidate and saves the choice under its slot name', async () => {
+    await render(settingsModel({}));
+
+    expect(labels(host)).toEqual(expect.arrayContaining(['T5 Encoder', 'Qwen3 Encoder']));
+    // Nothing installed fills the PiD decoder, so it stays out of the way.
+    expect(labels(host)).not.toContain('PiD Decoder');
+
+    await choose('T5 Encoder', 'T5 B');
+    await save();
+
+    expect(savedDefaults()).toMatchObject({ components: { t5_encoder: 't5-b' } });
+  });
+
+  it('keeps a slot that holds a value, even one nothing installed can fill, so it can be cleared', async () => {
+    await render(settingsModel({ default_settings: { components: { pid_decoder: 'gone' } } }));
+    await clear('PiD Decoder');
+    await save();
+
+    expect(savedDefaults().components).toBeNull();
+  });
+
+  describe('clearing a slot', () => {
+    it('removes it from the stored map and keeps the others', async () => {
+      await render(
+        settingsModel({ default_settings: { components: { qwen3_encoder: 'qwen3-a', t5_encoder: 't5-a' } } })
+      );
+      await clear('T5 Encoder');
+      await save();
+
+      expect(savedDefaults().components).toEqual({ qwen3_encoder: 'qwen3-a' });
+    });
+
+    it('stores no map once the last slot is cleared', async () => {
+      await render(settingsModel({ default_settings: { components: { t5_encoder: 't5-a' } } }));
+      await clear('T5 Encoder');
+      await save();
+
+      expect(savedDefaults().components).toBeNull();
+    });
+
+    it('takes a dependent slot along when the slot it hangs on is cleared', async () => {
+      await render(
+        settingsModel({
+          default_settings: { components: { qwen3_encoder: 'qwen3-a', qwen3_vl_vision_tower: 'tower-a' } },
+        })
+      );
+      expect(labels(host)).toContain('Vision Tower');
+
+      await clear('Qwen3 Encoder');
+      await save();
+
+      expect(savedDefaults().components).toBeNull();
+    });
+  });
+
+  it('keeps a stored key for a slot this version does not offer through an unrelated edit', async () => {
+    // Deliberate: another version or client may know slots this one does not, and an edit elsewhere must not drop them.
+    await render(settingsModel({ default_settings: { components: { t5_encoder: 't5-a', unknown_slot: 'x' } } }));
+    await choose('T5 Encoder', 'T5 B');
+    await save();
+
+    expect(savedDefaults().components).toEqual({ t5_encoder: 't5-b', unknown_slot: 'x' });
+  });
+
+  it('is clean again when the choice is put back to the saved one', async () => {
+    await render(settingsModel({ default_settings: { components: { t5_encoder: 't5-a' } } }));
+    expect(saveButton().disabled).toBe(true);
+
+    await choose('T5 Encoder', 'T5 B');
+    expect(saveButton().disabled).toBe(false);
+
+    await choose('T5 Encoder', 'T5 A');
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it('is clean after a save', async () => {
+    await render(settingsModel({}));
+    await choose('T5 Encoder', 'T5 B');
+    await save();
+
+    expect(api.updateModel).toHaveBeenCalledTimes(1);
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it('shows no group while the rules are unavailable, and still saves the stored components with other edits', async () => {
+    await render(settingsModel({ default_settings: { components: { t5_encoder: 't5-a' } } }), unavailableAdapter);
+
+    expect(labels(host)).not.toContain('models.defaultComponents');
+
+    const stepsSwitch = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((input) =>
+      input.closest('div')?.textContent?.includes('models.defaultFields.steps')
+    );
+    await act(async () => {
+      stepsSwitch!.click();
+      await Promise.resolve();
+    });
+    await save();
+
+    expect(savedDefaults()).toMatchObject({ components: { t5_encoder: 't5-a' }, steps: 30 });
+  });
+
+  it('shows the pickers once the rules arrive', async () => {
+    const rules = createSource({ status: 'unavailable' });
+
+    await render(settingsModel({}), adapterFor(rules.source));
+    expect(labels(host)).not.toContain('T5 Encoder');
+
+    await act(() => rules.set(readyState));
+
+    expect(labels(host)).toContain('T5 Encoder');
+  });
+
+  describe('the default VAE picker', () => {
+    const mossModel = settingsModel({ base: 'moss-image', default_settings: { vae: 'default' } });
+    const offeredVaes = async () => {
+      await act(() => pickerOf('models.defaultFields.vae').click());
+      await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+
+      return [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
+    };
+
+    it('offers the VAEs Generate accepts for the model, whatever their base, and not the ones it rejects', async () => {
+      await render(mossModel);
+      const offered = (await offeredVaes()).join('|');
+
+      expect(offered).toContain('FLUX.2 VAE');
+      expect(offered).toContain('MOSS VAE');
+      expect(offered).not.toContain('SDXL VAE');
+    });
+
+    it("offers the model's own base only until the rules arrive", async () => {
+      await render(mossModel, unavailableAdapter);
+      const offered = (await offeredVaes()).join('|');
+
+      expect(offered).toContain('MOSS VAE');
+      expect(offered).not.toContain('FLUX.2 VAE');
+    });
+
+    it('keeps a stored default VAE the rule no longer accepts, so it can be cleared', async () => {
+      await render(settingsModel({ base: 'moss-image', default_settings: { vae: 'sdxl-vae' } }));
+
+      expect(host.textContent).toContain('SDXL VAE');
+      await clear('models.defaultFields.vae');
+      await save();
+
+      expect(savedDefaults().vae).toBe('default');
+    });
   });
 });

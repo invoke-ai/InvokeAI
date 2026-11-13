@@ -23,6 +23,7 @@ import {
   coerceSchedulerForGraph,
   getComponentPolicyContext,
   getComponentSectionPolicy,
+  getDefaultComponentSlotPolicies,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
@@ -36,6 +37,7 @@ import {
   getImageExpandPromptSuggestion,
   getCompatibleReferenceImages,
   getKrea2EditLoraState,
+  getModelDefaultComponents,
   getMaxReferenceImages,
   getReferenceImageUnavailableReason,
   getPromptPolicy,
@@ -3557,5 +3559,155 @@ describe('isModelFromRepo', () => {
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it-q4', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it/model.safetensors', REPO)).toBe(false);
     expect(isModelFromRepo(null, REPO)).toBe(false);
+  });
+});
+
+describe("a main model's default components", () => {
+  const withDefaults = (base: string, components: Record<string, string>, overrides: Partial<MainModelConfig> = {}) =>
+    createModel(base, {
+      default_settings: { components },
+      format: 'checkpoint',
+      key: `${base}-with-defaults`,
+      ...overrides,
+    });
+  const switchTo = (model: GenerateModelConfig, models: unknown[], currentValues?: GenerateSettings) =>
+    getGenerateModelSelectionResult({
+      currentValues: currentValues ?? createSettings(createModel('sd-1')),
+      model,
+      models: models as ComponentModelConfig[],
+    });
+  const otherT5: ComponentModelConfig = { base: 'any', key: 't5-other', name: 'Other T5', type: 't5_encoder' };
+
+  it('fills the empty slots on a switch without counting them as a loss', () => {
+    const model = withDefaults('flux', { clip_embed_model: clipEmbed.key, t5_encoder: t5Encoder.key });
+    const result = switchTo(model, [t5Encoder, clipEmbed]);
+
+    expect(result.settings.t5EncoderModel).toBe(t5Encoder);
+    expect(result.settings.clipEmbedModel).toBe(clipEmbed);
+    expect(result.changes).toEqual([]);
+    expect(isLossyModelSwitch(result)).toBe(false);
+  });
+
+  it('keeps a selection that already fits the new model', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const current = createSettings(createModel('flux', { key: 'flux-other' }), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [t5Encoder, otherT5], current).settings.t5EncoderModel).toBe(otherT5);
+  });
+
+  it('fills a slot the switch cleared as incompatible, and still reports the loss', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    // A Qwen VL encoder fits no FLUX slot, so a stale one is cleared; the T5 default is not what it held.
+    const current = createSettings(createModel('qwen-image', { format: 'diffusers' }), {
+      qwenVLEncoderModel: qwenVlEncoder,
+    });
+    const result = switchTo(model, [t5Encoder, qwenVlEncoder], current);
+
+    expect(result.settings.qwenVLEncoderModel).toBeNull();
+    expect(result.settings.t5EncoderModel).toBe(t5Encoder);
+    expect(isLossyModelSwitch(result)).toBe(true);
+  });
+
+  it('skips unknown slot names, models that are not installed and models the slot rejects', () => {
+    const model = withDefaults('flux', {
+      clip_embed_model: t5Encoder.key,
+      not_a_slot: clipEmbed.key,
+      t5_encoder: 'uninstalled',
+    });
+    const { settings } = switchTo(model, [t5Encoder, clipEmbed]);
+
+    expect(settings.t5EncoderModel).toBeNull();
+    expect(settings.clipEmbedModel).toBeNull();
+  });
+
+  it('changes nothing when the model is selected again', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const current = createSettings(model);
+
+    expect(switchTo(model, [t5Encoder], current).settings.t5EncoderModel).toBeNull();
+  });
+
+  it('skips the FLUX.2 component source, which the family offers no slot for and picks automatically', () => {
+    const source = createModel('flux2', { format: 'diffusers', key: 'klein-a', variant: 'klein_9b' });
+    const model = createModel('flux2', {
+      default_settings: { components: { component_source: source.key } },
+      format: 'gguf_quantized',
+      key: 'klein-default',
+      variant: 'klein_9b',
+    });
+
+    expect(getModelDefaultComponents(model, createSettings(model), [source] as ComponentModelConfig[])).toEqual({});
+  });
+
+  it('opens a dependent slot once the slot it hangs on is filled, whatever order they are stored in', () => {
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'qwen3-vl-8b-gguf',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const tower = { ...encoder, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const model = withDefaults('qwen-image-2-1', { qwen3_vl_vision_tower: tower.key, qwen3_vl_encoder: encoder.key });
+    const current = createSettings(model);
+
+    expect(getModelDefaultComponents(model, current, [tower, encoder] as ComponentModelConfig[])).toEqual({
+      qwen3VLEncoderModel: encoder,
+      qwen3VLVisionTowerModel: tower,
+    });
+    // Without the encoder default the tower has no slot to fill.
+    expect(
+      getModelDefaultComponents(withDefaults('qwen-image-2-1', { qwen3_vl_vision_tower: tower.key }), current, [
+        tower,
+      ] as ComponentModelConfig[])
+    ).toEqual({});
+    // The component list the Model Manager offers follows the same rule.
+    const offered = (components: Record<string, string>) =>
+      getDefaultComponentSlotPolicies(withDefaults('qwen-image-2-1', components), [
+        encoder,
+        tower,
+      ] as ComponentModelConfig[]).map((slot) => slot.persistenceKey);
+
+    expect(offered({})).not.toContain('qwen3_vl_vision_tower');
+    expect(offered({ qwen3_vl_encoder: encoder.key })).toContain('qwen3_vl_vision_tower');
+  });
+
+  describe('the default VAE', () => {
+    it('fills an empty VAE of a family with a VAE slot', () => {
+      const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
+
+      expect(switchTo(model, [fluxVae]).settings.vae).toBe(fluxVae);
+    });
+
+    it('fills the FLUX.2 VAE a single-file MOSS-Image takes as its default', () => {
+      const model = createModel('moss-image', { default_settings: { vae: flux2Vae.key }, format: 'checkpoint' });
+
+      expect(isComponentCompatibleWithModel(model, createSettings(model), 'vae', flux2Vae)).toBe(true);
+      expect(switchTo(model, [flux2Vae]).settings.vae).toBe(flux2Vae);
+      // SDXL's VAE is not among the ones MOSS-Image accepts.
+      expect(
+        switchTo(createModel('moss-image', { default_settings: { vae: sdxlVae.key }, format: 'checkpoint' }), [sdxlVae])
+          .settings.vae
+      ).toBeNull();
+    });
+
+    it('fills the SD VAE picker, and leaves a VAE the user chose', () => {
+      const model = createModel('sdxl', { default_settings: { vae: sdxlVae.key } });
+      const chosen: VaeModelConfig = { ...sdxlVae, key: 'chosen', name: 'Chosen' };
+      const current = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: chosen });
+
+      expect(switchTo(model, [sdxlVae]).settings.vae).toBe(sdxlVae);
+      expect(switchTo(model, [sdxlVae, chosen], current).settings.vae).toBe(chosen);
+    });
+
+    it('leaves the bundled VAE for the "default" sentinel, and skips a VAE of another base', () => {
+      expect(
+        switchTo(createModel('sdxl', { default_settings: { vae: 'default' } }), [sdxlVae]).settings.vae
+      ).toBeNull();
+      expect(
+        switchTo(createModel('sdxl', { default_settings: { vae: fluxVae.key } }), [fluxVae]).settings.vae
+      ).toBeNull();
+    });
   });
 });

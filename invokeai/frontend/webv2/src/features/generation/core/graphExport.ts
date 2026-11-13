@@ -23,6 +23,7 @@ import {
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
+  getModelDefaultComponents,
   getReferenceImageUnavailableReason,
   getSchedulerOptions,
   isArchitectureDescribed,
@@ -153,7 +154,7 @@ const getSelectableModel = (key: string, models: readonly ModelConfig[]): Genera
   return model;
 };
 
-/** Selecting the model, then "Reset to model defaults", which also applies the model's default VAE. */
+/** Selecting the model, then "Reset to model defaults", which also applies its default VAE and components. */
 const getModelDefaultValues = (model: GenerateModelConfig, models: readonly ModelConfig[]): GenerateWidgetValues => {
   const { settings } = getGenerateModelSelectionResult({
     currentValues: getDefaultGenerateSettings(model),
@@ -162,7 +163,7 @@ const getModelDefaultValues = (model: GenerateModelConfig, models: readonly Mode
   });
   const vae = hasModelDefaultVae(model) ? getModelDefaultVae(model, models.filter(isVaeModelConfig)) : settings.vae;
 
-  return { ...settings, model, vae };
+  return { ...settings, ...getModelDefaultComponents(model, settings, models, { replace: true }), model, vae };
 };
 
 const withCaseValues = (values: GenerateWidgetValues, input: GraphExportCase): GenerateWidgetValues => ({

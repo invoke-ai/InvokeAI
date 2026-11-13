@@ -107,6 +107,8 @@ export interface MainModelDefaultSettings {
   height?: number | null;
   guidance?: number | null;
   fp8_storage?: boolean | null;
+  /** Default component models by slot name (`generation/core/componentDefaults`), each a model key; null when none. */
+  components?: Record<string, string> | null;
 }
 
 export interface LoraModelDefaultSettings {

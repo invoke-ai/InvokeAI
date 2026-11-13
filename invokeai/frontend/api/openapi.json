@@ -78142,6 +78142,21 @@
             ],
             "title": "Fp8 Storage",
             "description": "Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference."
+          },
+          "components": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components",
+            "description": "Default component models for this main model, keyed by component slot (the generation metadata name, e.g. `t5_encoder`, `qwen3_encoder`); values are model keys. The default VAE lives in `vae`."
           }
         },
         "additionalProperties": false,
