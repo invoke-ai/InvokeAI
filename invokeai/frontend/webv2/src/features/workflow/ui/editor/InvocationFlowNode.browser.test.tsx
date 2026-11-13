@@ -61,7 +61,10 @@ const exportMocks = vi.hoisted(() => ({
 }));
 vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
-vi.mock('@features/queue/react', () => ({ useProgressImage: () => exportMocks.progressImage }));
+vi.mock('@features/queue/react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useProgressImage: () => exportMocks.progressImage,
+}));
 vi.mock('@features/generation/queries', () => ({
   promptTemplatesQueryOptions: () => ({
     queryFn: () => Promise.resolve([]),
@@ -2261,5 +2264,64 @@ describe('InvocationFlowNode batch nodes', () => {
 
     await render('None');
     expect(header().textContent).toContain('(no group)');
+  });
+});
+
+describe('CurrentImageFlowNode waiting vs active states', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    exportMocks.progressImage = null;
+    host = document.createElement('div');
+    host.style.height = '600px';
+    host.style.width = '800px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => {
+      root.unmount();
+    });
+    host.remove();
+  });
+
+  it('shows waiting status without hiding selected media or its drag grip while a workflow run is pending', async () => {
+    const selectedVideo = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-11-13T00:00:00Z',
+      durationSeconds: 4,
+      fps: 24,
+      fullUrl: 'data:video/mp4;base64,AAAA',
+      height: 576,
+      isIntermediate: false,
+      kind: 'video' as const,
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
+      width: 1024,
+    };
+    const snapshot = {
+      ...projectSnapshotFor(currentImageGraph, { selectedImage: selectedVideo }),
+      isWorkflowRunning: true,
+    };
+    const adapter = createAdapter(createExecutionPort().port, snapshot);
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe('common.status.waiting');
+    expect(host.querySelector('[data-testid="current-image-media-drag-grip"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="current-image-copy-video-frame"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
   });
 });

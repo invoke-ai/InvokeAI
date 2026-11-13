@@ -1,4 +1,10 @@
-import type { GalleryItem, GalleryItemRef, GeneratedImageContract } from '@features/gallery/contracts';
+import type {
+  GalleryItem,
+  GalleryItemKey,
+  GalleryItemRef,
+  GalleryVideoItem,
+  GeneratedImageContract,
+} from '@features/gallery/contracts';
 import type * as VideoPlayerModule from '@platform/ui/video-player/VideoPlayer';
 import type { NodeProps } from '@xyflow/react';
 
@@ -8,15 +14,12 @@ import {
   getSelectedGalleryItemFromValues,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
+  toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
-import {
-  useActiveProgressTargets,
-  useIsProcessorPaused,
-  useProgressImage,
-  useQueueItemProgress,
-} from '@features/queue/react';
+import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
+import { useActiveProgressTargets, useProgressImage, useQueueItemProgress } from '@features/queue/react';
 import {
   CURRENT_IMAGE_DEFAULT_HEIGHT,
   CURRENT_IMAGE_DEFAULT_WIDTH,
@@ -48,6 +51,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -59,6 +63,9 @@ import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAda
 const KEYBOARD_RESIZE_STEP_PX = 32;
 const RING_CIRCUMFERENCE = 37.7;
 const INDETERMINATE_DASH_OFFSET = 27.1;
+// Seek far enough from zero to clear poster state while staying within frame zero.
+const FIRST_FRAME_SEEK_SECONDS = 0.0001;
+
 const RESIZE_FOCUS_VISIBLE_STYLE = {
   opacity: 1,
   outline: '2px solid',
@@ -66,6 +73,14 @@ const RESIZE_FOCUS_VISIBLE_STYLE = {
   outlineOffset: '-2px',
 } as const;
 const RESIZE_HOVER_STYLE = { opacity: 1 } as const;
+const VIDEO_FAILURE_POSTER_STYLE: CSSProperties = {
+  display: 'block',
+  height: '100%',
+  inset: 0,
+  objectFit: 'contain',
+  position: 'absolute',
+  width: '100%',
+};
 
 const LazyVideoPlayer = lazy(() =>
   import('@platform/ui/video-player/VideoPlayer').then((mod) => ({ default: mod.VideoPlayer }))
@@ -84,6 +99,115 @@ interface ResizeDragSession {
   zoom: number;
 }
 
+export interface CurrentImageExecutionState {
+  dragRef: GalleryItemRef | null;
+  hasLiveFrame: boolean;
+  isGenerating: boolean;
+  isShowingVideo: boolean;
+  isWaiting: boolean;
+  progressPercent: number | null;
+}
+
+/**
+ * Separate active backend execution (`progressImage` or `activeTargetCount > 0`) from queued/pending workflow runs
+ * (`isWorkflowRunning`), so waiting jobs never hide usable media or remove the drag handle.
+ */
+export const resolveCurrentImageExecutionState = ({
+  activeTargetCount,
+  displayedItem,
+  isWorkflowRunning,
+  progressImage,
+  progressPercentage,
+}: {
+  activeTargetCount: number;
+  displayedItem: GalleryItem | null;
+  isWorkflowRunning: boolean;
+  progressImage: unknown;
+  progressPercentage: number | null | undefined;
+}): CurrentImageExecutionState => {
+  const hasLiveFrame = Boolean(progressImage);
+  const isGenerating = hasLiveFrame || activeTargetCount > 0;
+  const isWaiting = !isGenerating && isWorkflowRunning;
+  const isShowingVideo = !hasLiveFrame && displayedItem?.kind === 'video';
+  const dragRef = !hasLiveFrame && displayedItem ? toGalleryItemRef(displayedItem) : null;
+  const progressPercent =
+    isGenerating && typeof progressPercentage === 'number' && progressPercentage > 0
+      ? Math.round(Math.min(100, Math.max(0, progressPercentage * 100)))
+      : null;
+
+  return { dragRef, hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent };
+};
+
+export interface VideoErrorRecovery {
+  handleError(video: HTMLVideoElement | null, isElementCurrent: () => boolean): void;
+  retry(video: HTMLVideoElement | null): void;
+}
+
+/**
+ * Match PreviewFrame's protected-media video recovery: refresh the media cookie once per load attempt, guard against
+ * stale element or account changes while refreshing, and expose manual retry when loading still fails.
+ */
+export const createVideoErrorRecovery = ({
+  getAccountEpoch,
+  onFailedChange,
+  refreshCookie,
+}: {
+  getAccountEpoch: () => number;
+  onFailedChange: (failed: boolean) => void;
+  refreshCookie: () => Promise<boolean>;
+}): VideoErrorRecovery => {
+  let automaticRefreshUsed = false;
+  let pendingRefresh: Promise<boolean> | null = null;
+
+  return {
+    handleError(video, isElementCurrent) {
+      if (!video || pendingRefresh !== null) {
+        return;
+      }
+
+      if (automaticRefreshUsed) {
+        onFailedChange(true);
+        return;
+      }
+
+      automaticRefreshUsed = true;
+      const accountEpoch = getAccountEpoch();
+      const refresh = refreshCookie();
+      pendingRefresh = refresh;
+
+      const finishRefresh = (refreshed: boolean): void => {
+        if (pendingRefresh !== refresh) {
+          return;
+        }
+
+        pendingRefresh = null;
+
+        if (!isElementCurrent() || getAccountEpoch() !== accountEpoch) {
+          return;
+        }
+
+        if (refreshed) {
+          video.load();
+        } else {
+          onFailedChange(true);
+        }
+      };
+
+      void refresh.then(finishRefresh, () => finishRefresh(false));
+    },
+    retry(video) {
+      if (!video) {
+        return;
+      }
+
+      automaticRefreshUsed = false;
+      pendingRefresh = null;
+      onFailedChange(false);
+      video.load();
+    },
+  };
+};
+
 const resolveDisplayedGalleryItem = (values: Record<string, unknown>): GalleryItem | null => {
   const selected = getSelectedGalleryItemFromValues(values);
   if (selected) {
@@ -101,6 +225,9 @@ const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoEl
     video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
   );
 
+const isCanvasSecurityError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'SecurityError';
+
 const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
   new Promise((resolve, reject) => {
     try {
@@ -110,6 +237,14 @@ const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
     }
   });
 
+const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
+  try {
+    video.currentTime = seconds;
+  } catch {
+    // Some browsers throw while the seekable range is still empty; the element keeps its position.
+  }
+};
+
 const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
@@ -118,17 +253,24 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const isWorkflowRunning = useWorkflowProjectSelector((project) => project.isWorkflowRunning);
   const progressImage = useProgressImage();
   const activeTargets = useActiveProgressTargets();
-  const isProcessorPaused = useIsProcessorPaused();
 
-  // Gate render status strictly on live execution (`progressImage`, `activeTargets`, or an unpaused running workflow)
-  // and read percentage from the active queue item target so completed backend entries never keep spinning.
-  const isGenerating = Boolean(progressImage) || activeTargets.length > 0 || (isWorkflowRunning && !isProcessorPaused);
   const activeQueueItemId = activeTargets[0]?.queueItemId ?? '';
-  const activeProgress = useQueueItemProgress(isGenerating ? activeQueueItemId : '');
-  const progressPercent =
-    isGenerating && typeof activeProgress?.percentage === 'number' && activeProgress.percentage > 0
-      ? Math.round(Math.min(100, Math.max(0, activeProgress.percentage * 100)))
-      : null;
+  const hasActiveRun = Boolean(progressImage) || activeTargets.length > 0;
+  const activeProgress = useQueueItemProgress(hasActiveRun ? activeQueueItemId : '');
+
+  const displayedItem = useMemo(() => resolveDisplayedGalleryItem(galleryValues), [galleryValues]);
+  const displayedItemKey = useMemo(() => (displayedItem ? toGalleryItemKey(displayedItem) : null), [displayedItem]);
+  const { dragRef, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
+    () =>
+      resolveCurrentImageExecutionState({
+        activeTargetCount: activeTargets.length,
+        displayedItem,
+        isWorkflowRunning,
+        progressImage,
+        progressPercentage: activeProgress?.percentage,
+      }),
+    [activeProgress?.percentage, activeTargets.length, displayedItem, isWorkflowRunning, progressImage]
+  );
 
   const node = data.documentNode;
   const savedWidth = node.data.width ?? CURRENT_IMAGE_DEFAULT_WIDTH;
@@ -138,27 +280,17 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const displayHeight = liveSize?.height ?? savedHeight;
   const isCustomSize = displayWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || displayHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
 
-  const displayedItem = useMemo(() => resolveDisplayedGalleryItem(galleryValues), [galleryValues]);
-  const isShowingVideo = !isGenerating && displayedItem?.kind === 'video';
-  const dragRef = useMemo<GalleryItemRef | null>(
-    () => (displayedItem && !isGenerating ? toGalleryItemRef(displayedItem) : null),
-    [displayedItem, isGenerating]
-  );
-
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [canCopyVideoFrame, setCanCopyVideoFrame] = useState(false);
+  const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<GalleryItemKey | null>(null);
+  const canCopyVideoFrame = isShowingVideo && displayedItemKey !== null && copyReadyVideoKey === displayedItemKey;
   const dragSessionRef = useRef<ResizeDragSession | null>(null);
 
-  const syncVideoCopyAvailability = useCallback(() => {
-    setCanCopyVideoFrame(canCopyImage() && isVideoFrameReady(videoRef.current));
+  const handleVideoElementChange = useCallback((element: HTMLVideoElement | null) => {
+    videoRef.current = element;
   }, []);
 
-  const setVideoElementRef = useCallback((element: HTMLVideoElement | null) => {
-    videoRef.current = element;
-    if (element) {
-      element.disablePictureInPicture = true;
-    }
-    setCanCopyVideoFrame(canCopyImage() && isVideoFrameReady(element));
+  const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
+    setCopyReadyVideoKey((prev) => (isAvailable ? itemKey : prev === itemKey ? null : prev));
   }, []);
 
   const handleCopyCurrentFrame = useCallback(
@@ -174,6 +306,8 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         notifications.error(t('widgets.preview.copyCurrentFrameNotReady'));
         return;
       }
+
+      const accountEpoch = getAuthSession().accountEpoch;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -182,18 +316,51 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         notifications.error(t('widgets.preview.copyCurrentFrameDrawFailed'));
         return;
       }
+
       try {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const blob = await encodeCanvasPng(canvas);
-        if (!blob) {
-          notifications.error(t('widgets.preview.copyCurrentFrameEncodeFailed'));
-          return;
-        }
+      } catch {
+        notifications.error(t('widgets.preview.copyCurrentFrameDrawFailed'));
+        return;
+      }
+
+      let blob: Blob | null;
+      try {
+        blob = await encodeCanvasPng(canvas);
+      } catch (error: unknown) {
+        notifications.error(
+          t(
+            isCanvasSecurityError(error)
+              ? 'widgets.preview.copyCurrentFrameDrawFailed'
+              : 'widgets.preview.copyCurrentFrameEncodeFailed'
+          )
+        );
+        return;
+      }
+      if (!blob) {
+        notifications.error(t('widgets.preview.copyCurrentFrameEncodeFailed'));
+        return;
+      }
+
+      const isCurrent = (): boolean => videoRef.current === video && getAuthSession().accountEpoch === accountEpoch;
+
+      if (!isCurrent()) {
+        notifications.error(t('widgets.preview.copyCurrentFrameStale'));
+        return;
+      }
+
+      try {
         await copyImage(blob);
-        notifications.success(t('widgets.preview.copyCurrentFrameSuccess'));
       } catch {
         notifications.error(t('widgets.preview.copyCurrentFrameWriteFailed'));
+        return;
       }
+
+      if (!isCurrent()) {
+        notifications.error(t('widgets.preview.copyCurrentFrameStale'));
+        return;
+      }
+      notifications.success(t('widgets.preview.copyCurrentFrameSuccess'));
     },
     [notifications, t]
   );
@@ -307,23 +474,6 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     [displayedItem]
   );
   const liveImage = useMemo(() => progressImageToStreamingSource(progressImage), [progressImage]);
-  const videoPosterImage = useMemo(
-    () =>
-      displayedItem && displayedItem.kind === 'video'
-        ? imageUrlToStreamingSource({
-            alt: displayedItem.name,
-            height: displayedItem.height,
-            kind: 'fallback',
-            src: displayedItem.thumbnailUrl,
-            width: displayedItem.width,
-          })
-        : null,
-    [displayedItem]
-  );
-  const videoPosterFallback = useMemo(
-    () => <StreamingImageFrame fallbackImage={videoPosterImage} fit="contain" h="full" liveImage={null} w="full" />,
-    [videoPosterImage]
-  );
 
   const resizeLabel = t('widgets.workflow.currentImageResizeHandle', {
     height: displayHeight,
@@ -353,6 +503,10 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
               {progressPercent !== null
                 ? `${t('widgets.workflow.generating')} ${progressPercent}%`
                 : t('widgets.workflow.generating')}
+            </Text>
+          ) : isWaiting ? (
+            <Text color="fg.muted" data-node-status-indicator="true" fontSize="xs">
+              {t('common.status.waiting')}
             </Text>
           ) : null}
           {isShowingVideo ? (
@@ -409,26 +563,14 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       ) : null}
 
       <Box h={`${displayHeight}px`} overflow="hidden" position="relative" w="full">
-        {isShowingVideo && displayedItem.kind === 'video' ? (
-          <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
-            <Suspense fallback={videoPosterFallback}>
-              <PlayerComponent
-                ref={setVideoElementRef}
-                aria-label={displayedItem.name}
-                defaultLoop
-                fps={displayedItem.fps}
-                poster={displayedItem.thumbnailUrl}
-                size="full"
-                src={displayedItem.fullUrl}
-                onCanPlay={syncVideoCopyAvailability}
-                onLoadedData={syncVideoCopyAvailability}
-                onLoadedMetadata={syncVideoCopyAvailability}
-                onPlaying={syncVideoCopyAvailability}
-                onResize={syncVideoCopyAvailability}
-                onSeeked={syncVideoCopyAvailability}
-              />
-            </Suspense>
-          </Box>
+        {isShowingVideo && displayedItem?.kind === 'video' && displayedItemKey ? (
+          <CurrentImageVideoSurface
+            key={displayedItemKey}
+            item={displayedItem}
+            itemKey={displayedItemKey}
+            onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+            onVideoElementChange={handleVideoElementChange}
+          />
         ) : (
           <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
             <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
@@ -527,6 +669,151 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           />
         </Box>
       </Flex>
+    </Box>
+  );
+};
+
+const CurrentImageVideoSurface = ({
+  item,
+  itemKey,
+  onCopyAvailabilityChange,
+  onVideoElementChange,
+}: {
+  item: GalleryVideoItem;
+  itemKey: GalleryItemKey;
+  onCopyAvailabilityChange: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
+  onVideoElementChange: (element: HTMLVideoElement | null) => void;
+}) => {
+  const { t } = useTranslation();
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  const publishCopyAvailability = useCallback(() => {
+    onCopyAvailabilityChange(itemKey, canCopyImage() && isVideoFrameReady(localVideoRef.current));
+  }, [itemKey, onCopyAvailabilityChange]);
+
+  const setVideoElementRef = useCallback(
+    (element: HTMLVideoElement | null) => {
+      localVideoRef.current = element;
+      onVideoElementChange(element);
+      if (element) {
+        element.disablePictureInPicture = true;
+      }
+      onCopyAvailabilityChange(itemKey, canCopyImage() && isVideoFrameReady(element));
+    },
+    [itemKey, onCopyAvailabilityChange, onVideoElementChange]
+  );
+
+  const recovery = useMemo(
+    () =>
+      createVideoErrorRecovery({
+        getAccountEpoch: () => getAuthSession().accountEpoch,
+        onFailedChange: setHasFailed,
+        refreshCookie: refreshProtectedMediaCookie,
+      }),
+    []
+  );
+
+  const handleVideoError = useCallback(() => {
+    publishCopyAvailability();
+    const video = localVideoRef.current;
+    recovery.handleError(video, () => localVideoRef.current === video);
+  }, [publishCopyAvailability, recovery]);
+
+  const handleLoadedMetadata = useCallback(() => {
+    publishCopyAvailability();
+    const video = localVideoRef.current;
+    if (video && video.paused && video.currentTime === 0) {
+      seekVideo(video, FIRST_FRAME_SEEK_SECONDS);
+    }
+  }, [publishCopyAvailability]);
+
+  const handleRetryClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      recovery.retry(localVideoRef.current);
+      publishCopyAvailability();
+    },
+    [publishCopyAvailability, recovery]
+  );
+
+  const videoPosterImage = useMemo(
+    () =>
+      imageUrlToStreamingSource({
+        alt: item.name,
+        height: item.height,
+        kind: 'fallback',
+        src: item.thumbnailUrl,
+        width: item.width,
+      }),
+    [item.height, item.name, item.thumbnailUrl, item.width]
+  );
+  const videoPosterFallback = useMemo(
+    () => <StreamingImageFrame fallbackImage={videoPosterImage} fit="contain" h="full" liveImage={null} w="full" />,
+    [videoPosterImage]
+  );
+
+  const failureOverlay = useMemo(
+    () =>
+      hasFailed ? (
+        <>
+          <img
+            aria-hidden="true"
+            alt=""
+            draggable={false}
+            height={item.height}
+            src={item.thumbnailUrl}
+            style={VIDEO_FAILURE_POSTER_STYLE}
+            width={item.width}
+          />
+          <Flex
+            align="center"
+            bg="blackAlpha.700"
+            data-testid="current-image-video-failure"
+            direction="column"
+            gap="2.5"
+            inset="0"
+            justify="center"
+            position="absolute"
+            px="3"
+            textAlign="center"
+          >
+            <Text color="white" fontSize="sm" fontWeight="semibold">
+              {t('widgets.preview.videoFailed')}
+            </Text>
+            <Button aria-label={t('widgets.preview.videoRetry')} size="sm" onClick={handleRetryClick}>
+              {t('widgets.preview.videoRetry')}
+            </Button>
+          </Flex>
+        </>
+      ) : null,
+    [handleRetryClick, hasFailed, item.height, item.thumbnailUrl, item.width, t]
+  );
+
+  return (
+    <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
+      <Suspense fallback={videoPosterFallback}>
+        <PlayerComponent
+          ref={setVideoElementRef}
+          aria-label={item.name}
+          defaultLoop
+          fps={item.fps}
+          overlay={failureOverlay}
+          poster={item.thumbnailUrl}
+          size="full"
+          src={item.fullUrl}
+          onCanPlay={publishCopyAvailability}
+          onEmptied={publishCopyAvailability}
+          onError={handleVideoError}
+          onLoadedData={publishCopyAvailability}
+          onLoadedMetadata={handleLoadedMetadata}
+          onPlaying={publishCopyAvailability}
+          onResize={publishCopyAvailability}
+          onSeeked={publishCopyAvailability}
+          onWaiting={publishCopyAvailability}
+        />
+      </Suspense>
     </Box>
   );
 };
