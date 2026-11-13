@@ -109,6 +109,18 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 | `vae` | `ModelIdentifier`: a standalone VAE override |
 | `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; absent when none ran |
 
+### Image profile
+
+Image records add the sampling settings (`cfg_scale`, FLUX's `guidance`, `scheduler`, `cfg_rescale_multiplier`,
+`seamless_x`/`seamless_y`, `clip_skip`, `hidiffusion_*`), each component under its family's key (`t5_encoder`,
+`qwen3_encoder`, `qwen3_source`, `pid_decoder`, ...), the reference images (`ref_images`), the SDXL refiner
+(`refiner_*`), per-family tuning (`dype_*`, `z_image_*`, `qwen_image_*`, `krea2_*`, `ideogram4_*`, `moss_image_*`,
+`pid_*`), hosted-provider options (`image_size`, `openai_*`, `gemini_*`, `seedream_*`), and, from the Canvas,
+`strength`, the control layers and `canvas_v3_metadata`. An upscale adds its own settings (`upscale_*`,
+`creativity`, `structure`, `tile_*`). The keys the coverage fixtures write and the keys the backend declares,
+with what image recall does with each, are listed in `IMAGE_RECALL_CONTRACT`
+(`invokeai/frontend/webv2/src/workbench/image-actions/imageRecallContract.test.ts`).
+
 ### Video profile
 
 | Key | Type | Notes |
@@ -147,9 +159,11 @@ graph builders write only the canonical ones.
   by `name` + `base` + `type`. Keys are minted per install, so a record that travelled with a file
   names keys the receiving catalog has never seen; the BLAKE3 hash is the content identity and
   resolves the same weights wherever they are installed. The name step is the last resort and the
-  only one that can pick a different file of the same model. Image recall resolves its main model
-  and components by key only; its **LoRAs** resolve by `key`, then by `hash` when one was recorded,
-  otherwise by `name` + `base`, and skip any portable identifier that matches more than one install.
+  only one that can pick a different file of the same model. Image recall resolves its main model,
+  VAE, components, refiner and **LoRAs** by `key`, then by `hash` when one was recorded, otherwise
+  by `name` + `base` (and `type` when recorded). A recorded hash that matches nothing is not
+  replaced by a same-named file, and an identifier that matches more than one install is skipped.
+  Reference-image adapters fall back to `name` + `base` on a hash miss.
 - **Media references** (`image_name`, `video_name`) are names in the originating gallery, exactly
   as an image record's `init_image` is. Recall restores everything else and clears media it
   cannot find rather than substituting.
@@ -163,6 +177,13 @@ same key names from an external process, with models given by name.
 
 1. Add a typed `Optional` field to `CoreMetadataInvocation` under its canonical name, stamp it from
    the graph builder, and read it in the recall mappers.
-2. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
+2. Give the key an entry in the recall contract of each profile that writes it:
+   `IMAGE_RECALL_CONTRACT` (`invokeai/frontend/webv2/src/workbench/image-actions/imageRecallContract.test.ts`)
+   and its video twin, `videoRecallContract.test.ts` beside it. A contract test fails for a key without an
+   entry that the coverage fixtures' graphs write; a key written only under some setting needs that setting off
+   its default in `recallTunedSettingsFor` (`graphCoverage.testing.ts`) or in a dedicated case. A field
+   `CoreMetadataInvocation` declares without an image entry fails webv2's type check once the API types are
+   regenerated.
+3. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
    type change, and add the old spelling to the readers' alias table.
-3. Update the tables on this page.
+4. Update the tables on this page.

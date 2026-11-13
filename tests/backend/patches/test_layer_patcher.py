@@ -783,6 +783,35 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(
     assert patch.calc_size() == before_bytes
 
 
+@pytest.mark.parametrize(
+    "input_device",
+    ["meta", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU"))],
+)
+@pytest.mark.parametrize(
+    "make_layer", [_lora_layer, _merged_layer, _swapped_halves_layer], ids=["lora", "merged", "swapped_halves"]
+)
+@torch.no_grad()
+def test_sidecar_forward_leaves_the_cached_patch_in_place_during_the_scope(
+    make_layer: Callable[[int, int], BaseLayerPatch], input_device: str
+) -> None:
+    """The sidecar forward moves a copy of each patch to the input's device. For wrapper patches the copy used
+    to share its sub-patches with the cached patch, so the first forward moved those off the device the model
+    cache accounts them on, until the scope ended."""
+    model = DummyModuleWithOneLayer(in_features=8, out_features=16, device="cpu", dtype=torch.bfloat16)
+    apply_custom_layers_to_model(model)
+    model.linear_layer_1.set_device_autocasting_enabled(True)
+    patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 16)})
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.bfloat16, force_sidecar_patching=True
+    ):
+        # Whatever placement patching itself chose for the scope; only the forward must not change it.
+        during_scope = _placements(patch)
+        model(torch.ones(1, 8, device=input_device, dtype=torch.bfloat16))
+        assert _placements(patch) == during_scope
+        assert all(placement_device.type == "cpu" for placement_device, _ in _placements(patch))
+
+
 @pytest.mark.parametrize("make_layer", [_lora_layer, _swapped_halves_layer], ids=["lora", "swapped_halves"])
 @pytest.mark.parametrize(
     "device",

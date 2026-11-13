@@ -6,6 +6,8 @@ part a loader can get wrong without anything raising — every failure below wou
 surface as a model that loads cleanly and generates noise.
 """
 
+import weakref
+
 import pytest
 import torch
 from safetensors.torch import save_file
@@ -543,6 +545,53 @@ class TestTheSharedInstall:
         assert surviving == {}
         assert reserved == [4 * CONVROT_GROUP_SIZE * 4]
         assert torch.allclose(sd["widens.weight"], int4.dequantized, atol=1e-5)
+
+    def test_a_header_read_never_holds_more_than_the_reservation(self) -> None:
+        """A loader that hands over the file's header has each payload read after the reservation, which charges a
+        dense tensor at the compute width. Reading an fp32 file's dense tensors first and casting them afterwards held
+        twice that, so each is cast as it arrives; the int8 payload and its scale still arrive as stored."""
+        width = CONVROT_GROUP_SIZE
+        model = self._model()
+        model.dense = torch.nn.Linear(width, width)
+        stored = {
+            **self._int8_layer("keeps"),
+            "dense.weight": torch.randn(width, width),
+            "dense.bias": torch.randn(width),
+        }
+        sd = {key: tensor.to("meta") for key, tensor in stored.items()}
+        reserved: list[int] = []
+        held: list[int] = []
+        # Every payload handed out, so one the install still references outside `sd` counts as held too.
+        handed_out: list[weakref.ref[torch.Tensor]] = []
+
+        def held_bytes() -> int:
+            alive = {id(t): t for t in sd.values() if not t.is_meta}
+            alive.update({id(t): t for t in (ref() for ref in handed_out) if t is not None})
+            return sum(tensor.nelement() * tensor.element_size() for tensor in alive.values())
+
+        def read(key: str) -> torch.Tensor:
+            held.append(held_bytes())
+            payload = stored[key].clone()
+            handed_out.append(weakref.ref(payload))
+            return payload
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"keeps": MARKER},
+            torch.bfloat16,
+            architecture="Wan 2.2",
+            reserve=reserved.append,
+            read=read,
+        )
+        held.append(held_bytes())
+
+        # Spelled out: int8 codes and their float32 scale as stored, the dense tensors at bf16's two bytes.
+        assert reserved == [4 * width + 4 * 4 + (width * width + width) * 2]
+        assert max(held) <= reserved[0]
+        assert sd["dense.weight"].dtype is torch.bfloat16 and sd["dense.bias"].dtype is torch.bfloat16
+        assert sd["keeps.weight"].dtype is torch.int8 and sd["keeps.weight_scale"].dtype is torch.float32
+        assert torch.equal(sd["dense.weight"], stored["dense.weight"].to(torch.bfloat16))
 
 
 def test_read_comfy_quant_markers_reads_a_marker_off_a_file(tmp_path) -> None:
