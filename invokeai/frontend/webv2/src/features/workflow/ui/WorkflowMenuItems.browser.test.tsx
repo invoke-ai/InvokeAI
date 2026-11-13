@@ -77,6 +77,7 @@ const TRANSLATIONS: Record<string, string> = {
   'widgets.workflow.detailsWithEllipsis': 'Details…',
   'widgets.workflow.downloadPng': 'Download as PNG',
   'widgets.workflow.downloadPngUnavailable': 'Open the workflow editor to download it as an image',
+  'widgets.workflow.downloadPngRunning': 'Already downloading the workflow as an image',
   'widgets.workflow.export': 'Export',
   'widgets.workflow.exportJson': 'Export JSON',
   'widgets.workflow.importJsonWithEllipsis': 'Import from JSON…',
@@ -353,6 +354,36 @@ describe('WorkflowMenuItems', () => {
 
     expect(imageExport.exportWorkflowAsPng).not.toHaveBeenCalled();
     expect(copyWorkflowJsonMock).not.toHaveBeenCalled();
+  });
+
+  it('says an image download is already running until it finishes', async () => {
+    const editor = mountEditor();
+    let finishPreparing: (element: HTMLDivElement) => void = () => undefined;
+    editor.prepare.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishPreparing = resolve;
+      })
+    );
+    await renderMenu(createProjectGraph('workflow-1'));
+
+    await openExport();
+    await act(() => userEvent.click(menuItem('Download as PNG')));
+    await vi.waitFor(() => expect(editor.prepare).toHaveBeenCalledOnce());
+    await openExport();
+
+    await expect.element(menuItem('Download as PNG')).toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .element(menuItem('Download as PNG'))
+      .toHaveAccessibleDescription('Already downloading the workflow as an image');
+    await act(() => (menuItem('Download as PNG').element() as HTMLElement).click());
+
+    await act(async () => {
+      finishPreparing(editor.flowElement);
+      await vi.waitFor(() => expect(editor.complete).toHaveBeenCalledOnce());
+    });
+    await expect.element(menuItem('Download as PNG')).not.toHaveAttribute('aria-disabled');
+    expect(editor.prepare).toHaveBeenCalledOnce();
+    expect(imageExport.exportWorkflowAsPng).toHaveBeenCalledOnce();
   });
 
   it('blocks export and copy with action-specific translated feedback', async () => {

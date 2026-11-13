@@ -417,7 +417,13 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
   const workflowName = useWorkflowProjectSelector((project) => project.activeWorkflow.document.name);
-  const { isAvailable: canDownloadPng } = useWorkflowPngExportState();
+  const pngExport = useWorkflowPngExportState();
+  // One export runs at a time, from here or the editor toolbar.
+  const downloadPngUnavailableReason = pngExport.isExporting
+    ? t('widgets.workflow.downloadPngRunning')
+    : pngExport.isAvailable
+      ? undefined
+      : t('widgets.workflow.downloadPngUnavailable');
   const canUpdateSource = isUpdatableSource(source, session);
 
   const openDetailsPanel = useCallback(() => {
@@ -535,7 +541,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
                 <MenuActionItem
                   icon={CameraIcon}
                   label={t('widgets.workflow.downloadPng')}
-                  unavailableReason={canDownloadPng ? undefined : t('widgets.workflow.downloadPngUnavailable')}
+                  unavailableReason={downloadPngUnavailableReason}
                   value="download-png"
                   onSelect={downloadPng}
                 />

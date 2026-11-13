@@ -4755,6 +4755,7 @@
       "detailsWithEllipsis": "Details…",
       "downloadPng": "Download as PNG",
       "downloadPngUnavailable": "Open the workflow editor to download it as an image",
+      "downloadPngRunning": "Already downloading the workflow as an image",
       "export": "Export",
       "renameWithEllipsis": "Rename…",
       "exportJson": "Export JSON",
