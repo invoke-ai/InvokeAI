@@ -2,7 +2,7 @@ import { ChakraProvider, Portal } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { act, StrictMode, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { Dialog } from './Dialog';
@@ -82,6 +82,24 @@ const ParentWithChild = () => {
   );
 };
 
+/** Closes on any dismissal, so a focus-outside dismissal that got through would close it. */
+const ModalWithFocusOutside = ({ onFocusOutside }: { onFocusOutside: () => void }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const handleOpenChange = useCallback((details: Dialog.OpenChangeDetails) => setIsOpen(details.open), []);
+
+  return (
+    <Dialog.Root open={isOpen} onFocusOutside={onFocusOutside} onOpenChange={handleOpenChange}>
+      <Portal>
+        <Dialog.Positioner>
+          <Dialog.Content aria-label="Modal">
+            <button type="button">Inside</button>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
+  );
+};
+
 const getDialog = (label: string) => document.querySelector<HTMLElement>(`[role="dialog"][aria-label="${label}"]`);
 const getButton = (dialog: HTMLElement, text: string) =>
   [...dialog.querySelectorAll('button')].find((button) => button.textContent === text)!;
@@ -128,5 +146,30 @@ describe('Dialog', () => {
     await act(() => userEvent.click(document.body, { position: { x: 4, y: 4 } }));
 
     await expect.poll(() => parent.getAttribute('data-state')).toBe('closed');
+  });
+
+  it('still tells the caller when focus lands outside a modal dialog, which stays open', async () => {
+    const onFocusOutside = vi.fn();
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root!.render(
+        <ChakraProvider value={system}>
+          <button type="button">Outside</button>
+          <ModalWithFocusOutside onFocusOutside={onFocusOutside} />
+        </ChakraProvider>
+      )
+    );
+    const dialog = getDialog('Modal')!;
+    await expect.poll(() => dialog.getAttribute('data-state')).toBe('open');
+    // The outside handling is set up in the frame after the dialog opens.
+    await act(() => sleep(50));
+
+    await act(() => host!.querySelector('button')!.focus());
+
+    await expect.poll(() => onFocusOutside.mock.calls.length).toBe(1);
+    await act(() => sleep(50));
+    expect(dialog.getAttribute('data-state')).toBe('open');
   });
 });
