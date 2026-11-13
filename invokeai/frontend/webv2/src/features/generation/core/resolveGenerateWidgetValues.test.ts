@@ -89,6 +89,15 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
   });
 
+  it("starts a new project with the first model's default VAE, though the VAE belongs to another base", () => {
+    const vae = { base: 'flux2', key: 'flux2-vae', latent_channels: 32, name: 'flux2-vae_small', type: 'vae' };
+    const moss = createModel('moss', { base: 'moss-image', default_settings: { vae: vae.key } });
+    const result = resolveGenerateWidgetValues({ models: [moss, vae], storedValues: {} });
+
+    expect(result?.values.vae).toMatchObject({ key: vae.key });
+    expect(result?.systemPatch).toMatchObject({ vae: { key: vae.key } });
+  });
+
   it('reads dynamic prompts as on for a project saved before the toggle, without writing the flag in', () => {
     const model = createModel('current');
     const { dynamicPromptsEnabled: _absent, ...storedValues } = createValues(model);

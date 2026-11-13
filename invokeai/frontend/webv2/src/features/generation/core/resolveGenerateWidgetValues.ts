@@ -3,7 +3,7 @@ import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
 import type { GenerationModelCatalogItem } from './contracts';
 import type { PromptTemplateSnapshot } from './promptTemplates';
-import type { GenerateWidgetValues } from './types';
+import type { GenerateModelConfig, GenerateWidgetValues } from './types';
 
 import {
   getAutoFlux2ComponentSourceModel,
@@ -13,7 +13,10 @@ import {
 } from './baseGenerationPolicies';
 import { syncPromptTemplateWithCatalog } from './promptTemplates';
 import {
+  getModelDefaultVae,
+  hasModelDefaultVae,
   isGenerateWidgetValues,
+  isVaeModelConfig,
   isSameModelFile,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
@@ -67,6 +70,15 @@ const createSystemPatch = (values: GenerateWidgetValues): Partial<GenerateWidget
   return systemPatch;
 };
 
+/** First-run settings carry the model's default VAE too, which Model Manager's default settings promise a new project. */
+const getFirstRunSettings = (model: GenerateModelConfig, models: readonly GenerationModelCatalogItem[]) => {
+  const settings = getDefaultGenerateSettings(model);
+
+  return hasModelDefaultVae(model)
+    ? { ...settings, vae: getModelDefaultVae(model, models.filter(isVaeModelConfig)) }
+    : settings;
+};
+
 /** This resolver owns reconciliation; applying systemPatch must reach a fixed point. */
 export const resolveGenerateWidgetValues = ({
   models,
@@ -106,7 +118,7 @@ export const resolveGenerateWidgetValues = ({
   const baseValues: GenerateWidgetValues = canReuseStoredValues
     ? storedValues
     : {
-        ...(normalizedSettings ?? getDefaultGenerateSettings(selectedModel)),
+        ...(normalizedSettings ?? getFirstRunSettings(selectedModel, models)),
         model: selectedModel,
       };
 
