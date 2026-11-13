@@ -875,6 +875,18 @@ describe('GraphPreviewDialog', () => {
   });
 
   it('widens every chip for its longest title where the stage has the room', async () => {
+    // Keep the title between the minimum and maximum chip widths, independent of the host's fonts and root size.
+    const typography = document.createElement('style');
+    typography.textContent = ':root { font-size: 16px !important; --chakra-fonts-body: monospace; }';
+    document.head.append(typography);
+    onTestFinished(() => typography.remove());
+    templatesSnapshotRef.current = {
+      ...TEMPLATES_SNAPSHOT,
+      templates: {
+        ...TEMPLATES_SNAPSHOT.templates,
+        sdxl_compel: { ...TEMPLATES_SNAPSHOT.templates.sdxl_compel!, title: 'Positive Conditioning' },
+      },
+    };
     await resizeViewport(1288, 942);
     const graph: WorkflowPreviewGraph = {
       edges: [
