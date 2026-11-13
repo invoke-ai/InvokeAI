@@ -2288,13 +2288,14 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
   });
 
   it('shows waiting status without hiding selected media or its drag grip while a workflow run is pending', async () => {
+    await import('@platform/ui/video-player/VideoPlayer');
     const selectedVideo = {
       boardId: 'none',
       category: 'general',
       createdAt: '2026-11-13T00:00:00Z',
       durationSeconds: 4,
       fps: 24,
-      fullUrl: 'data:video/mp4;base64,AAAA',
+      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
       height: 576,
       isIntermediate: false,
       kind: 'video' as const,
@@ -2319,7 +2320,17 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
       );
     });
 
-    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe('common.status.waiting');
+    await vi.waitFor(
+      async () => {
+        await act(() => Promise.resolve());
+        expect(host.querySelector('video')).not.toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+
+    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe(
+      i18n.t('common.status.waiting')
+    );
     expect(host.querySelector('[data-testid="current-image-media-drag-grip"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="current-image-copy-video-frame"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
