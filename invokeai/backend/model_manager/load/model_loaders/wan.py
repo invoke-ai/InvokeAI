@@ -12,8 +12,9 @@ Currently covers:
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
+from itertools import chain
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import torch
 
@@ -30,10 +31,12 @@ from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_G
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
-    _dequantize_comfyui_fp8,
     _strip_quantization_metadata,
+    fold_comfyui_fp8_scale,
+    reject_layers_the_fold_cannot_decode,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -48,8 +51,11 @@ from invokeai.backend.model_manager.util.llamacpp_t5 import (
     make_feed_forward_gguf_safe,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    COMFY_QUANT_SUFFIX,
     is_scale_metadata_key,
+    iter_weight_scale_pairs,
     parse_quantization_metadata,
+    predict_cast_state_dict_size,
     read_safetensors_metadata,
     strip_layer_path_prefix,
 )
@@ -127,6 +133,7 @@ class WanDiffusersModel(GenericDiffusersLoader):
         except TypeError:
             # Older diffusers releases use torch_dtype instead of dtype.
             result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
+        _copy_tensors_left_on_the_mapping(result, torch.bfloat16)
 
         # This override exists to force bfloat16, and in doing so it replaced the parent's whole
         # `_load_model` -- including the cast at `GenericDiffusersLoader._load_model`, which every
@@ -134,6 +141,29 @@ class WanDiffusersModel(GenericDiffusersLoader):
         # and silently did nothing. The weights here are the same `WanTransformer3DModel` the
         # single-file path casts.
         return self._apply_fp8_layerwise_casting(result, config, submodel_type)
+
+
+def _copy_tensors_left_on_the_mapping(model: Any, dtype: torch.dtype) -> None:
+    """Give memory of their own to the tensors ``from_pretrained`` kept off ``dtype`` that still read the file's.
+
+    ``from_pretrained`` memory-maps each shard and casts tensor by tensor; a tensor whose cast is a no-op stays a
+    view of the mapping, and a view keeps its whole shard mapped. At ``dtype`` those views are the model's own
+    weights, and mapping them is how a bf16 folder loads without a copy, so they stay. Off ``dtype`` they are what
+    ``_keep_in_fp32_modules`` (norms, modulation tables, the time embedder) leaves in float32 when the file is
+    float32: a few MB per shard, each holding a multi-GB shard whose other tensors were all cast away. The A14B
+    experts ship float32, and one would hold 80 GB of working set against its 27 GB bf16 size. Copied, the mapping is
+    released with its last view, for a transient the size of the copies.
+
+    The test is ``resizable()``, which is False for a storage torch did not allocate itself -- here, the views of the
+    mapping; it does not mean "mapped" in general. It skips what the load already copied: a bf16 file whose
+    ``_keep_in_fp32_modules`` are stored in bf16 has them upcast by the load, and a second copy would buy nothing.
+    """
+    if not isinstance(model, torch.nn.Module):
+        return
+    with torch.no_grad():
+        for tensor in chain(model.parameters(), model.buffers()):
+            if tensor.device.type == "cpu" and tensor.dtype != dtype and not tensor.untyped_storage().resizable():
+                tensor.data = tensor.data.clone()
 
 
 # Native (upstream) -> Diffusers key rename rules.
@@ -226,11 +256,11 @@ def _drop_benign_extra_keys(sd: dict, source: str, logger: Any) -> None:
     """Remove packaging weights the transformer has no use for, in place.
 
     Done up front rather than left to ``load_state_dict(strict=False)`` because
-    everything between here and there costs real memory: the fp8 dequant pass, the
-    blanket cast to the compute dtype, and the RAM-cache reservation all run over the
-    whole dict. An all-in-one checkpoint bundles a full VAE and UMT5-XXL text encoder —
-    several GB, upcast to bf16 and reserved in the cache — only for
-    ``load_state_dict`` to discard them one line later.
+    everything between here and there costs real memory: the read, the fp8 dequant pass,
+    the cast to the compute dtype, and the RAM-cache reservation. An all-in-one checkpoint
+    bundles a full VAE and UMT5-XXL text encoder — several GB, upcast to bf16 and reserved
+    in the cache — only for ``load_state_dict`` to discard them. The single-file loader
+    runs this over the header, so what it drops is never read.
     """
     dropped = [key for key in sd if isinstance(key, str) and _is_benign_extra_key(key)]
     if not dropped:
@@ -427,6 +457,37 @@ class WanGGUFCheckpointModel(ModelLoader):
         return model
 
 
+def _predict_folded_cast_size(sd: dict, dtype: torch.dtype) -> int:
+    """Bytes the state dict occupies once the scale fold and the cast to ``dtype`` have run.
+
+    The fold consumes and strips the scale tensors, and it widens every weight that has a sibling
+    scale to ``dtype`` whatever its stored dtype, so those are charged at ``dtype`` too.
+    """
+    kept = {k: v for k, v in sd.items() if not is_scale_metadata_key(k)}
+    folded = {weight_key for weight_key, _ in iter_weight_scale_pairs(sd)}
+    total = predict_cast_state_dict_size({k: v for k, v in kept.items() if k not in folded}, dtype, keep_fp8=False)
+    return total + sum(kept[k].nelement() * dtype.itemsize for k in folded)
+
+
+def _read_folded_and_cast(sd: dict[str, torch.Tensor], read: Callable[[str], torch.Tensor], dtype: torch.dtype) -> int:
+    """Fill ``sd``'s header entries from ``read`` one tensor at a time, each converted as it arrives.
+
+    A ComfyUI weight scale is folded into its weight and dropped with the rest of the quantization metadata;
+    every other float tensor is cast to ``dtype``. Converted on arrival, the peak is the finished state dict plus
+    the tensor in flight rather than the whole source. Returns the number of folds.
+    """
+    scales = dict(iter_weight_scale_pairs(sd))
+    _strip_quantization_metadata(sd)
+    for key in sd:
+        tensor = read(key)
+        if key in scales:
+            tensor = fold_comfyui_fp8_scale(tensor, read(scales[key]), key, dtype)
+        elif tensor.is_floating_point():
+            tensor = tensor.to(dtype)
+        sd[key] = tensor
+    return len(scales)
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class WanCheckpointModel(ModelLoader):
     """Loader for single-file Wan 2.2 transformer checkpoints (safetensors).
@@ -463,7 +524,7 @@ class WanCheckpointModel(ModelLoader):
     def _load_from_singlefile(self, config: Main_Checkpoint_Wan_Config) -> AnyModel:
         import accelerate
         from diffusers import WanTransformer3DModel
-        from safetensors.torch import load_file
+        from safetensors import safe_open
 
         from invokeai.backend.util.logging import InvokeAILogger
 
@@ -473,78 +534,85 @@ class WanCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(str(model_path))
-        sd = CheckpointPrefix.detect(sd).strip(sd)
+        # Everything up to the read -- the prefix, what is dropped, how the file is quantized, the reservation -- is
+        # decided on the header's `meta` tensors, so a bundled VAE or text encoder is never read and the cache makes
+        # room before the first payload arrives.
+        sd = safetensors_meta_state_dict(model_path)
+        prefix = CheckpointPrefix.detect(sd)
+        file_keys = prefix.strip({key: key for key in sd})
+        sd = prefix.strip(sd)
         _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
 
-        # Markers and header entries name their layers in the file's native key space, so they are read before
-        # any rename. The refusal sits outside the "found markers" branch on purpose: an int8 weight no marker
-        # claims must be refused, not cast to the compute dtype as raw codes.
-        header_layers = strip_layer_path_prefix(
-            parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
-        )
-        int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
-        reject_unmarked_int8_weights(sd, int8_markers, f"Wan 2.2 ({model_path.name})", header_layers=header_layers)
+        # pread gives every tensor memory of its own. Through the default mmap each one is a slice of one file-wide
+        # mapping, and a tensor whose cast is a no-op (bf16 on disk) would keep the whole file mapped.
+        with safe_open(str(model_path), framework="pt", device="cpu", backend="pread") as f:
 
-        dequantized = 0
-        if int8_markers:
-            sd = drop_unconsumed_quantization_sidecars(sd)
-        else:
-            dequantized = _dequantize_comfyui_fp8(sd, model_dtype, f"Wan checkpoint {model_path.name}")
-            if dequantized > 0:
-                logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
-            # Drop the scale tensors themselves — they've been folded into the weights
-            # above and are not parameters of WanTransformer3DModel. load_state_dict
-            # runs with strict=False and would ignore them anyway, but dropping them
-            # here keeps the dtype cast and the RAM-cache reservation below honest.
-            _strip_quantization_metadata(sd)
+            def read(key: str) -> torch.Tensor:
+                return f.get_tensor(file_keys[key])
 
-        # Community releases ship the native upstream Wan key layout
-        # (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
-        # diffusers' WanTransformer3DModel expects condition_embedder.*,
-        # attn1/attn2, ffn.net.*, proj_out. Convert if needed.
-        key_map: dict[str, str] = {}
-        if _is_native_wan_layout(sd):
-            key_map = {key: _rename_wan_native_key(key) for key in sd if isinstance(key, str)}
-            sd = _convert_wan_native_to_diffusers(sd)
+            # The markers are the one payload the decisions below look at.
+            for key in [k for k in sd if k.endswith(COMFY_QUANT_SUFFIX)]:
+                sd[key] = read(key)
 
-        model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
-
-        with accelerate.init_empty_weights():
-            model = WanTransformer3DModel(**model_config)
-
-        if int8_markers:
-            # Casts only the dense tensors: the blanket cast below would also cast the fp32 scales. The skip
-            # patterns match diffusers names, hence after the rename; `condition_embedder` reads its dtype from
-            # a parameter, which an int8 layer does not have, so it is widened here.
-            quantized = install_int8_convrot_layers(
-                model,
-                sd,
-                resolve_quantized_module_paths(int8_markers, key_map),
-                model_dtype,
-                architecture="Wan 2.2",
-                reserve=self._ram_cache.make_room,
-                skip_patterns=_model_declared_skip_patterns(model),
+            # Markers and header entries name their layers in the file's native key space, so they are read before
+            # any rename. The refusal sits outside the "found markers" branch on purpose: an int8 weight no marker
+            # claims must be refused, not cast to the compute dtype as raw codes.
+            header_layers = strip_layer_path_prefix(
+                parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
             )
-            # Metadata the fp8 branch strips: a stray `scaled_fp8` flag, or a weight scale beside a dense weight.
-            # Left in, `_raise_for_incompatible_keys` would blame it on an Animate/S2V variant. Dropped after the
-            # install, whose foreign-scale check has to see (and refuse) a scale that sits on an fp8 weight.
-            for key in [k for k in sd if is_scale_metadata_key(k) and k.rsplit(".", 1)[0] not in quantized]:
-                del sd[key]
-            logger.info(
-                f"Wan 2.2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
-                "(int8_tensorwise checkpoint, dequantized per forward)"
-            )
-        else:
-            # Cast every float tensor to the compute dtype. Dequantized fp8_scaled
-            # weights are already there; this catches plain fp16/fp32/fp8 checkpoints
-            # and makes the cache reservation below reflect the post-cast sizes.
-            for key in list(sd.keys()):
-                if sd[key].is_floating_point():
-                    sd[key] = sd[key].to(model_dtype)
+            int8_markers = extract_int8_convrot_markers(sd, header_layers=header_layers)
+            reject_unmarked_int8_weights(sd, int8_markers, f"Wan 2.2 ({model_path.name})", header_layers=header_layers)
 
-            new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
-            self._ram_cache.make_room(new_sd_size)
+            dequantized = 0
+            if int8_markers:
+                # Still the header's tensors: `install_int8_convrot_layers` reads them once it has reserved.
+                sd = drop_unconsumed_quantization_sidecars(sd)
+            else:
+                reject_layers_the_fold_cannot_decode(sd, f"Wan checkpoint {model_path.name}")
+                # Before the first read: the reservation is the state dict after the fold and the cast.
+                self._ram_cache.make_room(_predict_folded_cast_size(sd, model_dtype))
+                dequantized = _read_folded_and_cast(sd, read, model_dtype)
+                if dequantized > 0:
+                    logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
+
+            # Community releases ship the native upstream Wan key layout
+            # (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
+            # diffusers' WanTransformer3DModel expects condition_embedder.*,
+            # attn1/attn2, ffn.net.*, proj_out. Convert if needed.
+            key_map: dict[str, str] = {}
+            if _is_native_wan_layout(sd):
+                key_map = {key: _rename_wan_native_key(key) for key in sd if isinstance(key, str)}
+                sd = _convert_wan_native_to_diffusers(sd)
+                file_keys = _convert_wan_native_to_diffusers(file_keys)
+
+            model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
+
+            with accelerate.init_empty_weights():
+                model = WanTransformer3DModel(**model_config)
+
+            if int8_markers:
+                # Casts only the dense tensors: the blanket cast below would also cast the fp32 scales. The skip
+                # patterns match diffusers names, hence after the rename; `condition_embedder` reads its dtype from
+                # a parameter, which an int8 layer does not have, so it is widened here.
+                quantized = install_int8_convrot_layers(
+                    model,
+                    sd,
+                    resolve_quantized_module_paths(int8_markers, key_map),
+                    model_dtype,
+                    architecture="Wan 2.2",
+                    reserve=self._ram_cache.make_room,
+                    skip_patterns=_model_declared_skip_patterns(model),
+                    read=read,
+                )
+                # Metadata the fp8 branch strips: a stray `scaled_fp8` flag, or a weight scale beside a dense weight.
+                # Left in, `_raise_for_incompatible_keys` would blame it on an Animate/S2V variant. Dropped after the
+                # install, whose foreign-scale check has to see (and refuse) a scale that sits on an fp8 weight.
+                for key in [k for k in sd if is_scale_metadata_key(k) and k.rsplit(".", 1)[0] not in quantized]:
+                    del sd[key]
+                logger.info(
+                    f"Wan 2.2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                    "(int8_tensorwise checkpoint, dequantized per forward)"
+                )
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
