@@ -45,6 +45,7 @@ from invokeai.app.services.image_index.projection import (
 )
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+from invokeai.app.util.ssrf import UnsafeDownloadURLException, build_guarded_session, validate_download_url
 from invokeai.backend.util.host_platform import is_windows_arm64
 
 image_map_router = APIRouter(prefix="/v1/image_map", tags=["image_map"])
@@ -742,36 +743,19 @@ _download_slots = asyncio.Semaphore(4)
 
 def _assert_url_host_allowed(url: str) -> None:
     """Reject URLs whose scheme is not http(s) or whose host resolves to any
-    non-global address (loopback, RFC1918, link-local, reserved).
+    non-public address (loopback, RFC1918, link-local, reserved, NAT64).
 
-    Resolving via getaddrinfo covers hostnames like 'localhost' and the
-    non-canonical IP notations (decimal, hex, octal, shortened) that a plain
-    ip_address() literal parse misses. DNS rebinding between this check and
-    the actual request is accepted residual risk: the endpoint is
-    authenticated, and nothing about the response is revealed beyond whether
-    it decoded as an image.
+    This is the cheap up-front check, delegated to the shared SSRF guard. The
+    session from build_guarded_session() re-checks the connected peer, which is
+    what closes DNS rebinding between this check and the request.
     """
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="image_url must be an http(s) URL")
-
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
     try:
-        infos = socket.getaddrinfo(parsed.hostname, port, proto=socket.IPPROTO_TCP)
-    except OSError:
+        validate_download_url(url)
+    except UnsafeDownloadURLException:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="image_url host could not be resolved"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="image_url must be an http(s) URL that does not target a private or loopback address",
         )
-    for info in infos:
-        if not ipaddress.ip_address(info[4][0]).is_global:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="image_url must not target a private or loopback address",
-            )
 
 
 def _download_search_image(url: str) -> bytes:
@@ -785,8 +769,6 @@ def _download_search_image(url: str) -> bytes:
     """
     import time
     from urllib.parse import urljoin
-
-    import requests
 
     deadline = time.monotonic() + _URL_TOTAL_DEADLINE_SECONDS
 
@@ -810,10 +792,16 @@ def _download_search_image(url: str) -> bytes:
         return left
 
     try:
+        # The guarded session ignores HTTP(S)_PROXY/ALL_PROXY and validates the address
+        # each socket actually connects to, so neither a proxy nor an address the
+        # up-front check misjudges can redirect the fetch to an internal host.
         for _ in range(_URL_MAX_REDIRECTS + 1):
             _assert_url_host_allowed(url)
             hop_timeout = min(_URL_TIMEOUT_SECONDS, _remaining())
-            with requests.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response:
+            with (
+                build_guarded_session() as session,
+                session.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response,
+            ):
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
