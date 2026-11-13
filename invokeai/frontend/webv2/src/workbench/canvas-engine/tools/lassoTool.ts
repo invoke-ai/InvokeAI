@@ -1,6 +1,6 @@
 /**
- * Freehand lasso gathers decimated drag points; polygon lasso spans clicks and closes on double-click, Enter or
- * first-vertex proximity. Both commit through `commitSelection` with shared modifier/persistent-op resolution.
+ * Freehand lasso keeps drag corners, coalescing only exact straight runs. Polygon lasso spans clicks and closes on
+ * double-click, Enter or first-vertex proximity. Both commit through `commitSelection` with shared modifier/persistent-op resolution.
  * Previews never dispatch. Temporary tool switches preserve polygon sessions; real switches cancel them. Selection
  * history is owned by the engine wrapper.
  */
@@ -12,27 +12,35 @@ import { selectionOpFor } from '@workbench/canvas-engine/selection/selectionOpMo
 
 import type { Tool, ToolContext } from './tool';
 
-import {
-  extendFreehandTrace,
-  finishFreehandTrace,
-  MIN_POLYLINE_POINTS,
-  movePolyline,
-  polylinePreview,
-  pressPolyline,
-  startFreehandTrace,
-  startPolyline,
-  type FreehandTrace,
-  type PolylineSession,
-} from './polylineSession';
+import { movePolyline, polylinePreview, pressPolyline, startPolyline, type PolylineSession } from './polylineSession';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
+/** Keep subpixel corners and winding; only redundant points on a forward straight run may be dropped. */
+const appendFreehandPoint = (points: Vec2[], point: Vec2): void => {
+  const last = points[points.length - 1];
+  if (last && last.x === point.x && last.y === point.y) {
+    return;
+  }
+  const previous = points[points.length - 2];
+  if (previous && last) {
+    const dx = last.x - previous.x;
+    const dy = last.y - previous.y;
+    const nextDx = point.x - last.x;
+    const nextDy = point.y - last.y;
+    if (dx * nextDy === dy * nextDx && dx * nextDx + dy * nextDy > 0) {
+      points[points.length - 1] = { x: point.x, y: point.y };
+      return;
+    }
+  }
+  points.push({ x: point.x, y: point.y });
+};
 
 /** A freehand drag in progress. */
-interface FreehandSession extends FreehandTrace {
+interface FreehandSession {
   kind: 'freehand';
+  points: Vec2[];
 }
 
 /** A polygon vertex-placing session spanning multiple clicks. */
@@ -69,13 +77,20 @@ export const createLassoTool = (): Tool => {
 
   /** Commits `polygon` as a selection under the modifiers held at close time. */
   const commit = (ctx: ToolContext, polygon: readonly Vec2[], modifiers: { shift: boolean; alt: boolean }): void => {
-    const bounds = polygonBounds(polygon);
-    // A double-click's second press lands on the previous vertex, so count
-    // distinct points; and a flat polygon would select a line of nothing.
-    const distinct = polygon.filter((point, index) => index === 0 || distance(point, polygon[index - 1]!) >= 1);
-    if (distinct.length < MIN_POLYLINE_POINTS || bounds.width < 1 || bounds.height < 1 || !ctx.commitSelection) {
+    const first = polygon[0];
+    const second = polygon.find((point) => point.x !== first?.x || point.y !== first?.y);
+    // A line has no fill, but signed area alone would also reject valid self-crossing outlines.
+    if (
+      !first ||
+      !second ||
+      !polygon.some(
+        (point) => (second.x - first.x) * (point.y - first.y) !== (second.y - first.y) * (point.x - first.x)
+      ) ||
+      !ctx.commitSelection
+    ) {
       return;
     }
+    const bounds = polygonBounds(polygon);
     ctx.commitSelection({
       bounds,
       op: selectionOpFor(modifiers, ctx.stores.lassoOptions.get().mode),
@@ -139,7 +154,7 @@ export const createLassoTool = (): Tool => {
         if (session) {
           return;
         }
-        session = { ...startFreehandTrace(input), kind: 'freehand' };
+        session = { kind: 'freehand', points: [{ ...input.documentPoint }] };
         publishPreview(ctx);
         return;
       }
@@ -169,7 +184,9 @@ export const createLassoTool = (): Tool => {
           ctx.updateCursor();
         }
       } else {
-        extendFreehandTrace(session, batch);
+        for (const sample of batch) {
+          appendFreehandPoint(session.points, sample.documentPoint);
+        }
       }
       publishPreview(ctx);
     },
@@ -179,7 +196,8 @@ export const createLassoTool = (): Tool => {
       if (!session || session.kind === 'polygon') {
         return;
       }
-      const polygon = finishFreehandTrace(session, input);
+      appendFreehandPoint(session.points, input.documentPoint);
+      const polygon = session.points;
       reset();
       clearPreview(ctx);
       commit(ctx, polygon, input.modifiers);

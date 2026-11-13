@@ -117,33 +117,65 @@ describe('lassoTool: cancel + guards', () => {
     expect(commits).toHaveLength(0);
   });
 
-  it('decimates by on-screen travel, stores document points, and always keeps the release point', () => {
-    const at = (x: number, y: number, zoom: number): PointerInput => ({
+  it.each([
+    [1, 1, 1],
+    [10, 10, 0.1],
+    [0.5, 0.5, 10],
+    [8, 0.25, 1],
+  ])('keeps a %s by %s outline at %sx zoom', (width, height, zoom) => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    const at = (x: number, y: number): PointerInput => ({
       ...pointer(x, y),
       screenPoint: { x: x * zoom, y: y * zoom },
     });
-    // Zoomed in 10×: half-pixel document steps are 5 CSS px apart and all survive.
-    const zoomedIn = createLassoTool();
-    const near = createHarness();
-    down(zoomedIn, near.ctx, at(0, 0, 10));
-    move(zoomedIn, near.ctx, at(0.5, 0, 10));
-    move(zoomedIn, near.ctx, at(0.5, 0.5, 10));
-    expect(near.stores.lassoPreview.get()?.points).toEqual([
-      { x: 0, y: 0 },
-      { x: 0.5, y: 0 },
-      { x: 0.5, y: 0.5 },
-    ]);
+    down(tool, ctx, at(0, 0));
+    move(tool, ctx, at(width, 0));
+    move(tool, ctx, at(width, height));
+    move(tool, ctx, at(0, height));
+    up(tool, ctx, at(0, 0));
 
-    // Zoomed out 10×: 10-unit document steps are 1 CSS px apart and decimate away, but the release point stays.
-    const zoomedOut = createLassoTool();
-    const far = createHarness();
-    down(zoomedOut, far.ctx, at(0, 0, 0.1));
-    move(zoomedOut, far.ctx, at(10, 0, 0.1));
-    expect(far.stores.lassoPreview.get()?.points).toHaveLength(1);
-    move(zoomedOut, far.ctx, at(40, 0, 0.1));
-    move(zoomedOut, far.ctx, at(40, 40, 0.1));
-    up(zoomedOut, far.ctx, at(41, 40, 0.1));
-    expect(far.commits[0]?.bounds).toEqual({ height: 40, width: 41, x: 0, y: 0 });
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.bounds).toEqual({ height, width, x: 0, y: 0 });
+  });
+
+  it('coalesces repeated and forward collinear samples without losing reversals or thin corners', () => {
+    const tool = createLassoTool();
+    const { commits, ctx, stores } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    for (let step = 0; step <= 1000; step++) {
+      move(tool, ctx, pointer(step / 10, 0));
+    }
+    expect(stores.lassoPreview.get()?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    move(tool, ctx, pointer(90, 0));
+    move(tool, ctx, pointer(90, 0.25));
+    up(tool, ctx, pointer(0, 0.25));
+
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.path).toEqual({ d: 'M 0 0 L 100 0 L 90 0 L 90 0.25 L 0 0.25 Z' });
+  });
+
+  it('commits a self-crossing outline even when its signed areas cancel', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    move(tool, ctx, pointer(1, 1));
+    move(tool, ctx, pointer(0, 1));
+    move(tool, ctx, pointer(1, 0));
+    up(tool, ctx, pointer(0, 0));
+    expect(commits).toHaveLength(1);
+  });
+
+  it('does not commit a diagonal line with three distinct vertices', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    move(tool, ctx, pointer(2, 2));
+    up(tool, ctx, pointer(4, 4));
+    expect(commits).toHaveLength(0);
   });
 });
 
@@ -201,6 +233,17 @@ describe('lassoTool: polygon mode', () => {
     expect(commits).toHaveLength(1);
     expect(commits[0]!.bounds).toEqual({ height: 40, width: 40, x: 0, y: 0 });
     expect(stores.lassoPreview.get()).toBeNull();
+  });
+
+  it('commits subpixel polygon vertices on Enter', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createPolygonHarness();
+    click(tool, ctx, 0, 0, 0);
+    click(tool, ctx, 0.5, 0, 1000);
+    click(tool, ctx, 0.5, 0.5, 2000);
+    tool.onKeyCommand?.(ctx, 'apply');
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.bounds).toEqual({ height: 0.5, width: 0.5, x: 0, y: 0 });
   });
 
   it('arms the close cue and pointer cursor while the cursor hovers the first vertex', () => {
