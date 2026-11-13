@@ -282,6 +282,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
         ) : null}
         {layout === 'list' ? (
           <WorkflowLibraryList
+            isActive={isOpen}
             key={`${authSession.user?.user_id}:${viewKey}`}
             window={browseWindow}
             removedWorkflowId={removedWorkflowId}

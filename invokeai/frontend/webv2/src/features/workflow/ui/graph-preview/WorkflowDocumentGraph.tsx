@@ -357,6 +357,7 @@ const PillLabel = ({ pill }: { pill: WorkflowPreviewPill }) => {
       {pill.label}
       {pill.value ? (
         <chakra.span color="fg" ms="1">
+          {' '}
           {formatWorkflowPreviewValue(pill.value, t)}
         </chakra.span>
       ) : null}
@@ -390,7 +391,7 @@ const PreviewChip = memo(function PreviewChip({ id, data }: NodeProps<ChipNode>)
               rounded="full"
               truncate
             >
-              <PillLabel pill={pill} />
+              <PillLabel pill={pill} />{' '}
             </Box>
           ))}
         </Stack>
@@ -419,7 +420,7 @@ const PreviewChip = memo(function PreviewChip({ id, data }: NodeProps<ChipNode>)
           lineHeight="1.2"
           truncate
         >
-          {node.title}
+          {node.title}{' '}
         </Text>
         {node.isUnknown || summary || node.isExposed || needsModel || node.isResult ? (
           <HStack color={node.isUnknown ? 'fg.error' : 'fg.muted'} fontSize="xs" gap="1" lineHeight="1.2" minW="0">
@@ -906,24 +907,20 @@ const getNodeName = (
   node: WorkflowPreviewNode,
   needsModel: boolean,
   pills: readonly WorkflowPreviewPill[],
+  summary: string | null,
   t: TFunction
 ) =>
   [
+    ...pills.map((pill) => (pill.value ? `${pill.label} ${formatWorkflowPreviewValue(pill.value, t)}` : pill.label)),
     node.title,
+    summary,
     node.isUnknown ? t('workflowLibrary.preview.unknownNodeMarker') : null,
     node.isExposed ? t('workflowLibrary.preview.youSetThisInline') : null,
     needsModel ? t('workflowLibrary.preview.needsModelInline') : null,
     node.isResult ? t('workflowLibrary.preview.resultInline') : null,
-    pills.length > 0
-      ? t('workflowLibrary.preview.withHelpers', {
-          helpers: pills
-            .map((pill) => (pill.value ? `${pill.label} ${formatWorkflowPreviewValue(pill.value, t)}` : pill.label))
-            .join(', '),
-        })
-      : null,
   ]
     .filter((part) => part !== null)
-    .join(', ');
+    .join(' ');
 
 /** `next`, with each item that equals its predecessor of the same id replaced by that predecessor. */
 const keepUnchanged = <Item extends { id: string }>(
@@ -1065,12 +1062,13 @@ const GraphView = ({
         const node = model.nodes.get(id)!;
         const pills = layout.pills[id] ?? NO_PILLS;
         const nodeNeedsModel = needsModel.has(id);
+        const summary = getChipSummary(node, nodeNeedsModel, t);
 
         return {
-          ariaLabel: getNodeName(node, nodeNeedsModel, pills, t),
+          ariaLabel: getNodeName(node, nodeNeedsModel, pills, summary, t),
           ariaRole: 'button',
           connectable: false,
-          data: { needsModel: nodeNeedsModel, node, pills, summary: getChipSummary(node, nodeNeedsModel, t) },
+          data: { needsModel: nodeNeedsModel, node, pills, summary },
           draggable: false,
           height: NODE_HEIGHT,
           id,

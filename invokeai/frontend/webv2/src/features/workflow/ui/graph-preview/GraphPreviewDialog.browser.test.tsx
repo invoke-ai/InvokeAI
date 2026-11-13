@@ -18,6 +18,7 @@ import {
 } from '@features/workflow/ui/library/useWorkflowPublication';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph } from '@features/workflow/utility';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -159,7 +160,6 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.aboutThisGraph': 'About this graph',
   'graphPreview.cannotInvoke': "Can't invoke yet",
   'graphPreview.editAsWorkflow': 'Edit as workflow',
-  'graphPreview.invokeRouteBatch': 'Invoke {{route}} ×{{count}}',
   'graphPreview.readyToInvoke': 'Ready to invoke',
   'workflowLibrary.preview.graph': 'Graph',
   'workflowLibrary.preview.graphJson': 'Graph JSON',
@@ -174,7 +174,6 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.forkIntoProjectFailed': 'No nodes to fork into a project.',
   'graphPreview.graphJsonCopied': 'Graph JSON copied',
   'graphPreview.invalidTitle': "This graph can't compile yet.",
-  'graphPreview.invokeRoute': 'Invoke {{route}}',
   'graphPreview.liveHint': 'Updates as you change settings.',
   'graphPreview.more': 'More',
   'graphPreview.noCompiledGraph': 'No compiled graph is available for "{{graphId}}" yet.',
@@ -603,8 +602,8 @@ describe('GraphPreviewDialog', () => {
 
     // The seed primitive folds into a pill on the denoiser, showing what runs rather than the compiled placeholder.
     expect(drawnNodeIds()).toEqual(['denoise_latents', 'l2i']);
-    expect(previewNode('denoise_latents')?.querySelector('[data-preview-pill="seed"]')?.textContent).toBe(
-      'Integer Primitiveregenerated each run'
+    expect(previewNode('denoise_latents')?.querySelector('[data-preview-pill="seed"]')?.textContent?.trim()).toBe(
+      'Integer Primitive regenerated each run'
     );
     // The steps came from a setting: the node is marked as set; the decoder is what the graph makes.
     expect(previewNode('denoise_latents')?.querySelector('[data-marker="exposed"]')).not.toBeNull();
@@ -866,13 +865,25 @@ describe('GraphPreviewDialog', () => {
     expectClear('[data-preview-legend]');
 
     await clickButtonWithText('workflowLibrary.preview.fit', stage()!);
-    await act(async () => {
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 300);
-      });
-    });
     // Fitted: the whole graph in the stage's open area, clear of every control.
-    expectClear('[data-preview-overlay]');
+    await vi.waitFor(() => expectClear('[data-preview-overlay]'));
+  });
+
+  it('exposes the preview controls and drawn nodes with accessible names', async () => {
+    const wasDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.add('dark');
+    onTestFinished(() => {
+      if (!wasDark) {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+    await renderDialog(PLAIN_SOURCE);
+    await waitForGraph();
+    await settleOpening();
+    const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+    expect(await auditAccessibility(dialog, { rules: { 'label-content-name-mismatch': { enabled: true } } })).toEqual(
+      []
+    );
   });
 
   it('widens every chip for its longest title where the stage has the room', async () => {

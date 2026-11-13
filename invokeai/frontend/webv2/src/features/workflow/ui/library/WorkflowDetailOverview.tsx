@@ -1,7 +1,7 @@
 import type { ProjectGraphState } from '@features/workflow/core/types';
 import type { WorkflowPreviewModel } from '@features/workflow/core/workflowPreview';
 
-import { Badge, chakra, HStack, Kbd, Stack, type SystemStyleObject, Text } from '@chakra-ui/react';
+import { Badge, chakra, HStack, Stack, type SystemStyleObject, Text } from '@chakra-ui/react';
 import { buildWorkflowPreviewModel } from '@features/workflow/core/workflowPreview';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { Button } from '@platform/ui/Button';
@@ -191,7 +191,7 @@ const THUMBNAIL_BUTTON_CSS: SystemStyleObject = {
 
 /**
  * The rail thumbnail as the way into the preview: a press anywhere on it previews the workflow, and its corner names
- * the shortcut a selected card answers. Laid over the thumbnail, under any controls drawn after it.
+ * the action. Laid over the thumbnail, under any controls drawn after it.
  */
 export const WorkflowPreviewThumbnailButton = ({ name, onPreview }: { name: string; onPreview: () => void }) => {
   const { t } = useTranslation();
@@ -219,7 +219,6 @@ export const WorkflowPreviewThumbnailButton = ({ name, onPreview }: { name: stri
         rounded="md"
       >
         {t('workflowLibrary.preview.action')}
-        <Kbd size="md">{t('workflowLibrary.preview.spaceKey')}</Kbd>
       </HStack>
     </chakra.button>
   );

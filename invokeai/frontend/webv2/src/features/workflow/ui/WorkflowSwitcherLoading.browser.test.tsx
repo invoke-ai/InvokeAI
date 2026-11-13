@@ -3,11 +3,12 @@ import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext'
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { createProjectGraph } from '@features/workflow/utility';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { WorkflowUiProvider } from './WorkflowUiContext';
@@ -122,9 +123,15 @@ describe('the workflow switcher while its scrolling list loads', () => {
     });
 
   it('opens whole before its list loads, keeps its actions in place as the list arrives, and works throughout', async () => {
+    const wasDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.add('dark');
+    onTestFinished(() => {
+      document.documentElement.classList.toggle('dark', wasDark);
+    });
     await openMenu();
     expect(themedList()).toBeNull();
     expect(choices()).toEqual(['Text 2 Image', 'Upscale']);
+    expect(await auditAccessibility(menu()!)).toEqual([]);
     await act(() => userEvent.click(library()));
     expectLibraryOnThisProject();
     await vi.waitFor(() => expect(menu()).toBeNull());
@@ -135,6 +142,7 @@ describe('the workflow switcher while its scrolling list loads', () => {
     await act(() => scrollableChunk.release());
     await vi.waitFor(() => expect(themedList()).not.toBeNull(), { timeout: 8000 });
     expect(library().getBoundingClientRect().top).toBe(before);
+    expect(await auditAccessibility(menu()!)).toEqual([]);
     expect(menu()!.contains(document.activeElement)).toBe(true);
     await act(() => userEvent.click(library()));
     expectLibraryOnThisProject();

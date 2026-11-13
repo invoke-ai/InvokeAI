@@ -2124,7 +2124,7 @@
     "status": {
       "label": "Status: {{status}}",
       "running": "Running",
-      "runningProgress": "Running ({{percent}}%)",
+      "runningProgress": "Running ({{percent, number}}%)",
       "issueCount_one": "{{count}} field needs attention",
       "issueCount_other": "{{count}} fields need attention",
       "fieldRequired": "{{field}} is required.",
@@ -6731,6 +6731,7 @@
     }
   },
   "workflowLibrary": {
+    "dialogLoadFailed": "Could not load the workflow library.",
     "activeWorkflow": "Active",
     "applying": "Applying workflow…",
     "cardSize": "Card size",
@@ -6774,8 +6775,9 @@
     "placeShared": "Shared with me",
     "placeUser": "My library",
     "preview": {
+      "loadFailed": "Could not load the workflow preview.",
       "action": "Preview",
-      "actionHint": "Preview · Space",
+      "actionHint": "Preview",
       "atFirst": "This is the first workflow here",
       "atLast": "This is the last workflow here",
       "authorNotes": "Author's notes",
@@ -6819,7 +6821,7 @@
       "nodePackMissing": "Node pack missing",
       "nothingSelected": "No workflow is selected.",
       "pickAfterOpening": "Pick one after opening",
-      "position": "{{position}} of {{total}}",
+      "position": "{{position, number}} of {{total, number}}",
       "positionUnknown": "Its place in these results isn't loaded",
       "previewNamed": "Preview {{name}}",
       "previous": "Previous workflow",
@@ -7013,7 +7015,8 @@
     "projectCopies_one": "{{count, number}} copy",
     "projectCopies_other": "{{count, number}} copies",
     "projectCopiesNone": "None",
-    "projectCopyRevision": "1 copy · revision {{revision}}",
+    "projectCopyRevision_one": "{{count, number}} copy · revision {{revision, number}}",
+    "projectCopyRevision_other": "{{count, number}} copies · revision {{revision, number}}",
     "ranWhen": "Ran {{when}}",
     "readyToRun": "Ready to run",
     "templateNewer": "Template is newer",

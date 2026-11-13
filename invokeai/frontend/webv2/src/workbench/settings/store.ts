@@ -83,7 +83,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowGroupNodesByCategory: true,
   workflowLibraryCardSize: 'small',
   workflowLibraryLayout: 'grid',
-  workflowLibrarySort: 'opened',
+  workflowLibrarySort: 'updated',
   workflowLibrarySortDirection: 'desc',
   workflowLibraryThumbnailFit: 'cover',
   workflowShowMinimap: true,

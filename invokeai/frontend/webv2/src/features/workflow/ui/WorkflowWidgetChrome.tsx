@@ -1,7 +1,7 @@
 import type { InvocationTemplate, ProjectWorkflowSource, XYPosition } from '@features/workflow/contracts';
 import type * as ScrollableMenuModule from '@platform/ui/ScrollableMenuContent';
 
-import { Box, HStack, Icon, Menu, Portal, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Center, HStack, Icon, Menu, Portal, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
@@ -28,6 +28,9 @@ import { canCopyText } from '@platform/browser/clipboard';
 import { createDeferredModule } from '@platform/react/deferredModule';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
+import { CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
+import { LoadError } from '@platform/ui/LoadError';
 import { MenuActionItem, MenuContent, SCROLLABLE_MENU_CONTENT_PROPS } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useTooltipTriggerIds } from '@platform/ui/Tooltip';
@@ -56,18 +59,7 @@ import {
   TriangleAlertIcon,
   UploadIcon,
 } from 'lucide-react';
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ElementType,
-} from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
@@ -111,18 +103,67 @@ import {
  * library first opens; its entry points preload it on hover or focus so that opening feels immediate. A failed load
  * (an offline moment, a redeploy) retries on the next attempt.
  */
-let workflowLibraryDialogModule: Promise<typeof WorkflowLibraryDialogModule> | null = null;
-const loadWorkflowLibraryDialog = (): Promise<typeof WorkflowLibraryDialogModule> =>
-  (workflowLibraryDialogModule ??= import('./library/WorkflowLibraryDialog').catch((error: unknown) => {
-    workflowLibraryDialogModule = null;
-    throw error;
-  }));
-const preloadWorkflowLibraryDialog = (): void => {
-  void loadWorkflowLibraryDialog().catch(() => {});
+const workflowLibraryDialog = createDeferredModule(() => import('./library/WorkflowLibraryDialog'));
+const preloadWorkflowLibraryDialog = workflowLibraryDialog.preload;
+
+const handleLibraryPlaceholderOpenChange = ({ open }: { open: boolean }) => setWorkflowLibraryOpen(open);
+
+const WorkflowLibraryDialogLoader = ({ isOpen }: { isOpen: boolean }) => {
+  const { t } = useTranslation();
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  const renderDialog = useCallback(
+    (module: typeof WorkflowLibraryDialogModule) => (
+      <module.WorkflowLibraryDialog isOpen={isOpen} onOpenChange={setWorkflowLibraryOpen} />
+    ),
+    [isOpen]
+  );
+  const renderPlaceholder = useCallback(
+    (failed: boolean) => (
+      <Dialog.Root open={isOpen} onOpenChange={handleLibraryPlaceholderOpenChange}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>{t('workflowLibrary.title')}</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                {failed ? (
+                  <LoadError
+                    isRetrying={false}
+                    layout="state"
+                    message={t('workflowLibrary.dialogLoadFailed')}
+                    onRetry={retry}
+                  />
+                ) : (
+                  <Center gap="2" p="6" role="status">
+                    <Spinner />
+                    <Text>{t('workflowLibrary.loading')}</Text>
+                  </Center>
+                )}
+              </Dialog.Body>
+              <Dialog.CloseTrigger asChild>
+                <CloseButton />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    ),
+    [isOpen, retry, t]
+  );
+  const renderError = useCallback(() => renderPlaceholder(true), [renderPlaceholder]);
+
+  return (
+    <workflowLibraryDialog.Deferred
+      key={attempt}
+      fallback={renderPlaceholder(false)}
+      render={renderDialog}
+      renderError={renderError}
+    />
+  );
 };
-const LazyWorkflowLibraryDialog = lazy(() =>
-  loadWorkflowLibraryDialog().then((module) => ({ default: module.WorkflowLibraryDialog }))
-);
 
 interface WorkflowChoice {
   id: string;
@@ -203,7 +244,7 @@ const WorkflowSwitcherContent = ({
   const rows = useMemo(
     () => (
       <Menu.RadioItemGroup value={activeWorkflowId} onValueChange={chooseWorkflow}>
-        <Menu.ItemGroupLabel>{t('widgets.workflow.inThisProject')}</Menu.ItemGroupLabel>
+        <Menu.ItemGroupLabel color="fg.muted">{t('widgets.workflow.inThisProject')}</Menu.ItemGroupLabel>
         {choices.map((choice) => {
           const name = choice.name || t('widgets.workflow.untitled');
 
@@ -938,11 +979,7 @@ export const WorkflowDialogHost = () => {
       />
       {/* Loaded on the first opening and kept mounted after, so its exit transitions, reset on close and remembered
           place behave as for an always-mounted dialog. Its own busy overlay covers loading once it shows. */}
-      {hasOpenedLibrary ? (
-        <Suspense fallback={null}>
-          <LazyWorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
-        </Suspense>
-      ) : null}
+      {hasOpenedLibrary ? <WorkflowLibraryDialogLoader isOpen={isLibraryOpen} /> : null}
       <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}

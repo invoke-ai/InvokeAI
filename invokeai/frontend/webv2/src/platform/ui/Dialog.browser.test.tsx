@@ -19,9 +19,9 @@ afterEach(async () => {
   root = null;
 });
 
-const sleep = (ms: number) =>
+const nextFrame = () =>
   new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
+    requestAnimationFrame(() => resolve());
   });
 
 /**
@@ -130,8 +130,9 @@ describe('Dialog', () => {
     await expect.poll(() => getDialog('Child')?.getAttribute('data-state')).toBe('open');
     await act(() => userEvent.click(getButton(getDialog('Child')!, 'Close')));
     await expect.poll(() => getDialog('Child')).toBeNull();
-    // Past the focus traps' deferred return of focus and the dismissable layer's deferred outside handling.
-    await act(() => sleep(250));
+    await expect.poll(() => document.activeElement).toBe(getButton(parent, 'Open child'));
+    // Let the restored focus's outside handler run before checking that it did not dismiss the parent.
+    await act(nextFrame);
 
     expect(parent.isConnected).toBe(true);
     expect(parent.getAttribute('data-state')).toBe('open');
@@ -141,7 +142,7 @@ describe('Dialog', () => {
   it('still closes on a pointer press outside it', async () => {
     const parent = await renderParent();
     // The outside handling is set up in the frame after the dialog opens.
-    await act(() => sleep(50));
+    await act(nextFrame);
 
     await act(() => userEvent.click(document.body, { position: { x: 4, y: 4 } }));
 
@@ -164,12 +165,12 @@ describe('Dialog', () => {
     const dialog = getDialog('Modal')!;
     await expect.poll(() => dialog.getAttribute('data-state')).toBe('open');
     // The outside handling is set up in the frame after the dialog opens.
-    await act(() => sleep(50));
+    await act(nextFrame);
 
     await act(() => host!.querySelector('button')!.focus());
 
     await expect.poll(() => onFocusOutside.mock.calls.length).toBe(1);
-    await act(() => sleep(50));
+    await act(nextFrame);
     expect(dialog.getAttribute('data-state')).toBe('open');
   });
 });

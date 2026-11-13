@@ -4,7 +4,7 @@ import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowse
 import type { ListRange, ListRowProps } from '@platform/ui/list/List';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 import type { ListRow } from '@platform/ui/list/listRows';
-import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { FocusEvent, MouseEvent, UIEvent } from 'react';
 
 import { Badge, Box, HStack, Icon, type SystemStyleObject, Text } from '@chakra-ui/react';
 import {
@@ -54,6 +54,7 @@ export type WorkflowLibraryListTrailingField = 'updated_at' | 'opened_at' | 'cre
 
 export interface WorkflowLibraryListProps extends WorkflowLibraryGridProps {
   trailingField?: WorkflowLibraryListTrailingField;
+  isActive?: boolean;
 }
 
 interface WorkflowLibraryListItem {
@@ -155,6 +156,7 @@ export const WorkflowLibraryList = ({
   entries,
   error,
   isHidden = false,
+  isActive = true,
   missingCounts = NO_MISSING_COUNTS,
   openMenuAnchor = null,
   removedWorkflowId = null,
@@ -263,27 +265,37 @@ export const WorkflowLibraryList = ({
   const rangeReports = useRef(0);
   const handleRangeChange = useCallback(
     (next: ListRange) => {
+      const viewport = wrapperRef.current?.querySelector<HTMLElement>('[data-list-viewport]');
+      if (!isActive || (viewport && viewport.clientHeight === 0)) {
+        return;
+      }
       setRange(next);
       rangeReports.current += 1;
 
       // The first report is the restored position itself; later ones keep the view's anchor current, so leaving for
       // another filter (which unmounts this list after the store has moved on) still returns here.
-      const viewport = wrapperRef.current?.querySelector<HTMLElement>('[data-list-viewport]');
-
       if (filter && viewport && rangeReports.current > 1) {
         rememberWorkflowLibraryScroll(filter, toScrollAnchor(viewport.scrollTop));
       }
     },
-    [filter]
+    [filter, isActive]
   );
-  const persistScrollOffset = useCallback(
-    (offset: number) => {
-      if (filter) {
-        rememberWorkflowLibraryScroll(filter, toScrollAnchor(offset));
+  // Passive unmount cleanup runs after DOM refs detach; retain only offsets observed while the list is visible.
+  const visibleScrollOffset = useRef<number | null>(null);
+  const handleScrollCapture = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      const viewport = event.target as HTMLElement;
+      if (isActive && viewport.matches('[data-list-viewport]') && viewport.clientHeight > 0) {
+        visibleScrollOffset.current = viewport.scrollTop;
       }
     },
-    [filter]
+    [isActive]
   );
+  const persistScrollOffset = useCallback(() => {
+    if (filter && visibleScrollOffset.current !== null) {
+      rememberWorkflowLibraryScroll(filter, toScrollAnchor(visibleScrollOffset.current));
+    }
+  }, [filter]);
   // Shares the grid's anchor for this filter; its position converts to a row offset, close enough across layouts.
   const [initialScrollOffset] = useState(() => {
     const snapshot = getWorkflowLibraryBrowseSnapshot();
@@ -364,21 +376,6 @@ export const WorkflowLibraryList = ({
     },
     [actions, rows]
   );
-  // Space on a row's button previews it, as Quick Look does; the row's own activation (selecting) is Enter or a press.
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      const target = event.target as Element;
-      const row = target.closest('[data-list-primary]') === target ? rowOf(target) : null;
-      const index = row ? positionOf(row) : -1;
-      const entry = entryAt(rows, index);
-
-      if (event.key === ' ' && !event.repeat && entry && onPreview) {
-        event.preventDefault();
-        actions.preview(entry.item.workflow_id, index);
-      }
-    },
-    [actions, onPreview, rows]
-  );
   // Pointer-only quick actions never take focus: it moves to their row, so a dialog they open returns there.
   const handleMouseDown = useCallback((event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as Element;
@@ -442,10 +439,10 @@ export const WorkflowLibraryList = ({
       data-workflow-library-list=""
       onDoubleClick={handleDoubleClick}
       onFocusCapture={handleFocusCapture}
-      onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
+      onScrollCapture={handleScrollCapture}
     >
-      {isWindowed && range !== null && total > 0 ? (
+      {isActive && isWindowed && range !== null && total > 0 ? (
         <WorkflowLibraryDemand key={demandKey} end={last} ids={ids} start={first} />
       ) : null}
       {hasEntries && error ? (

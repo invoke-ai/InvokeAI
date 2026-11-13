@@ -13,10 +13,15 @@ export interface DeferredModule<Module> {
   /**
    * Renders `render(module)`. Once the module has loaded it renders directly. Before that, each mount owns its own
    * lazy load, so a load that failed is tried again on the next mount, where a module-level `lazy` would keep its first
-   * failure for the page's lifetime. While loading, and if the load fails, it shows `fallback`; an error the loaded
+   * failure for the page's lifetime. While loading it shows `fallback`; a failed load shows `renderError(error)`
+   * when provided, else `fallback`. An error the loaded
    * module throws while rendering reaches the host's error boundary instead.
    */
-  Deferred: (props: { fallback: ReactNode; render: (module: Module) => ReactNode }) => ReactNode;
+  Deferred: (props: {
+    fallback: ReactNode;
+    renderError?: (error: unknown) => ReactNode;
+    render: (module: Module) => ReactNode;
+  }) => ReactNode;
 }
 
 interface DeferredSource<Module> {
@@ -28,16 +33,19 @@ type RenderModule<Module> = (module: Module) => ReactNode;
 
 interface LazyViewProps<Module> {
   fallback: ReactNode;
+  renderError?: (error: unknown) => ReactNode;
   renderModule: RenderModule<Module>;
 }
 
 // A top-level component, so it closes over nothing: the module's state is read through `source` on each mount.
 const DeferredView = <Module,>({
   fallback,
+  renderError,
   render,
   source,
 }: {
   fallback: ReactNode;
+  renderError?: (error: unknown) => ReactNode;
   render: RenderModule<Module>;
   source: DeferredSource<Module>;
 }) => {
@@ -54,7 +62,10 @@ const DeferredView = <Module,>({
                 message: 'A view loaded on demand failed to load; showing its fallback',
                 name: 'deferred-module.load-failed',
               });
-              return { default: ({ fallback: failed }: LazyViewProps<Module>) => failed };
+              return {
+                default: ({ fallback: failed, renderError }: LazyViewProps<Module>) =>
+                  renderError ? renderError(error) : failed,
+              };
             }
           )
         )
@@ -62,7 +73,7 @@ const DeferredView = <Module,>({
   );
   return LazyView ? (
     <Suspense fallback={fallback}>
-      <LazyView fallback={fallback} renderModule={render} />
+      <LazyView fallback={fallback} renderError={renderError} renderModule={render} />
     </Suspense>
   ) : (
     // Mounted without a lazy view only once the module had loaded, and a loaded module stays loaded.
@@ -89,7 +100,9 @@ export const createDeferredModule = <Module,>(importModule: () => Promise<Module
   };
 
   return {
-    Deferred: ({ fallback, render }) => <DeferredView fallback={fallback} render={render} source={source} />,
+    Deferred: ({ fallback, renderError, render }) => (
+      <DeferredView fallback={fallback} render={render} renderError={renderError} source={source} />
+    ),
     load: source.load,
     preload: () => void source.load().catch(() => {}),
   };

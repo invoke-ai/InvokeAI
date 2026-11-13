@@ -110,4 +110,28 @@ describe('createDeferredModule', () => {
     expect(host.textContent).toBe('host caught: render failed');
     consoleError.mockRestore();
   });
+
+  it('distinguishes a pending load from a rejected import without failing its host', async () => {
+    let rejectImport: (error: Error) => void = () => {};
+    const deferred = createDeferredModule(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectImport = reject;
+        })
+    );
+    const renderError = vi.fn((error: unknown) => <p>load failed: {String(error)}</p>);
+
+    await act(() =>
+      root.render(
+        <HostBoundary>
+          <deferred.Deferred fallback={<p>loading</p>} render={() => <p>loaded</p>} renderError={renderError} />
+        </HostBoundary>
+      )
+    );
+    expect(host.textContent).toBe('loading');
+    expect(renderError).not.toHaveBeenCalled();
+
+    await act(() => rejectImport(new Error('offline')));
+    await vi.waitFor(() => expect(host.textContent).toBe('load failed: Error: offline'));
+  });
 });

@@ -529,7 +529,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                   {projectCopies.length === 0
                     ? t('workflowLibrary.projectCopiesNone')
                     : linkedRevision !== null
-                      ? t('workflowLibrary.projectCopyRevision', { revision: linkedRevision })
+                      ? t('workflowLibrary.projectCopyRevision', { count: 1, revision: linkedRevision })
                       : t('workflowLibrary.projectCopies', { count: projectCopies.length })}
                 </WorkflowDetailFact>
                 {updatedWhen ? (

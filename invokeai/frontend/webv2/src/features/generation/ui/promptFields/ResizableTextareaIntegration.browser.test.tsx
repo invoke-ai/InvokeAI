@@ -70,27 +70,20 @@ describe('ResizableTextarea', () => {
     await act(async () => {
       await userEvent.hover(textarea);
       await userEvent.tab();
-      await new Promise((resolve) => {
-        globalThis.setTimeout(resolve, 200);
-      });
     });
     expect(document.activeElement).toBe(textarea);
-    const hoveredFocusBorderColor = getComputedStyle(textarea).borderTopColor;
     const accentProbe = document.createElement('div');
     accentProbe.style.border = '1px solid var(--chakra-colors-accent-solid)';
     document.body.append(accentProbe);
     const accentBorderColor = getComputedStyle(accentProbe).borderTopColor;
     accentProbe.remove();
     expect(getComputedStyle(textarea).outlineStyle).toBe('none');
-    expect(hoveredFocusBorderColor).toBe(accentBorderColor);
+    await expect.poll(() => getComputedStyle(textarea).borderTopColor).toBe(accentBorderColor);
 
     await act(async () => {
       await userEvent.unhover(textarea);
-      await new Promise((resolve) => {
-        globalThis.setTimeout(resolve, 200);
-      });
     });
-    expect(getComputedStyle(textarea).borderTopColor).toBe(accentBorderColor);
+    await expect.poll(() => getComputedStyle(textarea).borderTopColor).toBe(accentBorderColor);
   });
 
   it('allows unbounded pointer and keyboard growth while keeping Home at the minimum', async () => {
@@ -178,9 +171,11 @@ describe('ResizableTextarea', () => {
     const { fade, textarea } = await renderTextarea(undefined, { zoom: 1 });
     const settled = () =>
       act(async () => {
-        await new Promise((resolve) => {
-          globalThis.setTimeout(resolve, 200);
-        });
+        // Flush style so the transitions exist before waiting for their actual completion.
+        textarea.getBoundingClientRect();
+        await Promise.all(
+          textarea.parentElement!.parentElement!.getAnimations({ subtree: true }).map((animation) => animation.finished)
+        );
       });
     const colors = () => [
       getComputedStyle(fade, '::after').borderBottomColor,

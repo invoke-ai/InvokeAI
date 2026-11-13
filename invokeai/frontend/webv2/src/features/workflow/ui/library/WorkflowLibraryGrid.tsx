@@ -514,14 +514,6 @@ export const WorkflowLibraryGrid = ({
     () => ({
       onKeyDown: (event) => {
         const target = event.target as HTMLElement;
-        // Space on a card previews it, as Quick Look does; the card's own activation (selecting) is Enter or a press.
-        if (event.key === ' ' && onPreview && target.dataset.workflowCard && !event.repeat) {
-          event.preventDefault();
-          const id = target.dataset.workflowCard;
-          handleSelect(id);
-          handlePreview(id);
-          return;
-        }
         if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) {
           return;
         }
@@ -652,7 +644,6 @@ export const WorkflowLibraryGrid = ({
       handleOpen,
       handlePreview,
       handleSelect,
-      onPreview,
     ]
   );
   return (

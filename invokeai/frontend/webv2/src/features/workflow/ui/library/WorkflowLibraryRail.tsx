@@ -95,7 +95,7 @@ const PlaceButton = ({
 
   return (
     <Button
-      aria-current={isCurrent ? 'page' : undefined}
+      aria-pressed={isCurrent}
       data-library-place={place}
       gap="2"
       h="auto"
@@ -271,7 +271,7 @@ export const WorkflowLibraryRail = ({
   const railRef = useRef<HTMLDivElement>(null);
   const placesLabelId = useId();
   const getCurrentPlace = useCallback(
-    () => railRef.current?.querySelector<HTMLElement>('[data-library-place][aria-current="page"]'),
+    () => railRef.current?.querySelector<HTMLElement>('[data-library-place][aria-pressed="true"]'),
     []
   );
 

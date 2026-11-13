@@ -371,12 +371,12 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
   const DEFAULTS = {
     workflowLibraryCardSize: 'small',
     workflowLibraryLayout: 'grid',
-    workflowLibrarySort: 'opened',
+    workflowLibrarySort: 'updated',
     workflowLibrarySortDirection: 'desc',
     workflowLibraryThumbnailFit: 'cover',
   };
 
-  it('lists most recently opened first in a grid of small filled cards unless a known choice is stored', () => {
+  it('lists most recently updated first in a grid of small filled cards unless a known choice is stored', () => {
     expect(store.normalizeWorkbenchPreferences({})).toMatchObject(DEFAULTS);
     expect(
       store.normalizeWorkbenchPreferences({
@@ -411,6 +411,10 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
     });
     expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'updated' })).toMatchObject({
       workflowLibrarySort: 'updated',
+      workflowLibrarySortDirection: 'desc',
+    });
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened' })).toMatchObject({
+      workflowLibrarySort: 'opened',
       workflowLibrarySortDirection: 'desc',
     });
     // A stored direction wins.

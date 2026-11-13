@@ -17,13 +17,16 @@ import { WorkflowLibraryList } from './WorkflowLibraryList';
 const store = vi.hoisted(() => ({
   loadWorkflowLibraryRange: vi.fn((_start: number, _end: number, _force?: boolean) => Promise.resolve(true)),
   refreshWorkflowLibraryBrowse: vi.fn(() => Promise.resolve()),
+  rememberWorkflowLibraryScroll: vi.fn(),
+  setWorkflowLibraryVisibleDemand: vi.fn(),
 }));
 
 vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => ({
   ...(await original<typeof BrowseStoreModule>()),
   loadWorkflowLibraryRange: store.loadWorkflowLibraryRange,
   refreshWorkflowLibraryBrowse: store.refreshWorkflowLibraryBrowse,
-  setWorkflowLibraryVisibleDemand: vi.fn(),
+  rememberWorkflowLibraryScroll: store.rememberWorkflowLibraryScroll,
+  setWorkflowLibraryVisibleDemand: store.setWorkflowLibraryVisibleDemand,
 }));
 vi.mock('@features/workflow/react', async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -59,6 +62,8 @@ beforeEach(() => {
   root = createRoot(host);
   store.loadWorkflowLibraryRange.mockClear();
   store.refreshWorkflowLibraryBrowse.mockClear();
+  store.rememberWorkflowLibraryScroll.mockClear();
+  store.setWorkflowLibraryVisibleDemand.mockClear();
 });
 
 afterEach(async () => {
@@ -174,6 +179,49 @@ describe('WorkflowLibraryList', () => {
 
     await render({ entries: [ran], trailingField: 'updated_at', window: undefined });
     expect(primaryOf('wf-0')?.textContent).toContain('workflowLibrary.ranWhen');
+  });
+
+  it('releases closed-list demand without overwriting its scroll anchor, and reacquires on reopen', async () => {
+    await render({});
+    await expect.poll(() => store.setWorkflowLibraryVisibleDemand.mock.calls.at(-1)?.[0].length).toBeGreaterThan(0);
+    const viewport = host.querySelector<HTMLElement>('[data-list-viewport]')!;
+    await act(() => {
+      viewport.scrollTop = 270;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await expect.poll(() => store.rememberWorkflowLibraryScroll.mock.calls.length).toBeGreaterThan(0);
+    const anchor = store.rememberWorkflowLibraryScroll.mock.calls.at(-1);
+
+    // Closing retains the collection while the dialog's hidden layout collapses its viewport.
+    await render({ isActive: false });
+    host.style.display = 'none';
+    await expect.poll(() => store.setWorkflowLibraryVisibleDemand.mock.calls.at(-1)?.[0]).toEqual([]);
+    store.loadWorkflowLibraryRange.mockClear();
+    await act(() => {
+      viewport.scrollTop = 0;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    expect(store.rememberWorkflowLibraryScroll.mock.calls.at(-1)).toEqual(anchor);
+    expect(store.loadWorkflowLibraryRange).not.toHaveBeenCalled();
+
+    host.style.display = 'flex';
+    await render({ isActive: true });
+    await expect.poll(() => store.setWorkflowLibraryVisibleDemand.mock.calls.at(-1)?.[0].length).toBeGreaterThan(0);
+  });
+
+  it('persists the final fractional scroll offset after its viewport detaches', async () => {
+    await render({});
+    const viewport = host.querySelector<HTMLElement>('[data-list-viewport]')!;
+    await act(() => {
+      viewport.scrollTop = 281;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    store.rememberWorkflowLibraryScroll.mockClear();
+    await act(() => root.render(null));
+    expect(store.rememberWorkflowLibraryScroll).toHaveBeenLastCalledWith(FILTER, {
+      fraction: 11 / 54,
+      index: 5,
+    });
   });
 
   it('retries a failed range in place, forcing a reread of the positions on screen', async () => {

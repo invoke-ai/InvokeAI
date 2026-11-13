@@ -3,10 +3,12 @@ import type { WorkflowDocumentGraphHandle } from '@features/workflow/ui/graph-pr
 import type { TFunction } from 'i18next';
 
 import { Center, HStack, Icon, Input, InputGroup, Spinner, type SystemStyleObject, Text } from '@chakra-ui/react';
+import { createDeferredModule } from '@platform/react/deferredModule';
+import { LoadError } from '@platform/ui/LoadError';
 import { SearchIcon } from 'lucide-react';
 import {
   type ChangeEvent,
-  lazy,
+  type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -14,6 +16,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type * as WorkflowPreviewJsonModule from './WorkflowPreviewJson';
 
 /**
  * The parts every workflow preview stage shares (the library's preview mode and the graph preview dialog): the bar
@@ -39,7 +43,27 @@ export const WORKFLOW_PREVIEW_DIALOG_SIZE = {
 } as const;
 
 /** The Graph view and the platform's JSON preview load when that view first shows, outside every startup chunk. */
-export const WorkflowPreviewJson = lazy(() => import('./WorkflowPreviewJson'));
+const workflowPreviewJson = createDeferredModule(() => import('./WorkflowPreviewJson'));
+
+export const WorkflowPreviewJson = (props: ComponentProps<typeof WorkflowPreviewJsonModule.default>) => {
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  const render = useCallback((module: typeof WorkflowPreviewJsonModule) => <module.default {...props} />, [props]);
+  const renderError = useCallback(() => <WorkflowPreviewLoadError onRetry={retry} />, [retry]);
+
+  return (
+    <workflowPreviewJson.Deferred key={attempt} fallback={STAGE_LOADING} render={render} renderError={renderError} />
+  );
+};
+
+/** A failed preview stays local to its stage, leaving the surrounding tabs and close action available. */
+export const WorkflowPreviewLoadError = ({ onRetry }: { onRetry: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <LoadError isRetrying={false} layout="state" message={t('workflowLibrary.preview.loadFailed')} onRetry={onRetry} />
+  );
+};
 
 const FIND_START_ELEMENT = <Icon aria-hidden as={SearchIcon} boxSize="3.5" color="fg.subtle" />;
 
@@ -194,3 +218,5 @@ export const WorkflowPreviewStageLoading = () => {
     </Center>
   );
 };
+
+const STAGE_LOADING = <WorkflowPreviewStageLoading />;

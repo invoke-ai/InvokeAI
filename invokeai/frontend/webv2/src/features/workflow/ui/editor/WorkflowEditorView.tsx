@@ -897,11 +897,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<WorkflowFlowEdge>[]) => {
-      // A collapsed edge stands for every edge between its two nodes: selecting or removing it acts on all of them.
-      const removedEdgeIds = withCollapsedEdgeSiblings(
-        projectGraph,
-        changes.flatMap((change) => (change.type === 'remove' ? [change.id] : []))
-      );
+      // Selection changes already keep collapsed siblings together before XYFlow removes the selected edges.
+      const removedEdgeIds = changes.flatMap((change) => (change.type === 'remove' ? [change.id] : []));
       if (removedEdgeIds.length > 0) {
         editGraph({ edgeIds: removedEdgeIds, type: 'removeEdges' });
       }
