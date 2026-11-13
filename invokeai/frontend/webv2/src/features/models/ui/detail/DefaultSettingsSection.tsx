@@ -3,6 +3,7 @@ import type { AnyModelDefaultSettings } from '@features/models/core/types';
 import type { SchedulerPolicyState } from '@features/models/ui/ModelsUiContext';
 
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import { isVaeAcceptedByBase } from '@features/generation/settings';
 import { updateModel } from '@features/models/data/api';
 import {
   ensureFp8StorageSupportLoaded,
@@ -49,8 +50,8 @@ interface FieldControlProps {
   control: DefaultSettingsControl;
   disabled: boolean;
   label: string;
-  /** Base of the model being edited, for same-base model pickers. */
-  modelBase: string;
+  /** The model being edited, for pickers restricted to what it accepts. */
+  model: DefaultSettingsModel;
   setValue: (value: unknown) => void;
   value: unknown;
 }
@@ -59,7 +60,7 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
-const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: FieldControlProps) => {
+const FieldControl = ({ control, disabled, label, model, setValue, value }: FieldControlProps) => {
   const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
@@ -140,7 +141,9 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
     return (
       <ModelSelect
         disabled={disabled}
-        filter={(candidate) => !control.sameBase || String(candidate.base) === modelBase}
+        filter={(candidate) =>
+          !control.compatibleVae || isVaeAcceptedByBase(String(model.base), model.variant)(candidate)
+        }
         isClearable
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
@@ -343,7 +346,7 @@ export const DefaultSettingsSection = ({
                   control={field.control}
                   disabled={!isEnabled || field.pending !== undefined}
                   label={t(field.labelKey)}
-                  modelBase={String(model.base)}
+                  model={model}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
                   value={isEnabled ? value : field.defaultValue}
                 />

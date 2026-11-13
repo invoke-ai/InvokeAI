@@ -38,8 +38,8 @@ export type DefaultSettingsControl =
   | {
       kind: 'model';
       modelTypes: readonly ModelTaxonomyType[];
-      /** Restrict candidates to the edited model's base. */
-      sameBase: boolean;
+      /** Restrict candidates to the VAEs the edited model's architecture decodes with, which may be another base's. */
+      compatibleVae: boolean;
       /** Placeholder shown for the backend's 'default' sentinel. */
       placeholderKey: string;
     };
@@ -75,7 +75,7 @@ const FP8_STORAGE_FIELD: FieldSpec = {
 };
 
 const VAE_FIELD: FieldSpec = {
-  control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
+  control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', compatibleVae: true },
   // The backend sentinel for "the compatible default VAE" — what legacy
   // writes when the toggle is on but no specific model is picked.
   defaultValue: 'default',
