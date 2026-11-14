@@ -35,13 +35,16 @@ import {
   isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
+  isGgufQwen3Vl4bEncoder,
   isGgufQwen3Vl8bEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isQwen3Vl4bVisionTower,
   isQwen3Vl8bEncoder,
   isQwen3Vl8bVisionTower,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
+  isVisionTextLlm,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -221,11 +224,11 @@ const addFluxKontextReferenceImages = (
   settings: GenerateSettings,
   denoise: BackendInvocationContract,
   type: 'flux2_reference_image' | 'flux_kontext_reference_image'
-) => {
+): BackendInvocationContract | null => {
   const refs = getEnabledReferenceImages(settings.referenceImages, type);
 
   if (refs.length === 0) {
-    return;
+    return null;
   }
 
   let prevCollect: BackendInvocationContract | null = null;
@@ -257,6 +260,8 @@ const addFluxKontextReferenceImages = (
   if (prevCollect) {
     addEdge(graph, prevCollect, 'collection', denoise, 'kontext_conditioning');
   }
+
+  return prevCollect;
 };
 
 const getDiffusersSource = (settings: GenerateSettings, model: MainModelConfig): MainModelConfig | undefined =>
@@ -1467,6 +1472,11 @@ const buildKrea2Graph = (
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
+  // The loader refuses a tower beside any other encoder, so a stale pick is never sent.
+  const qwen3VlVisionTowerModel =
+    qwen3VlEncoderModel && isGgufQwen3Vl4bEncoder(qwen3VlEncoderModel)
+      ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl4bVisionTower)
+      : null;
 
   if (!isDiffusers) {
     requireComponent(vaeModel, 'Krea-2 VAE');
@@ -1482,6 +1492,7 @@ const buildKrea2Graph = (
     id: 'model_loader',
     model,
     qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower_model: qwen3VlVisionTowerModel ?? undefined,
     type: 'krea2_model_loader',
     vae_model: vaeModel ?? undefined,
   });
@@ -1580,6 +1591,7 @@ const buildKrea2Graph = (
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
     ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1879,8 +1891,21 @@ const buildFlux3Graph = (
       ])
     : modelLoader;
   // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
-  // flows through `positive_prompt`. Without regions the prompt passes through unchanged.
-  const layoutPrompt: BackendInvocationContract = addNode(graph, { id: 'layout_prompt', type: 'flux3_layout_prompt' });
+  // flows through `positive_prompt`. Without regions the prompt passes through unchanged. The prompt upsampler takes
+  // this place when it is on: it takes the regions itself and also reads the reference images.
+  const upsamplerModel = settings.flux3PromptUpsamplerEnabled
+    ? requireComponent(
+        getCompatibleComponent(settings.flux3PromptUpsamplerModel, isVisionTextLlm),
+        'FLUX.3 prompt upsampler model'
+      )
+    : null;
+  const layoutPrompt: BackendInvocationContract = upsamplerModel
+    ? addNode(graph, {
+        id: 'prompt_upsampler',
+        type: 'flux3_prompt_upsampler',
+        upsampler_model: toModelIdentifier(upsamplerModel),
+      })
+    : addNode(graph, { id: 'layout_prompt', type: 'flux3_layout_prompt' });
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1921,22 +1946,28 @@ const buildFlux3Graph = (
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
-  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
-  // With reference images FLUX.3 edits them, and its boxes mark where new content goes in the output.
-  if (
-    graph.edges.some(
-      (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'kontext_conditioning'
-    )
-  ) {
+  const referenceCollect = addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  if (upsamplerModel) {
+    // The upsampler derives edit targets from the images it receives; one collect feeds it and the denoiser.
+    if (referenceCollect) {
+      addEdge(graph, referenceCollect, 'collection', layoutPrompt, 'reference_images');
+    }
+  } else if (referenceCollect) {
+    // With reference images FLUX.3 edits them, and its boxes mark where new content goes in the output.
     layoutPrompt.edit_targets = true;
   }
-  addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
+  const metadata = addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
     // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
     scheduler: 'euler',
+    ...(upsamplerModel ? { flux3_prompt_upsampler: toModelIdentifier(upsamplerModel) } : {}),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
+  if (upsamplerModel) {
+    // Metadata records the caption encoded, not the prompt typed (recall restores `positive_prompt`).
+    addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
+  }
   addReferenceImageMetadata(graph, output, settings);
 
   return {

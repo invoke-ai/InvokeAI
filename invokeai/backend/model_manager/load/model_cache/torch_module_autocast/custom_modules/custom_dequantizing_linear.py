@@ -7,10 +7,23 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
+
+
+def _reads_weight_values(patch: BaseLayerPatch) -> bool:
+    if isinstance(patch, SwappedHalvesLayerPatch):
+        return _reads_weight_values(patch.layer)
+    if isinstance(patch, MergedLayerPatch):
+        return any(_reads_weight_values(layer) for layer in patch.lora_layers)
+    # Only DoRA reads the original weight's values; every other layer applied to a Linear reads its shape.
+    return isinstance(patch, DoRALayer)
 
 
 class CustomDequantizingLinear(DequantizingLinear, CustomModuleMixin):
@@ -39,10 +52,14 @@ class CustomDequantizingLinear(DequantizingLinear, CustomModuleMixin):
         return tensor
 
     def _cast_weight_bias_for_input(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
-        # A meta tensor lets patch types without an optimized sidecar path read the weight's shape but never its
-        # quantized values; LoRA layers take the residual path and never get here. Patches are reshaped to this
-        # shape, so it has to be the unpacked one, which the weight buffer's is not for nvfp4 or int4.
-        weight = torch.empty((self.out_features, self.in_features), device="meta")
+        # Most patch types only read the weight's shape, so they get a meta tensor and no dequantization is paid
+        # for them. Patches are reshaped to this shape, so it has to be the unpacked one, which the weight buffer's
+        # is not for nvfp4 or int4. A patch that reads values (DoRA) gets the dequantized weight instead, built
+        # for this call only: it is neither stored on the module nor cached.
+        if any(_reads_weight_values(patch) for patch, _ in self._patches_and_weights):
+            weight = self._dequantized_weight(input.device, input.dtype)
+        else:
+            weight = torch.empty((self.out_features, self.in_features), device="meta")
         bias = self._cast_tensor_for_input(self.bias, input)
         return weight, bias
 

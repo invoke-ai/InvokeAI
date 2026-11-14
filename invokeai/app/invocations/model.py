@@ -165,7 +165,7 @@ class Qwen3VLEncoderField(BaseModel):
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
     vision_tower: ModelIdentifierField | None = Field(
         default=None,
-        description="Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)",
+        description="Info to load the vision tower of a GGUF encoder, which has none of its own",
     )
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 

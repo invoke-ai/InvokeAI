@@ -30,6 +30,7 @@ import {
 import { galleryImageUrls } from '@features/gallery/utility';
 import { isModelFromRepo } from '@features/generation/core/baseGenerationPolicies';
 import { servesAsType } from '@features/generation/core/componentCompatibility';
+import { isSuggestedExpandPromptModel } from '@features/generation/core/baseGenerationPolicies';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
@@ -682,7 +683,7 @@ const ExpandPromptButton = ({
   const textLlmModels = models.filter((model) => servesAsType(model, 'text_llm'));
   const suggestedModelKey = suggestion?.modelSource
     ? (textLlmModels.find((model) =>
-        isModelFromRepo(typeof model.source === 'string' ? model.source : null, suggestion.modelSource ?? '')
+        isSuggestedExpandPromptModel(typeof model.source === 'string' ? model.source : null, suggestion)
       )?.key ?? null)
     : null;
   const onSaveModelKey = savedPromptModels?.onChange;

@@ -16,7 +16,10 @@ from invokeai.app.invocations.model import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import accepted_vae_bases, accepts_vae
-from invokeai.backend.model_manager.qwen3_vl_labels import raise_for_wrong_qwen3_vl_variant
+from invokeai.backend.model_manager.qwen3_vl_labels import (
+    raise_for_unfit_vision_tower,
+    raise_for_wrong_qwen3_vl_variant,
+)
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -42,7 +45,7 @@ class Krea2ModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Krea-2",
     tags=["model", "krea2", "krea-2"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2ModelLoaderInvocation(BaseInvocation):
@@ -78,6 +81,16 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
         input=Input.Direct,
         ui_model_type=ModelType.Qwen3VLEncoder,
         title="Qwen3-VL Encoder",
+    )
+
+    qwen3_vl_vision_tower_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Qwen3-VL 4B vision tower (the llama.cpp mmproj file). "
+        "Lets a GGUF encoder read edit reference images.",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.Any,
+        ui_model_type=ModelType.Qwen3VLVisionTower,
+        title="Vision Tower",
     )
 
     def invoke(self, context: InvocationContext) -> Krea2ModelLoaderOutput:
@@ -122,11 +135,30 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
             tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
+        vision_tower = self._vision_tower(context)
+
         return Krea2ModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
-            qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[]),
+            qwen3_vl_encoder=Qwen3VLEncoderField(
+                tokenizer=tokenizer, text_encoder=text_encoder, vision_tower=vision_tower, loras=[]
+            ),
             vae=VAEField(vae=vae),
         )
+
+    def _vision_tower(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
+        """The mmproj tower for a GGUF encoder, checked against it; None when none was selected."""
+        if self.qwen3_vl_vision_tower_model is None:
+            return None
+        encoder_config = (
+            context.models.get_config(self.qwen3_vl_encoder_model) if self.qwen3_vl_encoder_model is not None else None
+        )
+        raise_for_unfit_vision_tower(
+            context.models.get_config(self.qwen3_vl_vision_tower_model),
+            encoder_config,
+            Qwen3VLVariantType.Qwen3VL_4B,
+            "Krea-2",
+        )
+        return self.qwen3_vl_vision_tower_model
 
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str

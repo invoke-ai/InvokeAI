@@ -11,6 +11,10 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import (
+    DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
+    DORA_MAGNITUDE_VALUE_KEYS,
+)
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import (
     Z_IMAGE_LORA_QWEN3_PREFIX,
     Z_IMAGE_LORA_TRANSFORMER_PREFIX,
@@ -203,6 +207,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
             values["alpha"] = layer_dict["alpha"]
         elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
+        for magnitude_key in DORA_MAGNITUDE_VALUE_KEYS:
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         # Already in internal format
@@ -217,7 +224,7 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
 
     Z-Image LoRAs have keys like:
     - diffusion_model.layers.17.attention.to_k.alpha
-    - diffusion_model.layers.17.attention.to_k.dora_scale
+    - diffusion_model.layers.17.attention.to_k.dora_scale (or PEFT lora_magnitude_vector, ai-toolkit magnitude)
     - diffusion_model.layers.17.attention.to_k.lora_down.weight
     - diffusion_model.layers.17.attention.to_k.lora_up.weight
 
@@ -226,15 +233,15 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    # Known suffixes that indicate the end of a layer name
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
+    # Known suffixes that indicate the end of a layer name, with the value key each is stored under
+    known_suffixes = {
+        ".lora_A.weight": "lora_A.weight",
+        ".lora_B.weight": "lora_B.weight",
+        ".lora_down.weight": "lora_down.weight",
+        ".lora_up.weight": "lora_up.weight",
+        ".alpha": "alpha",
+        **DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
+    }
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -243,10 +250,10 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
         # Try to find a known suffix
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in known_suffixes.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]  # Remove leading dot
+                key_name = value_key
                 break
 
         if layer_name is None:

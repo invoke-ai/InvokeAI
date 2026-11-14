@@ -1480,21 +1480,27 @@ def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeyp
     assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
 
 
-def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is_loaded() -> None:
+def test_a_dora_lora_runs_on_an_int8_transformer(monkeypatch: pytest.MonkeyPatch) -> None:
     from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
         apply_custom_layers_to_model,
     )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
     from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
     transformer = _LinearTransformer()
-    weight = torch.zeros(8, 8, dtype=torch.int8)
-    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(weight, torch.ones(8, 1), convrot=False)
+    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(
+        torch.ones(8, 8, dtype=torch.int8), torch.full((8, 1), 0.125), convrot=False
+    )
     apply_custom_layers_to_model(transformer)
-    low_rank = {"lora_A.weight": torch.zeros(2, 8), "lora_B.weight": torch.zeros(8, 2)}
-    dora = _patch(**low_rank, **{"lora_magnitude_vector.weight": torch.ones(8)})
+    magnitude = torch.arange(1, 9, dtype=torch.float32) / 4
+    dora = _patch(
+        "transformer_blocks.0.attn.to_q",
+        **{"lora_A.weight": _DOWN, "lora_B.weight": _UP, "lora_magnitude_vector.weight": magnitude},
+    )
     transformer_info = _ReservingTransformerInfo(transformer)
     context = _context(_Transformer(), QwenImage21VariantType.Base)
-    loaded = {"lora": SimpleNamespace(model=dora)}
+    loaded = {"lora": SimpleNamespace(model=dora, model_in_ram=nullcontext)}
     context.models = SimpleNamespace(
         load=lambda identifier: loaded.get(identifier.key, transformer_info),
         get_config=lambda _identifier: SimpleNamespace(
@@ -1504,13 +1510,13 @@ def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is
     node = _denoise(steps=1)
     node.transformer.loras.append(_lora_field(1.0))
 
-    with pytest.raises(ValueError) as refused:
-        node._run_diffusion(context)
-    assert _LORA_NAME in str(refused.value) and "int8" in str(refused.value)
-    assert transformer_info.reserved == []
-    # A low-rank LoRA runs there as a sidecar.
-    loaded["lora"] = SimpleNamespace(model=_patch(**low_rank))
-    node._refuse_dora_on_int8(context, transformer)
+    node._run_diffusion(context)
+
+    # DoRA of the dequantized weight (0.125 everywhere): the updated rows, rescaled to the magnitude.
+    updated = torch.full((8, 8), 0.125) + _UP @ _DOWN
+    expected = (magnitude[:, None] * updated / updated.norm(dim=1, keepdim=True)) @ torch.ones(8)
+    torch.testing.assert_close(transformer.seen[0][1][0], expected)
+    assert len(transformer_info.reserved) == 1
 
 
 def test_a_lora_already_on_the_transformer_is_not_applied_again() -> None:

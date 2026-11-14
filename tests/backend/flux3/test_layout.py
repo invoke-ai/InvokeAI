@@ -12,7 +12,7 @@ import pytest
 from diffusers.modular_pipelines.flux3.prompt_upsampler import boxes_to_canvas
 from pydantic import ValidationError
 
-from invokeai.backend.flux3.layout import Flux3LayoutRegion, build_flux3_layout_prompt
+from invokeai.backend.flux3.layout import Flux3LayoutRegion, build_flux3_layout_prompt, flux3_locked_rows
 
 
 def _region(desc: str, bbox: list) -> Flux3LayoutRegion:
@@ -206,3 +206,60 @@ def test_descriptions_reach_the_table_stripped_and_unescaped() -> None:
 def test_a_region_outside_the_grid_contract_is_refused(region: dict) -> None:
     with pytest.raises(ValidationError):
         Flux3LayoutRegion.model_validate(region)
+
+
+TABLE = '[{"id": "obj_3", "bbox": [10, 20, 500, 600], "desc": "a boat"}]'
+
+
+def test_locked_rows_of_a_prompt_with_neither_table_nor_regions_leave_it_unchanged() -> None:
+    assert flux3_locked_rows("  A misty coast.\n", []) == ("  A misty coast.\n", [])
+
+
+def test_a_table_that_ends_the_prompt_is_locked_without_regions() -> None:
+    caption, rows = flux3_locked_rows(f"  A misty coast. {TABLE}", [])
+
+    assert caption == "A misty coast."
+    assert rows == [{"id": "obj_3", "bbox": [10, 20, 500, 600], "desc": "a boat"}]
+
+
+def test_regions_alone_become_object_rows_after_the_stripped_caption() -> None:
+    caption, rows = flux3_locked_rows(" A misty coast. ", [BALLOON, LIGHTHOUSE])
+
+    assert caption == "A misty coast."
+    assert rows == [
+        {"id": "obj_1", "bbox": [80, 100, 450, 420], "desc": "a red hot-air balloon"},
+        {"id": "obj_2", "bbox": [300, 600, 950, 900], "desc": "a lighthouse on a cliff"},
+    ]
+
+
+def test_regions_follow_the_rows_of_the_table_numbered_after_its_highest_object() -> None:
+    caption, rows = flux3_locked_rows(f"A misty coast. {TABLE}", [BALLOON])
+
+    assert caption == "A misty coast."
+    assert [row["id"] for row in rows] == ["obj_3", "obj_4"]
+    assert rows[1]["desc"] == "a red hot-air balloon"
+
+
+def test_edit_targets_make_the_regions_target_rows_and_keep_the_tables_rows_as_they_are() -> None:
+    edit_row = {"id": "move", "from": "ref_image_0", "src_bbox": [0, 0, 100, 100], "tgt_bbox": [200, 200, 300, 300]}
+    table = json.dumps([{**edit_row, "desc": "the dog"}])
+
+    _, rows = flux3_locked_rows(f"Move the dog. {table}", [BALLOON], edit_targets=True)
+
+    assert rows == [
+        {**edit_row, "desc": "the dog"},
+        {
+            "id": "obj_1",
+            "from": "target",
+            "src_bbox": None,
+            "tgt_bbox": [80, 100, 450, 420],
+            "desc": "a red hot-air balloon",
+        },
+    ]
+
+
+@pytest.mark.parametrize("prompt", ["", "  \n", TABLE])
+def test_rows_on_a_blank_caption_are_refused_whether_they_come_from_regions_or_the_table(prompt: str) -> None:
+    regions = [] if prompt == TABLE else [BALLOON]
+    with pytest.raises(ValueError, match="need a prompt"):
+        flux3_locked_rows(prompt, regions)

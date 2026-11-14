@@ -171,6 +171,7 @@
         "flux3_layout_prompt",
         "flux3_lora_collection_loader",
         "flux3_model_loader",
+        "flux3_prompt_upsampler",
         "flux3_text_encoder",
         "flux_kontext",
         "img_nsfw",
@@ -296,6 +297,10 @@
       "componentsFilled": {
         "diffusers": [],
         "standalone-components": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
+        "standalone-gguf-encoder": [
           "qwen3VLEncoderModel",
           "vae"
         ],
@@ -709,6 +714,7 @@
     },
     "core_metadata": {
       "inputs": [
+        "flux3_caption",
         "ideogram4_caption",
         "moss_image_layout_prompt",
         "negative_prompt",
@@ -744,6 +750,7 @@
         "dype_scale": [
           3
         ],
+        "flux3_prompt_upsampler": [],
         "generation_mode": [
           "anima_txt2img",
           "cogview4_txt2img",
@@ -1568,6 +1575,24 @@
         "vae"
       ]
     },
+    "flux3_prompt_upsampler": {
+      "inputs": [
+        "prompt",
+        "reference_images"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "upsampler_model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
     "flux3_text_encoder": {
       "inputs": [
         "prompt",
@@ -1883,6 +1908,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],

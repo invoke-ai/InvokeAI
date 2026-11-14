@@ -18,6 +18,8 @@ export type GenerateComponentCandidate = {
   /** Other types the same files serve as; the backend always sends it. */
   roles?: readonly ModelRole[];
   submodels?: Record<string, unknown> | null;
+  /** Text LLMs only: whether the model reads images. */
+  supports_images?: unknown;
   type: string;
   variant?: unknown;
 };
@@ -107,6 +109,10 @@ export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
 
+/** The FLUX.3 prompt upsampler reads reference images, so a text-only LLM cannot serve it. */
+export const isVisionTextLlm: GenerateComponentFilter = (model) =>
+  model.type === 'text_llm' && model.supports_images === true;
+
 /** Ministral and Mistral encoders require distinct variants. */
 const MINISTRAL_3B_VARIANT = 'ministral3_3b';
 
@@ -123,13 +129,19 @@ export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
 export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
 
-/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the 8B one only. */
+/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the tower of the encoder's own size only. */
 export const isQwen3Vl8bVisionTower: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_8b';
+
+export const isQwen3Vl4bVisionTower: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_4b';
 
 /** A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file), so references need the tower model. */
 export const isGgufQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   isQwen3Vl8bEncoder(model) && model.format === 'gguf_quantized';
+
+export const isGgufQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
+  isQwen3Vl4bEncoder(model) && model.format === 'gguf_quantized';
 
 /** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
