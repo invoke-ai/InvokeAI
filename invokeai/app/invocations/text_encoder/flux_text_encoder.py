@@ -23,7 +23,7 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.t5.t5_encoder import t5_dtype_for_device
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 
 
@@ -86,7 +86,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         # A GGUF build dequantizes each Linear per forward and a retained-FP8 build widens each one, transients
         # its resident size does not cover; both are zero for other builds.
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(t5_encoder_info.compute_device)
+        compute_dtype = t5_dtype_for_device(t5_encoder_info.compute_device)
         dequant_bytes = peak_dequant_transient_bytes(
             t5_encoder_info.model, compute_dtype
         ) + peak_fp8_cast_transient_bytes(t5_encoder_info.model, compute_dtype)
