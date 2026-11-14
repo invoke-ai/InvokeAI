@@ -1169,7 +1169,15 @@ def test_an_sdnq_vae_is_priced_in_its_packed_weights_compute_dtype_not_an_fp32_b
 
 def test_every_stand_in_slope_is_at_least_the_pre_dtype_figure() -> None:
     """A stand-in is a declared conservative value on a measured platform; nothing else guards it."""
-    stand_ins = [entry for data in shipped_data().values() for entry in data.coefficients if entry.stand_ins]
+    # Qwen-Image-2.1's VAE is another network than the AutoencoderKL family this figure is of. `tests/backend/qwen_image_2_1/
+    # test_vae.py` holds its AMD stand-ins to the W7900's line at the measured ratio, its cuDNN tiled stand-ins to a floor,
+    # and pins cuDNN's untiled ones.
+    stand_ins = [
+        entry
+        for data in shipped_data().values()
+        for entry in data.coefficients
+        if entry.stand_ins and entry.estimator != "vae.qwen_image_2_1"
+    ]
     assert stand_ins, "the shipped data declares no stand-ins -- the check is broken"
     for entry in stand_ins:
         for name in entry.stand_ins:
