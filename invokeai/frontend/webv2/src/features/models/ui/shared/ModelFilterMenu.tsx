@@ -8,7 +8,7 @@ import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { MenuContent, Scrollable } from '@platform/ui';
-import { ManagerFilterButton, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
+import { ManagerFilterMenu, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
 import { ArrowUpDownIcon, CheckIcon, ChevronRightIcon, LayersIcon, ShapesIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,10 +86,12 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
     : undefined;
 
   return (
-    <Menu.Root closeOnSelect={false} positioning={ROOT_POSITIONING}>
-      <Menu.Trigger asChild>
-        <ManagerFilterButton activeCount={activeFilterCount} label={ariaLabel} />
-      </Menu.Trigger>
+    <ManagerFilterMenu
+      activeCount={activeFilterCount}
+      closeOnSelect={false}
+      label={ariaLabel}
+      positioning={ROOT_POSITIONING}
+    >
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="15rem" py="1">
@@ -146,7 +148,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
           </MenuContent>
         </Menu.Positioner>
       </Portal>
-    </Menu.Root>
+    </ManagerFilterMenu>
   );
 };
 

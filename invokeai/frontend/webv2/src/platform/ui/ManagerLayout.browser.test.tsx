@@ -18,7 +18,7 @@ import { listRowsFromItems } from './list/listRows';
 import {
   ManagerColumn,
   ManagerDetailHeader,
-  ManagerFilterButton,
+  ManagerFilterMenu,
   ManagerFilterResetItem,
   ManagerLayout,
   ManagerSearchField,
@@ -483,15 +483,40 @@ describe('ManagerLayout', () => {
     });
   });
 
+  it('names the icon-only filter trigger in a tooltip that leaves its menu working', async () => {
+    await render(
+      WIDE_PX,
+      <ManagerFilterMenu activeCount={1} label="Filter items">
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent>
+              <ManagerFilterResetItem activeCount={1} onReset={() => undefined} />
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </ManagerFilterMenu>
+    );
+    const trigger = page.getByRole('button', { name: 'Filter items, 1 active' });
+
+    await trigger.hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Filter items, 1 active');
+    await trigger.click();
+
+    // One trigger id serves both: the menu anchors to the button the tooltip describes.
+    const menu = page.getByRole('menu');
+    await expect.element(menu).toBeVisible();
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger.element().getAttribute('aria-controls')).toBe(menu.element().id);
+    expect(menu.element().getAttribute('aria-labelledby')).toBe(trigger.element().id);
+    expect(await auditAccessibility(host)).toEqual([]);
+  });
+
   it('badges the filter trigger with the active filter count, which its reset item clears', async () => {
     const FilterHarness = () => {
       const [count, setCount] = useState(2);
 
       return (
-        <Menu.Root closeOnSelect={false}>
-          <Menu.Trigger asChild>
-            <ManagerFilterButton activeCount={count} label="Filter items" />
-          </Menu.Trigger>
+        <ManagerFilterMenu activeCount={count} closeOnSelect={false} label="Filter items">
           <Portal>
             <Menu.Positioner>
               <MenuContent>
@@ -499,7 +524,7 @@ describe('ManagerLayout', () => {
               </MenuContent>
             </Menu.Positioner>
           </Portal>
-        </Menu.Root>
+        </ManagerFilterMenu>
       );
     };
     await render(WIDE_PX, <FilterHarness />);

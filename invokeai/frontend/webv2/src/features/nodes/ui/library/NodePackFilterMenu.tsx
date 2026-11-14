@@ -2,7 +2,7 @@ import type { NodePackFilters, NodePackSortField } from '@features/nodes/core/li
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { ManagerFilterButton, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
+import { ManagerFilterMenu, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { CheckIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -33,10 +33,12 @@ export const NodePackFilterMenu = ({
   };
 
   return (
-    <Menu.Root closeOnSelect={false} positioning={{ placement: 'bottom-end' }}>
-      <Menu.Trigger asChild>
-        <ManagerFilterButton activeCount={Number(filters.problemsOnly)} label={t('nodes.filterAndSort')} />
-      </Menu.Trigger>
+    <ManagerFilterMenu
+      activeCount={Number(filters.problemsOnly)}
+      closeOnSelect={false}
+      label={t('nodes.filterAndSort')}
+      positioning={{ placement: 'bottom-end' }}
+    >
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="13rem">
@@ -71,7 +73,7 @@ export const NodePackFilterMenu = ({
           </MenuContent>
         </Menu.Positioner>
       </Portal>
-    </Menu.Root>
+    </ManagerFilterMenu>
   );
 };
 

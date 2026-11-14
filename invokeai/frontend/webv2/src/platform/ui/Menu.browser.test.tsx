@@ -2,7 +2,7 @@ import { Box, ChakraProvider, Icon, Menu, Portal } from '@chakra-ui/react';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { CopyIcon } from 'lucide-react';
-import { act, useCallback, useMemo } from 'react';
+import { Activity, act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, server, userEvent } from 'vitest/browser';
@@ -750,5 +750,60 @@ describe('menu arrows', () => {
         );
       }
     );
+  });
+});
+
+/** Two sections kept alive by Activity, like the launchpad's pages, switched from outside them. */
+const MenuSections = () => {
+  const [isOtherShown, setIsOtherShown] = useState(false);
+  const showOther = useCallback(() => setIsOtherShown(true), []);
+  const showFirst = useCallback(() => setIsOtherShown(false), []);
+
+  return (
+    <ChakraProvider value={system}>
+      <button type="button" onClick={showFirst}>
+        First section
+      </button>
+      <button type="button" onClick={showOther}>
+        Other section
+      </button>
+      <Activity mode={isOtherShown ? 'hidden' : 'visible'}>
+        <Menu.Root>
+          <Menu.Trigger>Actions</Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent>
+                <MenuItem value="rename">Rename</MenuItem>
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Activity>
+    </ChakraProvider>
+  );
+};
+
+describe('menus in a hidden section', () => {
+  it('stay closed when their section returns after it was hidden while they faded out', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => root?.render(<MenuSections />));
+    const shownMenu = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="content"]')].find((menu) =>
+        menu.checkVisibility()
+      );
+
+    await userEvent.click(page.getByRole('button', { name: 'Actions' }));
+    await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
+    // Escape closes the menu, and a switch hides its section before the fade ends.
+    await act(() => userEvent.keyboard('{Escape}'));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Other section' })));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'First section' })));
+
+    await expect.poll(shownMenu).toBeUndefined();
+    // Fully usable again: the trigger opens it afresh.
+    await userEvent.click(page.getByRole('button', { name: 'Actions' }));
+    await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
   });
 });

@@ -34,7 +34,7 @@ import { listRowsFromItems } from '@platform/ui/list/listRows';
 import {
   ManagerColumn,
   ManagerDetailHeader,
-  ManagerFilterButton,
+  ManagerFilterMenu,
   ManagerFilterResetItem,
   ManagerLayout,
   ManagerSearchField,
@@ -628,10 +628,12 @@ const FontLibrary = () => {
                   setOffset(0);
                 }}
               />
-              <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
-                <Menu.Trigger asChild>
-                  <ManagerFilterButton activeCount={Number(filter !== 'all')} label={t('fonts.filterMenu')} />
-                </Menu.Trigger>
+              <ManagerFilterMenu
+                activeCount={Number(filter !== 'all')}
+                closeOnSelect={false}
+                label={t('fonts.filterMenu')}
+                positioning={FILTER_POSITION}
+              >
                 <Portal>
                   <Menu.Positioner>
                     <MenuContent minW="13rem">
@@ -662,7 +664,7 @@ const FontLibrary = () => {
                     </MenuContent>
                   </Menu.Positioner>
                 </Portal>
-              </Menu.Root>
+              </ManagerFilterMenu>
             </HStack>
             <List
               key={listKey}
