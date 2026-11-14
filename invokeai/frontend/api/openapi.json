@@ -80097,7 +80097,7 @@
           "format"
         ],
         "title": "Main_Checkpoint_MossImage_Config",
-        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both\nmay fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with\n`InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead."
+        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Dense (bf16/fp16/fp32) files load, and so do Comfy-Org's `int8_tensorwise` convrot export and\nunsloth's torchao fp8 export (fp8 weights with one scale per output row). The dense and int8 files may fuse each\nblock's `q`, `k`, `v` into `proj.qkv`; the fp8 export keeps them split. Any other quantization is refused at\ninstall with `InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead."
       },
       "Main_Checkpoint_QwenImage21_Config": {
         "properties": {

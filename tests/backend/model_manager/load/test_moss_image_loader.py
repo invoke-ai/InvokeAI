@@ -538,6 +538,120 @@ class TestFusedAndInt8Checkpoints:
         assert (forward(model) - expected).norm() / expected.norm() < 0.1
 
 
+class TestTorchaoFp8Checkpoint:
+    """unsloth's fp8 build: the block projections as `<layer>._weight_qdata` (float8_e4m3fn) plus a `[out, 1]` float32
+    scale, everything else dense. Real tiny tensors through the loader; compute is float32 on the CPU."""
+
+    QUANTIZED = ("q", "k", "v", "o", "ffn_up_gate", "ffn_down")
+
+    def _file(self, tmp_path: Path, prefix: str = "") -> tuple[Path, dict[str, torch.Tensor], dict[str, Any]]:
+        """The written file, the dense weights it keeps, and what each quantized layer means: (codes, scale)."""
+        dense = _tiny_state_dict(tiny_reference())
+        stored = dict(dense)
+        generator = torch.Generator().manual_seed(7)
+        quantized: dict[str, Any] = {}
+        for index in range(TINY_GEOMETRY["num_layers"]):
+            for name in self.QUANTIZED:
+                layer = f"layers.{index}.proj.{name}"
+                weight = dense.pop(f"{layer}.weight")
+                del stored[f"{layer}.weight"]
+                # Per-row and far from uniform, so a scale applied to the wrong rows or dropped shows in a forward.
+                scale = torch.rand(weight.shape[0], 1, generator=generator) * 3 + 0.25
+                codes = (weight / scale).to(torch.float8_e4m3fn)
+                stored[f"{layer}._weight_qdata"] = codes
+                stored[f"{layer}._weight_scale"] = scale
+                quantized[layer] = (codes, scale)
+        path = tmp_path / "MOSS-Image-Base-FP8.safetensors"
+        save_file({f"{prefix}{key}": value for key, value in stored.items()}, str(path))
+        return path, dense, quantized
+
+    def _load(
+        self, monkeypatch: pytest.MonkeyPatch, path: Path, *, keep_fp8: bool
+    ) -> tuple[Any, Any, dict[str, torch.Tensor]]:
+        """The model, its loader, and the tensors `load_file` returned for the real file."""
+        loaded: dict[str, torch.Tensor] = {}
+        real_load_file = loader_module.load_file
+
+        def recording_load_file(path: Any) -> dict[str, torch.Tensor]:
+            tensors = real_load_file(path)
+            loaded.update(tensors)
+            return tensors
+
+        monkeypatch.setattr(loader_module, "load_file", recording_load_file)
+        loader = _loader(MossImageCheckpointModel, monkeypatch)
+        loader._should_use_fp8 = lambda _config, _submodel=None: keep_fp8
+        config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+        return loader._load_model(config, SubModelType.Transformer), loader, loaded
+
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
+    def test_the_layers_the_forward_does_not_read_stay_fp8_and_still_compute_what_the_file_means(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, prefix: str
+    ) -> None:
+        path, dense, quantized = self._file(tmp_path, prefix)
+
+        model, loader, _ = self._load(monkeypatch, path, keep_fp8=True)
+
+        for layer in ("layers.0.proj.k", "layers.2.proj.ffn_down"):
+            codes, scale = quantized[layer]
+            module = model.get_submodule(layer)
+            assert module.weight.dtype is torch.float8_e4m3fn, layer
+            assert torch.equal(module.weight.view(torch.uint8), codes.view(torch.uint8)), layer
+            # Flat per-row, the form the fp8 matmul reads.
+            assert module.weight_scale.shape == (codes.shape[0],), layer
+            assert torch.equal(module.weight_scale, scale.reshape(-1)), layer
+        # `.proj.q` is a skip pattern: the forward reads its dtype, so it is folded with its scale applied.
+        for index in range(TINY_GEOMETRY["num_layers"]):
+            codes, scale = quantized[f"layers.{index}.proj.q"]
+            q = model.layers[index].proj["q"]
+            assert torch.equal(q.weight, codes.float() * scale), index
+            assert not hasattr(q, "weight_scale")
+        # Dense layers are untouched, bit for bit.
+        for key in ("video_embedder.weight", "text_embedder.blocks.0.qkv.weight", "final_linear_video.weight"):
+            assert torch.equal(model.state_dict()[key], dense[key]), key
+        loader._ram_cache.make_room.assert_called_once()
+
+        # The kept layers dequantize with their own per-row scale in the forward, as the cache runs them. The scales
+        # are far from uniform, so a dropped one or one paired with the wrong rows moves the output.
+        meant = dict(dense)
+        for layer, (codes, scale) in quantized.items():
+            meant[f"{layer}.weight"] = codes.float() * scale
+        apply_custom_layers_to_model(model)
+        torch.testing.assert_close(forward(model), forward(with_state_dict(meant)), rtol=1e-4, atol=1e-5)
+
+    def test_without_anything_asking_for_fp8_every_layer_is_folded_to_the_codes_times_the_scale(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, dense, quantized = self._file(tmp_path)
+
+        model, _, _ = self._load(monkeypatch, path, keep_fp8=False)
+
+        assert [name for name, p in model.named_parameters() if p.dtype is not torch.float32] == []
+        for layer, (codes, scale) in quantized.items():
+            assert torch.equal(model.get_submodule(layer).weight, codes.float() * scale), layer
+
+    def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The dense tensors are stored in the compute dtype, so neither the fold nor the cast replaces them; assigned
+        as parameters they would be slices of the file's mapping, which the cache's size calculation cannot see."""
+        path, dense, _ = self._file(tmp_path)
+
+        model, _, loaded = self._load(monkeypatch, path, keep_fp8=False)
+
+        for name in ("video_embedder.weight", "layers.0.norm1.weight"):
+            parameter = model.get_parameter(name)
+            assert parameter.data_ptr() != loaded[name].data_ptr(), name
+            assert torch.equal(parameter, dense[name])
+
+    def test_a_kept_fp8_load_does_not_copy_the_codes(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        path, _, _ = self._file(tmp_path)
+
+        model, _, loaded = self._load(monkeypatch, path, keep_fp8=True)
+
+        codes = model.get_parameter("layers.0.proj.k.weight")
+        assert codes.data_ptr() == loaded["layers.0.proj.k._weight_qdata"].data_ptr()
+
+
 class TestGGUFLoader:
     """unsloth's split layout and leejet's fused, metadata-free one, as real tiny GGUF files."""
 
