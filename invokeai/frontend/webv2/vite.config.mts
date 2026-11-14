@@ -181,6 +181,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
   '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
+  // The status bar and rails (editor boot) and the lazy Layers, Gallery and drop surfaces share this portal guard;
+  // alone it costs a boot request.
+  '/platform/react/isEventFromOwnDom.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
