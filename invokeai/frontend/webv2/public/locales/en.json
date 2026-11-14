@@ -1515,6 +1515,9 @@
       "weightMin": "Weight Min",
       "width": "Width"
     },
+    "defaultComponents": "Default Components",
+    "defaultComponentsHelp": "Filled in when you switch to this model; a component that already fits stays. Reset to model defaults applies them all.",
+    "defaultComponentsNone": "No default",
     "defaultSettings": "Default Settings",
     "defaultVae": "Default VAE",
     "defaultSettingsHelp": "Applied automatically when this model is selected. Off = use the app default.",
@@ -1632,7 +1635,7 @@
     "library": "Model library",
     "libraryMaintenance": "Model library maintenance",
     "linkedModel": "Linked model",
-    "linkedToCurrentSelection": "Linked to the current selection",
+    "linkedToModel": "Linked to {{name}}",
     "loadingModels": "Loading models…",
     "manageApiKeys": "Manage API keys",
     "manageModels": "Manage models",

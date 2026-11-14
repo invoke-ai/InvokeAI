@@ -2904,6 +2904,82 @@ describe('legacy records', () => {
       expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
     });
 
+    describe("the recalled model's default components", () => {
+      const defaultT5: ComponentModelConfig = {
+        base: 'any',
+        key: 't5-default',
+        name: 'Default T5',
+        type: 't5_encoder',
+      };
+      const recordedT5: ComponentModelConfig = {
+        base: 'any',
+        hash: 'blake3:recorded',
+        key: 't5-recorded',
+        name: 'Recorded T5',
+        type: 't5_encoder',
+      };
+      const defaultClip: ComponentModelConfig = {
+        base: 'any',
+        key: 'clip-default',
+        name: 'Default CLIP',
+        type: 'clip_embed',
+        variant: 'large',
+      };
+      const withDefaults: MainModelConfig = {
+        ...fluxModel,
+        default_settings: { components: { clip_embed_model: defaultClip.key, t5_encoder: defaultT5.key } },
+        key: 'flux-with-defaults',
+      };
+      const installed = [withDefaults, defaultT5, recordedT5, defaultClip];
+
+      it('fills the slots the image recorded nothing for, and lets a recorded component win', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: { ...recordedT5 } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(recordedT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      it('replaces a current selection that fits when the image recorded nothing for the slot, like Reset', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: withDefaults, modelKey: withDefaults.key, t5EncoderModel: recordedT5 },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+      });
+
+      it('lets a component the image recorded as empty clear the default', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: null },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel).toBeNull();
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      it('fills every slot of an image that recorded none', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+    });
+
     describe('reference-image adapters', () => {
       const adapter: ComponentModelConfig = {
         base: 'sdxl',

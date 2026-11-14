@@ -1,4 +1,4 @@
-import type { ModelConfig } from '@features/models/core/types';
+import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { CalibrationGraphCompiler } from '@features/models/core/workingMemory';
 import type { ReactNode } from 'react';
 
@@ -26,27 +26,60 @@ export type SchedulerPolicyModel = Pick<ModelConfig, 'base' | 'format' | 'varian
 
 export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: string | null) => ModelSchedulerPolicy;
 
+/** What Generate's component rules read of the main model: its architecture, and the bundle a self-contained one holds. */
+export type DefaultComponentSlotModel = Pick<ModelConfig, 'base' | 'format' | 'key' | 'name' | 'submodels' | 'variant'>;
+
+/** One component slot of a main model's family that the model can store a default for. */
+export interface DefaultComponentSlotPolicy {
+  /** The slot's name in `default_settings.components`. */
+  persistenceKey: string;
+  label: string;
+  /** Generate's help for the slot. */
+  helpText?: string;
+  modelTypes: readonly ModelTaxonomyType[];
+  /** Whether `candidate` may fill the slot, beside the other default components stored. */
+  filter: (candidate: ModelConfig) => boolean;
+}
+
 /**
- * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable`
- * when either failed, and `ready` with a reader that is replaced whenever the table changes.
+ * The slots Generate offers `model`, given the default components stored so far (a slot can depend on another: the
+ * vision tower appears only beside a GGUF Qwen3-VL encoder). `catalog` resolves the stored model keys; the VAE has
+ * its own default and is not listed.
  */
-export type SchedulerPolicyState =
+export type DefaultComponentSlotReader = (
+  model: DefaultComponentSlotModel,
+  components: Readonly<Record<string, string>>,
+  catalog: readonly ModelConfig[]
+) => readonly DefaultComponentSlotPolicy[];
+
+/**
+ * Generate's rules for a main model's defaults (the scheduler and the component slots): `loading` until the rules and
+ * the architecture table they read arrive, `unavailable` when either failed, and `ready` with readers that are
+ * replaced whenever the table changes.
+ */
+export type ModelDefaultsRulesState =
   | { status: 'loading' }
   | { status: 'unavailable' }
-  | { read: SchedulerPolicyReader; status: 'ready' };
+  | {
+      /** Whether Generate accepts `candidate` as the VAE of `model`, which may be of another base (MOSS-Image takes FLUX.2's). */
+      acceptsDefaultVae: (model: DefaultComponentSlotModel, candidate: ModelConfig) => boolean;
+      read: SchedulerPolicyReader;
+      readComponentSlots: DefaultComponentSlotReader;
+      status: 'ready';
+    };
 
-/** Generate's scheduler rules, loaded on first use so the Model Manager carries no Generation code at startup. */
-export interface SchedulerPolicySource {
-  getSnapshot: () => SchedulerPolicyState;
+/** Generate's rules for main-model defaults, loaded on first use so the Model Manager carries no Generation code at startup. */
+export interface ModelDefaultsRulesSource {
+  getSnapshot: () => ModelDefaultsRulesState;
   /** Starts loading the rules and the table, or retries after a failure; joins a load already running. */
   load: () => void;
   subscribe: (listener: () => void) => () => void;
 }
 
-const SCHEDULER_POLICY_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
+const DEFAULTS_RULES_UNAVAILABLE: ModelDefaultsRulesState = { status: 'unavailable' };
 /** For surfaces composed without Generation, such as isolated tests: the rules never arrive. */
-export const NO_SCHEDULER_POLICY: SchedulerPolicySource = {
-  getSnapshot: () => SCHEDULER_POLICY_UNAVAILABLE,
+export const NO_DEFAULTS_RULES: ModelDefaultsRulesSource = {
+  getSnapshot: () => DEFAULTS_RULES_UNAVAILABLE,
   load: () => undefined,
   subscribe: () => () => undefined,
 };
@@ -60,7 +93,7 @@ export interface ModelsUiAdapter {
   installInPlace: boolean;
   isProjectActive: (projectId: string) => boolean;
   managerProjectId: string | null;
-  schedulerPolicy: SchedulerPolicySource;
+  defaultsRules: ModelDefaultsRulesSource;
   setInstallInPlace: (installInPlace: boolean) => void;
 }
 
@@ -70,7 +103,7 @@ const DEFAULT_MODELS_UI_ADAPTER: ModelsUiAdapter = {
   installInPlace: true,
   isProjectActive: () => false,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
 
