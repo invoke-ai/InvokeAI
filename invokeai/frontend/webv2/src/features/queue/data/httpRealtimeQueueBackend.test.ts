@@ -7,6 +7,7 @@ const server = vi.hoisted(() => ({
 }));
 vi.mock('./serverApi', async (importOriginal) => ({ ...(await importOriginal<object>()), ...server }));
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { RequestDeadlineError } from '@platform/transport/http';
 
 import { CANCEL_ITEM_TIMEOUT_MS, queueBackend } from './httpRealtimeQueueBackend';
@@ -87,6 +88,36 @@ describe('queueBackend item cancel', () => {
     const cancel = queueBackend.cancelItem(7);
     const settled = expect(cancel).rejects.toBeInstanceOf(RequestDeadlineError);
     await vi.advanceTimersByTimeAsync(CANCEL_ITEM_TIMEOUT_MS);
+
+    await settled;
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('answers for no account once the one that asked has signed out, aborting its request', async () => {
+    accountLifecycle.activate('user-a');
+    let requestSignal: AbortSignal | undefined;
+    let answer!: (dto: unknown) => void;
+    // A server that answers whatever happens to the request.
+    server.cancelQueueItem.mockImplementation(
+      (_itemId: number, signal: AbortSignal) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          answer = resolve;
+        })
+    );
+
+    const cancel = queueBackend.cancelItem(7);
+    const settled = expect(cancel).rejects.toThrow('no longer active');
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    answer({
+      batch_id: 'batch',
+      created_at: '2026-11-14T00:00:00',
+      item_id: 7,
+      session_id: 's',
+      status: 'canceled',
+      updated_at: '2026-11-14T00:00:00',
+    });
 
     await settled;
     expect(requestSignal?.aborted).toBe(true);

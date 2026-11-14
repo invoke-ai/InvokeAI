@@ -103,8 +103,14 @@ export const QueueCluster = () => {
   }, []);
   // Shift-click reaches every item, so it confirms first; a plain click stops one item, the running one or between
   // items the next one waiting (the button's name says which), and does not.
+  // The later clicks of a double click are one gesture with the first, however long the system lets it take; the
+  // command's own settle window covers double taps from the keyboard and the palette.
   const handleCancelClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.detail > 1) {
+        return;
+      }
+
       if (event.shiftKey && cancelAll && !cancelAll.disabled) {
         void cancelAll.trigger();
         return;

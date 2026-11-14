@@ -264,23 +264,31 @@ describe('applyQueueItemStatusChange', () => {
     waiting: 0,
     ...overrides,
   });
-  const model = (overrides: Partial<QueueReadModel>): QueueReadModel => ({
-    current: null,
-    items: [],
-    next: null,
-    scope: { originPrefix: PROJECT },
-    status: { processor: { isProcessing: true, isStarted: true }, queue: counts({}) },
-    ...overrides,
-  });
-
-  it("takes only the whole queue's counts, never the owner's own counts an administrator also receives", () => {
-    const before = model({
-      scope: {},
+  /** A reading whose counts are its window's unless `queue` says otherwise (more waiting than it lists). */
+  const model = (
+    overrides: Partial<Omit<QueueReadModel, 'status'>>,
+    queue: Partial<QueueCounts> = {}
+  ): QueueReadModel => {
+    const items = overrides.items ?? [];
+    return {
+      current: null,
+      items,
+      next: null,
+      scope: { originPrefix: PROJECT },
+      ...overrides,
       status: {
         processor: { isProcessing: true, isStarted: true },
-        queue: counts({ userInProgress: 0, userPending: 4 }),
+        queue: counts({
+          inProgress: items.filter((candidate) => candidate.status === 'in_progress').length,
+          pending: items.filter((candidate) => candidate.status === 'pending').length,
+          ...queue,
+        }),
       },
-    });
+    };
+  };
+
+  it("takes only the whole queue's counts, never the owner's own counts an administrator also receives", () => {
+    const before = model({ scope: {} }, { userInProgress: 0, userPending: 4 });
 
     // Another user's item started; the event carries that user's own counts.
     const after = applyQueueItemStatusChange(before, {
@@ -293,13 +301,9 @@ describe('applyQueueItemStatusChange', () => {
     expect(after.status.queue).toMatchObject({ inProgress: 1, pending: 5, userInProgress: 0, userPending: 4 });
   });
 
-  it("leaves a scoped model's counts to its read, and a model alone for an item outside its scope", () => {
+  it("moves a scoped model's known item between its buckets, never taking the whole queue's counts", () => {
     const running = item(1, 'in_progress');
-    const before = model({
-      current: running,
-      items: [running],
-      status: { processor: { isProcessing: true, isStarted: true }, queue: counts({ inProgress: 1 }) },
-    });
+    const before = model({ current: running, items: [running] });
     const wholeQueue = counts({ canceled: 1, inProgress: 3, pending: 9, total: 13 });
 
     const after = applyQueueItemStatusChange(before, {
@@ -308,13 +312,60 @@ describe('applyQueueItemStatusChange', () => {
     });
 
     expect(after.current).toBeNull();
-    expect(after.status.queue).toBe(before.status.queue);
+    expect(after.status.queue).toMatchObject({ canceled: 1, inProgress: 0, pending: 0 });
     expect(
       applyQueueItemStatusChange(before, {
         item: item(9, 'in_progress', { origin: 'webv2:p:other:q:run-9' }),
         queueCounts: null,
       })
     ).toBe(before);
+  });
+
+  it("takes an event's whole-queue counts even when it already shows the item so, as after the viewer's own cancel", () => {
+    const running = item(1, 'in_progress', { origin: 'webv2:p:any:q:run' });
+    // This tab assumed the cancel; then the server's event says the same.
+    const assumed = applyQueueItemStatusChange(model({ current: running, items: [running], scope: {} }), {
+      item: { ...running, status: 'canceled', statusSequence: null },
+      queueCounts: null,
+    });
+    expect(assumed.status.queue).toMatchObject({ canceled: 1, inProgress: 0 });
+
+    const confirmed = applyQueueItemStatusChange(assumed, {
+      item: { ...running, status: 'canceled', statusSequence: 2 },
+      queueCounts: counts({ canceled: 4, inProgress: 2, pending: 6, total: 12 }),
+    });
+
+    expect(confirmed.status.queue).toMatchObject({ canceled: 4, inProgress: 2, pending: 6 });
+  });
+
+  describe('the window standing in for the next item', () => {
+    // Item 2 is next; it starts, and the window's next pending item in run order would stand in.
+    const window = () => [item(4, 'pending'), item(3, 'pending'), item(2, 'pending')];
+    const start2 = (before: QueueReadModel) =>
+      applyQueueItemStatusChange(before, { item: item(2, 'in_progress', { statusSequence: 2 }), queueCounts: null });
+
+    it('stands in when the window holds every pending item the counts report', () => {
+      expect(start2(model({ items: window(), next: item(2, 'pending') })).next?.id).toBe(3);
+    });
+
+    it('leaves the next item unknown when more wait than the window lists', () => {
+      // A long batch: the true next is older than every item the window shows.
+      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: 40 })).next).toBeNull();
+    });
+
+    it('leaves the next item unknown when the counts disagree with the window', () => {
+      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: 0 })).next).toBeNull();
+      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: -3 })).next).toBeNull();
+    });
+
+    it('leaves it unknown when an item the window does not list starts waiting', () => {
+      // The window holds every pending item; then an older item (a retry) waits again, which it does not list.
+      const before = model({ items: [item(9, 'pending'), item(8, 'pending')], next: null });
+
+      expect(
+        applyQueueItemStatusChange(before, { item: item(5, 'pending', { statusSequence: 3 }), queueCounts: null }).next
+      ).toBeNull();
+    });
   });
 
   it('names the next item in the order the server runs them: highest priority first, then oldest', () => {

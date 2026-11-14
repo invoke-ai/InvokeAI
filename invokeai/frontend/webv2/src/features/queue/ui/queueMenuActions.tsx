@@ -23,9 +23,16 @@ import { useTranslation } from 'react-i18next';
 
 import type { QueueUiNotificationPort, QueueViewer } from './QueueUiContext';
 
-import { cancelCurrentQueueItem, getCancelCurrentTarget } from './cancelCurrent';
+import { cancelCurrentQueueItem, getCancelCurrentTarget, getInProgressAnywhere } from './cancelCurrent';
 import { requestQueueConfirmation, type QueueConfirmation } from './queueConfirmationStore';
-import { refreshQueue, useIsProcessorPaused, useNowNextItems, useQueueCounts, useRecentItems } from './queueDataStore';
+import {
+  refreshQueue,
+  useIsProcessorPaused,
+  useNowNextItems,
+  useQueueCounts,
+  useQueueReadModelData,
+  useWholeQueueStatus,
+} from './queueDataStore';
 import {
   translateScoped,
   useQueueActionScope,
@@ -296,8 +303,8 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const serverCounts = useQueueCounts();
-  const { current, next } = useNowNextItems();
-  const recentItems = useRecentItems();
+  const { current } = useNowNextItems();
+  const readModel = useQueueReadModelData();
   const isPaused = useIsProcessorPaused();
   const queryScope = useQueueQueryScope();
   const scope = useQueueActionScope();
@@ -313,9 +320,14 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   } = useQueueUi();
   const counts = useMemo(() => getQueueActionCounts(serverCounts, scope, viewer), [scope, serverCounts, viewer]);
   const hasRunningItem = current?.status === 'in_progress' && canManageItem(current);
+  const wholeQueueStatus = useWholeQueueStatus(queryScope);
   const cancelCurrentTarget = useMemo(
-    () => getCancelCurrentTarget({ current, items: recentItems, next }, canManageItem),
-    [canManageItem, current, next, recentItems]
+    () =>
+      getCancelCurrentTarget(readModel, {
+        canManageItem,
+        inProgressAnywhere: getInProgressAnywhere(queryScope, readModel, wholeQueueStatus),
+      }),
+    [canManageItem, queryScope, readModel, wholeQueueStatus]
   );
   const localProjectId = scope.kind === 'project' ? activeProjectId : null;
   const localUnsubmitted = useScopedLocalRuns().length;

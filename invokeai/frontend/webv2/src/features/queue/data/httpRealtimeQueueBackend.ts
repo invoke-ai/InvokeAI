@@ -65,13 +65,13 @@ export const queueBackend: QueueBackendPort = {
   },
   cancelItem: async (itemId) => {
     const owner = captureAccountScope();
+    // An account change aborts the request; either way it ends, the answer belongs to the account that asked or to
+    // nobody, and the caller hears that as the account being gone.
     const item = await withRequestDeadline(
       (signal) => cancelQueueItem(itemId, signal),
       CANCEL_ITEM_TIMEOUT_MS,
       owner.signal
-    );
-
-    assertAccountScopeCurrent(owner);
+    ).finally(() => assertAccountScopeCurrent(owner));
 
     return mapQueueItemDTO(item);
   },

@@ -137,12 +137,50 @@ const isNewerReading = (known: QueueItemReadModel, change: QueueItemReadModel): 
     ? change.statusSequence > known.statusSequence
     : !isFinished(known.status);
 
+const COUNT_KEYS: Record<QueueItemReadModel['status'], keyof QueueCounts> = {
+  canceled: 'canceled',
+  completed: 'completed',
+  failed: 'failed',
+  in_progress: 'inProgress',
+  pending: 'pending',
+  waiting: 'waiting',
+};
+
+/** The whole-queue counts an event carries, over the reading's own counts of the viewer's items. */
+const withEventCounts = (counts: QueueCounts, event: QueueCounts): QueueCounts => ({
+  ...counts,
+  canceled: event.canceled,
+  completed: event.completed,
+  failed: event.failed,
+  inProgress: event.inProgress,
+  pending: event.pending,
+  total: event.total,
+  waiting: event.waiting,
+});
+
 /**
- * The read model with one item's status change applied at once, so the current and next items are right before the
- * read that reconciles them lands. A change outside the model's scope, or not newer than what the model holds,
- * changes nothing. Only an unscoped model can take counts from an event, and only its whole-queue counts: the
- * own-item counts and the current item's identifiers in an event are the item owner's, and a scoped model's counts
- * cover only its scope. The reconciling read brings the rest.
+ * Moves one item between two count buckets, as a change of an item in the counts' scope does; the viewer's own counts
+ * wait for the read, since whose item it is is not known here.
+ */
+const shiftCounts = (
+  counts: QueueCounts,
+  from: QueueItemReadModel['status'],
+  to: QueueItemReadModel['status']
+): QueueCounts =>
+  from === to
+    ? counts
+    : {
+        ...counts,
+        [COUNT_KEYS[from]]: Math.max(0, (counts[COUNT_KEYS[from]] as number) - 1),
+        [COUNT_KEYS[to]]: (counts[COUNT_KEYS[to]] as number) + 1,
+      };
+
+/**
+ * The read model with one item's status change applied at once, so the current and next items and the counts are
+ * right before the read that reconciles them lands. A change outside the model's scope, or not newer than what the
+ * model holds, changes no item. Counts: an unscoped model takes an event's whole-queue counts, even when it already
+ * shows the item so (as after the viewer's own cancel); otherwise a change to an item the model knows moves it between
+ * buckets. The viewer's own counts wait for the read: an event's are the item owner's.
  */
 export const applyQueueItemStatusChange = (
   model: QueueReadModel,
@@ -155,9 +193,12 @@ export const applyQueueItemStatusChange = (
   }
 
   const known = [model.current, model.next, ...model.items].find((candidate) => candidate?.id === item.id) ?? null;
+  const eventCounts = queueCounts && !originPrefix ? withEventCounts(model.status.queue, queueCounts) : null;
 
   if (known && (known.status === item.status || !isNewerReading(known, item))) {
-    return model;
+    return eventCounts && known.status === item.status
+      ? { ...model, status: { ...model.status, queue: eventCounts } }
+      : model;
   }
 
   const updated: QueueItemReadModel = known
@@ -174,47 +215,59 @@ export const applyQueueItemStatusChange = (
     : item;
   const items = model.items.map((candidate) => (candidate.id === item.id ? updated : candidate));
   const others = items.filter((candidate) => candidate.id !== item.id);
-  const oldestOf = (status: 'in_progress' | 'pending') =>
-    others.filter((candidate) => candidate.status === status).sort(compareQueuedItems)[0] ?? null;
   const current =
     item.status === 'in_progress'
       ? (model.current ?? updated)
       : model.current?.id === item.id
-        ? oldestOf('in_progress')
+        ? (others.filter((candidate) => candidate.status === 'in_progress').sort(compareQueuedItems)[0] ?? null)
         : model.current;
-  // Until the read names the server's, the window's first pending item in run order stands in.
+  const counts =
+    eventCounts ?? (known ? shiftCounts(model.status.queue, known.status, item.status) : model.status.queue);
+  // Until the read names the server's next item, the window's first pending item in run order stands in, but only
+  // when the window holds exactly the pending items the counts report: the window is the newest items, and the true
+  // next may be older than all of them (a long batch, or a member's own items among everyone's). An item the window
+  // does not list turning pending, or counts that disagree with the window, leave the next item unknown until then.
+  const pendingInWindow = items.filter((candidate) => candidate.status === 'pending');
+  const standIn =
+    (known || item.status !== 'pending') && pendingInWindow.length === counts.pending
+      ? (pendingInWindow.sort(compareQueuedItems)[0] ?? null)
+      : null;
   const next =
     model.next?.id === item.id
       ? item.status === 'pending'
         ? updated
-        : oldestOf('pending')
+        : standIn
       : model.next === null && item.status === 'pending'
-        ? updated
+        ? standIn
         : model.next;
-  const counts =
-    queueCounts && !originPrefix
-      ? {
-          ...model.status.queue,
-          canceled: queueCounts.canceled,
-          completed: queueCounts.completed,
-          failed: queueCounts.failed,
-          inProgress: queueCounts.inProgress,
-          pending: queueCounts.pending,
-          total: queueCounts.total,
-          waiting: queueCounts.waiting,
-        }
-      : model.status.queue;
 
   return { ...model, current, items, next, status: { ...model.status, queue: counts } };
 };
 
 /**
- * Apply a status change to every loaded read model at once, so the current and next items are right before the
- * coalesced invalidation's read reconciles them. Only data already in the cache changes.
+ * Apply a status change to every loaded read model at once, and to the whole queue's status read, so the current and
+ * next items and what runs anywhere are right before the coalesced invalidation's read reconciles them. Only data
+ * already in the cache changes.
  */
 export const applyQueueItemStatusToReadModels = (queryClient: QueryClient, change: QueueItemStatusChange): void => {
+  const previous = readQueueReadModels(queryClient)
+    .flatMap(([, model]) => (model ? [model.current, model.next, ...model.items] : []))
+    .find((candidate) => candidate?.id === change.item.id)?.status;
+
   queryClient.setQueriesData<QueueReadModel>({ queryKey: [...queueKeys.all, 'read-model'] }, (model) =>
     model ? applyQueueItemStatusChange(model, change) : model
+  );
+  queryClient.setQueryData<QueueStatusReadModel>(queueKeys.status({}), (status) =>
+    status
+      ? {
+          ...status,
+          queue: change.queueCounts
+            ? withEventCounts(status.queue, change.queueCounts)
+            : previous
+              ? shiftCounts(status.queue, previous, change.item.status)
+              : status.queue,
+        }
+      : status
   );
 };
 

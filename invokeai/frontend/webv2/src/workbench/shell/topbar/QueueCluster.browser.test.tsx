@@ -2,10 +2,12 @@
 import type * as QueueDataStore from '@features/queue/ui/queueDataStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { CANCEL_CURRENT_SETTLE_MS } from '@features/queue/ui/cancelCurrent';
 import { clearQueueConfirmation } from '@features/queue/ui/queueConfirmationStore';
 import { QueueDataRuntime } from '@features/queue/ui/QueueDataRuntime';
 import { createTestLocalRun, createTestQueueUiAdapter } from '@features/queue/ui/queueUiAdapter.testing';
 import { QueueUiProvider, type QueueLocalRun } from '@features/queue/ui/QueueUiContext';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -15,6 +17,11 @@ import { userEvent } from 'vitest/browser';
 
 const state = vi.hoisted(() => ({
   isConnected: true,
+  /** The queue processor is paused. */
+  isPaused: false,
+  /** "Show jobs from" the active project; with it, how many items run anywhere in the queue. */
+  projectScoped: false,
+  wholeQueueInProgress: 0,
   localItems: [] as unknown[],
   /** This tab's runs the backend has not accepted, which only cancel-all reaches. */
   localRuns: [] as QueueLocalRun[],
@@ -98,6 +105,14 @@ const render = async ({
 }: { current?: ReturnType<typeof serverItem> | null; items?: ReturnType<typeof serverItem>[] } = {}) => {
   client = new QueryClient();
   client.setQueryData(['queue', 'read-model', 'all'], readModel({ current, items }));
+  if (state.projectScoped) {
+    // The whole queue's status read the Launchpad shares, fresh, so nothing reads it again here.
+    const whole = readModel({ current: null, items: [] }).status;
+    client.setQueryData(['queue', 'status', 'all'], {
+      ...whole,
+      queue: { ...whole.queue, inProgress: state.wholeQueueInProgress },
+    });
+  }
   state.serverItems ??= structuredClone(items);
 
   await act(() =>
@@ -106,6 +121,9 @@ const render = async ({
         <QueryClientProvider client={client}>
           <QueueUiProvider
             adapter={createTestQueueUiAdapter({
+              activeProjectId: 'project-1',
+              canManageItem: (item) => item.userId !== 'someone-else',
+              queueJobsScope: state.projectScoped ? 'active-project' : 'all',
               isConnected: state.isConnected,
               localRuns: state.localRuns,
               notify,
@@ -142,7 +160,7 @@ const readModel = ({
     next: open.filter((item) => item.status === 'pending').sort((left, right) => left.id - right.id)[0] ?? null,
     scope: {},
     status: {
-      processor: { isProcessing: true, isStarted: true },
+      processor: { isProcessing: true, isStarted: !state.isPaused },
       queue: {
         canceled: 0,
         completed: 0,
@@ -185,6 +203,9 @@ beforeEach(() => {
   state.isConnected = true;
   state.localItems = [];
   state.localRuns = [];
+  state.isPaused = false;
+  state.projectScoped = false;
+  state.wholeQueueInProgress = 0;
   state.serverItems = null;
   notify.error.mockClear();
   notify.info.mockClear();
@@ -200,6 +221,10 @@ afterEach(async () => {
   clearQueueConfirmation();
   await act(() => root.unmount());
   host.remove();
+  // A cancel that stopped an item keeps the command busy for its settle window; a new account ends it, so the next
+  // test starts free.
+  accountLifecycle.invalidate();
+  accountLifecycle.activate('queue-cluster-test');
 });
 
 describe('QueueCluster', () => {
@@ -250,14 +275,51 @@ describe('QueueCluster', () => {
     await render();
 
     await act(() => userEvent.dblClick(cancelButton()));
-    // The canceled item already shows as such, and the button stays live for the next one.
-    expect(cancelButton().disabled).toBe(false);
     await act(() => answer());
     await vi.waitFor(() => expect(notify.success).toHaveBeenCalledOnce());
     expect(commands.cancelItem.mock.calls).toEqual([[7]]);
 
+    // Once the reconciling read has landed and the settle window is over, a deliberate click stops the next item.
+    await vi.waitFor(() => expect(cancelButton().getAttribute('aria-label')).toBe('widgets.queue.cancelNextItem'));
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, CANCEL_CURRENT_SETTLE_MS + 100);
+        })
+    );
     await act(() => userEvent.click(cancelButton()));
     await vi.waitFor(() => expect(commands.cancelItem.mock.calls).toEqual([[7], [8]]));
+  });
+
+  it('stops nothing waiting while the processor is paused: the × is disabled', async () => {
+    state.isPaused = true;
+    await render({ current: null, items: [serverItem(7, 'completed'), serverItem(8, 'pending')] });
+
+    expect(cancelButton().disabled).toBe(true);
+  });
+
+  it("in a project view, stops nothing waiting while another project's item runs: the × is disabled", async () => {
+    state.projectScoped = true;
+    state.wholeQueueInProgress = 1;
+    // The project's own reading: nothing of its own runs, and its next item waits.
+    await render({ current: null, items: [serverItem(7, 'completed'), serverItem(8, 'pending')] });
+
+    expect(cancelButton().disabled).toBe(true);
+  });
+
+  it('in a project view, offers the next item while nothing runs anywhere', async () => {
+    state.projectScoped = true;
+    await render({ current: null, items: [serverItem(7, 'completed'), serverItem(8, 'pending')] });
+
+    expect(cancelButton().disabled).toBe(false);
+    expect(cancelButton().getAttribute('aria-label')).toBe('widgets.queue.cancelNextItem');
+  });
+
+  it("stops nothing waiting while someone else's item runs: the × is disabled", async () => {
+    const theirs = { ...serverItem(20, 'in_progress'), userId: 'someone-else' };
+    await render({ current: theirs, items: [serverItem(21, 'pending'), theirs] });
+
+    expect(cancelButton().disabled).toBe(true);
   });
 
   it('shows the item running again and says the cancel failed, so the next click tries it again', async () => {
