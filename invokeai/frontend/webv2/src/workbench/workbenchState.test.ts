@@ -10588,6 +10588,54 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     });
   });
 
+  it('keeps each open project its own follow state, and drops it with the project', () => {
+    const startRun = (current: WorkbenchState) => {
+      let state = submitGenerate(primeGenerate(withInvocationDestination(current, 'canvas'), { batchCount: 2 }));
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0]!;
+      state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+      state = workbenchReducer(state, {
+        backendItemIds: [11, 12],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'markQueueItemBackendSubmitted',
+      });
+      return { projectId: project.id, queueItemId: queueItem.id, state };
+    };
+    const selectedIn = (state: WorkbenchState, projectId: string) => {
+      const project = state.projects.find((candidate) => candidate.id === projectId)!;
+      return getCanvasStagingSlots(project.canvas, project.queue.items)[project.canvas.stagingArea.selectedImageIndex];
+    };
+    const a = startRun(createInitialWorkbenchState());
+    // Pin the second image of A, then open B and start a run there.
+    let state = workbenchReducer(a.state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, { type: 'createProject' });
+    const b = startRun(state);
+    state = b.state;
+
+    // A first frame in A, now in the background, is recorded and followed there; B is left alone.
+    state = workbenchReducer(state, {
+      itemIndex: 1,
+      projectId: a.projectId,
+      queueItemId: a.queueItemId,
+      type: 'noteQueueItemFirstProgressFrame',
+    });
+    expect(state.canvasStagingFollow?.[a.projectId]?.framedSlotIds).toEqual([`${a.queueItemId}:0`]);
+    // A's pin holds over its first image's frame.
+    expect(selectedIn(state, a.projectId)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    expect(state.canvasStagingFollow?.[b.projectId]).toBeUndefined();
+
+    // A pick in B pins B's slot and leaves A's pin as it was.
+    state = workbenchReducer(state, { imageIndex: 0, type: 'setStagedImageIndex' });
+    expect(state.canvasStagingFollow?.[b.projectId]?.pinnedSlotId).toBe(`${b.queueItemId}:0`);
+    expect(state.canvasStagingFollow?.[a.projectId]?.pinnedSlotId).toBe(`${a.queueItemId}:1`);
+
+    // Closing A takes its follow state with it.
+    state = workbenchReducer(state, { projectId: a.projectId, type: 'closeProject' });
+    expect(state.canvasStagingFollow?.[a.projectId]).toBeUndefined();
+    expect(state.canvasStagingFollow?.[b.projectId]?.pinnedSlotId).toBe(`${b.queueItemId}:0`);
+  });
+
   it.each(['off', 'latest'] as const)("'%s' keeps its selection when a slot shows its first frame", (mode) => {
     let state = submitGenerate(primeGenerate(undefined, { batchCount: 2 }));
     const project = getActiveProject(state);

@@ -120,8 +120,20 @@ export const getLayeredKeys = (ownerId: string): Readonly<Record<string, Layered
   return ownerId === PROJECT_SETTINGS_OWNER ? table.projectSettings : table.widgetValues[ownerId];
 };
 
+/**
+ * Every Auto-switch mode, keyed by the shared policy's union (`ViewerAutoSwitchMode` is `AutoSwitchMode`): a mode added
+ * there fails to compile here until it is listed, so a stored value is never reset to `off` for being unknown. A record
+ * rather than the policy's own list: importing it would bring the Queue contracts into the boot graph with the
+ * settings store.
+ */
+const VIEWER_AUTO_SWITCH_MODES: Readonly<Record<ViewerAutoSwitchMode, true>> = {
+  latest: true,
+  off: true,
+  progress: true,
+};
+
 export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
-  value === 'off' || value === 'latest' || value === 'progress';
+  typeof value === 'string' && Object.hasOwn(VIEWER_AUTO_SWITCH_MODES, value);
 
 /** Keeps the project's own pins (absent follows the user's default) and drops everything else it does not own. */
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => {

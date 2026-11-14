@@ -63,15 +63,16 @@ import {
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
 
-/**
- * The user picked a staged slot, by click, focus or stepping: it is selected, and Auto-switch follows the pick as
- * Preview's does (`pickAutoSwitch`). A finished result pauses it (Off); a slot still generating turns it to In
- * progress, and the workbench pins that slot (`canvasStagingFollow`). Picking the slot already selected still counts.
- */
 /** Auto-switch after the user picks this slot: the one pick rule, shared with Preview. */
 export const pickStagedSlotAutoSwitch = (slot: CanvasStagingSlot) =>
   pickAutoSwitch(slot.kind === 'placeholder' ? { id: slot.id, kind: 'live' } : { kind: 'result' });
 
+/**
+ * The user picked a staged slot, by a click or right-click, an arrow key from the selected thumbnail or a step (never
+ * by Tab focus): it is selected, and Auto-switch follows the pick as Preview's does (`pickStagedSlotAutoSwitch`). A
+ * finished result pauses it (Off); a slot still generating turns it to In progress, and the workbench pins that slot
+ * (`canvasStagingFollow`). Picking the slot already selected still counts.
+ */
 const pickStagedSlot = (project: Project, imageIndex: number): Project => {
   const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
   const selectedImageIndex = clampStagedImageIndex(imageIndex, slots.length);

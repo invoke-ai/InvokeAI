@@ -571,9 +571,11 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         />
       ) : null}
       <CanvasColorFeed engine={engine} />
-      {engine ? <CanvasFrameLockFeed key={projectId} engine={engine} projectId={projectId} /> : null}
-      {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
-      {engine ? <CanvasStagedRegionsFeed key={projectId} engine={engine} projectId={projectId} /> : null}
+      {engine ? <CanvasFrameLockFeed key={`${projectId}:frame-lock`} engine={engine} projectId={projectId} /> : null}
+      {engine ? <CanvasEditRefusalNotices key={`${projectId}:edit-refusals`} engine={engine} /> : null}
+      {engine ? (
+        <CanvasStagedRegionsFeed key={`${projectId}:staged-regions`} engine={engine} projectId={projectId} />
+      ) : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
