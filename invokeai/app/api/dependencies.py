@@ -23,6 +23,7 @@ from invokeai.app.services.external_generation.providers import (
     GeminiProvider,
     OpenAIProvider,
     SeedreamProvider,
+    UberLLMProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.files.files_disk import DiskFileService
@@ -207,6 +208,7 @@ class ApiDependencies:
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),
+                UberLLMProvider.provider_id: UberLLMProvider(app_config=configuration, logger=logger),
             },
             logger=logger,
             record_store=model_record_service,

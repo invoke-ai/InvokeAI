@@ -377,3 +377,31 @@ class AtlasCloudImageGenerationInvocation(BaseExternalImageGenerationInvocation)
     )
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
     reference_images: list[ImageField] = InputField(default=[], description="Reference images", ui_hidden=True)
+
+
+@invocation(
+    "uberllm_image_generation",
+    title="UberLLM Image Generation",
+    tags=["external", "generation", "uberllm"],
+    category="image",
+    version="1.0.0",
+)
+class UberLLMImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images through the UberLLM image API."""
+
+    provider_id = "uberllm"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["uberllm"],
+    )
+
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image for img2img/inpaint", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+    reference_images: list[ImageField] = InputField(default=[], description="Reference images", ui_hidden=True)

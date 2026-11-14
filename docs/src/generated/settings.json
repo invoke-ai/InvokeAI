@@ -1254,6 +1254,28 @@
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for UberLLM image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_UBERLLM_API_KEY",
+      "literal_values": [],
+      "name": "external_uberllm_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for UberLLM image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_UBERLLM_BASE_URL",
+      "literal_values": [],
+      "name": "external_uberllm_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
     }
   ]
 }

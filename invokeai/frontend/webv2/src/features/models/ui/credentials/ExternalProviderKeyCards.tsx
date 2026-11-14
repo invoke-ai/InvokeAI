@@ -37,6 +37,7 @@ const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
   gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
   seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
+  uberllm: { icon: CloudIcon, placeholder: 'ull_…', title: 'UberLLM' },
 };
 
 /** One key card per provider the backend reports, from the shared store. */
