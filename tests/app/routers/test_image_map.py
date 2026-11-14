@@ -9,11 +9,13 @@ from typing import AbstractSet
 
 import numpy as np
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import insert
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers import image_map as image_map_router_module
 from invokeai.app.api_app import app
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -1355,30 +1357,39 @@ def test_search_by_image_rejects_bad_inputs(client: TestClient) -> None:
         )
 
 
-def test_search_by_image_revalidates_redirect_targets(monkeypatch, client: TestClient) -> None:
-    # A public URL redirecting to a private address must be refused: requests'
-    # automatic redirect following is disabled and every hop is re-validated.
-    import requests
+class _FakeRedirect:
+    status_code = 302
+    is_redirect = True
+    headers = {"location": "http://127.0.0.1:9090/steal"}
 
-    class FakeRedirect:
-        status_code = 302
-        is_redirect = True
-        headers = {"location": "http://127.0.0.1:9090/steal"}
+    def __enter__(self):
+        return self
 
+    def __exit__(self, *args):
+        return False
+
+
+def _fake_guarded_session(calls: list[str]):
+    class FakeSession:
         def __enter__(self):
             return self
 
         def __exit__(self, *args):
             return False
 
+        def get(self, url, **kwargs):
+            calls.append(url)
+            assert kwargs.get("allow_redirects") is False
+            return _FakeRedirect()
+
+    return FakeSession
+
+
+def test_search_by_image_revalidates_redirect_targets(monkeypatch, client: TestClient) -> None:
+    # A public URL redirecting to a private address must be refused: requests'
+    # automatic redirect following is disabled and every hop is re-validated.
     calls: list[str] = []
-
-    def fake_get(url, **kwargs):
-        calls.append(url)
-        assert kwargs.get("allow_redirects") is False
-        return FakeRedirect()
-
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(image_map_router_module, "build_guarded_session", _fake_guarded_session(calls))
     monkeypatch.setattr(
         "socket.getaddrinfo",
         lambda host, port, **kw: [
@@ -1392,6 +1403,50 @@ def test_search_by_image_revalidates_redirect_targets(monkeypatch, client: TestC
     # The first (public) hop was fetched; the redirect target failed
     # validation before any second request was issued.
     assert calls == ["http://public.example/a.png"]
+
+
+def test_search_by_image_rejects_nat64_mapped_loopback(monkeypatch, client: TestClient) -> None:
+    # 64:ff9b::/96 can translate to an IPv4 address (here 127.0.0.1); it must be refused both as a
+    # literal and as a hostname that resolves to it.
+    monkeypatch.setattr(
+        "socket.getaddrinfo",
+        lambda host, port, **kw: [(None, None, None, None, ("64:ff9b::7f00:1", port, 0, 0))],
+    )
+    import requests
+
+    calls: list[str] = []
+    monkeypatch.setattr(requests, "get", lambda url, **kw: calls.append(url))
+    monkeypatch.setattr(image_map_router_module, "build_guarded_session", _fake_guarded_session(calls), raising=False)
+    for bad_url in ("http://[64:ff9b::7f00:1]/a.png", "http://nat64.example/a.png"):
+        response = client.post("/api/v1/image_map/search_by_image", params={"image_url": bad_url})
+        assert response.status_code == 422, bad_url
+    # Refused before any request was issued.
+    assert calls == []
+
+
+def test_search_by_image_download_ignores_proxy_environment(monkeypatch) -> None:
+    # With HTTP(S)_PROXY / ALL_PROXY set, the fetch must still connect directly (where the peer
+    # address is checked) instead of handing the URL to the proxy.
+    import requests
+
+    proxied: list[str] = []
+
+    def fake_send(self, request, **kwargs):
+        proxied.append(str(kwargs.get("proxies")))
+        raise requests.ConnectionError("stop")
+
+    monkeypatch.setattr(
+        "socket.getaddrinfo", lambda host, port, **kw: [(None, None, None, None, ("93.184.216.34", port))]
+    )
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.setenv(name, "http://127.0.0.1:3128")
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", fake_send)
+
+    with pytest.raises(HTTPException) as exc:
+        image_map_router_module._download_search_image("http://public.example/a.png")
+
+    assert exc.value.status_code == 422
+    assert proxied and "3128" not in proxied[0]
 
 
 def test_multiuser_image_search_enforces_read_access_and_user_scope(
