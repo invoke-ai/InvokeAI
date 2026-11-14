@@ -31,7 +31,7 @@ import {
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
 
-const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud', 'atlascloud'];
+const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud', 'atlascloud', 'minimax'];
 
 function resolveProviderIcon(providerId: string): IconType | null {
   const provider = providerId.toLowerCase();
@@ -283,7 +283,7 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
           {ProviderIcon && <ProviderIcon />}
           <Flex flexDir="column" gap={1} mt="-0.5">
             <Heading size="xs" textTransform="capitalize" display="flex" alignItems="center" gap={2}>
-              {provider.provider_id}
+              {provider.provider_id === 'minimax' ? 'MiniMax' : provider.provider_id}
             </Heading>
             <Text variant="subtext">
               {t('modelManager.externalProviderCardDescription', { providerId: provider.provider_id })}

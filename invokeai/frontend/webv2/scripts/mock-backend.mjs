@@ -404,7 +404,7 @@ const getStarterModelsResponse = (state) => {
 };
 
 /** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
-const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'minimax', 'openai', 'seedream'];
 
 /**
  * Hosted-provider credentials as the config route reports them. A provider the profile's hosted records route to has a
