@@ -10,11 +10,14 @@ Originally written for the Qwen Image loader; shared so the Wan loader doesn't
 need a second copy.
 """
 
+from typing import Any, Mapping
+
 import torch
 
 from invokeai.backend.quantization.fp8_scaled import (
     expand_weight_scale,
     is_scale_metadata_key,
+    iter_weight_scale_pairs,
     reject_undecoded_mx_scale,
 )
 from invokeai.backend.quantization.int8_convrot import reject_int8_layers_a_plain_fold_cannot_decode
@@ -44,32 +47,40 @@ def _dequantize_comfyui_fp8(sd: dict, compute_dtype: torch.dtype, what: str = "T
     in the file is a scale that still needs applying — i.e. a checkpoint must not ship
     already-dequantized weights alongside their scales.
     """
-    reject_nvfp4_layers_a_plain_fold_cannot_decode(sd, what)
-    reject_int8_layers_a_plain_fold_cannot_decode(sd, what)
-    scale_suffixes = (".weight_scale", ".scale_weight")
-    weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]
+    reject_layers_the_fold_cannot_decode(sd, what)
     count = 0
-    for scale_key in weight_scale_keys:
-        for suffix in scale_suffixes:
-            if scale_key.endswith(suffix):
-                weight_key = scale_key[: -len(suffix)] + ".weight"
-                break
-        if weight_key not in sd:
-            continue
-        # Before the cast: `.to(compute_dtype)` on an E8M0 grid converts the exponent bytes to
-        # floats and loses the only evidence of what they were.
-        reject_undecoded_mx_scale(weight_key[: -len(".weight")], sd[scale_key])
-        weight = sd[weight_key].to(compute_dtype)
-        scale = sd[scale_key].to(compute_dtype)
-        # Through the shared expansion rather than a local copy of it. The copy that used to live
-        # here compared `scale.shape[dim] != weight.shape[dim]`, so a per-output-channel scale --
-        # whose length already equals the number of rows -- was expanded by nothing and left to
-        # broadcasting, which aligns on the *last* axis. That scales columns instead of rows: a
-        # shape error on a non-square weight, and on a square one (every attention out-projection)
-        # a model that loads and generates noise.
-        sd[weight_key] = weight * expand_weight_scale(weight, scale, weight_key)
+    for weight_key, scale_key in iter_weight_scale_pairs(sd):
+        sd[weight_key] = fold_comfyui_fp8_scale(sd[weight_key], sd[scale_key], weight_key, compute_dtype)
         count += 1
     return count
+
+
+def reject_layers_the_fold_cannot_decode(sd: Mapping[str, Any], what: str = "This checkpoint") -> None:
+    """Refuse the quantized layers that share scaled fp8's key layout but that a plain fold would turn into noise.
+
+    Reads keys, dtypes and the ``.comfy_quant`` marker blobs only, so a loader that reads a file one tensor at a
+    time can run it over the header's ``meta`` tensors (with the markers read) before any weight is read.
+    """
+    reject_nvfp4_layers_a_plain_fold_cannot_decode(sd, what)
+    reject_int8_layers_a_plain_fold_cannot_decode(sd, what)
+
+
+def fold_comfyui_fp8_scale(
+    weight: torch.Tensor, scale: torch.Tensor, weight_key: str, compute_dtype: torch.dtype
+) -> torch.Tensor:
+    """``weight`` with its ComfyUI ``weight_scale`` multiplied in, at ``compute_dtype``."""
+    # Before the cast: `.to(compute_dtype)` on an E8M0 grid converts the exponent bytes to
+    # floats and loses the only evidence of what they were.
+    reject_undecoded_mx_scale(weight_key[: -len(".weight")], scale)
+    weight = weight.to(compute_dtype)
+    scale = scale.to(compute_dtype)
+    # Through the shared expansion rather than a local copy of it. The copy that used to live
+    # here compared `scale.shape[dim] != weight.shape[dim]`, so a per-output-channel scale --
+    # whose length already equals the number of rows -- was expanded by nothing and left to
+    # broadcasting, which aligns on the *last* axis. That scales columns instead of rows: a
+    # shape error on a non-square weight, and on a square one (every attention out-projection)
+    # a model that loads and generates noise.
+    return weight * expand_weight_scale(weight, scale, weight_key)
 
 
 def _strip_quantization_metadata(sd: dict) -> None:

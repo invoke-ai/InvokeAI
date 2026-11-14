@@ -681,6 +681,7 @@ export const cloneGenerateWidgetValues = (
   qwen3VLVisionTowerModel: values.qwen3VLVisionTowerModel ? { ...values.qwen3VLVisionTowerModel } : null,
   qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
   animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
+  flux3PromptUpsamplerModel: values.flux3PromptUpsamplerModel ? { ...values.flux3PromptUpsamplerModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
@@ -781,6 +782,7 @@ export const syncGenerateWidgetValuesWithModels = (
     qwen3VLVisionTowerModel: syncModelIdentifierWithModels(values.qwen3VLVisionTowerModel, modelsByKey),
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
     animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
+    flux3PromptUpsamplerModel: syncModelIdentifierWithModels(values.flux3PromptUpsamplerModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
     refinerModel: isMainModelConfig(refinerModel) ? refinerModel : values.refinerModel,
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
@@ -801,6 +803,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.qwen3VLVisionTowerModel === values.qwen3VLVisionTowerModel &&
     nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
     nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
+    nextValues.flux3PromptUpsamplerModel === values.flux3PromptUpsamplerModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
     nextValues.refinerModel === values.refinerModel &&
@@ -1014,6 +1017,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3VLVisionTowerModel: getModelIdentifierOrNull(values.qwen3VLVisionTowerModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    flux3PromptUpsamplerEnabled: values.flux3PromptUpsamplerEnabled === true,
+    flux3PromptUpsamplerModel: getModelIdentifierOrNull(values.flux3PromptUpsamplerModel),
     // Projects saved before the toggle existed wired the adapter whenever one was selected.
     animaInpaintAdapterEnabled: values.animaInpaintAdapterEnabled !== false,
     animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(

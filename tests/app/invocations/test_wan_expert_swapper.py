@@ -14,6 +14,8 @@ so we can verify the swapper hands back the right model and routes the right
 LoRA factory at each step.
 """
 
+import gc
+import weakref
 from types import SimpleNamespace
 from typing import Iterable, Tuple
 from unittest.mock import patch
@@ -701,3 +703,35 @@ def test_slots_cleared_when_device_exit_raises():
 
     assert log.count("lora-exit") == 1
     assert log.count("device-exit:HIGH") == 1
+
+
+def test_outgoing_expert_is_collectable_when_the_next_expert_loads():
+    """While the swapper (or the caller) still references the outgoing expert, both experts are
+    resident through the incoming load. Handles are built per load and kept nowhere else, so any
+    surviving reference is the swapper's."""
+    log: list[str] = []
+    refs: dict[str, weakref.ref] = {}
+    outgoing_collected: list[bool] = []
+
+    class _Models:
+        def load(self, model_id):
+            if model_id == "low":
+                gc.collect()
+                outgoing_collected.append(refs["high"]() is None)
+            model = nn.Linear(1, 1)
+            refs[model_id] = weakref.ref(model)
+            return _FakeInfo(model_id.upper(), model, log)
+
+    swapper = _ExpertSwapper(
+        context=SimpleNamespace(models=_Models()),
+        high_model="high",
+        low_model="low",
+        inference_dtype=torch.bfloat16,
+        high_lora_factory=None,
+        low_lora_factory=None,
+    )
+    swapper.get(_ExpertSwapper.HIGH)
+    swapper.get(_ExpertSwapper.LOW)
+    swapper.close()
+
+    assert outgoing_collected == [True]

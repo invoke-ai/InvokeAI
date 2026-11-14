@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY
 from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
     lora_model_from_ernie_image_state_dict,
 )
@@ -85,7 +86,7 @@ from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import
 from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
-_DORA_MAGNITUDE_SUFFIXES = (".dora_scale", ".dora_magnitude", ".lora_magnitude_vector.weight", ".magnitude")
+_DORA_MAGNITUDE_SUFFIXES = (*DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY, ".dora_magnitude")
 _FACTORIZED_LAYER_SUFFIXES = (".hada_w1_a", ".lokr_w1", ".lokr_w1_a")
 
 
