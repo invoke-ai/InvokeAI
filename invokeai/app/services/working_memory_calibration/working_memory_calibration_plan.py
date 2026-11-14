@@ -267,6 +267,15 @@ def _flux2_sources(main: ModelConfig, models: Sequence[ModelConfig]) -> list[Mod
     return [model for model in models if _is_flux2_source(main, model)]
 
 
+def _qwen3_encoder_variant(model: ModelConfig) -> Optional[str]:
+    """The variant a model serves the Qwen3 encoder in, as filed or by a role (a Qwen3 folder installed as a Text LLM);
+    None when it does not serve it or names no variant. `roles` is read leniently: the configs here are duck-typed."""
+    if model.type == ModelType.Qwen3Encoder:
+        return _variant(model)
+    role = next((r for r in getattr(model, "roles", ()) if r.type == ModelType.Qwen3Encoder), None)
+    return None if role is None or role.variant is None else _value(role.variant)
+
+
 def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
     """Whether a standalone text encoder Generate can fill in for a FLUX.2 main model is installed: a Mistral encoder
     other than the Ministral 3B for [dev] (`isFlux2MistralEncoder`), else a Qwen3 encoder other than the 0.6B, of the
@@ -277,11 +286,12 @@ def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) ->
             for model in models
         )
     required = _KLEIN_QWEN3.get(_variant(main) or "")
+    qwen3_variants = (_qwen3_encoder_variant(model) for model in models)
     return any(
-        model.type == ModelType.Qwen3Encoder
-        and _variant(model) != Qwen3VariantType.Qwen3_06B.value
-        and (required is None or _variant(model) == required)
-        for model in models
+        variant is not None
+        and variant != Qwen3VariantType.Qwen3_06B.value
+        and (required is None or variant == required)
+        for variant in qwen3_variants
     )
 
 

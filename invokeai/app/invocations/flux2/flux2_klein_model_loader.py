@@ -168,9 +168,11 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
         # Determine Qwen3 Encoder source
         if self.qwen3_encoder_model is not None:
             # Use standalone Qwen3 Encoder - validate it matches the FLUX.2 Klein variant
-            self._validate_qwen3_encoder_variant(context, main_config)
-            qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-            qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+            # Asked for as an encoder: a Text LLM holding a Qwen3 folder serves as one.
+            encoder = self.qwen3_encoder_model.model_copy(update={"type": ModelType.Qwen3Encoder})
+            self._validate_qwen3_encoder_variant(context, main_config, encoder)
+            qwen3_tokenizer = encoder.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            qwen3_encoder = encoder.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif main_is_diffusers:
             # Extract from main model (recommended for FLUX.2 Klein)
             qwen3_tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
@@ -258,19 +260,24 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
                 "Select a Klein pipeline from the same family - 4B pairs with 4B, 9B with 9B."
             )
 
-    def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config: AnyModelConfig) -> None:
+    def _validate_qwen3_encoder_variant(
+        self, context: InvocationContext, main_config: AnyModelConfig, encoder: ModelIdentifierField
+    ) -> None:
         """Validate that the standalone Qwen3 encoder variant matches the FLUX.2 Klein variant.
 
         - FLUX.2 Klein 4B (and 4B Base) require the Qwen3 4B encoder
         - FLUX.2 Klein 9B (and 9B Base) require the Qwen3 8B encoder
         """
-        if self.qwen3_encoder_model is None:
-            return
-
         # `getattr(..., None)` rather than `hasattr`: the field can exist and still be None, and
         # comparing None against the expected variant would then raise `AttributeError` on
         # `.value` in the error path instead of the intended `ValueError`.
-        qwen3_variant = getattr(context.models.get_config(self.qwen3_encoder_model), "variant", None)
+        encoder_config = context.models.get_config(encoder)
+        if encoder_config.type is not ModelType.Qwen3Encoder:
+            raise ValueError(
+                f"'{encoder_config.name}' is not a Qwen3 encoder. Select a Qwen3 encoder or a Text LLM that serves "
+                "as one, or clear it and set 'Qwen3 Source' to a Diffusers FLUX.2 Klein model."
+            )
+        qwen3_variant = getattr(encoder_config, "variant", None)
         if qwen3_variant is None:
             return
 

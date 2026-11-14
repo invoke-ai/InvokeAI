@@ -3,6 +3,7 @@ instances of the model exactly when the change affects how it loads. The load fe
 themselves to is covered by `tests/app/services/model_load/test_stale_model_load_fence.py`."""
 
 import gc
+import json
 import re
 import threading
 import time
@@ -31,17 +32,20 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig, Model
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_InvokeAI_SD1_Config
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config, Main_Checkpoint_SDXL_Config
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import ModelRoleError, view_as
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
+    ModelFormat,
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
     Qwen35VariantType,
     SubModelType,
 )
@@ -59,6 +63,7 @@ from tests.backend.model_manager.load.state_dicts import (
     flux3_pup_int8_convrot_keys,
 )
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.spandrel_models import write_compact_upscaler
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 from tests.fixtures.tiny_autoencoders import (
@@ -435,7 +440,8 @@ def _write_moss_int8_encoder(path: Path) -> Path:
 
 
 def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) -> None:
-    """A local copy has no source to tell the encoder from the upsampler, so the type it was installed with stays."""
+    """The weights cannot tell the encoder from the upsampler, so the type it was installed with stays; the file
+    gains the Text LLM role."""
     path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
     installed = _identify(
         path,
@@ -451,9 +457,12 @@ def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) 
 
     assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
     assert updated.variant is Qwen35VariantType.Qwen35_9B
+    assert [role.type for role in updated.roles] == [ModelType.TextLLM]
 
 
-def test_reidentify_repairs_a_text_llm_record_installed_from_comfy_orgs_encoder_url(harness: _Harness) -> None:
+def test_reidentify_keeps_a_text_llm_from_comfy_orgs_encoder_url_a_text_llm_serving_as_the_encoder(
+    harness: _Harness,
+) -> None:
     path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
     installed = _identify(path, key=KEY, path="encoder.safetensors", name="encoder")
     assert isinstance(installed, TextLLM_Checkpoint_Config)
@@ -462,8 +471,60 @@ def test_reidentify_repairs_a_text_llm_record_installed_from_comfy_orgs_encoder_
 
     updated = harness.manager.reidentify_model(KEY)
 
-    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert isinstance(updated, TextLLM_Checkpoint_Config)
     assert updated.source == _COMFY_MOSS_INT8_URL
+    assert [(role.type, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen35Encoder, Qwen35VariantType.Qwen35_9B)
+    ]
+
+
+def test_reidentify_gives_a_record_stored_without_roles_the_roles_of_its_files(harness: _Harness) -> None:
+    """Records written before roles existed carry none; Re-identify is how they gain them."""
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    llm = _identify(path, key=KEY, path="encoder.safetensors", name="llm")
+    assert isinstance(llm, TextLLM_Checkpoint_Config)
+    llm.roles = []
+    harness.store.add_model(llm)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert [(role.type, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen35Encoder, Qwen35VariantType.Qwen35_9B)
+    ]
+    harness.store.del_model(KEY)
+
+    encoder = _identify(
+        path,
+        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        key=KEY,
+        path="encoder.safetensors",
+        name="encoder",
+    )
+    encoder.roles = []
+    harness.store.add_model(encoder)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert [role.type for role in updated.roles] == [ModelType.TextLLM]
+
+
+def test_reidentify_gives_a_qwen3_folder_stored_without_roles_its_encoder_role(harness: _Harness) -> None:
+    folder = harness.models_path / "qwen3-4b"
+    folder.mkdir()
+    (folder / "config.json").write_text(json.dumps({"architectures": ["Qwen3ForCausalLM"], "hidden_size": 2560}))
+    (folder / "tokenizer.json").write_text("{}")
+    installed = _identify(folder, key=KEY, path="qwen3-4b", name="Qwen3 4B")
+    assert isinstance(installed, TextLLM_Diffusers_Config)
+    installed.roles = []
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, TextLLM_Diffusers_Config)
+    assert [(role.type, role.format, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen3Encoder, ModelFormat.Qwen3Encoder, Qwen3VariantType.Qwen3_4B)
+    ]
 
 
 def test_reidentify_keeps_an_ip_adapter_encoder_override_its_files_leave_blank(harness: _Harness) -> None:
@@ -627,3 +688,82 @@ def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harne
 def test_reidentify_of_an_unknown_model_raises(harness: _Harness) -> None:
     with pytest.raises(UnknownModelException):
         harness.manager.reidentify_model(KEY)
+
+
+# A record that serves as another type loads through that type's config class and cache entry.
+
+
+def _add_text_llm(harness: _Harness) -> None:
+    """A Text LLM record serving as the Qwen3.5 encoder, with the files the loader checks for."""
+    for name in (KEY, "other.safetensors"):
+        (harness.models_path / "llm").mkdir(exist_ok=True)
+        (harness.models_path / "llm" / name).write_bytes(b"")
+    harness.store.add_model(text_llm_file(KEY))
+
+
+def _cached_entries(harness: _Harness) -> set[str]:
+    return set(harness.caches[0]._cached_models)
+
+
+def test_a_role_view_loads_through_the_role_class_into_its_own_cache_entry(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    record = harness.store.get_model(KEY)
+
+    as_encoder = harness.manager.load.load_model(view_as(record, ModelType.Qwen35Encoder))
+    as_llm = harness.manager.load.load_model(record)
+
+    assert isinstance(as_encoder.config, Qwen35Encoder_Checkpoint_Config)
+    assert isinstance(as_llm.config, TextLLM_Checkpoint_Config)
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config", "TextLLM_Checkpoint_Config"]
+    assert _cached_entries(harness) == {KEY, f"{KEY}:as_qwen3_5_encoder"}
+
+
+def test_a_role_view_of_an_unchanged_record_is_current_and_loads_once(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+
+    first = harness.manager.load.load_model(view)
+    second = harness.manager.load.load_model(view)
+
+    assert first.model is second.model
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config"]
+
+
+def test_a_load_affecting_update_drops_the_primary_and_role_entries(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    record = harness.store.get_model(KEY)
+    for config in (record, view_as(record, ModelType.Qwen35Encoder)):
+        # Used and released, as a node does. A wrapper dropped unused releases its first-use hold on the cache's
+        # worker thread, and an update that runs before that thread only marks the entry stale.
+        with harness.manager.load.load_model(config):
+            pass
+    assert len(_cached_entries(harness)) == 2
+
+    harness.manager.update_model_record(KEY, ModelRecordChanges(path="llm/other.safetensors"))
+
+    assert _cached_entries(harness) == set()
+
+
+def test_a_view_loaded_after_the_record_moved_is_rebuilt_from_the_moved_record_in_its_role(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    stale_view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+    harness.manager.update_model_record(KEY, ModelRecordChanges(path="llm/other.safetensors"))
+
+    loaded = harness.manager.load.load_model(stale_view)
+
+    assert isinstance(loaded.config, Qwen35Encoder_Checkpoint_Config)
+    assert loaded.config.path.endswith("other.safetensors")
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config"]
+
+
+def test_a_record_that_lost_the_role_meanwhile_fails_with_a_role_error_instead_of_loading_as_another_type(
+    harness: _Harness,
+) -> None:
+    _add_text_llm(harness)
+    view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+    harness.store.replace_model(KEY, text_llm_file(KEY, serves_encoder=None))
+
+    with pytest.raises(ModelRoleError):
+        harness.manager.load.load_model(view)
+
+    assert _RecordingLoader.built_from == []

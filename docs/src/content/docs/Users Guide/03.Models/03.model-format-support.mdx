@@ -128,13 +128,13 @@ models. Install the whole MOSS-Image Diffusers folder or a merged single file in
 
 The Qwen3.5 9B encoder also installs in ComfyUI's `int8_convrot` build. It keeps its quantized layers in int8 and
 widens the embedding when it loads; the vision tower, LM head and multi-token-prediction head in the file are not read.
-The files in Comfy-Org's MOSS-Image repository (`text_encoders/`) have the same tensors as the FLUX.3 prompt
-upsampler, so nothing in the file tells the two apart; InvokeAI goes by where the file came from. Installing it from
-that repository by URL, or with the **Qwen3.5 9B Encoder (int8)** starter model, gives a Qwen3.5 encoder, and
-Reidentify repairs an older Text LLM record made from that URL. A local copy of the file installs as a
-[Text LLM](#text-llms), so use the starter or the URL. A model already installed as a Qwen3.5 encoder stays one when
-it is reidentified. w4a8, fp8 scaled, nvfp4 and mxfp8 builds are refused at install with a message. No int8 build
-of the 4B exists to test against.
+The files in Comfy-Org's MOSS-Image repository (`text_encoders/`) have the same tensors as the FLUX.3 prompt upsampler:
+a whole Qwen3.5 9B vision-language model. Such a file installs as a [Text LLM](#text-llms) and also serves as the
+Qwen3.5 9B encoder, whether it comes from a URL, a repository id or a local copy. Installed with the **Qwen3.5 9B
+Encoder (int8)** starter model, it is filed as a Qwen3.5 encoder and also serves as a Text LLM. An export without LM
+head or vision tower, such as ComfyUI's `moss-image-qwen35.safetensors`, is only an encoder. Roles are recorded when a
+model is installed or re-identified. w4a8, fp8 scaled, nvfp4 and mxfp8 builds are refused at install with a message. No
+int8 build of the 4B exists to test against.
 
 ## Text LLMs
 
@@ -153,6 +153,20 @@ ComfyUI's exports of the FLUX.3 prompt upsampler (bf16 or `int8_convrot`), or th
 InvokeAI supplies the config, tokenizer and processor itself. Such a file in w4a8, fp8 scaled, nvfp4 or mxfp8 is
 refused at install with a message, and a GGUF of it is not recognized. The same layout at the 4B's width installs as a
 Qwen3.5 encoder, and other widths are not identified.
+
+A Qwen3.5 9B file also serves as the Qwen3.5 9B encoder of MOSS-Image (see above). The FLUX.3 prompt upsampler is a
+fine-tune: MOSS-Image lists it, but was trained on the stock encoder.
+
+A complete Qwen3 causal-language-model folder (a `config.json` declaring `Qwen3ForCausalLM`, tokenizer files and weights
+at the folder root, such as a download of `Qwen/Qwen3-4B`) installs as a Text LLM and also serves as the Qwen3 encoder
+of its size: 0.6B for Anima, 4B for Z-Image and FLUX.2 Klein 4B, 8B for FLUX.2 Klein 9B. Quantized folders (a
+`quantization_config` in `config.json`, or SDNQ) and other sizes get no encoder role. Roles are recorded at install or
+Re-identify, so a folder installed earlier gets the role when re-identified. A folder holding only the text encoder (no
+tokenizer at its root) still installs as a Qwen3 encoder.
+
+The role depends only on architecture and size, so any Qwen3 fine-tune of that size (chat, abliterated, distilled) is
+offered too, and conditioning follows its weights. Anima's own encoder is Qwen3-0.6B Base (`qwen_3_06b_base`); a
+post-trained Qwen3-0.6B folder conditions differently.
 
 ## VAEs
 

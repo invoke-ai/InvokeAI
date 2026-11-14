@@ -25,6 +25,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     build_plan,
     case_sides,
 )
+from invokeai.backend.model_manager.configs.base import ModelRole
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.flux import (
     Flux2DiffusersModel,
@@ -365,6 +366,22 @@ def test_a_flux2_model_without_a_text_encoder_generate_can_use_cannot_be_calibra
 
     assert not plan.supported and plan.cases == [] and plan.device_class is not None
     assert "text encoder" in (plan.reason or "") and f"{encoder} encoder" in (plan.reason or "")
+
+
+def _text_llm_serving_qwen3(key: str, variant: Qwen3VariantType) -> SimpleNamespace:
+    role = ModelRole(type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder, variant=variant)
+    return _model(key, BaseModelType.Any, ModelType.TextLLM, roles=[role])
+
+
+def test_a_text_llm_serving_as_the_klein_qwen3_encoder_is_a_standalone_encoder() -> None:
+    """Generate offers such a folder in the Qwen3 Encoder picker, and the loader node asks for it in that role."""
+    right_size = _text_llm_serving_qwen3("llm-8b", Qwen3VariantType.Qwen3_8B)
+    wrong_size = _text_llm_serving_qwen3("llm-4b", Qwen3VariantType.Qwen3_4B)
+
+    assert _plan(GGUF_KLEIN_9B, [FLUX2_VAE, right_size]).supported
+    plan = _plan(GGUF_KLEIN_9B, [FLUX2_VAE, wrong_size])
+    assert not plan.supported and "Qwen3 8B encoder" in (plan.reason or "")
+    assert not _plan(GGUF_KLEIN_9B, [FLUX2_VAE, _model("llm", BaseModelType.Any, ModelType.TextLLM)]).supported
 
 
 def test_a_flux2_vae_is_calibrated_through_a_main_model_whose_graph_compiles() -> None:

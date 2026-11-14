@@ -53,6 +53,16 @@ const ENHANCER = {
   type: 'text_llm',
 };
 
+/** A record whose primary type is another one but whose files also serve as a Text LLM. */
+const ROLE_ENHANCER = {
+  ...ENHANCER,
+  key: 'role-e4b',
+  name: 'Gemma 4 E4B (encoder)',
+  roles: [{ format: null, type: 'text_llm', variant: null }],
+  source: 'google/gemma-4-E4B-it',
+  type: 'qwen3_5_encoder',
+};
+
 const MOSS_ENHANCER = { ...ENHANCER, key: 'e4b', name: 'Gemma 4 E4B', source: 'google/gemma-4-E4B-it' };
 const MOSS_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011';
 const MOSS_SUGGESTION: ExpandPromptSuggestion = {
@@ -116,7 +126,12 @@ const LTX_SUGGESTION: ExpandPromptSuggestion = {
 const notices = vi.hoisted(() => ({ info: vi.fn(), offer: vi.fn(), undoable: vi.fn() }));
 
 // Read at render time by the mocks below, so each test can set them before rendering.
-let catalog: (typeof TEXT_ONLY | typeof ENHANCER | typeof VISION_A)[] = [];
+let catalog: (
+  | typeof TEXT_ONLY
+  | typeof ENHANCER
+  | typeof VISION_A
+  | (Omit<typeof ROLE_ENHANCER, 'roles'> & { roles?: unknown[] })
+)[] = [];
 let arePromptsLoading = false;
 
 const StubSelect = ({
@@ -431,6 +446,21 @@ it('preselects an installed suggestion when nothing is saved, without the hint',
 
   expect(select('text llm')?.value).toBe('e4b');
   expect(useSuggestedButton('Gemma 4 E4B')).toBeNull();
+});
+
+it('offers a record that serves as a Text LLM through a role, and suggests it by source', async () => {
+  catalog = [TEXT_ONLY, ROLE_ENHANCER];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('role-e4b');
+});
+
+it('does not take a record of another type without the Text LLM role as a candidate', async () => {
+  catalog = [TEXT_ONLY, { ...ROLE_ENHANCER, roles: [] }];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('qwen');
+  expect(document.body.textContent).toContain('is not installed');
 });
 
 it('recognises the MOSS-Image enhancer installed in place from a local folder', async () => {

@@ -238,7 +238,7 @@
           "parameters": [
             {
               "default": "",
-              "description": "The key or ModelField representing the model.",
+              "description": "The key or ModelField representing the model. A ModelField's `type` selects the role. The config is the record's view in that type when it serves as it (see `Config_Base.roles`), else the stored record.",
               "name": "identifier",
               "type": "Union[str, ModelIdentifierField]"
             }
@@ -253,7 +253,7 @@
           "parameters": [
             {
               "default": "",
-              "description": "The key or ModelField representing the model.",
+              "description": "The key or ModelField representing the model. A ModelField's `type` is the type the model is loaded as, its own type or a role it serves as (see `Config_Base.roles`).",
               "name": "identifier",
               "type": "Union[str, ModelIdentifierField]"
             },

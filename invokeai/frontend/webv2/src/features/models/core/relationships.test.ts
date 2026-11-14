@@ -8,6 +8,7 @@ import {
   hasLinkableBase,
   isBaseCompatible,
   isLinkablePair,
+  isLinkableModel,
   isLinkableType,
   LINKABLE_TYPES,
   NULL_BASE_ALLOWANCES,
@@ -150,6 +151,44 @@ describe('hasLinkableBase', () => {
     expect(hasLinkableBase(model('any', 'spandrel_image_to_image'))).toBe(false);
     expect(hasLinkableBase(model('external', 'main'))).toBe(false);
     expect(hasLinkableBase(model('unknown', 'main'))).toBe(false);
+  });
+});
+
+describe('models that serve as another type through a role', () => {
+  // A directly downloaded MOSS encoder: a Text LLM record whose files also serve as the Qwen3.5 encoder.
+  const roleEncoder: RelatableModel = {
+    base: 'any',
+    roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+    type: 'text_llm',
+  };
+  const plainTextLlm: RelatableModel = { base: 'any', roles: [], type: 'text_llm' };
+
+  it('treats the model as linkable when any of its types is', () => {
+    expect(isLinkableModel(roleEncoder)).toBe(true);
+    expect(hasLinkableBase(roleEncoder)).toBe(true);
+    expect(isLinkableModel(plainTextLlm)).toBe(false);
+    expect(hasLinkableBase(plainTextLlm)).toBe(false);
+    expect(isLinkableModel({ type: 'text_llm' })).toBe(false);
+  });
+
+  it('links to the hosts its role type has an allowance for, and not to others', () => {
+    // The rule is by base like the native encoder's; the role variant (9B vs 4B) is not consulted.
+    expect(isLinkablePair(roleEncoder, model('moss-image', 'main'))).toBe(true);
+    expect(isLinkablePair(model('moss-image', 'main'), roleEncoder)).toBe(true);
+    expect(isLinkablePair(roleEncoder, model('sdxl', 'main'))).toBe(false);
+  });
+
+  it('never links a plain Text LLM', () => {
+    expect(isLinkablePair(plainTextLlm, model('moss-image', 'main'))).toBe(false);
+    expect(isLinkablePair(model('moss-image', 'main'), plainTextLlm)).toBe(false);
+  });
+
+  it('refuses a pair that shares a single-slot type through a role', () => {
+    const native: RelatableModel = { base: 'any', type: 'qwen3_5_encoder' };
+
+    expect(isLinkablePair(roleEncoder, native)).toBe(false);
+    expect(isLinkablePair(native, roleEncoder)).toBe(false);
+    expect(isLinkablePair(roleEncoder, { ...roleEncoder })).toBe(false);
   });
 });
 

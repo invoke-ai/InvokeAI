@@ -160,6 +160,13 @@ export interface ExternalModelCapabilities {
   input_image_required_for?: ExternalGenerationMode[] | null;
 }
 
+/** Another model type the same files serve as, besides the record's primary `type`. */
+export type ModelRole = {
+  type: ModelTaxonomyType;
+  format?: string | null;
+  variant?: string | null;
+};
+
 /**
  * A model config record. This is the union of fields across all backend config
  * classes; fields not applicable to a given type/format are absent.
@@ -179,6 +186,8 @@ export interface ModelConfig {
   type: ModelTaxonomyType;
   format: ModelFileFormat;
   variant?: string | null;
+  /** Other types these files serve as. The backend always sends it; older fixtures may omit it. */
+  roles?: ModelRole[];
   prediction_type?: PredictionType | null;
   config_path?: string | null;
   cpu_only?: boolean | null;

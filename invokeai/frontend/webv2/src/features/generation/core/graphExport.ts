@@ -37,6 +37,7 @@ import {
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './canvas/controlValidation';
+import { servesAsType } from './componentCompatibility';
 import { expandsDynamicPrompts, planGenerateSubmission, type GenerateSubmissionPrompts } from './dynamicPrompts';
 import { compileGenerateGraph } from './graph';
 import { stabilizeBackendGraphNodeIds } from './previewGraph';
@@ -195,7 +196,8 @@ const withSettingsOverrides = (
 };
 
 const fitsSlot = (slot: ComponentSlotPolicy, candidate: ModelConfig, ctx: ComponentPolicyContext): boolean =>
-  (slot.modelTypes as readonly string[]).includes(candidate.type) && (!slot.filter || slot.filter(candidate, ctx));
+  (slot.modelTypes as readonly string[]).some((type) => servesAsType(candidate, type)) &&
+  (!slot.filter || slot.filter(candidate, ctx));
 
 /** The value the component picker commits for `model`, by the slot's value kind. */
 const toSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig): ComponentModelConfig | null => {

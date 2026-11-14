@@ -357,7 +357,8 @@ class ModelLoader(ModelLoaderBase):
 
         Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
         loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
-        returns the format here, so only devices that build the same weights share a copy. Empty by default.
+        returns the format here, so only devices that build the same weights share a copy. Empty by default. Appended after
+        the role suffix (`:as_<type>`, see `_load_and_cache`).
         """
         return ""
 
@@ -376,6 +377,10 @@ class ModelLoader(ModelLoaderBase):
         """
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         cache_key = get_model_cache_key(config.key, submodel_type)
+        if getattr(config, "role_of", None) is not None:
+            # A role view loads the record's files through another config class and loader, so it is its own entry.
+            # The "<key>:" prefix stays, so dropping or offloading the record still covers it.
+            cache_key = f"{cache_key}:as_{config.type.value}"
         variant = self._cache_key_variant(config, submodel_type)
         if variant:
             cache_key = f"{cache_key}:{variant}"

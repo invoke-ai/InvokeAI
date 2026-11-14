@@ -966,6 +966,14 @@ class ZImageSDNQCheckpointModel(ModelLoader):
 class Qwen3EncoderLoader(ModelLoader):
     """Class to load standalone Qwen3 Encoder models for Z-Image (directory format)."""
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # A few small tokenizer files, or the vendored one: the generic sizing would charge the whole model.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,

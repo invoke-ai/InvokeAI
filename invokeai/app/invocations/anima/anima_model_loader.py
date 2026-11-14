@@ -100,8 +100,10 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
 
         # Qwen3 Encoder
-        qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-        qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        # Asked for as an encoder: a Text LLM holding a Qwen3 folder serves as one.
+        qwen3 = self.qwen3_encoder_model.model_copy(update={"type": ModelType.Qwen3Encoder})
+        qwen3_tokenizer = qwen3.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+        qwen3_encoder = qwen3.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
         return AnimaModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
@@ -127,13 +129,14 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         # MOSS-Image's 9B installs under the same model type, and the connector was trained on the 4B.
         # Without this check the 9B loads (~16 GB) and denoising then fails on a 4096-against-2560 shape
         # mismatch, which says nothing about the encoder the user picked.
-        encoder_config = context.models.get_config(self.qwen3_5_encoder_model)
+        encoder = self.qwen3_5_encoder_model.model_copy(update={"type": ModelType.Qwen35Encoder})
+        encoder_config = context.models.get_config(encoder)
         if getattr(encoder_config, "variant", None) != Qwen35VariantType.Qwen35_4B:
             raise ValueError(
                 f"'{encoder_config.name}' is not a Qwen3.5 4B encoder, which {self.model.name}'s semantic "
                 "connector was trained on (hidden size 2560). Select qwen35_4b.safetensors as the Qwen3.5 Encoder."
             )
         return Qwen35EncoderField(
-            tokenizer=self.qwen3_5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
-            text_encoder=self.qwen3_5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder}),
+            tokenizer=encoder.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
+            text_encoder=encoder.model_copy(update={"submodel_type": SubModelType.TextEncoder}),
         )

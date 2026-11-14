@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 from tests.fixtures.device_pool import GPU0, GPU1, two_gpu_pool
+from tests.fixtures.model_roles import encoder_file
 
 
 class TestExpandPromptRequest:
@@ -123,6 +124,40 @@ def test_expand_prompt_uses_fresh_seed() -> None:
         pipeline_class.return_value.run.reset_mock()
         assert _run_expand_prompt("cat", "model", 10, None, 456, None, "user") == ("expanded", 456)
         assert pipeline_class.return_value.run.call_args.kwargs["seed"] == 456
+
+
+def test_expand_prompt_accepts_an_encoder_record_that_serves_as_a_text_llm_and_loads_its_view() -> None:
+    loaded_configs: list[object] = []
+    inner = _loaded(_model(), {SubModelType.Tokenizer: MagicMock(spec=PreTrainedTokenizerBase)})
+
+    def load_model(config: object, submodel_type: SubModelType | None = None, **kwargs: object) -> MagicMock:
+        loaded_configs.append(config)
+        return inner(config, submodel_type)
+
+    services = MagicMock()
+    services.model_manager.store.get_model.return_value = encoder_file("enc")
+    services.model_manager.load.load_model.side_effect = load_model
+
+    with (
+        patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True),
+        patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
+    ):
+        pipeline_class.return_value.run.return_value = "expanded"
+        assert _run_expand_prompt("cat", "enc", 10, None, 1, None, "user") == ("expanded", 1)
+
+    assert loaded_configs and all(
+        c.type is ModelType.TextLLM and c.role_of is ModelType.Qwen35Encoder for c in loaded_configs
+    )  # type: ignore[attr-defined]
+
+
+def test_expand_prompt_refuses_an_encoder_record_without_the_text_llm_role() -> None:
+    services = MagicMock()
+    services.model_manager.store.get_model.return_value = encoder_file("enc", serves_text_llm=False)
+
+    with patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True):
+        with pytest.raises(ValueError, match="not a TextLLM model"):
+            _run_expand_prompt("cat", "enc", 10, None, 1, None, "user")
+    services.model_manager.load.load_model.assert_not_called()
 
 
 def test_expand_prompt_with_an_image_runs_it_through_the_processor() -> None:

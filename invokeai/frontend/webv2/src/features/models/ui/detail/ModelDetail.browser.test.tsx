@@ -20,7 +20,9 @@ vi.mock('./DefaultSettingsSection', () => ({ DefaultSettingsSection: section('de
 vi.mock('./RelatedModelsSection', () => ({ RelatedModelsSection: section('related-models') }));
 vi.mock('./TriggerPhrasesEditor', () => ({ MemoizedTriggerPhrasesEditor: section('trigger-phrases') }));
 vi.mock('./WorkingMemorySection', () => ({ WorkingMemorySection: section('working-memory') }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t: (key: string) => key }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -108,6 +110,40 @@ describe('ModelDetail', () => {
 
     const order = [...host.querySelectorAll('[data-section]')].map((element) => element.getAttribute('data-section'));
     expect(order).toEqual(['default-settings', 'related-models', 'trigger-phrases', 'working-memory']);
+  });
+
+  it('lists the roles a model also serves, and no row without any', async () => {
+    const withRoles = config('llm', 'text_llm', {
+      roles: [
+        { type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' },
+        { format: null, type: 'qwen3_encoder' },
+      ],
+    });
+    setModelsSnapshotForTests({ models: [MAIN, withRoles], status: 'loaded' });
+    const alsoUsableAs = () =>
+      [...host.querySelectorAll('dt')].find((label) => label.textContent === 'models.alsoUsableAs')?.nextElementSibling
+        ?.textContent;
+
+    await renderDetail(withRoles.key);
+    expect(alsoUsableAs()).toBe('Qwen3.5 Encoder · Qwen3.5 9B (MOSS-Image) and Qwen3 Encoder');
+
+    await renderDetail(MAIN.key);
+    expect(alsoUsableAs()).toBeUndefined();
+  });
+
+  it('offers Related Models to a Text LLM only when it serves as a linkable type', async () => {
+    const encoderLlm = config('encoder-llm', 'text_llm', {
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+    });
+    const plainLlm = config('plain-llm', 'text_llm', { roles: [] });
+    setModelsSnapshotForTests({ models: [encoderLlm, plainLlm], status: 'loaded' });
+    const hasRelated = () => host.querySelector('[data-section="related-models"]') !== null;
+
+    await renderDetail(encoderLlm.key);
+    expect(hasRelated()).toBe(true);
+
+    await renderDetail(plainLlm.key);
+    expect(hasRelated()).toBe(false);
   });
 
   it('offers Run on CPU exactly when the config carries cpu_only', async () => {
