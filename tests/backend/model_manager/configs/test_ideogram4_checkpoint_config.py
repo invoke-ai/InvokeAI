@@ -168,6 +168,18 @@ class TestRefusals:
         with pytest.raises(NotAMatchError, match="Ideogram 4 transformer"):
             _identify(_mod(sd))
 
+    def test_rejects_torchao_tensors_its_loader_cannot_decode(self) -> None:
+        sd = _state_dict(
+            **{
+                "layers.0.attention.qkv._weight_qdata": torch.zeros(24, 8, dtype=torch.float8_e4m3fn),
+                "layers.0.attention.qkv._weight_scale": torch.ones(24, 1),
+            }
+        )
+        del sd["layers.0.attention.qkv.weight"]
+
+        with pytest.raises(InvalidMatchError, match="torchao"):
+            _identify(_mod(sd))
+
     def test_rejects_the_nvfp4_repack(self) -> None:
         # The released file keeps `input_proj` in fp8 and packs only the block linears, so the
         # refusal cannot key on one tensor's dtype -- and a packed nvfp4 weight is uint8, the same
