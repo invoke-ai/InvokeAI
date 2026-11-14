@@ -136,9 +136,9 @@ To crop a layer to the generation frame, choose **Crop layer to frame** from its
 * **Blur & noise** — Content shuffle, Blur and Noise.
 * **Upscale** — an upscaling model.
 
-Choose a filter and its settings in Properties, click **Process** (or turn on **Process automatically**) to preview the result, then **Apply** it. The arrow next to Apply offers **Apply as** a new raster or control layer instead. Edge, depth and pose filters produce the guide images that control layers need.
+Choose a filter and its settings in Properties, click **Process** (or turn on **Auto-update preview**) to preview the result, then **Apply** it. The arrow next to Apply offers **Apply as** a new raster or control layer instead. Edge, depth and pose filters produce the guide images that control layers need.
 
-**Select object**, in a layer's menu, finds an object automatically with a segmentation model. Its settings open in the **Properties** tab, headed *Operation: Select Object*. Click the object to add points (Shift-click marks areas to exclude), or describe it by text, then **Process** and **Apply**, or save the result as a selection or a new layer.
+**Select object**, in a layer's menu, finds an object automatically with a segmentation model. Its settings open in the **Properties** tab, headed *Operation: Select Object*. Under **Select by**, choose **Points & box** and click the object to add points (Shift-click marks areas to exclude) or drag a box around it, or choose **Prompt** and describe it by text; switching between the two keeps what you entered in each. With **Auto-update preview** on (the default, under **Settings**), the preview follows every change; with it off, click **Find object**. Pressing Enter in the prompt finds the object at once. Then **Apply** the result, or use the arrow next to Apply to save it as a selection or a new layer. **Reset** clears the points, box and prompt, and puts **Invert**, **Model**, **Refine edges** and **Show only the object** back to their defaults; **Auto-update preview** stays as you set it.
 
 ## Running a workflow on a layer
 
