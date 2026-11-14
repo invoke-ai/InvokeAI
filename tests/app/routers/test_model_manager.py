@@ -332,6 +332,51 @@ def test_empty_model_cache_clears_duplicate_cache_objects_once(monkeypatch: Any,
     assert shared.calls == 1
 
 
+def test_empty_model_cache_succeeds_when_the_device_refuses_to_release_its_cached_memory(
+    monkeypatch: Any, client: TestClient
+) -> None:
+    """The models are dropped before the allocator is asked to hand its blocks back; a device context that refuses
+    (here a CUDA error) must not turn the finished eviction into a server error."""
+    import torch
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+    from invokeai.backend.util import devices
+    from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
+
+    releases = []
+
+    def refuse() -> None:
+        releases.append("refused")
+        # The type the report hit; older torch builds only have RuntimeError.
+        raise getattr(torch, "AcceleratorError", RuntimeError)("CUDA error: out of memory")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", refuse)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices, "_xpu_is_available", lambda: False)
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logging.getLogger("test.model_manager_router"),
+    )
+    cache.put("model", DummyModule())
+    size = cache.get("model").cached_model.total_bytes()
+    invoker = DummyInvoker(_make_stats_services({"cpu": cache}))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 1, "bytes_freed": size}
+    assert "model" not in cache._cached_models
+    assert releases == ["refused"]
+
+
 def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClient) -> None:
     class _Cache:
         def __init__(self) -> None:

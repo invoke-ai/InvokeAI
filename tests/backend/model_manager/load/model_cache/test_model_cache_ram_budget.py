@@ -2353,7 +2353,7 @@ def test_keep_alive_timer_start_failure_does_not_leak_a_pin(mock_logger, monkeyp
 
 def test_reconcile_hook_failure_does_not_leak_a_pin(mock_logger, monkeypatch):
     """The synchronized-decorator's post-release reconcile runs inside the caller's frame after the
-    method body - a raise there (e.g. TorchDevice.empty_cache on a sick CUDA context) escapes
+    method body - a raise there (e.g. from a clear callback) escapes
     lock_in_ram() after the lock count was incremented, before model_in_ram()'s unlock-pairing try
     block. It must be swallowed and logged; the pending flag persists so the next release retries."""
     store = SharedCpuWeightsStore()
