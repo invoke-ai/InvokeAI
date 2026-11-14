@@ -132,8 +132,7 @@ export const NegativePromptField = ({
 
   const labelEnd = useMemo(
     () => (
-      // Pulled out by the last icon button's inset, so its glyph ends on the prompt box's right edge.
-      <HStack gap="0.5" me="-1.5">
+      <HStack gap="0.5">
         <AddPromptTriggerButton
           isOpen={triggerPicker.isOpen || isViewingMerged}
           onOpenPromptTriggerPicker={triggerPicker.open}
