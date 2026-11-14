@@ -9,9 +9,10 @@ from pathlib import Path
 import pytest
 from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection
 
+from invokeai.backend.clip.clip_text_encoder import load_bundled_clip_tokenizer
 from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
 from invokeai.backend.model_manager.load.model_loaders.flux import CLIPDiffusersLoader
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ClipVariantType, SubModelType
 
 TINY = CLIPTextConfig(
     vocab_size=64,
@@ -57,3 +58,34 @@ def test_a_clip_g_folder_without_a_projection_is_refused(tmp_path: Path) -> None
 
     with pytest.raises(ValueError, match="has no text_projection, which SD 3 needs"):
         _load(config)
+
+
+def test_a_bare_encoder_folder_loads_from_its_root_with_the_bundled_tokenizer(tmp_path: Path) -> None:
+    """An SD3.5 pipeline's `text_encoder_2` installed on its own: `config.json` at the root, no tokenizer. The
+    expected ids are what that pipeline's own `tokenizer_2` gives: CLIP-G pads with "!" (id 0)."""
+    CLIPTextModelWithProjection(TINY).save_pretrained(tmp_path)
+    config = CLIPEmbed_Diffusers_G_Config.model_construct(path=str(tmp_path), name="text_encoder_2")
+    loader = object.__new__(CLIPDiffusersLoader)
+
+    model = loader._load_model(config, SubModelType.TextEncoder)
+    tokenizer = loader._load_model(config, SubModelType.Tokenizer)
+
+    saved = CLIPTextModelWithProjection.from_pretrained(tmp_path)
+    assert type(model) is CLIPTextModelWithProjection
+    assert model.text_projection.weight.equal(saved.text_projection.weight)
+    assert (
+        tokenizer("a photo!!", padding="max_length", max_length=77).input_ids
+        == [49406, 320, 1125, 0, 0, 49407] + [0] * 71
+    )
+    assert loader.get_size_fs(config, tmp_path, SubModelType.Tokenizer) == 0
+
+
+def test_a_bundled_folder_keeps_its_own_tokenizer(tmp_path: Path) -> None:
+    """The folder's tokenizer, not the bundled CLIP-G one: this one pads with the end token."""
+    _folder(tmp_path, CLIPTextModelWithProjection)
+    load_bundled_clip_tokenizer(ClipVariantType.L).save_pretrained(tmp_path / "tokenizer")
+    config = CLIPEmbed_Diffusers_G_Config.model_construct(path=str(tmp_path), name="clip-g")
+
+    tokenizer = object.__new__(CLIPDiffusersLoader)._load_model(config, SubModelType.Tokenizer)
+
+    assert tokenizer("a photo", padding="max_length", max_length=8).input_ids == [49406, 320, 1125] + [49407] * 5

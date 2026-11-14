@@ -34,6 +34,7 @@ from invokeai.backend.model_manager.load.model_loaders.flux import (
 from invokeai.backend.model_manager.load.model_loaders.z_image import ZImageSDNQCheckpointModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    ClipVariantType,
     Flux2VariantType,
     FluxVariantType,
     MistralVariantType,
@@ -71,6 +72,13 @@ def _reservation(estimator: str, height: int, width: int, dtype: str) -> int:
 QWEN3_8B = _model("qwen3-8b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_8B)
 """The standalone text encoder Generate fills in for a FLUX.2 Klein 9B model, or one without a variant, that is no
 pipeline: without one, or a pipeline whose encoder fits, its graph does not compile."""
+
+SD3_T5 = _model("t5", BaseModelType.Any, ModelType.T5Encoder)
+SD3_CLIP_L = _model("clip-l", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.L)
+SD3_CLIP_G = _model("clip-g", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.G)
+SD3_ENCODERS = [SD3_T5, SD3_CLIP_L, SD3_CLIP_G]
+"""The standalone encoders Generate fills in for an SD3 model that is no Diffusers pipeline: without all three its
+graph does not compile."""
 
 
 def _plan(
@@ -140,7 +148,8 @@ def test_an_sdxl_model_runs_three_sizes_per_vae_precision() -> None:
 )
 def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, estimator, lines) -> None:
     vae_base = BaseModelType.Flux if base == BaseModelType.ZImage else base
-    plan = _plan(_model("main", base), [_model("vae", vae_base, ModelType.VAE), QWEN3_8B], precision=precision)
+    models = [_model("vae", vae_base, ModelType.VAE), QWEN3_8B, *SD3_ENCODERS]
+    plan = _plan(_model("main", base), models, precision=precision)
 
     assert plan.supported and plan.estimators == [estimator]
     assert sorted({case.line for case in plan.cases}) == lines
@@ -647,7 +656,7 @@ def test_an_sd_vae_is_calibrated_through_a_main_model_whose_default_vae_runs_on_
 
 
 def test_a_model_with_a_vae_slot_picks_a_gpu_vae_over_its_default_one_on_the_cpu() -> None:
-    sd3 = _with_default_vae(_model("sd3", BaseModelType.StableDiffusion3), "a-cpu-vae")
+    sd3 = _with_default_vae(_model("sd3", BaseModelType.StableDiffusion3, format="diffusers"), "a-cpu-vae")
     cpu = _model("a-cpu-vae", BaseModelType.StableDiffusion3, ModelType.VAE, cpu_only=True)
     gpu = _model("b-gpu-vae", BaseModelType.StableDiffusion3, ModelType.VAE)
 
@@ -825,7 +834,11 @@ def test_force_tiled_decode_leaves_nothing_to_calibrate_and_says_how_to_change_t
 
 
 @pytest.mark.parametrize(
-    "target", [_model("sd3", BaseModelType.StableDiffusion3), _model("cogview4", BaseModelType.CogView4)]
+    "target",
+    [
+        _model("sd3", BaseModelType.StableDiffusion3, format="diffusers"),
+        _model("cogview4", BaseModelType.CogView4),
+    ],
 )
 def test_force_tiled_decode_leaves_the_decodes_that_ignore_it_calibratable(
     tmp_path: Path, mock_invoker: Invoker, target
@@ -866,6 +879,68 @@ def test_a_pipeline_with_its_own_vae_needs_no_gpu_vae_beside_it() -> None:
     assert _plan(_model("klein", BaseModelType.Flux2, format="diffusers"), [cpu_vae]).supported
     # Nor does a FLUX.2 model decoding with its component source's VAE.
     assert _plan(GGUF_KLEIN_9B, [cpu_vae, klein_9b]).supported
+
+
+SD3_GGUF = _model("a-sd3-gguf", BaseModelType.StableDiffusion3, format="gguf_quantized")
+SD3_DIFFUSERS = _model("b-sd3-diffusers", BaseModelType.StableDiffusion3, format="diffusers")
+SD3_VAE = _model("sd3-vae", BaseModelType.StableDiffusion3, ModelType.VAE)
+
+
+@pytest.mark.parametrize(
+    "encoders, install",
+    [
+        ([], "Install a T5 encoder, a CLIP-L encoder and a CLIP-G encoder."),
+        ([SD3_T5, SD3_CLIP_L], "Install a CLIP-G encoder."),
+        # A CLIP-L does not fill the CLIP-G slot, nor a CLIP-G the CLIP-L one.
+        ([SD3_T5, SD3_CLIP_G], "Install a CLIP-L encoder."),
+        ([SD3_CLIP_L, SD3_CLIP_G], "Install a T5 encoder."),
+    ],
+    ids=["none", "no-clip-g", "no-clip-l", "no-t5"],
+)
+def test_an_sd3_gguf_without_its_standalone_encoders_cannot_be_calibrated(encoders, install) -> None:
+    """An SD3 GGUF holds the transformer alone: Generate requires a T5, a CLIP-L and a CLIP-G encoder beside it, and
+    `pnpm graphs:export` rejects each case without one ("Generate needs a CLIP G encoder for non-Diffusers SD3
+    models")."""
+    plan = _plan(SD3_GGUF, [SD3_VAE, *encoders])
+
+    assert not plan.supported and plan.cases == [] and plan.device_class is not None
+    assert "A-SD3-GGUF holds only the SD3 transformer" in (plan.reason or "")
+    assert (plan.reason or "").endswith(install)
+
+
+def test_an_sd3_vae_is_calibrated_through_a_main_model_whose_graph_compiles() -> None:
+    """The GGUF sorts first but has no encoders; the Diffusers pipeline brings its own and takes the `vae` pick. With
+    the encoders installed the GGUF compiles, and as the first by name it calibrates the VAE."""
+    plan = _plan(SD3_VAE, [SD3_GGUF, SD3_DIFFUSERS])
+    with_encoders = _plan(SD3_VAE, [SD3_GGUF, SD3_DIFFUSERS, *SD3_ENCODERS])
+
+    assert (plan.supported, plan.calibrated_through) == (True, "b-sd3-diffusers")
+    assert _lines_of(plan) == {("decode_fp16", (("vae", "sd3-vae"),))}
+    assert (with_encoders.supported, with_encoders.calibrated_through) == (True, "a-sd3-gguf")
+
+
+def test_an_sd3_vae_whose_only_main_model_is_a_gguf_without_encoders_cannot_be_calibrated() -> None:
+    plan = _plan(SD3_VAE, [SD3_GGUF, SD3_T5])
+
+    assert not plan.supported and plan.cases == []
+    assert "A-SD3-GGUF holds only the SD3 transformer" in (plan.reason or "")
+
+
+def test_an_sd3_gguf_whose_only_vae_runs_on_the_cpu_cannot_be_calibrated() -> None:
+    """Generate fills the GGUF's required `vae` slot with the CPU VAE, whose decode measures no GPU memory; a Diffusers
+    pipeline decodes with its own VAE and picks none."""
+    cpu_vae = _model("cpu-vae", BaseModelType.StableDiffusion3, ModelType.VAE, cpu_only=True)
+
+    gguf = _plan(SD3_GGUF, [cpu_vae, *SD3_ENCODERS])
+    diffusers = _plan(SD3_DIFFUSERS, [cpu_vae])
+
+    assert not gguf.supported and gguf.cases == []
+    assert "no compatible VAE that runs on the GPU" in (gguf.reason or "")
+    assert diffusers.supported and _lines_of(diffusers) == {("decode_fp16", ())}
+    # Beside a GPU VAE the GGUF pins it, so Generate's fill cannot land on the CPU one listed first; with GPU VAEs
+    # alone Generate's fill is fine and the GGUF picks none.
+    assert _lines_of(_plan(SD3_GGUF, [cpu_vae, SD3_VAE, *SD3_ENCODERS])) == {("decode_fp16", (("vae", "sd3-vae"),))}
+    assert _lines_of(_plan(SD3_GGUF, [SD3_VAE, *SD3_ENCODERS])) == {("decode_fp16", ())}
 
 
 # The pipeline VAE dtypes the plan restates, held to what their loaders yield (`own_vae_dtype`).

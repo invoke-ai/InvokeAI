@@ -37,7 +37,7 @@ from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
     sd3_variant_from_width,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
@@ -354,6 +354,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # reservation below can be sized from the patches.
         lora_patch_specs = self._materialize_lora_patches(context)
         self._raise_unless_loras_fit(context, transformer_info.model, lora_patch_specs)
+        # A GGUF build's packed weights cannot be written to, so its LoRAs always go on the sidecar.
         force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
             transformer_info.model, context.models.get_config(self.transformer.transformer).format
         )
@@ -361,14 +362,33 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         lora_on_device = force_sidecar or (
             bool(lora_patch_specs) and any(p.dtype in FP8_STORAGE_DTYPES for p in transformer_info.model.parameters())
         )
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover; zero for a
+        # Diffusers build.
+        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
         # This node has no activation estimate, so the cache floors its request at `device_working_mem_gb`, which then
-        # stands in for the activations. Sidecar patches stay on the device for the whole run, so they come on top of
-        # that floor rather than out of it. Patches merged into the weights leave nothing resident.
-        working_mem_bytes: Optional[int] = None
+        # stands in for the activations; without sidecar patches the dequantization copy is the whole request. Sidecar
+        # patches stay on the device for the whole run, so they come on top of that floor rather than out of it,
+        # with one layer's transients. For plain LoRA layers those follow each other: the base forward frees its
+        # dequantized weight before `linear_lora_forward` runs, so the larger one is reserved. Any other patch (LoKR,
+        # LoHA, a full layer) goes through `_aggregate_patch_parameters`, which dequantizes the weight again and holds
+        # it beside the full delta it builds, so both are reserved. Patches merged into the weights leave nothing
+        # resident.
+        working_mem_bytes: Optional[int] = dequant_bytes or None
         if lora_on_device:
             floor = int(context.config.get().device_working_mem_gb * 2**30)
             lora_bytes = sum(spec[0].calc_size() for spec in lora_patch_specs)
-            working_mem_bytes = floor + lora_bytes + _SIDECAR_TRANSIENT_BYTES
+            aggregates_with_weight = any(
+                not isinstance(layer, LoRALayer)
+                for spec in lora_patch_specs
+                for key, layer in spec[0].layers.items()
+                if key.startswith(SD3_LORA_TRANSFORMER_PREFIX)
+            )
+            transient = (
+                _SIDECAR_TRANSIENT_BYTES + dequant_bytes
+                if aggregates_with_weight
+                else max(_SIDECAR_TRANSIENT_BYTES, dequant_bytes)
+            )
+            working_mem_bytes = floor + lora_bytes + transient
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(

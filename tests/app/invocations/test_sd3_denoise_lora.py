@@ -19,15 +19,22 @@ from diffusers import SD3Transformer2DModel
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField
 from invokeai.app.invocations.sd3 import sd3_denoise
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
+from invokeai.backend.model_manager.configs.main import Main_GGUF_SD3_Config
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SD3VariantType
+from invokeai.backend.model_manager.load.model_loaders import sd3
+from invokeai.backend.model_manager.load.model_loaders.sd3 import SD3GGUFModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SD3VariantType, SubModelType
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import SD3_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.backend.model_manager.load.sd3_gguf_fixture import write_sd3_gguf
+from tests.fixtures.loader_seams import Seam, prepare
 
 _SD35_MEDIUM_CONFIG = {
     k: v
@@ -369,3 +376,69 @@ def test_the_node_refuses_a_lora_that_does_not_fit_before_it_locks_the_transform
         _run(monkeypatch, model, ModelFormat.Diffusers, patch, lambda _m: None, locks)
     # Refused before the transformer moved: nothing was evicted for a generation that cannot run.
     assert locks == []
+
+
+def _gguf_transformer(monkeypatch, tmp_path: Path) -> SD3Transformer2DModel:
+    """A tiny SD 3 transformer loaded from a GGUF file by the real loader, wrapped as the model cache wraps it."""
+    path = tmp_path / "sd3.5_medium-Q8_0.gguf"
+    write_sd3_gguf(path)
+    config = Main_GGUF_SD3_Config.model_construct(path=str(path), name="sd3.5_medium-Q8_0")
+    seam = Seam(loader=SD3GGUFModel, module=sd3, entry="_load_model", casts_fp8_storage=False)
+    model = prepare(seam, monkeypatch).load(config, SubModelType.Transformer)
+    apply_custom_layers_to_model(model)
+    return model
+
+
+@pytest.mark.parametrize("sidecar_transient", [sd3_denoise._SIDECAR_TRANSIENT_BYTES, 1], ids=["sidecar", "dequant"])
+def test_a_lora_on_a_gguf_transformer_runs_on_the_sidecar_and_reserves_it_once_with_one_transient(
+    monkeypatch, tmp_path: Path, sidecar_transient: int
+) -> None:
+    """Packed GGUF weights cannot be written to, so the LoRA computes beside them and stays on the device, on top of
+    the working-memory floor. A layer's dequantized weight is freed before a plain LoRA computes its residual, so the
+    request holds the larger of the two per-layer transients, not both."""
+    monkeypatch.setattr(sd3_denoise, "_SIDECAR_TRANSIENT_BYTES", sidecar_transient)
+    model = _gguf_transformer(monkeypatch, tmp_path)
+    dequant_bytes = peak_dequant_transient_bytes(model, torch.float32)
+    module = model.get_submodule(_QKV)
+    generator = torch.Generator().manual_seed(1)
+    layer = _layer(64, 64, generator)
+    patch = _patch({_QKV: layer})
+    x = torch.randn(2, 64, generator=generator)
+    unpatched = module(x)
+    seen: list[torch.Tensor] = []
+
+    requested = _run(
+        monkeypatch, model, ModelFormat.GGUFQuantized, patch, lambda m: seen.append(m.get_submodule(_QKV)(x))
+    )
+
+    assert isinstance(module.weight, GGMLTensor)  # never merged into
+    torch.testing.assert_close(seen[0], unpatched + x @ (layer.up @ layer.down).T, atol=1e-5, rtol=1e-5)
+    assert not torch.allclose(seen[0], unpatched)
+    assert 0 < dequant_bytes < _GIB
+    assert requested == 3 * _GIB + patch.calc_size() + max(sidecar_transient, dequant_bytes)
+    # The patch is gone after the run: the next generation starts from the bare weights.
+    torch.testing.assert_close(module(x), unpatched)
+
+
+def test_a_lokr_on_a_gguf_transformer_reserves_the_dequantized_weight_beside_its_delta(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A LoKR builds its full delta from the layer's weight, which the sidecar dequantizes again for it and holds beside
+    the delta, so both transients are reserved on top of the floor and the patch."""
+    model = _gguf_transformer(monkeypatch, tmp_path)
+    dequant_bytes = peak_dequant_transient_bytes(model, torch.float32)
+    module = model.get_submodule(_QKV)
+    generator = torch.Generator().manual_seed(2)
+    w1, w2 = torch.randn(8, 8, generator=generator) * 0.1, torch.randn(8, 8, generator=generator) * 0.1
+    patch = _patch({_QKV: LoKRLayer(w1, None, None, w2, None, None, None, alpha=None, bias=None)})
+    x = torch.randn(2, 64, generator=generator)
+    unpatched = module(x)
+    seen: list[torch.Tensor] = []
+
+    requested = _run(
+        monkeypatch, model, ModelFormat.GGUFQuantized, patch, lambda m: seen.append(m.get_submodule(_QKV)(x))
+    )
+
+    torch.testing.assert_close(seen[0], unpatched + x @ torch.kron(w1, w2).T, atol=1e-5, rtol=1e-5)
+    assert 0 < dequant_bytes < _GIB
+    assert requested == 3 * _GIB + patch.calc_size() + _GIB + dequant_bytes
