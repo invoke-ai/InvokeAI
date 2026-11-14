@@ -436,6 +436,7 @@ class TestDiffusersFolderLoad:
                 return model
 
         loader = object.__new__(WanDiffusersModel)
+        loader._torch_device = torch.device("cpu")
         loader.get_hf_load_class = lambda *_args, **_kwargs: Recorded
         loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
         return loader._load_model(config, SubModelType.Transformer), as_loaded

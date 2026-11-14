@@ -143,7 +143,7 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
 
     log = _patch_common(monkeypatch, state_dict, {"_quantization_metadata": json.dumps({"layers": header})})
     monkeypatch.setattr(diffusers, "QwenImageTransformer2DModel", _TinyQwenImageTransformer, raising=False)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
     checkpoint = tmp_path / "qwen_image_nvfp4.safetensors"
     checkpoint.touch()

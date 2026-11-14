@@ -48,6 +48,8 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
     from a diffusers pipeline directory.
     """
 
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -74,8 +76,7 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
             result: AnyModel = load_class.from_pretrained(model_path, local_files_only=True)
             return result
 
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant, local_files_only=True)
         except OSError as e:
@@ -95,6 +96,10 @@ class ErnieImageCheckpointModel(ModelLoader):
     encoder, VAE and (optional) prompt enhancer are separate models, chosen on the loader node.
     """
 
+    _default_submodel_type = SubModelType.Transformer
+
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -110,8 +115,7 @@ class ErnieImageCheckpointModel(ModelLoader):
 
         from diffusers import ErnieImageTransformer2DModel
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         sd = safetensors.torch.load_file(Path(config.path))
         reject_quantized_side_channel(sd, f"ERNIE-Image checkpoint {Path(config.path).name}")
@@ -141,6 +145,8 @@ class ErnieImageGGUFModel(ModelLoader):
 
     No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
     """
+
+    _default_submodel_type = SubModelType.Transformer
 
     def _load_model(
         self,

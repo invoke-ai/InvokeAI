@@ -15,6 +15,7 @@ import psutil
 import torch
 
 from invokeai.app.util.torch_cuda_allocator import expandable_segments_enabled
+from invokeai.backend.model_manager.cache_key import get_model_cache_key  # noqa: F401 - public import compatibility
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
@@ -33,7 +34,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
-from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
@@ -389,15 +390,6 @@ MODEL_LOAD_LOCK = _ModelLoadReadWriteLock()
 # construction's wait to roughly one pass. 1 GiB keeps the per-pass overhead (lock churn plus a
 # re-scan of the model's state dict) negligible against the transfer itself.
 VRAM_MOVE_PASS_BYTES = 1 << 30
-
-
-# TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
-def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = None) -> str:
-    """Get the cache key for a model based on the optional submodel type."""
-    if submodel_type:
-        return f"{model_key}:{submodel_type.value}"
-    else:
-        return model_key
 
 
 def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
@@ -1222,9 +1214,9 @@ class ModelCache:
         Used by the session queue's device-affinity heuristic to prefer pending items whose
         models are already warm on the claiming device. Two properties matter to that caller:
 
-        - Entries keyed by `get_model_cache_key` (model key plus optional ``:submodel`` suffix)
-          are reported with the suffix stripped so they match plain model keys. Entries keyed by
-          filesystem path (`load_model_from_path`) are excluded: a path - or the bare Windows
+        - Entries keyed by `get_model_cache_key` (model key plus optional ``:submodel`` and
+          ``:storage=<variant>`` suffixes) are reported with the suffixes stripped so they match plain model keys.
+          Entries keyed by filesystem path (`load_model_from_path`) are excluded: a path - or the bare Windows
           drive letter that splitting ``C:\\...`` on ``:`` would leave - is not a model key, and
           such short strings would corrupt substring-based affinity scoring.
         - Non-blocking: the cache lock is held across long operations (VRAM transfers, cache
@@ -3084,9 +3076,9 @@ class ModelCache:
     def drop_model(self, model_key: str) -> int:
         """Drop all cache entries belonging to a model so the next load rebuilds them.
 
-        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
-        so a single model may have multiple entries. Locked entries - and entries inside a
-        first-use window (a LoadedModel wrapper obtained but not yet locked) - are marked
+        Cache keys start with `<model_key>`, followed by optional `:<submodel>` and `:storage=<variant>`
+        suffixes (see `get_model_cache_key`), so a single model may have multiple entries. Locked entries - and entries
+        inside a first-use window (a LoadedModel wrapper obtained but not yet locked) - are marked
         `is_stale` and evicted as soon as the last lock (or the window) releases - without that,
         a setting toggled during an in-flight generation would survive on the locked entry and quietly
         get reused by the next generation.

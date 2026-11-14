@@ -55,7 +55,7 @@ If your model is quantized, its full-precision variant gets the full effect of F
 | Wan (checkpoint and Diffusers) | Yes, except ComfyUI `fp8_scaled` files, which load at BF16 |
 | ControlNet (SD1, SD2, SDXL), T2I-Adapter | Yes |
 | VAE | No: visible decode-quality regression |
-| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. The FLUX.2 Mistral encoder keeps its scaled fp8 weights packed on any GPU that passes the FP8 test, with no setting. |
+| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. The FLUX.2 Mistral encoder keeps its scaled fp8 weights packed on a GPU that passes the FP8 test, with no setting. CPU-only loads unpack them using the CPU's dtype policy (see [Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders)). |
 | Anima ControlNet-LLLite | No: the adapter is only tens of MB |
 | FLUX.1, FLUX.2, Z-Image and Qwen-Image ControlNets | No: not implemented yet |
 | MiniMax H3 | No: not implemented yet |
@@ -121,9 +121,18 @@ without FP8 and the log warns once: `FP8 storage probe failed on <device> (…);
 <TabItem label="CPU and Apple silicon">
 Not used. PyTorch can hold FP8 on the CPU, but casting is emulated in software and costs more than the memory saves.
 With the setting on, the loader returns the model unchanged, without a log line. Checkpoints that store FP8 weights are
-unpacked to BF16 here.
+unpacked using the device's dtype policy: BF16 where supported, otherwise FP32. See
+[Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders).
 </TabItem>
 </Tabs>
+
+## Sharing across devices and CPU encoders
+
+Devices share a cached CPU copy only when their loading policies produce the same stored weights and compute dtype. A device that retains FP8 weights and one that unpacks them need separate CPU copies. The dtype also matters: if PyTorch rejects BF16, InvokeAI falls back to FP16 on CUDA and FP32 on other devices. Matching policies can reuse the same CPU allocation without another checkpoint read.
+
+This choice is made before reading the checkpoint. With `fp8_compute` enabled (off by default), a mixed-capability setup can therefore retain two CPU copies and read a checkpoint twice even when that file contains only BF16 weights. FP8 Storage can likewise separate device caches when its device support differs. This conservative policy avoids reading large files just to decide whether their cached weights can be shared. A transient FP8 probe failure uses the unpacked policy for that load; a later successful probe can leave both copies resident until normal eviction.
+
+**CPU-only Mistral and Qwen3-VL encoders unpack FP8 weights using the CPU's dtype policy**, even on a machine with an FP8-capable GPU. This saves VRAM but increases system RAM compared with retaining the packed weights: approximately 16.8 to 32.3 GiB for the scaled-FP8 Mistral 24B encoder, and 4.4 to 8.9 GiB for Qwen3-VL 4B when unpacked to BF16. Allow more RAM where BF16 is unsupported and FP32 is required. The CPU-only encoder can share its unpacked CPU copy with another load using the same policy; the GPU's packed copy stays separate.
 
 ## Turning it on
 

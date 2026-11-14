@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
@@ -188,7 +189,7 @@ def _checkpoint_loader(monkeypatch, te_config) -> Qwen3VLEncoderCheckpointLoader
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2._device_supports_fp8_storage",
+        "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage",
         lambda _device, _logger: False,
     )
     return loader
@@ -292,6 +293,7 @@ def test_the_bundled_pipeline_encoder_drops_the_tower(monkeypatch, tmp_path: Pat
     encoder = _tiny_encoder()
     config = Main_Diffusers_Krea2_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(Krea2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loader.get_hf_load_class = lambda _path, _submodel: SimpleNamespace(from_pretrained=MagicMock(return_value=encoder))
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     monkeypatch.setattr(
@@ -355,6 +357,7 @@ def _qwen_image_2_1_pipeline(
     )
     config = Main_Diffusers_QwenImage21_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(QwenImage21DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     encoder = saved.model if conditional_generation else saved
     return loader, config, encoder
@@ -420,3 +423,28 @@ def test_the_tower_reserves_its_own_size_at_the_dtype_it_loads_in(monkeypatch, t
 
     elements = sum(v.nelement() for v in saved.visual.state_dict().values())
     assert loader.get_size_fs(config, tmp_path, SubModelType.VisionEncoder) == 4 * elements
+
+
+@pytest.mark.parametrize("cpu_dtype", [torch.float32, torch.bfloat16])
+def test_cpu_only_tower_reservation_matches_frozen_load_dtype(
+    monkeypatch, tmp_path: Path, cpu_dtype: torch.dtype
+) -> None:
+    loader, config, saved = _qwen_image_2_1_pipeline(monkeypatch, tmp_path, conditional_generation=True)
+    config.default_settings = MainModelDefaultSettings(cpu_only=True)
+    loader._torch_device = torch.device("cuda:0")
+    other_dtype = torch.bfloat16 if cpu_dtype == torch.float32 else torch.float32
+    monkeypatch.setattr("invokeai.backend.util.devices.TorchDevice.choose_torch_device", lambda: torch.device("cuda:0"))
+    monkeypatch.setattr(
+        "invokeai.backend.util.devices.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda device: cpu_dtype if device.type == "cpu" else other_dtype,
+    )
+
+    # Cache-key lookup freezes the decision before the reservation and construction.
+    loader._decision(config, SubModelType.VisionEncoder)
+    reserved = loader.get_size_fs(config, tmp_path, SubModelType.VisionEncoder)
+    monkeypatch.setattr("invokeai.backend.util.devices.TorchDevice.choose_bfloat16_safe_dtype", lambda _d: other_dtype)
+    tower = loader._load_model(config, SubModelType.VisionEncoder)
+
+    assert all(t.dtype == cpu_dtype for t in tower.state_dict().values())
+    assert reserved == sum(t.numel() * t.element_size() for t in tower.state_dict().values())
+    assert reserved == sum(t.numel() for t in saved.visual.state_dict().values()) * cpu_dtype.itemsize
