@@ -371,7 +371,7 @@ const config = defineConfig({
       },
     },
     layerStyles: {
-      // The inset dot-grid surface behind previews and the loading splash.
+      // The inset dot-grid surface behind previews, the loading splash and the auth screens.
       dotGrid: {
         value: {
           backgroundColor: 'bg.inset',
