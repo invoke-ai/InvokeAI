@@ -68,10 +68,10 @@ export const OperationActions = ({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const runStartedFocused = useRef(false);
   const runLoading = run?.loading ?? false;
-  // Renewed with every `run`, so React re-attaches it on each render that keeps the button: a render that shows the
-  // button idle again means the run the user started settled with the button staying (it failed, or the button still
-  // offers a run), and the hand-off is dropped. Cleanup that finds the button gone hands focus over a microtask later,
-  // after the same commit may have enabled Apply; StrictMode's extra mount attach runs before any run.
+  // Re-attached when loading changes: the button going idle while it stays means the run the user started settled
+  // with the button kept (it failed, or the button still offers a run), and the hand-off is dropped. Cleanup that
+  // finds the button gone hands focus over a microtask later, after the same commit may have enabled Apply;
+  // StrictMode's extra mount attach runs before any run.
   const runButtonRef = useCallback(
     (node: HTMLButtonElement | null) => {
       if (!node) {
@@ -97,9 +97,7 @@ export const OperationActions = ({
         });
       };
     },
-    // `run` is a fresh object each render; depending on it re-attaches the ref on every render, which is the point.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-    [run, runLoading]
+    [runLoading]
   );
   const onRun = run?.onRun;
   const onRunClick = useCallback(
