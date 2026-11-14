@@ -271,6 +271,128 @@ it('respects modal suspension and custom bindings', async () => {
   await expectFocusedRegion('center');
 });
 
+it('moves focus between the workflow graph and a collapsed workflow panel, preserving both views', async () => {
+  await act(() => {
+    runtime.store.commands.layout.applyPreset('automate');
+    runtime.store.commands.widgets.patchValues('workflow', { editTab: 'json', panelMode: 'edit' });
+    runtime.store.commands.layout.setRegionCollapsed('left', true);
+  });
+  const before = project();
+  expect(before.widgetRegions.left.isCollapsed).toBe(true);
+  await focusRegion('center');
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project().widgetRegions.left).toEqual({ ...before.widgetRegions.left, isCollapsed: false });
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('center');
+  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  expect(project().widgetInstances).toBe(before.widgetInstances);
+  expect(project().workflows).toBe(before.workflows);
+});
+
+it.each([
+  { graphInstanceId: 'workflow:center', leftInstanceId: 'workflow' },
+  { graphInstanceId: 'workflow:bottom', leftInstanceId: 'workflow:center' },
+])(
+  'opens the Compose workflow graph while keeping the $leftInstanceId panel visible',
+  async ({ graphInstanceId, leftInstanceId }) => {
+    await act(() => {
+      runtime.store.commands.layout.applyPreset('compose');
+      if (leftInstanceId === 'workflow') {
+        runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+      } else {
+        runtime.store.commands.widgets.toggle({ region: 'left', widgetId: leftInstanceId });
+      }
+    });
+    const before = project();
+    const left = before.widgetRegions.left;
+    expect(before.layout.presetId).toBe('compose');
+    expect(left.activeInstanceId).toBe(leftInstanceId);
+    expect(before.widgetRegions.center.instanceIds).not.toContain(graphInstanceId);
+    await focusRegion('left');
+
+    await press('{Shift>}Z{/Shift}');
+    await expectFocusedRegion('center');
+    expect(project().widgetRegions.left).toEqual(left);
+    expect(project().layout.panels.isLeftOpen).toBe(true);
+    expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+
+    await press('{Shift>}Z{/Shift}');
+    await expectFocusedRegion('left');
+    expect(project().widgetRegions.left).toEqual(left);
+    expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+  }
+);
+
+it('selects the existing Compose graph while preserving the shared left Workflow panel', async () => {
+  await act(() => runtime.store.commands.layout.applyPreset('compose'));
+  await press('4');
+  const graphInstanceId = project().widgetRegions.center.activeInstanceId;
+  expect(project().widgetInstances[graphInstanceId]?.typeId).toBe('workflow');
+
+  await act(() => {
+    runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+    runtime.store.commands.widgets.select({ region: 'center', widgetId: 'preview' });
+  });
+  const before = project();
+  expect(before.widgetRegions.left.activeInstanceId).toBe(graphInstanceId);
+  expect(before.widgetRegions.center.activeInstanceId).toBe('preview');
+  expect(before.widgetRegions.center.instanceIds).toContain(graphInstanceId);
+  await focusRegion('left');
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('center');
+  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
+  expect(project().layout.panels.isLeftOpen).toBe(true);
+  expect(project().widgetRegions.center).toEqual({
+    ...before.widgetRegions.center,
+    activeInstanceId: graphInstanceId,
+  });
+
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
+  expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+});
+
+it('reopens a bottom workflow graph using the remapped shortcut only from workflow surfaces', async () => {
+  await act(() => {
+    runtime.store.commands.widgets.open({ region: 'bottom', widgetId: 'workflow' });
+    runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+    runtime.store.commands.layout.setRegionCollapsed('bottom', true);
+  });
+  const before = project();
+  expect(before.widgetRegions.bottom.isCollapsed).toBe(true);
+
+  await focusRegion('right');
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('right');
+  expect(project()).toBe(before);
+
+  const workflowId = before.widgetRegions.left.activeInstanceId;
+  const textarea = host.querySelector<HTMLTextAreaElement>(`[aria-label="${workflowId} text"]`)!;
+  await act(() => textarea.focus());
+  await press('{Shift>}Z{/Shift}');
+  expect(textarea.value).toBe('Z');
+  expect(document.activeElement).toBe(textarea);
+  expect(project()).toBe(before);
+
+  await focusRegion('left');
+  await act(() => patchWorkbenchPreferences({ customHotkeys: { 'app.switchWorkflowView': ['shift+j'] } }));
+  await press('{Shift>}Z{/Shift}');
+  await expectFocusedRegion('left');
+  expect(project()).toBe(before);
+
+  await press('{Shift>}J{/Shift}');
+  await expectFocusedRegion('bottom');
+  expect(project().widgetRegions.bottom).toEqual({ ...before.widgetRegions.bottom, isCollapsed: false });
+  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  await press('{Shift>}J{/Shift}');
+  await expectFocusedRegion('left');
+});
+
 it('does not cycle a floating window and can move from it to a docked region', async () => {
   const window = host.querySelector<HTMLElement>('[data-floating-window]')!;
   await act(() => window.focus());
