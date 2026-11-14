@@ -81,7 +81,7 @@ export type VideoReferenceItem =
   | { kind: 'image'; image: ImageWithDims; detail: VideoReferenceImageDetail };
 
 export type WanTargetResolution = '480p' | '720p' | '1080p';
-export type MiniMaxH3TargetResolution = '768 highres' | '768 lowres';
+export type MiniMaxH3TargetResolution = '768 highres' | '768 lowres' | '480p' | '544p';
 /** LTX-2 presets pin the canvas's SHORT edge; the long edge follows the aspect ratio. */
 export type Ltx2TargetResolution = '512p' | '704p' | '768p' | '1024p' | '1536p';
 export type VideoTargetResolution = WanTargetResolution | MiniMaxH3TargetResolution | Ltx2TargetResolution;

@@ -1732,3 +1732,46 @@ describe('legacy H3 duration recall', () => {
     }
   );
 });
+
+describe('H3 draft size recall', () => {
+  it.each([
+    [864, 480, '16:9', '480p'],
+    [960, 544, '16:9', '544p'],
+    [544, 960, '9:16', '544p'],
+    [480, 480, '1:1', '480p'],
+  ] as const)('recalls %sx%s as %s %s', (width, height, aspectRatioId, targetResolution) => {
+    expect(getVideoSizeRecalls(h3Model(), width, height)).toContainEqual({ aspectRatioId, targetResolution });
+  });
+});
+
+describe('equivalent H3 media-sized presets', () => {
+  const model = h3Model();
+  const frame = { width: 1000, height: 700, image_name: 'legacy-frame.png' };
+
+  it.each(['768 highres', '768 lowres', '544p'] as const)(
+    'recalls the original 768x544 canvas from %s without increasing its size',
+    (targetResolution) => {
+      const values = { ...createDefaultVideoWidgetValues([model]), firstFrameImage: frame, targetResolution };
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'all',
+        metadata: {
+          generation_mode: 'minimax_h3_i2v',
+          width: 768,
+          height: 544,
+          first_frame_image: { image_name: frame.image_name },
+        },
+        models: [model],
+      });
+      expect(result).not.toBeNull();
+      const settled = settleMediaSizedRecall({ ...result!, values: { ...result!.values, firstFrameImage: frame } });
+      expect(settled.values.targetResolution).toBe(targetResolution === '544p' ? '544p' : '768 lowres');
+      expect(getVideoDimensions(model, settled.values)).toMatchObject({ width: 768, height: 544 });
+      const sizeOnly = resolveVideoSizeRecall(values, 768, 544);
+      expect(sizeOnly).toEqual({
+        outcome: 'fits',
+        sizeRecall: { targetResolution: targetResolution === '544p' ? '544p' : '768 lowres' },
+      });
+    }
+  );
+});

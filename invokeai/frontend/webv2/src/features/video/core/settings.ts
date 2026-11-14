@@ -64,7 +64,12 @@ export const isVideoAspectRatioId = (value: unknown): value is VideoAspectRatioI
   typeof value === 'string' && (VIDEO_ASPECT_RATIO_IDS as readonly string[]).includes(value);
 
 export const WAN_TARGET_RESOLUTIONS: readonly WanTargetResolution[] = ['480p', '720p', '1080p'];
-export const MINIMAX_H3_TARGET_RESOLUTIONS: readonly MiniMaxH3TargetResolution[] = ['768 highres', '768 lowres'];
+export const MINIMAX_H3_TARGET_RESOLUTIONS: readonly MiniMaxH3TargetResolution[] = [
+  '768 highres',
+  '768 lowres',
+  '480p',
+  '544p',
+];
 export const LTX2_TARGET_RESOLUTIONS: readonly Ltx2TargetResolution[] = ['512p', '704p', '768p', '1024p', '1536p'];
 
 export const isVideoTargetResolution = (value: unknown): value is VideoTargetResolution =>

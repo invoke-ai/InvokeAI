@@ -92095,7 +92095,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\n\"768 highres\" applies the released pipeline's canvas policy: short edge 768, soft\narea cap of 768x1344. \"768 lowres\" pins the LONG edge to 768 instead, giving a\ncanvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes\n512x768 instead of 768x1152) \u2014 faster and cheaper, at some cost in fidelity since it\nis below the model's training resolution. Both presets round each axis to the\nnearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios\nbeyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs\nand into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax\nH3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\n\"768 highres\" applies the released pipeline's canvas policy: short edge 768, soft\narea cap of 768x1344. \"768 lowres\" pins the LONG edge to 768 instead, giving a\ncanvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes\n512x768 instead of 768x1152) \u2014 faster and cheaper, at some cost in fidelity since it\nis below the model's training resolution. \"480p\" and \"544p\" target shorter edges\nunder the native area cap (16:9 gives 864x480 and 960x544). All presets round each axis to the\nnearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios\nbeyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs\nand into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax\nH3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -92146,8 +92146,8 @@
           },
           "target_resolution": {
             "default": "768 highres",
-            "description": "Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.",
-            "enum": ["768 highres", "768 lowres"],
+            "description": "Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity. 480p and 544p target a shorter edge under the same area cap for draft renders.",
+            "enum": ["768 highres", "768 lowres", "480p", "544p"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "768 highres",
@@ -92155,6 +92155,8 @@
             "title": "Target Resolution",
             "type": "string",
             "ui_choice_labels": {
+              "480p": "480p draft (target short edge 480)",
+              "544p": "544p draft (target short edge 544)",
               "768 highres": "768 highres (native: short edge 768, cap 768x1344)",
               "768 lowres": "768 lowres (long edge 768 \u2014 smaller, faster)"
             }
@@ -92171,7 +92173,7 @@
         "tags": ["minimax", "video", "dimensions", "math"],
         "title": "MiniMax H3 Ideal Dimensions",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/IdealSizeOutput"
         }

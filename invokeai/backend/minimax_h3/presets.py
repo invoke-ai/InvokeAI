@@ -14,6 +14,8 @@ Two additions:
 - :func:`resolve_lowres_canvas_size`, a reduced-size canvas family for fast preview renders.
 """
 
+from typing import Literal
+
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_CANVAS_MULTIPLE,
     MINIMAX_H3_FPS,
@@ -21,6 +23,7 @@ from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_LATENTS_PER_CHUNK,
     MINIMAX_H3_MAX_ASPECT_RATIO,
     MINIMAX_H3_MAX_DURATION,
+    MINIMAX_H3_MAX_PIXELS,
     MINIMAX_H3_MIN_ASPECT_RATIO,
     MINIMAX_H3_SHORT_EDGE,
 )
@@ -74,5 +77,33 @@ def resolve_lowres_canvas_size(aspect_width: float, aspect_height: float) -> tup
     else:
         width, height = MINIMAX_H3_SHORT_EDGE * ratio, float(MINIMAX_H3_SHORT_EDGE)
 
+    multiple = MINIMAX_H3_CANVAS_MULTIPLE
+    return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)
+
+
+def resolve_reduced_canvas_size(
+    aspect_width: float, aspect_height: float, short_edge: Literal[480, 544]
+) -> tuple[int, int]:
+    """Resolve a draft canvas on the 32-pixel grid, retaining H3's native aspect and area bounds.
+
+    The short edge is a target, not a guarantee: extreme ratios are scaled down to the
+    native area cap before rounding. These are below-training-resolution preview presets.
+    Returns (height, width), like the native and legacy lowres resolvers.
+    """
+    if short_edge not in (480, 544):
+        raise ValueError("MiniMax-H3 draft short edge must be 480 or 544 pixels.")
+    if aspect_width <= 0 or aspect_height <= 0:
+        raise ValueError(f"The aspect ratio must be positive, got {aspect_width}:{aspect_height}.")
+    ratio = aspect_width / aspect_height
+    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
+        raise ValueError(f"MiniMax-H3 supports aspect ratios from 1:4 to 4:1, got {aspect_width}:{aspect_height}.")
+    # Match the frontend/native operation order at half-grid rounding boundaries.
+    if ratio >= 1.0:
+        width, height = short_edge * ratio, float(short_edge)
+    else:
+        width, height = float(short_edge), short_edge / ratio
+    if width * height > MINIMAX_H3_MAX_PIXELS:
+        scale = (MINIMAX_H3_MAX_PIXELS / (width * height)) ** 0.5
+        width, height = width * scale, height * scale
     multiple = MINIMAX_H3_CANVAS_MULTIPLE
     return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)

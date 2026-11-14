@@ -353,6 +353,21 @@ describe('compileVideoGraph — Wan 2.2', () => {
 describe('compileVideoGraph — MiniMax H3', () => {
   const model = h3Model();
 
+  it.each(['480p', '544p'] as const)('wires %s into text, keyframe, denoise, and metadata', (targetResolution) => {
+    const settings = settingsFor(model, { firstFrameImage: FIRST_FRAME, targetResolution });
+    const { backendGraph } = compileVideoGraph(settings, model);
+    const size = targetResolution === '480p' ? { width: 864, height: 480 } : { width: 960, height: 544 };
+
+    for (const type of [
+      'minimax_h3_text_encoder',
+      'minimax_h3_frame_conditioning',
+      'minimax_h3_denoise',
+      'core_metadata',
+    ]) {
+      expect(nodeOfType(backendGraph, type)).toMatchObject(size);
+    }
+  });
+
   it('builds a text-to-video graph with audio, no negative prompt, and string frame counts', () => {
     const settings = settingsFor(model, { aspectRatioId: '16:9' });
     const { backendGraph } = compileVideoGraph(settings, model);
@@ -479,6 +494,18 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
       },
       { detail: 'match', image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' },
     ],
+  });
+
+  it('uses the draft canvas for reference conditioning, text, denoise, and metadata', () => {
+    const { backendGraph } = compileVideoGraph({ ...referenceSettings, targetResolution: '544p' }, model);
+    for (const type of [
+      'minimax_h3_text_encoder',
+      'minimax_h3_reference_conditioning',
+      'minimax_h3_denoise',
+      'core_metadata',
+    ]) {
+      expect(nodeOfType(backendGraph, type)).toMatchObject({ width: 960, height: 544 });
+    }
   });
 
   it('builds the reference graph: ordered chained collect into conditioning AND prompt, no frame conditioning', () => {
