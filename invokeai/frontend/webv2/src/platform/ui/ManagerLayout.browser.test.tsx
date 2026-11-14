@@ -15,10 +15,22 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { List } from './list/List';
 import { ListItem } from './list/ListItem';
 import { listRowsFromItems } from './list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from './ManagerLayout';
+import {
+  ManagerColumn,
+  ManagerDetailHeader,
+  ManagerFilterButton,
+  ManagerFilterResetItem,
+  ManagerLayout,
+  ManagerSearchField,
+} from './ManagerLayout';
 import { MenuContent } from './Menu';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: { count?: number }) =>
+      values?.count === undefined ? key : `${String(values.count)} active`,
+  }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -469,5 +481,42 @@ describe('ManagerLayout', () => {
       await expect.element(library()).toBeVisible();
       expect(focused()).toBe(toggle().element());
     });
+  });
+
+  it('badges the filter trigger with the active filter count, which its reset item clears', async () => {
+    const FilterHarness = () => {
+      const [count, setCount] = useState(2);
+
+      return (
+        <Menu.Root closeOnSelect={false}>
+          <Menu.Trigger asChild>
+            <ManagerFilterButton activeCount={count} label="Filter items" />
+          </Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent>
+                <ManagerFilterResetItem activeCount={count} onReset={() => setCount(0)} />
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      );
+    };
+    await render(WIDE_PX, <FilterHarness />);
+    const trigger = page.getByRole('button', { name: /^Filter items/ });
+
+    // The visible badge digits are part of the name, which axe's label-in-name rule checks.
+    await expect.element(trigger).toHaveAccessibleName('Filter items, 2 active');
+    expect((trigger.element() as HTMLElement).innerText).toBe('2');
+    expect(await auditAccessibility(host)).toEqual([]);
+
+    await trigger.click();
+    const reset = page.getByRole('menuitem', { name: 'common.resetFilters' });
+    await reset.click();
+
+    await expect.element(trigger).toHaveAccessibleName('Filter items');
+    expect((trigger.element() as HTMLElement).innerText).toBe('');
+    // The menu stays open, and the reset has nothing left to clear.
+    await expect.element(reset).toHaveAttribute('aria-disabled', 'true');
   });
 });

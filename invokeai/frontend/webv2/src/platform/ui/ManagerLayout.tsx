@@ -1,12 +1,14 @@
 import type { ChangeEvent, FocusEvent, ReactNode } from 'react';
 
-import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Menu, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { focusSearchOnSlash } from '@platform/browser/searchShortcut';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ArrowLeftIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react';
+import { ArrowLeftIcon, PlusIcon, RotateCcwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { Button, IconButton } from './Button';
+import { Button, IconButton, type IconButtonProps } from './Button';
+import { MenuActionItem } from './Menu';
 import { isModalPresent } from './modalPresence';
 import { Tooltip } from './Tooltip';
 
@@ -427,6 +429,88 @@ export const ManagerSearchField = ({
         onChange={change}
       />
     </InputGroup>
+  );
+};
+
+/**
+ * Trimmed to the digits' cap height and baseline, the count's box is its ink, so the badge's flex centring centres the
+ * digits; untrimmed, the font's descender room lifts them off centre.
+ */
+const FILTER_COUNT_TEXT: SystemStyleObject = { textBox: 'trim-both cap alphabetic' };
+
+/**
+ * The manager toolbar's filter-menu trigger, for a `Menu.Trigger asChild`. A count badge on its corner says how many
+ * filters narrow the list, so filtering shows with the menu closed; sort order is not a filter and is not counted. The
+ * name ends with the count, so the visible digits stay part of it (label in name; a parenthetical would not count).
+ */
+export const ManagerFilterButton = ({
+  activeCount,
+  label,
+  ...props
+}: Omit<IconButtonProps, 'aria-label' | 'aria-labelledby' | 'children'> & {
+  activeCount: number;
+  label: string;
+}) => {
+  const { t } = useTranslation();
+  const isFiltered = activeCount > 0;
+
+  return (
+    <IconButton
+      aria-label={isFiltered ? `${label}, ${t('common.activeFilterCount', { count: activeCount })}` : label}
+      color="fg.muted"
+      flexShrink={0}
+      variant="outline"
+      {...props}
+    >
+      <Icon as={SlidersHorizontalIcon} boxSize="4" />
+      {isFiltered ? (
+        <Box
+          aria-hidden
+          alignItems="center"
+          bg="accent.solid"
+          color="accent.contrast"
+          display="flex"
+          fontSize="xs"
+          fontWeight="semibold"
+          h="4"
+          justifyContent="center"
+          minW="4"
+          outline="2px solid"
+          outlineColor="bg"
+          pointerEvents="none"
+          position="absolute"
+          px="1"
+          right="-2.5"
+          rounded="full"
+          top="-2.5"
+        >
+          <Box as="span" css={FILTER_COUNT_TEXT}>
+            {activeCount}
+          </Box>
+        </Box>
+      ) : null}
+    </IconButton>
+  );
+};
+
+/**
+ * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterButton` counts and
+ * leaves sort order and search alone. Disabled while none is active.
+ */
+export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: number; onReset: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <Menu.Separator />
+      <MenuActionItem
+        disabled={activeCount === 0}
+        icon={RotateCcwIcon}
+        label={t('common.resetFilters')}
+        value="reset-filters"
+        onSelect={onReset}
+      />
+    </>
   );
 };
 

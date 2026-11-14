@@ -25,13 +25,20 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, ConfirmDialog, IconButton, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
+import { Button, ConfirmDialog, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListPager } from '@platform/ui/list/ListPager';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from '@platform/ui/ManagerLayout';
+import {
+  ManagerColumn,
+  ManagerDetailHeader,
+  ManagerFilterButton,
+  ManagerFilterResetItem,
+  ManagerLayout,
+  ManagerSearchField,
+} from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,7 +49,6 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
-  SlidersHorizontalIcon,
   Trash2Icon,
   TypeIcon,
   UploadIcon,
@@ -624,13 +630,7 @@ const FontLibrary = () => {
               />
               <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
                 <Menu.Trigger asChild>
-                  <IconButton
-                    aria-label={t('fonts.filterMenu')}
-                    color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
-                    variant="outline"
-                  >
-                    <Icon as={SlidersHorizontalIcon} boxSize="4" />
-                  </IconButton>
+                  <ManagerFilterButton activeCount={Number(filter !== 'all')} label={t('fonts.filterMenu')} />
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>
@@ -652,6 +652,13 @@ const FontLibrary = () => {
                           </Menu.RadioItem>
                         ))}
                       </Menu.RadioItemGroup>
+                      <ManagerFilterResetItem
+                        activeCount={Number(filter !== 'all')}
+                        onReset={() => {
+                          setFilter('all');
+                          setOffset(0);
+                        }}
+                      />
                     </MenuContent>
                   </Menu.Positioner>
                 </Portal>

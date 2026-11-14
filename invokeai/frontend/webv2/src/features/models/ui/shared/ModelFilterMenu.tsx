@@ -7,15 +7,9 @@ import type { ReactNode } from 'react';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
-import { IconButton, MenuContent, Scrollable } from '@platform/ui';
-import {
-  ArrowUpDownIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  LayersIcon,
-  ShapesIcon,
-  SlidersHorizontalIcon,
-} from 'lucide-react';
+import { MenuContent, Scrollable } from '@platform/ui';
+import { ManagerFilterButton, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
+import { ArrowUpDownIcon, CheckIcon, ChevronRightIcon, LayersIcon, ShapesIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,13 +34,14 @@ export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
 
 /** Narrow sort callbacks to the supplied sort-field subset. */
 export const ModelFilterMenu = <Field extends ModelSortField>({
+  activeFilterCount,
   ariaLabel,
   availableBases,
   availableTypes,
   baseFilter,
   extraTypeItems,
-  isActive,
   onBaseFilterChange,
+  onResetFilters,
   onSortChange,
   onTypeFilterChange,
   sortDirection,
@@ -56,13 +51,16 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   typeFilter,
   typeSummary,
 }: {
+  /** Type and base filters in effect; sort order is not counted. */
+  activeFilterCount: number;
   ariaLabel: string;
   availableBases: string[];
   availableTypes: ModelTaxonomyType[];
   baseFilter: string | null;
   extraTypeItems?: ReactNode;
-  isActive: boolean;
   onBaseFilterChange: (base: string | null) => void;
+  /** Clears the counted filters; sort order stays. */
+  onResetFilters: () => void;
   onSortChange: (field: Field, direction: 'asc' | 'desc') => void;
   onTypeFilterChange: (type: ModelTaxonomyType | null) => void;
   sortDirection: 'asc' | 'desc';
@@ -90,9 +88,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   return (
     <Menu.Root closeOnSelect={false} positioning={ROOT_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} variant="outline">
-          <Icon as={SlidersHorizontalIcon} boxSize="4" />
-        </IconButton>
+        <ManagerFilterButton activeCount={activeFilterCount} label={ariaLabel} />
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
@@ -146,6 +142,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
                 />
               ))}
             </FilterSubMenu>
+            <ManagerFilterResetItem activeCount={activeFilterCount} onReset={onResetFilters} />
           </MenuContent>
         </Menu.Positioner>
       </Portal>

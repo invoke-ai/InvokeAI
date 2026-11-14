@@ -1,9 +1,10 @@
+import type { NodePackFilters, NodePackSortField } from '@features/nodes/core/library';
+
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { DEFAULT_NODE_PACK_FILTERS, type NodePackFilters, type NodePackSortField } from '@features/nodes/core/library';
-import { IconButton } from '@platform/ui/Button';
+import { ManagerFilterButton, ManagerFilterResetItem } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
-import { CheckIcon, SlidersHorizontalIcon } from 'lucide-react';
+import { CheckIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const SORT_FIELDS: readonly { field: NodePackSortField; labelKey: string }[] = [
@@ -21,10 +22,6 @@ export const NodePackFilterMenu = ({
   onChange: (next: NodePackFilters) => void;
 }) => {
   const { t } = useTranslation();
-  const isActive =
-    filters.problemsOnly ||
-    filters.sortField !== DEFAULT_NODE_PACK_FILTERS.sortField ||
-    filters.sortDirection !== DEFAULT_NODE_PACK_FILTERS.sortDirection;
 
   // Reselecting the active field flips direction (models menu behavior).
   const reportSort = (field: NodePackSortField) => {
@@ -38,13 +35,7 @@ export const NodePackFilterMenu = ({
   return (
     <Menu.Root closeOnSelect={false} positioning={{ placement: 'bottom-end' }}>
       <Menu.Trigger asChild>
-        <IconButton
-          aria-label={t('nodes.filterAndSort')}
-          color={isActive ? 'accent.solid' : 'fg.muted'}
-          variant="outline"
-        >
-          <Icon as={SlidersHorizontalIcon} boxSize="4" />
-        </IconButton>
+        <ManagerFilterButton activeCount={Number(filters.problemsOnly)} label={t('nodes.filterAndSort')} />
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
@@ -73,6 +64,10 @@ export const NodePackFilterMenu = ({
                 />
               ))}
             </Menu.ItemGroup>
+            <ManagerFilterResetItem
+              activeCount={Number(filters.problemsOnly)}
+              onReset={() => onChange({ ...filters, problemsOnly: false })}
+            />
           </MenuContent>
         </Menu.Positioner>
       </Portal>
