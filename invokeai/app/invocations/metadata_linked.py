@@ -3,7 +3,7 @@
 # Thanks to @skunworkxdark for the original implementation!
 
 import copy
-from typing import Any, Dict, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
@@ -22,11 +22,44 @@ from invokeai.app.invocations.fields import (
     InputField,
     MetadataField,
     OutputField,
+    TensorField,
     UIType,
     WithMetadata,
 )
 from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    MetadataOutput,
+    build_denoise_metadata,
+    unwrap_metadata_value,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS as CORE_LABELS,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_BOOL as CORE_LABELS_BOOL,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_FLOAT as CORE_LABELS_FLOAT,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_INTEGER as CORE_LABELS_INTEGER,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_MODEL as CORE_LABELS_MODEL,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_SCHEDULER as CORE_LABELS_SCHEDULER,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_STRING as CORE_LABELS_STRING,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_VAE as CORE_LABELS_VAE,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CUSTOM_LABEL as CUSTOM_LABEL,
+)
 from invokeai.app.invocations.model import (
     CLIPField,
     LoRAField,
@@ -45,7 +78,6 @@ from invokeai.app.invocations.primitives import (
     FloatOutput,
     IntegerCollectionOutput,
     IntegerOutput,
-    LatentsOutput,
     StringCollectionOutput,
     StringOutput,
 )
@@ -59,78 +91,6 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.version import __version__
-
-CUSTOM_LABEL: str = "* CUSTOM LABEL *"
-
-CORE_LABELS = Literal[
-    f"{CUSTOM_LABEL}",
-    "positive_prompt",
-    "positive_style_prompt",
-    "negative_prompt",
-    "negative_style_prompt",
-    "width",
-    "height",
-    "seed",
-    "cfg_scale",
-    "cfg_rescale_multiplier",
-    "steps",
-    "scheduler",
-    "clip_skip",
-    "model",
-    "vae",
-    "seamless_x",
-    "seamless_y",
-    "guidance",
-    "cfg_scale_start_step",
-    "cfg_scale_end_step",
-]
-
-CORE_LABELS_STRING = Literal[
-    f"{CUSTOM_LABEL}",
-    "positive_prompt",
-    "positive_style_prompt",
-    "negative_prompt",
-    "negative_style_prompt",
-]
-
-CORE_LABELS_INTEGER = Literal[
-    f"{CUSTOM_LABEL}",
-    "width",
-    "height",
-    "seed",
-    "steps",
-    "clip_skip",
-    "cfg_scale_start_step",
-    "cfg_scale_end_step",
-]
-
-CORE_LABELS_FLOAT = Literal[
-    f"{CUSTOM_LABEL}",
-    "cfg_scale",
-    "cfg_rescale_multiplier",
-    "guidance",
-]
-
-CORE_LABELS_BOOL = Literal[
-    f"{CUSTOM_LABEL}",
-    "seamless_x",
-    "seamless_y",
-]
-
-CORE_LABELS_SCHEDULER = Literal[
-    f"{CUSTOM_LABEL}",
-    "scheduler",
-]
-
-CORE_LABELS_MODEL = Literal[
-    f"{CUSTOM_LABEL}",
-    "model",
-]
-
-CORE_LABELS_VAE = Literal[
-    f"{CUSTOM_LABEL}",
-    "vae",
-]
 
 T = TypeVar("T")
 
@@ -272,12 +232,19 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
-    def invoke(self, context: InvocationContext) -> MetadataOutput:
-        k = self.custom_label if self.label == CUSTOM_LABEL else self.label
-        v = self.value.vae if isinstance(self.value, VAEField) else self.value
+    def _validate_invoke_fields(self) -> None:
+        # Upstream optional output ports (e.g. anima_model_loader.qwen3_5_encoder or sd3_model_loader.t5_encoder)
+        # resolve to None when the selected model omits that submodel; allow value=None and skip it in invoke().
+        if "value" not in self.model_fields_set:
+            super()._validate_invoke_fields()
 
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        data.update({str(k): v})
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
+        data: Dict[str, Any] = {} if self.metadata is None else dict(self.metadata.root)
+        if self.value is not None:
+            k = self.custom_label if self.label == CUSTOM_LABEL else self.label
+            v = unwrap_metadata_value(self.value, label=k)
+            if v is not None:
+                data.update({str(k): v})
         data.update({"app_version": __version__})
 
         return MetadataOutput(metadata=MetadataField.model_validate(data))
@@ -614,80 +581,24 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
         )
 
 
-@invocation_output("latents_meta_output")
-class LatentsMetaOutput(LatentsOutput, MetadataOutput):
-    """Latents + metadata"""
-
-
 @invocation(
     "denoise_latents_meta",
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.4.0",
+    version="1.6.0",
+    classification=Classification.Deprecated,
 )
-class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
+class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
-        def _to_json(obj: Union[Any, list[Any]]):
-            if not isinstance(obj, list):
-                obj = [obj]
-
-            return [
-                item.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-                for item in obj
-            ]
-
-        def _loras_to_json(obj: Union[Any, list[Any]]):
-            if not isinstance(obj, list):
-                obj = [obj]
-
-            output: list[dict[str, Any]] = []
-            for item in obj:
-                output.append(
-                    LoRAMetadataField(
-                        model=item.lora,
-                        weight=item.weight,
-                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-                )
-            return output
-
         obj = super().invoke(context)
-
-        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        md.update({"width": obj.width})
-        md.update({"height": obj.height})
-        md.update({"steps": self.steps})
-        md.update({"cfg_scale": self.cfg_scale})
-        md.update({"cfg_rescale_multiplier": self.cfg_rescale_multiplier})
-        md.update({"denoising_start": self.denoising_start})
-        md.update({"denoising_end": self.denoising_end})
-        md.update({"scheduler": self.scheduler})
-        md.update({"model": self.unet.unet})
-        md.update({"hidiffusion": self.hidiffusion})
-        md.update({"hidiffusion_raunet": self.hidiffusion_raunet})
-        md.update({"hidiffusion_window_attn": self.hidiffusion_window_attn})
-        md.update({"hidiffusion_auto_ratios": self.hidiffusion_auto_ratios})
-        md.update({"hidiffusion_t1_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio})
-        md.update({"hidiffusion_t2_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio})
-        if isinstance(self.control, ControlField) or (isinstance(self.control, list) and len(self.control) > 0):
-            md.update({"controlnets": _to_json(self.control)})
-        if isinstance(self.ip_adapter, IPAdapterField) or (
-            isinstance(self.ip_adapter, list) and len(self.ip_adapter) > 0
-        ):
-            md.update({"ipAdapters": _to_json(self.ip_adapter)})
-        if isinstance(self.t2i_adapter, T2IAdapterField) or (
-            isinstance(self.t2i_adapter, list) and len(self.t2i_adapter) > 0
-        ):
-            md.update({"t2iAdapters": _to_json(self.t2i_adapter)})
-        if len(self.unet.loras) > 0:
-            md.update({"loras": _loras_to_json(self.unet.loras)})
-        if self.noise is not None:
-            md.update({"seed": self.noise.seed})
-
-        params = obj.__dict__.copy()
-        del params["type"]
-
-        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
+        metadata = getattr(obj, "metadata", None) or self._build_metadata(obj.width, obj.height)
+        return LatentsMetaOutput(
+            latents=obj.latents,
+            width=obj.width,
+            height=obj.height,
+            metadata=metadata,
+        )
 
 
 @invocation(
@@ -695,53 +606,21 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     title=f"{FluxDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["flux", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.0.1",
+    version="1.2.0",
+    classification=Classification.Deprecated,
 )
-class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
+class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation):
     """Run denoising process with a FLUX transformer model + metadata."""
 
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
-        def _loras_to_json(obj: Union[Any, list[Any]]):
-            if not isinstance(obj, list):
-                obj = [obj]
-
-            output: list[dict[str, Any]] = []
-            for item in obj:
-                output.append(
-                    LoRAMetadataField(
-                        model=item.lora,
-                        weight=item.weight,
-                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-                )
-            return output
-
         obj = super().invoke(context)
-
-        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        md.update({"width": obj.width})
-        md.update({"height": obj.height})
-        md.update({"steps": self.num_steps})
-        md.update({"guidance": self.guidance})
-        md.update({"denoising_start": self.denoising_start})
-        md.update({"denoising_end": self.denoising_end})
-        md.update({"model": self.transformer.transformer})
-        md.update(
-            {
-                "seed": self.noise.seed
-                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
-                else self.seed
-            }
+        metadata = getattr(obj, "metadata", None) or self._build_metadata()
+        return LatentsMetaOutput(
+            latents=obj.latents,
+            width=obj.width,
+            height=obj.height,
+            metadata=metadata,
         )
-        md.update({"cfg_scale": self.cfg_scale})
-        md.update({"cfg_scale_start_step": self.cfg_scale_start_step})
-        md.update({"cfg_scale_end_step": self.cfg_scale_end_step})
-        if len(self.transformer.loras) > 0:
-            md.update({"loras": _loras_to_json(self.transformer.loras)})
-
-        params = obj.__dict__.copy()
-        del params["type"]
-
-        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
 
 
 @invocation(
@@ -749,51 +628,21 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
     title=f"{ZImageDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
+    classification=Classification.Deprecated,
 )
-class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
+class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation):
     """Run denoising process with a Z-Image transformer model + metadata."""
 
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
-        def _loras_to_json(obj: Union[Any, list[Any]]):
-            if not isinstance(obj, list):
-                obj = [obj]
-
-            output: list[dict[str, Any]] = []
-            for item in obj:
-                output.append(
-                    LoRAMetadataField(
-                        model=item.lora,
-                        weight=item.weight,
-                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-                )
-            return output
-
         obj = super().invoke(context)
-
-        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        md.update({"width": obj.width})
-        md.update({"height": obj.height})
-        md.update({"steps": self.steps})
-        md.update({"guidance": self.guidance_scale})
-        md.update({"denoising_start": self.denoising_start})
-        md.update({"denoising_end": self.denoising_end})
-        md.update({"scheduler": self.scheduler})
-        md.update({"model": self.transformer.transformer})
-        md.update(
-            {
-                "seed": self.noise.seed
-                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
-                else self.seed
-            }
+        metadata = getattr(obj, "metadata", None) or self._build_metadata()
+        return LatentsMetaOutput(
+            latents=obj.latents,
+            width=obj.width,
+            height=obj.height,
+            metadata=metadata,
         )
-        if len(self.transformer.loras) > 0:
-            md.update({"loras": _loras_to_json(self.transformer.loras)})
-
-        params = obj.__dict__.copy()
-        del params["type"]
-
-        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
 
 
 @invocation(
@@ -802,9 +651,9 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
     tags=["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
     version="1.1.0",
-    classification=Classification.Prototype,
+    classification=Classification.Deprecated,
 )
-class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation, WithMetadata):
+class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation):
     """Run denoising process with an Anima transformer model + metadata."""
 
     # Anima loads its VAE and text encoder as standalone models, so - unlike SD/FLUX, where they come out of
@@ -825,51 +674,21 @@ class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation, WithMetadata):
     )
 
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
-        def _loras_to_json(obj: Union[Any, list[Any]]):
-            if not isinstance(obj, list):
-                obj = [obj]
-
-            output: list[dict[str, Any]] = []
-            for item in obj:
-                output.append(
-                    LoRAMetadataField(
-                        model=item.lora,
-                        weight=item.weight,
-                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-                )
-            return output
-
         obj = super().invoke(context)
-
-        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        md.update({"width": obj.width})
-        md.update({"height": obj.height})
-        md.update({"steps": self.steps})
-        # Anima's CFG value is recorded as `cfg_scale`, matching what the Anima graph builder writes and what
-        # the UI's CFGScale recall handler reads - not as `guidance`, which is FLUX's guidance-embeds scale.
-        md.update({"cfg_scale": self.guidance_scale})
-        md.update({"denoising_start": self.denoising_start})
-        md.update({"denoising_end": self.denoising_end})
-        md.update({"scheduler": self.scheduler})
-        md.update({"model": self.transformer.transformer})
-        md.update(
-            {
-                "seed": self.noise.seed
-                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
-                else self.seed
-            }
-        )
+        metadata = getattr(obj, "metadata", None) or self._build_metadata()
+        extra: dict[str, Any] = {}
         if self.vae is not None:
-            md.update({"vae": self.vae.vae})
+            extra["vae"] = self.vae.vae
         if self.qwen3_encoder is not None:
-            md.update({"qwen3_encoder": self.qwen3_encoder.text_encoder})
-        if len(self.transformer.loras) > 0:
-            md.update({"loras": _loras_to_json(self.transformer.loras)})
-
-        params = obj.__dict__.copy()
-        del params["type"]
-
-        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
+            extra["qwen3_encoder"] = self.qwen3_encoder.text_encoder
+        if extra:
+            metadata = build_denoise_metadata(metadata, extra)
+        return LatentsMetaOutput(
+            latents=obj.latents,
+            width=obj.width,
+            height=obj.height,
+            metadata=metadata,
+        )
 
 
 @invocation(
@@ -1135,6 +954,281 @@ class MetadataToSDXLLorasInvocation(BaseInvocation, WithMetadata):
         return output
 
 
+def _resolve_ref_image_field(img_container: Any) -> Optional[dict[str, Any]]:
+    if isinstance(img_container, dict):
+        crop = img_container.get("crop")
+        if isinstance(crop, dict) and isinstance(crop.get("image"), dict) and crop["image"].get("image_name"):
+            return {"image_name": crop["image"]["image_name"]}
+        orig = img_container.get("original")
+        if isinstance(orig, dict) and isinstance(orig.get("image"), dict) and orig["image"].get("image_name"):
+            return {"image_name": orig["image"]["image_name"]}
+        if img_container.get("image_name"):
+            return {"image_name": img_container["image_name"]}
+    return None
+
+
+def _warn(context: InvocationContext, msg: str) -> None:
+    logger = getattr(context, "logger", None)
+    if logger is not None:
+        logger.warning(msg)
+
+
+def _extract_canvas_control_layer_image(entity: dict[str, Any]) -> Optional[dict[str, Any]]:
+    for obj in entity.get("objects") or []:
+        if isinstance(obj, dict) and obj.get("type") == "image":
+            obj_img = obj.get("image")
+            if isinstance(obj_img, dict) and obj_img.get("image_name"):
+                return {"image_name": obj_img["image_name"]}
+            if obj.get("image_name"):
+                return {"image_name": obj["image_name"]}
+    return None
+
+
+def _extract_controlnets_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    if "controlnets" in data:
+        for item in data.get("controlnets") or []:
+            if not isinstance(item, dict):
+                continue
+            img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+            if img is None or ("control_model" not in item and "model" not in item):
+                continue
+            normalized = dict(item)
+            normalized["image"] = img
+            result.append(normalized)
+        return result
+    if not result:
+        raw_control_layers = data.get("control_layers")
+        if isinstance(raw_control_layers, list):
+            for item in raw_control_layers:
+                if not isinstance(item, dict) or item.get("type") != "controlnet":
+                    continue
+                img = (
+                    item.get("processed_image")
+                    or item.get("image")
+                    or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+                )
+                model = item.get("control_model") or item.get("model")
+                if img is None or not model:
+                    continue
+                result.append(
+                    {
+                        "image": img,
+                        "control_model": model,
+                        "control_weight": item.get("control_weight", item.get("weight", 1.0)),
+                        "begin_step_percent": item.get("begin_step_percent", 0.0),
+                        "end_step_percent": item.get("end_step_percent", 1.0),
+                        "control_mode": item.get("control_mode", "balanced"),
+                        "resize_mode": item.get("resize_mode", "just_resize"),
+                    }
+                )
+    if not result:
+        canvas_v2 = data.get("canvas_v2_metadata")
+        control_layers = canvas_v2.get("controlLayers") if isinstance(canvas_v2, dict) else None
+        entities = (
+            control_layers
+            if isinstance(control_layers, list)
+            else (control_layers.get("entities", []) if isinstance(control_layers, dict) else [])
+        )
+        for entity in entities:
+            if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
+                continue
+            adapter = entity.get("controlAdapter")
+            if not isinstance(adapter, dict) or adapter.get("type") != "controlnet":
+                continue
+            model = adapter.get("model")
+            img = _extract_canvas_control_layer_image(entity)
+            if not model or img is None:
+                continue
+            begin_end = adapter.get("beginEndStepPct") or [0.0, 1.0]
+            result.append(
+                {
+                    "image": img,
+                    "control_model": model,
+                    "control_weight": adapter.get("weight", 1.0),
+                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                    "control_mode": adapter.get("controlMode", "balanced"),
+                    "resize_mode": "just_resize",
+                }
+            )
+    return result
+
+
+def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    if "ref_images" in data:
+        ref_images = data.get("ref_images")
+        if isinstance(ref_images, list):
+            for entry in ref_images:
+                if not isinstance(entry, dict) or entry.get("isEnabled", True) is False:
+                    continue
+                cfg = entry.get("config")
+                if not isinstance(cfg, dict) or cfg.get("type") != "ip_adapter":
+                    continue
+                img = _resolve_ref_image_field(cfg.get("image"))
+                model = cfg.get("model")
+                if img is None or not model:
+                    continue
+                begin_end = cfg.get("beginEndStepPct") or [0.0, 1.0]
+                raw_weight = cfg.get("weight", 1.0)
+                if isinstance(raw_weight, (list, tuple)):
+                    weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+                else:
+                    weight = float(raw_weight)
+                res_entry: dict[str, Any] = {
+                    "image": img,
+                    "ip_adapter_model": model,
+                    "weight": weight,
+                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                    "clip_vision_model": cfg.get("clipVisionModel", "ViT-H"),
+                    "method": cfg.get("method", "full"),
+                }
+                if cfg.get("mask") is not None:
+                    res_entry["mask"] = cfg["mask"]
+                result.append(res_entry)
+        return result
+    if not result:
+        canvas_v2 = data.get("canvas_v2_metadata")
+        ref_imgs = canvas_v2.get("referenceImages") if isinstance(canvas_v2, dict) else None
+        entities = (
+            ref_imgs
+            if isinstance(ref_imgs, list)
+            else (ref_imgs.get("entities", []) if isinstance(ref_imgs, dict) else [])
+        )
+        for entity in entities:
+            if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
+                continue
+            ipa_cfg = entity.get("ipAdapter") or entity.get("config")
+            if not isinstance(ipa_cfg, dict):
+                continue
+            if "type" in ipa_cfg and ipa_cfg.get("type") != "ip_adapter":
+                continue
+            img = _resolve_ref_image_field(ipa_cfg.get("image"))
+            model = ipa_cfg.get("model")
+            if img is None or not model:
+                continue
+            begin_end = ipa_cfg.get("beginEndStepPct") or [0.0, 1.0]
+            raw_weight = ipa_cfg.get("weight", 1.0)
+            if isinstance(raw_weight, (list, tuple)):
+                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+            else:
+                weight = float(raw_weight)
+            entry = {
+                "image": img,
+                "ip_adapter_model": model,
+                "weight": weight,
+                "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                "clip_vision_model": ipa_cfg.get("clipVisionModel", "ViT-H"),
+                "method": ipa_cfg.get("method", "full"),
+            }
+            if ipa_cfg.get("mask") is not None:
+                entry["mask"] = ipa_cfg["mask"]
+            result.append(entry)
+    if not result:
+        for x in data.get("ipAdapters") or []:
+            if not isinstance(x, dict):
+                continue
+            raw_img = x.get("image")
+            if raw_img is None:
+                continue
+            img_list = raw_img if isinstance(raw_img, list) else [raw_img]
+            cvm = x.get("clip_vision_model") or x.get("clipVisionModel")
+            if cvm not in ("ViT-H", "ViT-G", "ViT-L"):
+                enc = x.get("image_encoder_model")
+                enc_name = str(enc.get("name", "") if isinstance(enc, dict) else getattr(enc, "name", "")).lower()
+                if "vit-l" in enc_name or "large" in enc_name:
+                    cvm = "ViT-L"
+                elif "sdxl" in enc_name or "vit-g" in enc_name:
+                    cvm = "ViT-G"
+                else:
+                    cvm = "ViT-H"
+            raw_weight = x.get("weight", 1.0)
+            if isinstance(raw_weight, (list, tuple)):
+                weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+            else:
+                weight = float(raw_weight)
+            for img in img_list:
+                normalized = dict(x)
+                normalized["image"] = img
+                normalized["weight"] = weight
+                normalized["clip_vision_model"] = cvm
+                normalized["method"] = x.get("method") or "full"
+                result.append(normalized)
+    return result
+
+
+def _extract_t2i_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    if "t2iAdapters" in data:
+        for item in data.get("t2iAdapters") or []:
+            if not isinstance(item, dict):
+                continue
+            img = item.get("image") or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+            if img is None or ("t2i_adapter_model" not in item and "model" not in item):
+                continue
+            normalized = dict(item)
+            normalized["image"] = img
+            result.append(normalized)
+        return result
+    if not result:
+        raw_control_layers = data.get("control_layers")
+        if isinstance(raw_control_layers, list):
+            for item in raw_control_layers:
+                if not isinstance(item, dict) or item.get("type") != "t2i_adapter":
+                    continue
+                img = (
+                    item.get("processed_image")
+                    or item.get("image")
+                    or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+                )
+                model = item.get("t2i_adapter_model") or item.get("model")
+                if img is None or not model:
+                    continue
+                result.append(
+                    {
+                        "image": img,
+                        "t2i_adapter_model": model,
+                        "weight": item.get("weight", 1.0),
+                        "begin_step_percent": item.get("begin_step_percent", 0.0),
+                        "end_step_percent": item.get("end_step_percent", 1.0),
+                        "resize_mode": item.get("resize_mode", "just_resize"),
+                    }
+                )
+    if not result:
+        canvas_v2 = data.get("canvas_v2_metadata")
+        control_layers = canvas_v2.get("controlLayers") if isinstance(canvas_v2, dict) else None
+        entities = (
+            control_layers
+            if isinstance(control_layers, list)
+            else (control_layers.get("entities", []) if isinstance(control_layers, dict) else [])
+        )
+        for entity in entities:
+            if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
+                continue
+            adapter = entity.get("controlAdapter")
+            if not isinstance(adapter, dict) or adapter.get("type") != "t2i_adapter":
+                continue
+            model = adapter.get("model")
+            img = _extract_canvas_control_layer_image(entity)
+            if not model or img is None:
+                continue
+            begin_end = adapter.get("beginEndStepPct") or [0.0, 1.0]
+            result.append(
+                {
+                    "image": img,
+                    "t2i_adapter_model": model,
+                    "weight": adapter.get("weight", 1.0),
+                    "begin_step_percent": begin_end[0] if len(begin_end) > 0 else 0.0,
+                    "end_step_percent": begin_end[1] if len(begin_end) > 1 else 1.0,
+                    "resize_mode": "just_resize",
+                }
+            )
+    return result
+
+
 @invocation_output("md_control_list_output")
 class MDControlListOutput(BaseInvocationOutput):
     # Outputs
@@ -1163,11 +1257,7 @@ class MetadataToControlnetsInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MDControlListOutput:
         data = {} if self.metadata is None else self.metadata.root
-        key = "controlnets"
-        if key in data:
-            md_controls = data[key]
-        else:
-            md_controls = []
+        md_controls = _extract_controlnets_from_metadata(data)
 
         controls: Optional[Union[ControlField, list[ControlField]]]
 
@@ -1177,17 +1267,33 @@ class MetadataToControlnetsInvocation(BaseInvocation, WithMetadata):
             controls = []
 
         for x in md_controls:
-            model_key = extract_model_key(x, "control_model", "", ModelType.ControlNet, context)
-            model = get_model(model_key, context)
+            model_key = extract_model_key(x, "control_model", "", ModelType.ControlNet, context) or extract_model_key(
+                x, "model", "", ModelType.ControlNet, context
+            )
+            if not model_key:
+                _warn(context, f"Could not resolve ControlNet model from metadata: {x}")
+                continue
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load ControlNet model '{model_key}': {e}")
+                continue
+            if model.base not in (
+                BaseModelType.StableDiffusion1,
+                BaseModelType.StableDiffusion2,
+                BaseModelType.StableDiffusionXL,
+            ):
+                _warn(context, f"Unsupported ControlNet base model '{model.base}' for SD ControlNet")
+                continue
 
             cn = ControlNetInvocation(
                 image=x["image"],
                 control_model=model,
-                control_weight=x["control_weight"],
-                begin_step_percent=x["begin_step_percent"],
-                end_step_percent=x["end_step_percent"],
-                control_mode=x["control_mode"],
-                resize_mode=x["resize_mode"],
+                control_weight=x.get("control_weight", x.get("weight", 1.0)),
+                begin_step_percent=x.get("begin_step_percent", 0.0),
+                end_step_percent=x.get("end_step_percent", 1.0),
+                control_mode=x.get("control_mode", "balanced"),
+                resize_mode=x.get("resize_mode", "just_resize"),
             )
             i = cn.invoke(context)
 
@@ -1224,11 +1330,7 @@ class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MDIPAdapterListOutput:
         data = {} if self.metadata is None else self.metadata.root
-        key = "ipAdapters"
-        if key in data:
-            md_adapters = data[key]
-        else:
-            md_adapters = []
+        md_adapters = _extract_ip_adapters_from_metadata(data)
 
         adapters: Optional[Union[IPAdapterField, list[IPAdapterField]]]
 
@@ -1238,17 +1340,42 @@ class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
             adapters = []
 
         for x in md_adapters:
-            model_key = extract_model_key(x, "ip_adapter_model", "", ModelType.IPAdapter, context)
-            model = get_model(model_key, context)
+            model_key = extract_model_key(x, "ip_adapter_model", "", ModelType.IPAdapter, context) or extract_model_key(
+                x, "model", "", ModelType.IPAdapter, context
+            )
+            if not model_key:
+                _warn(context, f"Could not resolve IP-Adapter model from metadata: {x}")
+                continue
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load IP-Adapter model '{model_key}': {e}")
+                continue
+            if model.base not in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL):
+                _warn(context, f"Unsupported IP-Adapter base model '{model.base}' for SD IP-Adapter")
+                continue
+
+            raw_mask = x.get("mask")
+            mask_field: Optional[TensorField] = None
+            if raw_mask is not None:
+                if isinstance(raw_mask, TensorField):
+                    mask_field = raw_mask
+                elif isinstance(raw_mask, dict) and "tensor_name" in raw_mask:
+                    mask_field = TensorField.model_validate(raw_mask)
 
             ipa = IPAdapterInvocation(
                 image=x["image"],
                 ip_adapter_model=model,
-                weight=x["weight"],
-                begin_step_percent=x["begin_step_percent"],
-                end_step_percent=x["end_step_percent"],
+                clip_vision_model=x.get("clip_vision_model", "ViT-H"),
+                method=x.get("method", "full"),
+                weight=x.get("weight", 1.0),
+                begin_step_percent=x.get("begin_step_percent", 0.0),
+                end_step_percent=x.get("end_step_percent", 1.0),
+                mask=mask_field,
             )
             i = ipa.invoke(context)
+            if mask_field is not None and getattr(i.ip_adapter, "mask", None) is None:
+                i.ip_adapter.mask = mask_field
 
             adapters = append_list(IPAdapterField, i.ip_adapter, adapters)
 
@@ -1283,11 +1410,7 @@ class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MDT2IAdapterListOutput:
         data = {} if self.metadata is None else self.metadata.root
-        key = "t2iAdapters"
-        if key in data:
-            md_adapters = data[key]
-        else:
-            md_adapters = []
+        md_adapters = _extract_t2i_adapters_from_metadata(data)
 
         adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]]
 
@@ -1297,16 +1420,28 @@ class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
             adapters = []
 
         for x in md_adapters:
-            model_key = extract_model_key(x, "t2i_adapter_model", "", ModelType.T2IAdapter, context)
-            model = get_model(model_key, context)
+            model_key = extract_model_key(
+                x, "t2i_adapter_model", "", ModelType.T2IAdapter, context
+            ) or extract_model_key(x, "model", "", ModelType.T2IAdapter, context)
+            if not model_key:
+                _warn(context, f"Could not resolve T2I-Adapter model from metadata: {x}")
+                continue
+            try:
+                model = get_model(model_key, context)
+            except Exception as e:
+                _warn(context, f"Could not load T2I-Adapter model '{model_key}': {e}")
+                continue
+            if model.base not in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL):
+                _warn(context, f"Unsupported T2I-Adapter base model '{model.base}' for SD T2I-Adapter")
+                continue
 
             t2i = T2IAdapterInvocation(
                 image=x["image"],
                 t2i_adapter_model=model,
-                weight=x["weight"],
-                begin_step_percent=x["begin_step_percent"],
-                end_step_percent=x["end_step_percent"],
-                resize_mode=x["resize_mode"],
+                weight=x.get("weight", 1.0),
+                begin_step_percent=x.get("begin_step_percent", 0.0),
+                end_step_percent=x.get("end_step_percent", 1.0),
+                resize_mode=x.get("resize_mode", "just_resize"),
             )
             i = t2i.invoke(context)
 
@@ -1344,9 +1479,14 @@ class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return StringCollectionOutput(collection=output)
+        val = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label))
+        if val is None:
+            return StringCollectionOutput(collection=self.default_value)
+        if isinstance(val, list):
+            return StringCollectionOutput(collection=val)
+        if isinstance(val, str):
+            return StringCollectionOutput(collection=[val])
+        return StringCollectionOutput(collection=self.default_value)
 
 
 @invocation(

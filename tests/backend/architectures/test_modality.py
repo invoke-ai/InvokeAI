@@ -68,9 +68,11 @@ def test_the_refiner_generates_nothing() -> None:
 
 
 def test_the_text_to_image_only_architectures() -> None:
-    for base in (BaseModelType.ErnieImage, BaseModelType.Ideogram4):
-        facet = get(base, ModalityFacet)
-        assert facet is not None and facet.modes == frozenset({"txt2img"}), base.value
+    facet = get(BaseModelType.Ideogram4, ModalityFacet)
+    assert facet is not None and facet.modes == frozenset({"txt2img"}), BaseModelType.Ideogram4.value
+
+    ernie = get(BaseModelType.ErnieImage, ModalityFacet)
+    assert ernie is not None and ernie.modes == frozenset({"txt2img", "img2img"}), BaseModelType.ErnieImage.value
 
 
 def test_the_video_architectures() -> None:
