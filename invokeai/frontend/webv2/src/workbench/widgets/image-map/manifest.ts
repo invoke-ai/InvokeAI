@@ -8,6 +8,7 @@ export const imageMapWidgetManifest: WidgetManifest = {
   allowFloating: true,
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center'],
+  chrome: { body: 'fill' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: MapIcon,
   id: 'image-map',

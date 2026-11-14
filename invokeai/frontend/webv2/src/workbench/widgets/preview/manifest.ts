@@ -8,6 +8,7 @@ export const previewWidgetManifest: WidgetManifest = {
   allowFloating: true,
   allowMultiple: false,
   allowedRegions: ['center', 'right'],
+  chrome: { body: 'fill' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: EyeIcon,
   id: 'preview',
