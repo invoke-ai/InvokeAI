@@ -62,24 +62,30 @@ export interface SelectObjectSessionDeps<T> {
 
 export interface CreateSelectObjectSessionOptions<T> {
   deps: SelectObjectSessionDeps<T>;
-  /** Auto Process is an account preference; the session starts from it and Reset keeps it. */
-  initialAutoProcess?: boolean;
+  /** Auto-update is an account preference; the session starts from it and Reset keeps it. */
+  initialAutoProcess: boolean;
   operation: CanvasOperationSession;
 }
 
 export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'deduped' | 'invalid';
 
+export type SelectObjectSessionChanges<T> = Partial<
+  Pick<
+    SelectObjectSessionState<T>,
+    'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
+  >
+> & {
+  /**
+   * Switches between visual and prompt input: the current input is kept aside and the requested type's last input
+   * (or an empty one) comes back. An explicit `input` in the same update wins; one of the other type is a switch too.
+   */
+  inputType?: SamInput['type'];
+};
+
 export interface SelectObjectSession<T> {
   getSnapshot(): SelectObjectSessionState<T>;
   subscribe(listener: () => void): () => void;
-  update(
-    changes: Partial<
-      Pick<
-        SelectObjectSessionState<T>,
-        'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
-      >
-    >
-  ): void;
+  update(changes: SelectObjectSessionChanges<T>): void;
   process(): Promise<SelectObjectSessionProcessResult>;
   reportError(error: SamSessionError | string): void;
   reset(): void;
@@ -87,11 +93,18 @@ export interface SelectObjectSession<T> {
   dispose(): void;
 }
 
+type StashedSamInputs = { [K in SamInput['type']]?: Extract<SamInput, { type: K }> };
+
+const EMPTY_INPUTS: Required<StashedSamInputs> = {
+  prompt: { prompt: '', type: 'prompt' },
+  visual: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+};
+
 const defaultState = <T>(autoProcess: boolean): SelectObjectSessionState<T> => ({
   applyPolygonRefinement: false,
   autoProcess,
   error: null,
-  input: { prompt: '', type: 'prompt' },
+  input: EMPTY_INPUTS.visual,
   invert: false,
   isolatedPreview: true,
   model: 'segment-anything-2-large',
@@ -168,7 +181,9 @@ class SamSessionFailure extends Error {
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
   const { deps, operation } = options;
-  let state = defaultState<T>(options.initialAutoProcess ?? false);
+  let state = defaultState<T>(options.initialAutoProcess);
+  // The input of the type not in use, so switching back restores it; not part of the snapshot.
+  let stashedInputs: StashedSamInputs = {};
   let source: SelectObjectPreparedSource | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
@@ -523,6 +538,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       operation.reset();
       source = null;
       lastPublishedHash = null;
+      stashedInputs = {};
       publishState(defaultState<T>(state.autoProcess));
     },
     subscribe: (listener) => {
@@ -532,9 +548,18 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    update: (changes) => {
+    update: ({ inputType, ...requested }) => {
       if (disposed) {
         return;
+      }
+      const changes: Omit<SelectObjectSessionChanges<T>, 'inputType'> = inputType &&
+      inputType !== state.input.type &&
+      !('input' in requested)
+        ? { ...requested, input: stashedInputs[inputType] ?? EMPTY_INPUTS[inputType] }
+        : requested;
+      // Any switch of input type keeps the outgoing input, an explicit cross-type input included.
+      if (changes.input && changes.input.type !== state.input.type) {
+        stashedInputs = { ...stashedInputs, [state.input.type]: state.input };
       }
       const processingChanged =
         ('input' in changes && changes.input !== state.input) ||

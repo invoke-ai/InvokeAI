@@ -87,7 +87,7 @@ const createHarness = (
   if (!operation) {
     throw new Error('expected Select Object operation');
   }
-  const session = createSelectObjectSession({ deps, initialAutoProcess, operation });
+  const session = createSelectObjectSession({ deps, initialAutoProcess: initialAutoProcess ?? false, operation });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -844,7 +844,7 @@ describe('createSelectObjectSession', () => {
       applyPolygonRefinement: false,
       autoProcess: true,
       error: null,
-      input: { prompt: '', type: 'prompt' },
+      input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
       invert: false,
       isolatedPreview: true,
       model: 'segment-anything-2-large',
@@ -854,6 +854,61 @@ describe('createSelectObjectSession', () => {
     });
     await vi.runAllTimersAsync();
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it('keeps each input type while switching between them and Reset forgets both', () => {
+    const harness = createHarness();
+    const points = {
+      bbox: { height: 4, width: 4, x: 1, y: 1 },
+      excludePoints: [{ x: 2, y: 2 }],
+      includePoints: [{ x: 3, y: 3 }],
+      type: 'visual' as const,
+    };
+
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual({
+      bbox: null,
+      excludePoints: [],
+      includePoints: [],
+      type: 'visual',
+    });
+    harness.session.update({ input: points });
+    harness.session.update({ inputType: 'prompt' });
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: 'cat', type: 'prompt' });
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual(points);
+
+    harness.session.reset();
+    harness.session.update({ inputType: 'prompt' });
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: '', type: 'prompt' });
+  });
+
+  it('keeps the prompt when a visual input replaces it directly', () => {
+    const harness = createHarness();
+    const points = { bbox: null, excludePoints: [], includePoints: [{ x: 3, y: 3 }], type: 'visual' as const };
+
+    harness.session.update({ input: points });
+    harness.session.update({ inputType: 'prompt' });
+
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: 'cat', type: 'prompt' });
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual(points);
+  });
+
+  it('treats an input-type switch as an input change: clears the preview and schedules the restored input', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    await harness.session.process();
+    expect(harness.session.getSnapshot().preview).not.toBeNull();
+    harness.session.update({ inputType: 'visual' });
+    harness.session.update({ autoProcess: true });
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'ready' });
+
+    harness.session.update({ inputType: 'prompt' });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ input: { prompt: 'cat' }, status: 'scheduled' });
+    await vi.runAllTimersAsync();
+    expect(harness.session.getSnapshot().preview).not.toBeNull();
   });
 
   it('dispose clears scheduling and preview, unsubscribes exactly once, and makes methods inert', async () => {

@@ -51,6 +51,8 @@ export type SaveSelectObjectSessionResult =
   | ReplaceSelectionFromImageResult;
 export interface SelectObjectSessionUpdate {
   input?: SamInput;
+  /** Switch between visual and prompt input; each type keeps its last input until Reset. */
+  inputType?: SamInput['type'];
   pointLabel?: 'include' | 'exclude';
   model?: SamModel;
   invert?: boolean;
@@ -203,8 +205,8 @@ export interface CanvasSelectObjectCoordinatorDeps {
   readonly stores: CanvasApplicationOperationStores;
   readonly controller: CanvasOperationController;
   readonly projectId: string;
-  /** Reads the account's Auto Process preference when a session starts; absent means off. */
-  readAutoProcessPreference?(): boolean;
+  /** Reads the account's auto-update preference when a session starts; absent starts from the account default. */
+  readAutoUpdatePreference?(): boolean;
   prepareStart(layerId: string): SelectObjectStartContext;
   selectLayer(layerId: string): void;
   clearOtherOperation(): void;
@@ -308,7 +310,7 @@ export interface SelectObjectSession<T> {
         SelectObjectSessionState<T>,
         'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
       >
-    >
+    > & { inputType?: SamInput['type'] }
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
   reportError(error: SamSessionError | string): void;
@@ -388,7 +390,7 @@ export interface CreateSelectObjectSessionOptions<T> {
     cleanupPreview(): void;
     isGuardCurrent(guard: LayerExportGuard): boolean;
   };
-  initialAutoProcess?: boolean;
+  initialAutoProcess: boolean;
   operation: CanvasOperationSession;
 }
 

@@ -1,13 +1,12 @@
 import type {
   OperationPropertyForm,
+  OperationStatus,
   ToolFormProps,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import { Box, createListCollection, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
+import { createListCollection } from '@chakra-ui/react';
 import { galleryDurability } from '@features/gallery';
-import { Button } from '@platform/ui/Button';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Select } from '@platform/ui/Select';
 import {
   buildFilterDefaults,
@@ -23,11 +22,10 @@ import {
 import { useFilterSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { LayerFilterControls } from '@workbench/widgets/layers/LayerFilterControls';
-import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { OperationStatusChip } from './OperationStatusSlot';
+import { OperationActions } from './OperationActions';
 
 export interface FilterActionEligibility {
   canApply: boolean;
@@ -59,14 +57,13 @@ export const getFilterActionEligibility = (session: FilterOperationSessionState)
   };
 };
 
-export const getFilterStatusTranslationKey = (status: FilterOperationSessionState['status']): string =>
+/** The phase shown while the filter works; null at rest. */
+export const getFilterBusyTranslationKey = (status: FilterOperationSessionState['status']): string | null =>
   status === 'processing'
     ? 'widgets.layers.rasterFilter.running'
     : status === 'committing'
       ? 'widgets.layers.rasterFilter.statusCommitting'
-      : status === 'error'
-        ? 'widgets.layers.rasterFilter.statusError'
-        : 'widgets.layers.selectObject.statusReady';
+      : null;
 
 const FILTER_ERROR_TRANSLATION_KEYS: Record<FilterSessionErrorCode, string> = {
   aborted: 'widgets.layers.rasterFilter.aborted',
@@ -120,7 +117,7 @@ const useFilterDraft = (engine: ToolFormProps['engine']) => {
   return { operations, reset, setSettings, setType };
 };
 
-/** Filter choice (grouped by category) and auto-process: the iteration dials. */
+/** Filter choice (grouped by category) and auto-update: the iteration dials. */
 const FilterChooseSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
@@ -205,7 +202,23 @@ const FilterParamsSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-const FilterFooter = ({ engine }: ToolFormProps) => {
+const useFilterStatus = (engine: ToolFormProps['engine']): OperationStatus | null => {
+  const { t } = useTranslation();
+  const session = useFilterSession(engine);
+  if (!session) {
+    return null;
+  }
+  const busyKey = getFilterBusyTranslationKey(session.status);
+  return {
+    busyText: busyKey ? t(busyKey) : null,
+    error: session.error
+      ? { detail: session.error.detail ?? null, text: t(getFilterErrorTranslationKey(session.error.code)) }
+      : null,
+    source: `${session.layerName} · ${t(`widgets.layers.selectObject.saveAs_${session.layerType}`)}`,
+  };
+};
+
+const FilterActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
   const { operations, reset } = useFilterDraft(engine);
@@ -219,97 +232,51 @@ const FilterFooter = ({ engine }: ToolFormProps) => {
   }
   const eligibility = getFilterActionEligibility(session);
   const saveTargets = getFilterSaveTargetEligibility(eligibility);
-  const sourceLabel = `${session.layerName} · ${t(`widgets.layers.selectObject.saveAs_${session.layerType}`)}`;
-  const isBusy = !session.error && (session.status === 'processing' || session.status === 'committing');
   return (
-    <Flex align="center" gap="1" minW="0" w="full">
-      <Box flex="1" minW="0" overflow="hidden" whiteSpace="nowrap">
-        <OperationStatusChip
-          errorDetail={session.error?.detail ?? null}
-          errorText={session.error ? t(getFilterErrorTranslationKey(session.error.code)) : null}
-          isBusy={isBusy}
-          sourceLabel={sourceLabel}
-          statusText={t(getFilterStatusTranslationKey(session.status))}
-          technicalDetailsLabel={t('widgets.layers.selectObject.technicalDetails')}
-          title={t('widgets.layers.rasterFilter.title')}
-        />
-      </Box>
-      <Button disabled={!eligibility.canReset} flexShrink={0} variant="ghost" onClick={reset}>
-        {t('widgets.layers.rasterFilter.resetSettings')}
-      </Button>
-      {session.autoProcess ? null : (
-        <Button
-          disabled={!eligibility.canProcess}
-          flexShrink={0}
-          loading={session.status === 'processing'}
-          onClick={() => void operations.processFilterOperation()}
-        >
-          {t('widgets.layers.selectObject.process')}
-        </Button>
-      )}
-      <Flex flexShrink={0}>
-        <Button
-          data-pane-action="apply"
-          disabled={!eligibility.canApply}
-          loading={session.status === 'committing'}
-          roundedRight="none"
-          variant="solid"
-          onClick={onApply}
-        >
-          {t('common.apply')}
-        </Button>
-        <Menu.Root positioning={APPLY_MENU_POSITIONING}>
-          <Menu.Trigger asChild>
-            <Button
-              aria-label={t('widgets.layers.rasterFilter.applyAs')}
-              disabled={!eligibility.canSave}
-              px="1"
-              roundedLeft="none"
-              variant="solid"
-            >
-              <Icon as={ChevronDownIcon} boxSize="3.5" />
-            </Button>
-          </Menu.Trigger>
-          <Portal>
-            <Menu.Positioner>
-              <MenuContent minW="12rem" py="1">
-                <MenuActionItem
-                  disabled={!saveTargets.raster}
-                  label={t('widgets.layers.selectObject.saveAs_raster')}
-                  value="save-raster"
-                  onSelect={() => void operations.commitFilterOperation('raster', galleryDurability.makeCanvasAsset)}
-                />
-                <MenuActionItem
-                  disabled={!saveTargets.control}
-                  label={t('widgets.layers.selectObject.saveAs_control')}
-                  value="save-control"
-                  onSelect={() => void operations.commitFilterOperation('control', galleryDurability.makeCanvasAsset)}
-                />
-              </MenuContent>
-            </Menu.Positioner>
-          </Portal>
-        </Menu.Root>
-      </Flex>
-      <Button
-        data-pane-action="cancel"
-        disabled={!eligibility.canCancel}
-        flexShrink={0}
-        variant="ghost"
-        onClick={onCancel}
-      >
-        {t('common.cancel')}
-      </Button>
-    </Flex>
+    <OperationActions
+      applying={session.status === 'committing'}
+      canApply={eligibility.canApply}
+      canCancel={eligibility.canCancel}
+      canReset={eligibility.canReset}
+      canSave={eligibility.canSave}
+      run={
+        session.autoProcess
+          ? null
+          : {
+              disabled: !eligibility.canProcess,
+              label: t('widgets.layers.rasterFilter.process'),
+              loading: session.status === 'processing',
+              onRun: () => void operations.processFilterOperation(),
+            }
+      }
+      saveAsLabel={t('widgets.layers.rasterFilter.applyAs')}
+      saveTargets={[
+        {
+          disabled: !saveTargets.raster,
+          label: t('widgets.layers.selectObject.saveAs_raster'),
+          value: 'save-raster',
+          onSelect: () => void operations.commitFilterOperation('raster', galleryDurability.makeCanvasAsset),
+        },
+        {
+          disabled: !saveTargets.control,
+          label: t('widgets.layers.selectObject.saveAs_control'),
+          value: 'save-control',
+          onSelect: () => void operations.commitFilterOperation('control', galleryDurability.makeCanvasAsset),
+        },
+      ]}
+      onApply={onApply}
+      onCancel={onCancel}
+      onReset={reset}
+    />
   );
 };
 
-const APPLY_MENU_POSITIONING = { placement: 'top-end' } as const;
-
 export const filterOperationForm: OperationPropertyForm = {
-  footer: FilterFooter,
+  actions: FilterActions,
   groups: [
     { body: FilterChooseSettings, id: 'filter-choose', labelKey: 'widgets.layers.control.filter' },
     { body: FilterParamsSettings, id: 'filter-params', labelKey: 'widgets.properties.groups.settings' },
   ],
   kind: 'filter',
+  useStatus: useFilterStatus,
 };

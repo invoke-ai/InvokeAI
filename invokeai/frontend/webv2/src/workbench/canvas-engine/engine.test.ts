@@ -18660,6 +18660,156 @@ describe('Select Object canvas engine integration', () => {
     h.engine.lifecycle.dispose();
   });
 
+  it('places the first click as a point right after starting from another tool, with auto-update scheduling it', async () => {
+    const h = await createSamHarness();
+    h.engine.tools.setTool('brush');
+    expect(getCanvasOperations(h.engine).startSelectObject('source')).toBe('started');
+    expect(getCanvasOperations(h.engine).stores.samSession.get()?.autoProcess).toBe(true);
+
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    h.overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+
+    expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({
+      input: { includePoints: [{ x: 5, y: 5 }] },
+      status: 'scheduled',
+    });
+    expect(h.engine.stores.activeTool.get()).toBe('sam');
+    expect(getCanvasOperations(h.engine).controller.getSnapshot()).toMatchObject({ status: 'active' });
+    h.engine.lifecycle.dispose();
+  });
+
+  it('places the first click of a session started right after cancelling one that was waiting to process', async () => {
+    const h = await createSamHarness();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const operations = getCanvasOperations(h.engine);
+      operations.startSelectObject('source');
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+      expect(operations.stores.samSession.get()?.status).toBe('scheduled');
+
+      operations.cancelSelectObjectSession();
+      expect(operations.startSelectObject('source')).toBe('started');
+      h.overlay.fire('pointerdown', pointerAt(20, 30));
+      h.overlay.fire('pointerup', pointerAt(20, 30, { buttons: 0 }));
+
+      expect(operations.stores.samSession.get()).toMatchObject({
+        input: { includePoints: [{ x: 20, y: 30 }] },
+        status: 'scheduled',
+      });
+      // The cancelled session's debounce must not land on, or reset, the new one.
+      await vi.advanceTimersByTimeAsync(500);
+      h.overlay.fire('pointerdown', pointerAt(40, 40));
+      h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+      expect(operations.stores.samSession.get()?.input.includePoints).toEqual([
+        { x: 20, y: 30 },
+        { x: 40, y: 40 },
+      ]);
+      expect(h.engine.stores.activeTool.get()).toBe('sam');
+      h.engine.lifecycle.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe('canvas input overlapping auto-update processing', () => {
+    type GraphResult = { height: number; imageName: string; origin: string; width: number };
+    const click = (h: Awaited<ReturnType<typeof createSamHarness>>, x: number, y: number): void => {
+      h.overlay.fire('pointerdown', pointerAt(x, y));
+      h.overlay.fire('pointerup', pointerAt(x, y, { buttons: 0 }));
+    };
+    const startWithGraph = async (runGraph: () => Promise<GraphResult>) => {
+      const graph = vi.fn(runGraph);
+      const h = await createSamHarness({ runGraph: graph });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const operations = getCanvasOperations(h.engine);
+      expect(operations.startSelectObject('source')).toBe('started');
+      expect(operations.stores.samSession.get()?.autoProcess).toBe(true);
+      return { graph, h, operations };
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('keeps a click whose press spans the debounce firing and the run starting', async () => {
+      const pending = createDeferred<GraphResult>();
+      const { graph, h, operations } = await startWithGraph(() => pending.promise);
+      click(h, 20, 20);
+
+      h.overlay.fire('pointerdown', pointerAt(40, 40));
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(graph).toHaveBeenCalledOnce();
+      expect(operations.stores.samSession.get()?.status).toBe('processing-sam');
+      h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+
+      expect(operations.stores.samSession.get()).toMatchObject({
+        input: {
+          includePoints: [
+            { x: 20, y: 20 },
+            { x: 40, y: 40 },
+          ],
+        },
+        status: 'scheduled',
+      });
+      expect(h.engine.stores.activeTool.get()).toBe('sam');
+      h.engine.lifecycle.dispose();
+    });
+
+    it('adds a click made while a run is in flight, invalidates that run and schedules a new one', async () => {
+      const first = createDeferred<GraphResult>();
+      const { graph, h, operations } = await startWithGraph(() =>
+        graph.mock.calls.length === 1
+          ? first.promise
+          : Promise.resolve({ height: 100, imageName: 'second.png', origin: 'test', width: 100 })
+      );
+      click(h, 20, 20);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(operations.stores.samSession.get()?.status).toBe('processing-sam');
+
+      click(h, 40, 40);
+      expect(operations.stores.samSession.get()).toMatchObject({
+        input: {
+          includePoints: [
+            { x: 20, y: 20 },
+            { x: 40, y: 40 },
+          ],
+        },
+        status: 'scheduled',
+      });
+      first.resolve({ height: 100, imageName: 'first.png', origin: 'test', width: 100 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(operations.stores.samSession.get()).toMatchObject({ hasPreview: false, status: 'scheduled' });
+
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(graph).toHaveBeenCalledTimes(2);
+      expect(h.engine.stores.activeTool.get()).toBe('sam');
+      h.engine.lifecycle.dispose();
+    });
+
+    it('adds a click made right after a run fails and clears the error', async () => {
+      const { h, operations } = await startWithGraph(() => Promise.reject(new Error('backend down')));
+      click(h, 20, 20);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(operations.stores.samSession.get()).toMatchObject({ error: { code: 'queue' }, status: 'error' });
+
+      click(h, 40, 40);
+
+      expect(operations.stores.samSession.get()).toMatchObject({
+        error: null,
+        input: {
+          includePoints: [
+            { x: 20, y: 20 },
+            { x: 40, y: 40 },
+          ],
+        },
+        status: 'scheduled',
+      });
+      expect(h.engine.stores.activeTool.get()).toBe('sam');
+      h.engine.lifecycle.dispose();
+    });
+  });
+
   it('resets edited inputs and point mode immediately after launch without requiring a preview guard', async () => {
     const h = await createSamHarness();
     expect(getCanvasOperations(h.engine).startSelectObject('source')).toBe('started');
@@ -19020,6 +19170,25 @@ describe('Select Object canvas engine integration', () => {
 
     await expect(pending).resolves.toMatchObject({ status: 'committed' });
     expect(getDocumentLeaves(h.engine.document.getDocument())[0]?.type).toBe('inpaint_mask');
+    h.engine.lifecycle.dispose();
+  });
+
+  it('cancels a pending save when Select by switches input type', async () => {
+    const h = await createCommittingSamHarness();
+    const leavesBefore = getDocumentLeaves(h.engine.document.getDocument()).length;
+    const durable = createDeferred<void>();
+    const pending = getCanvasOperations(h.engine).saveSelectObjectSession('inpaint_mask', () => durable.promise);
+
+    getCanvasOperations(h.engine).updateSelectObjectSession({ inputType: 'prompt' });
+    durable.resolve();
+
+    await expect(pending).resolves.toEqual({ status: 'stale' });
+    expect(getDocumentLeaves(h.engine.document.getDocument())).toHaveLength(leavesBefore);
+    expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({
+      hasPreview: false,
+      input: { type: 'prompt' },
+      status: 'ready',
+    });
     h.engine.lifecycle.dispose();
   });
 

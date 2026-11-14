@@ -15,9 +15,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   filterOperationForm,
   getFilterActionEligibility,
+  getFilterBusyTranslationKey,
   getFilterErrorTranslationKey,
   getFilterSaveTargetEligibility,
-  getFilterStatusTranslationKey,
 } from './FilterOptions';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
@@ -122,12 +122,12 @@ describe('getFilterActionEligibility', () => {
   });
 });
 
-describe('getFilterStatusTranslationKey', () => {
-  it('maps each session status to its message key', () => {
-    expect(getFilterStatusTranslationKey('processing')).toBe('widgets.layers.rasterFilter.running');
-    expect(getFilterStatusTranslationKey('committing')).toBe('widgets.layers.rasterFilter.statusCommitting');
-    expect(getFilterStatusTranslationKey('error')).toBe('widgets.layers.rasterFilter.statusError');
-    expect(getFilterStatusTranslationKey('ready')).toBe('widgets.layers.selectObject.statusReady');
+describe('getFilterBusyTranslationKey', () => {
+  it('names the working phases and nothing at rest', () => {
+    expect(testI18n.t(getFilterBusyTranslationKey('processing')!)).toBe('Running filter…');
+    expect(testI18n.t(getFilterBusyTranslationKey('committing')!)).toBe('Applying filter…');
+    expect(getFilterBusyTranslationKey('error')).toBeNull();
+    expect(getFilterBusyTranslationKey('ready')).toBeNull();
   });
 });
 
@@ -190,42 +190,43 @@ const renderRegions = (session: FilterOperationSessionState) => {
   const [choose, params] = filterOperationForm.groups;
   return {
     choose: render(createElement(choose!.body, { engine: engine as never })),
-    footer: render(createElement(filterOperationForm.footer, { engine: engine as never })),
+    actions: render(createElement(filterOperationForm.actions, { engine: engine as never })),
     operations,
     params: render(createElement(params!.body, { engine: engine as never })),
   };
 };
 
 describe('filter operation form', () => {
-  it('puts the choice and auto switch in one group, parameters in the next, and every verb in the footer', () => {
-    const { choose, footer, params } = renderRegions(
+  it('puts the choice and auto switch in one group, parameters in the next, and every verb in the actions row', () => {
+    const { actions, choose, params } = renderRegions(
       state({ draft: { settings: { high_threshold: 200, low_threshold: 100 }, type: 'canny_edge_detection' } })
     );
 
     // The select names itself through a real (visually hidden) label part.
     expect(choose).toContain('>Filter</label>');
-    expect(choose).toContain('>Process automatically<');
+    expect(choose).toContain('>Auto-update preview<');
     expect(choose).not.toContain('>Process<');
 
     expect(params).not.toContain('>Filter</label>');
     expect(params).toContain('Low threshold');
 
-    expect(footer).toContain('Portrait · Raster layer');
-    expect(footer).toContain('role="status"');
-    // Auto-process on: no Process verb; Reset settings then Apply then Cancel.
-    expect(footer).not.toContain('>Process<');
-    expect(footer).not.toContain('>Reset<');
-    expect(footer.indexOf('>Reset settings<')).toBeGreaterThan(-1);
-    expect(footer.indexOf('>Reset settings<')).toBeLessThan(footer.indexOf('>Apply<'));
-    expect(footer.indexOf('>Apply<')).toBeLessThan(footer.indexOf('>Cancel<'));
+    // Auto-update on: no Process verb; Reset, then Cancel, then Apply. Status lives in the section, not in the row.
+    expect(actions).not.toContain('Portrait');
+    expect(actions).not.toContain('role="status"');
+    expect(actions).not.toContain('>Process<');
+    expect(actions.indexOf('>Reset<')).toBeGreaterThan(-1);
+    expect(actions.indexOf('>Reset<')).toBeLessThan(actions.indexOf('>Cancel<'));
+    expect(actions.indexOf('>Cancel<')).toBeLessThan(actions.indexOf('>Apply<'));
   });
 
-  it('shows Process only with auto-process off, disabled while processing, and keeps Cancel live', () => {
-    const manual = renderRegions(state({ autoProcess: false })).footer;
-    expect(manual).toContain('>Process<');
+  it('shows Process only with auto-update off, labelled and disabled while processing, and keeps Cancel live', () => {
+    const manual = renderRegions(state({ autoProcess: false })).actions;
+    expect(manual.indexOf('>Cancel<')).toBeLessThan(manual.indexOf('>Process<'));
+    expect(manual.indexOf('>Process<')).toBeLessThan(manual.indexOf('>Apply<'));
 
-    const busy = renderRegions(state({ autoProcess: false, status: 'processing' })).footer;
+    const busy = renderRegions(state({ autoProcess: false, status: 'processing' })).actions;
     const processIdx = busy.indexOf('>Process<');
+    expect(processIdx).toBeGreaterThan(-1);
     const processButtonTag = busy.slice(busy.lastIndexOf('<button', processIdx), processIdx);
     expect(processButtonTag).toContain('disabled=""');
     expect(processButtonTag).toContain('data-loading=""');

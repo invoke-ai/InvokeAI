@@ -5,6 +5,9 @@ import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
+/** Select Object starts with auto-update on until the person turns it off. */
+export const DEFAULT_SELECT_OBJECT_AUTO_UPDATE = true;
+
 export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
@@ -146,8 +149,12 @@ export interface WorkbenchPreferences {
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
-  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
-  selectObjectAutoProcess: boolean;
+  /**
+   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under
+   * a new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
+   * any settings save, so it cannot tell a choice from the old default, and normalization drops it.
+   */
+  selectObjectAutoUpdate: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */

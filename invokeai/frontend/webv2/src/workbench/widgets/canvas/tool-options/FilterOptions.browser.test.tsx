@@ -3,6 +3,7 @@ import type { FilterOperationSessionState } from '@workbench/canvas-operations/a
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
+import { createOperationSection } from '@workbench/widgets/layers/panes/OperationSection';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,6 +12,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { filterOperationForm } from './FilterOptions';
+
+const FilterSection = createOperationSection(filterOperationForm);
 
 const enCatalog: Record<string, unknown> = await fetch('/locales/en.json').then((response) => response.json());
 
@@ -64,7 +67,7 @@ const SESSION: FilterOperationSessionState = {
   status: 'ready',
 };
 
-describe('filter footer errors', () => {
+describe('filter operation errors', () => {
   let root: Root | null = null;
   let container: HTMLDivElement | null = null;
 
@@ -75,19 +78,18 @@ describe('filter footer errors', () => {
     container = null;
   });
 
-  const renderFooter = async (initial: Partial<FilterOperationSessionState>) => {
+  const renderSection = async (initial: Partial<FilterOperationSessionState>) => {
     const i18n = await createI18n();
     const store = sessionStore({ ...SESSION, ...initial });
     const engine = engineWith(store);
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    const Footer = filterOperationForm.footer;
     act(() =>
       root!.render(
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
-            <Footer engine={engine as never} />
+            <FilterSection engine={engine as never} />
           </I18nextProvider>
         </ChakraProvider>
       )
@@ -96,7 +98,7 @@ describe('filter footer errors', () => {
   };
 
   it('translates a refusal and updates an already visible error when the language changes', async () => {
-    const { i18n } = await renderFooter({ error: { code: 'over-budget' }, status: 'error' });
+    const { i18n } = await renderSection({ error: { code: 'over-budget' }, status: 'error' });
     await expect
       .element(page.getByRole('alert'))
       .toHaveTextContent('The filtered layer is too large to undo, so it was not applied.');
@@ -107,7 +109,7 @@ describe('filter footer errors', () => {
   });
 
   it('falls back to English for a refusal the language does not translate', async () => {
-    const { i18n } = await renderFooter({ error: { code: 'stale' }, status: 'error' });
+    const { i18n } = await renderSection({ error: { code: 'stale' }, status: 'error' });
     await act(() => i18n.changeLanguage('de'));
 
     await expect
@@ -116,7 +118,7 @@ describe('filter footer errors', () => {
   });
 
   it('summarizes an unexpected failure and keeps its message as technical detail', async () => {
-    await renderFooter({ error: { code: 'apply-failed', detail: 'cache failed' }, status: 'error' });
+    await renderSection({ error: { code: 'apply-failed', detail: 'cache failed' }, status: 'error' });
 
     await expect.element(page.getByRole('alert')).toHaveTextContent('The filter could not be applied.');
     const details = page.getByRole('button', { name: 'Technical details' });
@@ -125,7 +127,7 @@ describe('filter footer errors', () => {
   });
 
   it('clears the error once a retry starts', async () => {
-    const { store } = await renderFooter({ error: { code: 'busy' }, status: 'error' });
+    const { store } = await renderSection({ error: { code: 'busy' }, status: 'error' });
     await expect.element(page.getByRole('alert')).toBeVisible();
 
     act(() => store.set({ error: null, status: 'committing' }));

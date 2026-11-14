@@ -26,6 +26,7 @@ import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+import { DEFAULT_SELECT_OBJECT_AUTO_UPDATE } from '@workbench/settings/contracts';
 import { getLayeredKeys } from '@workbench/settings/projectSettings';
 
 export { WORKBENCH_LANGUAGES } from '@platform/i18n/languages';
@@ -72,7 +73,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   queueJobsScope: 'all',
   reduceMotion: false,
   scopedDefaults: {},
-  selectObjectAutoProcess: false,
+  selectObjectAutoUpdate: DEFAULT_SELECT_OBJECT_AUTO_UPDATE,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   startupDestination: 'launchpad',
@@ -498,10 +499,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
-  selectObjectAutoProcess:
-    typeof preferences?.selectObjectAutoProcess === 'boolean'
-      ? preferences.selectObjectAutoProcess
-      : DEFAULT_PREFERENCES.selectObjectAutoProcess,
+  selectObjectAutoUpdate:
+    typeof preferences?.selectObjectAutoUpdate === 'boolean'
+      ? preferences.selectObjectAutoUpdate
+      : DEFAULT_PREFERENCES.selectObjectAutoUpdate,
   showFocusRegionHighlight:
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight

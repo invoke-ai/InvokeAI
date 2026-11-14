@@ -8,6 +8,8 @@ import type {
   SelectObjectSessionPreview,
 } from '@workbench/canvas-operations/contracts';
 
+import { DEFAULT_SELECT_OBJECT_AUTO_UPDATE } from '@workbench/settings/contracts';
+
 import { createSelectObjectSession } from './selectObjectSession';
 
 interface CommitOwner {
@@ -221,7 +223,7 @@ export const createSelectObjectOperationCoordinator = (
           runGraph: deps.runGraph,
           uploadIntermediate: deps.uploadIntermediate,
         },
-        initialAutoProcess: deps.readAutoProcessPreference?.() ?? false,
+        initialAutoProcess: deps.readAutoUpdatePreference?.() ?? DEFAULT_SELECT_OBJECT_AUTO_UPDATE,
         operation,
       });
       const installed = session;
@@ -242,7 +244,6 @@ export const createSelectObjectOperationCoordinator = (
           }
         }
       });
-      installed.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
       syncStore();
       deps.setSamTool();
       return 'started';
@@ -255,6 +256,7 @@ export const createSelectObjectOperationCoordinator = (
       const state = session.getSnapshot();
       const processingChanged =
         ('input' in sessionChanges && sessionChanges.input !== state.input) ||
+        (sessionChanges.inputType !== undefined && sessionChanges.inputType !== state.input.type) ||
         ('model' in sessionChanges && sessionChanges.model !== state.model) ||
         ('invert' in sessionChanges && sessionChanges.invert !== state.invert) ||
         ('applyPolygonRefinement' in sessionChanges &&
@@ -392,7 +394,6 @@ export const createSelectObjectOperationCoordinator = (
       publishedGuard = null;
       pointLabel = 'include';
       session.reset();
-      session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
       syncStore();
       return 'updated';
     },
