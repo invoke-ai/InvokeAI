@@ -10,7 +10,7 @@ import { createItemId } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/ui/toaster';
-import { getDocumentIndex, isNodeHidden } from '@workbench/canvas-engine/api';
+import { getDocumentIndex, isNodeHidden, isOverlayStack } from '@workbench/canvas-engine/api';
 import { nextLayerName } from '@workbench/canvasProjectMutations';
 import { useNotify } from '@workbench/useNotify';
 import {
@@ -129,7 +129,13 @@ export const CanvasEditRefusalNotices = ({
         });
         return;
       }
-      const { message, offersNewLayer, title } = describeLayerEditRefusal(refusal, t);
+      const document = engine.document.model()?.document;
+      const stack = document ? getDocumentIndex(document).byId.get(refusal.layerId)?.stack : undefined;
+      const { message, offersNewLayer, title } = describeLayerEditRefusal(
+        refusal,
+        t,
+        stack !== undefined && isOverlayStack(stack)
+      );
       // One toast per layer and reason: pressing again on the same layer replaces it rather than stacking another.
       const id = `${scope}:${refusal.status}:${refusal.layerId}`;
       if (!offersNewLayer) {

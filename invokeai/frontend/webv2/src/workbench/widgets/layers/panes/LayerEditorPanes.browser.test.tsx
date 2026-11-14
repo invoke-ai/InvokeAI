@@ -192,6 +192,7 @@ const samSession = (patch: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot
   layerType: 'raster',
   model: 'segment-anything-2-large',
   pointLabel: 'include',
+  retrying: false,
   sourceRect: { height: 768, width: 1024, x: 0, y: 0 },
   status: 'ready',
   ...patch,
@@ -819,7 +820,7 @@ describe('Select Object properties', () => {
     await expect.element(clear).toBeDisabled();
   });
 
-  it('finds the prompted object on Enter whatever auto-update says, and offers Find object only while manual', async () => {
+  it('finds the prompted object on Enter whatever auto-update says, and offers Find object while manual', async () => {
     await startSam({ input: { prompt: 'cat', type: 'prompt' } });
     const prompt = page.getByRole('textbox', { name: 'Prompt' });
     expect(page.getByRole('button', { name: 'Find object' }).query()).toBeNull();
@@ -831,6 +832,51 @@ describe('Select Object properties', () => {
     await act(() => operations!.setSam({ autoProcess: false }));
     await userEvent.click(page.getByRole('button', { name: 'Find object' }));
     expect(operations!.processSelectObjectSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers Find object to retry a failed run with auto-update on, until that retry has finished', async () => {
+    const input = { bbox: null, excludePoints: [], includePoints: [{ x: 4, y: 5 }], type: 'visual' as const };
+    await startSam({ input });
+    const findObject = page.getByRole('button', { name: 'Find object' });
+    expect(findObject.query()).toBeNull();
+
+    await act(() => operations!.setSam({ error: { code: 'not-ready' }, status: 'error' }));
+    await expect.element(findObject).toBeEnabled();
+    await userEvent.click(findObject);
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
+
+    // The retry clears the error as it starts; the button stays, busy, while the session says it retries.
+    await act(() => operations!.setSam({ error: null, retrying: true, status: 'processing-sam' }));
+    await expect.element(findObject).toBeDisabled();
+    await act(() => operations!.setSam({ hasPreview: true, retrying: false, status: 'ready' }));
+    expect(findObject.query()).toBeNull();
+  });
+
+  it('keeps Find object for a retry started by Enter in the prompt', async () => {
+    await startSam({
+      error: { code: 'queue', detail: 'AttributeError' },
+      input: { prompt: 'cat', type: 'prompt' },
+      status: 'error',
+    });
+    const findObject = page.getByRole('button', { name: 'Find object' });
+    await expect.element(findObject).toBeEnabled();
+
+    await userEvent.click(page.getByRole('textbox', { name: 'Prompt' }));
+    await userEvent.keyboard('{Enter}');
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
+    await act(() => operations!.setSam({ error: null, retrying: true, status: 'uploading' }));
+
+    await expect.element(findObject).toBeDisabled();
+  });
+
+  it('leaves a failed apply to Apply: no Find object with auto-update on', async () => {
+    await startSam({ error: { code: 'commit-failed', detail: 'commit failed' }, hasPreview: true, status: 'error' });
+
+    await expect
+      .element(page.getByRole('alert'))
+      .toHaveTextContent('Select Object could not apply or save the result.');
+    expect(page.getByRole('button', { name: 'Find object' }).query()).toBeNull();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
   });
 
   it('leaves Enter to an IME that is composing, and does nothing on an empty prompt', async () => {

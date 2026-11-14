@@ -8,7 +8,9 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import {
   getDocumentNode,
   isLeafPixelEditEligible,
+  isOverlayStack,
   lookupDocumentLeaf,
+  lookupDocumentNodeState,
   selectionPixelEditRefusal,
 } from '@workbench/canvas-engine/api';
 import { useNotify } from '@workbench/useNotify';
@@ -116,14 +118,18 @@ const selectedLeafOrGroup = (document: CanvasDocumentContractV3) => {
 
 /**
  * Why Fill or Erase is unavailable, in the words of the notice the engine would give: what is wrong and what to do.
- * `layer` names the layer that refuses.
+ * `layer` names the layer that refuses and whether it sits in an overlay stack.
  */
 const describePixelRefusal = (
   status: Exclude<SelectionPixelEditRefusal, 'no-target' | 'unsupported'> | 'transform-session',
-  layer: { id: string; name: string },
+  layer: { id: string; name: string; overlay: boolean },
   t: TFunction
 ): string => {
-  const { message, title } = describeLayerEditRefusal({ layerId: layer.id, layerName: layer.name, status }, t);
+  const { message, title } = describeLayerEditRefusal(
+    { layerId: layer.id, layerName: layer.name, status },
+    t,
+    layer.overlay
+  );
   return t('widgets.canvas.toolOptions.refusalReason', { message, title });
 };
 
@@ -150,6 +156,11 @@ export const SelectionActions = ({ engine }: ToolFormProps) => {
   const selectedName = useActiveProjectSelector(
     (project) => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId)?.name ?? ''
   );
+  const selectedOverlay = useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const stack = lookupDocumentNodeState(document, document.selectedLayerId ?? '')?.stack;
+    return stack !== undefined && isOverlayStack(stack);
+  });
   const sessionLayerId = useTransformSession(engine)?.layerId ?? null;
   const sessionName = useActiveProjectSelector((project) =>
     sessionLayerId === null ? '' : (getDocumentNode(project.canvas.document, sessionLayerId)?.name ?? '')
@@ -172,9 +183,9 @@ export const SelectionActions = ({ engine }: ToolFormProps) => {
     (refusal === 'no-target' || refusal === 'unsupported'
       ? t('widgets.canvas.toolOptions.selectionNeedsPixelLayer')
       : refusal
-        ? describePixelRefusal(refusal, { id: '', name: selectedName }, t)
+        ? describePixelRefusal(refusal, { id: '', name: selectedName, overlay: selectedOverlay }, t)
         : sessionLayerId !== null
-          ? describePixelRefusal('transform-session', { id: sessionLayerId, name: sessionName }, t)
+          ? describePixelRefusal('transform-session', { id: sessionLayerId, name: sessionName, overlay: false }, t)
           : null);
   const fillReason = pixelReason(fillRefusal);
   const eraseReason = pixelReason(eraseRefusal);

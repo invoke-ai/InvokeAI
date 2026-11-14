@@ -81,6 +81,7 @@ import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState
 
 import {
   actionTargets,
+  enabledToggleLabel,
   getLayerContextActions,
   type LayerConfigPatchKind,
   type LayerContextAction,
@@ -536,17 +537,12 @@ const LayerMenu = ({
 
   const handleToggleVisibility = useCallback(() => {
     const targets = actionTargets({ layer, selectedIds });
-    if (targets.length > 1) {
-      const index = getDocumentIndex(document);
-      const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
-      commitPrepared(
-        t(isEnabled ? 'widgets.layers.actions.showSelected' : 'widgets.layers.actions.hideSelected'),
-        (model) => model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
-      );
-      return;
-    }
-    patchBase(t('widgets.layers.actions.toggleActive'), { isEnabled: !layer.isEnabled });
-  }, [commitPrepared, document, layer, patchBase, selectedIds, t]);
+    const index = getDocumentIndex(document);
+    const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
+    commitPrepared(t(enabledToggleLabel(document, targets, !isEnabled).key), (model) =>
+      model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
+    );
+  }, [commitPrepared, document, layer, selectedIds, t]);
 
   const handleToggleHidden = useCallback(() => {
     const targets = actionTargets({ layer, selectedIds });

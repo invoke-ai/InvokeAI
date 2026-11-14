@@ -1120,7 +1120,12 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
-const rowFocusRing = {
+/**
+ * The keyboard focus ring of every row surface, inset so neighbouring rows never clip it. Exported for row-like
+ * surfaces that cannot build on `Row` or `ListItem` for their focus target, such as tree items whose focus sits on a
+ * wrapper around the row surface.
+ */
+export const rowFocusRing = {
   outline: '2px solid',
   outlineColor: 'accent.solid',
   outlineOffset: '-2px',

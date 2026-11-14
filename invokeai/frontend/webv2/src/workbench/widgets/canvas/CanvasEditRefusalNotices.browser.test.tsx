@@ -121,6 +121,16 @@ describe('CanvasEditRefusalNotices', () => {
   });
 
   it.each([
+    ['inpaint_mask', '“Sky” is left out of generation', 'Use it in generation to edit it.'],
+    ['control', '“Sky” is left out of generation', 'Use it in generation to edit it.'],
+    ['raster', '“Sky” is hidden', 'Show the layer to edit it.'],
+  ] as const)('words a %s out of generation for the control that brings it back', async (type, title, message) => {
+    const { emit } = await mount([layerContract('sky', type, { isEnabled: false, name: 'Sky' })], 'sky');
+    await emit(refusal('layer-hidden', 'sky', 'Sky'));
+    await expect.poll(toastTexts).toEqual([{ actions: [], message, title }]);
+  });
+
+  it.each([
     ['cutout-no-target', 'Nothing to cut the shape out of', 'Select a paint layer or mask to cut the shape out of it.'],
     ['erase-no-target', 'Nothing to erase', 'Select a paint layer, image, control layer or mask to erase from it.'],
     [

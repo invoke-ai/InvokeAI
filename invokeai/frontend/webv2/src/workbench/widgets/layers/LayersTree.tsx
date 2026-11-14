@@ -46,6 +46,7 @@ import {
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
+import { enabledToggleLabel } from './layerContextActions';
 import { copyLayerToClipboard } from './layerExportActions';
 import { createAdjustmentId, createNoiseSeed } from './layerOps';
 import {
@@ -672,7 +673,7 @@ export const LayersTree = ({
       setChildEnabled: (child, isEnabled) =>
         runChildStructural(t('widgets.layers.modifiers.toggleActive'), child, { isEnabled, type: 'set-enabled' }),
       setEnabled: (id, isEnabled) =>
-        runStructural(t('widgets.layers.actions.toggleActive'), {
+        runStructural(t(enabledToggleLabel(latest.current.document, [id], !isEnabled).key), {
           type: 'set-enabled',
           updates: [{ id, isEnabled }],
         }),

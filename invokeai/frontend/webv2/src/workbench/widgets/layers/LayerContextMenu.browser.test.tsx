@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
+import type { CanvasGroupContract, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project } from '@workbench/projectContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -7,7 +7,12 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { CanvasImageMissingError, getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import {
+  CanvasImageMissingError,
+  getDocumentIndex,
+  getDocumentLeaves,
+  isNodeHidden,
+} from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -41,6 +46,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
 }));
 
 import { CanvasLayerContextMenu } from './LayerContextMenu';
+import { LayerGroupContextMenu } from './LayerGroupContextMenu';
 
 const i18n = createInstance();
 let root: Root | null = null;
@@ -254,5 +260,107 @@ describe('Layers context menu over a real engine', () => {
 
     await userEvent.keyboard('{Enter}');
     expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual(['m1', 'm2']);
+  });
+});
+
+describe('generation and canvas visibility in the layer menus', () => {
+  const nodeOf = (document: () => ReturnType<CanvasEngine['document']['getDocument']>, id: string) =>
+    getDocumentIndex(document()!).byId.get(id)!.node;
+  const labels = () =>
+    [...window.document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((entry) => entry.textContent);
+
+  it('names an overlay’s two axes as its row does, and each item changes only its own', async () => {
+    const { engine, openMenu } = await renderMenu([maskLayer('mask')]);
+    const document_ = () => engine.document.getDocument();
+
+    await openMenu('mask');
+    expect(labels()).toEqual(expect.arrayContaining(['Exclude from generation', 'Hide on canvas']));
+    expect(labels()).not.toContain('Hide layer');
+    await act(() => item('Hide on canvas').click());
+    await vi.waitFor(() => expect(nodeOf(document_, 'mask')).toMatchObject({ isEnabled: true, isHidden: true }));
+
+    await openMenu('mask');
+    expect(labels()).toContain('Show on canvas');
+    // From the keyboard, as the row's controls are reached.
+    const exclude = window.document.querySelector<HTMLElement>('[role="menuitem"][data-value="toggle-visibility"]')!;
+    expect(exclude.textContent).toBe('Exclude from generation');
+    for (let step = 0; step < 30 && !exclude.hasAttribute('data-highlighted'); step += 1) {
+      await userEvent.keyboard('{ArrowDown}');
+    }
+    await userEvent.keyboard('{Enter}');
+    await vi.waitFor(() => expect(nodeOf(document_, 'mask')).toMatchObject({ isEnabled: false, isHidden: true }));
+    expect(engine.history.getEntries().past).toEqual(['Hide on canvas', 'Exclude from generation']);
+
+    await openMenu('mask');
+    expect(labels()).toEqual(expect.arrayContaining(['Use in generation', 'Show on canvas']));
+  });
+
+  it('keeps one show-or-hide item on a raster layer', async () => {
+    const { engine, openMenu } = await renderMenu([imageLayer('art')]);
+    await openMenu('art');
+    expect(labels()).toContain('Hide layer');
+    expect(labels().some((label) => /generation|on canvas/.test(label ?? ''))).toBe(false);
+    await act(() => item('Hide layer').click());
+    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Hide layer']));
+  });
+
+  it('turns a selection of overlays and raster layers off and on, in words true of both', async () => {
+    const { engine, openMenu } = await renderMenu([maskLayer('mask'), imageLayer('art')], ['mask', 'art']);
+    const document_ = () => engine.document.getDocument();
+    const enabled = () => ['mask', 'art'].map((id) => nodeOf(document_, id).isEnabled);
+
+    await openMenu('mask');
+    expect(labels()).not.toContain('Hide selected');
+    await act(() => item('Turn off selected').click());
+    await vi.waitFor(() => expect(enabled()).toEqual([false, false]));
+    await openMenu('art');
+    await act(() => item('Turn on selected').click());
+    await vi.waitFor(() => expect(enabled()).toEqual([true, true]));
+    expect(engine.history.getEntries().past).toEqual(['Turn off selected', 'Turn on selected']);
+  });
+
+  it('applies the overlay items to a selection of overlays', async () => {
+    const { engine, openMenu } = await renderMenu([maskLayer('m1'), maskLayer('m2')], ['m1', 'm2']);
+    const document_ = () => engine.document.getDocument();
+
+    await openMenu('m1');
+    await act(() => item('Exclude selected from generation').click());
+    await vi.waitFor(() => expect(['m1', 'm2'].map((id) => nodeOf(document_, id).isEnabled)).toEqual([false, false]));
+    await openMenu('m1');
+    await act(() => item('Hide selected on canvas').click());
+    await vi.waitFor(() => expect(['m1', 'm2'].map((id) => isNodeHidden(nodeOf(document_, id)))).toEqual([true, true]));
+    expect(engine.history.getEntries().past).toEqual(['Exclude selected from generation', 'Hide selected on canvas']);
+  });
+
+  it.each([
+    ['inpaint_mask', ['Exclude group from generation', 'Hide group on canvas'], 'Hide group'],
+    ['raster', ['Hide group'], 'Exclude group from generation'],
+  ] as const)('words a group in the %s stack for its axes', async (stack, expected, absent) => {
+    const member = stack === 'raster' ? imageLayer('member') : maskLayer('member');
+    const { engine } = await renderMenu([groupContract('G', [member])]);
+    const document_ = () => engine.document.getDocument();
+    await act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <LayerGroupContextMenu
+              anchor={{ height: 1, width: 1, x: 40, y: 40 }}
+              editingLocked={false}
+              engine={engine}
+              group={nodeOf(document_, 'G') as CanvasGroupContract}
+              stack={stack}
+              onClose={() => undefined}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    expect(labels()).toEqual(expect.arrayContaining([...expected]));
+    expect(labels()).not.toContain(absent);
+
+    await act(() => item(expected[0]).click());
+    await vi.waitFor(() => expect(nodeOf(document_, 'G').isEnabled).toBe(false));
+    expect(engine.history.getEntries().past).toEqual([expected[0]]);
   });
 });

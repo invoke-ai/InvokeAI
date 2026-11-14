@@ -116,14 +116,26 @@ const LAYER_REFUSAL_KEYS: Record<
 };
 
 /**
+ * An overlay (mask, regional guidance or control layer) out of generation is turned back on with its row's dot, not its
+ * eye, which only hides it on the canvas; its notice says so. Only raster images offer a new layer, so it has no offer.
+ */
+const OVERLAY_EXCLUDED_KEYS = {
+  message: 'widgets.canvas.editRefusal.excludedMessage',
+  offerMessage: null,
+  title: 'widgets.canvas.editRefusal.excluded',
+} as const;
+
+/**
  * The notice for a layer the active tool could not edit: its title, its message, and whether it offers a new paint
- * layer instead (only for a status that has offer wording).
+ * layer instead (only for a status that has offer wording). `overlay` says the layer sits in an overlay stack.
  */
 export const describeLayerEditRefusal = (
   refusal: CanvasLayerEditRefusal,
-  t: TFunction
+  t: TFunction,
+  overlay: boolean
 ): { message: string; offersNewLayer: boolean; title: string } => {
-  const keys = LAYER_REFUSAL_KEYS[refusal.status];
+  const keys =
+    overlay && refusal.status === 'layer-hidden' ? OVERLAY_EXCLUDED_KEYS : LAYER_REFUSAL_KEYS[refusal.status];
   const offerMessage = refusal.canPaintNewLayer ? keys.offerMessage : null;
   return {
     message: t(offerMessage ?? keys.message),

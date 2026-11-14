@@ -147,6 +147,17 @@ describe('SelectionActions pixel target eligibility', () => {
     );
   });
 
+  it('words a layer out of generation by the control that brings it back: the dot on overlays, the eye on raster', () => {
+    renderRow({ ...mask, isEnabled: false });
+    expect(reasons.get('widgets.canvas.toolOptions.fillSelection')).toBe(
+      'widgets.canvas.editRefusal.excluded:Mask / widgets.canvas.editRefusal.excludedMessage'
+    );
+    renderRow({ ...rasterPaint, isEnabled: false });
+    expect(reasons.get('widgets.canvas.toolOptions.fillSelection')).toBe(
+      'widgets.canvas.editRefusal.hidden:Raster / widgets.canvas.editRefusal.hiddenMessage'
+    );
+  });
+
   it('fills a transparency-locked layer but refuses to erase it', () => {
     const rendered = renderRow({ ...rasterPaint, isTransparencyLocked: true } as CanvasLayerContract);
     expect(rendered.get('widgets.canvas.toolOptions.fillSelection')?.['aria-disabled']).toBe(false);
