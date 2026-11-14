@@ -282,6 +282,7 @@ const ReferenceImageCardBase = ({
                 <ReferenceModelSelector
                   config={config}
                   disabled={!isEnabled}
+                  relatedTo={selectedModel?.key ?? null}
                   selectedBase={selectedBase}
                   onConfigChange={changeConfig}
                 />
@@ -291,6 +292,7 @@ const ReferenceImageCardBase = ({
                 <ReferenceModelSelector
                   config={config}
                   disabled={!isEnabled}
+                  relatedTo={selectedModel?.key ?? null}
                   selectedBase={selectedBase}
                   onConfigChange={changeConfig}
                 />
@@ -300,6 +302,7 @@ const ReferenceImageCardBase = ({
               <ReferenceModelSelector
                 config={config}
                 disabled={!isEnabled}
+                relatedTo={selectedModel?.key ?? null}
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
@@ -385,10 +388,12 @@ const ReferenceModelSelector = ({
   config,
   disabled,
   onConfigChange,
+  relatedTo,
   selectedBase,
 }: {
   config: ModelBackedConfig;
   disabled: boolean;
+  relatedTo: string | null;
   selectedBase: string | undefined;
   onConfigChange: (config: GenerateReferenceImageConfig) => void;
 }) => {
@@ -437,6 +442,7 @@ const ReferenceModelSelector = ({
           filter={filterModel}
           modelTypes={modelTypes}
           placeholder={t('widgets.generate.selectModel')}
+          relatedTo={relatedTo}
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />

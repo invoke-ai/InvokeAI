@@ -311,7 +311,7 @@ def test_a_gguf_encoder_refuses_the_tower_by_name(tmp_path: Path) -> None:
         path=str(tmp_path / "enc.gguf"), variant=Qwen3VLVariantType.Qwen3VL_4B, name="tiny-gguf"
     )
 
-    with pytest.raises(ValueError, match="'tiny-gguf' has no vision tower"):
+    with pytest.raises(ValueError, match="'tiny-gguf' has no vision tower.*the 4B mmproj file"):
         _loader(Qwen3VLEncoderGGUFLoader)._load_model(config, SubModelType.VisionEncoder)
 
 

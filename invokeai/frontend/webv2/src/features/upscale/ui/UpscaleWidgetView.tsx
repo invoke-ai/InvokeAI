@@ -194,10 +194,12 @@ const isSelectableMainModel = (model: ModelConfig): boolean => isSupportedUpscal
 
 const UpscaleComponentPicker = memo(function UpscaleComponentPicker({
   onPatch,
+  relatedTo,
   slot,
   value,
 }: {
   onPatch: (patch: Partial<UpscaleWidgetValues>) => void;
+  relatedTo: string | null;
   slot: UpscaleComponentSlot;
   value: UpscaleWidgetValues[UpscaleComponentField];
 }) {
@@ -216,6 +218,7 @@ const UpscaleComponentPicker = memo(function UpscaleComponentPicker({
         invalid={!value}
         modelTypes={ui.modelTypes}
         placeholder={t(ui.placeholder)}
+        relatedTo={relatedTo}
         value={value?.key ?? null}
         onChange={select}
       />
@@ -902,6 +905,7 @@ export const UpscaleWidgetView = () => {
                 filter={loraFilter}
                 modelTypes={LORA_MODEL_TYPES}
                 placeholder={t('widgets.upscale.searchCompatibleConcepts')}
+                relatedTo={values.model?.key ?? null}
                 scopeLabel={t('models.scopeConcepts')}
                 value={null}
                 onChange={addLora}
@@ -948,6 +952,7 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.tileControlnetModel}
                   modelTypes={CONTROLNET_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectTileControlNet')}
+                  relatedTo={values.model?.key ?? null}
                   value={values.tileControlnetModel?.key ?? null}
                   onChange={setTileControlNet}
                 />
@@ -964,13 +969,20 @@ export const UpscaleWidgetView = () => {
                   isClearable
                   modelTypes={CONTROLNET_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectOptionalTileControlNet')}
+                  relatedTo={values.model?.key ?? null}
                   value={values.tileControlnetModel?.key ?? null}
                   onChange={setTileControlNet}
                 />
               </Field>
             )}
             {components.slots.map((slot) => (
-              <UpscaleComponentPicker key={slot.field} slot={slot} value={values[slot.field]} onPatch={patch} />
+              <UpscaleComponentPicker
+                key={slot.field}
+                relatedTo={values.model?.key ?? null}
+                slot={slot}
+                value={values[slot.field]}
+                onPatch={patch}
+              />
             ))}
             <ScrubberField
               error={errors.tileSize}
@@ -1008,6 +1020,7 @@ export const UpscaleWidgetView = () => {
                   isClearable={!components.vae}
                   modelTypes={VAE_MODEL_TYPES}
                   placeholder={components.vae ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
+                  relatedTo={values.model?.key ?? null}
                   value={values.vae?.key ?? null}
                   onChange={set.vae}
                 />
