@@ -29,10 +29,19 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     UIType,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    extract_conditioning_metadata,
+    serialize_adapter_metadata,
+    serialize_ip_adapter_ref_images,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import ModelIdentifierField, UNetField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd.controlnet import ControlField
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterField
 from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField
@@ -146,9 +155,9 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.8.0",
+    version="1.9.0",
 )
-class DenoiseLatentsInvocation(BaseInvocation):
+class DenoiseLatentsInvocation(BaseInvocation, WithMetadata):
     """Denoises noisy latents to decodable images"""
 
     positive_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
@@ -932,7 +941,82 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return seed, noise, latents
 
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _build_metadata(self, width: int, height: int, context: Optional[InvocationContext] = None) -> MetadataField:
+        suffix = (
+            "inpaint"
+            if getattr(self, "denoise_mask", None) is not None
+            else ("img2img" if getattr(self, "latents", None) is not None else "txt2img")
+        )
+        prefix = "sdxl_" if getattr(self.unet.unet, "base", None) == BaseModelType.StableDiffusionXL else ""
+        updates: dict[str, Any] = {
+            "generation_mode": f"{prefix}{suffix}",
+            "width": width,
+            "height": height,
+            "cfg_scale": self.cfg_scale,
+            "steps": self.steps,
+            "scheduler": self.scheduler,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "cfg_rescale_multiplier": self.cfg_rescale_multiplier,
+            "model": self.unet.unet,
+            "seamless_x": "x" in (getattr(self.unet, "seamless_axes", []) or []),
+            "seamless_y": "y" in (getattr(self.unet, "seamless_axes", []) or []),
+            "hidiffusion": self.hidiffusion,
+            "hidiffusion_raunet": self.hidiffusion_raunet,
+            "hidiffusion_window_attn": self.hidiffusion_window_attn,
+            "hidiffusion_auto_ratios": self.hidiffusion_auto_ratios,
+            "hidiffusion_t1_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+            "hidiffusion_t2_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
+        }
+        if getattr(self.unet, "freeu_config", None) is not None:
+            updates["freeu_s1"] = self.unet.freeu_config.s1
+            updates["freeu_s2"] = self.unet.freeu_config.s2
+            updates["freeu_b1"] = self.unet.freeu_config.b1
+            updates["freeu_b2"] = self.unet.freeu_config.b2
+
+        updates["loras"] = serialize_lora_metadata(getattr(self.unet, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
+        updates["ref_images"] = serialize_ip_adapter_ref_images(
+            getattr(self, "ip_adapter", None), context=context, default_width=width, default_height=height
+        )
+        updates["t2iAdapters"] = serialize_adapter_metadata(getattr(self, "t2i_adapter", None))
+
+        if self.noise and self.noise.seed is not None:
+            updates["seed"] = self.noise.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if (
+            getattr(self.unet.unet, "base", None) == BaseModelType.StableDiffusionXLRefiner
+            and getattr(self, "metadata", None) is not None
+            and "model" in self.metadata.root
+        ):
+            updates["refiner_model"] = self.unet.unet
+            updates["refiner_cfg_scale"] = self.cfg_scale
+            updates["refiner_steps"] = self.steps
+            updates["refiner_scheduler"] = self.scheduler
+            updates["refiner_start"] = self.denoising_start
+            updates.pop("model", None)
+            updates.pop("cfg_scale", None)
+            updates.pop("steps", None)
+            updates.pop("scheduler", None)
+            if "positive_aesthetic_score" in cond_updates:
+                updates["refiner_positive_aesthetic_score"] = cond_updates.pop("positive_aesthetic_score")
+            if "negative_aesthetic_score" in cond_updates:
+                updates["refiner_negative_aesthetic_score"] = cond_updates.pop("negative_aesthetic_score")
+
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         self.validate_hidiffusion_ratio_order()
         if os.environ.get("USE_MODULAR_DENOISE", False):
             return self._new_invoke(context)
@@ -941,7 +1025,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _new_invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
 
         device = TorchDevice.choose_torch_device()
@@ -1110,11 +1194,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+        width = result_latents.shape[-1] * LATENT_SCALE_FACTOR
+        height = result_latents.shape[-2] * LATENT_SCALE_FACTOR
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=result_latents,
+            seed=None,
+            metadata=self._build_metadata(width, height, context),
+            width=width,
+            height=height,
+        )
 
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _old_invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         device = TorchDevice.choose_torch_device()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
@@ -1290,4 +1383,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+        width = result_latents.shape[-1] * LATENT_SCALE_FACTOR
+        height = result_latents.shape[-2] * LATENT_SCALE_FACTOR
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=result_latents,
+            seed=None,
+            metadata=self._build_metadata(width, height, context),
+            width=width,
+            height=height,
+        )

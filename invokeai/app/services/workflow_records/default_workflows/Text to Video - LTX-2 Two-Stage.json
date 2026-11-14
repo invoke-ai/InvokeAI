@@ -293,7 +293,7 @@
       "type": "invocation",
       "data": {
         "id": "denoise_latents",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "The four guidance scales here are the released Dev recipe (CFG 3 arrives over an edge, Audio CFG 7, STG 1, modality 3). Each scale away from its off value (1, or 0 for STG) costs one extra model evaluation per step.",
@@ -868,7 +868,7 @@
       "type": "invocation",
       "data": {
         "id": "refine_latents",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "The refine pass: enters the schedule partway down (Noise Scale) and samples its tail over the upscaled latent and the base pass's audio, re-noising both so they stay on one trajectory. It runs at four times the base pass's tokens, so it dominates the render time -- which is why it gets its own, smaller step budget: keep it between 2 and the base pass's Steps. Keep its guidance scales equal to the base pass's.",

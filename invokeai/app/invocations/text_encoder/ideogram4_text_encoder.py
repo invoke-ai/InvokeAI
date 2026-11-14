@@ -3,7 +3,14 @@ from contextlib import ExitStack
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Ideogram4ConditioningField,
+    Input,
+    InputField,
+    UIComponent,
+)
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import Ideogram4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -69,4 +76,13 @@ class Ideogram4TextEncoderInvocation(BaseInvocation):
             conditionings=[Ideogram4ConditioningInfo(prompt_embeds=prompt_embeds)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return Ideogram4ConditioningOutput.build(conditioning_name)
+        loras = extract_loras_metadata(getattr(self.qwen3_encoder, "loras", None))
+        return Ideogram4ConditioningOutput(
+            conditioning=Ideogram4ConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                color_palette=getattr(self, "color_palette", None),
+                qwen3_vl_encoder=extract_encoder_model(self.qwen3_encoder),
+                loras=loras,
+            )
+        )

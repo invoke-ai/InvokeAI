@@ -80,4 +80,14 @@ class Krea2ConditioningRebalanceInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(new_data)
-        return Krea2ConditioningOutput.build(conditioning_name, mask=self.conditioning.mask)
+        active = self.multiplier > 0 and bool(weights)
+        return Krea2ConditioningOutput(
+            conditioning=self.conditioning.model_copy(
+                update={
+                    "conditioning_name": conditioning_name,
+                    "rebalance_enabled": active,
+                    "rebalance_multiplier": self.multiplier,
+                    "rebalance_weights": [str(w) for w in weights],
+                }
+            )
+        )

@@ -1,14 +1,13 @@
 """LTX-2 denoise: joint video and audio sampling from one transformer."""
 
 from contextlib import nullcontext
-from typing import Literal
+from typing import Any, Literal
 
 import torch
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     Classification,
     invocation,
     invocation_output,
@@ -22,7 +21,15 @@ from invokeai.app.invocations.fields import (
     LTX2ConditioningField,
     LTX2FullVideoConditioningField,
     LTX2VideoConditioningField,
+    MetadataField,
     OutputField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    MetadataOutput,
+    build_denoise_metadata,
+    extract_conditioning_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import LTX2TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -71,7 +78,7 @@ LTX2_SCHEDULE_LABELS: dict[str, str] = {
 
 
 @invocation_output("ltx2_denoise_output")
-class LTX2DenoiseOutput(BaseInvocationOutput):
+class LTX2DenoiseOutput(MetadataOutput):
     """Joint video and audio latents from one LTX-2 denoise run."""
 
     video_latents: LatentsField = OutputField(description="Video latents [1, 128, T_lat, H/32, W/32].")
@@ -86,10 +93,10 @@ class LTX2DenoiseOutput(BaseInvocationOutput):
     title="Denoise - LTX-2",
     tags=["ltx", "ltx2", "video", "audio", "denoise"],
     category="latents",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
-class LTX2DenoiseInvocation(BaseInvocation):
+class LTX2DenoiseInvocation(BaseInvocation, WithMetadata):
     """Generates LTX-2 video and audio latents together.
 
     One transformer forward produces both modalities at every step, so the soundtrack is generated
@@ -394,6 +401,62 @@ class LTX2DenoiseInvocation(BaseInvocation):
             )
         return context.tensors.load(self.video_conditioning.latents_name)
 
+    def _build_metadata(self) -> MetadataField:
+        if (
+            getattr(self, "video_conditioning", None) is not None
+            and getattr(self, "keyframe_conditioning", None) is not None
+        ):
+            gen_mode = "ltx2_flf2v"
+        elif getattr(self, "keyframe_conditioning", None) is not None:
+            gen_mode = "ltx2_lf2v"
+        elif getattr(self, "video_conditioning", None) is not None:
+            gen_mode = "ltx2_i2v"
+        elif getattr(self, "audio_conditioning", None) is not None:
+            gen_mode = "ltx2_a2v"
+        elif getattr(self, "full_video_conditioning", None) is not None:
+            gen_mode = "ltx2_v2a"
+        else:
+            gen_mode = "ltx2_t2v"
+        updates: dict[str, Any] = {
+            "generation_mode": gen_mode,
+            "width": self.width,
+            "height": self.height,
+            "num_frames": self.num_frames,
+            "fps": round(self.fps),
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "ltx2_audio_cfg_scale": self.audio_cfg_scale,
+            "ltx2_stg_scale": self.stg_scale,
+            "ltx2_modality_scale": self.modality_scale,
+            "ltx2_guidance_rescale": self.guidance_rescale,
+            "ltx2_schedule": self.schedule,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.latents is not None:
+            updates["ltx2_noise_scale"] = self.noise_scale
+
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+
+        if self.latents is not None and getattr(self, "metadata", None) is not None:
+            base_w = self.metadata.root.get("width")
+            base_h = self.metadata.root.get("height")
+            if (base_w is not None and base_w != self.width) or (base_h is not None and base_h != self.height):
+                updates["ltx2_two_stage"] = True
+                updates["ltx2_base_width"] = base_w
+                updates["ltx2_base_height"] = base_h
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LTX2DenoiseOutput:
         # The canvas is checked by the fields themselves (`multiple_of`), so a bad one never
@@ -646,4 +709,5 @@ class LTX2DenoiseInvocation(BaseInvocation):
             width=self.width,
             height=self.height,
             num_frames=self.num_frames,
+            metadata=self._build_metadata(),
         )

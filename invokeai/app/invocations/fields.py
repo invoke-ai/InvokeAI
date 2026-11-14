@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Callable, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
 from pydantic.fields import _Unset
@@ -13,10 +13,14 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     ModelVariantType,
+    SubModelType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
+
+if TYPE_CHECKING:
+    from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 
 
 class UIType(str, Enum, metaclass=MetaEnum):
@@ -347,6 +351,38 @@ class ColorField(BaseModel):
         return (self.r, self.g, self.b, self.a)
 
 
+class ModelIdentifierField(BaseModel):
+    key: str = Field(description="The model's unique key")
+    hash: str = Field(description="The model's BLAKE3 hash")
+    name: str = Field(description="The model's name")
+    base: BaseModelType = Field(description="The model's base model type")
+    type: ModelType = Field(description="The model's type")
+    submodel_type: SubModelType | None = Field(
+        description="The submodel to load, if this is a main model",
+        default=None,
+    )
+
+    @classmethod
+    def from_config(
+        cls, config: "AnyModelConfig", submodel_type: Optional[SubModelType] = None
+    ) -> "ModelIdentifierField":
+        return cls(
+            key=config.key,
+            hash=config.hash,
+            name=config.name,
+            base=config.base,
+            type=config.type,
+            submodel_type=submodel_type,
+        )
+
+
+class LoRAMetadataField(BaseModel):
+    """LoRA Metadata Field"""
+
+    model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
+    weight: float = Field(description=FieldDescriptions.lora_weight)
+
+
 class FluxConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
@@ -356,6 +392,15 @@ class FluxConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    t5_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone T5 encoder model")
+    clip_embed_model: Optional[ModelIdentifierField] = Field(default=None, description="Standalone CLIP embed model")
+    mistral_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Mistral encoder model"
+    )
+    qwen3_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone Qwen3 encoder model")
+    qwen3_source: Optional[ModelIdentifierField] = Field(default=None, description="Source model for Qwen3 encoder")
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class FluxReduxConditioningField(BaseModel):
@@ -386,12 +431,19 @@ class SD3ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    t5_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone T5 encoder model")
+    clip_l_model: Optional[ModelIdentifierField] = Field(default=None, description="Standalone CLIP-L model")
+    clip_g_model: Optional[ModelIdentifierField] = Field(default=None, description="Standalone CLIP-G model")
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class CogView4ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    glm_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone GLM encoder model")
 
 
 class ZImageConditioningField(BaseModel):
@@ -403,24 +455,47 @@ class ZImageConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    qwen3_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone Qwen3 encoder model")
+    qwen3_source: Optional[ModelIdentifierField] = Field(default=None, description="Source model for Qwen3 encoder")
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
+    seed_variance_enabled: Optional[bool] = Field(default=None, description="Whether seed variance is enabled")
+    seed_variance_strength: Optional[float] = Field(default=None, description="Seed variance strength")
+    seed_variance_randomize_percent: Optional[int] = Field(default=None, description="Seed variance randomize percent")
 
 
 class ErnieImageConditioningField(BaseModel):
     """An ERNIE-Image conditioning tensor primitive value."""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    mistral_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Mistral encoder model"
+    )
 
 
 class Ideogram4ConditioningField(BaseModel):
     """An Ideogram 4 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    color_palette: Optional[str] = Field(default=None, description="Color palette")
+    qwen3_vl_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3-VL encoder model"
+    )
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class QwenImageConditioningField(BaseModel):
     """A Qwen Image Edit conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    quantization: Optional[str] = Field(default=None, description="Quantization mode")
+    qwen_vl_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen-VL encoder model"
+    )
+    component_source: Optional[ModelIdentifierField] = Field(default=None, description="Component source model")
 
 
 class Krea2ConditioningField(BaseModel):
@@ -432,18 +507,40 @@ class Krea2ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    qwen3_vl_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3-VL encoder model"
+    )
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
+    rebalance_enabled: Optional[bool] = Field(default=None, description="Whether conditioning rebalance is enabled")
+    rebalance_multiplier: Optional[float] = Field(default=None, description="Conditioning rebalance multiplier")
+    rebalance_weights: Optional[list[str]] = Field(default=None, description="Conditioning rebalance weights")
+    seed_variance_enabled: Optional[bool] = Field(default=None, description="Whether seed variance is enabled")
+    seed_variance_strength: Optional[float] = Field(default=None, description="Seed variance strength")
+    seed_variance_randomize_percent: Optional[int] = Field(default=None, description="Seed variance randomize percent")
 
 
 class QwenImage21ConditioningField(BaseModel):
     """A Qwen-Image-2.1 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    qwen3_vl_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3-VL encoder model"
+    )
 
 
 class Flux3ConditioningField(BaseModel):
     """A FLUX.3 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    flux3_caption: Optional[str] = Field(default=None, description="Structured layout prompt / caption")
+    qwen3_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone Qwen3 encoder model")
+    qwen3_vl_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3-VL encoder model"
+    )
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class Krea2StyleReferenceField(BaseModel):
@@ -495,6 +592,12 @@ class AnimaConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    qwen3_encoder: Optional[ModelIdentifierField] = Field(default=None, description="Standalone Qwen3 encoder model")
+    qwen3_5_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3.5 encoder model"
+    )
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class WanConditioningField(BaseModel):
@@ -505,6 +608,11 @@ class WanConditioningField(BaseModel):
     """
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    wan_t5_encoder_model: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Wan T5 encoder model"
+    )
+    wan_component_source: Optional[ModelIdentifierField] = Field(default=None, description="Wan component source model")
 
 
 class WanRefImageConditioningField(BaseModel):
@@ -538,6 +646,13 @@ class MiniMaxH3ConditioningField(BaseModel):
     """
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    minimax_h3_text_encoder_model: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone MiniMax H3 text encoder model"
+    )
+    minimax_h3_component_source: Optional[ModelIdentifierField] = Field(
+        default=None, description="MiniMax H3 component source model"
+    )
 
 
 class LTX2ConditioningField(BaseModel):
@@ -548,12 +663,25 @@ class LTX2ConditioningField(BaseModel):
     """
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    ltx2_text_encoder_model: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone LTX-2 text encoder model"
+    )
+    ltx2_component_source: Optional[ModelIdentifierField] = Field(
+        default=None, description="LTX-2 component source model"
+    )
 
 
 class MossImageConditioningField(BaseModel):
     """A MOSS-Image conditioning tensor primitive value."""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    prompt: Optional[str] = Field(default=None, description="The prompt text")
+    layout_prompt: Optional[str] = Field(default=None, description="Layout prompt string")
+    qwen3_5_encoder: Optional[ModelIdentifierField] = Field(
+        default=None, description="Standalone Qwen3.5 encoder model"
+    )
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class LTX2VideoConditioningField(BaseModel):
@@ -698,6 +826,11 @@ class ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
+    prompt: Optional[str] = Field(default=None, description="The positive or negative prompt text")
+    style_prompt: Optional[str] = Field(default=None, description="The style prompt text (e.g. SDXL)")
+    skipped_layers: Optional[int] = Field(default=None, description="CLIP skip layer count")
+    aesthetic_score: Optional[float] = Field(default=None, description="SDXL aesthetic score")
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="LoRAs applied to text encoders")
 
 
 class BoundingBoxField(BoundingBox):

@@ -235,7 +235,7 @@
       "type": "invocation",
       "data": {
         "id": "denoise_latents",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "num_frames is the GENERATED clip's length and must exceed context_frames -- at or below it the output would be all replay. width/height must match the Extend Conditioning node's.",

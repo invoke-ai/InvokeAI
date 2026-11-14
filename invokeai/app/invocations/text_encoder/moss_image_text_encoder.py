@@ -4,7 +4,14 @@ import torch
 from transformers import PreTrainedTokenizerBase
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    MossImageConditioningField,
+    UIComponent,
+)
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen35EncoderField
 from invokeai.app.invocations.primitives import MossImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -49,7 +56,17 @@ class MossImageTextEncoderInvocation(BaseInvocation):
             conditionings=[MossImageConditioningInfo(prompt_embeds=prompt_embeds)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return MossImageConditioningOutput.build(conditioning_name)
+        encoder_loras = getattr(self.qwen3_5_encoder, "loras", None)
+        loras = extract_loras_metadata(encoder_loras)
+        return MossImageConditioningOutput(
+            conditioning=MossImageConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                layout_prompt=getattr(self, "layout_prompt", None),
+                qwen3_5_encoder=extract_encoder_model(self.qwen3_5_encoder),
+                loras=loras,
+            )
+        )
 
     def _encode(self, context: InvocationContext) -> torch.Tensor:
         # Imported here: transformers' qwen3_5 modeling module costs ~0.25 s, which every app start would otherwise

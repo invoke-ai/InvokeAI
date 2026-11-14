@@ -1,6 +1,6 @@
 import re
 from contextlib import ExitStack
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import torch
 
@@ -10,9 +10,17 @@ from invokeai.app.invocations.fields import (
     Ideogram4ConditioningField,
     Input,
     InputField,
+    LatentsField,
+    MetadataField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    extract_conditioning_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ideogram4 import run_ideogram4_denoise
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer, compute_dtype_of
@@ -107,7 +115,7 @@ def _effective_guidance_schedule(
     version="1.2.0",
     classification=Classification.Prototype,
 )
-class Ideogram4DenoiseInvocation(BaseInvocation):
+class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
     """Runs the Ideogram 4 dual-branch flow-matching denoising loop (text-to-image)."""
 
     transformer: TransformerField = InputField(
@@ -153,8 +161,53 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         description="Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.",
     )
 
+    def _build_metadata(self) -> MetadataField:
+        preset = PRESETS[self.sampler_preset]
+        # guidance_schedule is in loop-index order (index 0 = polish step, -1 = main weight).
+        effective_guidance = (
+            self.guidance_scale if self.guidance_scale is not None else float(preset.guidance_schedule[-1])
+        )
+        updates: dict[str, Any] = {
+            "generation_mode": "ideogram4_txt2img",
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps if self.steps is not None else preset.num_steps,
+            "cfg_scale": effective_guidance,
+            "guidance": effective_guidance,
+            "ideogram4_sampler_preset": self.sampler_preset,
+            "seed": self.seed,
+        }
+        if getattr(self, "transformer", None) is not None:
+            updates["model"] = self.transformer.transformer
+        if self.steps is not None:
+            updates["ideogram4_steps"] = self.steps
+        if self.guidance_scale is not None:
+            updates["ideogram4_guidance_scale"] = self.guidance_scale
+        if self.mu is not None:
+            updates["ideogram4_mu"] = self.mu
+        if getattr(self, "unconditional_transformer", None) is not None:
+            updates["ideogram4_unconditional_model"] = self.unconditional_transformer.transformer
+
+        updates["loras"] = serialize_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            getattr(self.unconditional_transformer, "loras", None)
+            if self.unconditional_transformer is not None
+            else None,
+        )
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         device = TorchDevice.choose_torch_device()
         preset = PRESETS[self.sampler_preset]
 
@@ -203,7 +256,12 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
         packed = packed.detach().to("cpu")
         name = context.tensors.save(tensor=packed)
-        return LatentsOutput.build(latents_name=name, latents=packed, seed=None)
+        return LatentsMetaOutput(
+            latents=LatentsField(latents_name=name, seed=self.seed),
+            width=self.width,
+            height=self.height,
+            metadata=self._build_metadata(),
+        )
 
     def _estimate_working_memory(self, num_text_tokens: int) -> int:
         """Activation headroom to reserve, in bytes, so the cache does not fill VRAM with weights.

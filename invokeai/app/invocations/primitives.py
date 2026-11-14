@@ -733,7 +733,7 @@ class ConditioningInvocation(BaseInvocation):
     conditioning: ConditioningField = InputField(description=FieldDescriptions.cond, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        return ConditioningOutput(conditioning=self.conditioning)
+        return ConditioningOutput(conditioning=self.conditioning.model_copy())
 
 
 @invocation(

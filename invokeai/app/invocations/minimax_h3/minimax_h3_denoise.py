@@ -7,7 +7,7 @@ guidance-distilled: no negative prompt, no CFG, one forward per step.
 """
 
 from contextlib import ExitStack
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 import torch
 from PIL import Image
@@ -15,7 +15,6 @@ from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     Classification,
     invocation,
     invocation_output,
@@ -25,10 +24,18 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     MiniMaxH3ConditioningField,
     MiniMaxH3FrameConditioningField,
     MiniMaxH3ReferenceConditioningField,
     OutputField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    MetadataOutput,
+    build_denoise_metadata,
+    extract_conditioning_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import MiniMaxH3TransformerField
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
@@ -117,7 +124,7 @@ MINIMAX_H3_NUM_FRAMES_LABELS: dict[str, str] = {
 
 
 @invocation_output("minimax_h3_denoise_output")
-class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
+class MiniMaxH3DenoiseOutput(MetadataOutput):
     """Joint video + audio latents from one MiniMax H3 denoise run."""
 
     video_latents: LatentsField = OutputField(description="5D video latents [1, 24, T_lat, H/16, W/16].")
@@ -134,10 +141,10 @@ class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
-class MiniMaxH3DenoiseInvocation(BaseInvocation):
+class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the MiniMax H3 joint audio-video denoising loop."""
 
     transformer: MiniMaxH3TransformerField = InputField(
@@ -314,6 +321,56 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
             seed=self.seed,
             device=device,
         )
+
+    def _build_metadata(self) -> MetadataField:
+        existing = getattr(self, "metadata", None)
+        existing_mode = existing.root.get("generation_mode") if isinstance(existing, MetadataField) else None
+        if int(self.num_frames) == 5:
+            gen_mode = "minimax_h3_txt2img"
+        elif existing_mode == "minimax_h3_extend_video":
+            gen_mode = "minimax_h3_extend_video"
+        elif getattr(self, "reference_conditioning", None) is not None:
+            gen_mode = "minimax_h3_ref2v"
+        elif getattr(self, "frame_conditioning", None) is not None:
+            anchors = set(getattr(self.frame_conditioning, "keyframe_anchors", []) or [])
+            if "first" in anchors and "last" in anchors:
+                gen_mode = "minimax_h3_flf2v"
+            elif "last" in anchors and "first" not in anchors:
+                gen_mode = "minimax_h3_lf2v"
+            else:
+                gen_mode = "minimax_h3_i2v"
+        else:
+            gen_mode = "minimax_h3_t2v"
+        updates: dict[str, Any] = {
+            "generation_mode": gen_mode,
+            "width": self.width,
+            "height": self.height,
+            "num_frames": int(self.num_frames),
+            "fps": MINIMAX_H3_FPS,
+            "steps": self.steps,
+            "seed": self.seed,
+            "model": (
+                self.transformer.adaln_overlay.overlay
+                if getattr(self.transformer, "adaln_overlay", None) is not None
+                else self.transformer.transformer
+            ),
+        }
+        if getattr(self.transformer, "adaln_overlay", None) is not None:
+            updates["minimax_h3_hybrid_base_model"] = self.transformer.transformer
+            updates["minimax_h3_hybrid_start_block"] = self.transformer.adaln_overlay.start_block
+
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MiniMaxH3DenoiseOutput:
@@ -609,6 +666,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
             width=self.width,
             height=self.height,
             num_frames=num_frames,
+            metadata=self._build_metadata(),
         )
 
     def _materialize_adaln_overlay(

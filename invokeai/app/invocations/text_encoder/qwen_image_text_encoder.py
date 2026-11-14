@@ -15,8 +15,10 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    QwenImageConditioningField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -208,7 +210,15 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             conditionings=[QwenImageConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return QwenImageConditioningOutput.build(conditioning_name)
+        return QwenImageConditioningOutput(
+            conditioning=QwenImageConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                quantization=self.quantization,
+                qwen_vl_encoder=extract_encoder_model(self.qwen_vl_encoder),
+                component_source=getattr(self, "component_source", None),
+            )
+        )
 
     def _raise_if_encoder_cannot_see_images(self, context: InvocationContext) -> None:
         """Refuse reference images for an encoder without a vision tower, before anything is loaded.
