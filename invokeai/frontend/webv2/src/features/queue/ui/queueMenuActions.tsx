@@ -386,6 +386,12 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
               getQueueItemReadModelLabel(outcome.item) || t('widgets.queue.itemTitle', { id: outcome.item.id })
             );
             return;
+          case 'finished':
+            notify.info(
+              t('widgets.queue.itemAlreadyFinished'),
+              getQueueItemReadModelLabel(outcome.item) || t('widgets.queue.itemTitle', { id: outcome.item.id })
+            );
+            return;
           case 'nothing':
             notify.info(
               t('widgets.queue.noCurrentItem'),

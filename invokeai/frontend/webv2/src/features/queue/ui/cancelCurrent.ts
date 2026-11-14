@@ -8,11 +8,11 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { CANCEL_ITEM_TIMEOUT_MS } from '@features/queue/data/httpRealtimeQueueBackend';
 import {
+  applyQueueItemStatusGuess,
   applyQueueItemStatusToReadModels,
   compareQueuedItems,
   invalidateQueueQueries,
   queueKeys,
-  readQueueReadModels,
 } from '@features/queue/data/queries';
 import { getQueueReadModelOptions, queueCommands } from '@features/queue/publicApi';
 import { noteQueueCancelRequested } from '@features/queue/runtime/cancelRequests';
@@ -93,6 +93,8 @@ export type CancelCurrentOutcome =
   | { kind: 'busy' }
   | { item: QueueItemReadModel; kind: 'canceled' }
   | { error: unknown; kind: 'failed' }
+  /** The item it read as current had already finished, and what is current now could not be read: nothing stopped. */
+  | { item: QueueItemReadModel; kind: 'finished' }
   | { kind: 'nothing' }
   /** The account changed meanwhile; nothing is reported for the one that asked. */
   | { kind: 'superseded' };
@@ -112,25 +114,22 @@ const CANCEL_CURRENT_SETTLE_LIMIT_MS = 2_000;
 let inFlightOwner: AccountScope | null = null;
 
 /**
- * Shows the item canceled in every loaded read model at once, then asks the server; true when the server canceled
- * it. An item that had already finished comes back unchanged: the cancel did nothing. A failed request puts back each
- * read model this write changed, only while the account that made it is still signed in (a sign-out clears the cache
- * first, and the next account must not see this one's queue) and only where nothing changed it since (an event that
- * arrived meanwhile stays).
+ * Shows the item canceled at once, then asks the server; true when the server canceled it. An item that had already
+ * finished comes back unchanged: the cancel did nothing. A failed request takes the guess back, only while the account
+ * that made it is still signed in (a sign-out clears the cache first, and the next account must not see this one's
+ * queue), unless an event reported the item canceled meanwhile: the server canceled it, though its answer was lost.
  */
 const cancelItem = async (client: QueryClient, owner: AccountScope, item: QueueItemReadModel): Promise<boolean> => {
   const dropNote = noteQueueCancelRequested({ itemId: item.id, kind: 'item' });
-  const before = readQueueReadModels(client);
-
-  applyQueueItemStatusToReadModels(client, {
+  const guess = applyQueueItemStatusGuess(client, {
     item: { ...item, status: 'canceled', statusSequence: null },
     queueCounts: null,
   });
-  const written = new Map(readQueueReadModels(client).map(([queryKey, model]) => [JSON.stringify(queryKey), model]));
 
   try {
     const answer = await queueCommands.cancelItem(item.id);
 
+    guess.settle();
     // The server's answer, a canceled item or one that had already finished, supersedes the guess.
     applyQueueItemStatusToReadModels(client, { item: answer, queueCounts: null });
     if (answer.status !== 'canceled') {
@@ -139,15 +138,12 @@ const cancelItem = async (client: QueryClient, owner: AccountScope, item: QueueI
 
     return answer.status === 'canceled';
   } catch (error) {
-    dropNote();
-    if (isAccountScopeCurrent(owner)) {
-      for (const [queryKey, model] of before) {
-        const optimistic = written.get(JSON.stringify(queryKey));
-        if (optimistic !== model && client.getQueryData(queryKey) === optimistic) {
-          client.setQueryData(queryKey, model);
-        }
-      }
+    if (!isAccountScopeCurrent(owner)) {
+      guess.settle();
+    } else if (guess.revert()) {
+      return true;
     }
+    dropNote();
     throw error;
   }
 };
@@ -227,19 +223,25 @@ const cancelCurrent = async (
     }
 
     // The reading the target came from was out of date: read afresh, and for a scoped view the whole queue's status
-    // too. Bounded, so a stalled read cannot hold the command busy.
-    const [fresh, wholeQueueStatus] = await withRequestDeadline(
+    // too. Bounded, so a stalled read cannot hold the command busy. A read that fails leaves what the server answered:
+    // the item had already finished, which is no failure to cancel.
+    const reading = await withRequestDeadline(
       (signal) =>
         Promise.all([
           readQueueReadModel(client, scope, signal),
           scope.originPrefix ? readWholeQueueStatus(client, signal) : Promise.resolve(null),
         ]),
       CANCEL_ITEM_TIMEOUT_MS
-    );
+    ).catch(() => null);
 
     if (!isAccountScopeCurrent(owner)) {
       return { kind: 'superseded' };
     }
+    if (!reading) {
+      return { item: target, kind: 'finished' };
+    }
+
+    const [fresh, wholeQueueStatus] = reading;
 
     const retarget = getCancelCurrentTarget(fresh, {
       canManageItem,

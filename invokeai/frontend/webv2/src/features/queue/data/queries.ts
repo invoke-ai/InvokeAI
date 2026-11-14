@@ -10,7 +10,7 @@ import type {
 
 import { isTerminalBackendStatus } from '@features/queue/data/events';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, type QueryClient, type QueryKey } from '@tanstack/react-query';
 
 export const QUEUE_RECENT_WINDOW = 50;
 
@@ -245,11 +245,27 @@ export const applyQueueItemStatusChange = (
 };
 
 /**
+ * Guesses awaiting the server's answer. A reported change of the same item to the same status confirms one: it may
+ * change nothing in the cache (the item already reads so, and equal data keeps its reference), so the cache alone
+ * cannot tell it happened.
+ */
+const pendingGuesses = new Set<{ client: QueryClient; confirmed: boolean; item: QueueItemReadModel }>();
+
+const readQueueReadModels = (queryClient: QueryClient) =>
+  queryClient.getQueriesData<QueueReadModel>({ queryKey: [...queueKeys.all, 'read-model'] });
+
+/**
  * Apply a status change to every loaded read model at once, and to the whole queue's status read, so the current and
  * next items and what runs anywhere are right before the coalesced invalidation's read reconciles them. Only data
  * already in the cache changes.
  */
 export const applyQueueItemStatusToReadModels = (queryClient: QueryClient, change: QueueItemStatusChange): void => {
+  for (const guess of pendingGuesses) {
+    if (guess.client === queryClient && guess.item.id === change.item.id && guess.item.status === change.item.status) {
+      guess.confirmed = true;
+    }
+  }
+
   const previous = readQueueReadModels(queryClient)
     .flatMap(([, model]) => (model ? [model.current, model.next, ...model.items] : []))
     .find((candidate) => candidate?.id === change.item.id)?.status;
@@ -271,6 +287,58 @@ export const applyQueueItemStatusToReadModels = (queryClient: QueryClient, chang
   );
 };
 
-/** Every loaded read model, to put back as they were when a change applied ahead of the server turns out wrong. */
-export const readQueueReadModels = (queryClient: QueryClient) =>
-  queryClient.getQueriesData<QueueReadModel>({ queryKey: [...queueKeys.all, 'read-model'] });
+/** Everything `applyQueueItemStatusToReadModels` writes: every loaded read model and the whole queue's status read. */
+const readQueueItemStatusData = (queryClient: QueryClient): Array<[QueryKey, unknown]> => [
+  ...readQueueReadModels(queryClient),
+  [queueKeys.status({}), queryClient.getQueryData(queueKeys.status({}))],
+];
+
+export interface QueueItemStatusGuess {
+  /** The request was answered: the guess no longer waits. Apply the answer as any other change. */
+  settle: () => void;
+  /**
+   * The request failed: puts back each read model and the whole queue's status the guess changed, only where nothing
+   * changed it since, and nothing once a reported change confirmed the guess. True when one did: the server made the
+   * change though its answer was lost.
+   */
+  revert: () => boolean;
+}
+
+/**
+ * Applies the viewer's own change at once, ahead of the server (a cancel assumes the item canceled), and returns how
+ * to settle it. The caller settles or reverts it once its request ends, whichever way.
+ */
+export const applyQueueItemStatusGuess = (
+  queryClient: QueryClient,
+  change: QueueItemStatusChange
+): QueueItemStatusGuess => {
+  const before = readQueueItemStatusData(queryClient);
+
+  applyQueueItemStatusToReadModels(queryClient, change);
+
+  const written = new Map(
+    readQueueItemStatusData(queryClient).map(([queryKey, data]) => [JSON.stringify(queryKey), data])
+  );
+  const guess = { client: queryClient, confirmed: false, item: change.item };
+
+  pendingGuesses.add(guess);
+
+  return {
+    revert: () => {
+      pendingGuesses.delete(guess);
+      if (guess.confirmed) {
+        return true;
+      }
+      for (const [queryKey, data] of before) {
+        const guessed = written.get(JSON.stringify(queryKey));
+        if (guessed !== data && queryClient.getQueryData(queryKey) === guessed) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+      return false;
+    },
+    settle: () => {
+      pendingGuesses.delete(guess);
+    },
+  };
+};

@@ -86,6 +86,9 @@ const readNow = async <T, Key extends readonly unknown[]>(
   const queryFn = options.queryFn as QueryFunction<T, Key>;
   const data = await queryFn({ client, meta: undefined, queryKey: options.queryKey, signal });
 
+  // The caller's signal ends with the account: a reading that lands after a switch must not reach the next account's
+  // cleared cache.
+  signal.throwIfAborted();
   client.setQueryData<T>(options.queryKey as readonly unknown[], data);
   return data;
 };

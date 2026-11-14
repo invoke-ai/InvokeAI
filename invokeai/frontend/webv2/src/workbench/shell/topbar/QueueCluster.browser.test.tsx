@@ -25,6 +25,8 @@ const state = vi.hoisted(() => ({
   localItems: [] as unknown[],
   /** This tab's runs the backend has not accepted, which only cancel-all reaches. */
   localRuns: [] as QueueLocalRun[],
+  /** A read of the server fails, as when it stops answering. */
+  readFails: false,
   /**
    * The server's items now. The seeded reading stays cached until a read asks again; null keeps the server as the test
    * seeded it.
@@ -140,6 +142,9 @@ const render = async ({
 
 /** What a read of the server finds now. */
 function serverReading() {
+  if (state.readFails) {
+    throw new Error('Server unavailable');
+  }
   const items = (state.serverItems ?? []) as ReturnType<typeof serverItem>[];
   return readModel({ current: items.find((item) => item.status === 'in_progress') ?? null, items });
 }
@@ -206,6 +211,7 @@ beforeEach(() => {
   state.isPaused = false;
   state.projectScoped = false;
   state.wholeQueueInProgress = 0;
+  state.readFails = false;
   state.serverItems = null;
   notify.error.mockClear();
   notify.info.mockClear();
@@ -291,6 +297,32 @@ describe('QueueCluster', () => {
     await vi.waitFor(() => expect(commands.cancelItem.mock.calls).toEqual([[7], [8]]));
   });
 
+  it("ignores a double click's second click, though the first click's cancel has already failed", async () => {
+    // Nothing keeps the command busy after a failure, so only the click's own count tells the two apart.
+    commands.cancelItem.mockImplementationOnce(() => Promise.reject(new Error('Server unavailable')));
+    await render();
+
+    await act(() => userEvent.dblClick(cancelButton()));
+
+    await vi.waitFor(() => expect(notify.error).toHaveBeenCalledOnce());
+    expect(commands.cancelItem.mock.calls).toEqual([[7]]);
+  });
+
+  it('acts once for a held Enter: its repeats neither retry a failed cancel nor stop another item', async () => {
+    commands.cancelItem.mockImplementationOnce(() => Promise.reject(new Error('Server unavailable')));
+    await render();
+
+    cancelButton().focus();
+    await act(() => userEvent.keyboard('{Enter>4}'));
+    await act(() => userEvent.keyboard('{/Enter}'));
+
+    await vi.waitFor(() => expect(notify.error).toHaveBeenCalledOnce());
+    expect(commands.cancelItem.mock.calls).toEqual([[7]]);
+    // A new press is no repeat.
+    await act(() => userEvent.keyboard('{Enter}'));
+    await vi.waitFor(() => expect(commands.cancelItem.mock.calls).toEqual([[7], [7]]));
+  });
+
   it('stops nothing waiting while the processor is paused: the × is disabled', async () => {
     state.isPaused = true;
     await render({ current: null, items: [serverItem(7, 'completed'), serverItem(8, 'pending')] });
@@ -362,6 +394,20 @@ describe('QueueCluster', () => {
       expect(notify.info).toHaveBeenCalledExactlyOnceWith('widgets.queue.noCurrentItem', expect.any(String))
     );
     expect(commands.cancelItem.mock.calls).toEqual([[7]]);
+    expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it('says the item had already finished, not that the cancel failed, when what runs now cannot be read', async () => {
+    state.serverItems = [serverItem(7, 'completed')];
+    await render({ current: running, items: [running] });
+    state.readFails = true;
+
+    await act(() => userEvent.click(cancelButton()));
+
+    await vi.waitFor(() =>
+      expect(notify.info).toHaveBeenCalledExactlyOnceWith('widgets.queue.itemAlreadyFinished', expect.any(String))
+    );
+    expect(notify.error).not.toHaveBeenCalled();
     expect(notify.success).not.toHaveBeenCalled();
   });
 

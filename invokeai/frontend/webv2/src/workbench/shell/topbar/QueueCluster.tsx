@@ -19,7 +19,15 @@ import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useQueueChromeActivity } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { CloudOffIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TopbarMenuChevron } from './TopbarMenuChevron';
@@ -120,6 +128,13 @@ export const QueueCluster = () => {
     },
     [cancelAll, cancelCurrent]
   );
+  // A held Enter clicks on every auto-repeat, and the repeats outlast the command's settle window; one press stops one
+  // item. Space clicks on release, so it never repeats. Enter alone: a held Tab moving through must not stop here.
+  const handleCancelKeyDown = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.repeat && event.key === 'Enter') {
+      event.preventDefault();
+    }
+  }, []);
 
   return (
     <Menu.Root>
@@ -172,6 +187,7 @@ export const QueueCluster = () => {
               size="lg"
               variant="outline"
               onClick={handleCancelClick}
+              onKeyDown={handleCancelKeyDown}
               onPointerEnter={isCancellable ? handleCancelPointerEnter : undefined}
               onPointerLeave={isCancellable ? handleCancelPointerLeave : undefined}
             >
