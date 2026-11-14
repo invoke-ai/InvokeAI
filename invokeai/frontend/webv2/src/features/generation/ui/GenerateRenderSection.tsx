@@ -22,6 +22,7 @@ import {
   DEFAULT_TIMESTEP_SHIFT,
   FLUX_DYPE_PRESETS,
   getDynamicPromptsConfig,
+  getEffectiveIdeogram4Sampling,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
   IDEOGRAM4_MU_MAX,
@@ -30,6 +31,7 @@ import {
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
@@ -136,15 +138,17 @@ interface RenderFieldsProps {
   onCommit: GenerateRenderSectionProps['onCommit'];
 }
 
-/** Labels expose step counts hidden in backend preset IDs. */
 const IDEOGRAM4_PRESET_LABELS: Record<Ideogram4SamplerPreset, string> = {
-  V4_DEFAULT_20: 'Default (20 steps)',
-  V4_QUALITY_48: 'Quality (48 steps)',
-  V4_TURBO_12: 'Turbo (12 steps)',
+  V4_DEFAULT_20: 'Default',
+  V4_QUALITY_48: 'Quality',
+  V4_TURBO_12: 'Turbo',
 };
 
 const IDEOGRAM4_PRESET_COLLECTION = createListCollection({
-  items: IDEOGRAM4_SAMPLER_PRESETS.map((value) => ({ label: IDEOGRAM4_PRESET_LABELS[value], value })),
+  items: Object.entries(IDEOGRAM4_SAMPLER_PRESETS).map(([value, { steps }]) => ({
+    label: `${IDEOGRAM4_PRESET_LABELS[value as Ideogram4SamplerPreset]} (${steps} steps)`,
+    value,
+  })),
 });
 
 const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
@@ -160,8 +164,8 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
           onValueChange={({ value }) => {
             const preset = value[0];
 
-            if (IDEOGRAM4_SAMPLER_PRESETS.includes(preset as Ideogram4SamplerPreset)) {
-              onCommit({ ideogram4SamplerPreset: preset as Ideogram4SamplerPreset });
+            if (isIdeogram4SamplerPreset(preset)) {
+              onCommit({ ideogram4SamplerPreset: preset });
             }
           }}
         />
@@ -621,6 +625,11 @@ export const GenerateRenderSection = ({
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const uiPolicy = getGenerationUiPolicy(selectedModel);
   const familyBase = selectedModel && selectedModel.type !== 'external_image_generator' ? selectedModel.base : null;
+  const isIdeogram4 = familyBase === 'ideogram-4';
+  const sampling = isIdeogram4
+    ? getEffectiveIdeogram4Sampling(settings)
+    : { guidanceScale: settings.cfgScale, steps: settings.steps };
+  const guidanceLabel = isIdeogram4 ? t('widgets.generate.ideogram4GuidanceScale') : uiPolicy.guidanceLabel;
 
   // Cap both input and track at the architecture ceiling without crossing the floor.
   const guidanceInputMax = uiPolicy.guidanceMax ?? GUIDANCE_INPUT_MAX;
@@ -651,47 +660,51 @@ export const GenerateRenderSection = ({
 
   const renderFields = (strengthField: ReactNode) => (
     <>
-      <GenerateFieldContextMenu
-        fieldLabel={t('widgets.generate.steps')}
-        copyValue={() => String(settings.steps)}
-        isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
-        onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
-      >
-        <ScrubberField
-          defaultValue={modelDefaults?.steps}
-          hint="steps"
-          inputMax={Number.MAX_SAFE_INTEGER}
-          label={t('widgets.generate.steps')}
-          marks={modelDefaults ? [modelDefaults.steps] : undefined}
-          max={STEPS_SLIDER_MAX}
-          min={1}
-          step={1}
-          value={settings.steps}
-          onChange={(steps) => commitNumber('steps', steps)}
-        />
-      </GenerateFieldContextMenu>
-      <GenerateFieldContextMenu
-        fieldLabel={uiPolicy.guidanceLabel}
-        copyValue={() => String(settings.cfgScale)}
-        isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
-        onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
-      >
-        <ScrubberField
-          defaultValue={modelDefaults?.cfgScale}
-          error={guidanceError}
-          hint="guidance"
-          inputMax={guidanceInputMax}
-          label={uiPolicy.guidanceLabel}
-          marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
-          max={guidanceSliderMax}
-          min={uiPolicy.guidanceMin}
-          step={0.5}
-          value={settings.cfgScale}
-          onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
-        />
-      </GenerateFieldContextMenu>
-      {/* The scrubber shows the message; this adds its one-step fix. */}
-      <GenerateIssueNotes field="cfgScale" fixesOnly section="render" />
+      {!isIdeogram4 ? (
+        <>
+          <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.steps')}
+            copyValue={() => String(settings.steps)}
+            isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
+            onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
+          >
+            <ScrubberField
+              defaultValue={modelDefaults?.steps}
+              hint="steps"
+              inputMax={Number.MAX_SAFE_INTEGER}
+              label={t('widgets.generate.steps')}
+              marks={modelDefaults ? [modelDefaults.steps] : undefined}
+              max={STEPS_SLIDER_MAX}
+              min={1}
+              step={1}
+              value={settings.steps}
+              onChange={(steps) => commitNumber('steps', steps)}
+            />
+          </GenerateFieldContextMenu>
+          <GenerateFieldContextMenu
+            fieldLabel={uiPolicy.guidanceLabel}
+            copyValue={() => String(settings.cfgScale)}
+            isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
+            onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
+          >
+            <ScrubberField
+              defaultValue={modelDefaults?.cfgScale}
+              error={guidanceError}
+              hint="guidance"
+              inputMax={guidanceInputMax}
+              label={uiPolicy.guidanceLabel}
+              marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
+              max={guidanceSliderMax}
+              min={uiPolicy.guidanceMin}
+              step={0.5}
+              value={settings.cfgScale}
+              onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
+            />
+          </GenerateFieldContextMenu>
+          {/* The scrubber shows the message; this adds its one-step fix. */}
+          <GenerateIssueNotes field="cfgScale" fixesOnly section="render" />
+        </>
+      ) : null}
       {strengthField}
       {familyBase === 'moss-image' ? (
         <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
@@ -740,7 +753,7 @@ export const GenerateRenderSection = ({
           </Field>
         </GenerateFieldContextMenu>
       ) : null}
-      {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
+      {isIdeogram4 ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
       <Separator borderColor="border.subtle" />
       {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'krea-2' ? (
@@ -765,7 +778,7 @@ export const GenerateRenderSection = ({
       badges={
         <>
           <Badge>
-            {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
+            {sampling.steps} · {guidanceLabel} {sampling.guidanceScale}
           </Badge>
           {canvas?.badges}
           {seedBadge}

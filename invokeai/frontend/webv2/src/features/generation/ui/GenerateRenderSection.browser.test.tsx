@@ -446,21 +446,20 @@ describe('GenerateRenderSection guidance field', () => {
     expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: 1 });
   });
 
-  it('holds the Ideogram 4 overrides to their own node bounds', async () => {
-    // Ideogram override bounds come from numeric anyOf branches.
-    await render(ideogram4Model, { ideogram4GuidanceScale: 5, ideogram4Mu: 1, ideogram4Steps: 48 });
+  it('summarizes Ideogram 4 sampling and offers only the preset overrides', async () => {
+    await render(ideogram4Model, { cfgScale: 3, ideogram4SamplerPreset: 'V4_TURBO_12', steps: 99 });
     const ranges = (label: string) =>
       slidersNamed(label).map((slider) => [slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]);
 
-    // Address shared guidance before the override; both controls have the same accessible label.
-    expect(ranges('Guidance')).toEqual([
-      ['1', '10'],
-      ['1', '20'],
-    ]);
-    expect(ranges('Steps')).toEqual([
-      ['1', '100'],
-      ['2', '100'],
-    ]);
+    expect(host?.textContent).toContain('12 · Guidance 7');
+    expect(ranges('Guidance')).toEqual([]);
+    expect(ranges('Steps')).toEqual([]);
+
+    await settle(() => draftStore?.patchSnapshot({ ideogram4GuidanceScale: 5, ideogram4Mu: 1, ideogram4Steps: 18 }));
+
+    expect(host?.textContent).toContain('18 · Guidance 5');
+    expect(ranges('Guidance')).toEqual([['1', '20']]);
+    expect(ranges('Steps')).toEqual([['2', '100']]);
     expect(ranges('Mu')).toEqual([['-4', '4']]);
 
     // Off hands Mu to the sampler preset, and its description says so.

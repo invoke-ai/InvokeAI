@@ -72,6 +72,7 @@ import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
+import { getEffectiveIdeogram4Sampling } from './settings';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -2047,7 +2048,10 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  const sampling = getEffectiveIdeogram4Sampling(settings);
   const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+    cfg_scale: sampling.guidanceScale,
+    steps: sampling.steps,
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? null,
     ideogram4_mu: settings.ideogram4Mu ?? null,

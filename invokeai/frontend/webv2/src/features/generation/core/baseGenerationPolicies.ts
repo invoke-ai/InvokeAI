@@ -2766,6 +2766,11 @@ export const getGuidanceBoundReason = (
   model: Pick<GenerateModelConfig, 'base' | 'name' | 'type'> & { variant?: unknown },
   cfgScale: number
 ): string | null => {
+  // Ideogram validates its own sampler override and never reads the shared guidance value.
+  if (model.base === 'ideogram-4') {
+    return null;
+  }
+
   const { guidance, guidanceLabel } = getBaseGenerationConfig(model);
 
   if (cfgScale < guidance.min) {

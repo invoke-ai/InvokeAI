@@ -283,9 +283,23 @@ const getRefinerModelOrNull = (value: unknown): MainModelConfig | null =>
 
 const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
 
-/** Backend defaults from `Ideogram4DenoiseInvocation` / `Krea2*Invocation`. */
-export const IDEOGRAM4_SAMPLER_PRESETS: Ideogram4SamplerPreset[] = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12'];
+/** Mirror `invokeai/backend/ideogram4/sampler_configs.py`. Guidance describes the main phase before the polish tail. */
+export const IDEOGRAM4_SAMPLER_PRESETS: Record<Ideogram4SamplerPreset, { guidanceScale: number; steps: number }> = {
+  V4_QUALITY_48: { guidanceScale: 7, steps: 48 },
+  V4_DEFAULT_20: { guidanceScale: 7, steps: 20 },
+  V4_TURBO_12: { guidanceScale: 7, steps: 12 },
+};
 export const DEFAULT_IDEOGRAM4_SAMPLER_PRESET: Ideogram4SamplerPreset = 'V4_QUALITY_48';
+
+export const getEffectiveIdeogram4Sampling = (
+  settings: Pick<GenerateSettings, 'ideogram4SamplerPreset' | 'ideogram4GuidanceScale' | 'ideogram4Steps'>
+) => {
+  const preset = IDEOGRAM4_SAMPLER_PRESETS[settings.ideogram4SamplerPreset];
+  return {
+    guidanceScale: settings.ideogram4GuidanceScale ?? preset.guidanceScale,
+    steps: settings.ideogram4Steps ?? preset.steps,
+  };
+};
 /** Ideogram guidance_scale bounds live on the numeric anyOf branch, outside the shared capability-table slider. */
 export const IDEOGRAM4_GUIDANCE_MIN = 1;
 export const IDEOGRAM4_GUIDANCE_MAX = 20;
@@ -353,7 +367,7 @@ export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
   Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
 export const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
-  IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
+  typeof value === 'string' && Object.hasOwn(IDEOGRAM4_SAMPLER_PRESETS, value);
 
 export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
   FLUX_DYPE_PRESETS.includes(value as FluxDypePreset);
