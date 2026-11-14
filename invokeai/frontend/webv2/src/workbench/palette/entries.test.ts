@@ -189,21 +189,24 @@ describe('buildCatalogCommandEntries', () => {
     expect(withCanvas).toContain('canvas.undo');
   });
 
-  it('formats the bound hotkey (custom overrides win) and executes by command id', () => {
+  it.each([
+    { platform: 'macOS', isMacOs: true, invokeKeys: ['cmd', 'enter'], clearKeys: ['shift', 'cmd', 'q'] },
+    { platform: 'other platforms', isMacOs: false, invokeKeys: ['ctrl', 'enter'], clearKeys: ['ctrl', 'shift', 'q'] },
+  ])('formats the bound hotkey and executes by command id on $platform', ({ isMacOs, invokeKeys, clearKeys }) => {
     const execute = vi.fn();
     const entries = buildCatalogCommandEntries({
       catalog: firstPartyHotkeyCatalog,
       customHotkeys: { 'app.clearQueue': ['mod+shift+q'] },
       execute,
-      formatHotkey: formatHotkeyForPlatform,
+      formatHotkey: (hotkey) => formatHotkeyForPlatform(hotkey, isMacOs),
       presentWidgetTypeIds: new Set(),
       t,
     });
     const invoke = entries.find((entry) => entry.id === 'app.invoke');
     const clearQueue = entries.find((entry) => entry.id === 'app.clearQueue');
 
-    expect(invoke?.keys).toEqual(['ctrl', 'enter']);
-    expect(clearQueue?.keys).toEqual(['ctrl', 'shift', 'q']);
+    expect(invoke?.keys).toEqual(invokeKeys);
+    expect(clearQueue?.keys).toEqual(clearKeys);
 
     invoke?.run();
     expect(execute).toHaveBeenCalledWith('app.invoke');
