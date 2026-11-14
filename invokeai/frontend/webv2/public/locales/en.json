@@ -4968,6 +4968,7 @@
         "operationFailed": "The canvas could not apply this change, so nothing was changed.",
         "overBudget": "There is not enough canvas memory to make this change undoable, so nothing was changed.",
         "stale": "The layer changed before this action finished, so nothing was changed. Try again.",
+        "properties": "Layer properties",
         "rasterize": "Rasterize layer",
         "removeQuickSwitchBookmark": "Remove quick switch bookmark",
         "rename": "Rename layer",

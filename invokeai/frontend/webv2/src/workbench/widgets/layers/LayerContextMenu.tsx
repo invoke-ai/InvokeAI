@@ -79,6 +79,7 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
+import { clearLayerChildSelection } from './layerChildSelection';
 import {
   actionTargets,
   getLayerContextActions,
@@ -123,7 +124,7 @@ import {
   needsBakedControlPixels,
 } from './layerOps';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
-import { useRevealLayerProperties } from './revealLayerProperties';
+import { revealLayerSection, useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -742,8 +743,11 @@ const LayerMenu = ({
 
   const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
+    // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
+    clearLayerChildSelection();
     revealProperties(layer.id);
     focusRegion('right', 'layers');
+    revealLayerSection();
   }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
