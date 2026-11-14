@@ -1,4 +1,5 @@
 import gc
+import itertools
 import logging
 import queue
 import sys
@@ -29,6 +30,7 @@ from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
     SHARED_CPU_WEIGHTS,
     SharedCpuWeightsStore,
 )
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import storage_key
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -1028,11 +1030,6 @@ class ModelCache:
             return None
 
         size = calc_model_size_by_data(self._logger, model)
-        self._make_room_internal(size)
-
-        # Inject custom modules into the model.
-        if isinstance(model, torch.nn.Module):
-            apply_custom_layers_to_model(model)
 
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
@@ -1069,24 +1066,50 @@ class ModelCache:
                 "footprint against the same memory. Weights are moved rather than copied.",
             )
 
-        # Wrap model.
-        if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(
-                model,
-                effective_execution_device,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
-        else:
-            wrapped_model = CachedModelOnlyFullLoad(
-                model,
-                effective_execution_device,
-                size,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
+        # Pin the canonical until the wrapper has acquired its own reference. A peer may be
+        # evicted concurrently, and a mere peek would let the budget stop counting those bytes.
+        store = self._shared_cpu_weights
+        pinned = None
+        if (
+            isinstance(model, torch.nn.Module)
+            and keep_ram_copy
+            and store is not None
+            and self._ram_budget is not None
+            and self._ram_budget.counts_store(store)
+        ):
+            state_dict = model.state_dict()
+            if all(isinstance(t, torch.Tensor) for t in state_dict.values()):
+                model_tensors = {storage_key(t) for t in itertools.chain(model.parameters(), model.buffers())}
+                if model_tensors == {storage_key(t) for t in state_dict.values()}:
+                    pinned = store.acquire_matching(key, state_dict, size)
+        try:
+            self._make_room_internal(0 if pinned is not None else size)
+
+            # Inject custom modules into the model.
+            if isinstance(model, torch.nn.Module):
+                apply_custom_layers_to_model(model)
+
+            if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
+                wrapped_model = CachedModelWithPartialLoad(
+                    model,
+                    effective_execution_device,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                )
+            else:
+                wrapped_model = CachedModelOnlyFullLoad(
+                    model,
+                    effective_execution_device,
+                    size,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                )
+        finally:
+            if pinned is not None:
+                assert store is not None
+                store.release(key, pinned)
 
         # awaiting_first_use protects an unclaimed new entry from the asynchronous eviction paths
         # (budget reconcile, peer-requested eviction) until the loader locks it - see CacheRecord.

@@ -74,6 +74,10 @@ class RamBudget:
         """The global cap on actual model-cache RAM, in bytes."""
         return self._max_bytes
 
+    def counts_store(self, store: SharedCpuWeightsStore) -> bool:
+        """Whether this budget includes this store's canonical weights."""
+        return self._store is store
+
     def add_non_shared(self, nbytes: int, cache: Optional["ModelCache"] = None) -> None:
         """Record `nbytes` of newly-resident non-deduplicated model RAM."""
         with self._lock:
