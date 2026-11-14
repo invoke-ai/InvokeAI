@@ -1,5 +1,6 @@
 """Class for Z-Image model loading in InvokeAI."""
 
+from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
@@ -380,7 +381,11 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             "SDNQ Z-Image Qwen3 text encoder", missing, unexpected, allowed_missing={"lm_head.weight"}
         )
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights
@@ -1542,7 +1547,11 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         # GGMLTensor wrappers will be dequantized on-the-fly during inference
         load_state_dict_ignoring_extras(model, sd, source="Qwen3 GGUF text encoder", assign=True, allow_missing=True)
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights - llama.cpp GGUF doesn't include lm_head.weight when embeddings are tied
@@ -1729,7 +1738,11 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load("SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"})
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights

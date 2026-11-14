@@ -35,6 +35,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderGGUFLoader
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
+from invokeai.backend.quantization.gguf import loaders as gguf_loaders
 from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
@@ -114,13 +115,15 @@ def _write_gguf(path: Path, architecture: str, tensors: dict[str, np.ndarray], m
     return path
 
 
-def _write_uniform_gguf(path: Path) -> Path:
+def _write_uniform_gguf(path: Path, *, extra_weights: bool = False) -> Path:
     """The llama.cpp tensor set for a tiny Mistral decoder, every value `_FILL`.
 
     No `attn_q_norm` / `attn_k_norm`: `MistralModel` has no QK norm, and a real Mistral GGUF carries
     none either.
     """
     shapes: dict[str, tuple[int, ...]] = {"token_embd.weight": (_VOCAB, _HIDDEN), "output_norm.weight": (_HIDDEN,)}
+    if extra_weights:
+        shapes["unused_projection.weight"] = (_FFN, _HIDDEN)
     for layer in range(_LAYERS):
         shapes.update(
             {
@@ -264,17 +267,35 @@ def test_the_shared_converter_lands_every_weight_in_the_mistral_module_tree(tmp_
             assert projection.weight.shape == (projection.out_features, projection.in_features)
 
 
-def test_the_embedding_is_materialized_and_its_copy_reserved(tmp_path, monkeypatch) -> None:
-    """The site this change added a reservation to. `nn.Embedding` indexes its weight directly, so
-    the dequantized copy is unavoidable — and the framework reserved only the file size.
+@pytest.mark.parametrize("extra_weights", [False, True])
+def test_embedding_reservation_covers_live_model_and_checkpoint(tmp_path, monkeypatch, extra_weights):
+    """The checkpoint survives assign=True, including weights the model does not use. Its assigned
+    parameters alias those bytes; model-owned RoPE buffers are additional live storage.
     """
+    path = _write_uniform_gguf(tmp_path / "mistral_budget.gguf", extra_weights=extra_weights)
+    reader = gguf.GGUFReader(path)
+    packed_bytes = sum(int(tensor.n_bytes) for tensor in reader.tensors)
+    del reader
+    monkeypatch.setattr(gguf_loaders, "_UNPACK_CHUNK_ELEMENTS", 3 * _HIDDEN)
     ram_cache = create_autospec(ModelCache, instance=True)
+    model_buffer_bytes = []
+    real_load = MistralModel.load_state_dict
 
-    model = _load(tmp_path, monkeypatch, _write_uniform_gguf(tmp_path / "mistral_tiny.gguf"), ram_cache=ram_cache)
+    def recording(model, *args, **kwargs):
+        result = real_load(model, *args, **kwargs)
+        model_buffer_bytes.append(sum(b.untyped_storage().nbytes() for b in model.buffers() if not b.is_meta))
+        return result
 
-    assert not isinstance(model.embed_tokens.weight, GGMLTensor)
-    assert model.embed_tokens(torch.tensor([[0, 1]])).shape == (1, 2, _HIDDEN)
-    assert ram_cache.make_room.call_args_list == [call(PEAK_COPIES * _VOCAB * _HIDDEN * torch.float32.itemsize)]
+    monkeypatch.setattr(MistralModel, "load_state_dict", recording)
+
+    model = _load(tmp_path, monkeypatch, path, ram_cache=ram_cache)
+
+    output_bytes = _VOCAB * _HIDDEN * torch.float32.itemsize
+    chunk_bytes = 3 * _HIDDEN * torch.float32.itemsize
+    assert ram_cache.make_room.call_args_list == [
+        call(packed_bytes + model_buffer_bytes[0] + output_bytes + PEAK_COPIES * chunk_bytes)
+    ]
+    assert torch.allclose(model.embed_tokens(torch.tensor([[0, 63]])), torch.full((1, 2, _HIDDEN), _FILL), atol=1e-3)
 
 
 @pytest.mark.parametrize(
