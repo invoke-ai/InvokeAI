@@ -423,13 +423,13 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
                     self._reconcile_budget_if_pending()
                 except Exception:
                     # The reconcile is deferrable housekeeping and must not fail the operation
-                    # that triggered it. It can raise from a sick CUDA context (empty_cache after
-                    # an eviction) - and this hook runs inside the caller's frame AFTER the
-                    # method body, so a raise out of lock_in_ram()/lock() here would propagate
-                    # before LoadedModel's unlock-pairing try block is entered, leaking a
-                    # permanently locked record (the same shape as a keep-alive Timer.start()
-                    # failure, handled in _record_activity). The pending flag is only cleared
-                    # once the budget is satisfied, so the next lock release retries.
+                    # that triggered it. It can still raise (the clear callbacks, budget bookkeeping) -
+                    # and this hook runs inside the caller's frame AFTER the method body, so a raise
+                    # out of lock_in_ram()/lock() here would propagate before LoadedModel's
+                    # unlock-pairing try block is entered, leaking a permanently locked record (the
+                    # same shape as a keep-alive Timer.start() failure, handled in _record_activity).
+                    # The pending flag is only cleared once the budget is satisfied, so the next lock
+                    # release retries.
                     self._logger.exception("Error reconciling the shared RAM budget after a lock release")
 
     return wrapper
@@ -1646,18 +1646,8 @@ class ModelCache:
                 bytes_requested=0,
                 bytes_freed=bytes_freed,
             )
-            try:
-                gc.collect()
-                TorchDevice.empty_cache()
-            except Exception:
-                # Deferrable housekeeping: empty_cache() can raise from a sick CUDA context after
-                # an eviction, and this runs in a dying worker's last frame. The eviction itself
-                # is already done and must not be undone by a failure to hand memory back.
-                _log_best_effort(
-                    self._logger,
-                    "exception",
-                    "Error releasing device memory after a stranded-record eviction",
-                )
+            gc.collect()
+            TorchDevice.empty_cache()
 
     @synchronized
     def _recover_from_dead_worker(self, worker: threading.Thread) -> None:
@@ -2276,11 +2266,11 @@ class ModelCache:
             releasable = self._get_reclaimable_allocator_bytes()
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
             return
-        TorchDevice.empty_cache(force=sys.platform == "win32")
-        self._logger.debug(
-            f"Returned {releasable / MB:.0f}MB of the allocator's unused blocks to the driver: {driver_free / MB:.0f}MB "
-            f"driver-free was short of the {reserve / MB:.0f}MB working-memory reserve."
-        )
+        if TorchDevice.empty_cache(force=sys.platform == "win32"):
+            self._logger.debug(
+                f"Returned {releasable / MB:.0f}MB of the allocator's unused blocks to the driver: "
+                f"{driver_free / MB:.0f}MB driver-free was short of the {reserve / MB:.0f}MB working-memory reserve."
+            )
 
     def _move_model_to_vram(
         self, cache_entry: CacheRecord, vram_available: int, max_move_bytes: Optional[int] = None
@@ -2716,19 +2706,24 @@ class ModelCache:
         )
 
         if self._execution_device.type != "cpu":
-            vram_in_use_bytes = self._get_vram_in_use()
-            vram_available_bytes = self._get_vram_available(None)
-            vram_size_bytes = vram_in_use_bytes + vram_available_bytes
-            vram_in_use_bytes_percent = vram_in_use_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
-            vram_available_bytes_percent = vram_available_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
-            log += log_format.format(
-                f"Compute Device ({self._execution_device.type})",
-                vram_size_bytes / MB,
-                vram_in_use_bytes / MB,
-                vram_in_use_bytes_percent,
-                vram_available_bytes / MB,
-                vram_available_bytes_percent,
-            )
+            # Diagnostic only: a broken device context must not fail the eviction that logs its state.
+            try:
+                vram_in_use_bytes = self._get_vram_in_use()
+                vram_available_bytes = self._get_vram_available(None)
+            except RuntimeError as e:
+                log += f"  Compute Device ({self._execution_device.type}): unavailable ({e})\n"
+            else:
+                vram_size_bytes = vram_in_use_bytes + vram_available_bytes
+                vram_in_use_bytes_percent = vram_in_use_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
+                vram_available_bytes_percent = vram_available_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
+                log += log_format.format(
+                    f"Compute Device ({self._execution_device.type})",
+                    vram_size_bytes / MB,
+                    vram_in_use_bytes / MB,
+                    vram_in_use_bytes_percent,
+                    vram_available_bytes / MB,
+                    vram_available_bytes_percent,
+                )
 
         # Dispatch on this cache's execution device, not on availability order: a box with both
         # an NVIDIA card and an Arc would otherwise take the CUDA branch while running on XPU and

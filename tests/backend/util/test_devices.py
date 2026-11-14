@@ -1162,3 +1162,60 @@ def test_choose_krea2_transformer_dtype_otherwise_ignores_precision(monkeypatch,
     with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16) as mock_safe:
         assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=is_gguf, device=device) is torch.bfloat16
     mock_safe.assert_called_once_with(device)
+
+
+class _CountingObserver:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def before_empty_cache(self) -> None:
+        self.calls.append("before")
+
+    def after_empty_cache(self) -> None:
+        self.calls.append("after")
+
+
+@pytest.fixture
+def refusing_backend(monkeypatch):
+    """A CUDA backend whose release raises, and the observer that sees every release attempt."""
+    from invokeai.backend.util import devices as devices_module
+
+    class Backend:
+        calls = 0
+
+        def refuse(self) -> None:
+            self.calls += 1
+            raise torch.OutOfMemoryError("CUDA out of memory while releasing\nsecond line of detail")
+
+    backend = Backend()
+    backend.observer = _CountingObserver()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", backend.refuse)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "_xpu_is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "EMPTY_CACHE_OBSERVERS", [backend.observer])
+    TorchDevice._empty_cache_deferred.clear()
+    return backend
+
+
+def test_empty_cache_the_backend_refuses_is_reported_as_not_run(refusing_backend, caplog):
+    """An ordinary release is advisory: a device context that cannot return its cached blocks (or runs out of
+    memory doing so) must not fail the eviction, offload or Empty Cache request that asked for it."""
+    with caplog.at_level("WARNING"):
+        assert TorchDevice.empty_cache() is False
+
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after"]
+    assert not TorchDevice._empty_cache_deferred.is_set()
+    assert "CUDA out of memory while releasing" in caplog.text
+    assert "second line of detail" not in caplog.text
+
+
+def test_forced_empty_cache_the_backend_refuses_raises(refusing_backend):
+    """A forced caller cannot proceed as if the release ran (a short reserve hangs on Windows, a probe window would
+    record a baseline that still counts the blocks), so the refusal reaches it."""
+    with pytest.raises(torch.OutOfMemoryError, match="while releasing"):
+        TorchDevice.empty_cache(force=True)
+
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after"]

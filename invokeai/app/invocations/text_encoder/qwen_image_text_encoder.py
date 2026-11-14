@@ -584,11 +584,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             state_dict = None
             text_encoder = None
             gc.collect()
-            try:
-                TorchDevice.empty_cache()
-            except Exception as cache_exc:
-                # A sick device context fails here too; the original error is the one worth reporting.
-                context.logger.warning(f"Could not empty the device cache after the failed load: {cache_exc}")
+            TorchDevice.empty_cache()
             # Only a failed load is reported as the encoder not fitting; an OOM while patching is not that.
             if load_failed and isinstance(exc, torch.OutOfMemoryError):
                 raise torch.OutOfMemoryError(self._oom_message(device, quantized_bytes, vram_available)) from exc
