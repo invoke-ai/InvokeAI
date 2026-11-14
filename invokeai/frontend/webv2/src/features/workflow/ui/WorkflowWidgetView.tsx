@@ -1,5 +1,6 @@
 import { Box, HStack, Icon, VisuallyHidden } from '@chakra-ui/react';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { chipLabelStyles } from '@theme/recipes';
 import { WorkflowIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,17 +10,20 @@ import { WorkflowEditorView } from './editor/WorkflowEditorView';
 import { WorkflowLinearPanel } from './linear/WorkflowLinearPanel';
 import { useWorkflowProjectSelector } from './WorkflowUiContext';
 
+// The truncating label is a flex container, so its text sits in the spans it splits the name into.
+const STATUS_LABEL_CSS = { '& > span': chipLabelStyles };
+
 const WorkflowStatusBarItem = () => {
   const { t } = useTranslation();
   const workflowName = useWorkflowProjectSelector((project) => project.projectGraph.name);
   const isRunning = useWorkflowProjectSelector((project) => project.isWorkflowRunning);
 
   return (
-    <HStack gap="1" maxW="14rem" minW="0" px="2">
+    <HStack fontWeight="500" gap="2" maxW="14rem" minW="0" px="2">
       {/* The status-bar chip is named by its content; the name alone would not say which widget it is. */}
       <VisuallyHidden>{t('widgets.labels.workflow')}</VisuallyHidden>
       <Icon as={WorkflowIcon} boxSize="3" color={isRunning ? 'brand.solid' : undefined} flexShrink={0} />
-      <MiddleTruncate fontSize="xs" minW="0" text={workflowName || 'Untitled Workflow'} />
+      <MiddleTruncate css={STATUS_LABEL_CSS} fontSize="xs" minW="0" text={workflowName || 'Untitled Workflow'} />
       {isRunning ? <Box bg="brand.solid" boxSize="1.5" flexShrink={0} rounded="full" /> : null}
     </HStack>
   );

@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { Icon } from '@chakra-ui/react';
+import { GenerationSectionJumpMenu } from '@features/generation/components';
 import { useModelsSelector } from '@features/models';
 import { normalizeVideoWidgetValues } from '@features/video/core/settings';
 import { getVideoSettingsWithModelDefaults } from '@features/video/core/videoPolicies';
@@ -14,7 +15,7 @@ import { useVideoUi } from './VideoUiContext';
 const sortLorasByKey = <T extends { model: { key: string } }>(loras: readonly T[]): T[] =>
   [...loras].sort((a, b) => a.model.key.localeCompare(b.model.key));
 
-export const VideoHeaderActions = () => {
+export const VideoHeaderActions = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const { patchValues, rawValues } = useVideoUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -43,16 +44,19 @@ export const VideoHeaderActions = () => {
   };
 
   return (
-    <Tooltip content={label}>
-      <IconButton
-        aria-label={label}
-        disabled={isAtModelDefaults}
-        size="sm"
-        variant="ghost"
-        onClick={resetToModelDefaults}
-      >
-        <Icon as={RotateCcwIcon} boxSize="3.5" />
-      </IconButton>
-    </Tooltip>
+    <>
+      <GenerationSectionJumpMenu panelId={instance?.id} />
+      <Tooltip content={label}>
+        <IconButton
+          aria-label={label}
+          disabled={isAtModelDefaults}
+          size="sm"
+          variant="ghost"
+          onClick={resetToModelDefaults}
+        >
+          <Icon as={RotateCcwIcon} boxSize="3.5" />
+        </IconButton>
+      </Tooltip>
+    </>
   );
 };

@@ -11,7 +11,7 @@ export type InvocationIssueTarget =
   /** A Generate setting: open the Generate panel at its section, or apply its one-step fix. */
   | { kind: 'generation'; issue: GenerationIssue }
   /** The positive prompt of this widget could not be expanded. */
-  | { kind: 'prompt'; widgetId: 'generate' | 'video' }
+  | { kind: 'prompt'; widgetId: 'generate' | 'upscale' | 'video' }
   | { kind: 'layer'; layerId: string }
   | { kind: 'workflowNode'; nodeId: string }
   /** The source's widget is not in the layout: add it, or run another source. */

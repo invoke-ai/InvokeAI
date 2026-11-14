@@ -1,8 +1,20 @@
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
+import type { UpscaleSection } from '@features/upscale/core/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { ReactNode } from 'react';
 
 import { createContext, use, useMemo } from 'react';
+
+/**
+ * The persisted open state of each Upscale section, kept with Generate's under the same per-user preference. Detail
+ * guidance holds the prompt, which an invoke issue opens to show.
+ */
+export const UPSCALE_SECTION_IDS = {
+  advanced: 'upscaleAdvanced',
+  detailGuidance: 'upscaleDetailGuidance',
+  generation: 'upscaleGeneration',
+  source: 'upscaleSource',
+} as const satisfies Record<UpscaleSection | 'detailGuidance', string>;
 
 /** This UI port preserves dependency direction: Upscale cannot import Workbench. */
 export interface UpscaleUiAdapter {

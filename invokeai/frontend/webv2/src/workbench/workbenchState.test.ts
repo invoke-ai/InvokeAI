@@ -3446,6 +3446,10 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       queueItemId: queueItem.id,
       type: 'routeQueueItemResults',
     });
+    // The newest result of the batch is selected; stepping wraps around the slots.
+    expect(getActiveProject(state).canvas.stagingArea.selectedImageIndex).toBe(1);
+    state = workbenchReducer(state, { direction: 1, type: 'cycleStagedImage' });
+    expect(getActiveProject(state).canvas.stagingArea.selectedImageIndex).toBe(0);
     state = workbenchReducer(state, { direction: -1, type: 'cycleStagedImage' });
 
     expect(getActiveProject(state).canvas.stagingArea.selectedImageIndex).toBe(1);
@@ -6495,7 +6499,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(createDraftProject([]).settings.viewerAutoSwitch).toBe('progress');
   });
 
-  it('clears the Gallery selection while keeping the compare image and navigation stamp', () => {
+  it('clears the Gallery selection and its comparison, keeping the navigation stamp', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
@@ -6510,8 +6514,367 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.selectedImage).toBeNull();
     expect(values.selectedImageName).toBeNull();
     expect(values.selectedImageNames).toEqual([]);
-    expect(values.compareImage).toMatchObject({ name: 'compare.png' });
+    // A comparison left behind would open again on whatever image is selected next.
+    expect(values.compareImage).toBeNull();
     expect(values.selectedImageQuery).toBeDefined();
+  });
+
+  describe('a comparison waiting for its second image', () => {
+    const galleryValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    // Select for compare on the shown image: the comparison image is the selection itself until another is picked.
+    const arm = (name = 'base.png') => {
+      const base = createGalleryImageItem(name);
+      let state = workbenchReducer(createInitialWorkbenchState(), { item: base, type: 'selectGalleryItem' });
+
+      state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+      return state;
+    };
+
+    it('compares the next image picked against it', () => {
+      const state = workbenchReducer(arm(), { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: { name: 'base.png' },
+        selectedImageName: 'image:other.png',
+      });
+    });
+
+    it('is cancelled by a multi-selection, whether toggled or ranged', () => {
+      const toggled = workbenchReducer(arm(), {
+        item: createGalleryImageItem('other.png'),
+        nextPrimaryItem: null,
+        type: 'toggleGalleryItemInSelection',
+      });
+      const ranged = workbenchReducer(arm(), {
+        itemKeys: ['image:base.png', 'image:other.png'],
+        primaryItem: createGalleryImageItem('other.png'),
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(galleryValues(toggled).compareImage).toBeNull();
+      expect(galleryValues(toggled).selectedImageNames).toEqual(['image:base.png', 'image:other.png']);
+      expect(galleryValues(ranged).compareImage).toBeNull();
+    });
+
+    it('keeps an open comparison through a multi-selection, as before', () => {
+      let state = workbenchReducer(arm(), { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+
+      state = workbenchReducer(state, {
+        item: createGalleryImageItem('third.png'),
+        nextPrimaryItem: null,
+        type: 'toggleGalleryItemInSelection',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'base.png' });
+    });
+
+    it('is cancelled, not consumed, by a result Auto-switch selects', () => {
+      let state = primeGenerate();
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = submitGenerate(state);
+      const queueItem = getActiveProject(state).queue.items[0]!;
+      const base = createGalleryImageItem('base.png');
+
+      state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+      state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+      // Arming turned Auto-switch Off; the user turns it back on before the run finishes.
+      state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'latest' }, type: 'setActiveProjectSettings' });
+      state = workbenchReducer(state, {
+        images: [createImage('result.png', queueItem.id)],
+        projectId: getActiveProject(state).id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+      expect(galleryValues(state)).toMatchObject({ compareImage: null, selectedImageName: 'image:result.png' });
+    });
+
+    it.each(['progress', 'latest'] as const)(
+      'is ended by turning Auto-switch back on (%s), so live frames never hide it',
+      (mode) => {
+        let state = primeGenerate();
+        state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+        state = submitGenerate(state);
+        const queueItem = getActiveProject(state).queue.items[0]!;
+        const base = createGalleryImageItem('base.png');
+
+        state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+        state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+        expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+        // Following the run's live frames again (the Auto-switch menu, or a progress tile) ends the wait at once.
+        state = workbenchReducer(state, { settings: { viewerAutoSwitch: mode }, type: 'setActiveProjectSettings' });
+        expect(galleryValues(state).compareImage).toBeNull();
+
+        // Picking another image mid-run, then the result arriving, opens no comparison.
+        state = workbenchReducer(state, { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+        state = workbenchReducer(state, {
+          images: [createImage('result.png', queueItem.id)],
+          projectId: getActiveProject(state).id,
+          queueItemId: queueItem.id,
+          type: 'routeQueueItemResults',
+        });
+        expect(galleryValues(state).compareImage).toBeNull();
+      }
+    );
+
+    it('is cancelled by deleting the image it waits with', () => {
+      const state = workbenchReducer(arm(), { itemKeys: ['image:base.png'], type: 'removeGalleryItems' });
+
+      expect(galleryValues(state).compareImage).toBeNull();
+    });
+  });
+
+  describe('deleting the shown image of an open comparison', () => {
+    const galleryValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    const compareWithReference = () => {
+      const state = workbenchReducer(createInitialWorkbenchState(), {
+        item: createGalleryImageItem('candidate-1.png'),
+        type: 'selectGalleryItem',
+      });
+
+      return workbenchReducer(state, {
+        image: createGalleryImageItem('reference.png'),
+        type: 'setGalleryCompareImage',
+      });
+    };
+
+    it('keeps the comparison for the next candidate the deletion selects', () => {
+      // Culling: each rejected candidate is deleted, and the next one shows against the same reference.
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'reference.png' });
+      state = workbenchReducer(state, { item: createGalleryImageItem('candidate-2.png'), type: 'selectGalleryItem' });
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: { name: 'reference.png' },
+        selectedImageName: 'image:candidate-2.png',
+      });
+    });
+
+    it('ends the comparison when no next image follows, so a later selection opens none', () => {
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state)).toMatchObject({ compareImage: null, selectedImage: null });
+      state = workbenchReducer(state, { item: createGalleryImageItem('later.png'), type: 'selectGalleryItem' });
+      expect(galleryValues(state).compareImage).toBeNull();
+    });
+
+    it('keeps the comparison when the selection survives the deletion', () => {
+      const state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:unrelated.png'],
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'reference.png' });
+    });
+
+    it.each<[string, `image:${string}`[]]>([
+      ['selected alone', ['image:reference.png']],
+      ['selected beside an item that failed to delete', ['image:candidate-2.png', 'image:reference.png']],
+    ])('ends the comparison when the next image is the comparison image, %s', (_case, itemKeys) => {
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      state = workbenchReducer(state, {
+        itemKeys,
+        primaryItem: createGalleryImageItem('reference.png'),
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: null,
+        selectedImageName: 'image:reference.png',
+        selectedImageNames: itemKeys,
+      });
+    });
+
+    it('ends the comparison when a plain selection of the comparison image follows', () => {
+      let state = workbenchReducer(compareWithReference(), {
+        itemKeys: ['image:candidate-1.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      state = workbenchReducer(state, { item: createGalleryImageItem('reference.png'), type: 'selectGalleryItem' });
+
+      expect(galleryValues(state)).toMatchObject({ compareImage: null, selectedImageName: 'image:reference.png' });
+    });
+  });
+
+  describe('a multi-selection landing on the comparison image of an open comparison', () => {
+    const galleryValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    // Compare base.png (the comparison image) against other.png (the selection).
+    const compare = () => {
+      const base = createGalleryImageItem('base.png');
+      let state = workbenchReducer(createInitialWorkbenchState(), { item: base, type: 'selectGalleryItem' });
+
+      state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+      return workbenchReducer(state, { item: createGalleryImageItem('other.png'), type: 'selectGalleryItem' });
+    };
+
+    it('ends the comparison on a Ctrl/Cmd-click of the comparison image, keeping the selection made', () => {
+      const state = workbenchReducer(compare(), {
+        item: createGalleryImageItem('base.png'),
+        nextPrimaryItem: null,
+        type: 'toggleGalleryItemInSelection',
+      });
+
+      // Not a comparison waiting for another image: the next plain click opens none.
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: null,
+        selectedImageName: 'image:base.png',
+        selectedImageNames: ['image:other.png', 'image:base.png'],
+      });
+      expect(
+        galleryValues(workbenchReducer(state, { item: createGalleryImageItem('third.png'), type: 'selectGalleryItem' }))
+          .compareImage
+      ).toBeNull();
+    });
+
+    it('ends the comparison on a range ending on the comparison image', () => {
+      const state = workbenchReducer(compare(), {
+        itemKeys: ['image:other.png', 'image:between.png', 'image:base.png'],
+        primaryItem: createGalleryImageItem('base.png'),
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: null,
+        selectedImageName: 'image:base.png',
+        selectedImageNames: ['image:other.png', 'image:between.png', 'image:base.png'],
+      });
+    });
+
+    it('keeps the comparison for a range that holds the comparison image but ends elsewhere', () => {
+      const state = workbenchReducer(compare(), {
+        itemKeys: ['image:base.png', 'image:between.png', 'image:third.png'],
+        primaryItem: createGalleryImageItem('third.png'),
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(galleryValues(state)).toMatchObject({
+        compareImage: { name: 'base.png' },
+        selectedImageName: 'image:third.png',
+      });
+    });
+
+    it('keeps a waiting comparison restored together with its selection', () => {
+      const base = createGalleryImageItem('base.png');
+      // A rollback writes the selection and the comparison image back in one patch: the wait it restores stays.
+      const state = workbenchReducer(createInitialWorkbenchState(), {
+        type: 'patchWidgetValues',
+        values: {
+          compareImage: base,
+          selectedImage: base,
+          selectedImageName: 'image:base.png',
+          selectedImageNames: ['image:base.png'],
+        },
+        widgetId: 'gallery',
+      });
+
+      expect(galleryValues(state).compareImage).toMatchObject({ name: 'base.png' });
+    });
+  });
+
+  describe('deleting an image shown in another project', () => {
+    const galleryValues = (state: WorkbenchState, projectId: string) =>
+      getProjectWidgetValues(getProject(state, projectId), 'gallery');
+    // The deleting project compares x.png against reference.png; the other compares x.png against y.png.
+    const twoComparisons = () => {
+      let state = createInitialWorkbenchState();
+      const deletingProjectId = state.activeProjectId;
+
+      state = workbenchReducer(state, { item: createGalleryImageItem('x.png'), type: 'selectGalleryItem' });
+      state = workbenchReducer(state, {
+        image: createGalleryImageItem('reference.png'),
+        type: 'setGalleryCompareImage',
+      });
+      state = workbenchReducer(state, { type: 'createProject' });
+      const otherProjectId = state.activeProjectId;
+
+      state = workbenchReducer(state, { item: createGalleryImageItem('x.png'), type: 'selectGalleryItem' });
+      state = workbenchReducer(state, { image: createGalleryImageItem('y.png'), type: 'setGalleryCompareImage' });
+      state = workbenchReducer(state, { projectId: deletingProjectId, type: 'switchProject' });
+
+      return { deletingProjectId, otherProjectId, state };
+    };
+
+    it('keeps the comparison for the successor only in the deleting project', () => {
+      const { deletingProjectId, otherProjectId, state: compared } = twoComparisons();
+      let state = workbenchReducer(compared, {
+        itemKeys: ['image:x.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state, deletingProjectId).compareImage).toMatchObject({ name: 'reference.png' });
+      // No successor is selected there, so no comparison is left to open on its next selection.
+      expect(galleryValues(state, otherProjectId)).toMatchObject({
+        compareImage: null,
+        selectedImage: null,
+        selectedImageName: null,
+        selectedImageNames: [],
+      });
+
+      state = workbenchReducer(state, {
+        item: createGalleryImageItem('later.png'),
+        projectId: otherProjectId,
+        type: 'selectGalleryItem',
+      });
+      expect(galleryValues(state, otherProjectId).compareImage).toBeNull();
+    });
+
+    it('scopes the kept comparison to the project named, whichever is active', () => {
+      const { deletingProjectId, otherProjectId, state: compared } = twoComparisons();
+      const state = workbenchReducer(workbenchReducer(compared, { projectId: otherProjectId, type: 'switchProject' }), {
+        itemKeys: ['image:x.png'],
+        keepComparisonForSuccessor: true,
+        projectId: deletingProjectId,
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state, deletingProjectId).compareImage).toMatchObject({ name: 'reference.png' });
+      expect(galleryValues(state, otherProjectId).compareImage).toBeNull();
+    });
+
+    it("ends another project's comparison when its comparison image is deleted", () => {
+      const { deletingProjectId, otherProjectId, state: compared } = twoComparisons();
+      const state = workbenchReducer(compared, {
+        itemKeys: ['image:y.png'],
+        keepComparisonForSuccessor: true,
+        type: 'removeGalleryItems',
+      });
+
+      expect(galleryValues(state, otherProjectId)).toMatchObject({
+        compareImage: null,
+        selectedImageName: 'image:x.png',
+      });
+      expect(galleryValues(state, deletingProjectId).compareImage).toMatchObject({ name: 'reference.png' });
+    });
+  });
+
+  it('swaps an open comparison when its comparison image is picked', () => {
+    const base = createGalleryImageItem('base.png');
+    const viewing = createGalleryImageItem('viewing.png');
+    let state = workbenchReducer(createInitialWorkbenchState(), { item: viewing, type: 'selectGalleryItem' });
+
+    state = workbenchReducer(state, { image: base, type: 'setGalleryCompareImage' });
+    state = workbenchReducer(state, { item: base, type: 'selectGalleryItem' });
+
+    // The pair stays open with its sides exchanged, rather than collapsing into a comparison waiting for an image.
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).toMatchObject({
+      compareImage: { name: 'viewing.png' },
+      selectedImageName: 'image:base.png',
+    });
   });
 
   it('preserves a manually selected image when later Gallery results arrive', () => {
@@ -9772,7 +10135,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(selectedSlot).toMatchObject({ itemIndex: 1, kind: 'candidate' });
   });
 
-  it("'off' keeps a later placeholder selected when an earlier partial result arrives", () => {
+  it('follows a picked generating slot (In progress) when an earlier partial result arrives', () => {
     let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
     const project = getActiveProject(state);
     const queueItem = project.queue.items[0];
@@ -9798,9 +10161,10 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     ];
 
     expect(selectedSlot).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    expect(updatedProject.canvas.stagingArea.autoSwitchMode).toBe('progress');
   });
 
-  it("'off' keeps a later placeholder selected when an earlier partial has no visible images", () => {
+  it('follows a picked generating slot (In progress) when an earlier partial has no visible images', () => {
     let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
     const project = getActiveProject(state);
     const queueItem = project.queue.items[0];
@@ -9826,6 +10190,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     ];
 
     expect(selectedSlot).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    expect(updatedProject.canvas.stagingArea.autoSwitchMode).toBe('progress');
   });
 
   it("'off' keeps a candidate selected when an earlier final result has no visible images", () => {
@@ -9904,10 +10269,23 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(selectedSlot).toMatchObject({ candidate: { imageName: 'candidate-1.png' }, kind: 'candidate' });
   });
 
-  it("'progress' selects the active in-progress placeholder", () => {
+  const selectedStagingSlot = (state: WorkbenchState) => {
+    const project = getActiveProject(state);
+
+    return getCanvasStagingSlots(project.canvas, project.queue.items)[project.canvas.stagingArea.selectedImageIndex];
+  };
+
+  it("'progress' keeps each finished result on screen until the next image's first frame", () => {
     let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
     const project = getActiveProject(state);
     const queueItem = project.queue.items[0];
+    const firstFrame = (itemIndex: number) =>
+      workbenchReducer(state, {
+        itemIndex,
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'noteQueueItemFirstProgressFrame',
+      });
 
     state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
     state = workbenchReducer(state, {
@@ -9916,15 +10294,108 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       queueItemId: queueItem.id,
       type: 'markQueueItemBackendSubmitted',
     });
+    state = firstFrame(1);
+    expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 1, kind: 'placeholder' });
 
-    expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('progress');
-    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(0);
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [createImage('candidate-1.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    // The second image is loading its model: the first one's result stays shown and selected.
+    expect(selectedStagingSlot(state)).toMatchObject({
+      candidate: { imageName: 'candidate-1.png' },
+      kind: 'candidate',
+    });
+
+    state = firstFrame(2);
+    expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    // Later frames of the slot already shown change nothing.
+    expect(firstFrame(2)).toBe(state);
   });
 
-  it("'progress' advances selection to the next in-progress placeholder as partials land", () => {
+  it("'progress' leaves the shown result for a new run only once that run's first frame arrives", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 1 }));
+    const firstQueueItem = getActiveProject(state).queue.items[0];
+
+    state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      images: [createImage('first-result.png', firstQueueItem.id)],
+      projectId: state.activeProjectId,
+      queueItemId: firstQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = submitGenerate(primeGenerate(state, { batchCount: 2, positivePrompt: 'second prompt' }));
+    const secondQueueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      backendItemIds: [21, 22],
+      projectId: state.activeProjectId,
+      queueItemId: secondQueueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+
+    expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first-result.png' } });
+
+    state = workbenchReducer(state, {
+      itemIndex: 1,
+      projectId: state.activeProjectId,
+      queueItemId: secondQueueItem.id,
+      type: 'noteQueueItemFirstProgressFrame',
+    });
+
+    expect(selectedStagingSlot(state)).toMatchObject({
+      itemIndex: 1,
+      kind: 'placeholder',
+      queueItemId: secondQueueItem.id,
+    });
+  });
+
+  it("'progress' keeps a slot that is still generating on screen when another slot's result lands", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 2 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    // Two GPUs: the second image streams while the first one finishes.
+    state = workbenchReducer(state, {
+      itemIndex: 2,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'noteQueueItemFirstProgressFrame',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [createImage('candidate-1.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+
+    expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+  });
+
+  it.each([
+    ['canceled', { backendItemId: 12, type: 'markQueueItemBackendCancelled' as const }],
+    ['finished without an image', { backendItemId: 12, images: [], type: 'routeQueueItemPartialResults' as const }],
+  ])("'progress' falls back to the newest result when the followed slot is %s", (_label, ending) => {
     let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
     const project = getActiveProject(state);
     const queueItem = project.queue.items[0];
+    const firstFrame = (itemIndex: number) =>
+      workbenchReducer(state, {
+        itemIndex,
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'noteQueueItemFirstProgressFrame',
+      });
 
     state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
     state = workbenchReducer(state, {
@@ -9940,11 +10411,254 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       queueItemId: queueItem.id,
       type: 'routeQueueItemPartialResults',
     });
+    state = firstFrame(2);
+    state = workbenchReducer(state, { ...ending, projectId: project.id, queueItemId: queueItem.id });
 
-    expect(
-      getCanvasStagingSlots(getCanvas(state), getActiveProject(state).queue.items).map((slot) => slot.kind)
-    ).toEqual(['candidate', 'placeholder', 'placeholder']);
-    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(1);
+    // Not the third image's placeholder, which slid into the index and has no frame yet.
+    expect(selectedStagingSlot(state)).toMatchObject({
+      candidate: { imageName: 'candidate-1.png' },
+      kind: 'candidate',
+    });
+  });
+
+  describe('picking a slot steers Auto-switch as Preview does', () => {
+    const startBatch = (mode: 'latest' | 'off' | 'progress') => {
+      let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0]!;
+      state = workbenchReducer(state, { mode, type: 'setCanvasStagingAutoSwitch' });
+      state = workbenchReducer(state, {
+        backendItemIds: [11, 12, 13],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'markQueueItemBackendSubmitted',
+      });
+      const land = (current: WorkbenchState, backendItemId: number, imageName: string) =>
+        workbenchReducer(current, {
+          backendItemId,
+          images: [createImage(imageName, queueItem.id)],
+          projectId: project.id,
+          queueItemId: queueItem.id,
+          type: 'routeQueueItemPartialResults',
+        });
+      const firstFrame = (current: WorkbenchState, itemIndex: number) =>
+        workbenchReducer(current, {
+          itemIndex,
+          projectId: project.id,
+          queueItemId: queueItem.id,
+          type: 'noteQueueItemFirstProgressFrame',
+        });
+      return { firstFrame, land, state };
+    };
+
+    it.each(['latest', 'progress'] as const)(
+      "picking a finished result under '%s' pauses Auto-switch: later results and frames leave it shown",
+      (mode) => {
+        const { firstFrame, land, state: started } = startBatch(mode);
+        let state = land(land(started, 11, 'first.png'), 12, 'second.png');
+        expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'second.png' } });
+
+        // Click off the newest onto the older result.
+        state = workbenchReducer(state, { imageIndex: 0, type: 'setStagedImageIndex' });
+        expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('off');
+        state = land(firstFrame(state, 3), 13, 'third.png');
+
+        expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+      }
+    );
+
+    it('stepping onto a finished result pauses Auto-switch as clicking it does', () => {
+      const { land, state: started } = startBatch('latest');
+      let state = land(land(started, 11, 'first.png'), 12, 'second.png');
+
+      state = workbenchReducer(state, { direction: -1, type: 'cycleStagedImage' });
+
+      expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('off');
+      expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+    });
+
+    it("the canvas stepping keys' step onto the image still generating follows it", () => {
+      const { land, state: started } = startBatch('latest');
+      let state = land(land(started, 11, 'first.png'), 12, 'second.png');
+
+      // What ← / → and Alt+[ / Alt+] on the canvas dispatch (`canvasHotkeyCommands`).
+      state = workbenchReducer(state, { direction: 1, type: 'cycleStagedImage' });
+
+      expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('progress');
+      expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 3, kind: 'placeholder' });
+    });
+
+    it.each(['off', 'latest', 'progress'] as const)(
+      "picking a generating slot under '%s' turns Auto-switch to In progress and pins it over newer slots",
+      (mode) => {
+        const { firstFrame, land, state: started } = startBatch(mode);
+        let state = workbenchReducer(started, { imageIndex: 1, type: 'setStagedImageIndex' });
+        expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('progress');
+
+        // Another slot (a second GPU) shows its first frame, and a result lands: the picked slot stays.
+        state = land(firstFrame(state, 3), 11, 'first.png');
+        expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+
+        // Its own result releases the pin: the slot already streaming beside it is followed at once.
+        state = land(state, 12, 'second.png');
+        expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 3, kind: 'placeholder' });
+      }
+    );
+
+    it('follows the image already streaming when In progress is chosen from the menu', () => {
+      const { firstFrame, land, state: started } = startBatch('latest');
+      let state = land(started, 11, 'first.png');
+      state = workbenchReducer(state, { imageIndex: 0, type: 'setStagedImageIndex' });
+      state = firstFrame(state, 2);
+      expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+
+      state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+
+      expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    });
+
+    it('follows another slot already streaming when the followed slot ends (two GPUs)', () => {
+      const { firstFrame, land, state: started } = startBatch('progress');
+      let state = firstFrame(firstFrame(started, 1), 2);
+      // The newest slot showing frames is followed.
+      expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+
+      state = land(state, 12, 'second.png');
+
+      expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 1, kind: 'placeholder' });
+    });
+
+    it('lets no placeholder without a frame keep the selection under In progress when a result lands', () => {
+      const { land, state: started } = startBatch('off');
+      // Selected only because nothing else was staged.
+      expect(selectedStagingSlot(started)).toMatchObject({ itemIndex: 1, kind: 'placeholder' });
+      let state = workbenchReducer(started, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+
+      state = land(state, 12, 'second.png');
+
+      expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'second.png' } });
+    });
+
+    it.each(['latest', 'progress'] as const)(
+      "under '%s', a discard that would leave a placeholder without a frame selected shows the newest result",
+      (mode) => {
+        const { land, state: started } = startBatch(mode);
+        let state = land(land(started, 11, 'first.png'), 12, 'second.png');
+        expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'second.png' } });
+
+        // The third image, next in the slots, has not shown a frame.
+        state = workbenchReducer(state, { type: 'discardSelectedStagedImage' });
+
+        expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+      }
+    );
+
+    it("under 'off', a landed result takes the selection only while no result is selected", () => {
+      const { land, state: started } = startBatch('off');
+      // A placeholder the reducer selected, not the user: no result is selected.
+      let state = {
+        ...started,
+        projects: started.projects.map((project) =>
+          project.id === started.activeProjectId
+            ? {
+                ...project,
+                canvas: { ...project.canvas, stagingArea: { ...project.canvas.stagingArea, selectedImageIndex: 1 } },
+              }
+            : project
+        ),
+      };
+
+      state = land(state, 11, 'first.png');
+      expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+      state = land(state, 12, 'second.png');
+      expect(selectedStagingSlot(state)).toMatchObject({ candidate: { imageName: 'first.png' } });
+    });
+
+    it('releases the pin when the mode is set from the menu, and keeps it out of the project', () => {
+      const { firstFrame, state: started } = startBatch('progress');
+      let state = workbenchReducer(started, { imageIndex: 1, type: 'setStagedImageIndex' });
+      expect(state.canvasStagingFollow?.[state.activeProjectId]?.pinnedSlotId).toBeTruthy();
+      expect(JSON.stringify(getActiveProject(state))).not.toContain('pinnedSlotId');
+
+      state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+      expect(state.canvasStagingFollow?.[state.activeProjectId]?.pinnedSlotId ?? null).toBeNull();
+      state = firstFrame(state, 3);
+
+      expect(selectedStagingSlot(state)).toMatchObject({ itemIndex: 3, kind: 'placeholder' });
+    });
+  });
+
+  it('keeps each open project its own follow state, and drops it with the project', () => {
+    const startRun = (current: WorkbenchState) => {
+      let state = submitGenerate(primeGenerate(withInvocationDestination(current, 'canvas'), { batchCount: 2 }));
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0]!;
+      state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+      state = workbenchReducer(state, {
+        backendItemIds: [11, 12],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'markQueueItemBackendSubmitted',
+      });
+      return { projectId: project.id, queueItemId: queueItem.id, state };
+    };
+    const selectedIn = (state: WorkbenchState, projectId: string) => {
+      const project = state.projects.find((candidate) => candidate.id === projectId)!;
+      return getCanvasStagingSlots(project.canvas, project.queue.items)[project.canvas.stagingArea.selectedImageIndex];
+    };
+    const a = startRun(createInitialWorkbenchState());
+    // Pin the second image of A, then open B and start a run there.
+    let state = workbenchReducer(a.state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, { type: 'createProject' });
+    const b = startRun(state);
+    state = b.state;
+
+    // A first frame in A, now in the background, is recorded and followed there; B is left alone.
+    state = workbenchReducer(state, {
+      itemIndex: 1,
+      projectId: a.projectId,
+      queueItemId: a.queueItemId,
+      type: 'noteQueueItemFirstProgressFrame',
+    });
+    expect(state.canvasStagingFollow?.[a.projectId]?.framedSlotIds).toEqual([`${a.queueItemId}:0`]);
+    // A's pin holds over its first image's frame.
+    expect(selectedIn(state, a.projectId)).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+    expect(state.canvasStagingFollow?.[b.projectId]).toBeUndefined();
+
+    // A pick in B pins B's slot and leaves A's pin as it was.
+    state = workbenchReducer(state, { imageIndex: 0, type: 'setStagedImageIndex' });
+    expect(state.canvasStagingFollow?.[b.projectId]?.pinnedSlotId).toBe(`${b.queueItemId}:0`);
+    expect(state.canvasStagingFollow?.[a.projectId]?.pinnedSlotId).toBe(`${a.queueItemId}:1`);
+
+    // Closing A takes its follow state with it.
+    state = workbenchReducer(state, { projectId: a.projectId, type: 'closeProject' });
+    expect(state.canvasStagingFollow?.[a.projectId]).toBeUndefined();
+    expect(state.canvasStagingFollow?.[b.projectId]?.pinnedSlotId).toBe(`${b.queueItemId}:0`);
+  });
+
+  it.each(['off', 'latest'] as const)("'%s' keeps its selection when a slot shows its first frame", (mode) => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 2 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, { mode, type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+
+    const next = workbenchReducer(state, {
+      itemIndex: 2,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'noteQueueItemFirstProgressFrame',
+    });
+
+    // The frame is remembered for In progress, outside the project; the project and its selection stay as they were.
+    expect(getActiveProject(next)).toBe(getActiveProject(state));
+    expect(next.canvasStagingFollow?.[project.id]?.framedSlotIds).toEqual([`${queueItem.id}:1`]);
   });
 
   const createCanvasGenerateSnapshot = () => ({

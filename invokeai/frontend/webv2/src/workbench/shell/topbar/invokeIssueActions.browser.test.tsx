@@ -265,4 +265,29 @@ describe('useInvokeIssueActions', () => {
       videoPrompt.remove();
     }
   });
+
+  it("opens Upscale and its Detail guidance, and focuses Upscale's prompt, not Generate's", async () => {
+    await patchWorkbenchPreferences({ generateSectionsOpen: { upscaleDetailGuidance: false } });
+    const generatePrompt = document.createElement('textarea');
+    const upscalePrompt = document.createElement('textarea');
+    document.body.append(generatePrompt, upscalePrompt);
+    registerPositivePromptElement('generate', generatePrompt, null);
+    registerPositivePromptElement('upscale', upscalePrompt, null);
+
+    try {
+      await run(
+        { message: 'The prompt could not be expanded.', target: { kind: 'prompt', widgetId: 'upscale' } },
+        'show'
+      );
+      await expect.poll(() => document.activeElement).toBe(upscalePrompt);
+
+      expect(getWorkbenchPreferences().generateSectionsOpen.upscaleDetailGuidance).toBe(true);
+      expect(isPlaced('upscale')).toBe(true);
+    } finally {
+      registerPositivePromptElement('generate', null, generatePrompt);
+      registerPositivePromptElement('upscale', null, upscalePrompt);
+      generatePrompt.remove();
+      upscalePrompt.remove();
+    }
+  });
 });

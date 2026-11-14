@@ -1,14 +1,16 @@
 import type { ChangeEvent, FocusEvent, ReactNode } from 'react';
 
-import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Menu, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { focusSearchOnSlash } from '@platform/browser/searchShortcut';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ArrowLeftIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react';
+import { ArrowLeftIcon, PlusIcon, RotateCcwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button, IconButton } from './Button';
+import { MenuActionItem } from './Menu';
 import { isModalPresent } from './modalPresence';
-import { Tooltip } from './Tooltip';
+import { Tooltip, useTooltipTriggerIds } from './Tooltip';
 
 /**
  * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when
@@ -427,6 +429,95 @@ export const ManagerSearchField = ({
         onChange={change}
       />
     </InputGroup>
+  );
+};
+
+/**
+ * Trimmed to the digits' cap height and baseline, the count's box is its ink, so the badge's flex centring centres the
+ * digits; untrimmed, the font's descender room lifts them off centre.
+ */
+const FILTER_COUNT_TEXT: SystemStyleObject = { textBox: 'trim-both cap alphabetic' };
+
+/**
+ * The manager toolbar's filter menu: an icon-only trigger, named and tooltipped by `label`, opening `children` (the
+ * menu's portalled positioner and content). It owns the menu root so the root and the trigger's tooltip share one
+ * trigger id. A count badge on the trigger's corner says how many filters narrow the list, so filtering shows with the
+ * menu closed; sort order is not a filter and is not counted. The name ends with the count, so the visible digits stay
+ * part of it (label in name; a parenthetical would not count).
+ */
+export const ManagerFilterMenu = ({
+  activeCount,
+  children,
+  label,
+  ...rootProps
+}: Omit<Menu.RootProps, 'children' | 'ids'> & {
+  activeCount: number;
+  children: ReactNode;
+  label: string;
+}) => {
+  const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
+  const isFiltered = activeCount > 0;
+  const name = isFiltered ? `${label}, ${t('common.activeFilterCount', { count: activeCount })}` : label;
+
+  return (
+    <Menu.Root ids={ids} {...rootProps}>
+      <Tooltip content={name} ids={ids}>
+        <Menu.Trigger asChild>
+          <IconButton aria-label={name} color="fg.muted" flexShrink={0} variant="outline">
+            <Icon as={SlidersHorizontalIcon} boxSize="4" />
+            {isFiltered ? (
+              <Box
+                aria-hidden
+                alignItems="center"
+                bg="accent.solid"
+                color="accent.contrast"
+                display="flex"
+                fontSize="xs"
+                fontWeight="semibold"
+                h="4"
+                justifyContent="center"
+                minW="4"
+                outline="2px solid"
+                outlineColor="bg"
+                pointerEvents="none"
+                position="absolute"
+                px="1"
+                right="-2.5"
+                rounded="full"
+                top="-2.5"
+              >
+                <Box as="span" css={FILTER_COUNT_TEXT}>
+                  {activeCount}
+                </Box>
+              </Box>
+            ) : null}
+          </IconButton>
+        </Menu.Trigger>
+      </Tooltip>
+      {children}
+    </Menu.Root>
+  );
+};
+
+/**
+ * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterMenu` counts and
+ * leaves sort order and search alone. Disabled while none is active.
+ */
+export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: number; onReset: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <Menu.Separator />
+      <MenuActionItem
+        disabled={activeCount === 0}
+        icon={RotateCcwIcon}
+        label={t('common.resetFilters')}
+        value="reset-filters"
+        onSelect={onReset}
+      />
+    </>
   );
 };
 

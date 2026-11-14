@@ -86,6 +86,7 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isCompareArmed: false,
     isSearchActive: false,
     items: [],
     listingBoardId: 'dogs',

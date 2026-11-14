@@ -253,8 +253,8 @@ export interface Tool {
    * Whether a primary gesture starting now edits the selected layer in place, writing its pixels or its placement:
    * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture
    * starts, before the press reaches the tool; absent means not known then (a tool that decides from the press's
-   * modifiers or later calls {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a mask or a region, the screen shows
-   * their stacks above a staged preview that otherwise hides them.
+   * modifiers or later calls {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a control
+   * layer, a mask or a region, the screen shows their stacks above a staged preview that otherwise hides them.
    */
   editsSelectedLayer?(ctx: ToolContext): boolean;
 }

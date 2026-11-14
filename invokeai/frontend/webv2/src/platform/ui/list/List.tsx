@@ -93,6 +93,11 @@ export interface ListProps<T> {
   renderItem: (item: T, rowProps: ListRowProps) => ReactNode;
   /** Key of the row whose detail is open; it is the initial keyboard target. */
   activeKey?: string | null;
+  /**
+   * Keyboard target while no row has been focused and none is active, such as the first row that can be used when
+   * earlier ones are disabled; without it, the first row.
+   */
+  defaultFocusKey?: string | null;
   /** Row pitch; fixed for the list's lifetime, so change it with a keyed remount. */
   density?: ListDensity;
   /**
@@ -142,8 +147,25 @@ const primaryOf = (viewport: HTMLElement, key: string): HTMLElement | null =>
  * Virtualized list with pinned section headers and a roving tabindex. Headers and items share one flat index
  * space; the header at the top of the visible range renders in flow as a sticky element, pushed out by the next.
  */
+/** Inputs whose arrows, Home and End do nothing of their own: a row's selection checkbox and button-like inputs. */
+const KEYLESS_INPUT_TYPES = new Set(['button', 'checkbox', 'color', 'file', 'image', 'reset', 'submit']);
+
+/**
+ * Whether a focused control uses ArrowUp, ArrowDown, Home and End itself: a field in a row (a title editor moves its
+ * caret), a select, or a radio or range input. The List leaves those keys to it and moves between rows from anything
+ * else, the selection checkbox included.
+ */
+const usesNavigationKeys = (target: HTMLElement): boolean => {
+  if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+    return true;
+  }
+
+  return target instanceof HTMLInputElement && !KEYLESS_INPUT_TYPES.has(target.type);
+};
+
 export const List = <T,>({
   activeKey = null,
+  defaultFocusKey = null,
   density = 'regular',
   dividers = false,
   emptyState,
@@ -197,14 +219,16 @@ export const List = <T,>({
   const isMeasured = rowHeight === 'measured';
   const hasHeaders = headerIndexes.length > 0;
 
-  // The roving target survives filtering: fall back to the active row, then the first item.
+  // The roving target survives filtering: fall back to the active row, then the default one, then the first item.
   const focusKeyIsStale = focusKey !== null && !indexByKey.has(focusKey);
   const resolvedFocusKey =
     !focusKeyIsStale && focusKey !== null
       ? focusKey
       : activeKey !== null && indexByKey.has(activeKey)
         ? activeKey
-        : firstItemKey;
+        : defaultFocusKey !== null && indexByKey.has(defaultFocusKey)
+          ? defaultFocusKey
+          : firstItemKey;
   const focusIndex = resolvedFocusKey === null ? -1 : (indexByKey.get(resolvedFocusKey) ?? -1);
 
   // Keep the pinned header and the focused row mounted whatever the scroll position: focus must never fall off
@@ -319,7 +343,9 @@ export const List = <T,>({
   );
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.defaultPrevented || !(event.target as HTMLElement).closest('[data-list-row]')) {
+      const target = event.target as HTMLElement;
+
+      if (event.defaultPrevented || !target.closest('[data-list-row]') || usesNavigationKeys(target)) {
         return;
       }
 

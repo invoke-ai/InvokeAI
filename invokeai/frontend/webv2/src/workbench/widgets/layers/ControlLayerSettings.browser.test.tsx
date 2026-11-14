@@ -4,6 +4,7 @@ import type {
   CanvasLayerContract,
   CanvasLayerPreviewMutation,
 } from '@workbench/canvas-engine/api';
+import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 import type { ControlLayerIntent, ControlLayerIntentResult } from '@workbench/canvas-operations/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -15,7 +16,8 @@ import { toaster } from '@platform/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
-import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel, getDocumentLayer } from '@workbench/canvas-engine/api';
+import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { previewInverse } from '@workbench/canvas-engine/document-model/documentModel';
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
@@ -24,7 +26,7 @@ import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { normalizeControlAdapter } from '@workbench/controlAdapters';
 import { resetPropertyGroupCollapse } from '@workbench/widgets/canvas/tool-presentation/propertyGroupStore';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -201,6 +203,11 @@ const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): 
     projectId: 'test-project',
     tools: { setTool: vi.fn() },
   } as unknown as Engine;
+  attachOperations(engine);
+  return engine;
+};
+
+const attachOperations = (engine: Engine): void => {
   attachCanvasOperations(engine, {
     applyControlLayerIntent: (_layerId: string, intent: ControlLayerIntent) => {
       intents.push(intent);
@@ -213,7 +220,6 @@ const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): 
     },
     subscribeControlDetectionStatus: statuses.subscribe,
   } as never);
-  return engine;
 };
 
 const render = async (
@@ -843,6 +849,236 @@ describe('ControlLayerSettings adapter rows', () => {
   });
 });
 
+describe('ControlLayerSettings adapter gestures on the live document', () => {
+  let stub: StructuralEngineStub;
+  let liveEngine: Engine;
+  const live = () => getDocumentLayer(stub.document(), 'control-1') as CanvasControlLayerContract;
+
+  /** The panel as the Properties pane shows it: re-rendered from the document each preview reaches. */
+  const LiveSettings = () => {
+    const layer = useSyncExternalStore(stub.subscribe, live);
+    return <ControlLayerSettings engine={liveEngine} layer={layer} />;
+  };
+
+  const renderLive = async (adapter: Partial<CanvasControlLayerContract['adapter']>) => {
+    stub = createStructuralEngineStub({
+      layers: [
+        detectedLayer('depth', 'depth_anything_depth_estimation', {
+          adapter: { ...controlLayer().adapter, ...adapter },
+        }),
+      ],
+      // Previews reach the document at once, as a settled frame would deliver them before the release.
+      schedulePreview: (flush) => {
+        flush();
+        return () => undefined;
+      },
+    });
+    liveEngine = {
+      ...stub.engine,
+      document: { ...stub.engine.document, getDocument: () => stub.document() },
+      exports: { exportRasterComposite: () => ({ status: 'empty' }), hasExportableLayerContent: () => true },
+      interaction: { get: () => false, subscribe: () => () => undefined },
+      lifecycle: { flushPendingUploads: () => Promise.resolve() },
+      tools: { setTool: vi.fn() },
+    } as unknown as Engine;
+    attachOperations(liveEngine);
+    applyThemeToRoot(DEFAULT_THEME_ID);
+    host = document.createElement('div');
+    host.style.width = '320px';
+    document.body.append(host);
+    root = createRoot(host);
+    await settle(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <LiveSettings />
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+  };
+
+  /** Drives the slider whose thumb is `thumbName` through `fractions` of its track, pressing at the first. */
+  const dragSlider = async (
+    thumbName: string,
+    fractions: number[],
+    onMove: () => void = () => undefined,
+    { release = true } = {}
+  ) => {
+    const control = page
+      .getByRole('slider', { name: thumbName })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!
+      .querySelector<HTMLElement>('[data-part="control"]')!;
+    const rect = control.getBoundingClientRect();
+    const pointer = (target: EventTarget, type: string, fraction: number) =>
+      settle(() =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            button: 0,
+            clientX: rect.left + rect.width * fraction,
+            clientY: rect.top + rect.height / 2,
+            pointerId: 1,
+          })
+        )
+      );
+    const [first, ...rest] = fractions;
+    await pointer(control, 'pointerdown', first!);
+    for (const fraction of rest) {
+      await pointer(document, 'pointermove', fraction);
+      onMove();
+    }
+    if (release) {
+      await pointer(document, 'pointerup', fractions.at(-1)!);
+    }
+  };
+  const thumbValue = (name: string) =>
+    Number(page.getByRole('slider', { name }).element().getAttribute('aria-valuenow'));
+
+  it('follows a weight drag step by step and keeps the released weight as one undoable step', async () => {
+    await renderLive({ weight: 1 });
+    const seen: number[] = [];
+    await dragSlider('Weight', [0.5, 0.6, 0.7, 0.8], () => {
+      seen.push(thumbValue('Weight'));
+      expect(live().adapter.weight).toBe(thumbValue('Weight'));
+    });
+
+    // Each move carries the thumb, and its preview, further than the one before.
+    expect(seen).toHaveLength(3);
+    expect(seen[0]).toBeGreaterThan(1);
+    expect(seen[1]).toBeGreaterThan(seen[0]!);
+    expect(seen[2]).toBeGreaterThan(seen[1]!);
+    const released = seen.at(-1)!;
+    expect(live().adapter.weight).toBe(released);
+    expect(thumbValue('Weight')).toBe(released);
+    await expect.element(page.getByRole('spinbutton', { name: 'Weight' })).toHaveValue(released.toFixed(2));
+    expect(stub.history.entries().past).toEqual(['Weight']);
+    expect(stub.commits).toHaveLength(1);
+    expect(stub.commits[0]!.inverse).toMatchObject({ config: { adapter: { weight: 1 } } });
+
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.weight).toBe(1);
+    expect(thumbValue('Weight')).toBe(1);
+    await settle(() => stub.engine.history.redo());
+    expect(live().adapter.weight).toBe(released);
+  });
+
+  it('records nothing for a weight drag that comes back to where it began', async () => {
+    await renderLive({ weight: 1 });
+    await dragSlider('Weight', [0.5, 0.7, 0.5]);
+
+    expect(live().adapter.weight).toBe(1);
+    expect(stub.history.entries().past).toEqual([]);
+  });
+
+  it('drags each step thumb on its own, recording one undoable step per drag', async () => {
+    await renderLive({ beginEndStepPct: [0.1, 0.9] });
+
+    const begins: number[] = [];
+    await dragSlider('Begin step', [0.1, 0.2, 0.3], () => begins.push(thumbValue('Begin step')));
+    expect(begins).toEqual([0.2, 0.3]);
+    expect(live().adapter.beginEndStepPct).toEqual([0.3, 0.9]);
+    expect(host!.textContent).toContain('30–90%');
+
+    const ends: number[] = [];
+    await dragSlider('End step', [0.9, 0.8, 0.6], () => ends.push(thumbValue('End step')));
+    expect(ends).toEqual([0.8, 0.6]);
+    expect(live().adapter.beginEndStepPct).toEqual([0.3, 0.6]);
+    expect(thumbValue('Begin step')).toBe(0.3);
+    expect(stub.history.entries().past).toEqual(['Steps', 'Steps']);
+
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.beginEndStepPct).toEqual([0.3, 0.9]);
+    expect(thumbValue('End step')).toBe(0.9);
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.beginEndStepPct).toEqual([0.1, 0.9]);
+  });
+
+  it('pushes the end step along with a begin thumb dragged past it, as one undoable step', async () => {
+    await renderLive({ beginEndStepPct: [0.2, 0.5] });
+    const seen: number[][] = [];
+    await dragSlider('Begin step', [0.2, 0.4, 0.7, 0.9], () =>
+      seen.push([thumbValue('Begin step'), thumbValue('End step')])
+    );
+
+    // The platform slider never crosses its thumbs: past the end step, the begin thumb carries it along.
+    expect(seen).toEqual([
+      [0.4, 0.5],
+      [0.7, 0.7],
+      [0.9, 0.9],
+    ]);
+    expect(live().adapter.beginEndStepPct).toEqual([0.9, 0.9]);
+    expect(stub.history.entries().past).toEqual(['Steps']);
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.beginEndStepPct).toEqual([0.2, 0.5]);
+    expect([thumbValue('Begin step'), thumbValue('End step')]).toEqual([0.2, 0.5]);
+  });
+
+  it.each([
+    ['Weight', (layer: CanvasControlLayerContract) => layer.adapter.weight],
+    ['Begin step', (layer: CanvasControlLayerContract) => layer.adapter.beginEndStepPct[0]],
+    ['End step', (layer: CanvasControlLayerContract) => layer.adapter.beginEndStepPct[1]],
+  ] as const)('records a %s drag the panel unmounts mid-gesture as one step', async (thumb, valueOf) => {
+    await renderLive({ beginEndStepPct: [0.2, 0.8], weight: 1 });
+    const before = valueOf(live());
+    const seen: number[] = [];
+    await dragSlider(thumb, [before / (thumb === 'Weight' ? 2 : 1), 0.45, 0.6], () => seen.push(valueOf(live())), {
+      release: false,
+    });
+    expect(seen.at(-1)).not.toBe(before);
+    await unmount();
+
+    expect(stub.history.entries().past).toEqual([thumb === 'Weight' ? 'Weight' : 'Steps']);
+    expect(valueOf(live())).toBe(seen.at(-1));
+    // The gesture's preview session is closed: what ends an open one (any later edit) restores nothing.
+    stub.controller.endPreview();
+    expect(valueOf(live())).toBe(seen.at(-1));
+    await settle(() => stub.engine.history.undo());
+    expect(valueOf(live())).toBe(before);
+  });
+
+  it('records one step per key press on the weight and step thumbs', async () => {
+    await renderLive({ beginEndStepPct: [0.1, 0.9], weight: 1 });
+    await act(() => page.getByRole('slider', { name: 'Weight' }).element().focus());
+    await act(() => userEvent.keyboard('{ArrowRight}{ArrowRight}'));
+    expect(live().adapter.weight).toBeCloseTo(1.1);
+    await act(() => userEvent.keyboard('{Home}'));
+    expect(live().adapter.weight).toBe(0);
+    expect(thumbValue('Weight')).toBe(0);
+
+    await act(() => page.getByRole('slider', { name: 'End step' }).element().focus());
+    await act(() => userEvent.keyboard('{ArrowLeft}'));
+    expect(live().adapter.beginEndStepPct).toEqual([0.1, 0.85]);
+    expect(stub.history.entries().past).toEqual(['Weight', 'Weight', 'Weight', 'Steps']);
+
+    await settle(() => stub.engine.history.undo());
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.weight).toBeCloseTo(1.1);
+    expect(live().adapter.beginEndStepPct).toEqual([0.1, 0.9]);
+  });
+
+  it('records a typed weight once, and undo restores the dragged one', async () => {
+    await renderLive({ weight: 1 });
+    await dragSlider('Weight', [0.5, 0.75]);
+    const dragged = live().adapter.weight;
+    expect(dragged).toBeGreaterThan(1);
+    const input = page.getByRole('spinbutton', { name: 'Weight' });
+    await act(async () => {
+      await userEvent.clear(input);
+      await userEvent.type(input, '0.4{Enter}');
+    });
+
+    expect(live().adapter.weight).toBe(0.4);
+    expect(stub.history.entries().past).toEqual(['Weight', 'Weight']);
+    await settle(() => stub.engine.history.undo());
+    expect(live().adapter.weight).toBe(dragged);
+    await expect.element(input).toHaveValue(dragged.toFixed(2));
+  });
+});
+
 describe('ControlLayerSettings and the capability table', () => {
   const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'Retry');
 
@@ -856,6 +1092,25 @@ describe('ControlLayerSettings and the capability table', () => {
         .elements()
         .map((element) => element.textContent)
     ).toContain('This layer is checked once model capabilities have loaded.');
+  });
+
+  it('checks the layer as soon as the table arrives, with nothing else changing', async () => {
+    accountLifecycle.invalidate();
+    const layer = detectedLayer('depth', 'depth_anything_depth_estimation');
+    // Without exportable content the panel judges the layer on its own, not in Invoke's sequence.
+    await render(layer, { engine: engineWith([layer], { hasContent: false }) });
+    const statusTexts = () =>
+      page
+        .getByRole('status')
+        .elements()
+        .map((element) => element.textContent);
+
+    expect(statusTexts()).toContain('This layer is checked once model capabilities have loaded.');
+
+    await loadCapabilities();
+
+    expect(statusTexts()).not.toContain('This layer is checked once model capabilities have loaded.');
+    expect(host!.textContent).toContain(DEPTH_A.name);
   });
 
   it('keeps the retry and its focus through a retry that fails again, then hands focus to the panel', async () => {

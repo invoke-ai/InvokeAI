@@ -13,7 +13,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -32,11 +32,11 @@ vi.mock('./GenerationUiContext', () => ({
     // Stands in for the canvas's strength slot, which lays out the section around its badge and field.
     CanvasDenoisingStrength: ({ children }: CanvasDenoisingStrengthProps) =>
       children({
-        badges: <span data-testid="strength-badge">75%</span>,
+        summary: <span data-testid="strength-badge">75%</span>,
         field: <div data-testid="strength-field" />,
       }),
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { render: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { render: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -103,6 +103,10 @@ void i18n.use(initReactI18next).init({
             render: 'Render',
             resetToDefault: 'Reset to default',
             scheduler: 'Scheduler',
+            sectionMenu: {
+              resetStepsAndGuidance: 'Reset steps and {{guidance}} to model defaults',
+              resetStepsGuidanceAndScheduler: 'Reset steps, {{guidance}} and scheduler to model defaults',
+            },
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
             useSeed: 'Use seed {{seed}}',
@@ -745,5 +749,67 @@ describe('GenerateRenderSection model-family tuning', () => {
 
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
+  });
+});
+
+describe('GenerateRenderSection title defaults', () => {
+  // Scheduler visibility comes from the architecture capabilities.
+  seedArchitectureCapabilities();
+
+  const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+  const isMarked = () => title().querySelector('[data-section-changed]') !== null;
+  const otherScheduler = (model: GenerateModelConfig) =>
+    getDefaultGenerateSettings(model).scheduler === 'ddim' ? 'euler' : 'ddim';
+  const openMenu = () =>
+    act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+
+  it('marks steps, CFG and scheduler off the model defaults, and resets those three only', async () => {
+    const defaults = getDefaultGenerateSettings(sd1Model);
+    const onCommit = await render(sd1Model, { scheduler: otherScheduler(sd1Model), seed: 42, seedMode: 'fixed' }, true);
+
+    expect(host?.textContent).toContain('Scheduler');
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to model defaults' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: defaults.cfgScale,
+      scheduler: defaults.scheduler,
+      steps: defaults.steps,
+    });
+    expect(draftStore?.getSnapshot()).toMatchObject({ seed: 42, seedMode: 'fixed' });
+    expect(isMarked()).toBe(false);
+  });
+
+  it('leaves a hidden scheduler out of the mark and the reset', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    const onCommit = await render(qwenImageModel, { scheduler: otherScheduler(qwenImageModel) }, true);
+
+    expect(isMarked()).toBe(false);
+
+    await settle(() => draftStore?.patchSnapshot({ steps: defaults.steps + 4 }));
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to model defaults' })));
+
+    expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: defaults.cfgScale, steps: defaults.steps });
+  });
+
+  it('names the guidance field as the model labels it', async () => {
+    const defaults = getDefaultGenerateSettings(fluxDevModel);
+    const onCommit = await render(fluxDevModel, { steps: defaults.steps + 4 }, true);
+
+    await openMenu();
+    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to model defaults$/ });
+
+    expect(reset.element().textContent).toContain('Guidance');
+    expect(reset.element().textContent).not.toContain('CFG');
+    await act(() => userEvent.click(reset));
+
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ steps: defaults.steps }));
   });
 });

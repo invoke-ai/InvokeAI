@@ -1,3 +1,6 @@
 patchedDependencies:
   react-hook-tanstack-virtual: patches/react-hook-tanstack-virtual.patch
   '@zag-js/react@1.43.3': patches/@zag-js__react@1.43.3.patch
+  '@zag-js/menu@1.43.3': patches/@zag-js__menu@1.43.3.patch
+  '@zag-js/presence@1.43.3': patches/@zag-js__presence@1.43.3.patch
+  '@zag-js/tooltip@1.43.3': patches/@zag-js__tooltip@1.43.3.patch

@@ -22,7 +22,7 @@ Hover over a board and click its **⋮** button, or right-click it, to open its 
 
 <Image src={boardMenu} alt="The board menu with Save new results here, Download board, Rename board, Archive board and Delete board." width={420} />
 
-* **Save new results here** — makes this the board that receives new results, marked with a crosshair-style icon in the board list, whichever board you are viewing; it also turns off **Follow the selected board**. On that board, the item is **Stop saving new results here**, which sends results back to the project's Inbox. Not offered for the Inbox itself, date boards, archived boards or boards you can only view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
+* **Save new results here** — makes this the board that receives new results, marked in the board list with the same icon as **Saving to**, whichever board you are viewing; it also turns off **Follow the selected board**. On that board, the item is **Stop saving new results here**, which sends results back to the project's Inbox. Not offered for the Inbox itself, date boards, archived boards or boards you can only view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
 * **Download Board** — downloads the board (see [below](#downloading-a-board)).
 * **Rename board** — opens a dialog to change the name.
 * **Access** — on a multi-user installation, who else can open the board: **Restricted**, **Everyone can view** or **Everyone can contribute**. Only the board's owner and administrators see it. See [Image Boards](/configuration/multi-user-mode/user-guide/#image-boards).
@@ -71,7 +71,7 @@ For an image, the menu offers:
 * **Load workflow** — open the workflow that made the image. Unavailable for images without one.
 * **Continue working** — **Edit on Canvas** adds the image to the open project's canvas as an image layer and opens Canvas; **Upscale** sends it to the Upscale panel or upscales it at once; **Send to Video** uses it as the first frame in the Video panel; **Add to Canvas as…** adds it as a layer of the kind you choose; **New project from image** starts a new project whose canvas holds the image, sized to fit it.
 * **Use image as** — **Use as reference image**, **Use as control** and **Use as prompt template**. Its **Reuse from image** submenu restores the settings that made the image: **Remix image**, **All settings**, **Use prompt**, **Use seed**, **Use size** and **Use CLIP skip**; see [Resetting to defaults](/users-guide/image-generation/generate-panel/#resetting-to-defaults). Settings an image does not record are unavailable.
-* **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same.
+* **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same. On the selected image itself, it waits for the next image you select, and reads **Cancel compare** until then.
 * **Generate PBR maps** — queue normal, roughness and displacement maps of the image. They are saved to the board new results go to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
 * **Find in Gallery** — select the image in its own board and scroll the grid to it, clearing a search or filter that would hide it.
 * **Move to board** and **Delete image**.

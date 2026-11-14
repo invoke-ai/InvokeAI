@@ -33,6 +33,59 @@ const controlSizes = <T>(
     CONTROL_SIZES.map((size) => [size, build(stock?.[basis[size]] ?? stock?.xl, `{sizes.control.${size}}`, size)])
   );
 
+/**
+ * Arrowed surfaces (menus, popovers, hover cards) keep the tip clear of the content's rounded corners: the arrow box gets
+ * a transparent border of the corner radius plus a margin. Floating UI keeps the whole box within the content's edge,
+ * so the tip never lands on a corner curve; a small trigger at the end of a bar shifts the panel instead. Zag's gutter
+ * reads the box's inner height, which the border leaves at the visible size. An arrow of no size gets no border either,
+ * so Floating UI has nothing to centre on the anchor and leaves the panel where its placement puts it. The box overlaps
+ * the content and is transparent, so it lets the pointer through.
+ */
+const arrowClearOfCorners = (visibleSize: string) => ({
+  '--arrow-visible-size': visibleSize,
+  '--arrow-clearance': 'min(calc({radii.md} + 2px), calc(var(--arrow-visible-size) * 1000))',
+  '--arrow-size': 'calc(var(--arrow-visible-size) + 2 * var(--arrow-clearance))',
+  borderColor: 'transparent',
+  borderStyle: 'solid',
+  borderWidth: 'var(--arrow-clearance)',
+  pointerEvents: 'none',
+});
+
+/**
+ * A popover's or hover card's arrow sits inside its content, which is `position: relative`, so Zag's offset out of the
+ * content lands on the padding edge, one border width (1px) inside the outer edge. Moved out by that width, away from
+ * the content only, it centres on the outer edge, as a menu's arrow does beside its content. It stacks below the
+ * content's children, in the stacking context the content slot isolates: the tip's cover over the content's edge
+ * (`arrowTipOutsideContent`) paints over the content's own border and shading but never over a child flush with that
+ * edge, such as the footer of a popover without padding.
+ */
+const arrowInsideContent = {
+  zIndex: '-1',
+  '[data-placement^=bottom] > &': { translate: '0 -1px' },
+  '[data-placement^=top] > &': { translate: '0 1px' },
+  '[data-placement^=right] > &': { translate: '-1px 0' },
+  '[data-placement^=left] > &': { translate: '1px 0' },
+};
+
+/**
+ * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus a
+ * band into the content, it covers the content's edge across its base, so tip and panel share one outline. The band
+ * spans the 1px border and the 1px inset highlight the dark `lg` shadow paints inside it, with room to spare: a
+ * rotated element loses its sub-pixel offset, so at a fractional device pixel ratio (125%) the tip lands up to half a
+ * device pixel off its layout position, and the arrow's 1px move outward overshoots a border the browser snapped to
+ * one device pixel (0.8px). A band of about 3px (4.5px along each side) absorbs both; one of 1px left part of the
+ * border or the highlight as a line across the base. A menu's tip, on top of its content, covers only padding with it.
+ * A tip of no size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow box,
+ * the visible tip takes the pointer as part of the surface, so resting on it keeps a hover card open and a click on
+ * it never reaches whatever lies beneath.
+ */
+const arrowTipOutsideContent = {
+  borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
+  borderTopWidth: 'min(1px, var(--arrow-visible-size))',
+  clipPath: 'polygon(0 0, calc(100% + 4.5px) 0, 0 calc(100% + 4.5px))',
+  pointerEvents: 'auto',
+};
+
 /** Extend the tooltip recipe; replacing it drops arrow size/background variables. */
 export const tooltipSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tooltip,
@@ -77,15 +130,23 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.hoverCard.base?.content,
       '--hovercard-bg': 'colors.bg.muted',
+      // The arrow stacks below the content's children, within the content: see `arrowInsideContent`.
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
       color: 'fg',
       maxWidth: '18rem',
     },
+    arrow: {
+      ...chakraSlotRecipes.hoverCard.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowInsideContent,
+    },
     arrowTip: {
       ...chakraSlotRecipes.hoverCard.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
     },
   },
   defaultVariants: { size: 'xs' },
@@ -99,6 +160,8 @@ export const popoverSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.popover.base?.content,
       '--popover-bg': 'colors.bg.muted',
+      // The arrow stacks below the content's children, within the content: see `arrowInsideContent`.
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
@@ -106,9 +169,15 @@ export const popoverSlotRecipe = defineSlotRecipe({
       _open: { animationStyle: 'slide-fade-in', animationDuration: 'faster' },
       _closed: { animationStyle: 'slide-fade-out', animationDuration: 'faster' },
     },
+    arrow: {
+      ...chakraSlotRecipes.popover.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowInsideContent,
+    },
     arrowTip: {
       ...chakraSlotRecipes.popover.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
     },
   },
 });
@@ -562,6 +631,18 @@ export const dropdownGroupLabel = {
   textTransform: 'uppercase',
 };
 
+/**
+ * A menu's arrow points at its anchor when the anchor is a box: a trigger, or a measured one. A context menu is
+ * anchored to the pointer, a point of at most 1px with nothing to point at, so its arrow's visible size is nothing. Zag sets
+ * the anchor's size on the positioner as it places the menu; until then, a box is assumed. The placement after that,
+ * which Floating UI's auto-update makes as soon as its resize observer reports the content, drops the shrunken arrow's
+ * height from the gutter. Zag's one-shot repositions (`listeners: false`: `Menu.ContextTrigger`, an `anchorPoint`
+ * prop, `TRIGGER_VALUE.SET`) get no such second placement and would keep a point-anchored menu 6px further out; the app
+ * uses none of them.
+ */
+const MENU_ARROW_SIZE =
+  'min({sizes.3}, max(0px, calc((min(var(--reference-width, 2px), var(--reference-height, 2px)) - 1px) * 1000)))';
+
 export const menuSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.menu,
   base: {
@@ -570,9 +651,29 @@ export const menuSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.menu.base?.content,
       ...dropdownContent,
     },
+    arrow: {
+      ...chakraSlotRecipes.menu.base?.arrow,
+      ...arrowClearOfCorners(MENU_ARROW_SIZE),
+      // Beside the content, the arrow is outside the scope of its `--menu-bg`.
+      '--arrow-background': `colors.${dropdownContent.bg}`,
+      // MenuContent mirrors the content's state and placement onto the arrow, so it slides and fades with the content.
+      _open: chakraSlotRecipes.menu.base?.content?._open,
+      // Held at its last frame: it ends with the content's exit, which unmounts both.
+      _closed: { ...chakraSlotRecipes.menu.base?.content?._closed, animationFillMode: 'forwards' },
+      // Content kept mounted when closed is hidden; the arrow beside it goes with it.
+      '[hidden] + &': { display: 'none' },
+    },
+    arrowTip: {
+      ...chakraSlotRecipes.menu.base?.arrowTip,
+      borderColor: dropdownContent.borderColor,
+      ...arrowTipOutsideContent,
+    },
     item: {
       ...chakraSlotRecipes.menu.base?.item,
       ...dropdownItem,
+      // An item's own icon sits back from its label, so every menu reads the same without each caller coloring it. A
+      // danger item keeps its tone, and a glyph nested deeper (an indicator, an icon-only item) keeps its own color.
+      '&:not([data-danger]) > svg': { color: 'fg.subtle' },
     },
     itemGroupLabel: {
       ...chakraSlotRecipes.menu.base?.itemGroupLabel,
@@ -942,6 +1043,32 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
 });
 
 /**
+ * Keycaps sit inside menu items and palette rows, whose hover fill is close to the stock keycap border. The emphasized
+ * border keeps the cap's outline readable on that fill; each size is 2px shorter than stock so a cap sits inside a
+ * row's text line without crowding it.
+ */
+const KBD_HEIGHTS: Record<string, string> = { '4.5': '16px', '5': '18px', '6': '22px' };
+
+export const kbdRecipe = defineRecipe({
+  ...chakraRecipes.kbd,
+  variants: {
+    ...chakraRecipes.kbd.variants,
+    variant: {
+      ...chakraRecipes.kbd.variants?.variant,
+      raised: { ...chakraRecipes.kbd.variants?.variant?.raised, borderColor: 'border.emphasized' },
+      outline: { ...chakraRecipes.kbd.variants?.variant?.outline, borderColor: 'border.emphasized' },
+    },
+    // Keyed by stock height, as the size names are already rebased onto the workbench scale.
+    size: Object.fromEntries(
+      Object.entries(chakraRecipes.kbd.variants?.size ?? {}).map(([name, styles]) => [
+        name,
+        { ...styles, height: KBD_HEIGHTS[String((styles as { height?: unknown }).height)] ?? styles.height },
+      ])
+    ),
+  } as unknown as typeof chakraRecipes.kbd.variants,
+});
+
+/**
  * Use a linear sweep to avoid endpoint pauses; system.ts disables skeleton motion and gradients under reduced
  * motion.
  */
@@ -993,7 +1120,12 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
-const rowFocusRing = {
+/**
+ * The keyboard focus ring of every row surface, inset so neighbouring rows never clip it. Exported for row-like
+ * surfaces that cannot build on `Row` or `ListItem` for their focus target, such as tree items whose focus sits on a
+ * wrapper around the row surface.
+ */
+export const rowFocusRing = {
   outline: '2px solid',
   outlineColor: 'accent.solid',
   outlineOffset: '-2px',
@@ -1073,6 +1205,8 @@ export const listItemSlotRecipe = defineSlotRecipe({
       minW: 0,
       position: 'relative',
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
+      // A disabled row stays focusable, so its content dims instead of the root: the focus ring keeps full strength.
+      _disabled: { cursor: 'not-allowed', '& > *': { opacity: 0.5 } },
       // Rows of a page being replaced stay readable; only the pointer says the list is working.
       '&[data-busy]': { cursor: 'progress' },
     },
@@ -1217,12 +1351,37 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
       lineHeight: 'shorter',
     },
   },
+  variants: {
+    placement: {
+      // Above a list: the label sits low in its row, close to the rows it names.
+      list: {},
+      // In a bar beside centred controls: the label centres with them.
+      bar: { root: { alignItems: 'center', pb: '0' } },
+    },
+  },
+  defaultVariants: { placement: 'list' },
 });
+
+/**
+ * A chip label's box trimmed to its cap height, so flex centring lines the letters up with the chip's icon wherever the
+ * engine's rounded ascent and descent put the baseline in the line box (about 2 device px high in Linux Chromium at
+ * 125%). Equal block padding keeps that centre and leaves room for descenders and accents inside a clipping label.
+ * Without `text-box` support the label keeps its full line box.
+ */
+export const chipLabelStyles = {
+  '@supports (text-box: trim-both cap alphabetic)': {
+    paddingBlock: '0.3em',
+    textBox: 'trim-both cap alphabetic',
+  },
+} as const;
 
 export const chipRecipe = defineRecipe({
   base: {
     alignItems: 'center',
-    borderRadius: 'sm',
+    // Fill the host row, so a progress hairline keeps to its bottom edge however tall the trimmed label is.
+    alignSelf: 'stretch',
+    // The status bar's hover and active fill radius, which the progress hairline is clipped to.
+    borderRadius: 'control',
     display: 'inline-flex',
     flexShrink: '0',
     fontSize: 'xs',
@@ -1231,6 +1390,8 @@ export const chipRecipe = defineRecipe({
     px: '2',
     py: '0.5',
     whiteSpace: 'nowrap',
+    // The label is the chip's text child.
+    '& > p': chipLabelStyles,
   },
   variants: {
     tone: {

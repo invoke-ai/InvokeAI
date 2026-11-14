@@ -110,7 +110,7 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
         imageResolver: createImageResolver(),
         fonts,
         mutationPort: createCanvasProjectMutationPort(store, projectId),
-        readSelectObjectAutoProcess: () => getWorkbenchPreferences().selectObjectAutoProcess,
+        readSelectObjectAutoUpdate: () => getWorkbenchPreferences().selectObjectAutoUpdate,
         toolMemory: {
           read: () => getWorkbenchPreferences().canvasToolMemory,
           subscribe: (listener) => subscribeWorkbenchPreferences(() => listener()),

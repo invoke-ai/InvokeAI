@@ -8,6 +8,7 @@ import type {
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { createControlLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { CircleDotIcon, CircleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -228,9 +229,7 @@ describe('layer context action registry', () => {
       'widgets.layers.selectObject.modelHuge',
       'widgets.layers.selectObject.modelSam2Large',
       'widgets.layers.selectObject.prompt',
-      'widgets.layers.selectObject.process',
       'widgets.layers.selectObject.refine',
-      'widgets.layers.selectObject.reset',
       'widgets.layers.selectObject.saveAs',
       'widgets.layers.selectObject.saveAs_control',
       'widgets.layers.selectObject.saveAs_inpaint_mask',
@@ -360,14 +359,20 @@ describe('getLayerContextActions', () => {
     expect(Boolean(action)).toBe(expected);
   });
 
+  it.each(['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'exposes transform for %s layers',
+    (type) => {
+      const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
+      expect(action).toBeDefined();
+    }
+  );
+
   it.each([
-    ['raster', true],
-    ['control', true],
-    ['inpaint_mask', false],
-    ['regional_guidance', false],
-  ] as const)('exposes transform only for engine-supported %s layers', (type, expected) => {
-    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
-    expect(Boolean(action)).toBe(expected);
+    ['an empty mask', makeLayer('inpaint_mask'), { hasSupportedContent: false }],
+    ['a disabled mask', { ...makeLayer('inpaint_mask'), isEnabled: false }, {}],
+  ] as const)('disables transform for %s, which has nothing to transform', (_, layer, state) => {
+    const action = getLayerContextActions(makeState(layer, state)).find((item) => item.id === 'transform');
+    expect(action?.isDisabled).toBe(true);
   });
 
   it.each([
@@ -942,12 +947,44 @@ describe('getLayerContextActions', () => {
 });
 
 describe('toggle-visibility', () => {
-  it('hides and shows the layer itself, the one visibility that generation also follows', () => {
-    const shown = getLayerContextActions(makeState(rasterLayer));
-    expect(byId(shown, 'toggle-visibility').labelKey).toBe('widgets.layers.actions.hideLayer');
-    expect(getEnglishTranslation('widgets.layers.actions.hideLayer')).toBe('Hide layer');
-    const off = getLayerContextActions(makeState({ ...rasterLayer, isEnabled: false }));
-    expect(byId(off, 'toggle-visibility').labelKey).toBe('widgets.layers.actions.showLayer');
+  const labelOf = (layer: CanvasLayerContract, overrides: Partial<LayerContextActionState> = {}) =>
+    getEnglishTranslation(byId(getLayerContextActions(makeState(layer, overrides)), 'toggle-visibility').labelKey);
+
+  it('hides and shows a raster layer, the one visibility that generation also follows', () => {
+    expect(labelOf(rasterLayer)).toBe('Hide layer');
+    expect(labelOf({ ...rasterLayer, isEnabled: false })).toBe('Show layer');
+  });
+
+  it.each(['control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'names the flag for generation on a %s layer, whose canvas visibility is its own action',
+    (type) => {
+      const layer = makeLayer(type);
+      expect(labelOf(layer)).toBe('Exclude from generation');
+      expect(labelOf({ ...layer, isEnabled: false })).toBe('Use in generation');
+      // The row dot's shapes: a plain ring for off, a dot for on; the dashed ring belongs to a group leaving it out.
+      const iconOf = (target: CanvasLayerContract) =>
+        byId(getLayerContextActions(makeState(target)), 'toggle-visibility').icon;
+      expect(iconOf(layer)).toBe(CircleIcon);
+      expect(iconOf({ ...layer, isEnabled: false })).toBe(CircleDotIcon);
+    }
+  );
+
+  it('words a selection by the kinds it holds: overlays, raster layers, or both', () => {
+    const mask = createInpaintMaskLayer('Mask', 'mask');
+    const region = { ...createRegionalGuidanceLayer('Region', 0, 'region'), isEnabled: false };
+    const overlays = { document: makeDocument([mask, region]), selectedIds: ['mask', 'region'] };
+    expect(labelOf(mask, overlays)).toBe('Use selected in generation');
+    expect(labelOf(mask, { ...overlays, document: makeDocument([mask, { ...region, isEnabled: true }]) })).toBe(
+      'Exclude selected from generation'
+    );
+    const mixed = { document: makeDocument([mask, rasterLayer]), selectedIds: ['mask', 'raster'] };
+    // Both kinds: the flag hides the raster layer and leaves the overlay out, so it is turned off.
+    expect(labelOf(mask, mixed)).toBe('Turn off selected');
+    expect(
+      labelOf(rasterLayer, { ...mixed, document: makeDocument([{ ...mask, isEnabled: false }, rasterLayer]) })
+    ).toBe('Turn on selected');
+    const rasters = { document: makeDocument([rasterLayer, paintLayer('second')]), selectedIds: ['raster', 'second'] };
+    expect(labelOf(rasterLayer, rasters)).toBe('Hide selected');
   });
 });
 
@@ -956,10 +993,25 @@ describe('toggle-hidden', () => {
     expect(idsFor(rasterLayer)).not.toContain('toggle-hidden');
     const control = getLayerContextActions(makeState(nonEmptyControlLayer));
     expect(byId(control, 'toggle-hidden').isDisabled).toBe(false);
-    expect(byId(control, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.hideOnCanvas');
-    expect(getEnglishTranslation('widgets.layers.actions.hideOnCanvas')).toBe('Hide on canvas only');
+    expect(getEnglishTranslation(byId(control, 'toggle-hidden').labelKey)).toBe('Hide on canvas');
     const hidden = getLayerContextActions(makeState({ ...nonEmptyControlLayer, isHidden: true }));
-    expect(byId(hidden, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.showOnCanvas');
+    expect(getEnglishTranslation(byId(hidden, 'toggle-hidden').labelKey)).toBe('Show on canvas');
+    const mask = createInpaintMaskLayer('Mask', 'mask');
+    const selection = (masks: CanvasLayerContract[]) =>
+      getLayerContextActions(
+        makeState(masks[0]!, {
+          document: makeDocument([...masks, rasterLayer]),
+          selectedIds: ['mask', 'other', 'raster'],
+        })
+      );
+    const other = { ...createInpaintMaskLayer('Other', 'other'), isHidden: true };
+    expect(getEnglishTranslation(byId(selection([mask, other]), 'toggle-hidden').labelKey)).toBe(
+      'Hide selected on canvas'
+    );
+    // The raster target has no canvas-only state, so it does not keep the selection from reading as hidden.
+    expect(getEnglishTranslation(byId(selection([{ ...mask, isHidden: true }, other]), 'toggle-hidden').labelKey)).toBe(
+      'Show selected on canvas'
+    );
     const gated = getLayerContextActions(makeState(nonEmptyControlLayer, { hiddenByAncestor: true }));
     expect(byId(gated, 'toggle-hidden').isDisabled).toBe(true);
     const runtime = makeRuntimeContext(nonEmptyControlLayer);

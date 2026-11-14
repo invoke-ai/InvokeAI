@@ -59,8 +59,8 @@ export const extractThemeTokens = (themesModule) => {
 const DERIVED_TOKENS = {
   // `bg.subtle`: the panel surface the fills below are mixed into.
   surface: 'var(--invoke-neutral-900)',
-  // `gray.hoverTint`: the foreground pulled toward the accent, applied at low alpha for hover fills.
-  'hover-tint': 'color-mix(in oklab, var(--invoke-accent) 55%, var(--invoke-neutral-50))',
+  // `gray.hoverTint`: the foreground leaned toward the accent by Classic's `interactionTint`, applied at low alpha.
+  'hover-tint': 'color-mix(in oklab, var(--invoke-accent) 15%, var(--invoke-neutral-50))',
   // `bg.hover` (`gray.hoverTint/10`): the hovered fill of tabs, rows and ghost buttons.
   'bg-hover': 'color-mix(in oklab, var(--invoke-hover-tint) 10%, transparent)',
   // The shown tab's fill: `gray.hoverTint/22`, the app's subtle button fill. The segment tabs' own `/15`

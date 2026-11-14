@@ -3,7 +3,7 @@ import type { CompositeEntry } from '@workbench/canvas-operations/generationCont
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
 
-import { createCompositeDedupeCache, executeControlComposite } from './compositeForGeneration';
+import { createCompositeDedupeCache, executeControlComposite, executeMaskComposite } from './compositeForGeneration';
 
 describe('executeControlComposite — real browser pixels', () => {
   it('uploads erased transparent pixels as opaque black', async () => {
@@ -67,5 +67,55 @@ describe('executeControlComposite — real browser pixels', () => {
     });
 
     expect(uploadedPixels).toEqual([255, 255, 255, 255, 60, 40, 20, 255, 0, 0, 0, 255]);
+  });
+});
+
+describe('executeMaskComposite — real browser pixels', () => {
+  it('places a rotated, scaled mask where the canvas shows it', async () => {
+    const backend = createDomRasterBackend();
+    // A 2×1 local mask: covered on the left pixel only.
+    const maskSurface = backend.createSurface(2, 1);
+    maskSurface.ctx.fillStyle = '#ffffff';
+    maskSurface.ctx.fillRect(0, 0, 1, 1);
+    const entry: CompositeEntry = {
+      bbox: { height: 8, width: 8, x: 0, y: 0 },
+      key: 'inpaint-mask|rotated',
+      kind: 'inpaint-mask',
+      layers: [],
+      maskLayers: [
+        {
+          attributeValue: 1,
+          contentOffset: { x: 0, y: 0 },
+          contentSize: { height: 1, width: 2 },
+          id: 'mask',
+          sourceRef: 'mask:mask.png',
+          // A quarter turn at scale 2 about (6, 0): local (x, y) lands at document (6 - 2y, 2x).
+          transform: { rotation: Math.PI / 2, scaleX: 2, scaleY: 2, x: 6, y: 0 },
+        },
+      ],
+    };
+    let uploaded: ImageData | null = null;
+
+    const result = await executeMaskComposite(entry, {
+      backend,
+      dedupe: createCompositeDedupeCache(),
+      getLayerSurface: () =>
+        Promise.resolve({ rect: { height: 1, width: 2, x: 0, y: 0 }, release: () => undefined, surface: maskSurface }),
+      hashBlob: () => Promise.resolve('mask-pixels'),
+      uploadImage: async (blob) => {
+        const bitmap = await backend.createImageBitmap(blob);
+        const decoded = backend.createSurface(8, 8);
+        decoded.ctx.drawImage(bitmap, 0, 0);
+        uploaded = decoded.ctx.getImageData(0, 0, 8, 8);
+        bitmap.close();
+        return { height: 8, imageName: 'mask.png', width: 8 };
+      },
+    });
+
+    const gray = (x: number, y: number): number => uploaded!.data[(y * 8 + x) * 4]!;
+    expect(result.hasContent).toBe(true);
+    // Local pixel (0, 0) covers document 4..6 × 0..2; local (1, 0), unmasked, covers 4..6 × 2..4.
+    expect([gray(4, 0), gray(5, 1)]).toEqual([0, 0]);
+    expect([gray(4, 2), gray(5, 3), gray(1, 0), gray(6, 0)]).toEqual([255, 255, 255, 255]);
   });
 });

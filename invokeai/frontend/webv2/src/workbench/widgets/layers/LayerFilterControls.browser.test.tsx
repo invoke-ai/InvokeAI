@@ -78,7 +78,7 @@ const drag = async (offsets: number[], beforeRelease: () => void = () => undefin
   const frame = lowThreshold().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
   const rect = frame.getBoundingClientRect();
   const startX = rect.left + rect.width / 2;
-  const xAt = (offset: number) => startX + offset * (rect.width - 20);
+  const xAt = (offset: number) => startX + offset * (rect.width - 12);
   const pointer = (target: EventTarget, type: string, x: number) =>
     settle(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 })));
   await pointer(frame, 'pointerdown', startX);

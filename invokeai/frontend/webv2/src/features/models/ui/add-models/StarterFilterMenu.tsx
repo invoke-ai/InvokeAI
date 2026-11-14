@@ -14,8 +14,8 @@ const STARTER_SORT_FIELDS: readonly ModelFilterSortOption<StarterSortField>[] = 
   { field: 'format', labelKey: 'models.sort.format' },
 ];
 
-const isFiltering = (filters: StarterModelFilters): boolean =>
-  filters.typeFilter !== null || filters.baseFilter !== null;
+const countActiveFilters = (filters: StarterModelFilters): number =>
+  Number(filters.typeFilter !== null) + Number(filters.baseFilter !== null);
 
 export const StarterFilterMenu = ({
   availableBases,
@@ -32,16 +32,17 @@ export const StarterFilterMenu = ({
 
   return (
     <ModelFilterMenu
+      activeFilterCount={countActiveFilters(filters)}
       ariaLabel={t('models.filterAndSortStarterModels')}
       availableBases={availableBases}
       availableTypes={availableTypes}
       baseFilter={filters.baseFilter}
-      isActive={isFiltering(filters)}
       sortDirection={filters.sortDirection}
       sortField={filters.sortField}
       sortFields={STARTER_SORT_FIELDS}
       typeFilter={filters.typeFilter}
       onBaseFilterChange={(baseFilter) => onChange({ ...filters, baseFilter })}
+      onResetFilters={() => onChange({ ...filters, baseFilter: null, typeFilter: null })}
       onSortChange={(sortField, sortDirection) => onChange({ ...filters, sortDirection, sortField })}
       onTypeFilterChange={(typeFilter) => onChange({ ...filters, typeFilter })}
     />

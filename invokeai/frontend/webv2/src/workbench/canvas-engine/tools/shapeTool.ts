@@ -16,7 +16,7 @@
  * and cancellation do not dispatch, and a nonzero shape produces one structural or stroke commit.
  */
 
-import type { CanvasLayerEditRefusal, CanvasShapeCutoutRefusal } from '@workbench/canvas-engine/capabilities';
+import type { CanvasLayerEditRefusal, CanvasNoTargetRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { ShapeToolOptions } from '@workbench/canvas-engine/engineStores';
@@ -25,8 +25,9 @@ import type { PlacedSurface, PointerInput, PointerModifiers, Rect, Vec2 } from '
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { isLayerTransparencyLocked, leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
+import { isLayerTransparencyLocked } from '@workbench/canvas-engine/document/layerEligibility';
 import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
+import { leafPaintRefusal } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { identity, invert, multiply, translate } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
@@ -134,7 +135,7 @@ export const polygonShapeFrom = (
 type ShapeTarget =
   | { kind: 'layer' }
   | { kind: 'pixels'; leaf: SemanticLeaf }
-  | { kind: 'refused'; refusal: CanvasLayerEditRefusal | CanvasShapeCutoutRefusal };
+  | { kind: 'refused'; refusal: CanvasLayerEditRefusal | CanvasNoTargetRefusal };
 
 /** With fill off and no stroke to draw, a shape changes no pixel, so it records no step and uploads nothing. */
 const drawsNothing = (source: ShapeSource): boolean =>
@@ -170,7 +171,7 @@ const resolveTarget = (ctx: ToolContext, mode: ShapeMode, loading: 'request' | '
     return { kind: 'layer' };
   }
   const { layer } = leaf;
-  let status: CanvasLayerEditRefusal['status'] | null = leafEditRefusal(leaf);
+  let status: CanvasLayerEditRefusal['status'] | null = leafPaintRefusal(leaf);
   if (!status && mode === 'cutout' && isLayerTransparencyLocked(layer)) {
     status = 'layer-alpha-locked';
   }

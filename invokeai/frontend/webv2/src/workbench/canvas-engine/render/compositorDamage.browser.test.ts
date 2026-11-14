@@ -237,7 +237,7 @@ describe('overlay stacks switched off while a result is staged', () => {
         backend,
         imageSmoothing: false,
         regionOverlays: !staging,
-        showOverlayStacks: staging ? { control: true, inpaint_mask: false, regional_guidance: false } : undefined,
+        showOverlayStacks: staging ? { control: false, inpaint_mask: false, regional_guidance: false } : undefined,
       });
 
     draw(true);

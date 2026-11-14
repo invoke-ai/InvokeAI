@@ -1,9 +1,13 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
 import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
+
+/** Select Object starts with auto-update on until the person turns it off. */
+export const DEFAULT_SELECT_OBJECT_AUTO_UPDATE = true;
 
 export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
@@ -40,11 +44,8 @@ export interface ProjectSettings {
   viewerAutoSwitch: ViewerAutoSwitchMode;
 }
 
-/**
- * `latest`: each finished result takes the selection. `progress`: the same, and live frames show while it runs.
- * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
- */
-export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
+/** The Preview's Auto-switch: the shared policy's modes (`AutoSwitchMode`, rules in `@features/queue/contracts`). */
+export type ViewerAutoSwitchMode = AutoSwitchMode;
 
 /** {@link ProjectSettings} with every layered flag resolved: project pin, then the user's default, then built-in. */
 export type EffectiveProjectSettings = Required<ProjectSettings>;
@@ -146,8 +147,12 @@ export interface WorkbenchPreferences {
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
-  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
-  selectObjectAutoProcess: boolean;
+  /**
+   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under
+   * a new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
+   * any settings save, so it cannot tell a choice from the old default, and normalization drops it.
+   */
+  selectObjectAutoUpdate: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */

@@ -1,12 +1,14 @@
-import { ChakraProvider, Menu } from '@chakra-ui/react';
+import { Box, ChakraProvider, Icon, Menu, Portal } from '@chakra-ui/react';
+import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { CopyIcon } from 'lucide-react';
-import { act } from 'react';
+import { Activity, act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { page, server, userEvent } from 'vitest/browser';
 
-import { MenuActionItem, MenuHeadingGroup, MenuIconItem, MenuItem } from './Menu';
+import { findArrowJointSeams } from './arrowJoint.testing';
+import { MenuActionItem, MenuContent, MenuHeadingGroup, MenuIconItem, MenuItem, useContextMenu } from './Menu';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -187,5 +189,621 @@ describe('menu heading groups', () => {
         .elements()
         .map((element) => element.textContent)
     ).toEqual(['Save changes', 'Other']);
+  });
+});
+
+describe('menu item icons', () => {
+  it("sit back from the label by default, keep a danger item's tone, and yield to an explicit color", async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <Menu.Root open>
+            <Menu.Positioner>
+              <MenuContent>
+                <Menu.Item value="plain">
+                  <CopyIcon data-testid="plain-icon" />
+                  Copy
+                </Menu.Item>
+                <Menu.Item data-danger="" value="danger">
+                  <CopyIcon data-testid="danger-icon" />
+                  Delete
+                </Menu.Item>
+                <Menu.Item value="explicit">
+                  <Icon as={CopyIcon} color="fg" data-testid="explicit-icon" />
+                  Checked
+                </Menu.Item>
+                {/* Token references resolved in the same color context as the items. */}
+                <Box color="fg.subtle" data-testid="subtle-reference" />
+                <Box color="fg" data-testid="fg-reference" />
+              </MenuContent>
+            </Menu.Positioner>
+          </Menu.Root>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(item('plain')).toBeVisible());
+
+    const color = (testId: string) => getComputedStyle(document.querySelector(`[data-testid="${testId}"]`)!).color;
+    const subtle = color('subtle-reference');
+    const fg = color('fg-reference');
+    const danger = getComputedStyle(item('danger')).color;
+    // Three distinct colors, so each expectation below tells the rules apart.
+    expect(new Set([subtle, fg, danger]).size).toBe(3);
+
+    expect(color('plain-icon')).toBe(subtle);
+    expect(color('danger-icon')).toBe(danger);
+    expect(color('explicit-icon')).toBe(fg);
+  });
+});
+
+const ROOT_END = { placement: 'bottom-end' } as const;
+const SUBMENU_RIGHT = { placement: 'right-start' } as const;
+
+describe('submenus', () => {
+  it('flipped to open left keep their placement and open animation while the pointer crosses into them', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          {/* At the viewport's right edge, so a right-start submenu has no room and flips to the left. */}
+          <Box position="fixed" right="1rem" top="2rem">
+            <Menu.Root positioning={ROOT_END}>
+              <Menu.Trigger>Open</Menu.Trigger>
+              <Menu.Positioner>
+                <MenuContent minW="12rem">
+                  <Menu.Item value="rename">Rename</Menu.Item>
+                  {/* As call sites nest them: right-start, positioned in a portal. */}
+                  <Menu.Root positioning={SUBMENU_RIGHT}>
+                    <Menu.TriggerItem>Move to</Menu.TriggerItem>
+                    <Portal>
+                      <Menu.Positioner>
+                        <MenuContent minW="12rem">
+                          <Menu.Item value="inbox">Inbox</Menu.Item>
+                          <Menu.Item value="archive">Archive</Menu.Item>
+                        </MenuContent>
+                      </Menu.Positioner>
+                    </Portal>
+                  </Menu.Root>
+                </MenuContent>
+              </Menu.Positioner>
+            </Menu.Root>
+          </Box>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Open' })));
+    await vi.waitFor(() => expect(item('rename')).toBeVisible());
+
+    const trigger = page.getByRole('menuitem', { name: 'Move to' }).element() as HTMLElement;
+    await act(() => userEvent.hover(trigger));
+    await vi.waitFor(() => expect(item('inbox')).toBeVisible());
+    const submenu = item('inbox').closest<HTMLElement>('[role="menu"]')!;
+    await vi.waitFor(() => expect(submenu.dataset.placement).toMatch(/^left/));
+    await Promise.all(submenu.getAnimations().map((animation) => animation.finished));
+
+    const changes: string[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        const element = record.target as HTMLElement;
+        const name = record.attributeName!;
+        changes.push(`${element === trigger ? 'trigger' : 'submenu'} ${name}=${String(element.getAttribute(name))}`);
+      }
+    });
+    for (const target of [trigger, submenu]) {
+      observer.observe(target, { attributeFilter: ['data-placement', 'data-state'] });
+    }
+    const animationStarts: string[] = [];
+    const recordAnimation = (event: AnimationEvent) => {
+      if (event.target === submenu) {
+        animationStarts.push(event.animationName);
+      }
+    };
+    submenu.addEventListener('animationstart', recordAnimation);
+
+    // Real pointer moves a pixel apart, from the trigger item's middle across its left edge to well inside the submenu,
+    // so the browser fires pointerleave on the item and pointerenter on the submenu as a hand's crossing does.
+    // `userEvent.hover` on an element jumps to its centre in one move. Forced, so Playwright does not wait out two frames
+    // of stability before each move, which would leave the pointer in each spot far longer than a hand does.
+    const body = document.body.getBoundingClientRect();
+    const from = trigger.getBoundingClientRect();
+    const y = from.top + from.height / 2;
+    const end = submenu.getBoundingClientRect().right - 16;
+    expect(end).toBeLessThan(from.left);
+    for (let x = from.left + from.width / 2; x >= end; x -= 1) {
+      await act(() =>
+        userEvent.hover(page.elementLocator(document.body), {
+          force: true,
+          position: { x: x - body.left, y: y - body.top },
+        })
+      );
+    }
+    // Long enough for a restarted open animation, and for the hover the submenu loses with it to come back.
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 300);
+    });
+    observer.disconnect();
+    submenu.removeEventListener('animationstart', recordAnimation);
+
+    expect(document.elementFromPoint(end, y)?.closest('[role="menu"]')).toBe(submenu);
+    // One assertion, so a failure shows every symptom together.
+    expect({ animationStarts, changes, state: submenu.dataset.state }).toEqual({
+      animationStarts: [],
+      changes: [],
+      state: 'open',
+    });
+    expect(submenu.dataset.placement).toMatch(/^left/);
+  });
+});
+
+/**
+ * A pointer-anchored context menu shaped as call sites build one, opened by buttons outside it: near the bottom edge,
+ * where a bottom-start menu has no room and flips to the top, and near the top, where it does not.
+ */
+const ContextMenuAt = () => {
+  const { anchor, close, onRequestDismiss, open } = useContextMenu();
+  const openLow = useCallback(() => open({ x: 120, y: window.innerHeight - 4 }), [open]);
+  const openHigh = useCallback(() => open({ x: 120, y: 60 }), [open]);
+  const positioning = useMemo(
+    () => ({
+      getAnchorRect: () => (anchor ? { height: 1, width: 1, x: anchor.x, y: anchor.y } : null),
+      placement: 'bottom-start' as const,
+    }),
+    [anchor]
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        close();
+      }
+    },
+    [close]
+  );
+  return (
+    <>
+      <button type="button" onClick={openLow}>
+        Open low
+      </button>
+      <button type="button" onClick={openHigh}>
+        Open high
+      </button>
+      <Menu.Root
+        open={anchor !== null}
+        positioning={positioning}
+        onOpenChange={handleOpenChange}
+        onRequestDismiss={onRequestDismiss}
+      >
+        <Menu.Positioner>
+          <MenuContent minW="12rem">
+            <Menu.Item value="rename">Rename</Menu.Item>
+            <Menu.Item value="duplicate">Duplicate</Menu.Item>
+          </MenuContent>
+        </Menu.Positioner>
+      </Menu.Root>
+    </>
+  );
+};
+
+describe('reopened menus', () => {
+  it('open from their configured side, without a frame on the side a previous opening flipped to', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <ContextMenuAt />
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Open low' })));
+    await vi.waitFor(() => expect(item('rename')).toBeVisible());
+    const content = item('rename').closest<HTMLElement>('[role="menu"]')!;
+    await vi.waitFor(() => expect(content.dataset.placement).toBe('top-start'));
+    await Promise.all(content.getAnimations().map((animation) => animation.finished));
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(content.dataset.state).toBe('closed'));
+    await Promise.all(content.getAnimations().map((animation) => animation.finished));
+
+    // The root stays mounted between openings, and so does the placement its machine resolved last; the content
+    // element may be replaced, so watch for whichever one is current.
+    const currentContent = () => document.querySelector<HTMLElement>('[data-scope="menu"][data-part="content"]');
+    const snapshots: string[] = [];
+    const observer = new MutationObserver(() => {
+      const current = currentContent();
+      snapshots.push(`${String(current?.dataset.state)} ${String(current?.dataset.placement)}`);
+    });
+    observer.observe(document.body, {
+      attributeFilter: ['data-placement', 'data-state'],
+      childList: true,
+      subtree: true,
+    });
+    // One opening starts its animations together, in one frame; a restarted one starts in a later frame.
+    const animationStarts: { name: string; time: CSSNumberish | null }[] = [];
+    const recordAnimation = (event: AnimationEvent) => {
+      if (event.target === currentContent()) {
+        animationStarts.push({ name: event.animationName, time: document.timeline.currentTime });
+      }
+    };
+    document.addEventListener('animationstart', recordAnimation, true);
+
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Open high' })));
+    await vi.waitFor(() => expect(currentContent()?.dataset.state).toBe('open'));
+    await vi.waitFor(() => expect(currentContent()?.dataset.placement).toBe('bottom-start'));
+    const reopened = currentContent()!;
+    await Promise.all(reopened.getAnimations().map((animation) => animation.finished));
+    // Long enough for a restarted open animation to start.
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 200);
+    });
+    observer.disconnect();
+    document.removeEventListener('animationstart', recordAnimation, true);
+
+    expect(animationStarts.length).toBeGreaterThan(0);
+    // One assertion, so a failure shows every symptom together.
+    expect({
+      openOnFlippedSide: snapshots.filter((snapshot) => snapshot.startsWith('open top')),
+      startedLater: animationStarts.filter(({ time }) => time !== animationStarts[0]!.time).map(({ name }) => name),
+    }).toEqual({ openOnFlippedSide: [], startedLater: [] });
+  });
+});
+
+const ARROW_PLACEMENTS = {
+  'bottom-start': { placement: 'bottom-start' },
+  'top-end': { placement: 'top-end' },
+  'right-start': { placement: 'right-start' },
+  'left-start': { placement: 'left-start' },
+} as const;
+
+// Context menus open at the pointer, anchored to a 1px point; other measured anchors are boxes, such as a tab.
+const POINT_START = { height: 1, width: 1, x: 40, y: 200 };
+const POINT_END = { height: 1, width: 1, x: 300, y: 200 };
+const BOX = { height: 24, width: 40, x: 40, y: 200 };
+const ANCHORED = {
+  'point-start': { getAnchorRect: () => POINT_START, placement: 'bottom-start' },
+  'point-end': { getAnchorRect: () => POINT_END, placement: 'bottom-end' },
+  box: { getAnchorRect: () => BOX, placement: 'bottom-start' },
+} as const;
+const END_ALIGNED = { placement: 'bottom-end' } as const;
+
+describe('menu arrows', () => {
+  const renderTriggerMenu = async (placement: keyof typeof ARROW_PLACEMENTS, submenu = false) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          {/* Room on the side the menu opens to, so it does not flip. */}
+          <Box
+            left={placement.startsWith('right') ? '1rem' : placement.startsWith('left') ? 'calc(100vw - 5rem)' : '50vw'}
+            position="fixed"
+            top="50vh"
+          >
+            <Menu.Root positioning={ARROW_PLACEMENTS[placement]}>
+              <Menu.Trigger>Open</Menu.Trigger>
+              <Menu.Positioner>
+                <MenuContent minW="12rem">
+                  <Menu.Item value="rename">Rename</Menu.Item>
+                  {submenu ? (
+                    <Menu.Root>
+                      <Menu.TriggerItem>Move to</Menu.TriggerItem>
+                      <Menu.Positioner>
+                        <MenuContent>
+                          <Menu.Item value="inbox">Inbox</Menu.Item>
+                        </MenuContent>
+                      </Menu.Positioner>
+                    </Menu.Root>
+                  ) : null}
+                </MenuContent>
+              </Menu.Positioner>
+            </Menu.Root>
+          </Box>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Open' })));
+    await vi.waitFor(() => expect(item('rename')).toBeVisible());
+  };
+
+  const arrowsIn = (positioner: Element | null | undefined) =>
+    positioner ? [...positioner.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="arrow"]')] : [];
+
+  it.each([
+    ['bottom-start', 'top'],
+    ['top-end', 'bottom'],
+    ['right-start', 'left'],
+  ] as const)('points a %s menu at its trigger from the content edge facing it', async (placement, edge) => {
+    await renderTriggerMenu(placement);
+    const trigger = page.getByRole('button', { name: 'Open' }).element().getBoundingClientRect();
+    const menu = page.getByRole('menu').element();
+    const [arrow] = arrowsIn(menu.parentElement);
+    const tip = arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!;
+    // The arrow slides in with the content once placed; measure both at rest.
+    await vi.waitFor(() => expect(menu.dataset.side).toBe(placement.split('-')[0]));
+    await Promise.all([...menu.getAnimations(), ...arrow!.getAnimations()].map((animation) => animation.finished));
+
+    // Beside the content, whose scrolling would clip it, not inside it.
+    expect(menu.contains(arrow!)).toBe(false);
+    const content = menu.getBoundingClientRect();
+    const tipBox = tip.getBoundingClientRect();
+    if (edge === 'left') {
+      expect(tipBox.left).toBeLessThan(content.left);
+      expect(tipBox.left).toBeGreaterThanOrEqual(trigger.right);
+      expect((tipBox.top + tipBox.bottom) / 2).toBeCloseTo((trigger.top + trigger.bottom) / 2, 0);
+    } else {
+      if (edge === 'top') {
+        expect(tipBox.top).toBeLessThan(content.top);
+        expect(tipBox.top).toBeGreaterThanOrEqual(trigger.bottom);
+      } else {
+        expect(tipBox.bottom).toBeGreaterThan(content.bottom);
+        expect(tipBox.bottom).toBeLessThanOrEqual(trigger.top);
+      }
+      expect((tipBox.left + tipBox.right) / 2).toBeCloseTo((trigger.left + trigger.right) / 2, 0);
+    }
+
+    // The tip reads as part of the content: its fill and border are the content's, not a transparent outline.
+    const contentStyle = getComputedStyle(menu);
+    const tipStyle = getComputedStyle(tip);
+    expect(tipStyle.backgroundColor).toBe(contentStyle.backgroundColor);
+    expect(tipStyle.borderTopColor).toBe(contentStyle.borderTopColor);
+    expect(tipStyle.borderTopWidth).toBe(contentStyle.borderTopWidth);
+  });
+
+  it('stays open, with keyboard navigation intact, when its tip is clicked; a click beside the menu still closes it', async () => {
+    await renderTriggerMenu('bottom-start', true);
+    const trigger = page.getByRole('button', { name: 'Open' }).element();
+    const menu = page.getByRole('menu').element();
+    const [arrow] = arrowsIn(menu.parentElement);
+    await vi.waitFor(() => expect(menu.dataset.side).toBe('bottom'));
+    await Promise.all([...menu.getAnimations(), ...arrow!.getAnimations()].map((animation) => animation.finished));
+    const tipBox = arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!.getBoundingClientRect();
+    const content = menu.getBoundingClientRect();
+    const body = document.body.getBoundingClientRect();
+    const clickAt = (x: number, y: number) =>
+      act(() =>
+        userEvent.click(page.elementLocator(document.body), { position: { x: x - body.left, y: y - body.top } })
+      );
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await vi.waitFor(() => expect(item('rename').hasAttribute('data-highlighted')).toBe(true));
+
+    // On the tip's outer half, above the content's edge.
+    await clickAt((tipBox.left + tipBox.right) / 2, content.top - 3);
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 100);
+    });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(menu.contains(document.activeElement)).toBe(true);
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await vi.waitFor(() =>
+      expect(page.getByRole('menuitem', { name: 'Move to' }).element()).toHaveAttribute('data-highlighted')
+    );
+
+    // The arrow's transparent clearance beside the tip lets the click through, to the page outside the menu.
+    const arrowBox = arrow!.getBoundingClientRect();
+    const clearance = { x: tipBox.right + 2, y: content.top - 3 };
+    expect(clearance.x).toBeLessThan(arrowBox.right);
+    expect(arrow!.contains(document.elementFromPoint(clearance.x, clearance.y))).toBe(false);
+    await clickAt(clearance.x, clearance.y);
+    await vi.waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('false'));
+  });
+
+  it('leaves submenus, which open flush beside their item, without one', async () => {
+    await renderTriggerMenu('bottom-start', true);
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Move to' })));
+    await vi.waitFor(() => expect(item('inbox')).toBeVisible());
+
+    const [parentMenu, submenu] = page.getByRole('menu').elements();
+    expect(arrowsIn(parentMenu!.parentElement)).toHaveLength(1);
+    expect(arrowsIn(submenu!.parentElement)).toHaveLength(0);
+  });
+
+  it.each([
+    ['a bottom-start context menu has none, and opens right at the pointer', 'point-start', 0, 8],
+    ['a bottom-end context menu has none, and opens right at the pointer', 'point-end', 0, 8],
+    ['a menu anchored to a measured box points at it', 'box', 12, 8 + 6],
+  ] as const)('%s', async (_name, anchor, arrowSize, gap) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <Menu.Root open positioning={ANCHORED[anchor]}>
+            <Menu.Positioner>
+              <MenuContent>
+                <Menu.Item value="rename">Rename</Menu.Item>
+              </MenuContent>
+            </Menu.Positioner>
+          </Menu.Root>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    const menu = page.getByRole('menu').element();
+    const [arrow] = arrowsIn(menu.parentElement);
+    const { getAnchorRect, placement } = ANCHORED[anchor];
+    await vi.waitFor(() => expect(menu.dataset.placement).toBe(placement));
+    // A point anchor shrinks the arrow once placed; the menu is then placed again without the arrow's height.
+    await vi.waitFor(() => {
+      expect(arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!.offsetWidth).toBe(arrowSize);
+      const rect = getAnchorRect();
+      expect(menu.getBoundingClientRect().top - (rect.y + rect.height)).toBeCloseTo(gap, 0);
+    });
+    if (arrowSize === 0) {
+      // Nor does its tip leave a bordered dot, nor its box shift the menu sideways to centre on the pointer: the menu's
+      // aligned edge is at the pointer. Floating UI keeps even an arrow of no size its 4px padding from the corner, which
+      // moves the menu by up to that, as it did before menus had arrows.
+      expect(getComputedStyle(arrow!.querySelector('[data-part="arrow-tip"]')!).borderTopWidth).toBe('0px');
+      const rect = getAnchorRect();
+      const content = menu.getBoundingClientRect();
+      if (placement === 'bottom-start') {
+        expect(Math.abs(content.left - rect.x)).toBeLessThanOrEqual(4);
+      } else {
+        expect(Math.abs(content.right - (rect.x + rect.width))).toBeLessThanOrEqual(4);
+      }
+    } else {
+      const tip = arrow!.querySelector('[data-part="arrow-tip"]')!.getBoundingClientRect();
+      expect((tip.left + tip.right) / 2).toBeCloseTo(BOX.x + BOX.width / 2, 0);
+    }
+  });
+
+  it.each([
+    ['clears the corner for a small trigger at the end of a bar, shifting the panel to point at it', '50vw'],
+    ['clears the corner for a small trigger at the viewport edge, where the panel cannot shift', '0px'],
+  ] as const)('%s', async (_name, right) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <Box position="fixed" right={right} top="40vh">
+            <Menu.Root positioning={END_ALIGNED}>
+              <Menu.Trigger aria-label="More" h="4" p="0" w="4" />
+              <Menu.Positioner>
+                <MenuContent minW="12rem">
+                  <Menu.Item value="rename">Rename</Menu.Item>
+                </MenuContent>
+              </Menu.Positioner>
+            </Menu.Root>
+          </Box>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    await act(() => userEvent.click(page.getByRole('button', { name: 'More' })));
+    const menu = page.getByRole('menu').element();
+    await vi.waitFor(() => expect(menu.dataset.side).toBe('bottom'));
+    await Promise.all(menu.getAnimations().map((animation) => animation.finished));
+
+    const content = menu.getBoundingClientRect();
+    const radius = parseFloat(getComputedStyle(menu).borderTopRightRadius);
+    const tip = arrowsIn(menu.parentElement)[0]!.querySelector('[data-part="arrow-tip"]')!.getBoundingClientRect();
+    // The diamond's widest extent is its base on the content's edge: it stays on the straight part of that edge.
+    expect(radius).toBeGreaterThan(0);
+    expect(tip.left).toBeGreaterThanOrEqual(content.left + radius);
+    expect(tip.right).toBeLessThanOrEqual(content.right - radius);
+    if (right !== '0px') {
+      const trigger = page.getByRole('button', { name: 'More' }).element().getBoundingClientRect();
+      expect((tip.left + tip.right) / 2).toBeCloseTo((trigger.left + trigger.right) / 2, 0);
+    }
+  });
+
+  it.each([
+    ['bottom-start', 'first item, below the arrow'],
+    ['top-end', 'last item, above the arrow'],
+  ] as const)('lets the pointer through the arrow box to a %s menu: its %s', async (placement, _where) => {
+    await renderTriggerMenu(placement);
+    const menu = page.getByRole('menu').element();
+    await vi.waitFor(() => expect(menu.dataset.side).toBe(placement.split('-')[0]));
+    await Promise.all(menu.getAnimations().map((animation) => animation.finished));
+    const [arrow] = arrowsIn(menu.parentElement);
+    const box = arrow!.getBoundingClientRect();
+    const content = menu.getBoundingClientRect();
+    // Inside the item, which starts past the content's padding, and inside the arrow box's half over the content.
+    const y = placement === 'bottom-start' ? content.top + 9 : content.bottom - 9;
+    expect(y).toBeGreaterThan(box.top);
+    expect(y).toBeLessThan(box.bottom);
+
+    expect(document.elementFromPoint(box.left + box.width / 2, y)?.closest('[role="menuitem"]')).toBe(item('rename'));
+  });
+
+  describe('joint with the content', () => {
+    afterEach(async () => {
+      await server.commands.emulateDevicePixelRatio(null);
+      applyThemeToRoot('classic');
+    });
+
+    it.each([
+      ['classic', 1, 'top-end'],
+      ['classic', 1, 'bottom-start'],
+      ['classic', 1.25, 'top-end'],
+      ['classic', 1.25, 'bottom-start'],
+      ['classic', 1.25, 'right-start'],
+      ['classic', 1.25, 'left-start'],
+      ['light', 1.25, 'top-end'],
+    ] as const)(
+      'reads as one shape, the content border never crossing the arrow (%s theme, DPR %s, %s)',
+      async (themeId, ratio, placement) => {
+        applyThemeToRoot(themeId);
+        await server.commands.emulateDevicePixelRatio(ratio);
+        await vi.waitFor(() => expect(globalThis.devicePixelRatio).toBe(ratio));
+        await renderTriggerMenu(placement);
+        const menu = page.getByRole('menu').element() as HTMLElement;
+        const [arrow] = arrowsIn(menu.parentElement);
+        await vi.waitFor(() => expect(menu.dataset.placement).toBe(placement));
+        await Promise.all([...menu.getAnimations(), ...arrow!.getAnimations()].map((animation) => animation.finished));
+
+        expect(await findArrowJointSeams(menu, arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!)).toEqual(
+          []
+        );
+      }
+    );
+  });
+});
+
+/** Two sections kept alive by Activity, like the launchpad's pages, switched from outside them. */
+const MenuSections = () => {
+  const [isOtherShown, setIsOtherShown] = useState(false);
+  const showOther = useCallback(() => setIsOtherShown(true), []);
+  const showFirst = useCallback(() => setIsOtherShown(false), []);
+
+  return (
+    <ChakraProvider value={system}>
+      <button type="button" onClick={showFirst}>
+        First section
+      </button>
+      <button type="button" onClick={showOther}>
+        Other section
+      </button>
+      <Activity mode={isOtherShown ? 'hidden' : 'visible'}>
+        <Menu.Root>
+          <Menu.Trigger>Actions</Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent>
+                <MenuItem value="rename">Rename</MenuItem>
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Activity>
+    </ChakraProvider>
+  );
+};
+
+describe('menus in a hidden section', () => {
+  it('stay closed when their section returns after it was hidden while they faded out', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => root?.render(<MenuSections />));
+    const shownMenu = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="content"]')].find((menu) =>
+        menu.checkVisibility()
+      );
+
+    await userEvent.click(page.getByRole('button', { name: 'Actions' }));
+    await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
+    // Escape closes the menu, and a switch hides its section before the fade ends.
+    await act(() => userEvent.keyboard('{Escape}'));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Other section' })));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'First section' })));
+
+    await expect.poll(shownMenu).toBeUndefined();
+    // Fully usable again: the trigger opens it afresh.
+    await userEvent.click(page.getByRole('button', { name: 'Actions' }));
+    await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
   });
 });

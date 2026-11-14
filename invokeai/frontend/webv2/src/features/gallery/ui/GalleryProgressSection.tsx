@@ -1,5 +1,5 @@
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
-import type { QueueProgressSession } from '@features/queue/contracts';
+import type { QueueProgressSession, QueueSourceId } from '@features/queue/contracts';
 
 import { Box, chakra, Icon, Skeleton, Text } from '@chakra-ui/react';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryProgressLayout } from './galleryGridLayout';
 
 import { GALLERY_TAB_STOP_SELECTOR } from './GalleryThumbnail';
-import { SELECTED_TILE_CSS } from './GalleryTileFrame';
+import { GalleryTileMedia, getGalleryTileMediaRatio } from './GalleryTileFrame';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -182,13 +182,25 @@ const GalleryProgressGrid = ({
   );
 };
 
-const FILL_CELL = { h: 'full', w: 'full' } as const;
-const FILL_WIDTH = { w: 'full' } as const;
-const FILL_HEIGHT = { h: 'full' } as const;
+/**
+ * Like a completed thumbnail: hover tints the square cell, while the border, selection and focus ring wrap the media
+ * box sized to the job's target ratio, so the finished item takes the same rect. The progress badge stays on the cell.
+ */
+const PROGRESS_CELL_CSS = {
+  _focusVisible: { outline: 'none' },
+  // Queued and settling tiles are inert; only a followable one answers hover.
+  '&:not([aria-disabled=true]):hover': { bg: 'bg.hover' },
+  '&:focus-visible [data-gallery-tile-media]': {
+    outline: '2px solid {colors.accent.solid}',
+    outlineOffset: '-2px',
+  },
+} as const;
 
-/** The output's width-to-height ratio, for letterboxing a placeholder like an aspect-fit thumbnail. */
-const getPlaceholderAspectRatio = ({ width, height }: QueueProgressSession): number | null =>
-  width > 0 && height > 0 && Number.isFinite(width / height) ? width / height : null;
+/**
+ * Sources whose snapshot records the size they will output. Workflows take Generate's size, which their graph need
+ * not use, so their tiles stay square and letterbox the live image.
+ */
+const SIZED_PROGRESS_SOURCES: ReadonlySet<QueueSourceId> = new Set(['canvas', 'generate', 'upscale', 'video']);
 
 const GalleryProgressTile = ({
   session,
@@ -246,51 +258,49 @@ const GalleryProgressTile = ({
   );
 
   const isShownSelected = selected && session.state !== 'queued';
-  // Aspect fit letterboxes the placeholder inside the square cell, as completed thumbnails are: the longer side fills
-  // the cell and the other follows the output's ratio.
-  const placeholderAspectRatio = fit === 'aspect' ? getPlaceholderAspectRatio(session) : null;
-  const placeholderSize =
-    placeholderAspectRatio === null ? FILL_CELL : placeholderAspectRatio >= 1 ? FILL_WIDTH : FILL_HEIGHT;
+  const mediaRatio = SIZED_PROGRESS_SOURCES.has(session.sourceId) ? getGalleryTileMediaRatio(session, fit) : null;
 
   return (
     <Tooltip content={`${label} · ${status}`}>
       <chakra.button
         ref={buttonRef}
         type="button"
-        focusVisibleRing="inside"
         aria-label={`${label} · ${status}`}
         aria-pressed={isShownSelected}
         aria-disabled={session.state !== 'running'}
         data-gallery-session-id={session.id}
         tabIndex={session.state === 'running' ? 0 : -1}
-        borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
-        borderWidth="2px"
-        css={isShownSelected ? SELECTED_TILE_CSS : undefined}
+        alignItems="center"
+        aspectRatio={1}
+        css={PROGRESS_CELL_CSS}
+        display="flex"
         flexShrink={0}
+        justifyContent="center"
         minW="0"
-        overflow="hidden"
         rounded="md"
         textAlign="start"
         position="relative"
+        transition="background-color var(--wb-motion-duration-fast) ease"
         w={`${size}px`}
         onClick={follow}
       >
-        <StreamingImageFrame
-          alignItems="center"
-          aspectRatio={1}
-          display="flex"
-          fit={fit === 'aspect' ? 'contain' : 'cover'}
-          justifyContent="center"
-          liveImage={progressImageToStreamingSource(image)}
-          shouldAntialiasLiveImage={antialiasProgressImages}
-          w="full"
+        <GalleryTileMedia
+          fit={mediaRatio === null ? 'square' : fit}
+          height={session.height}
+          isSelected={isShownSelected}
+          width={session.width}
         >
-          {session.state === 'queued' ? (
-            <Box bg="bg.subtle" aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
-          ) : (
-            <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
-          )}
-        </StreamingImageFrame>
+          <StreamingImageFrame
+            // A box sized to the target ratio is filled exactly; an unsized aspect fit letterboxes in the square.
+            fit={fit === 'aspect' && mediaRatio === null ? 'contain' : 'cover'}
+            h="full"
+            liveImage={progressImageToStreamingSource(image)}
+            shouldAntialiasLiveImage={antialiasProgressImages}
+            w="full"
+          >
+            {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
+          </StreamingImageFrame>
+        </GalleryTileMedia>
         <ProgressBadge
           label={status}
           percentage={percentage}

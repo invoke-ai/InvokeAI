@@ -24,6 +24,8 @@ export type PromptTemplateChange = 'chosen' | 'synced';
 interface PromptTemplatesButtonProps {
   activeTemplate: PromptTemplateSnapshot | null;
   showSyntaxHighlighting: boolean;
+  /** Whether a template draft handed over from the gallery opens here; it goes to Generate's field, not Upscale's. */
+  takesPendingDraft?: boolean;
   onApply: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
 }
 
@@ -34,6 +36,7 @@ export const PromptTemplatesButton = ({
   activeTemplate,
   onApply,
   showSyntaxHighlighting,
+  takesPendingDraft = true,
 }: PromptTemplatesButtonProps) => {
   const { t } = useTranslation();
   const triggerId = useId();
@@ -47,7 +50,8 @@ export const PromptTemplatesButton = ({
     useCallback((prefill: PendingPromptTemplateDraft) => {
       setEditorTarget({ prefill, record: null });
       setIsOpen(true);
-    }, [])
+    }, []),
+    takesPendingDraft
   );
 
   const handleOpenChange = useCallback((event: { open: boolean }) => {

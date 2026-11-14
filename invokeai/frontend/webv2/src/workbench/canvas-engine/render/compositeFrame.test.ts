@@ -17,7 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 
-import { createCompositeFrame, type CreateCompositeFrameDeps, isStagingHiddenStackSelected } from './compositeFrame';
+import { createCompositeFrame, type CreateCompositeFrameDeps, isInStagingHiddenStack } from './compositeFrame';
 
 const VIEW = [1, 0, 0, 1, 0, 0] as unknown as Mat2d;
 
@@ -338,7 +338,7 @@ describe('the surface budget', () => {
   });
 });
 
-describe('masks while a result is staged', () => {
+describe('overlay stacks while a result is staged', () => {
   const mask = (id: string, overrides: Record<string, unknown> = {}) =>
     layer(id, {
       mask: { bitmap: { height: 8, imageName: `${id}.png`, width: 8 }, fill: { color: '#e07575', style: 'solid' } },
@@ -364,7 +364,7 @@ describe('masks while a result is staged', () => {
       width: 8,
     });
 
-  it('hides mask and region stacks and the region tint under a shown preview, rebuilding the description per flip', () => {
+  it('hides control, mask and region stacks and the region tint under a shown preview, rebuilding the description per flip', () => {
     const frame = createCompositeFrame(harness.deps);
     const drawFrame = () => frame.draw(surface(), doc, VIEW, null, null);
 
@@ -378,25 +378,72 @@ describe('masks while a result is staged', () => {
     drawFrame();
     const hidden = description();
     expect(hidden).not.toBe(shown);
-    expect(drawnIds()).toEqual(['a', 'c']);
-    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(drawnIds()).toEqual(['a']);
+    expect(demandedIds()).toEqual(['a']);
     expect(lastCompositeOptions().regionOverlays).toBe(false);
     drawFrame();
     expect(description()).toBe(hidden);
 
-    // Toggling the preview off (or accepting/discarding) shows them again.
+    // Accepting or discarding ends the preview and shows them again.
     harness.previews.clearStaged();
     drawFrame();
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
   });
 
-  it('shows them over the preview only while a gesture edits a mask or region, whatever is selected', () => {
+  it('keeps them hidden while the staged result is toggled off to compare, until staging ends', () => {
+    const frame = createCompositeFrame(harness.deps);
+    const drawFrame = (document = doc) => frame.draw(surface(), document, VIEW, null, null);
+    const hiddenWhileComparing = () => {
+      expect(drawnIds()).toEqual(['a']);
+      expect(demandedIds()).toEqual(['a']);
+      expect(lastCompositeOptions().regionOverlays).toBe(false);
+    };
+
+    publishPreview();
+    drawFrame();
+    hiddenWhileComparing();
+    expect(lastCompositeOptions().stagedPreview).not.toBeNull();
+
+    // The eye shows the canvas under the result exactly as the shown result left it: no masks, no tint.
+    harness.previews.hideStaged();
+    drawFrame();
+    hiddenWhileComparing();
+    expect(lastCompositeOptions().stagedPreview).toBeNull();
+
+    // A mask gesture reveals them as it would over the shown result, and the frame keeps the selected mask ready.
+    harness.entries.set('m', entryFor(undefined, true));
+    drawFrame({ ...doc, selectedLayerId: 'm' });
+    expect(harness.rasterizeLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'm' }), expect.anything());
+    expect(demandedIds()).toEqual(['a', 'm']);
+    harness.editingHiddenStack = true;
+    drawFrame({ ...doc, selectedLayerId: 'm' });
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    harness.editingHiddenStack = false;
+    harness.entries.set('m', entryFor());
+
+    // Showing it again and hiding it again never brings them back.
+    publishPreview();
+    drawFrame();
+    hiddenWhileComparing();
+    harness.previews.hideStaged();
+    drawFrame();
+    hiddenWhileComparing();
+
+    // Accepting or discarding while it is toggled off ends the comparison.
+    harness.previews.clearStaged();
+    drawFrame();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
+  });
+
+  it('shows them over the preview only while a gesture edits a control layer, mask or region, whatever is selected', () => {
     const frame = createCompositeFrame(harness.deps);
     publishPreview();
     // Selecting a mask alone keeps the result unmasked.
     frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
-    expect(drawnIds()).toEqual(['a', 'c']);
+    expect(drawnIds()).toEqual(['a']);
 
     harness.editingHiddenStack = true;
     frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
@@ -407,11 +454,11 @@ describe('masks while a result is staged', () => {
 
     harness.editingHiddenStack = false;
     frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
-    expect(drawnIds()).toEqual(['a', 'c']);
+    expect(drawnIds()).toEqual(['a']);
     expect(lastCompositeOptions().regionOverlays).toBe(false);
   });
 
-  it('keeps the selected mask or region loaded and demanded while hidden, and nothing else', () => {
+  it('keeps the selected control layer, mask or region loaded and demanded while hidden, and nothing else', () => {
     const frame = createCompositeFrame(harness.deps);
     publishPreview();
     const drawSelected = (selectedLayerId: string, document = doc) => {
@@ -421,21 +468,24 @@ describe('masks while a result is staged', () => {
     };
 
     // A stale cache starts loading, and the frame protects the leaf from eviction though it draws none.
+    harness.entries.set('c', entryFor(undefined, true));
     harness.entries.set('m', entryFor(undefined, true));
     harness.entries.set('r', entryFor(undefined, true));
     expect(drawSelected('m')).toEqual(['m']);
-    expect(drawnIds()).toEqual(['a', 'c']);
-    expect(demandedIds()).toEqual(['a', 'c', 'm']);
+    expect(drawnIds()).toEqual(['a']);
+    expect(demandedIds()).toEqual(['a', 'm']);
     expect(drawSelected('r')).toEqual(['r']);
-    expect(demandedIds()).toEqual(['a', 'c', 'r']);
+    expect(demandedIds()).toEqual(['a', 'r']);
+    expect(drawSelected('c')).toEqual(['c']);
+    expect(demandedIds()).toEqual(['a', 'c']);
 
     // A disabled mask draws nowhere, and a selected group's brush or shape paints a new layer instead.
     const disabled = documentOf([layer('a'), control('c'), { ...mask('m'), isEnabled: false }, region('r')]);
     expect(drawSelected('m', disabled)).toEqual([]);
-    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a']);
     const grouped = documentOf([layer('a'), control('c'), groupContract('g', [mask('m')]), region('r')]);
     expect(drawSelected('g', grouped)).toEqual([]);
-    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a']);
 
     // Off screen it is left on demand, as a drawn leaf would be.
     const offscreen = documentOf([
@@ -445,7 +495,7 @@ describe('masks while a result is staged', () => {
       region('r'),
     ]);
     expect(drawSelected('m', offscreen)).toEqual([]);
-    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a']);
 
     // Without a shown preview the stacks draw, so their leaves are demanded as usual.
     harness.previews.clearStaged();
@@ -456,10 +506,10 @@ describe('masks while a result is staged', () => {
   it.each([
     ['m', true],
     ['r', true],
-    ['c', false],
+    ['c', true],
     ['a', false],
     [null, false],
-  ])('counts selecting %s as selecting a stack the staged view hides: %s', (id, hidden) => {
-    expect(isStagingHiddenStackSelected({ ...doc, selectedLayerId: id })).toBe(hidden);
+  ])('counts %s as in a stack the staged view hides: %s', (id, hidden) => {
+    expect(isInStagingHiddenStack(doc, id)).toBe(hidden);
   });
 });

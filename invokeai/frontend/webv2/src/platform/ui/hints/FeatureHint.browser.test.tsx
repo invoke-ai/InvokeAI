@@ -295,18 +295,18 @@ describe('FeatureHint', () => {
     it('stays open through a rest on the arrow, which lies outside the card body', async () => {
       const { trigger } = await renderHint(LEFT_PANEL_CSS);
       const card = await openHintCard(trigger);
-      const arrow = document.querySelector<HTMLElement>('[data-scope="hover-card"][data-part="arrow"]')!;
-      const arrowRect = arrow.getBoundingClientRect();
+      const tip = document.querySelector<HTMLElement>('[data-scope="hover-card"][data-part="arrow-tip"]')!;
+      const tipRect = tip.getBoundingClientRect();
       const label = trigger.getBoundingClientRect();
       const exit = { x: label.right - 2, y: label.top + label.height / 2 };
-      // The arrow straddles the card's edge: its outer half is clear of the content rect.
-      const outer = { x: arrowRect.left + 1, y: arrowRect.top + arrowRect.height / 2 };
+      // The tip straddles the card's edge, drawn only outside it: a point on its outer half is clear of the content
+      // rect, and the tip itself is what the pointer rests on there.
+      const outer = { x: tipRect.left + 3, y: tipRect.top + tipRect.height / 2 };
 
       expect(outer.x).toBeLessThan(card.left);
+      expect(document.elementFromPoint(outer.x, outer.y)).toBe(tip);
       await movePointerAlong(exit, { x: outer.x - 6, y: outer.y }, MOVE);
-      await act(() =>
-        userEvent.hover(arrow, { position: { x: outer.x - arrowRect.left, y: outer.y - arrowRect.top } })
-      );
+      await act(() => userEvent.hover(tip, { position: { x: outer.x - tipRect.left, y: outer.y - tipRect.top } }));
       // Past the corridor's grace window and the close delay after it.
       await settle(1500);
       // The title, the card's first paragraph.

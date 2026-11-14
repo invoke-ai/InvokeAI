@@ -1,20 +1,16 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
-import { invalidateGallery } from '@features/gallery/queries';
+import { classifyGalleryUpload } from '@features/gallery/contracts';
 import { useQueueItemProgressImage } from '@features/queue/react';
 import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useNativeFileDrag } from '@platform/react/useNativeFileDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import {
-  getControlUploadNotice,
-  resolveControlFileDrop,
-  uploadControlImageFile,
-  type ControlSourceNotice,
-} from '@workbench/canvas-operations/api';
+import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlotRect, getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
@@ -24,6 +20,7 @@ import { useWorkbenchPreferenceSelector, useWorkbenchSettingsSelector } from '@w
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
+import { useDroppedFileUpload } from '@workbench/widgets/shared/useDroppedFileUpload';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -37,7 +34,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
+import { copyCanvasSelection, decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
   cropAllLayersToFrame,
   resolveCanvasContextMenu,
@@ -48,9 +45,10 @@ import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
+import { CanvasFrameSizeReadout } from './CanvasFrameSizeReadout';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
-import { resolveCanvasImageDrop } from './canvasImageDnd';
+import { findCanvasImageDropDestination, resolveCanvasImageDrop, type CanvasImageDropData } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
@@ -62,7 +60,12 @@ import {
 import { CanvasStagedRegionsFeed } from './CanvasStagedRegionsFeed';
 import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
-import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCommands';
+import {
+  CANVAS_COMPANION_HOTKEYS,
+  reportMergeDownRefusal,
+  reportTransformRefusal,
+  showCanvasRefusalNotice,
+} from './canvasToolCommands';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
@@ -80,8 +83,6 @@ import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
-
-const isFileDrag = (dataTransfer: DataTransfer): boolean => dataTransfer.types.includes('Files');
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -195,72 +196,48 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isDocumentEditingLocked = operationKind !== null;
   const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
 
-  // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
-  // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
-  // hovers, the drop effect shows whether the canvas would take it; a drop that still arrives and cannot be used
-  // says why instead of doing nothing.
+  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload
+  // and import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows
+  // no zones, so it takes no drop; the overlay says why.
   const queryClient = useQueryClient();
-  const showNotice = useCallback(
-    (notice: ControlSourceNotice | null) => {
-      if (notice) {
+  const startDroppedFileUpload = useDroppedFileUpload({
+    pendingKey: 'widgets.canvas.fileDrop.pending',
+    uploadingKey: 'widgets.canvas.fileDrop.uploading',
+  });
+  const importDroppedFiles = useCallback(
+    (files: File[], destination: CanvasImageDropData['destination']) => {
+      const images = files.filter((file) => classifyGalleryUpload(file)?.kind === 'image');
+      if (images.length < files.length) {
         notifications.add({
-          kind: notice.kind,
-          message: notice.messageKey ? t(notice.messageKey) : notice.message,
-          title: t(notice.titleKey),
+          kind: images.length === 0 ? 'error' : 'info',
+          title: t('widgets.canvas.fileDrop.notImage'),
         });
       }
-    },
-    [notifications, t]
-  );
-  const handleFileDragOver = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      const { dataTransfer } = event;
-      if (!isFileDrag(dataTransfer)) {
+      if (images.length === 0) {
         return;
       }
-      event.preventDefault();
-      const accepted =
-        engine !== null &&
-        resolveControlFileDrop({
-          document,
-          engine,
-          // File contents stay hidden until the drop, but each item's type is readable while it hovers.
-          files: [...dataTransfer.items].filter((item) => item.kind === 'file'),
-          isCanvasLocked: isDocumentEditingLocked,
-        }).status === 'accepted';
-      dataTransfer.dropEffect = accepted ? 'copy' : 'none';
-    },
-    [document, engine, isDocumentEditingLocked]
-  );
-  const handleFileDrop = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!isFileDrag(event.dataTransfer)) {
-        return;
-      }
-      event.preventDefault();
-      if (!engine) {
-        return;
-      }
-      const files = [...event.dataTransfer.files];
-      const resolution = resolveControlFileDrop({
-        document,
-        engine,
-        files,
-        isCanvasLocked: isDocumentEditingLocked,
+      startDroppedFileUpload(images, {
+        load: () => import('./importCanvasFileDrop'),
+        run: ({ importCanvasFileDrop }, context) =>
+          importCanvasFileDrop({
+            ...context,
+            canvas: canvasCommands,
+            destination,
+            files: images,
+            notifications,
+            queries,
+            queryClient,
+            t,
+          }),
+        runFailedMessage: t('widgets.canvas.import.failed'),
       });
-      if (resolution.status === 'refused') {
-        showNotice(resolution.notice);
-        return;
-      }
-      void uploadControlImageFile({
-        engine,
-        file: files[0]!,
-        layerId: resolution.layerId,
-        onUploaded: (owner) => void invalidateGallery(queryClient, owner),
-      }).then((outcome) => showNotice(getControlUploadNotice(outcome)));
     },
-    [document, engine, isDocumentEditingLocked, queryClient, showNotice]
+    [canvasCommands, notifications, queries, queryClient, startDroppedFileUpload, t]
   );
+  const { drag: fileDrag, handlers: fileDragHandlers } = useNativeFileDrag({
+    findZone: findCanvasImageDropDestination,
+    onDrop: importDroppedFiles,
+  });
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
@@ -326,15 +303,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     }
     void (async () => {
       try {
-        const blob = await mountedEngine.selection.exportSelectionBlob();
-        if (!blob) {
-          return;
-        }
-        await copyImage(blob);
-        if (cut) {
-          // Only after the write succeeds — a failed copy must not destroy pixels.
-          mountedEngine.selection.eraseSelection();
-        }
+        await copyCanvasSelection(mountedEngine.selection, cut, copyImage);
       } catch (error) {
         notifications.add({
           kind: 'error',
@@ -441,7 +410,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
   const saveStagedImageAndContinue = useCallback(() => commitSelectedStagedImage(true), [commitSelectedStagedImage]);
-  const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
   const cycleStagedImage = useCallback(
     (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),
     [canvasDispatch]
@@ -516,7 +484,14 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
-      reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
+      reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),
+      reportTransformRefusal: (refusal, layerId) =>
+        reportTransformRefusal(
+          refusal,
+          { id: layerId, name: getDocumentNode(document, layerId)?.name ?? '' },
+          { error: notify.error, notice: showCanvasRefusalNotice },
+          t
+        ),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
@@ -585,8 +560,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       position="relative"
       role="region"
       w="full"
-      onDragOver={handleFileDragOver}
-      onDrop={handleFileDrop}
+      {...fileDragHandlers}
     >
       {engine ? (
         <CanvasShortcutHintRegistration
@@ -597,20 +571,23 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         />
       ) : null}
       <CanvasColorFeed engine={engine} />
-      {engine ? <CanvasFrameLockFeed key={projectId} engine={engine} projectId={projectId} /> : null}
-      {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
-      {engine ? <CanvasStagedRegionsFeed key={projectId} engine={engine} projectId={projectId} /> : null}
+      {engine ? <CanvasFrameLockFeed key={`${projectId}:frame-lock`} engine={engine} projectId={projectId} /> : null}
+      {engine ? <CanvasEditRefusalNotices key={`${projectId}:edit-refusals`} engine={engine} /> : null}
+      {engine ? (
+        <CanvasStagedRegionsFeed key={`${projectId}:staged-regions`} engine={engine} projectId={projectId} />
+      ) : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
         </Suspense>
       ) : null}
       <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
-        <CanvasImageDropOverlay isDocumentEditingLocked={isDocumentEditingLocked} />
+        <CanvasImageDropOverlay fileDrag={fileDrag} isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
             <ToolStrip engine={engine} />
-            <ControlLayerCanvasOverlay engine={engine} />
+            <CanvasFrameSizeReadout engine={engine} />
+            <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
               engine={engine}
@@ -644,7 +621,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
                 selectedSlot={selectedSlot}
                 slots={stagingSlots}
                 onAccept={acceptStagedImage}
-                onCancelQueueItem={cancelQueueItem}
                 onCycle={cycleStagedImage}
                 onDiscardAll={discardAllStagedImages}
                 onDiscardSelected={discardSelectedStagedImage}
@@ -653,6 +629,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
                 onSaveToGallery={saveStagedResult}
                 onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
+                onStopGenerating={stagingRecovery.stopGenerating}
                 onToggleThumbnails={toggleStagingThumbnails}
                 onToggleVisibility={toggleStagingVisibility}
               />

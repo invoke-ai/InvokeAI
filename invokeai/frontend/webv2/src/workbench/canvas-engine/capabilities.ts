@@ -194,6 +194,8 @@ export interface CanvasInteractionState {
   bboxGrid: number;
   bboxOptions: BboxToolOptions;
   bboxOverlay: boolean;
+  /** The generation frame as a Frame tool drag shows it, before it commits; null when no drag is under way. */
+  bboxPreview: Rect | null;
   brushOptions: BrushOptions;
   canRedo: boolean;
   canUndo: boolean;
@@ -225,6 +227,11 @@ export interface CanvasInteractionState {
   showBbox: boolean;
   showGrid: boolean;
   snapToGrid: boolean;
+  /**
+   * Whether a staged or progress preview, shown or toggled off with the staging bar's eye, hides control layers, masks
+   * and regions from the screen. An edit of one shows them meanwhile; that does not change this.
+   */
+  stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
   transformSession: TransformSession | null;
@@ -420,34 +427,52 @@ export interface CanvasHistoryCapability {
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
 /**
- * A tool press the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
- * itself or through a group), locked, has its transparency locked against the eraser, or its pixels have not loaded
- * yet (the engine has started loading them; the next press can edit).
+ * An edit the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
+ * itself or through a group), hidden on the canvas only (refused by edits that write pixels), locked, has its
+ * transparency locked against erasing, its pixels have not loaded yet (the engine has started loading them; the next
+ * press can edit), or it is a control layer whose empty shape has no pixels (`layer-unpaintable`).
+ * `erase-unsupported` names a selection the eraser cannot erase in place (a group, text, shape or gradient), where the
+ * brush would paint a new layer instead; `selection-erase-unsupported` the same for removing the selection's pixels
+ * (Erase, Delete, Cut); `gradient-unsupported` a mask or region, which the Gradient tool never adds a raster layer
+ * for; `transform-session` the layer whose open transform session selection Fill and Erase wait for.
  */
 export interface CanvasLayerEditRefusal {
-  readonly status: 'layer-hidden' | 'layer-locked' | 'layer-alpha-locked' | 'layer-loading';
+  readonly status:
+    | 'layer-hidden'
+    | 'layer-display-hidden'
+    | 'layer-locked'
+    | 'layer-alpha-locked'
+    | 'layer-loading'
+    | 'layer-unpaintable'
+    | 'erase-unsupported'
+    | 'selection-erase-unsupported'
+    | 'gradient-unsupported'
+    | 'transform-session';
   readonly layerId: string;
   readonly layerName: string;
   /** The brush would have painted this image layer in place; a new paint layer above it can take the stroke. */
   readonly canPaintNewLayer?: boolean;
 }
 
-/** A shape cut out with the mod key found no selected paint layer or mask to erase its footprint from. */
-export interface CanvasShapeCutoutRefusal {
-  readonly status: 'cutout-no-target';
+/**
+ * An erase found no layer selected to act on: an eraser stroke (`erase-no-target`), removing the selection's pixels
+ * (`selection-erase-no-target`), or a shape cut out with the mod key (`cutout-no-target`).
+ */
+export interface CanvasNoTargetRefusal {
+  readonly status: 'cutout-no-target' | 'erase-no-target' | 'selection-erase-no-target';
 }
 
 /**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
  * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
- * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasShapeCutoutRefusal` has no layer to
+ * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasNoTargetRefusal` has no layer to
  * name.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
   | AdjustmentRefusal
   | CanvasLayerEditRefusal
-  | CanvasShapeCutoutRefusal;
+  | CanvasNoTargetRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -504,6 +529,11 @@ export type ExportBakedLayerBlobResult =
   | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
+  /**
+   * Whether `eraseSelection` would remove the selection's pixels now; otherwise reports why through
+   * `tools.onEditRefused`, as the erase would. Cut asks before it writes the clipboard.
+   */
+  admitSelectionErase(): boolean;
   deselect(): void;
   eraseSelection(): void;
   fillSelection(): void;
@@ -887,9 +917,12 @@ export interface StagedPreviewPlacement extends Rect {
 /**
  * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
  * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
+ * `hidden`: the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but
+ * the screen keeps hiding control layers, masks, regions and the regenerate tint as the shown candidate does, so both
+ * sides of the comparison read alike.
  */
 export type StagedPreviewInput =
-  | { imageName: string; placement: StagedPreviewPlacement }
+  | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }
   | { dataUrl: string; placement: StagedPreviewPlacement };
 /** One pending result's landing rect in document space, for the staged-region overlay. */
 export interface StagedRegion {
@@ -962,7 +995,11 @@ export { documentToExportLocalSamPoint } from './samCoordinates';
 export { bboxEquals, bboxMinSize, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
 export { ZOOM_PRESETS } from './math/snapping';
-export { isLeafPixelEditEligible } from './editing/controlPixelEdit';
+export {
+  isLeafPixelEditEligible,
+  selectionPixelEditRefusal,
+  type SelectionPixelEditRefusal,
+} from './editing/controlPixelEdit';
 export {
   getSiblingOrder,
   haveSameStructure,

@@ -1,6 +1,6 @@
 import { refreshGenerationDevices } from '@features/queue/data/generationDevicesStore';
 import { itemProgressStore } from '@features/queue/data/itemProgressStore';
-import { invalidateQueueQueries } from '@features/queue/data/queries';
+import { applyQueueItemStatusToReadModels, invalidateQueueQueries } from '@features/queue/data/queries';
 import { createProductionQueueRealtimeRuntime } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -16,6 +16,7 @@ import { useQueueUi } from './QueueUiContext';
 
 export const attachQueueDataRuntime = (): (() => void) => {
   const runtime = createProductionQueueRealtimeRuntime({
+    applyStatusChange: (change) => applyQueueItemStatusToReadModels(queryClient, change),
     invalidate: () => invalidateQueueQueries(queryClient),
     progress: itemProgressStore,
     refreshModelCache: refreshWatchedModelCacheStats,

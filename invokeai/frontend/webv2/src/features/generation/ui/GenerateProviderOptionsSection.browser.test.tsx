@@ -10,14 +10,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationUi: () => ({
     project: { invocationSourceId: 'generate' },
-    sectionPreferences: { sectionsOpen: { providerOptions: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { providerOptions: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -195,5 +195,30 @@ describe('GenerateProviderOptionsSection', () => {
     await act(() => userEvent.click(labelOf(optimizePrompt)!));
     expect(onCommit).toHaveBeenCalledWith({ seedreamOptimizePrompt: true });
     expect(onCommit).not.toHaveBeenCalledWith({ seedreamWatermark: false });
+  });
+
+  it('marks its title while an option is overridden, and resets them all to the provider defaults from its menu', async () => {
+    const onCommit = await render(external('openai', { modes: ['txt2img', 'img2img'] }), {
+      openaiInputFidelity: 'high',
+      openaiQuality: 'high',
+    });
+    const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+
+    expect(title().querySelector('[data-section-changed]')).not.toBeNull();
+
+    await act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetProviderOptions' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+    });
+    expect(title().querySelector('[data-section-changed]')).toBeNull();
+    expect(host?.textContent).not.toContain('override');
   });
 });

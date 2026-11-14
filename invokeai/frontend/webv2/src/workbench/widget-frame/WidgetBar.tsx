@@ -5,6 +5,7 @@ import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/w
 
 import { Box, Flex, Icon, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useHighlightedRegion } from '@workbench/focusRegions';
@@ -77,6 +78,10 @@ export const WidgetBar = ({
   const instanceMenuTarget = instanceMenu?.projectId === projectId ? instanceMenu : null;
 
   const openEnableMenu = useCallback((event: MouseEvent) => {
+    // The rail's menus and tooltips are portalled; a right-click in them is theirs.
+    if (!isEventFromOwnDom(event)) {
+      return;
+    }
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);
@@ -99,6 +104,7 @@ export const WidgetBar = ({
   );
 
   const trigger = useMemo(() => ({ kind: 'rail', region }) as const, [region]);
+  const regionWidgetsLabel = t(side === 'left' ? 'widgets.regionWidgets.left' : 'widgets.regionWidgets.right');
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
   const handleInstanceClose = useCallback(() => setInstanceMenu(null), []);
@@ -115,9 +121,8 @@ export const WidgetBar = ({
 
   return (
     <Flex
-      aria-label={t('widgets.visibilityLabel', {
-        region: side === 'left' ? t('widgets.rail.create') : t('widgets.rail.inspect'),
-      })}
+      // Named apart from the widget panel landmark beside it, whose widget this rail switches.
+      aria-label={t(side === 'left' ? 'widgets.rail.left' : 'widgets.rail.right')}
       as="nav"
       bg="bg.subtle"
       borderColor={isEdgeOutlined ? 'transparent' : 'border.subtle'}
@@ -144,11 +149,11 @@ export const WidgetBar = ({
 
       <WidgetEnableMenu
         contextTarget={enableMenuTarget}
-        groupLabel={region === 'left' ? t('widgets.rail.createWidgets') : t('widgets.rail.inspectWidgets')}
+        groupLabel={regionWidgetsLabel}
         items={menuItems}
         positioning={positioning}
         trigger={trigger}
-        triggerLabel={region === 'left' ? t('widgets.rail.createWidgets') : t('widgets.rail.inspectWidgets')}
+        triggerLabel={regionWidgetsLabel}
         onContextClose={handleContextClose}
         onToggle={handleMenuToggle}
       />

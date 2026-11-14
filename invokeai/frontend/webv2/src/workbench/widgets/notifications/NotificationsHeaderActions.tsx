@@ -34,11 +34,11 @@ export const NotificationsHeaderActions = () => {
   }, [notifications, notify, queries, t]);
 
   return (
-    <HStack gap="2">
-      <Button disabled={!hasUnread} size="sm" variant="outline" onClick={markRead}>
+    <HStack gap="1">
+      <Button disabled={!hasUnread} size="xs" variant="ghost" onClick={markRead}>
         {t('notifications.markRead')}
       </Button>
-      <Button disabled={!hasAny} size="sm" variant="outline" onClick={clear}>
+      <Button disabled={!hasAny} size="xs" variant="ghost" onClick={clear}>
         {t('common.clear')}
       </Button>
     </HStack>

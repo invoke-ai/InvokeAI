@@ -7,6 +7,7 @@ export const galleryWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center', 'bottom'],
   bottomPanel: 'expandable',
+  chrome: { body: 'fill' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: ImageIcon,
   id: 'gallery',

@@ -52,6 +52,7 @@ vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));
 vi.mock('./CanvasCreateFromBboxSubmenu', () => ({ CanvasCreateFromBboxSubmenu: () => null }));
+vi.mock('./CanvasFrameSizeReadout', () => ({ CanvasFrameSizeReadout: () => null }));
 vi.mock('./CanvasGlobalContextMenu', () => ({ CanvasGlobalContextMenu: () => null }));
 vi.mock('./CanvasImageDropOverlay', () => ({ CanvasImageDropOverlay: () => null }));
 vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () => null }));

@@ -521,7 +521,8 @@ export const GalleryPickerView = ({
           </IconButton>
         </Tooltip>
       </HStack>
-      <Box pt="1.5" px="2">
+      {/* The same space below as above: the grid's own padding scrolls away, which would leave tiles under the field. */}
+      <Box pb="1.5" pt="1.5" px="2">
         <GallerySearchField
           ref={attachSearchInput}
           ariaLabel={searchLabel}

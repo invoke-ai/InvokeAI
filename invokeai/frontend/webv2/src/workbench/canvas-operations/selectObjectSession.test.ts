@@ -87,7 +87,7 @@ const createHarness = (
   if (!operation) {
     throw new Error('expected Select Object operation');
   }
-  const session = createSelectObjectSession({ deps, initialAutoProcess, operation });
+  const session = createSelectObjectSession({ deps, initialAutoProcess: initialAutoProcess ?? false, operation });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -120,6 +120,7 @@ describe('createSelectObjectSession', () => {
       isolatedPreview: true,
       model: 'segment-anything-2-large',
       preview: null,
+      retrying: false,
       sourceGuard: null,
       status: 'ready',
     });
@@ -602,6 +603,60 @@ describe('createSelectObjectSession', () => {
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
   });
 
+  it('runs the same input again on a manual retry after a failed auto-run', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({}, { initialAutoProcess: true });
+    harness.setCurrentGuard(null);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(harness.session.getSnapshot()).toMatchObject({ error: { code: 'not-ready' }, status: 'error' });
+
+    harness.setCurrentGuard(guard);
+    const retry = harness.session.process();
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, retrying: true, status: 'preparing-source' });
+    await expect(retry).resolves.toBe('published');
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+    expect(harness.session.getSnapshot()).toMatchObject({ retrying: false, status: 'ready' });
+
+    vi.mocked(harness.deps.runGraph).mockRejectedValueOnce(new Error('graph failed'));
+    harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(harness.session.getSnapshot()).toMatchObject({ error: { code: 'queue' }, status: 'error' });
+    await expect(harness.session.process()).resolves.toBe('published');
+    expect(harness.deps.runGraph).toHaveBeenCalledTimes(3);
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, retrying: false, status: 'ready' });
+  });
+
+  it('does not count a run after a failed apply as a retry', async () => {
+    const harness = createHarness();
+    await harness.session.process();
+    harness.session.reportError({ code: 'commit-failed', detail: 'commit failed' });
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+
+    const rerun = harness.session.process();
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, retrying: false });
+    await expect(rerun).resolves.toBe('published');
+  });
+
+  it('stops retrying once an input change supersedes the retry', async () => {
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
+    const harness = createHarness({
+      runGraph: vi.fn().mockRejectedValueOnce(new Error('graph failed')).mockReturnValueOnce(graph.promise),
+    });
+    await expect(harness.session.process()).resolves.toBe('error');
+    const retry = harness.session.process();
+    await vi.waitFor(() => expect(harness.session.getSnapshot().status).toBe('processing-sam'));
+    expect(harness.session.getSnapshot().retrying).toBe(true);
+
+    harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
+
+    expect(harness.session.getSnapshot().retrying).toBe(false);
+    graph.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
+    await expect(retry).resolves.toBe('stale');
+    expect(harness.session.getSnapshot().retrying).toBe(false);
+  });
+
   it('debounces auto-processing for one second and manual processing runs immediately', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
@@ -844,16 +899,72 @@ describe('createSelectObjectSession', () => {
       applyPolygonRefinement: false,
       autoProcess: true,
       error: null,
-      input: { prompt: '', type: 'prompt' },
+      input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
       invert: false,
       isolatedPreview: true,
       model: 'segment-anything-2-large',
       preview: null,
+      retrying: false,
       sourceGuard: null,
       status: 'ready',
     });
     await vi.runAllTimersAsync();
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it('keeps each input type while switching between them and Reset forgets both', () => {
+    const harness = createHarness();
+    const points = {
+      bbox: { height: 4, width: 4, x: 1, y: 1 },
+      excludePoints: [{ x: 2, y: 2 }],
+      includePoints: [{ x: 3, y: 3 }],
+      type: 'visual' as const,
+    };
+
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual({
+      bbox: null,
+      excludePoints: [],
+      includePoints: [],
+      type: 'visual',
+    });
+    harness.session.update({ input: points });
+    harness.session.update({ inputType: 'prompt' });
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: 'cat', type: 'prompt' });
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual(points);
+
+    harness.session.reset();
+    harness.session.update({ inputType: 'prompt' });
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: '', type: 'prompt' });
+  });
+
+  it('keeps the prompt when a visual input replaces it directly', () => {
+    const harness = createHarness();
+    const points = { bbox: null, excludePoints: [], includePoints: [{ x: 3, y: 3 }], type: 'visual' as const };
+
+    harness.session.update({ input: points });
+    harness.session.update({ inputType: 'prompt' });
+
+    expect(harness.session.getSnapshot().input).toEqual({ prompt: 'cat', type: 'prompt' });
+    harness.session.update({ inputType: 'visual' });
+    expect(harness.session.getSnapshot().input).toEqual(points);
+  });
+
+  it('treats an input-type switch as an input change: clears the preview and schedules the restored input', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    await harness.session.process();
+    expect(harness.session.getSnapshot().preview).not.toBeNull();
+    harness.session.update({ inputType: 'visual' });
+    harness.session.update({ autoProcess: true });
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'ready' });
+
+    harness.session.update({ inputType: 'prompt' });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ input: { prompt: 'cat' }, status: 'scheduled' });
+    await vi.runAllTimersAsync();
+    expect(harness.session.getSnapshot().preview).not.toBeNull();
   });
 
   it('dispose clears scheduling and preview, unsubscribes exactly once, and makes methods inert', async () => {

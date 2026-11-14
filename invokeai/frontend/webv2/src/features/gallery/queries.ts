@@ -54,4 +54,5 @@ export {
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';
+export { resolveGalleryUploadBoardId } from './data/uploadDestination';
 export { galleryBoardExists } from './data/backend';

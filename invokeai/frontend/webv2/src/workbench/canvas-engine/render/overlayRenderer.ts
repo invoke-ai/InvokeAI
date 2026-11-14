@@ -22,6 +22,18 @@ export const MIN_GRID_SPACING_PX = 8;
 
 const BBOX_COLOR = '#3b82f6';
 const BBOX_DASH: readonly number[] = [4, 4];
+/**
+ * The generation frame's dashes are an accent hairline cased by the accent's darkest shade outside and white inside.
+ * White carries backgrounds up to about 0.30 relative luminance, navy those from about 0.16, so some band of every dash
+ * keeps at least about 3.8:1 contrast with any content (least at the accent itself, where both casings do), and the
+ * frame stays blue rather than the brush ring's neutral dark/light/dark. Navy outside keeps the handles, which wrap the
+ * same bands around a white face, edged dark over light content. The gaps stay clear, so a pending result's outline
+ * under the frame still shows through them.
+ */
+const BBOX_CASING_OUTSIDE = '#172554';
+const BBOX_CASING_INSIDE = '#ffffff';
+/** Target frame dash and gap length (CSS px); each edge fits a whole odd number of them, dashes at both corners. */
+const BBOX_FRAME_DASH_PX = 4;
 /** Pending results' landing rects: amber, so a frame moved off them still reads as a different thing. */
 const STAGED_REGION_COLOR = '#f59e0b';
 const STAGED_REGION_DASH: readonly number[] = [6, 4];
@@ -40,8 +52,8 @@ const CURSOR_DARK = '#000000';
 const CURSOR_LIGHT = '#ffffff';
 const CURSOR_OUTER_WIDTH_PX = 3;
 const CURSOR_INNER_WIDTH_PX = 1;
-/** Side length (screen px) of a drawn bbox resize handle. */
-const BBOX_HANDLE_DRAW_PX = 8;
+/** Side (CSS px) of a bbox resize handle's white face, inside its accent ring and dark casing hairlines. */
+const BBOX_HANDLE_FACE_PX = 7;
 const BBOX_HANDLE_FILL = '#ffffff';
 /** Solid accent used for the selected-layer bounds outline while the move tool is active. */
 const LAYER_OUTLINE_COLOR = '#38bdf8';
@@ -638,23 +650,185 @@ const drawRuleOfThirds = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Draws the eight bbox resize handles as small squares at the frame's corners/edges (screen space). */
-const drawBboxHandles = (ctx: Ctx, state: OverlayState): void => {
-  if (!state.bboxHandles) {
+/**
+ * The bbox frame in device pixels: core-line centres where whole device pixels of the hairline's width land crisply, so
+ * an unaligned 1px line never smears into two half-strength pixels. The frame and its handles draw in device space.
+ */
+interface BboxFrameGeometry {
+  /** Core-line centres, device px. */
+  rect: Rect;
+  /** Hairline width in whole device pixels: about one CSS pixel, never thinner than one device pixel. */
+  hairline: number;
+  /** The backing store's device size: dashes beyond it are skipped, so a deep zoom traces only what shows. */
+  width: number;
+  height: number;
+}
+
+/**
+ * The device coordinate within half a pixel of `device` that centres a run of device pixels with odd (or even) width.
+ * Where two qualify (an odd run on a pixel boundary, an even one on a pixel centre), it takes the one toward `outward`
+ * (-1 before, +1 after), so a frame on whole pixels keeps its core just outside the area it marks on every side.
+ */
+const snapCentre = (device: number, odd: boolean, outward: -1 | 1): number => {
+  if (odd) {
+    return outward < 0 ? Math.ceil(device) - 0.5 : Math.floor(device) + 0.5;
+  }
+  return outward < 0 ? Math.ceil(device - 0.5) : Math.floor(device + 0.5);
+};
+
+const bboxFrameGeometry = (target: RasterSurface, state: OverlayState): BboxFrameGeometry => {
+  const screen = transformBounds(state.view, state.bbox);
+  const { dpr } = state;
+  const hairline = Math.max(1, Math.round(dpr));
+  const odd = hairline % 2 === 1;
+  const left = snapCentre(screen.x * dpr, odd, -1);
+  const top = snapCentre(screen.y * dpr, odd, -1);
+  const right = snapCentre((screen.x + screen.width) * dpr, odd, 1);
+  const bottom = snapCentre((screen.y + screen.height) * dpr, odd, 1);
+  return {
+    height: target.height,
+    hairline,
+    rect: { height: bottom - top, width: right - left, x: left, y: top },
+    width: target.width,
+  };
+};
+
+/** Edges run clockwise from the top-left corner: 0 top, 1 right, 2 bottom, 3 left; each starts at its own corner. */
+const frameEdgeLength = (rect: Rect, edge: number): number => (edge % 2 === 0 ? rect.width : rect.height);
+
+/** Dash and gap count along `edge`: an odd number near its length over the target, so it starts and ends on a dash. */
+const frameEdgeSegments = (rect: Rect, edge: number, dash: number): number =>
+  Math.max(1, Math.round((frameEdgeLength(rect, edge) / dash + 1) / 2)) * 2 - 1;
+
+/** Distance along `edge` of the boundary after its `k`th of `segments` dashes and gaps, on a whole device pixel. */
+const frameBoundary = (rect: Rect, edge: number, k: number, segments: number): number => {
+  const length = frameEdgeLength(rect, edge);
+  if (k <= 0 || k >= segments) {
+    return k <= 0 ? 0 : length;
+  }
+  const start = edge === 0 ? rect.x : edge === 1 ? rect.y : edge === 2 ? rect.x + rect.width : rect.y + rect.height;
+  const sign = edge < 2 ? 1 : -1;
+  return sign * (Math.round(start + (sign * k * length) / segments) - start);
+};
+
+/**
+ * Adds one band of one dash as a device-space rect. `from`/`to` run along `edge` from its starting corner; `inner` and
+ * `outer` are the band's offsets from the core line's centre, positive outward.
+ */
+const frameBandRect = (
+  ctx: Ctx,
+  rect: Rect,
+  edge: number,
+  from: number,
+  to: number,
+  inner: number,
+  outer: number
+): void => {
+  if (to <= from) {
     return;
   }
-  const screenRect = transformBounds(state.view, state.bbox);
-  const half = BBOX_HANDLE_DRAW_PX / 2;
-  ctx.save();
-  ctx.setLineDash([]);
-  ctx.fillStyle = BBOX_HANDLE_FILL;
-  ctx.strokeStyle = BBOX_COLOR;
-  ctx.lineWidth = 1;
-  for (const handle of BBOX_HANDLES) {
-    const center = bboxHandlePoint(screenRect, handle);
-    ctx.fillRect(center.x - half, center.y - half, BBOX_HANDLE_DRAW_PX, BBOX_HANDLE_DRAW_PX);
-    ctx.strokeRect(center.x - half, center.y - half, BBOX_HANDLE_DRAW_PX, BBOX_HANDLE_DRAW_PX);
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  if (edge === 0) {
+    ctx.rect(rect.x + from, rect.y - outer, to - from, outer - inner);
+  } else if (edge === 1) {
+    ctx.rect(right + inner, rect.y + from, outer - inner, to - from);
+  } else if (edge === 2) {
+    ctx.rect(right - to, bottom + inner, to - from, outer - inner);
+  } else {
+    ctx.rect(rect.x - outer, bottom - to, outer - inner, to - from);
   }
+};
+
+/**
+ * Traces one band of the dashed frame in device space as axis-aligned rects on whole device pixels, so every edge is
+ * crisp. Each edge fits its dashes between its corners, and a dash at a corner extends past it by the band's outer
+ * offset: the bands of the two edges meeting there tile one whole L, with no seam, cap or join to notch it. Dash and gap
+ * lengths vary by at most a device pixel along an edge.
+ */
+const traceBboxFrameBand = (ctx: Ctx, frame: BboxFrameGeometry, dash: number, inner: number, outer: number): void => {
+  const { rect } = frame;
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  // The inside band's offsets are negative: the band reaches as far as its larger magnitude.
+  const reach = Math.max(Math.abs(inner), Math.abs(outer));
+  ctx.beginPath();
+  for (let edge = 0; edge < 4; edge++) {
+    const across = edge === 0 ? rect.y : edge === 1 ? right : edge === 2 ? bottom : rect.x;
+    if (across + reach < 0 || across - reach > (edge % 2 === 0 ? frame.height : frame.width)) {
+      continue;
+    }
+    // The stretch of the edge inside the backing store, as distances from the edge's starting corner.
+    const near = edge === 0 ? -rect.x : edge === 1 ? -rect.y : edge === 2 ? right - frame.width : bottom - frame.height;
+    const far = edge === 0 ? frame.width - rect.x : edge === 1 ? frame.height - rect.y : edge === 2 ? right : bottom;
+    const segments = frameEdgeSegments(rect, edge, dash);
+    const step = frameEdgeLength(rect, edge) / segments;
+    const first = Math.max(0, Math.floor((near - reach) / step / 2) * 2 - 2);
+    const last = Math.min(segments, Math.ceil((far + reach) / step) + 2);
+    for (let k = first; k < last; k += 2) {
+      const from = frameBoundary(rect, edge, k, segments) - (k === 0 ? outer : 0);
+      const to = frameBoundary(rect, edge, k + 1, segments) + (k + 1 === segments ? outer : 0);
+      frameBandRect(ctx, rect, edge, from, to, inner, outer);
+    }
+  }
+};
+
+/**
+ * Fills the dashed frame's three bands, each one batched fill: the outside casing, the inside casing, then the accent
+ * core between them, every band one hairline wide.
+ */
+const drawBboxFrame = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void => {
+  const { hairline } = frame;
+  const dash = BBOX_FRAME_DASH_PX * dpr;
+  const half = hairline / 2;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = BBOX_CASING_OUTSIDE;
+  traceBboxFrameBand(ctx, frame, dash, half, half * 3);
+  ctx.fill();
+  ctx.fillStyle = BBOX_CASING_INSIDE;
+  traceBboxFrameBand(ctx, frame, dash, -half * 3, -half);
+  ctx.fill();
+  ctx.fillStyle = BBOX_COLOR;
+  traceBboxFrameBand(ctx, frame, dash, -half, half);
+  ctx.fill();
+  ctx.restore();
+};
+
+/** Adds a square of half-side `half` (device px) around each bbox handle, centred on the frame's core line. */
+const traceBboxHandles = (ctx: Ctx, rect: Rect, odd: boolean, half: number): void => {
+  ctx.beginPath();
+  for (const handle of BBOX_HANDLES) {
+    const point = bboxHandlePoint(rect, handle);
+    // Corners are already centred; an edge midpoint snaps either way.
+    const x = snapCentre(point.x, odd, 1);
+    const y = snapCentre(point.y, odd, 1);
+    ctx.rect(x - half, y - half, half * 2, half * 2);
+  }
+};
+
+/**
+ * Draws the eight bbox resize handles centred on the frame's core line as the frame's bands wrapped into a square: an
+ * outside-colored hairline, an accent ring, and a white face. Each band is one batched fill, so handles a small frame
+ * overlaps merge into one shape.
+ */
+const drawBboxHandles = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void => {
+  const { hairline, rect } = frame;
+  const odd = hairline % 2 === 1;
+  // Whole device pixels with the hairline's parity, so the face centres on the core line's pixels.
+  const parity = odd ? 1 : 0;
+  const faceHalf = Math.max(1, Math.round((BBOX_HANDLE_FACE_PX * dpr - parity) / 2) * 2 + parity) / 2;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = BBOX_CASING_OUTSIDE;
+  traceBboxHandles(ctx, rect, odd, faceHalf + hairline * 2);
+  ctx.fill();
+  ctx.fillStyle = BBOX_COLOR;
+  traceBboxHandles(ctx, rect, odd, faceHalf + hairline);
+  ctx.fill();
+  ctx.fillStyle = BBOX_HANDLE_FILL;
+  traceBboxHandles(ctx, rect, odd, faceHalf);
+  ctx.fill();
   ctx.restore();
 };
 
@@ -683,17 +857,17 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
   drawStagedRegions(ctx, state);
 
   // Passive bbox visibility is optional; active-tool handles remain editable even when hidden.
+  const bboxFrame = bboxFrameGeometry(target, state);
   if (state.showBbox ?? true) {
-    ctx.strokeStyle = BBOX_COLOR;
-    ctx.setLineDash([...BBOX_DASH]);
-    strokeRectScreen(ctx, transformBounds(state.view, state.bbox));
-    ctx.setLineDash([]);
+    drawBboxFrame(ctx, bboxFrame, state.dpr);
   }
 
   drawSamPreview(ctx, state, base);
   drawSamGeometry(ctx, state);
   drawLayerOutline(ctx, state);
-  drawBboxHandles(ctx, state);
+  if (state.bboxHandles) {
+    drawBboxHandles(ctx, bboxFrame, state.dpr);
+  }
   drawTransformFrame(ctx, state);
   if (state.marchingAnts) {
     drawMarchingAnts(ctx, state.view, state.marchingAnts, base);

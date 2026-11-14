@@ -5,10 +5,9 @@ import { Badge, Box, chakra, HStack, Icon, Input, Text } from '@chakra-ui/react'
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { IconButton, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { isGroupNode, isHideableLayer, isNodeHidden, isOverlayStack } from '@workbench/canvas-engine/api';
+import { isGroupNode, isNodeHidden, isOverlayStack } from '@workbench/canvas-engine/api';
 import {
   ChevronRightIcon,
-  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderIcon,
@@ -26,6 +25,7 @@ import type { LayerTreeRow } from './layerTreeRows';
 import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
 import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
+import { LAYER_ACTIVE_DOT_SIZE, LayerActiveDot } from './LayerActiveDot';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { anchorFromPoint } from './layerRowCommands';
 import { layerRowSummary } from './layerRowSummary';
@@ -171,6 +171,10 @@ const LayerRowComponent = ({
     },
     [commands, node.isEnabled, row.id]
   );
+  const handleSetEnabled = useCallback(
+    (isEnabled: boolean) => commands.setEnabled(row.id, isEnabled),
+    [commands, row.id]
+  );
   const handleToggleHidden = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -271,9 +275,9 @@ const LayerRowComponent = ({
     return rest;
   }, [dragDisabled, listeners]);
 
-  const hideable = group ? isOverlayStack(vm.stack) : isHideableLayer(layer!);
-  const ownHidden = isNodeHidden(node);
-  const hiddenByAncestor = vm.documentHidden && !ownHidden;
+  // Overlay rows (control, inpaint and regional layers, and groups in those stacks) can hide on the canvas alone.
+  const overlay = isOverlayStack(vm.stack);
+  const hiddenByAncestor = vm.documentHidden && !isNodeHidden(node);
   const lockedByAncestor = vm.effectiveLocked && !node.isLocked;
   const disabledByAncestor = !vm.contributionEnabled && node.isEnabled;
   const tone = primary
@@ -438,54 +442,78 @@ const LayerRowComponent = ({
         {/* Trailing cluster on the stack header's rhythm: the eye sits left of the lock as an overlay header's eye sits
             left of its New button, so eyes and locks each form one column at every depth. */}
         <HStack flexShrink="0" gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepRowFocus}>
-          {hideable && vm.documentHidden && vm.contributionEnabled ? (
-            // Hidden on the canvas only (an overlay put out of the way): it still shapes generation. The row menu
-            // sets it; this says so and brings it back. Rendered only when it applies, left of the eye column.
-            <Tooltip
-              content={
-                hiddenByAncestor
-                  ? t('widgets.layers.actions.groupHidden')
-                  : t('widgets.layers.actions.canvasHiddenTooltip')
-              }
-            >
-              <IconButton
-                aria-label={t('widgets.layers.actions.showOnCanvas')}
-                color="fg.muted"
-                disabled={editingLocked || hiddenByAncestor}
-                size="sm"
-                tabIndex={-1}
-                variant="ghost"
-                onClick={handleToggleHidden}
-                onPointerDown={stopPropagation}
+          {overlay ? (
+            // Overlays keep two axes: the dot says whether the layer takes part in generation (off, it is neither
+            // drawn nor generated) and the eye only whether it is drawn, so a mask can be out of view yet still used.
+            <>
+              <LayerActiveDot
+                checked={node.isEnabled}
+                disabled={editingLocked}
+                gatedReason={disabledByAncestor ? t('widgets.layers.actions.groupExcluded') : null}
+                label={t('widgets.layers.actions.useInGeneration')}
+                tooltip={
+                  node.isEnabled
+                    ? t('widgets.layers.actions.excludeFromGeneration')
+                    : t('widgets.layers.actions.useInGeneration')
+                }
+                onCheckedChange={handleSetEnabled}
+              />
+              <Tooltip
+                content={
+                  hiddenByAncestor
+                    ? t('widgets.layers.actions.groupHidden')
+                    : vm.documentHidden
+                      ? t('widgets.layers.actions.showOnCanvas')
+                      : t('widgets.layers.actions.hideOnCanvas')
+                }
               >
-                <EyeClosedIcon />
-              </IconButton>
-            </Tooltip>
-          ) : null}
-          {/* One visibility control: a hidden layer is off the canvas and out of generation alike. */}
-          <Tooltip
-            content={
-              disabledByAncestor
-                ? t('widgets.layers.actions.groupDisabled')
-                : node.isEnabled
-                  ? t('widgets.layers.actions.hideLayerTooltip')
-                  : t('widgets.layers.actions.showLayerTooltip')
-            }
-          >
-            <IconButton
-              aria-label={t('widgets.layers.actions.toggleActive')}
-              aria-pressed={node.isEnabled}
-              color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
-              disabled={editingLocked}
-              size="sm"
-              tabIndex={-1}
-              variant="ghost"
-              onClick={handleToggleVisible}
-              onPointerDown={stopPropagation}
-            >
-              {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
-            </IconButton>
-          </Tooltip>
+                <IconButton
+                  aria-label={t('widgets.layers.actions.showOnCanvas')}
+                  aria-pressed={!vm.documentHidden}
+                  // Out of generation the layer is not drawn either; the eye keeps its own state, dimmed, for when
+                  // the dot comes back on.
+                  color={vm.contributionEnabled && !vm.documentHidden ? 'fg.muted' : 'fg.subtle'}
+                  disabled={editingLocked || hiddenByAncestor}
+                  size="sm"
+                  tabIndex={-1}
+                  variant="ghost"
+                  onClick={handleToggleHidden}
+                  onPointerDown={stopPropagation}
+                >
+                  {vm.documentHidden ? <EyeOffIcon /> : <EyeIcon />}
+                </IconButton>
+              </Tooltip>
+            </>
+          ) : (
+            // Raster layers have one axis: the eye takes a layer off the canvas and out of generation alike. The empty
+            // dot slot keeps the eye and lock columns aligned with the overlay stacks.
+            <>
+              <Box aria-hidden flexShrink="0" w={LAYER_ACTIVE_DOT_SIZE} />
+              <Tooltip
+                content={
+                  disabledByAncestor
+                    ? t('widgets.layers.actions.groupDisabled')
+                    : node.isEnabled
+                      ? t('widgets.layers.actions.hideLayerTooltip')
+                      : t('widgets.layers.actions.showLayerTooltip')
+                }
+              >
+                <IconButton
+                  aria-label={t('widgets.layers.actions.toggleActive')}
+                  aria-pressed={node.isEnabled}
+                  color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
+                  disabled={editingLocked}
+                  size="sm"
+                  tabIndex={-1}
+                  variant="ghost"
+                  onClick={handleToggleVisible}
+                  onPointerDown={stopPropagation}
+                >
+                  {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
           <Tooltip
             content={
               lockedByAncestor ? t('widgets.layers.actions.groupLocked') : t('widgets.layers.actions.toggleLock')

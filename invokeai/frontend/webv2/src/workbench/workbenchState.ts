@@ -118,7 +118,11 @@ import {
   type WorkbenchActionOrigin,
 } from './autoRoutePolicy';
 import { createNewCanvasState, loadCanvasState } from './canvasMigration';
-import { applyCanvasProjectMutation, type CanvasProjectMutation } from './canvasProjectMutations';
+import {
+  applyCanvasProjectMutation,
+  pickStagedSlotAutoSwitch,
+  type CanvasProjectMutation,
+} from './canvasProjectMutations';
 import { gateProjectCanvases } from './projectCanvasGate';
 import {
   addProjectWorkflow,
@@ -166,7 +170,12 @@ import {
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
-import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
+import {
+  getAutoSwitchFollowedLive,
+  getQueueItemSnapshotLabel,
+  pickAutoSwitch,
+  selectsLandedResult,
+} from '@features/queue/contracts';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
@@ -175,6 +184,7 @@ import {
   createDefaultUpscaleWidgetValues,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleSubmissionSource,
   getUpscaleValidationReasons,
   isUpscaleSourceMetadataCurrent,
   normalizeUpscaleWidgetValues,
@@ -207,7 +217,6 @@ import {
 import {
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
-  getFirstCanvasPlaceholderSlotIndex,
   type CanvasStagingSlot,
   isCancellableQueueItem,
   isUnsubmittedQueueItem,
@@ -495,6 +504,8 @@ type WorkbenchReducerAction =
       videos?: GeneratedVideoContract[];
     }
   | { type: 'markQueueItemBackendCancelled'; projectId: string; queueItemId: string; backendItemId: number }
+  /** A slot of the run showed its first progress frame of its own: Canvas staging on 'progress' follows it. */
+  | { type: 'noteQueueItemFirstProgressFrame'; projectId: string; queueItemId: string; itemIndex: number }
   | { type: 'setQueueItemCancellationPending'; projectId: string; queueItemId: string; pending: boolean }
   | {
       type: 'setQueueItemLocalRecoveryState';
@@ -576,7 +587,18 @@ type WorkbenchReducerAction =
       changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>;
       itemKeys: GalleryItemKey[];
     }
-  | { type: 'removeGalleryItems'; itemKeys: GalleryItemKey[] }
+  | {
+      type: 'removeGalleryItems';
+      itemKeys: GalleryItemKey[];
+      /**
+       * The caller selects a next image in `projectId` right after, as deleting the shown item does: that project's open
+       * comparison stays for it. Otherwise, and in every other project, a removal that leaves nothing selected ends the
+       * comparison.
+       */
+      keepComparisonForSuccessor?: boolean;
+      /** The project deleting; the active one when omitted. */
+      projectId?: string;
+    }
   | {
       type: 'reconcileDeletedGalleryBoard';
       outcome: GalleryBoardDeletionResult;
@@ -1233,43 +1255,24 @@ const resolveStagingSelectionIndexForSlots = ({
   project: Project;
   slotCount: number;
 }): number => {
-  if (project.canvas.stagingArea.autoSwitchMode === 'progress') {
-    const placeholderIndex = getFirstCanvasPlaceholderSlotIndex(
-      getCanvasWithPendingImages(project.canvas, pendingImages),
-      project.queue.items
-    );
+  // A landed result takes the selection by Auto-switch's rule; `followCanvasStaging` then shows a followed live slot.
+  const slots = getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items);
+  const selectedSlot = previousSelectedSlot ?? getSelectedCanvasStagingSlot(project);
+  const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(slots, selectedSlot);
+  const { autoSwitchMode } = project.canvas.stagingArea;
+  const newestIncoming = incomingImages.at(-1);
 
-    if (placeholderIndex !== -1) {
-      return placeholderIndex;
+  if (newestIncoming && selectsLandedResult(autoSwitchMode, selectedSlot?.kind === 'candidate')) {
+    const newestSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, newestIncoming);
+
+    if (newestSlotIndex !== -1) {
+      return newestSlotIndex;
     }
-
-    const firstIncomingSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, incomingImages[0]);
-
-    return firstIncomingSlotIndex !== -1
-      ? firstIncomingSlotIndex
-      : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   }
 
-  if (project.canvas.stagingArea.autoSwitchMode === 'off' || incomingImages.length === 0) {
-    const selectedSlot = previousSelectedSlot ?? getSelectedCanvasStagingSlot(project);
-    const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(
-      getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items),
-      selectedSlot
-    );
-
-    if (preservedSlotIndex !== -1) {
-      return preservedSlotIndex;
-    }
-
-    return clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
-  }
-
-  const selectedImage = pendingImages[pendingImages.length - 1] ?? incomingImages[incomingImages.length - 1];
-  const selectedSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, selectedImage);
-
-  return selectedSlotIndex === -1
-    ? clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount)
-    : selectedSlotIndex;
+  return preservedSlotIndex !== -1
+    ? preservedSlotIndex
+    : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
 };
 
 const stageCanvasResultImages = (
@@ -1394,19 +1397,202 @@ const appendCanvasStagingCandidate = (project: Project, candidate: CanvasStaging
   };
 };
 
+type CanvasStagingFollow = NonNullable<WorkbenchState['canvasStagingFollow']>[string];
+
+const NO_STAGING_FOLLOW: CanvasStagingFollow = { framedSlotIds: [], pinnedSlotId: null };
+
+const updateCanvasStagingFollow = (
+  state: WorkbenchState,
+  projectId: string,
+  update: (follow: CanvasStagingFollow) => CanvasStagingFollow
+): WorkbenchState => {
+  const previous = state.canvasStagingFollow?.[projectId] ?? NO_STAGING_FOLLOW;
+  const next = update(previous);
+
+  return next === previous
+    ? state
+    : { ...state, canvasStagingFollow: { ...state.canvasStagingFollow, [projectId]: next } };
+};
+
+/** A placeholder showed its first frame of its own: Auto-switch may follow it from now on (`followCanvasStaging`). */
+const recordCanvasStagingFrame = (
+  state: WorkbenchState,
+  projectId: string,
+  queueItemId: string,
+  itemIndex: number
+): WorkbenchState => {
+  const project = state.projects.find((candidate) => candidate.id === projectId);
+  const slot = project
+    ? getCanvasStagingSlots(project.canvas, project.queue.items).find(
+        (candidate) =>
+          candidate.kind === 'placeholder' && candidate.queueItemId === queueItemId && candidate.itemIndex === itemIndex
+      )
+    : undefined;
+
+  return slot
+    ? updateCanvasStagingFollow(state, projectId, (follow) =>
+        follow.framedSlotIds.includes(slot.id)
+          ? follow
+          : { ...follow, framedSlotIds: [...follow.framedSlotIds, slot.id] }
+      )
+    : state;
+};
+
+/**
+ * Keeps the pin with the user's picks (`pickStagedSlotAutoSwitch`, the one pick rule): a generating slot picked pins
+ * it, a finished result picked or a mode set from the menu releases it, as Preview's pin does.
+ */
+const updateCanvasStagingPin = (
+  state: WorkbenchState,
+  projectId: string,
+  mutation: CanvasProjectMutation
+): WorkbenchState => {
+  const project = state.projects.find((candidate) => candidate.id === projectId);
+  const isPick = mutation.type === 'setStagedImageIndex' || mutation.type === 'cycleStagedImage';
+
+  if (!project || (!isPick && mutation.type !== 'setCanvasStagingAutoSwitch')) {
+    return state;
+  }
+
+  const slot = isPick ? getSelectedCanvasStagingSlot(project) : undefined;
+  const pinnedSlotId = slot ? pickStagedSlotAutoSwitch(slot).pinnedId : null;
+
+  return updateCanvasStagingFollow(state, projectId, (follow) =>
+    follow.pinnedSlotId === pinnedSlotId ? follow : { ...follow, pinnedSlotId }
+  );
+};
+
+/**
+ * Shows what Auto-switch follows among the staging slots, with the rules Preview follows: under In progress the pinned
+ * placeholder while it remains, else the newest one with a frame of its own; otherwise, under In progress and Newest,
+ * never a placeholder with nothing to show when a result is staged (the newest one takes the selection). Off leaves the
+ * selection alone. The reducer cannot tell a placeholder waiting to start from one running, so every placeholder counts
+ * as running: a pin holds until its placeholder is gone.
+ */
+const followCanvasStaging = (
+  project: Project,
+  slots: readonly CanvasStagingSlot[],
+  follow: CanvasStagingFollow
+): Project => {
+  const { autoSwitchMode, selectedImageIndex } = project.canvas.stagingArea;
+
+  if (autoSwitchMode === 'off') {
+    return project;
+  }
+
+  const lives = slots.flatMap((slot) =>
+    slot.kind === 'placeholder'
+      ? [{ hasOwnFrame: follow.framedSlotIds.includes(slot.id), id: slot.id, state: 'running' as const }]
+      : []
+  );
+  const followed = getAutoSwitchFollowedLive(autoSwitchMode, lives, follow.pinnedSlotId);
+  const nextIndex = followed
+    ? slots.findIndex((slot) => slot.id === followed.id)
+    : slots[selectedImageIndex]?.kind === 'placeholder'
+      ? getLatestCandidateSlotIndex(project, slots)
+      : -1;
+
+  return nextIndex === -1 || nextIndex === selectedImageIndex
+    ? project
+    : {
+        ...project,
+        canvas: { ...project.canvas, stagingArea: { ...project.canvas.stagingArea, selectedImageIndex: nextIndex } },
+      };
+};
+
+/** Forgets frames and pins of placeholders that have gone, so a slot id a retry brings back starts fresh. */
+const pruneCanvasStagingFollow = (
+  follow: CanvasStagingFollow,
+  slots: readonly CanvasStagingSlot[]
+): CanvasStagingFollow => {
+  const placeholderIds = new Set(slots.flatMap((slot) => (slot.kind === 'placeholder' ? [slot.id] : [])));
+  const framedSlotIds = follow.framedSlotIds.filter((id) => placeholderIds.has(id));
+  const pinnedSlotId =
+    follow.pinnedSlotId !== null && placeholderIds.has(follow.pinnedSlotId) ? follow.pinnedSlotId : null;
+
+  return framedSlotIds.length === follow.framedSlotIds.length && pinnedSlotId === follow.pinnedSlotId
+    ? follow
+    : { framedSlotIds, pinnedSlotId };
+};
+
+/**
+ * After every action: each project whose staging, queue or follow state changed shows what Auto-switch follows, and
+ * the follow state keeps only placeholders that remain and projects that are open.
+ */
+const reconcileCanvasStagingFollow = (previous: WorkbenchState, next: WorkbenchState): WorkbenchState => {
+  if (next.projects === previous.projects && next.canvasStagingFollow === previous.canvasStagingFollow) {
+    return next;
+  }
+
+  const previousById = new Map(previous.projects.map((project) => [project.id, project]));
+  const follows: Record<string, CanvasStagingFollow> = {};
+  let didChangeProjects = false;
+  const projects = next.projects.map((project) => {
+    const before = previousById.get(project.id);
+    const follow = next.canvasStagingFollow?.[project.id];
+    const isUnchanged =
+      before !== undefined &&
+      before.canvas.stagingArea === project.canvas.stagingArea &&
+      before.canvas.documentRevision === project.canvas.documentRevision &&
+      before.queue === project.queue &&
+      follow === previous.canvasStagingFollow?.[project.id];
+
+    if (isUnchanged) {
+      if (follow) {
+        follows[project.id] = follow;
+      }
+      return project;
+    }
+
+    const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
+    const pruned = pruneCanvasStagingFollow(follow ?? NO_STAGING_FOLLOW, slots);
+    const followed = followCanvasStaging(project, slots, pruned);
+
+    if (pruned.framedSlotIds.length > 0 || pruned.pinnedSlotId !== null) {
+      follows[project.id] = pruned;
+    }
+    didChangeProjects ||= followed !== project;
+    return followed;
+  });
+
+  // Closed projects, and projects with nothing left to follow, drop their entry.
+  const previousFollows = next.canvasStagingFollow ?? {};
+  const followIds = Object.keys(follows);
+  const didChangeFollows =
+    followIds.length !== Object.keys(previousFollows).length ||
+    followIds.some((projectId) => follows[projectId] !== previousFollows[projectId]);
+
+  return didChangeFollows || didChangeProjects
+    ? {
+        ...next,
+        ...(didChangeProjects ? { projects } : {}),
+        ...(didChangeFollows ? { canvasStagingFollow: follows } : {}),
+      }
+    : next;
+};
+
+/** The slot of the result staged last, or -1 when nothing is staged. */
+const getLatestCandidateSlotIndex = (project: Project, slots: readonly CanvasStagingSlot[]): number => {
+  const latest = project.canvas.stagingArea.pendingImages.at(-1);
+
+  return latest ? slots.findIndex((slot) => slot.kind === 'candidate' && slot.candidate === latest) : -1;
+};
+
 const clampCanvasStagingSelection = (project: Project, previousSelectedSlot?: CanvasStagingSlot): Project => {
   const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
   const slotCount = slots.length;
-  const placeholderIndex =
-    project.canvas.stagingArea.autoSwitchMode === 'progress'
-      ? getFirstCanvasPlaceholderSlotIndex(project.canvas, project.queue.items)
-      : -1;
   const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(slots, previousSelectedSlot);
+  // On 'progress', a followed slot that ends without a result (canceled, or finished with no image) hands the canvas
+  // to the newest result rather than to whatever placeholder takes its index, which has no frame yet.
+  const fallbackIndex =
+    project.canvas.stagingArea.autoSwitchMode === 'progress' && previousSelectedSlot?.kind === 'placeholder'
+      ? getLatestCandidateSlotIndex(project, slots)
+      : -1;
   const selectedImageIndex =
-    placeholderIndex !== -1
-      ? placeholderIndex
-      : preservedSlotIndex !== -1
-        ? preservedSlotIndex
+    preservedSlotIndex !== -1
+      ? preservedSlotIndex
+      : fallbackIndex !== -1
+        ? fallbackIndex
         : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   const isVisible = slotCount > 0 ? project.canvas.stagingArea.isVisible : false;
 
@@ -1441,6 +1627,55 @@ const getGalleryItemFromPersistedValue = (values: Record<string, unknown>, value
     selectedImage: value,
     selectedImageName: null,
   });
+
+const getPersistedPrimaryGalleryItemKey = (values: Record<string, unknown>): GalleryItemKey | null => {
+  if (typeof values.selectedImageName === 'string') {
+    return canonicalizeGalleryItemKey(values.selectedImageName);
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? toGalleryItemKey(selectedItem) : null;
+};
+
+/**
+ * Preview compares the stored comparison image with a different selected image. While both are the same image, Select
+ * for compare is waiting for the second one (`armed`).
+ */
+const getGalleryCompareState = (values: Record<string, unknown>): 'armed' | 'comparing' | null => {
+  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
+  const primaryKey = getPersistedPrimaryGalleryItemKey(values);
+
+  if (!compareItem || primaryKey === null || parseGalleryItemKey(primaryKey).kind !== 'image') {
+    return null;
+  }
+
+  return primaryKey === toGalleryItemKey(compareItem) ? 'armed' : 'comparing';
+};
+
+/**
+ * What selecting `item` does to the comparison. A video cannot be compared. Picking the comparison image of an open pair
+ * swaps the pair, as Swap does; any other selection landing on the comparison image ends it (`settleGalleryValues`).
+ */
+const getSelectionComparePatch = (values: Record<string, unknown>, item: GalleryItem): Record<string, unknown> => {
+  if (item.kind === 'video') {
+    return { compareImage: null };
+  }
+
+  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
+
+  if (
+    !compareItem ||
+    toGalleryItemKey(compareItem) !== toGalleryItemKey(item) ||
+    getGalleryCompareState(values) !== 'comparing'
+  ) {
+    return {};
+  }
+
+  const previousItem = getSelectedGalleryItemFromValues(values);
+
+  return { compareImage: previousItem?.kind === 'image' ? previousItem : null };
+};
 
 /**
  * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
@@ -3444,7 +3679,9 @@ const getLocallyKnownGalleryItemsOnBoard = (
 
 const removeGalleryItemsFromAllProjects = (
   state: WorkbenchState,
-  removedItemKeys: ReadonlySet<GalleryItemKey>
+  removedItemKeys: ReadonlySet<GalleryItemKey>,
+  /** The deleting project, when it selects a next image right after; only its comparison waits for that image. */
+  successorProjectId: string | null = null
 ): WorkbenchState => {
   if (removedItemKeys.size === 0) {
     return state;
@@ -3466,6 +3703,7 @@ const removeGalleryItemsFromAllProjects = (
   );
   let didChange = false;
   const projects = state.projects.map((project) => {
+    const keepComparisonForSuccessor = project.id === successorProjectId;
     const withoutGalleryItems = updateProjectWidgetValues(project, 'gallery', (values) => {
       const selectedImage = values.selectedImage;
       const compareImage = values.compareImage;
@@ -3482,8 +3720,14 @@ const removeGalleryItemsFromAllProjects = (
       );
       const nextSelectedItemKeys = selectedItemKeys.filter((key) => !removedItemKeys.has(key));
       const nextSelectedImage = selectedImageKey && removedItemKeys.has(selectedImageKey) ? null : selectedImage;
-      const nextCompareImage = compareImageKey && removedItemKeys.has(compareImageKey) ? null : compareImage;
       const nextSelectedImageName = selectedNameKey && removedItemKeys.has(selectedNameKey) ? null : selectedImageName;
+      // As clearing the selection does: a comparison left without a selection would open on whatever image is selected
+      // next, unless the caller is about to select the next image itself.
+      const nextCompareImage =
+        (compareImageKey && removedItemKeys.has(compareImageKey)) ||
+        (!keepComparisonForSuccessor && !nextSelectedImage && !nextSelectedImageName)
+          ? null
+          : compareImage;
 
       if (
         nextRecentImages.length === recentImages.length &&
@@ -3617,15 +3861,17 @@ const updateGalleryValuesAndStopAutoSwitch = (
   getValues: (values: Record<string, unknown>) => Record<string, unknown>,
   projectId = state.activeProjectId
 ): WorkbenchState =>
-  updateProjectById(state, projectId, (project) =>
-    updateProjectWidgetValues(
-      project.settings.viewerAutoSwitch === 'off'
+  updateProjectById(state, projectId, (project) => {
+    const { mode } = pickAutoSwitch({ kind: 'result' });
+
+    return updateProjectWidgetValues(
+      project.settings.viewerAutoSwitch === mode
         ? project
-        : { ...project, settings: { ...project.settings, viewerAutoSwitch: 'off' } },
+        : { ...project, settings: { ...project.settings, viewerAutoSwitch: mode } },
       'gallery',
       getValues
-    )
-  );
+    );
+  });
 
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => {
   let didChange = false;
@@ -3747,7 +3993,7 @@ const getQueueItemStatusAfterBackendCancellation = (
 
 /** Whether a newly routed result may take the Gallery selection (and so the settled Preview). */
 const shouldSelectGalleryResult = (project: Project, galleryValues: Record<string, unknown>): boolean =>
-  typeof galleryValues.selectedImageName !== 'string' || project.settings.viewerAutoSwitch !== 'off';
+  selectsLandedResult(project.settings.viewerAutoSwitch, typeof galleryValues.selectedImageName === 'string');
 
 const getGalleryResultSelectionValues = (
   galleryValues: Record<string, unknown>,
@@ -3760,7 +4006,8 @@ const getGalleryResultSelectionValues = (
   const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
-    ...(item.kind === 'video' ? { compareImage: null } : {}),
+    // A comparison waiting for its second image is the user's to complete; a result arriving does not complete it.
+    ...(item.kind === 'video' || getGalleryCompareState(galleryValues) === 'armed' ? { compareImage: null } : {}),
     selectedImage: item,
     selectedImageName: itemKey,
     selectedImageNames: [itemKey],
@@ -4014,13 +4261,18 @@ const enqueueCompiledSnapshot = (
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
-  // Upscale has no dynamic prompts switch: its prompt always runs as typed.
+  // Upscale runs the prompt it shares with Generate, template and dynamic prompts included, from the same snapshot its
+  // prompt text was resolved from.
+  const upscalePromptDraft = upscaleSettings ? getPromptDraftFromValues(widgetStates.generate?.values ?? {}) : null;
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : (videoSettings ?? (upscaleSettings ? { ...upscaleSettings, dynamicPromptsEnabled: false } : null));
+        : (videoSettings ??
+          (upscaleSettings && upscalePromptDraft
+            ? getUpscaleSubmissionSource(upscaleSettings, upscalePromptDraft)
+            : null));
   // Resolve template-merged prompts and seeds here, where Generate, Canvas, Upscale and Video submissions converge; the
   // planner decides whether the expansion counts.
   const submissionPlan = sourceGenerateSettings
@@ -4161,7 +4413,7 @@ const enqueueCompiledSnapshot = (
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
   // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
-  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings;
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings ?? upscalePromptDraft;
   // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
   const resampledProject =
     expansionSampleSeed !== null &&
@@ -4170,7 +4422,8 @@ const enqueueCompiledSnapshot = (
     dynamicPromptsSettings.dynamicPromptsResample
       ? updateProjectWidgetValues(
           advancedProject,
-          route.sourceId === 'canvas' ? 'generate' : route.sourceId,
+          // Canvas and Upscale draw from Generate's dynamic prompts settings.
+          route.sourceId === 'canvas' || route.sourceId === 'upscale' ? 'generate' : route.sourceId,
           (values) =>
             // Sanitized as the expansion read it: a record saved without the field drew sample seed 0.
             sanitizeSampleSeed(values.dynamicPromptsSampleSeed) === expansionSampleSeed &&
@@ -4442,7 +4695,7 @@ export const __workbenchReducerInternal = (
   action: WorkbenchReducerAction,
   context: WorkbenchReducerContext
 ): WorkbenchState => {
-  const next = reduceWorkbenchAction(state, action, context);
+  const next = reconcileCanvasStagingFollow(state, reduceWorkbenchAction(state, action, context));
   const describeStep = RECORDED_LAYOUT_ACTIONS[action.type];
 
   if (!describeStep || next === state || next.projects === state.projects) {
@@ -5704,6 +5957,9 @@ const reduceWorkbenchAction = (
         )
       );
     }
+    case 'noteQueueItemFirstProgressFrame': {
+      return recordCanvasStagingFrame(state, action.projectId, action.queueItemId, action.itemIndex);
+    }
     case 'markQueueItemBackendCancelled': {
       const project = state.projects.find((project) => project.id === action.projectId);
       const queueItem = project?.queue.items.find((item) => item.id === action.queueItemId);
@@ -5882,7 +6138,7 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+            ...getSelectionComparePatch(values, action.item),
             selectedImage: action.item,
             selectedImageName: itemKey,
             selectedImageNames: [itemKey],
@@ -5899,13 +6155,15 @@ const reduceWorkbenchAction = (
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
+          // Building a selection is not picking the second image: a comparison waiting for one ends.
+          const isCompareArmed = getGalleryCompareState(values) === 'armed';
 
           if (!selectedItemKeys.includes(itemKey)) {
             const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
-              ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+              ...(action.item.kind === 'video' || isCompareArmed ? { compareImage: null } : {}),
               selectedImage: action.item,
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
@@ -5927,6 +6185,7 @@ const reduceWorkbenchAction = (
           if (!wasPrimary) {
             return {
               ...values,
+              ...(isCompareArmed ? { compareImage: null } : {}),
               selectedImageNames: remainingItemKeys,
             };
           }
@@ -5947,7 +6206,7 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(nextPrimaryItem?.kind === 'image' ? {} : { compareImage: null }),
+            ...(nextPrimaryItem?.kind === 'image' && !isCompareArmed ? {} : { compareImage: null }),
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
@@ -5975,7 +6234,10 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(action.primaryItem.kind === 'video' ? { compareImage: null } : {}),
+            // Building a selection is not picking the second image: a comparison waiting for one ends.
+            ...(action.primaryItem.kind === 'video' || getGalleryCompareState(values) === 'armed'
+              ? { compareImage: null }
+              : {}),
             selectedImage: action.primaryItem,
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
@@ -6022,7 +6284,14 @@ const reduceWorkbenchAction = (
     case 'clearGallerySelection': {
       return updateGalleryValues(
         state,
-        (values) => ({ ...values, selectedImage: null, selectedImageName: null, selectedImageNames: [] }),
+        // A comparison has no pair without a selection; one left behind would open on the next image selected.
+        (values) => ({
+          ...values,
+          compareImage: null,
+          selectedImage: null,
+          selectedImageName: null,
+          selectedImageNames: [],
+        }),
         action.projectId
       );
     }
@@ -6182,7 +6451,11 @@ const reduceWorkbenchAction = (
       return patchGalleryItemsAcrossProjects(state, new Set(action.itemKeys), action.changes);
     }
     case 'removeGalleryItems': {
-      return removeGalleryItemsFromAllProjects(state, new Set(action.itemKeys));
+      return removeGalleryItemsFromAllProjects(
+        state,
+        new Set(action.itemKeys),
+        action.keepComparisonForSuccessor ? (action.projectId ?? state.activeProjectId) : null
+      );
     }
     case 'reconcileDeletedGalleryBoard': {
       const { outcome } = action;
@@ -6205,13 +6478,15 @@ const reduceWorkbenchAction = (
       return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }), action.projectId);
     }
     case 'applyCanvasProjectMutation': {
-      return updateProjectById(state, action.projectId, (project) => {
+      const nextState = updateProjectById(state, action.projectId, (project) => {
         const updated = applyCanvasProjectMutation(project, action.mutation);
 
         return updated !== project && action.origin !== 'system' && isHighConfidenceCanvasEdit(action.mutation)
           ? applyAutoRouteForEdit(updated, 'canvas', context)
           : updated;
       });
+
+      return updateCanvasStagingPin(nextState, action.projectId, action.mutation);
     }
     case 'commitCanvasEdit': {
       if (!isHighConfidenceCanvasEditIntent(action.intent)) {
@@ -6614,9 +6889,21 @@ const reduceWorkbenchAction = (
           keyof ProjectSettings
         >;
 
-        return [...keys].every((key) => areProjectSettingValuesEqual(project.settings[key], settings[key]))
-          ? project
-          : { ...project, settings };
+        if ([...keys].every((key) => areProjectSettingValuesEqual(project.settings[key], settings[key]))) {
+          return project;
+        }
+
+        // Select for compare turns Auto-switch Off; turning it back on ends the wait, so live frames can never hide a
+        // comparison that a later selection would open.
+        const endsCompareWait =
+          project.settings.viewerAutoSwitch === 'off' &&
+          settings.viewerAutoSwitch !== 'off' &&
+          getGalleryCompareState(getWidgetValues(project, 'gallery')) === 'armed';
+        const nextProject = { ...project, settings };
+
+        return endsCompareWait
+          ? updateProjectWidgetValues(nextProject, 'gallery', (values) => ({ ...values, compareImage: null }))
+          : nextProject;
       });
     }
     case 'setScopedDefaults': {

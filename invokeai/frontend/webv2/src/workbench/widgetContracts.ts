@@ -249,6 +249,12 @@ export interface WidgetWorkbenchApi {
   closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
 
+/**
+ * How a docked widget's body is sized. `flow` (default): the body grows with the view and scrolls as a whole. `fill`:
+ * the view gets exactly the body's height, for views that scroll or resize their own regions (lists, trees, panes).
+ */
+export type WidgetBodySizing = 'fill' | 'flow';
+
 export interface WidgetManifest {
   /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
   apiVersion?: 1;
@@ -272,6 +278,7 @@ export interface WidgetManifest {
   requiresAdmin?: boolean;
   chrome?: {
     header?: 'hidden' | 'visible';
+    body?: WidgetBodySizing;
   };
   /**
    * Literal dynamic loader for all render slots. The registry owns caching,

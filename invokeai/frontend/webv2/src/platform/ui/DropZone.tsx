@@ -29,6 +29,7 @@ export const DropZone = ({
   isOver,
   variant = 'inline',
   _hover,
+  css,
   ...boxProps
 }: DropZoneProps) => {
   // Merge hover styles so they cannot override drag-over fills; overlays use isOver instead of pointer hover.
@@ -41,6 +42,9 @@ export const DropZone = ({
     }),
     [_hover, isDisabled, isInvalid, isOver, variant]
   );
+  // A trigger filling the zone keeps the zone pointed while the trigger is: the gallery picker marks its trigger
+  // `data-hover` while it is open. A caller's own `css` adds to this rather than replacing it.
+  const zoneCss = useMemo(() => [{ '&:has(> [data-hover])': hoverProps }, css], [css, hoverProps]);
 
   return (
     <Box
@@ -54,6 +58,7 @@ export const DropZone = ({
       rounded="md"
       transition={DROP_ZONE_TRANSITION}
       _hover={hoverProps}
+      css={zoneCss}
       {...boxProps}
     >
       {children}

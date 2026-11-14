@@ -118,7 +118,8 @@ export const IconButton = ({
     () =>
       unavailableReason ? (
         <Stack gap="0">
-          {tooltip ? <Text>{tooltip}</Text> : null}
+          {/* A div, not a paragraph: a caller's tooltip may be a layout (a label beside its keycaps). */}
+          {tooltip ? <Text as="div">{tooltip}</Text> : null}
           <Text color={tooltip ? 'fg.muted' : undefined}>{unavailableReason}</Text>
         </Stack>
       ) : (

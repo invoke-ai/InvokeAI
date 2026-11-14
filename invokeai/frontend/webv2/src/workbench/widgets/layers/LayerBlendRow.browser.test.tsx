@@ -79,19 +79,19 @@ const commitBlendMode = (id: string, blendMode: CanvasBlendMode): void => {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** The row's engine surface: the stub's structural half plus an unlocked interaction store. */
-const rowEngine = () => ({
+/** The row's engine surface: the stub's structural half plus an interaction store, unlocked unless `locked`. */
+const rowEngine = (locked: boolean) => ({
   ...stub.engine,
   exports: {},
-  interaction: { get: () => false, subscribe: () => () => undefined },
+  interaction: { get: () => locked, subscribe: () => () => undefined },
 });
 
-const mount = async (width = 280): Promise<void> => {
+const mount = async (width = 280, locked = false): Promise<void> => {
   host = document.createElement('div');
   host.style.width = `${width}px`;
   document.body.append(host);
   root = createRoot(host);
-  const engine = rowEngine();
+  const engine = rowEngine(locked);
   await act(() =>
     root!.render(
       <I18nextProvider i18n={i18n}>
@@ -108,6 +108,13 @@ const unmount = async (): Promise<void> => {
   root = null;
 };
 
+const afterFrames = async (count: number): Promise<void> => {
+  for (let frame = 0; frame < count; frame += 1) {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+};
 const layer = (id = 'r1'): CanvasLayerContract => getDocumentLayer(stub.document(), id)!;
 const trigger = () => page.getByRole('combobox', { name: 'Blend mode' });
 const option = (name: string) => page.getByRole('option', { exact: true, name });
@@ -122,8 +129,6 @@ afterEach(async () => {
   host?.remove();
   host = null;
   vi.clearAllMocks();
-  // Prototype spies (pointer lock) must not leak into later tests or files sharing the browser.
-  vi.restoreAllMocks();
 });
 
 describe('blend mode preview', () => {
@@ -300,6 +305,28 @@ describe('blend mode preview', () => {
 
 describe('opacity input', () => {
   const opacityInput = () => page.getByRole('spinbutton', { exact: true, name: 'Opacity' });
+  const sliderTrigger = () => page.getByRole('button', { exact: true, name: 'Opacity slider' });
+  const slider = () => page.getByRole('slider', { exact: true, name: 'Opacity' });
+
+  /** Opens the dropdown slider; `pointer` builds a mouse event at a fraction of the track. */
+  const openSlider = async () => {
+    await userEvent.click(sliderTrigger());
+    await expect.element(slider()).toBeVisible();
+    const control = document.querySelector<HTMLElement>('[data-scope="slider"][data-part="control"]')!;
+    const { height, left, top, width } = control.getBoundingClientRect();
+    const pointer = (type: string, fraction: number) =>
+      new PointerEvent(type, {
+        bubbles: true,
+        button: 0,
+        buttons: type === 'pointerup' ? 0 : 1,
+        clientX: left + width * fraction,
+        clientY: top + height / 2,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+      });
+    return { control, pointer };
+  };
 
   it('records a held arrow key as one step from where it started', async () => {
     await mount();
@@ -311,33 +338,6 @@ describe('opacity input', () => {
     expect(layer().opacity).toBeCloseTo(0.96, 5);
     expect(commits()).toHaveLength(1);
     expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.96 } });
-    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
-  });
-
-  it('scrubs from its drag handle and records the result once when the mouse button lifts', async () => {
-    await mount();
-    // The scrubber locks the pointer once a real click has activated the page; the harness lock steals focus.
-    vi.spyOn(Element.prototype, 'requestPointerLock').mockImplementation(() => Promise.resolve());
-    const scrubber = host!.querySelector<HTMLElement>('[data-scope="number-input"][data-part="scrubber"]')!;
-    await act(() =>
-      scrubber.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }))
-    );
-    for (let step = 1; step <= 5; step += 1) {
-      await act(() =>
-        document.dispatchEvent(
-          new MouseEvent('mousemove', { bubbles: true, clientX: 100 - step * 4, clientY: 100, movementX: -4 })
-        )
-      );
-    }
-
-    // Each step previews on the layer; nothing is recorded until the release.
-    expect(layer().opacity).toBeCloseTo(0.95, 5);
-    expect(commits()).toHaveLength(0);
-    await act(() =>
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 80, clientY: 100 }))
-    );
-    expect(commits()).toHaveLength(1);
-    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.95 } });
     expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
   });
 
@@ -356,6 +356,34 @@ describe('opacity input', () => {
     expect(commits()[0]!.inverse).toMatchObject({ patch: { opacity: 1 } });
   });
 
+  it('keeps a typed value pending while the caret moves, and records only the final value', async () => {
+    await mount();
+    const input = opacityInput().element() as HTMLInputElement;
+    // Zag restores the caret one frame after each value change, so a caret move made sooner is undone. Let each
+    // keystroke settle before moving the caret, as a person typing would.
+    const typeSettled = async (text: string) => {
+      await userEvent.keyboard(text);
+      await act(() => afterFrames(2));
+    };
+    await userEvent.tripleClick(opacityInput());
+    await typeSettled('5');
+    await typeSettled('{ArrowLeft}');
+    expect(input.selectionStart).toBe(0);
+    await typeSettled('2');
+    await expect.element(opacityInput()).toHaveValue('25');
+    await typeSettled('{ArrowRight}');
+    expect(input.selectionStart).toBe(2);
+
+    expect(layer().opacity).toBeCloseTo(0.25, 5);
+    expect(commits()).toHaveLength(0);
+
+    await userEvent.keyboard('{Enter}');
+
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.25 } });
+    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
+  });
+
   it('records a still-pending edit when the row unmounts', async () => {
     await mount();
     await userEvent.tripleClick(opacityInput());
@@ -368,11 +396,89 @@ describe('opacity input', () => {
     expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.3 } });
   });
 
-  it('disables both controls without an editable selection', async () => {
+  it('previews each step of a slider drag and records the result once when the pointer lifts', async () => {
+    await mount();
+    const { control, pointer } = await openSlider();
+
+    await act(() => control.dispatchEvent(pointer('pointerdown', 0.8)));
+    const seen = [layer().opacity];
+    for (const fraction of [0.7, 0.6, 0.5]) {
+      await act(() => document.dispatchEvent(pointer('pointermove', fraction)));
+      seen.push(layer().opacity);
+    }
+
+    // Every step reaches the layer while nothing is recorded until the release.
+    expect(new Set(seen.map((value) => value.toFixed(2))).size).toBe(4);
+    expect(layer().opacity).toBeCloseTo(0.5, 1);
+    await expect.element(opacityInput()).toHaveValue(String(Math.round(layer().opacity * 100)));
+    expect(commits()).toHaveLength(0);
+
+    await act(() => document.dispatchEvent(pointer('pointerup', 0.5)));
+
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: layer().opacity } });
+    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
+    expect(stub.history.entries().past).toEqual(['Opacity']);
+  });
+
+  it('records a drag once when Escape closes the slider mid-drag, ignoring the moves that follow', async () => {
+    await mount();
+    const { control, pointer } = await openSlider();
+
+    await act(() => control.dispatchEvent(pointer('pointerdown', 0.8)));
+    await act(() => document.dispatchEvent(pointer('pointermove', 0.6)));
+    const atClose = layer().opacity;
+    expect(atClose).toBeCloseTo(0.6, 1);
+
+    await userEvent.keyboard('{Escape}');
+    await act(() => document.dispatchEvent(pointer('pointermove', 0.3)));
+    await act(() => document.dispatchEvent(pointer('pointerup', 0.3)));
+    await expect.poll(() => slider().query()).toBeNull();
+
+    expect(layer().opacity).toBe(atClose);
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: atClose } });
+    // Nothing is left pending for a later flush to record.
+    await unmount();
+    expect(commits()).toHaveLength(1);
+    expect(stub.history.entries().past).toEqual(['Opacity']);
+  });
+
+  it('opens the slider from the keyboard, records a held key once, and returns focus on Escape', async () => {
+    await mount();
+    await act(async () => {
+      (sliderTrigger().element() as HTMLElement).focus();
+      await userEvent.keyboard('{Enter}');
+    });
+    await expect.element(slider()).toHaveFocus();
+
+    await userEvent.keyboard('{ArrowLeft>3/}');
+
+    expect(layer().opacity).toBeCloseTo(0.97, 5);
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.97 } });
+    await expect.element(slider()).toHaveAttribute('aria-valuetext', '97%');
+
+    await userEvent.keyboard('{Escape}');
+
+    await expect.poll(() => slider().query()).toBeNull();
+    await expect.element(sliderTrigger()).toHaveFocus();
+    expect(commits()).toHaveLength(1);
+  });
+
+  it('disables every control without an editable selection', async () => {
     createStub(null);
     await mount();
 
     await expect.element(trigger()).toBeDisabled();
     await expect.element(opacityInput()).toBeDisabled();
+    await expect.element(sliderTrigger()).toBeDisabled();
+  });
+
+  it('disables the field and the slider trigger while canvas editing is locked', async () => {
+    await mount(280, true);
+
+    await expect.element(opacityInput()).toBeDisabled();
+    await expect.element(sliderTrigger()).toBeDisabled();
   });
 });

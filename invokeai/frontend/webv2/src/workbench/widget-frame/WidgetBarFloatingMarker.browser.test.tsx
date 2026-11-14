@@ -79,7 +79,7 @@ await i18n.use(initReactI18next).init({
             railMarker: '{{label}}, floating window',
             railMarkerHint: '{{label}} is floating — click to show the window',
           },
-          rail: { inspectWidgets: 'Inspect widgets' },
+          regionWidgets: { right: 'Right panel widgets' },
           removeWidget: 'Remove {{label}}',
         },
       },
@@ -228,7 +228,7 @@ describe('WidgetBar floating marker', () => {
   it('removes the window from the enable menu as a toggle, not as a marker removal', async () => {
     await renderBar();
     await act(async () => {
-      slot('Inspect widgets').click();
+      slot('Right panel widgets').click();
       await Promise.resolve();
     });
 
@@ -258,6 +258,27 @@ describe('WidgetBar floating marker', () => {
 
     expect(handlers.onToggle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'queue' }));
     expect(handlers.onRemoveFloating).not.toHaveBeenCalled();
+  });
+
+  it("leaves a right-click inside a slot's menu to that menu, and opens the widgets menu from the rail itself", async () => {
+    const openWidgetsMenus = () =>
+      [...document.body.querySelectorAll<HTMLElement>('[role="menu"][data-state="open"]')].filter((menu) =>
+        menu.textContent?.includes('Right panel widgets')
+      );
+    await renderBar();
+    await openMenu(slot('Queue'));
+
+    // The slot's menu is portalled out of the rail, but React still bubbles its events through the rail.
+    await openMenu(menuItem('remove-widget')!);
+    expect(openWidgetsMenus()).toHaveLength(0);
+    expect(menuItem('remove-widget')).not.toBeNull();
+
+    await act(async () => {
+      menuItem('remove-widget')?.click();
+      await Promise.resolve();
+    });
+    await openMenu(host!.querySelector('nav')!);
+    expect(openWidgetsMenus()).toHaveLength(1);
   });
 
   it("closes a marker's menu when the project changes, so it cannot dock or remove the new project's window", async () => {

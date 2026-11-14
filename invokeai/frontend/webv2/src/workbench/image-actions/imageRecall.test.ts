@@ -332,6 +332,7 @@ describe('image recall', () => {
           {
             id: 'ref-1',
             isEnabled: true,
+            name: 'Hero pose',
             config: {
               image: {
                 height: 770,
@@ -357,6 +358,8 @@ describe('image recall', () => {
       image: { original: { image: { height: 770, image_name: 'reference.png', width: 513 } } },
       type: 'ip_adapter',
     });
+    // The user's name stays with its image through the retarget to another family.
+    expect(result?.values.referenceImages[0]?.name).toBe('Hero pose');
     expect(result?.fields).toContain('referenceImages');
   });
 

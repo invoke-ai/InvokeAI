@@ -163,7 +163,7 @@ const activeProject = (): { id: string; name: string } | null => {
 };
 
 const generationUi = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 const mountEditor = async ({ strict = false, withStrength = false } = {}) => {

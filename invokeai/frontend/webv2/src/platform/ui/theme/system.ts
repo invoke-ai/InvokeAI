@@ -10,6 +10,7 @@ import {
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
+  kbdRecipe,
   menuSlotRecipe,
   numberInputSlotRecipe,
   popoverSlotRecipe,
@@ -104,9 +105,9 @@ const brandFg: Compute = (theme) =>
     ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
     : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
-/** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
+/** Foreground leaned toward accent by the theme's `interactionTint`: the colour interaction fills apply at low alpha. */
 const hoverTint: Compute = (theme) =>
-  `color-mix(in oklab, ${theme.colors.accent.solid} 55%, ${
+  `color-mix(in oklab, ${theme.colors.accent.solid} ${theme.interactionTint}%, ${
     theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
   })`;
 
@@ -164,7 +165,7 @@ const semanticColors = {
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
   /**
-   * The pointed or highlighted fill for rows, tabs, and options: a faint accent-tinted foreground, translucent so it
+   * The pointed or highlighted fill for rows, tabs, and options: a faint foreground leaned toward the accent, translucent so it
    * reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its
    * highlighted option share one fill.
    */
@@ -261,6 +262,14 @@ const highContrastConditions = {
   highContrastLight: `:root[data-high-contrast=true]:is(${lightThemeSelectors})`,
 };
 
+/**
+ * `inset / size` as a number (tan(atan2(a, b)) is a / b), and 0 while the collapsible has not measured the size yet
+ * (0px): the scale is then 1, never infinite or negative.
+ */
+const insetRatio = (inset: string, size: string): string =>
+  `tan(atan2(min(${inset}, ${size} * 1000), max(${size}, ${inset})))`;
+const SECTION_SCALE_INSET = `scale(calc(1 - ${insetRatio('8px', 'var(--width)')}), calc(1 - ${insetRatio('4px', 'var(--height)')}))`;
+
 const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
 
@@ -345,16 +354,33 @@ const config = defineConfig({
         from: { transform: 'translateX(-100%)' },
         to: { transform: 'translateX(300%)' },
       },
+      // A settings section's fields growing into place as it opens (and back as it folds), beside the collapsible's own
+      // height and fade. The start is a fixed inset, not a percentage, so every section's edges travel alike whatever
+      // its size: 4px in from each side and 4px up from the bottom, scaled from the top centre. The ratios come from
+      // the `--width` and `--height` the collapsible measures for its height animation. Neither is held after it ends,
+      // so no transform stays on the fields; the fold ends with the content faded out. They run on the fields inside
+      // the collapsible's content, never on the content itself: Chromium leaves fields unpainted when one element both
+      // runs a composited transform animation and animates its height under `overflow: hidden`.
+      'wb-section-scale-in': {
+        from: { transform: SECTION_SCALE_INSET },
+        to: { transform: 'scale(1)' },
+      },
+      'wb-section-scale-out': {
+        from: { transform: 'scale(1)' },
+        to: { transform: SECTION_SCALE_INSET },
+      },
     },
     layerStyles: {
-      // The inset dot-grid surface behind previews and the loading splash.
+      // The inset dot-grid surface behind previews, the loading splash and the auth screens. It matches the workflow
+      // editor's grid at 100% zoom (1.5px dots every 25px): the ramp from 0.4px to 1px carries the ink of that
+      // anti-aliased 0.75px-radius dot, where a wider gradient reads brighter.
       dotGrid: {
         value: {
           backgroundColor: 'bg.inset',
-          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+          backgroundImage: 'radial-gradient(circle, currentColor 0.4px, transparent 1px)',
           backgroundPosition: 'center',
           backgroundRepeat: 'repeat',
-          backgroundSize: '24px 24px',
+          backgroundSize: '25px 25px',
           color: 'fg.grid',
         },
       },
@@ -403,6 +429,7 @@ const config = defineConfig({
     recipes: {
       button: buttonRecipe,
       input: inputRecipe,
+      kbd: kbdRecipe,
       skeleton: skeletonRecipe,
       textarea: textareaRecipe,
     },

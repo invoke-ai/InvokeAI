@@ -204,6 +204,26 @@ const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[
     <Stack as="ul" gap="2" listStyleType="none" m="0" p="0">
       {issues.map((issue, index) => {
         const actions = getActions(issue);
+        const buttons = actions.map((action) => (
+          <Button
+            key={action.id}
+            flexShrink={0}
+            size="xs"
+            data-issue-action=""
+            variant="outline"
+            // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- a few buttons per shown issue.
+            onClick={() => {
+              action.run();
+              if (!action.stays) {
+                onJump();
+              }
+            }}
+          >
+            {action.label}
+          </Button>
+        ));
+        // A lone action sits at the end of the message's row; several get a row of their own under it.
+        const isInline = actions.length === 1;
 
         return (
           // Two issues can read the same (two nodes missing the same input), so the position keeps keys apart.
@@ -218,29 +238,14 @@ const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[
                 flexShrink={0}
                 mt="0.5"
               />
-              <Text color="fg" fontSize="sm" lineHeight="1.4" textWrap="pretty">
+              <Text color="fg" flex="1" fontSize="sm" lineHeight="1.4" minW="0" textWrap="pretty">
                 {issue.message}
               </Text>
+              {isInline ? buttons : null}
             </HStack>
-            {actions.length > 0 ? (
+            {actions.length > 1 ? (
               <HStack gap="1" ps="4.5" wrap="wrap">
-                {actions.map((action) => (
-                  <Button
-                    key={action.id}
-                    size="xs"
-                    data-issue-action=""
-                    variant="outline"
-                    // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- a few buttons per shown issue.
-                    onClick={() => {
-                      action.run();
-                      if (!action.stays) {
-                        onJump();
-                      }
-                    }}
-                  >
-                    {action.label}
-                  </Button>
-                ))}
+                {buttons}
               </HStack>
             ) : null}
           </Stack>

@@ -39,7 +39,7 @@ The Layers panel groups layers by type, in the stacks **Inpaint Masks**, **Regio
 
 <Image src={addLayerMenu} alt="The Add layer menu with Inpaint mask, Regional guidance, Regional reference image, Control layer, Raster layer and New group." width={500} />
 
-Each layer row has an eye button on the right. A hidden layer is off the canvas and takes no part in generation. To only get a mask, regional guidance or control layer out of view while it still affects generation, choose **Hide on canvas only** in its right-click menu. **Shift+H** does that for all of them at once so you can see the image underneath.
+Each raster layer row has an eye button on the right: a hidden raster layer is off the canvas and takes no part in generation. Mask, regional guidance and control layer rows have a dot before the eye as well. The dot decides whether the layer takes part in generation, and the eye only gets the layer out of view while it still affects generation. **Shift+H** does that for all of them at once so you can see the image underneath.
 
 ### Settings live in the Properties pane
 
@@ -120,7 +120,7 @@ Regional guidance gives one area of the image its own prompt. For example, keep 
 
 2. **Paint the region** with the **Brush**, or draw it with the **Shape** tool. It shows as a tinted overlay.
 
-3. **Enter the region's prompt.** With the layer selected, open **Properties** and scroll down to its **Layer** section. Type in **Positive prompt**, and optionally **Negative prompt**. The prompt is saved when you click away from the field.
+3. **Enter the region's prompt.** With the layer selected, open **Properties** and scroll down to its **Layer** section. Type in **Positive prompt**. To keep something out of the region as well, click **+ Negative prompt…** and type in **Negative prompt**. Each prompt is saved when you click away from its field.
 
 4. **Press Invoke.** The main prompt still describes the whole image; the regional prompt applies inside the region.
 
@@ -143,7 +143,7 @@ A control layer shapes the composition with a guide image: the edges of a sketch
    * Right-click an image in the Gallery and choose **Use as Control**. It fills the selected control layer if that layer has no image yet, and otherwise adds a new control layer.
    * Right-click a raster layer and choose **Use as control layer**, which copies its pixels to a new control layer.
    * Drag an image from the Gallery onto the canvas and drop it on **Add as control layer**. As with **Use as Control**, it fills the selected control layer if that layer is still empty.
-   * Select an empty control layer and drop an image file from your computer onto the canvas, where the layer shows *Drop an image here*. The file is uploaded into that layer.
+   * Drag an image file from your computer onto the canvas and drop it on **Add as control layer**. It is uploaded to the Gallery first, then fills the selected control layer if that layer is still empty, as a Gallery image does.
 
 2. **Choose the Type**: **Pose**, **Depth**, **Edges**, **Soft edges**, **Line art**, **Sketch**, **Color** or **Tile**. Next to each type, the menu says how many installed models are made for it, *via Union* when only a Union model covers it, or *Not installed*.
 
@@ -173,9 +173,10 @@ The tool strip also has shape, gradient and text tools, which are described in t
 
 ## Adding a gallery image to a layer
 
-There are three ways to bring an existing image onto the canvas:
+There are four ways to bring an existing image onto the canvas:
 
 * **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as raster layer**, **Add as control layer**, **Add as regional reference image**, **Add as inpaint mask** and **Add as resized control layer**, which scales the image to the model's optimal size.
+* **Drag it from your computer.** Drag one or more image files (PNG, JPEG or WebP) from your file manager or the desktop onto the canvas. The same drop zones appear. The files are uploaded to the Gallery, to the board new results go to, and then added as the zone says. Other kinds of files are refused with a notice. While an operation such as a filter is running, the canvas says it is busy and takes no drop, and until an upload finishes, another drop is refused. An image dragged from a web page often arrives as a link rather than a file; save it first, then drag the file.
 * **Use the image's menu.** Right-click an image in the Gallery or Preview, or open **Edit** in the Preview's header. **Edit on Canvas** adds it as an image layer and opens Canvas; **Add to Canvas as…** lets you choose the kind of layer. **New project from image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.
 

@@ -33,7 +33,7 @@ vi.mock('./GenerationUiContext', () => ({
     </div>
   ),
   useGenerationUi: () => ({
-    sectionPreferences: { sectionsOpen: { refiner: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { refiner: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 

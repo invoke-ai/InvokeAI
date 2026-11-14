@@ -179,6 +179,11 @@ export type GenerateReferenceImageConfig =
 
 export interface GenerateReferenceImage {
   id: string;
+  /**
+   * The user's name for the reference: trimmed, at most MAX_REFERENCE_IMAGE_NAME_LENGTH characters, never empty.
+   * Absent shows the positional default ("Reference image 2"). A label only: prompt tags stay positional.
+   */
+  name?: string;
   isEnabled: boolean;
   config: GenerateReferenceImageConfig;
 }

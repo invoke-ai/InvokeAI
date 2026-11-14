@@ -75,7 +75,9 @@ const quickWidgetProps: WidgetViewProps = {
   runtime: {} as WidgetRuntimeApi,
 };
 
-const render = async (quick = false) => {
+const queueWidgetProps: WidgetViewProps = { ...quickWidgetProps, manifest: queueWidgetManifest };
+
+const render = async (widget?: WidgetViewProps) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
@@ -83,7 +85,7 @@ const render = async (quick = false) => {
           <button type="button" onClick={() => openWorkbenchSettings('behavior')}>
             Open settings
           </button>
-          {quick ? <WidgetSettingsButton {...quickWidgetProps} /> : null}
+          {widget ? <WidgetSettingsButton {...widget} /> : null}
           <SettingsDialogHost />
         </I18nextProvider>
       </ChakraProvider>
@@ -331,7 +333,7 @@ describe('settings dialog', () => {
   });
 
   it('returns focus to the widget gear when quick settings close with Escape', async () => {
-    await render(true);
+    await render(quickWidgetProps);
     const gear = page.getByRole('button', {
       name: i18n.t('widgets.settingsLabel', { label: 'Appearance' }),
       exact: true,
@@ -343,8 +345,27 @@ describe('settings dialog', () => {
     await expect.element(gear).toHaveFocus();
   });
 
+  it("edits the Queue's job scope from its gear without opening the dialog", async () => {
+    await render(queueWidgetProps);
+    await act(() =>
+      page.getByRole('button', { name: i18n.t('widgets.settingsLabel', { label: 'Queue' }), exact: true }).click()
+    );
+    const scope = page.getByRole('combobox', { name: 'Show jobs from', exact: true });
+    await expect.element(scope).toHaveTextContent('All projects');
+    await userEvent.click(scope);
+    await userEvent.click(page.getByRole('option', { name: 'Active project', exact: true }));
+    await expect.poll(() => getWorkbenchPreferences().queueJobsScope).toBe('active-project');
+    await expect.element(scope).toHaveTextContent('Active project');
+    expect(settingsDialogStore.getSnapshot().isOpen).toBe(false);
+    await expect
+      .element(
+        page.getByRole('button', { name: i18n.t('settingsDialog.allWidgetSettings', { widget: 'Queue' }), exact: true })
+      )
+      .toBeVisible();
+  });
+
   it('hands quick settings to the full section and restores the widget gear', async () => {
-    await render(true);
+    await render(quickWidgetProps);
     const gear = page.getByRole('button', {
       name: i18n.t('widgets.settingsLabel', { label: 'Appearance' }),
       exact: true,

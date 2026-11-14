@@ -180,11 +180,15 @@ export interface QueueItemReadModel {
   origin?: string | null;
   /** The workflow-call parent this item runs for; null or absent on root items. */
   parentItemId?: number | null;
+  /** Pending items run highest priority first, then oldest first; absent when the source did not say. */
+  priority?: number | null;
   resultImageNames: string[];
   retriedFromItemId?: number | null;
   sessionId: string;
   startedAt?: string | null;
   status: QueueItemStatus;
+  /** Rises with every status change of the item; a reading with a lower one is older. Absent when unknown. */
+  statusSequence?: number | null;
   updatedAt: string;
   userDisplayName?: string | null;
   userEmail?: string | null;
@@ -296,8 +300,8 @@ export interface QueueResultVideoOptions extends QueueResultImageOptions {
 export interface QueueFeatureCommands {
   /** Cancels every unfinished item of one batch; resolves with how many the backend canceled. */
   cancelBatch(batchId: string): Promise<number>;
-  cancelCurrentItem(): Promise<void>;
-  cancelItem(itemId: number): Promise<void>;
+  /** Resolves with the item as the cancel left it: unchanged, so not canceled, when it had already finished. */
+  cancelItem(itemId: number): Promise<QueueItemReadModel>;
   cancelScopedItems(scope?: QueueQueryScope, options?: { keepCurrent?: boolean }): Promise<void>;
   clearFailedItems(scope?: QueueQueryScope): Promise<void>;
   /** Removes completed, canceled and failed items; pending and running work is kept. */

@@ -11,15 +11,30 @@ import type {
   CanvasNodeContract,
 } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
+import type { KeyboardEvent } from 'react';
 
-import { createListCollection, Flex, HStack, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
+import {
+  chakra,
+  createListCollection,
+  Flex,
+  HStack,
+  Icon,
+  InputGroup,
+  NumberInput,
+  Popover,
+  Portal,
+} from '@chakra-ui/react';
 import { Select } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { PopoverContent } from '@platform/ui/Popover';
+import { Slider } from '@platform/ui/Slider';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { baselinePatch, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { MoveHorizontalIcon } from 'lucide-react';
+import { BlendIcon, ChevronDownIcon, OpacityIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,8 +43,33 @@ type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'in
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
 const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
-// The drag handle sits inside the field, as on the Transform pane's number fields.
-const SCRUB_HANDLE_PROPS = { color: 'fg.muted', pointerEvents: 'auto', ps: '1.5' } as const;
+const OPACITY_ICON_SLOT_PROPS = { color: 'fg.muted', ps: '2' } as const;
+const SLIDER_TRIGGER_SLOT_PROPS = { pe: '0.5', pointerEvents: 'auto' } as const;
+const SLIDER_POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
+// Lucide has no dedicated opacity glyph; two overlapping translucent circles read as opacity, and the Workflow
+// editor's node-opacity control uses the same one.
+const OPACITY_ICON = <Icon aria-hidden as={OpacityIcon} boxSize="3.5" />;
+// Keys that step the slider; their release ends the gesture.
+const SLIDER_STEP_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'End',
+  'Home',
+  'PageDown',
+  'PageUp',
+]);
+// Keys Zag's number input steps or commits on (Home/End only without Ctrl/Alt/Meta). Any other key, a caret move
+// included, leaves a typed value pending.
+const FIELD_COMMIT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter']);
+const FIELD_BOUND_KEYS = new Set(['End', 'Home']);
+
+const isFieldCommitKey = (event: { altKey: boolean; ctrlKey: boolean; key: string; metaKey: boolean }): boolean =>
+  FIELD_COMMIT_KEYS.has(event.key) ||
+  (FIELD_BOUND_KEYS.has(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey);
+
+const getPercentValueText = ({ value }: { value: number }): string => `${value}%`;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
@@ -123,6 +163,17 @@ const BlendModeControl = ({
     [t]
   );
   const blendValue = useMemo(() => [shownMode], [shownMode]);
+  const blendValueText = useMemo(
+    () => (
+      <HStack as="span" display="inline-flex" gap="1.5" maxW="full" minW="0" verticalAlign="middle">
+        <Icon aria-hidden as={BlendIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
+        <chakra.span minW="0" truncate>
+          {t(`widgets.layers.blendModes.${shownMode}`)}
+        </chakra.span>
+      </HStack>
+    ),
+    [shownMode, t]
+  );
 
   const endPreview = useCallback(() => {
     previewRef.current = null;
@@ -194,7 +245,7 @@ const BlendModeControl = ({
         positioning={SELECT_POSITIONING}
         triggerProps={BLEND_TRIGGER_PROPS}
         value={blendValue}
-        valueText={t(`widgets.layers.blendModes.${shownMode}`)}
+        valueText={blendValueText}
         onHighlightChange={handleHighlightChange}
         onOpenChange={handleOpenChange}
         onValueChange={handleBlendChange}
@@ -203,6 +254,12 @@ const BlendModeControl = ({
   );
 };
 
+/**
+ * Typed entry, arrow keys, and a slider in a popover at the field's end. Every change previews on the layer; each
+ * completed gesture records one history entry: a typed value on Enter or blur, a held key on its release, a slider
+ * drag when the pointer lifts. The field shows the slider's live value, so the thumb carries no tooltip to cover the
+ * trigger.
+ */
 const OpacityRow = ({
   editingLocked,
   engine,
@@ -214,10 +271,19 @@ const OpacityRow = ({
 }) => {
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
+  const sliderTriggerIds = useTooltipTriggerIds();
   // Track latest writes outside render closures so same-event commits record current values.
   const pendingRef = useRef<{ id: string; latest: number } | null>(null);
+  // A slider key settles on its release, as in the field, so a held key records once.
+  const sliderKeyHeldRef = useRef(false);
+  // The closing popover's slider can keep tracking a drag through its exit; closing already recorded the gesture, so
+  // nothing the slider reports after it may preview or become pending.
+  const sliderOpenRef = useRef(false);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
-  const opacityPercent = useMemo(() => String(Math.round((layer?.opacity ?? 1) * 100)), [layer?.opacity]);
+  const percent = Math.round((layer?.opacity ?? 1) * 100);
+  const opacityPercent = String(percent);
+  const sliderValue = useMemo(() => [percent], [percent]);
+  const sliderLabel = useMemo(() => [t('widgets.layers.actions.opacity')], [t]);
 
   // Record one history entry per completed opacity gesture.
   const commitPending = useCallback(() => {
@@ -232,9 +298,9 @@ const OpacityRow = ({
     );
   }, [commitPrepared, t]);
 
-  const handleOpacityChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (!layer || !Number.isFinite(valueAsNumber)) {
+  const previewOpacity = useCallback(
+    (nextPercent: number) => {
+      if (!layer || !Number.isFinite(nextPercent)) {
         return;
       }
       // If a pending edit belongs to a previously selected layer, flush it first
@@ -242,14 +308,8 @@ const OpacityRow = ({
       if (pendingRef.current && pendingRef.current.id !== layer.id) {
         commitPending();
       }
-      const next = clamp01(valueAsNumber / 100);
-      if (
-        !previewStructural({
-          id: layer.id,
-          patch: { opacity: next },
-          type: 'updateCanvasLayer',
-        })
-      ) {
+      const next = clamp01(nextPercent / 100);
+      if (!previewStructural({ id: layer.id, patch: { opacity: next }, type: 'updateCanvasLayer' })) {
         return;
       }
       pendingRef.current = { id: layer.id, latest: next };
@@ -257,56 +317,131 @@ const OpacityRow = ({
     [commitPending, previewStructural, layer]
   );
 
-  // Commit on spinner release, arrow/page-key release, Enter, or typed-value blur.
+  const handleInputChange = useCallback(
+    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => previewOpacity(valueAsNumber),
+    [previewOpacity]
+  );
+
+  // Commit on a step key's release, Enter, or typed-value blur.
   const handleInputKeyUp = useCallback(
-    (event: { key: string }) => {
-      if (['ArrowDown', 'ArrowUp', 'End', 'Enter', 'Home', 'PageDown', 'PageUp'].includes(event.key)) {
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (isFieldCommitKey(event)) {
         commitPending();
       }
     },
     [commitPending]
   );
 
-  // A scrub ends with the mouse button rather than a key or blur, so the release records it.
-  const scrubRef = useRef<AbortController | null>(null);
-  const handleScrubStart = useCallback(() => {
-    scrubRef.current?.abort();
-    const scrub = new AbortController();
-    scrubRef.current = scrub;
-    window.addEventListener(
-      'mouseup',
-      () => {
-        scrub.abort();
-        scrubRef.current = null;
-        commitPending();
-      },
-      { signal: scrub.signal }
-    );
+  const handleSliderChange = useCallback(
+    ({ value: [next] }: { value: number[] }) => {
+      if (next !== undefined && sliderOpenRef.current) {
+        previewOpacity(next);
+      }
+    },
+    [previewOpacity]
+  );
+
+  // Zag ends a value change on every key press, from the thumb's own keydown; the capture-phase key flag lets a held
+  // key settle on its release instead. A drag ends once, when the pointer lifts.
+  const handleSliderChangeEnd = useCallback(() => {
+    if (!sliderKeyHeldRef.current) {
+      commitPending();
+    }
   }, [commitPending]);
 
-  const scrubHandle = useMemo(
-    () => (
-      <NumberInput.Scrubber aria-hidden onMouseDownCapture={handleScrubStart}>
-        <Icon as={MoveHorizontalIcon} boxSize="3" />
-      </NumberInput.Scrubber>
-    ),
-    [handleScrubStart]
+  const handleSliderKeyDown = useCallback((event: { key: string }) => {
+    if (SLIDER_STEP_KEYS.has(event.key)) {
+      sliderKeyHeldRef.current = true;
+    }
+  }, []);
+
+  const handleSliderKeyUp = useCallback(
+    (event: { key: string }) => {
+      if (SLIDER_STEP_KEYS.has(event.key)) {
+        sliderKeyHeldRef.current = false;
+        commitPending();
+      }
+    },
+    [commitPending]
+  );
+
+  const handlePopoverOpenChange = useCallback(
+    ({ open }: { open: boolean }) => {
+      sliderOpenRef.current = open;
+      sliderKeyHeldRef.current = false;
+      commitPending();
+    },
+    [commitPending]
   );
 
   // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel
-  // closes right after a spinner click or mid-scrub) so the edit is never lost to history.
+  // closes mid-drag or right after an arrow key) so the edit is never lost to history.
   const flushOnUnmountRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) {
-        return () => {
-          scrubRef.current?.abort();
-          scrubRef.current = null;
-          commitPending();
-        };
-      }
-      return undefined;
-    },
+    (node: HTMLDivElement | null) => (node ? commitPending : undefined),
     [commitPending]
+  );
+
+  const sliderTrigger = useMemo(
+    () => (
+      <Popover.Root
+        ids={sliderTriggerIds}
+        lazyMount
+        positioning={SLIDER_POPOVER_POSITIONING}
+        unmountOnExit
+        onOpenChange={handlePopoverOpenChange}
+      >
+        <Tooltip content={t('widgets.layers.actions.opacitySlider')} ids={sliderTriggerIds}>
+          <Popover.Trigger asChild>
+            <IconButton
+              aria-label={t('widgets.layers.actions.opacitySlider')}
+              color="fg.muted"
+              disabled={disabled}
+              minW="5"
+              size="sm"
+              variant="ghost"
+              w="5"
+            >
+              <Icon as={ChevronDownIcon} boxSize="3" />
+            </IconButton>
+          </Popover.Trigger>
+        </Tooltip>
+        <Portal>
+          <Popover.Positioner>
+            <PopoverContent aria-label={t('widgets.layers.actions.opacity')} w="auto">
+              <Popover.Body px="3" py="2.5">
+                <Slider
+                  aria-label={sliderLabel}
+                  disabled={disabled}
+                  getAriaValueText={getPercentValueText}
+                  max={100}
+                  min={0}
+                  step={1}
+                  value={sliderValue}
+                  w="36"
+                  withThumbTooltip={false}
+                  onKeyDownCapture={handleSliderKeyDown}
+                  onKeyUp={handleSliderKeyUp}
+                  onValueChange={handleSliderChange}
+                  onValueChangeEnd={handleSliderChangeEnd}
+                />
+              </Popover.Body>
+            </PopoverContent>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+    ),
+    [
+      disabled,
+      handlePopoverOpenChange,
+      handleSliderChange,
+      handleSliderChangeEnd,
+      handleSliderKeyDown,
+      handleSliderKeyUp,
+      sliderLabel,
+      sliderTriggerIds,
+      sliderValue,
+      t,
+    ]
   );
 
   return (
@@ -318,14 +453,19 @@ const OpacityRow = ({
         size="lg"
         step={1}
         value={opacityPercent}
-        w="20"
-        onValueChange={handleOpacityChange}
+        w="24"
+        onValueChange={handleInputChange}
       >
-        <NumberInput.Control onClick={commitPending} />
-        <InputGroup startElement={scrubHandle} startElementProps={SCRUB_HANDLE_PROPS}>
+        <InputGroup
+          endElement={sliderTrigger}
+          endElementProps={SLIDER_TRIGGER_SLOT_PROPS}
+          startElement={OPACITY_ICON}
+          startElementProps={OPACITY_ICON_SLOT_PROPS}
+        >
           <NumberInput.Input
             aria-label={t('widgets.layers.actions.opacity')}
             css={OPACITY_INPUT_PROPS}
+            fontVariantNumeric="tabular-nums"
             onBlur={commitPending}
             onKeyUp={handleInputKeyUp}
           />

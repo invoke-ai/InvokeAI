@@ -2,7 +2,7 @@
 import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
 
-import { createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   BUILTIN_REBALANCE_PRESETS,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
@@ -20,8 +20,8 @@ import { MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
-import { Tooltip } from '@platform/ui/Tooltip';
-import { MoreHorizontalIcon, RotateCcwIcon } from 'lucide-react';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +64,7 @@ export const GenerateConditioningRebalanceField = ({
   settings,
 }: GenerateConditioningRebalanceFieldProps) => {
   const { t } = useTranslation();
+  const presetActionsIds = useTooltipTriggerIds();
   const { notifications, rebalancePresets } = useGenerationUi();
   const [previewWeights, setPreviewWeights] = useState<number[] | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -100,6 +101,7 @@ export const GenerateConditioningRebalanceField = ({
   const isCustomPreset =
     activePreset !== null && !BUILTIN_REBALANCE_PRESETS.some((preset) => preset.id === activePreset.id);
   const isAtDefault = activePresetId === REBALANCE_PRESET_DEFAULT_ID;
+  const presetLabel = activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom');
 
   const applyWeights = useCallback(
     (nextWeights: string, multiplier?: number) => {
@@ -199,38 +201,36 @@ export const GenerateConditioningRebalanceField = ({
         {isEnabled ? (
           <Stack gap="2" w="full">
             <HStack gap="1">
-              <Select
-                aria-label={t('widgets.generate.krea2RebalancePreset')}
-                collection={presetCollection}
-                contentProps={SELECT_CONTENT_PROPS}
-                flex="1"
-                minW="0"
-                value={activePresetId === null ? [] : [activePresetId]}
-                valueText={activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom')}
-                onValueChange={({ value }) => handlePresetChange(value)}
-              />
-              <Tooltip content={t('widgets.generate.krea2RebalanceReset')}>
-                <IconButton
-                  aria-label={t('widgets.generate.krea2RebalanceReset')}
-                  color="fg.muted"
-                  disabled={isAtDefault}
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleReset}
+              <Box flex="1" minW="0">
+                <GenerateFieldContextMenu
+                  fieldLabel={t('widgets.generate.krea2RebalancePreset')}
+                  copyValue={() => presetLabel}
+                  isAtDefault={isAtDefault}
+                  resetLabel={t('widgets.generate.krea2RebalanceReset')}
+                  onReset={handleReset}
                 >
-                  <Icon as={RotateCcwIcon} boxSize="3" />
-                </IconButton>
-              </Tooltip>
-              <Menu.Root lazyMount unmountOnExit>
+                  <Select
+                    aria-label={t('widgets.generate.krea2RebalancePreset')}
+                    collection={presetCollection}
+                    contentProps={SELECT_CONTENT_PROPS}
+                    value={activePresetId === null ? [] : [activePresetId]}
+                    valueText={presetLabel}
+                    onValueChange={({ value }) => handlePresetChange(value)}
+                  />
+                </GenerateFieldContextMenu>
+              </Box>
+              <Menu.Root ids={presetActionsIds} lazyMount unmountOnExit>
                 <Menu.Trigger asChild>
-                  <IconButton
-                    aria-label={t('widgets.generate.krea2RebalancePresetActions')}
-                    color="fg.muted"
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Icon as={MoreHorizontalIcon} boxSize="3" />
-                  </IconButton>
+                  <Tooltip content={t('widgets.generate.krea2RebalancePresetActions')} ids={presetActionsIds}>
+                    <IconButton
+                      aria-label={t('widgets.generate.krea2RebalancePresetActions')}
+                      color="fg.muted"
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Icon as={MoreHorizontalIcon} boxSize="3" />
+                    </IconButton>
+                  </Tooltip>
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>

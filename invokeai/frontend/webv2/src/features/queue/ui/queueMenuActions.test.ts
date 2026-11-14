@@ -23,6 +23,7 @@ const describeActions = (overrides: Partial<Parameters<typeof getQueueActionDesc
   getQueueActionDescriptors({
     canManageProcessor: true,
     counts,
+    cancelCurrentTarget: 'in_progress',
     hasRunningItem: true,
     includeOpenQueue: false,
     isConnected: true,
@@ -138,6 +139,14 @@ describe('queue action model', () => {
     expect(localOnly.confirmation?.body).toContain('"count":1');
   });
 
+  it('names the item cancel-current will stop: the running one, or between items the next one waiting', () => {
+    expect(find(describeActions(), 'cancel-current').label).toBe('widgets.queue.cancelCurrentItem');
+    expect(find(describeActions({ cancelCurrentTarget: 'pending' }), 'cancel-current').label).toBe(
+      'widgets.queue.cancelNextItem'
+    );
+    expect(find(describeActions({ cancelCurrentTarget: null }), 'cancel-current').disabled).toBe(true);
+  });
+
   it('disables bulk actions with nothing to reach', () => {
     const empty = describeActions({
       counts: {
@@ -146,6 +155,7 @@ describe('queue action model', () => {
         inProgress: 0,
         pending: 0,
       },
+      cancelCurrentTarget: null,
       hasRunningItem: false,
     });
 

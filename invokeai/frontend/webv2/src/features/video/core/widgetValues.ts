@@ -13,14 +13,18 @@ import {
   getAcceleratorLoraChangeResult,
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
-  getVideoModelAvailabilityReasons,
+  getVideoIssueSections,
+  getVideoModelAvailabilityIssues,
   getVideoModelSelectionResult,
   getVideoModes,
-  getVideoValidationReasons,
+  getVideoValidationIssues,
   isSupportedVideoModel,
   isVideoModelSelectable,
   type VideoComponentPolicyContext,
   type VideoComponentValueKey,
+  type VideoField,
+  type VideoSection,
+  type VideoValidationIssue,
 } from './videoPolicies';
 
 // Shared empty array, so clearing already-clear keys keeps its identity.
@@ -202,23 +206,43 @@ export const syncVideoWidgetValuesWithModels = (
   return isUnchanged ? values : next;
 };
 
-/** The aggregate readiness check the invoke route and the compiler share. */
-export const getVideoWidgetValidationReasons = (
+/** The aggregate readiness check, each issue with the panel controls that fix it. */
+export const getVideoWidgetValidationIssues = (
   values: VideoWidgetValues,
   models?: readonly ModelConfig[]
-): string[] => {
+): VideoValidationIssue[] => {
+  // The model picker fixes it, and it sits in no section.
   if (!values.model) {
-    return ['Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.'];
+    return [{ fields: [], message: 'Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.' }];
   }
 
-  const reasons = getVideoValidationReasons(values.model, values);
+  const issues = getVideoValidationIssues(values.model, values);
 
   if (models) {
-    reasons.push(...getVideoModelAvailabilityReasons(values.model, values, models));
+    issues.push(...getVideoModelAvailabilityIssues(values.model, values, models));
   }
 
-  return reasons;
+  return issues;
 };
+
+/**
+ * The section of each issue Invoke lists for `validated` (the values Invoke checks), once for every section whose
+ * shown control can fix it, so each section title counts what it can fix. `shown` is the controls the panel renders
+ * (see `getVideoPanelFields`). An issue two sections can fix counts in both, so the counts can add up to more than
+ * Invoke's total.
+ */
+export const getVideoPanelIssueSections = (
+  validated: VideoWidgetValues | null,
+  shown: ReadonlySet<VideoField>,
+  models?: readonly ModelConfig[]
+): VideoSection[] =>
+  validated
+    ? getVideoWidgetValidationIssues(validated, models).flatMap((issue) => getVideoIssueSections(issue, shown))
+    : [];
+
+/** The aggregate readiness check the invoke route and the compiler share. */
+export const getVideoWidgetValidationReasons = (values: VideoWidgetValues, models?: readonly ModelConfig[]): string[] =>
+  getVideoWidgetValidationIssues(values, models).map((issue) => issue.message);
 
 export const resolveVideoSeed = (values: Pick<VideoWidgetValues, 'seed' | 'seedMode'>): number =>
   values.seedMode === 'random' ? Math.floor(Math.random() * SEED_MAX) : values.seed;

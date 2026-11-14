@@ -181,6 +181,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
   '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
+  // The status bar and rails (editor boot) and the lazy Layers, Gallery and drop surfaces share this portal guard;
+  // alone it costs a boot request.
+  '/platform/react/isEventFromOwnDom.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
@@ -204,6 +207,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/generation/ui/promptFields/promptAttentionHotkeys.ts',
   '/platform/ui/ResizeHandle.tsx',
   '/platform/ui/SeedInput.tsx',
+  // The Generate form (editor boot) and the lazy quick-settings popovers share the scrubber; alone it costs a boot
+  // request.
+  '/platform/ui/ScrubberField.tsx',
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
@@ -239,6 +245,12 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
   // costs a boot request.
   '/platform/react/useModifierHeld.ts',
+  // The Preview (open at boot) and the lazy Canvas share their drop zones' label and the desktop file drop: its drag
+  // tracking, zone lookup and the upload start that loads the rest on the first drop. Alone they cost a boot request.
+  '/platform/browser/dropZones.ts',
+  '/platform/react/useNativeFileDrag.ts',
+  '/workbench/widgets/shared/DropZoneLabel.tsx',
+  '/workbench/widgets/shared/useDroppedFileUpload.ts',
 ] as const;
 
 // Editor runtime the workbench store reaches: the editor boots it, and the settings field bindings (lazy on both
@@ -333,6 +345,8 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/core/mediaCounts.ts',
   '/features/gallery/data/queries.ts',
   '/features/gallery/data/queryCache.ts',
+  // Where uploads from Canvas and Preview drops land; published by the queries entry beside the cache it reads.
+  '/features/gallery/data/uploadDestination.ts',
   '/features/gallery/ui/GallerySearchHelp.tsx',
   '/platform/state/compareAndSwapRollback.ts',
   '/features/gallery/picker.ts',
@@ -451,6 +465,15 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/useSelectedModelBase.ts',
 ];
 
+/**
+ * The Canvas widget's frame readout, the lazy Size section and the canvas compiler share the render-size policy. Its
+ * public entry only re-exports the policy, so it rides in the policy's chunk; alone it costs the Canvas a boot request.
+ */
+const CANVAS_PROCESSING_SIZE_MODULES = [
+  '/features/generation/canvasProcessingSize.ts',
+  '/features/generation/core/canvas/canvasProcessingSize.ts',
+];
+
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
 
 const getLegacyChunkName = (id: string): string | null => {
@@ -543,6 +566,12 @@ export default defineConfig({
               name: 'canvas-layer-shared',
               priority: 30,
               test: (id) => matchesAnySuffix(id, CANVAS_LAYER_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'canvasProcessingSize',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, CANVAS_PROCESSING_SIZE_MODULES),
             },
             {
               includeDependenciesRecursively: false,

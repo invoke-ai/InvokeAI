@@ -280,11 +280,6 @@ export const hasPendingCanvasResults = (
       (item.status === 'pending' || item.status === 'running')
   );
 
-export const getFirstCanvasPlaceholderSlotIndex = (
-  canvas: CanvasStateContractV3,
-  queueItems: readonly QueueItem[]
-): number => getCanvasStagingSlots(canvas, queueItems).findIndex((slot) => slot.kind === 'placeholder');
-
 /** Whether the queue can still cancel `item`: the backend supports it and its work is queued or running. */
 export const isCancellableQueueItem = (item: QueueItem): boolean =>
   item.cancellable && (item.status === 'pending' || item.status === 'running');
@@ -295,6 +290,3 @@ export const isCancellableQueueItem = (item: QueueItem): boolean =>
  */
 export const isUnsubmittedQueueItem = (item: QueueItem): boolean =>
   isCancellableQueueItem(item) && !item.backendItemIds?.length;
-
-export const getCancelableCanvasStagingQueueItemId = (slot: CanvasStagingSlot | undefined): string | null =>
-  slot?.kind === 'placeholder' ? slot.queueItemId : null;

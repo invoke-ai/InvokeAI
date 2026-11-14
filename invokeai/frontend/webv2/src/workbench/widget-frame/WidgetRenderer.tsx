@@ -1,6 +1,7 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type {
   RegisteredWidget,
+  WidgetBodySizing,
   WidgetImplementation,
   WidgetInstanceContract,
   WidgetInstanceId,
@@ -445,7 +446,7 @@ const WidgetShellFrame = ({
             />
           </WidgetRecoveryBoundary>
         )}
-        <PanelBodySlot>{children}</PanelBodySlot>
+        <PanelBodySlot body={widget.manifest.chrome?.body}>{children}</PanelBodySlot>
         {footer}
       </WidgetPanelFrame>
     );
@@ -548,18 +549,31 @@ const HeaderSlot = memo(function HeaderSlot({
   );
 }, areSlotPropsEqual);
 
-// Stretch fill-height views while allowing flowing content to scroll vertically. minmax(0,1fr) prevents long
-// content from widening and clipping panels.
+// minmax(0,1fr) prevents long content from widening and clipping panels.
+// Never shrunk: the viewport is a flex column, and `minH: full` would let it squeeze the content to its own height.
+// The scroll area sizes its thumb from this element, so a squeezed one leaves a stale or missing scrollbar.
 const panelBodyContentProps = {
   display: 'grid',
+  flexShrink: 0,
   gridTemplateColumns: 'minmax(0, 1fr)',
   maxW: 'full',
   minH: 'full',
 } as const;
 
-export const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
+// Size containment drops the view's own height from the grid row, which then stretches to the body's height alone:
+// lists and panes inside stay bounded instead of pushing the content as tall as all their rows. Overflow past the
+// view's own minimums still spills, so a very short dock scrolls rather than crushing them.
+const FILL_BODY_CSS = { contain: 'size' } as const;
+
+export const PanelBodySlot = ({ body = 'flow', children }: { body?: WidgetBodySizing; children: React.ReactNode }) => (
   <Scrollable contentProps={panelBodyContentProps} flex="1" minH="0" minW="0" overflowX="hidden">
-    {children}
+    {body === 'fill' ? (
+      <Flex css={FILL_BODY_CSS} direction="column">
+        {children}
+      </Flex>
+    ) : (
+      children
+    )}
   </Scrollable>
 );
 

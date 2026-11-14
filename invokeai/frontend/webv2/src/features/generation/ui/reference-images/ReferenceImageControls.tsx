@@ -8,12 +8,13 @@ import type {
 import type { FeatureHintId } from '@platform/ui/hints';
 import type { ReactNode } from 'react';
 
-import { Collapsible, createListCollection, HStack, SegmentGroup, Stack, Text } from '@chakra-ui/react';
+import { Box, chakra, createListCollection, HStack, SegmentGroup, Stack, Text } from '@chakra-ui/react';
 import { DEFAULT_KREA2_STYLE_STRENGTH, MAX_KREA2_STYLE_STRENGTH } from '@features/generation/core/settings';
-import { Field, Select, Slider } from '@platform/ui';
+import { Field, FieldLabel, INSIDE_LABEL_INSET } from '@platform/ui/Field';
 import { FeatureHint } from '@platform/ui/hints';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { ChevronRightIcon } from 'lucide-react';
+import { Select } from '@platform/ui/Select';
+import { Slider } from '@platform/ui/Slider';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -72,29 +73,29 @@ const renderStyleVariantItem = (option: StyleVariantOption) => (
 
 /** The default weight is the one stop a drag can snap to; the track ends stand in for 0 and 2. */
 const WEIGHT_MARKS = [0, 1, 2];
-const DEFAULT_WEIGHT = 1;
+export const DEFAULT_REFERENCE_WEIGHT = 1;
 
-const BEGIN_END_MARKS = [
-  { label: '0%', value: 0 },
-  { label: '25%', value: 0.25 },
-  { label: '50%', value: 0.5 },
-  { label: '75%', value: 0.75 },
-  { label: '100%', value: 1 },
-];
+const STEPS_FIELD_DISABLED_CSS = { opacity: 0.5 } as const;
 
-const ADVANCED_TRIGGER_HOVER_STYLES = { color: 'fg' };
-const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
+/**
+ * Controls on a list row are backed with the widget's surface, as a concept row backs its weight: the row's
+ * hover tint would otherwise wash out their transparent fills and faint borders, and their own hover fills with it.
+ */
+export const ControlSurface = ({ children, ...props }: { children: ReactNode } & Record<`data-${string}`, string>) => (
+  <Box
+    bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))"
+    data-control-surface=""
+    flex="1"
+    minW="0"
+    rounded="control"
+    {...props}
+  >
+    {children}
+  </Box>
+);
 
 /** Tiny muted label row above a control, with optional right-aligned content. */
-export const FieldHeader = ({
-  children,
-  hint,
-  label,
-}: {
-  children?: ReactNode;
-  hint?: FeatureHintId;
-  label: string;
-}) => {
+const FieldHeader = ({ children, hint, label }: { children?: ReactNode; hint?: FeatureHintId; label: string }) => {
   const labelText = (
     <Text color="fg.muted" fontSize="xs" fontWeight="medium">
       {label}
@@ -110,10 +111,47 @@ export const FieldHeader = ({
 };
 
 /**
- * Render children inside Advanced. `strengthOnly` adapters (Anima) take a strength alone: no mode, and the scale
+ * The adapter's weight, its one control on the row. `strengthOnly` adapters (Anima) take a strength alone, which
  * cannot go negative.
  */
-export const IPAdapterControls = ({
+export const IPAdapterWeightField = ({
+  config,
+  disabled,
+  onChange,
+  strengthOnly = false,
+}: {
+  config: IPAdapterConfig;
+  disabled: boolean;
+  onChange: (config: GenerateReferenceImageConfig) => void;
+  strengthOnly?: boolean;
+}) => {
+  const { t } = useTranslation();
+  // Do not compare against captured drag-start values; returning to the start still needs a commit.
+  const handleWeightChange = useCallback((weight: number) => onChange({ ...config, weight }), [config, onChange]);
+
+  return (
+    <ScrubberField
+      defaultValue={DEFAULT_REFERENCE_WEIGHT}
+      disabled={disabled}
+      formatValue={formatWeight}
+      hint={strengthOnly ? 'referenceImageStrength' : 'referenceImageWeight'}
+      inputMin={strengthOnly ? 0 : -1}
+      label={strengthOnly ? t('widgets.generate.strength') : t('widgets.generate.weight')}
+      marks={WEIGHT_MARKS}
+      max={2}
+      min={0}
+      step={0.05}
+      value={config.weight}
+      onChange={handleWeightChange}
+    />
+  );
+};
+
+/**
+ * The adapter's settings under its row: mode (with the style variant for Style), the active step window, then
+ * `children` (the model pickers). `strengthOnly` adapters (Anima) have no mode.
+ */
+export const IPAdapterSettings = ({
   children,
   config,
   disabled,
@@ -127,9 +165,7 @@ export const IPAdapterControls = ({
   strengthOnly?: boolean;
 }) => {
   const { t } = useTranslation();
-  const [draftBeginEndStepPct, setDraftBeginEndStepPct] = useState<[number, number] | null>(null);
   const mode = getReferenceMode(config.method);
-  const beginEndStepPct = draftBeginEndStepPct ?? config.beginEndStepPct;
   const styleVariantCollection = useMemo(
     () =>
       createListCollection<StyleVariantOption>({
@@ -144,23 +180,6 @@ export const IPAdapterControls = ({
   const styleVariantValue = useMemo<StyleMethod[]>(
     () => [isStyleMethod(config.method) ? config.method : 'style'],
     [config.method]
-  );
-
-  // Do not compare against captured drag-start values; returning to the start still needs a commit.
-  const handleWeightChange = useCallback((weight: number) => onChange({ ...config, weight }), [config, onChange]);
-
-  const commitBeginEndStepPct = useCallback(
-    (nextBeginEndStepPct: [number, number]) => {
-      setDraftBeginEndStepPct(null);
-
-      if (
-        nextBeginEndStepPct[0] !== config.beginEndStepPct[0] ||
-        nextBeginEndStepPct[1] !== config.beginEndStepPct[1]
-      ) {
-        onChange({ ...config, beginEndStepPct: nextBeginEndStepPct });
-      }
-    },
-    [config, onChange]
   );
 
   const handleModeChange = useCallback(
@@ -190,35 +209,26 @@ export const IPAdapterControls = ({
     [config, onChange]
   );
 
-  const handleStepsChange = useCallback(({ value }: SliderValueChangeDetails) => {
-    const begin = value[0];
-    const end = value[1];
-
-    if (Number.isFinite(begin) && Number.isFinite(end)) {
-      setDraftBeginEndStepPct([begin as number, end as number]);
-    }
-  }, []);
-
-  const handleStepsChangeEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const begin = value[0];
-      const end = value[1];
-
-      if (Number.isFinite(begin) && Number.isFinite(end)) {
-        commitBeginEndStepPct([begin as number, end as number]);
+  const handleStepsChange = useCallback(
+    (beginEndStepPct: [number, number]) => {
+      if (beginEndStepPct[0] !== config.beginEndStepPct[0] || beginEndStepPct[1] !== config.beginEndStepPct[1]) {
+        onChange({ ...config, beginEndStepPct });
       }
     },
-    [commitBeginEndStepPct]
+    [config, onChange]
   );
 
-  const stepsAriaLabel = useMemo(() => [t('widgets.generate.activeSteps'), t('widgets.generate.activeSteps')], [t]);
-
   return (
-    <Stack gap="2">
+    <Stack gap="1.5">
       {strengthOnly ? null : (
-        <Stack gap="1">
-          <FieldHeader label={t('widgets.generate.mode')} />
-          <SegmentGroup.Root disabled={disabled} value={mode} w="full" onValueChange={handleModeChange}>
+        <ControlSurface>
+          <SegmentGroup.Root
+            aria-label={t('widgets.generate.mode')}
+            disabled={disabled}
+            value={mode}
+            w="full"
+            onValueChange={handleModeChange}
+          >
             <SegmentGroup.Indicator />
             {MODE_SEGMENTS.map((segment) => (
               <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
@@ -227,82 +237,95 @@ export const IPAdapterControls = ({
               </SegmentGroup.Item>
             ))}
           </SegmentGroup.Root>
-        </Stack>
+        </ControlSurface>
       )}
-
-      <ScrubberField
-        defaultValue={DEFAULT_WEIGHT}
-        disabled={disabled}
-        formatValue={formatWeight}
-        hint={strengthOnly ? 'referenceImageStrength' : 'referenceImageWeight'}
-        inputMin={strengthOnly ? 0 : -1}
-        label={strengthOnly ? t('widgets.generate.strength') : t('widgets.generate.weight')}
-        marks={WEIGHT_MARKS}
-        max={2}
-        min={0}
-        step={0.05}
-        value={config.weight}
-        onChange={handleWeightChange}
-      />
-
-      <Collapsible.Root>
-        <Collapsible.Trigger
-          alignItems="center"
-          color="fg.muted"
-          display="flex"
-          fontSize="xs"
-          fontWeight="medium"
-          gap="1"
-          _hover={ADVANCED_TRIGGER_HOVER_STYLES}
-        >
-          <Collapsible.Indicator
-            _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}
-            transition="transform var(--wb-motion-duration-slow)"
-          >
-            <ChevronRightIcon size="12" />
-          </Collapsible.Indicator>
-          {t('widgets.generate.advanced')}
-        </Collapsible.Trigger>
-        <Collapsible.Content>
-          <Stack borderTopWidth="1px" gap="2" mt="2" pt="2">
-            {children}
-            {mode === 'style' && !strengthOnly ? (
-              <Stack gap="1">
-                <FieldHeader label={t('widgets.generate.styleVariant')} />
-                <Select
-                  collection={styleVariantCollection}
-                  deselectable={false}
-                  disabled={disabled}
-                  renderItem={renderStyleVariantItem}
-                  value={styleVariantValue}
-                  w="full"
-                  onValueChange={handleStyleVariantChange}
-                />
-              </Stack>
-            ) : null}
-            <Stack gap="1">
-              <FieldHeader hint="stepRange" label={t('widgets.generate.activeSteps')}>
-                <Text color="fg.subtle" fontFamily="mono" fontSize="xs">
-                  {formatPct(beginEndStepPct[0])} – {formatPct(beginEndStepPct[1])}
-                </Text>
-              </FieldHeader>
-              <Slider
-                aria-label={stepsAriaLabel}
-                disabled={disabled}
-                formatValue={formatPct}
-                marks={BEGIN_END_MARKS}
-                max={1}
-                min={0}
-                step={0.05}
-                value={beginEndStepPct}
-                onValueChange={handleStepsChange}
-                onValueChangeEnd={handleStepsChangeEnd}
-              />
-            </Stack>
-          </Stack>
-        </Collapsible.Content>
-      </Collapsible.Root>
+      {mode === 'style' && !strengthOnly ? (
+        <ControlSurface>
+          <Field disabled={disabled} label={t('widgets.generate.styleVariant')} labelPlacement="inside">
+            <Select
+              collection={styleVariantCollection}
+              deselectable={false}
+              renderItem={renderStyleVariantItem}
+              value={styleVariantValue}
+              w="full"
+              onValueChange={handleStyleVariantChange}
+            />
+          </Field>
+        </ControlSurface>
+      ) : null}
+      <ActiveStepsField disabled={disabled} value={config.beginEndStepPct} onChange={handleStepsChange} />
+      {children}
     </Stack>
+  );
+};
+
+/**
+ * The step window as one control: its label, a range slider and the window it covers on a single line, the same
+ * height and frame as the weight scrubber above it. Every step of a drag commits, so the row's summary follows it.
+ */
+const ActiveStepsField = ({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  onChange: (value: [number, number]) => void;
+  value: [number, number];
+}) => {
+  const { t } = useTranslation();
+  const ariaLabel = useMemo(() => [t('widgets.generate.activeSteps'), t('widgets.generate.activeSteps')], [t]);
+  const handleChange = useCallback(
+    ({ value: next }: SliderValueChangeDetails) => {
+      const begin = next[0];
+      const end = next[1];
+
+      if (begin !== undefined && end !== undefined && Number.isFinite(begin) && Number.isFinite(end)) {
+        onChange([begin, end]);
+      }
+    },
+    [onChange]
+  );
+
+  return (
+    <HStack
+      aria-disabled={disabled || undefined}
+      bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))"
+      borderColor="border"
+      data-control-surface=""
+      borderWidth="1px"
+      css={disabled ? STEPS_FIELD_DISABLED_CSS : undefined}
+      gap="3"
+      h="control.md"
+      minW="0"
+      pe="3"
+      ps={INSIDE_LABEL_INSET}
+      role="group"
+      rounded="control"
+    >
+      <FeatureHint hint="stepRange">
+        <chakra.span flexShrink={0}>
+          <FieldLabel>{t('widgets.generate.activeStepsShort')}</FieldLabel>
+        </chakra.span>
+      </FeatureHint>
+      <Slider
+        aria-label={ariaLabel}
+        disabled={disabled}
+        flex="1"
+        formatValue={formatPct}
+        max={1}
+        min={0}
+        minW="0"
+        step={0.05}
+        value={value}
+        onValueChange={handleChange}
+      />
+      <Text flexShrink={0} fontSize="md" fontVariantNumeric="tabular-nums">
+        {t('widgets.generate.stepRangeValue', {
+          begin: Math.round(value[0] * 100),
+          end: Math.round(value[1] * 100),
+        })}
+      </Text>
+    </HStack>
   );
 };
 
@@ -315,6 +338,7 @@ export const ClipVisionSelect = ({
   disabled: boolean;
   onChange: (config: GenerateReferenceImageConfig) => void;
 }) => {
+  const { t } = useTranslation();
   const [draftClipVisionModel, setDraftClipVisionModel] = useState<ClipVisionModel | null>(null);
   const clipVisionModel = draftClipVisionModel ?? config.clipVisionModel;
   const selectValue = useMemo(() => [clipVisionModel], [clipVisionModel]);
@@ -338,6 +362,7 @@ export const ClipVisionSelect = ({
 
   return (
     <Select
+      aria-label={t('widgets.generate.clipVisionModel')}
       collection={CLIP_VISION_COLLECTION}
       deselectable={false}
       disabled={disabled}
@@ -352,10 +377,13 @@ export const ClipVisionSelect = ({
 export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfluence; type: 'flux_redux' }>({
   config,
   disabled,
+  labelPlacement = 'outside',
   onChange,
 }: {
   config: T;
   disabled: boolean;
+  /** `inside` puts the label in the select's own box, for a single-line row. */
+  labelPlacement?: 'inside' | 'outside';
   onChange: (config: T) => void;
 }) => {
   const { t } = useTranslation();
@@ -377,16 +405,29 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
     [config, onChange]
   );
 
-  return (
+  const select = (
+    <Select
+      collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
+      deselectable={false}
+      disabled={disabled}
+      value={imageInfluenceValue}
+      w="full"
+      onValueChange={handleValueChange}
+    />
+  );
+
+  return labelPlacement === 'inside' ? (
+    <Field
+      disabled={disabled}
+      hint="imageInfluence"
+      label={t('widgets.generate.imageInfluence')}
+      labelPlacement="inside"
+    >
+      {select}
+    </Field>
+  ) : (
     <Field disabled={disabled} hint="imageInfluence" label={t('widgets.generate.imageInfluence')}>
-      <Select
-        collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
-        deselectable={false}
-        disabled={disabled}
-        value={imageInfluenceValue}
-        w="full"
-        onValueChange={handleValueChange}
-      />
+      {select}
     </Field>
   );
 };
@@ -400,7 +441,7 @@ const KREA2_MODE_SEGMENTS = [
 
 /**
  * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. It
- * stays live while the card is off, so switched-off cards can be turned into the set they will join before they run.
+ * stays live while the row is off, so switched-off references can be turned into the set they will join before they run.
  */
 export const Krea2ReferenceModeControl = ({
   config,
@@ -429,15 +470,22 @@ export const Krea2ReferenceModeControl = ({
   return (
     <Stack gap="1">
       <FieldHeader hint="krea2ReferenceMode" label={t('widgets.generate.mode')} />
-      <SegmentGroup.Root aria-label={t('widgets.generate.mode')} value={mode} w="full" onValueChange={handleModeChange}>
-        <SegmentGroup.Indicator />
-        {KREA2_MODE_SEGMENTS.map((segment) => (
-          <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
-            <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
-            <SegmentGroup.ItemHiddenInput />
-          </SegmentGroup.Item>
-        ))}
-      </SegmentGroup.Root>
+      <ControlSurface>
+        <SegmentGroup.Root
+          aria-label={t('widgets.generate.mode')}
+          value={mode}
+          w="full"
+          onValueChange={handleModeChange}
+        >
+          <SegmentGroup.Indicator />
+          {KREA2_MODE_SEGMENTS.map((segment) => (
+            <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
+              <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
+              <SegmentGroup.ItemHiddenInput />
+            </SegmentGroup.Item>
+          ))}
+        </SegmentGroup.Root>
+      </ControlSurface>
     </Stack>
   );
 };

@@ -101,6 +101,8 @@ export interface QueueHistoryCommands {
     projectId: string;
     queueItemId: string;
   }): void;
+  /** A slot of a run showed its first progress frame of its own; Canvas staging following progress moves to it. */
+  noteFirstProgressFrame(payload: { itemIndex: number; projectId: string; queueItemId: string }): void;
   /** Record the latest failed submission of a run the backend has not accepted; acceptance or an ending clears it. */
   recordSubmissionRetry(payload: { projectId: string; queueItemId: string; retry: QueueSubmissionRetry }): void;
   setCancellationPending(payload: { pending: boolean; projectId: string; queueItemId: string }): void;
@@ -1553,6 +1555,17 @@ export const createQueueRuntime = ({
         const attempt = activeAttempts.get(getRunKey(target.project.id, target.queueItem.id));
         if (attempt) {
           return scheduleResultRoute(target.project.id, target.queueItem, backendItemId, attempt);
+        }
+      },
+      onFirstProgressFrame: ({ itemIndex, queueItemId }) => {
+        if (!isActive()) {
+          return;
+        }
+
+        const target = getRouteTarget(history, queueItemId);
+
+        if (target?.queueItem?.snapshot.destination === 'canvas') {
+          commands.noteFirstProgressFrame({ itemIndex, projectId: target.project.id, queueItemId });
         }
       },
       onGalleryRefresh: () => {

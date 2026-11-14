@@ -178,10 +178,15 @@ export interface WorkflowFieldInputProps {
 }
 
 // The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
-const MEDIA_WELL_PROPS = { _hover: { borderColor: 'accent.solid' } };
+// The well draws its button's hover, and keeps it while the button is pointed: the gallery picker marks its trigger
+// `data-hover` while it is open.
+const MEDIA_WELL_HOVER = { borderColor: 'accent.solid' };
+const MEDIA_WELL_INVALID_HOVER = { bg: 'bg.error/60', borderColor: 'border.error' };
+const MEDIA_WELL_PROPS = { _hover: MEDIA_WELL_HOVER, css: { '[data-hover] > &': MEDIA_WELL_HOVER } };
 const MEDIA_WELL_INVALID_PROPS = {
   borderColor: 'border.error',
-  _hover: { bg: 'bg.error/60', borderColor: 'border.error' },
+  _hover: MEDIA_WELL_INVALID_HOVER,
+  css: { '[data-hover] > &': MEDIA_WELL_INVALID_HOVER },
 };
 
 /** A row of a list names itself by position; a scalar field is named by its title. */

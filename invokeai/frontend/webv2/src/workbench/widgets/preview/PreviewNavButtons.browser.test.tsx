@@ -15,7 +15,8 @@ import type { PreviewSwipeNavigation } from './usePreviewSwipe';
 import { PreviewFrame } from './PreviewFrame';
 import { PREVIEW_NAV_STAGE_CSS, PreviewNavButtons } from './PreviewNavButtons';
 
-vi.mock('@features/identity', () => ({
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getAuthSession: () => ({ accountEpoch: 1 }),
   refreshProtectedMediaCookie: () => Promise.resolve(false),
 }));

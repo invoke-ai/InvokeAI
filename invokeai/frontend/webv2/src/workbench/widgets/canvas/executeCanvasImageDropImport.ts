@@ -2,7 +2,7 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCanvasCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
-import { galleryImages } from '@features/gallery';
+import { galleryImages, type GalleryImage } from '@features/gallery';
 import {
   getCanvasImportNotice,
   getSendAsControlNotice,
@@ -18,28 +18,39 @@ type CanvasImageDropEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | '
 
 /** Imports the dropped gallery images and says how it went, as the gallery menu's matching action does. */
 export const executeCanvasImageDropImport = async ({
-  destination,
-  canvas,
-  engine,
   getGalleryImages = galleryImages.resolveMany,
-  queries,
   imageNames,
-  importGalleryImages = importGalleryImagesToCanvas,
-  project,
-  sendAsControl = sendGalleryImageAsControl,
-}: {
+  ...options
+}: Omit<CanvasDropImportOptions, 'images'> & {
+  getGalleryImages?: typeof galleryImages.resolveMany;
+  imageNames: readonly string[];
+}): Promise<CanvasImportNotice> => {
+  const fetchedImages = await getGalleryImages([...imageNames]);
+  return importCanvasDropImages({ ...options, images: orderCanvasImageDropImages(imageNames, fetchedImages) });
+};
+
+interface CanvasDropImportOptions {
   destination: GalleryCanvasImportDestination;
   canvas: WorkbenchCanvasCommands;
   engine: CanvasImageDropEngine | null;
-  getGalleryImages?: typeof galleryImages.resolveMany;
   queries: Pick<WorkbenchQueries, 'getProject' | 'isActiveProject'>;
-  imageNames: readonly string[];
+  images: readonly GalleryImage[];
   importGalleryImages?: typeof importGalleryImagesToCanvas;
   project: Project;
   sendAsControl?: typeof sendGalleryImageAsControl;
-}): Promise<CanvasImportNotice> => {
-  const fetchedImages = await getGalleryImages([...imageNames]);
-  const images = orderCanvasImageDropImages(imageNames, fetchedImages);
+}
+
+/** Lands images dropped on a canvas zone, gallery images or files just uploaded, and says how it went. */
+export const importCanvasDropImages = async ({
+  destination,
+  canvas,
+  engine,
+  queries,
+  images,
+  importGalleryImages = importGalleryImagesToCanvas,
+  project,
+  sendAsControl = sendGalleryImageAsControl,
+}: CanvasDropImportOptions): Promise<CanvasImportNotice> => {
   const shared = {
     applyCanvasMutation: canvas.apply,
     engine,

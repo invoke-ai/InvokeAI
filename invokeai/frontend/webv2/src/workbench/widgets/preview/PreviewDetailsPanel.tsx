@@ -5,6 +5,7 @@ import { Box, chakra, HStack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { formatGalleryVideoDuration, toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
 import { useAuthSession } from '@features/identity';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { ToggleIconButton } from '@platform/ui/Button';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
@@ -114,11 +115,13 @@ export const PreviewDetailsPanel = ({
         event.key !== 'Escape' ||
         event.defaultPrevented ||
         event.nativeEvent.isComposing ||
-        !(event.target instanceof Node && event.currentTarget.contains(event.target))
+        !isEventFromOwnDom(event)
       ) {
         return;
       }
       event.preventDefault();
+      // The press is the panel's alone: Preview's own Esc (cancelling or closing a comparison) must not also take it.
+      event.stopPropagation();
       onOpenChange(false);
     },
     [onOpenChange]

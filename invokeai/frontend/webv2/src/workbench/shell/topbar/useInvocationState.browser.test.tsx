@@ -333,3 +333,35 @@ describe('useInvocationState and Video dynamic prompts', () => {
     ).toBe('1');
   });
 });
+
+describe('useInvocationState and Upscale dynamic prompts', () => {
+  const renderUpscale = async (upscaleValues: Record<string, unknown>) => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      sourceId: 'upscale',
+      type: 'patchProjectPromptDraft',
+      values: {
+        positivePrompt: 'a {cat|dog|bird}',
+        promptTemplate: { id: 'film', name: 'Film', negativePrompt: '', positivePrompt: '{prompt}, {grain|haze}' },
+      },
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: upscaleValues, widgetId: 'upscale' });
+    state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
+    harness.useDynamicPrompts.mockClear();
+    await renderProbe(activeProject(state));
+
+    return host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-prompt-count');
+  };
+
+  it('counts the expansion of the prompt Refine shares with Generate, inside its template', async () => {
+    expect(await renderUpscale({ mode: 'refine' })).toBe('4');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(
+      'a {cat|dog|bird}, {grain|haze}',
+      expect.objectContaining({ enabled: true })
+    );
+  });
+
+  it('counts one prompt for Model only, which reads none', async () => {
+    expect(await renderUpscale({ mode: 'model-only' })).toBe('1');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(expect.any(String), null);
+  });
+});

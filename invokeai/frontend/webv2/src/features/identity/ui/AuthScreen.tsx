@@ -15,8 +15,9 @@ export const AuthScreen = ({
   subtitle: string;
   title: string;
 }) => (
-  <Flex align="center" bg="bg" color="fg" justify="center" minH="100dvh" p="6">
-    <Stack gap="6" maxW="sm" w="full">
+  // The dot grid colors its dots through `color`, so the content restores the foreground color.
+  <Flex align="center" justify="center" layerStyle="dotGrid" minH="100dvh" p="6">
+    <Stack color="fg" gap="6" maxW="sm" w="full">
       <Stack align="center" gap="4">
         <InvokeMark />
         <Stack align="center" gap="1">

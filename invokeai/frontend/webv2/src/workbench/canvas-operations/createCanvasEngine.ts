@@ -35,8 +35,8 @@ export interface CanvasEngineOptions extends Omit<
    */
   ensureProjectOnServer(): Promise<void>;
   getMainModelBase?: () => string | null;
-  /** The account's Select Object Auto Process preference; the widget layer injects the settings read. */
-  readSelectObjectAutoProcess?: () => boolean;
+  /** The account's Select Object auto-update preference; the widget layer injects the settings read. */
+  readSelectObjectAutoUpdate?: () => boolean;
   /** Where the account keeps brush, eraser, shape and text options; the engine starts from them and saves changes. */
   toolMemory?: CanvasToolMemoryPort;
   selectObjectDeps?: {
@@ -83,7 +83,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     controlDetectionDeps,
     ensureProjectOnServer,
     filterDeps,
-    readSelectObjectAutoProcess,
+    readSelectObjectAutoUpdate,
     selectObjectDeps,
     toolMemory,
     ...coreOptions
@@ -195,7 +195,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     isSamToolActive: host.isSamToolActive,
     prepareStart: host.prepareSelectObjectStart,
     projectId: options.projectId,
-    readAutoProcessPreference: readSelectObjectAutoProcess,
+    readAutoUpdatePreference: readSelectObjectAutoUpdate,
     publishPreview: (preview) => host.publishSamPreview(preview),
     replaceSelection: (preview, signal) => host.replaceSelection(preview.guard, preview.image, preview.rect, signal),
     replaceTemporaryRestoreTool: host.replaceTemporaryRestoreTool,

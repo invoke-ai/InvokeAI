@@ -15,7 +15,7 @@ import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/docu
 import { rebaseControlOriginal } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
-import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
+import { isMaskLayer, isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import {
   collectHistoryMediaRefs,
   HISTORY_ENTRY_OVERHEAD_BYTES,
@@ -287,7 +287,9 @@ export class TransformEditingController {
       return;
     }
     const source = layer.type === 'raster' || layer.type === 'control' ? layer.source : null;
+    // A mask keeps its transform like an image, so its coverage is resampled only when composited, never baked.
     if (
+      isMaskLayer(layer) ||
       source?.type === 'image' ||
       source?.type === 'shape' ||
       source?.type === 'gradient' ||

@@ -59,7 +59,11 @@ vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
 vi.mock('@platform/ui/ConfirmDialog', () => ({ ConfirmDialog: () => null }));
 vi.mock('@workbench/components/QueueProgressIndicator', () => ({ QueueCircularProgress: () => null }));
 vi.mock('@workbench/launchpad/formatRelativeTime', () => ({ formatRelativeTime: () => '' }));
-vi.mock('@workbench/projects/components', () => ({ OpenProjectDialog: () => null }));
+vi.mock('@workbench/projects/components/OpenProjectDialog', () => ({
+  OpenProjectDialog: ({ isOpen }: { isOpen: boolean }) => (
+    <div data-open={String(isOpen)} data-testid="open-project-dialog" />
+  ),
+}));
 vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({ DeleteProjectDialog: () => null }));
 vi.mock('@workbench/projects/library', () => ({
   refreshProjectLibrary: vi.fn(() => Promise.resolve()),
@@ -189,6 +193,20 @@ describe('ProjectSwitcher', () => {
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).not.toBeNull());
   });
 
+  it('loads the Open Project dialog only once it is asked for, and opens it', async () => {
+    const dialog = () => document.querySelector('[data-testid="open-project-dialog"]');
+    let openItem: HTMLElement | undefined;
+    await vi.waitFor(() => {
+      openItem = document.querySelector<HTMLElement>('[role="menuitem"][data-value="open-project"]') ?? undefined;
+      expect(openItem).toBeDefined();
+    });
+    expect(dialog()).toBeNull();
+
+    await act(() => userEvent.click(openItem!));
+
+    await vi.waitFor(() => expect(dialog()?.getAttribute('data-open')).toBe('true'));
+  });
+
   it('brightens the trigger chevron while hovered and while the menu is open, like the app menu', async () => {
     const resolveColor = (token: string) => {
       const probe = document.createElement('span');
@@ -215,9 +233,22 @@ describe('ProjectSwitcher', () => {
     await vi.waitFor(() => expect(chevronColor()).toBe(bright));
   });
 
-  it('stands a folder icon in for the project name where the topbar is too narrow for it', async () => {
+  it('shows an open folder while its menu is open and a closed one otherwise', async () => {
     const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
-    const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder')!;
+
+    expect(trigger.querySelector('svg.lucide-folder-open')).not.toBeNull();
+    expect(trigger.querySelector('svg.lucide-folder')).toBeNull();
+
+    await act(() => setProjectSwitcherOpen(false));
+
+    expect(trigger.querySelector('svg.lucide-folder')).not.toBeNull();
+    expect(trigger.querySelector('svg.lucide-folder-open')).toBeNull();
+  });
+
+  it('keeps its folder icon and drops the project name where the topbar is too narrow for it', async () => {
+    const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
+    // The menu is open here, so the trigger shows its open-folder glyph.
+    const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder-open')!;
     const name = [...trigger.children].find((child) => child.textContent === 'Prompt project')!;
     const { innerHeight, innerWidth } = window;
 
@@ -231,7 +262,7 @@ describe('ProjectSwitcher', () => {
       await page.viewport(1200, 700);
       await vi.waitFor(() => {
         expect(name.checkVisibility()).toBe(true);
-        expect(folderIcon.checkVisibility()).toBe(false);
+        expect(folderIcon.checkVisibility()).toBe(true);
       });
     } finally {
       await page.viewport(innerWidth, innerHeight);

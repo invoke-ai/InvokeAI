@@ -31,8 +31,16 @@ const takePendingPromptTemplateDraft = (): PendingPromptTemplateDraft | null => 
   return draft;
 };
 
-export const useOnPendingPromptTemplateDraft = (onDraft: (draft: PendingPromptTemplateDraft) => void): void => {
+/** `isEnabled` false leaves a draft for another field: only the surface the handover reveals takes it. */
+export const useOnPendingPromptTemplateDraft = (
+  onDraft: (draft: PendingPromptTemplateDraft) => void,
+  isEnabled = true
+): void => {
   const deliver = useEffectEvent(() => {
+    if (!isEnabled) {
+      return;
+    }
+
     const draft = takePendingPromptTemplateDraft();
 
     if (draft) {

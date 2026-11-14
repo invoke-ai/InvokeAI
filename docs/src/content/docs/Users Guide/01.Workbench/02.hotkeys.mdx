@@ -54,7 +54,7 @@ These work anywhere in the workbench.
 | <kbd>Mod</kbd>+<kbd>Enter</kbd> | Invoke | Queues the active route |
 | <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd> | Invoke Front | Queues ahead of your pending items |
 | <kbd>Mod</kbd>+<kbd>Alt</kbd>+<kbd>Enter</kbd> | Invoke To Other Destination | Queues once with results sent to the other destination (Gallery instead of Canvas, or Canvas instead of Gallery). The saved route does not change. |
-| <kbd>Shift</kbd>+<kbd>X</kbd> | Cancel Queue Item | Cancels the item that is running |
+| <kbd>Shift</kbd>+<kbd>X</kbd> | Cancel current or next queue item | Cancels the item that is running, or, between two items, the next one waiting. Holding the key cancels one item |
 | <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | Cancel all queue items | Cancels every unfinished item, after you confirm |
 | <kbd>Alt</kbd>+<kbd>A</kbd> | Focus Prompt | Opens Generate and puts the cursor in the prompt |
 | <kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd> | Prompt History Prev / Prompt History Next | Steps through your prompt history |
@@ -92,7 +92,7 @@ These work while the Canvas has focus. The tool, brush size, color and undo keys
 
 | Keys | Command | What it does |
 | --- | --- | --- |
-| <kbd>H</kbd> | Select view tool | View tool |
+| <kbd>H</kbd> | Select pan tool | Pan tool |
 | <kbd>V</kbd> | Select move tool | Move tool |
 | <kbd>Shift</kbd>+<kbd>T</kbd> | Transform selected layer | Starts transforming the selected layer, or selects the Transform tool when no layer is selected |
 | <kbd>B</kbd> | Select brush tool | Brush tool |
@@ -117,7 +117,7 @@ These work while the Canvas has focus. The tool, brush size, color and undo keys
 | --- | --- | --- |
 | <kbd>Alt</kbd>+<kbd>[</kbd> / <kbd>Alt</kbd>+<kbd>]</kbd> | Previous canvas entity / Next canvas entity | With more than one staged or generating result, steps through the results. Otherwise selects the previous or next layer. |
 | <kbd>Q</kbd> | Quick switch to bookmarked or previous layer | Selects the bookmarked layer, or the layer you had selected before |
-| Arrow keys | Nudge layer left, right, up, down | Moves the selected layer 1 px |
+| Arrow keys | Nudge layer left, right, up, down | Moves the selected layer 1 px. With more than one staged or generating result, <kbd>←</kbd> and <kbd>→</kbd> step through the results instead, unless the Move or Transform tool is active. |
 | <kbd>Shift</kbd>+arrow keys | Nudge layer left, right, up, down 10px | Moves the selected layer 10 px |
 | <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete selected canvas item | Erases the selected pixels when there is a selection; otherwise deletes the selected layers |
 | <kbd>Shift</kbd>+<kbd>C</kbd> | Clear selected mask | Clears the selected mask layer |
@@ -186,6 +186,7 @@ These work while the Preview has focus. The recall keys and **Load Workflow** al
 | <kbd>F</kbd> | Zoom preview to fit | Fits an image to the Preview |
 | <kbd>C</kbd> | Swap comparison images | Swaps the two images being compared |
 | <kbd>M</kbd> | Next comparison mode | Switches to the next comparison mode while comparing |
+| <kbd>Esc</kbd> | Cancel or exit compare | Cancels **Select for compare** while it waits for a second image, or closes the comparison |
 | <kbd>R</kbd> | Remix | Recalls the image's settings, except the seed |
 | <kbd>A</kbd> | Recall All | Recalls all of the image's settings |
 | <kbd>S</kbd> | Recall Seed | Recalls the seed |
@@ -206,6 +207,7 @@ These work while the Gallery has focus. See [Gallery reference](/users-guide/gal
 | <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete gallery selection | Deletes the selected items |
 | <kbd>R</kbd> | Remix | Recalls the selected image's settings, except the seed |
 | <kbd>.</kbd> | Toggle gallery image star | Stars or unstars the selected items |
+| <kbd>Esc</kbd> | Cancel or exit compare | Cancels **Select for compare** while it waits for a second image, or closes the comparison |
 
 **Clear gallery selection**, **Add or remove the focused gallery item from the selection** and **Toggle gallery starred-only filter** have no default keys.
 

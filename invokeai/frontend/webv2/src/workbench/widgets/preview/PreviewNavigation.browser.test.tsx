@@ -2,6 +2,8 @@
 import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
 import type { InvocationProgressEvent, QueueItem, QueueItemStatusChangedEvent } from '@features/queue/contracts';
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import type { ImageActions } from '@workbench/image-actions';
+import type * as ImageContextMenuModule from '@workbench/image-actions/ImageContextMenu';
 import type * as DeletionConfirmationModule from '@workbench/image-actions/useDeletionConfirmation';
 import type * as projectsApi from '@workbench/projects/api';
 import type { WidgetContributionSource, WidgetViewProps } from '@workbench/widgetContracts';
@@ -17,17 +19,19 @@ import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES } from '@workbench/image-actions/imageRecall';
 import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import i18next from 'i18next';
-import { act, useCallback } from 'react';
+import { act, useCallback, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, page, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
+import { PreviewActionStrip } from './PreviewActionStrip';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
 import { PREVIEW_NAV_ATTRIBUTE } from './PreviewNavButtons';
 import { PreviewWidgetLabel } from './PreviewWidgetChrome';
@@ -169,6 +173,11 @@ const mocks = vi.hoisted(() => {
     galleryItemNames: [] as Array<{ kind: 'image' | 'video'; name: string }>,
     galleryItemNamesGate: null as Promise<void> | null,
     galleryItemNamesOptionCalls: 0,
+    // Widget values as an external store: `publishGalleryValues` re-renders its subscribers, as the workbench does.
+    widgetValues: { listeners: new Set<() => void>(), version: 0 },
+    // Set by a test that drives the real item menu: the actions the view hands it, in place of the empty stand-in.
+    imageActions: null as ImageActions | null,
+    realImageContextMenu: null as typeof ImageContextMenuModule.ImageContextMenu | null,
     imageActionOptions: null as null | {
       getItemActionContext?: () => {
         getItemSelectionPage?: (item: GalleryImageItem | GalleryVideoItem) => number;
@@ -180,7 +189,8 @@ const mocks = vi.hoisted(() => {
       requestDeletionConfirmation?: DeletionConfirmationModule.RequestDeletionConfirmation;
     },
     recentImages,
-    bridgeProgressImage: null as unknown,
+    /** Slots that have shown a frame of their own; every followed slot unless a test says otherwise. */
+    framedProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     runningProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     slotProgressImage: undefined as unknown,
     useActiveProgressTarget: vi.fn(() => null as unknown),
@@ -197,13 +207,22 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWidget,
 }));
 
+const subscribeWidgetValues = (listener: () => void) => {
+  mocks.widgetValues.listeners.add(listener);
+  return () => mocks.widgetValues.listeners.delete(listener);
+};
+const getWidgetValuesVersion = () => mocks.widgetValues.version;
+
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
+  useActiveProjectName: () => 'Project 1',
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
-  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
-    selector(
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    useSyncExternalStore(subscribeWidgetValues, getWidgetValuesVersion);
+
+    return selector(
       widgetId === 'gallery' || widgetId === 'preview'
         ? ((
             Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === widgetId) as
@@ -211,7 +230,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
               | undefined
           )?.state?.values ?? {})
         : {}
-    ),
+    );
+  },
   useWorkbenchCommands: () => mocks.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.
@@ -230,18 +250,20 @@ const mockProgressTargets = () => {
   return target ? [target] : [];
 };
 
+const mockFollowedProgressTargets = () =>
+  [...(mocks.runningProgressTargets ?? []), ...mockProgressTargets()].filter(
+    (target, index, all) =>
+      all.findIndex((other) => other.queueItemId === target.queueItemId && other.itemIndex === target.itemIndex) ===
+      index
+  );
+
 vi.mock('@features/queue/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useActiveProgressTarget: () => mocks.useActiveProgressTarget(),
   useActiveProgressTargets: () => mocks.runningProgressTargets ?? mockProgressTargets(),
-  useFollowedProgressTargets: () =>
-    [...(mocks.runningProgressTargets ?? []), ...mockProgressTargets()].filter(
-      (target, index, all) =>
-        all.findIndex((other) => other.queueItemId === target.queueItemId && other.itemIndex === target.itemIndex) ===
-        index
-    ),
+  useFollowedProgressTargets: () => mockFollowedProgressTargets(),
+  useFramedProgressTargets: () => mocks.framedProgressTargets ?? mockFollowedProgressTargets(),
   useProgressImage: () => mocks.useProgressImage(),
-  useQueueItemBridgeProgressImage: () => mocks.bridgeProgressImage,
   // The slot's own frame: derived from the "latest" mock by target unless a test overrides it.
   useQueueItemProgressImage: (queueItemId: string, itemIndex: number) => {
     if (mocks.slotProgressImage !== undefined) {
@@ -263,6 +285,21 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
 vi.mock('@features/gallery/queries', () => ({
+  // The item menu's reads: recorded metadata, which these images have none of, and whether one embeds a workflow.
+  galleryImageMetadataOptions: (_owner: unknown, imageName: string) => ({
+    queryFn: () => null,
+    queryKey: ['test-image-metadata', imageName],
+    staleTime: Infinity,
+  }),
+  galleryKeys: {
+    imageHasWorkflow: (_owner: unknown, imageName: string) => ['test-image-has-workflow', imageName],
+    videoHasWorkflow: (_owner: unknown, videoName: string) => ['test-video-has-workflow', videoName],
+  },
+  galleryVideoMetadataOptions: (_owner: unknown, videoName: string) => ({
+    queryFn: () => null,
+    queryKey: ['test-video-metadata', videoName],
+    staleTime: Infinity,
+  }),
   GALLERY_MAX_ROWS: 600,
   GALLERY_PAGE_SIZE: 60,
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
@@ -439,12 +476,17 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
-  ImageContextMenu: (props: { target: unknown; variant?: string }) => {
+  ImageContextMenu: (props: Parameters<typeof ImageContextMenuModule.ImageContextMenu>[0]) => {
+    const { realImageContextMenu: RealImageContextMenu } = mocks;
+
     contextMenuProps.current = props;
-    return null;
+    return mocks.imageActions && RealImageContextMenu ? (
+      <RealImageContextMenu {...props} actions={mocks.imageActions} />
+    ) : null;
   },
   ImageContinueGroup: () => null,
   ImageUseGroups: () => null,
+  VideoUseGroups: () => null,
   RecallActionButtons: () => null,
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
@@ -460,8 +502,9 @@ vi.mock('@workbench/image-actions', async () => ({
   ).useDeletionConfirmation,
   useImageActions: (options: typeof mocks.imageActionOptions) => {
     mocks.imageActionOptions = options;
-    return {};
+    return mocks.imageActions ?? {};
   },
+  useImageRecallCapabilities: () => ({ capabilities: {}, isLoading: false }),
 }));
 
 vi.mock('@features/generation/react', () => ({
@@ -477,6 +520,11 @@ vi.mock('@features/generation/react', () => ({
 
 import { PreviewWidgetView } from './PreviewWidgetView';
 
+// Loaded after the mocks, so the real menu reads the same mocked workbench as the view.
+mocks.realImageContextMenu = (
+  await vi.importActual<typeof ImageContextMenuModule>('@workbench/image-actions/ImageContextMenu')
+).ImageContextMenu;
+
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -485,6 +533,7 @@ await i18n.use(initReactI18next).init({
     en: {
       translation: {
         common: {
+          cancel: 'Cancel',
           countOfTotal: '{{count}} of {{total}}',
           generating: 'Generating',
           videoPlayer: {
@@ -501,7 +550,14 @@ await i18n.use(initReactI18next).init({
         widgets: {
           gallery: { commands: { clearSelection: 'Clear gallery selection' } },
           preview: {
-            commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
+            cancelCompare: 'Cancel compare',
+            commands: {
+              exitCompare: 'Cancel or exit compare',
+              nextItem: 'Show next item',
+              previousItem: 'Show previous item',
+            },
+            compareArmedHint: 'Pick another image to compare with this one',
+            imageActions: 'Item actions',
             noGallerySelection: 'No gallery selection',
             showGallery: 'Show Gallery',
             framesPerSecond: '{{count}} fps',
@@ -590,6 +646,22 @@ const HeaderPositionProbe = () => {
   return <span ref={ref} />;
 };
 
+// Off unless a test renders it: the header's ⋮ as the chrome shows it, only while Preview publishes an item to act on.
+let showsHeaderMenuButton = false;
+const HeaderMenuButton = () => {
+  const { actionItem, actions, getRegion, openItemMenu } = usePreviewHeaderContext();
+
+  return actionItem && actions ? (
+    <PreviewActionStrip
+      actions={actions}
+      density="minimal"
+      getRegion={getRegion ?? undefined}
+      item={actionItem}
+      onOpenMenu={openItemMenu}
+    />
+  ) : null;
+};
+
 // The shell's sensors, so touch on the preview arbitrates between swipe and drag as it does in the app.
 const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   const sensors = useSensors(
@@ -636,6 +708,7 @@ const renderTree = async (client: QueryClient) => {
                 <LivePreviewFollowProvider>
                   <FollowProbe />
                   <HeaderPositionProbe />
+                  {showsHeaderMenuButton ? <HeaderMenuButton /> : null}
                   <CenterRegion>
                     <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
                   </CenterRegion>
@@ -679,6 +752,14 @@ const setGalleryValues = (patch: Record<string, unknown>) => {
   const state = mocks.project.widgetInstances.gallery.state as { values: Record<string, unknown> };
 
   state.values = { ...state.values, ...patch };
+};
+
+// Gallery values republished as the workbench store publishes them: subscribers re-render at once, within the event
+// that changed them.
+const publishGalleryValues = (patch: Record<string, unknown>) => {
+  setGalleryValues(patch);
+  mocks.widgetValues.version += 1;
+  mocks.widgetValues.listeners.forEach((listener) => listener());
 };
 
 // Apply mocked selection results back to Gallery values so subsequent navigation starts from the newly selected
@@ -829,6 +910,7 @@ beforeEach(() => {
   mocks.commands.gallery.selectItem.mockClear();
   mocks.commands.gallery.clearSelection.mockReset();
   showsHeaderLabel = false;
+  showsHeaderMenuButton = false;
   vi.mocked(requestGalleryItemReveal).mockClear();
   mocks.project.queue.items = [];
   mocks.project.settings.viewerAutoSwitch = 'off';
@@ -859,6 +941,7 @@ beforeEach(() => {
   mocks.galleryItemNamesGate = null;
   mocks.galleryItemNamesOptionCalls = 0;
   mocks.imageActionOptions = null;
+  mocks.imageActions = null;
   mocks.galleryItemPages = [
     {
       items: mocks.recentImages.map((image) => ({
@@ -880,7 +963,7 @@ beforeEach(() => {
   ];
   mocks.useActiveProgressTarget.mockReturnValue(null);
   mocks.useProgressImage.mockReturnValue(null);
-  mocks.bridgeProgressImage = null;
+  mocks.framedProgressTargets = undefined;
   mocks.runningProgressTargets = undefined;
   mocks.slotProgressImage = undefined;
 });
@@ -3153,25 +3236,62 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.galleryItemFilters.every((filter) => filter.boardId !== 'board-live')).toBe(true);
   });
 
-  it('keeps following a completed slot while its result is still routing', async () => {
-    // Keep settling results in the single live frame after backend completion and before gallery arrival; do not
-    // tile them.
-    mocks.project.queue.items = [queueItem];
+  it("holds the finished slot's last frame while its result routes, then shows the result until the next first frame", async () => {
+    // Slot 1 completed and its result is still on its way; slot 2 runs but is loading its model.
+    const slotOne = { itemIndex: 1, queueItemId: 'queue-item-live' };
+    const slotTwo = { itemIndex: 2, queueItemId: 'queue-item-live' };
+    const resultOfSlotOne = { ...mocks.recentImages[0]!, sourceQueueItemId: 'queue-item-live' };
+    const stageSources = () =>
+      [...host!.querySelectorAll<HTMLImageElement>('img:not([data-preview-filmstrip] img)')].map((image) =>
+        image.getAttribute('src')
+      );
+    const statusLines = () => [...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent);
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2], completedBackendItemIds: [1] }];
     mocks.project.settings.viewerAutoSwitch = 'progress';
-    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
-    mocks.runningProgressTargets = [];
+    mocks.useActiveProgressTarget.mockReturnValue(slotOne);
+    mocks.runningProgressTargets = [slotTwo];
+    mocks.framedProgressTargets = [slotOne];
     mocks.useProgressImage.mockReturnValue({
-      dataUrl: 'data:image/png;base64,',
+      dataUrl: 'data:image/png;base64,slot-one-last',
       height: 64,
-      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      target: slotOne,
       width: 64,
     });
+    setGalleryValues({ selectedImage: legacyImage('oldest', '2026-07-20T00:00:00.000Z'), selectedImageName: 'oldest' });
+
+    await render();
+    expect(stageSources().filter((src) => src?.startsWith('data:image/png'))).toEqual([
+      'data:image/png;base64,slot-one-last',
+    ]);
+
+    // Routing lands: the settling slot is released and its result selected; slot 2 still has no frame.
+    mocks.useActiveProgressTarget.mockReturnValue(null);
+    mocks.framedProgressTargets = [];
+    mocks.useProgressImage.mockReturnValue(null);
+    publishGalleryValues({
+      recentImages: [resultOfSlotOne, ...mocks.recentImages.slice(1)],
+      selectedImage: legacyImage('newest', resultOfSlotOne.queuedAt),
+      selectedImageName: 'newest',
+    });
+    await rerender();
+
+    expect(stageSources()).toContain(resultOfSlotOne.imageUrl);
+    expect(stageSources().some((src) => src?.startsWith('data:image/png'))).toBe(false);
+    expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
+    expect(statusLines()).toContain('widgets.preview.startingAnnouncement');
+  });
+
+  it('shows a session starting before its first frame when nothing is selected, saying so', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.viewerAutoSwitch = 'progress';
+    mocks.runningProgressTargets = [{ itemIndex: 1, queueItemId: 'queue-item-live' }];
+    mocks.framedProgressTargets = [];
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
 
     await render();
 
-    expect(
-      host?.querySelectorAll<HTMLImageElement>('img[src^="data:image/png"]:not([data-preview-filmstrip] img)')
-    ).toHaveLength(1);
+    expect(host!.textContent).not.toContain('widgets.preview.noGallerySelection');
+    expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
   });
 
   it('keeps the same-root preview through child gaps and browser focus changes until the next denoising step', async () => {
@@ -3210,6 +3330,11 @@ describe('preview keyboard navigation boundary', () => {
               mocks.useActiveProgressTarget.mockReturnValue(null);
               mocks.runningProgressTargets = [];
             }
+          },
+          markFramed: (target) => {
+            activeTarget = target;
+            mocks.useActiveProgressTarget.mockReturnValue(target);
+            mocks.runningProgressTargets = [target];
           },
           set: (target) => {
             activeTarget = target;
@@ -3436,7 +3561,7 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('follows a running slot over a settling one so a concurrent session is never hidden', async () => {
+  it('follows a running slot with a frame of its own over a settling one so a concurrent session is never hidden', async () => {
     // Multi-GPU: slot 1 completed and is settling, slot 2 is still streaming.
     // The single-frame preview must show slot 2 live, not slot 1's static frame.
     mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2] }];
@@ -3449,31 +3574,42 @@ describe('preview keyboard navigation boundary', () => {
       target: { itemIndex: 2, queueItemId: 'queue-item-live' },
       width: 64,
     });
-    mocks.bridgeProgressImage = { dataUrl: 'data:image/png;base64,slot-one', height: 64, width: 64 };
 
     await render();
 
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-two"]')).not.toBeNull();
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-one"]')).toBeNull();
+    expect(
+      [...host!.querySelectorAll<HTMLImageElement>('img[src^="data:image/png"]:not([data-preview-filmstrip] img)')].map(
+        (image) => image.getAttribute('src')
+      )
+    ).toEqual(['data:image/png;base64,slot-two']);
   });
 
-  it("bridges to the next slot of a batch with the previous slot's last frame", async () => {
-    // Bridge a newly followed frameless slot with the previous frame until its first progress arrives.
+  it("shows a finished batch image, not the next slot, until that slot's first frame, saying what it waits for", async () => {
+    // Slot 1's result has landed and is selected; slot 2 runs but is still loading its model.
+    const finished = mocks.recentImages[0]!;
     mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2], completedBackendItemIds: [1] }];
     mocks.project.settings.viewerAutoSwitch = 'progress';
-    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 2, queueItemId: 'queue-item-live' });
-    mocks.useProgressImage.mockReturnValue({
-      dataUrl: 'data:image/png;base64,slot-one',
-      height: 64,
-      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
-      width: 64,
-    });
-    mocks.bridgeProgressImage = { dataUrl: 'data:image/png;base64,bridge', height: 64, width: 64 };
+    mocks.runningProgressTargets = [{ itemIndex: 2, queueItemId: 'queue-item-live' }];
+    mocks.framedProgressTargets = [];
+    mocks.slotProgressImage = null;
 
     await render();
 
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,bridge"]')).not.toBeNull();
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-one"]')).toBeNull();
+    const stageSources = () =>
+      [...host!.querySelectorAll<HTMLImageElement>('img:not([data-preview-filmstrip] img)')].map((image) =>
+        image.getAttribute('src')
+      );
+    expect(stageSources()).toContain(finished.imageUrl);
+    expect(stageSources().some((src) => src?.startsWith('data:image/png'))).toBe(false);
+    expect(host?.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
+
+    // The first frame of its own: the Preview follows the slot from here.
+    mocks.framedProgressTargets = [{ itemIndex: 2, queueItemId: 'queue-item-live' }];
+    mocks.slotProgressImage = { dataUrl: 'data:image/png;base64,slot-two-first', height: 64, width: 64 };
+    await rerender();
+
+    expect(stageSources()).toEqual(['data:image/png;base64,slot-two-first']);
+    expect(host?.querySelector('[data-preview-starting-cue]')).toBeNull();
   });
 
   it('keeps every concurrent session in the filmstrip, follows the newest session, and pins on request', async () => {
@@ -3524,6 +3660,39 @@ describe('preview keyboard navigation boundary', () => {
     expect(followedThumb()).toBe('queue-item-live:1');
   });
 
+  it('shows a picked session before its first frame, over the selected result, until it stops running', async () => {
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2] }];
+    mocks.project.settings.viewerAutoSwitch = 'progress';
+    mocks.runningProgressTargets = [
+      { queueItemId: queueItem.id, itemIndex: 1 },
+      { queueItemId: queueItem.id, itemIndex: 2 },
+    ];
+    // Slot 1 streams; slot 2 has started but shows nothing of its own yet.
+    mocks.framedProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,slot-one',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: queueItem.id },
+      width: 64,
+    });
+    const followedThumb = () =>
+      host!.querySelector<HTMLElement>('[data-preview-live-thumb][aria-current="true"]')?.dataset.previewLiveThumb;
+    await render();
+    expect(followedThumb()).toBe('queue-item-live:1');
+
+    await act(() => followControls.follow('queue-item-live:2'));
+    expect(mocks.commands.account.updateProjectPreferences).toHaveBeenCalledWith({ viewerAutoSwitch: 'progress' });
+    await rerender();
+    expect(followedThumb()).toBe('queue-item-live:2');
+    expect(host!.querySelector('[data-preview-starting-cue]')).not.toBeNull();
+
+    // It finishes: the pin goes, and the newest running session with a frame is followed again.
+    mocks.runningProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
+    await rerender();
+    expect(followControls.pinnedSessionId).toBeNull();
+    expect(followedThumb()).toBe('queue-item-live:1');
+  });
+
   it('keeps live previews available during similarity search and temporary comparison override', async () => {
     mocks.project.queue.items = [queueItem];
     mocks.project.settings.viewerAutoSwitch = 'progress';
@@ -3561,16 +3730,21 @@ describe('preview keyboard navigation boundary', () => {
     const values = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
     values.compareImage = mocks.recentImages[1];
     mocks.project.settings.viewerAutoSwitch = 'progress';
+    // Narrow Preview shows exit as an icon, so look for the control by its accessible name.
+    const isComparing = () =>
+      Array.from(host!.querySelectorAll('button')).some(
+        (button) => (button.getAttribute('aria-label') ?? button.textContent) === 'widgets.preview.exitCompare'
+      );
     await render();
-    expect(host!.textContent).toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(true);
     mocks.project.queue.items = [queueItem];
     mocks.runningProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
     await rerender();
-    expect(host!.textContent).not.toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(false);
     mocks.runningProgressTargets = [];
     mocks.project.queue.items = [];
     await rerender();
-    expect(host!.textContent).toContain('widgets.preview.exitCompare');
+    expect(isComparing()).toBe(true);
   });
   it('keeps pinned live controls and footer inside the widget without saved-image arrows or zero count', async () => {
     mocks.project.queue.items = [queueItem];
@@ -3937,6 +4111,262 @@ describe('preview deletion confirmation', () => {
   });
 });
 
+/** The shared item actions as stand-ins, for tests that open the real item menu. */
+const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions => ({
+  canUseAsConditioningClip: { audio: false, video: false },
+  canUseAsReferenceImage: false,
+  canUseAsReferenceVideo: false,
+  copyImage: vi.fn(() => Promise.resolve()),
+  createCanvasFromImages: vi.fn(() => Promise.resolve()),
+  deleteItems: vi.fn(() => Promise.resolve()),
+  deleteImages: vi.fn(() => Promise.resolve()),
+  deriveImageRecallCapabilities: vi.fn(() => EMPTY_IMAGE_RECALL_CAPABILITIES),
+  downloadItem: vi.fn(() => Promise.resolve()),
+  downloadItems: vi.fn(() => Promise.resolve()),
+  downloadImage: vi.fn(() => Promise.resolve()),
+  downloadImages: vi.fn(() => Promise.resolve()),
+  generatePbrMaps: vi.fn(() => Promise.resolve()),
+  loadImageWorkflow: vi.fn(() => Promise.resolve()),
+  moveItemsToBoard: vi.fn(() => Promise.resolve()),
+  moveImagesToBoard: vi.fn(() => Promise.resolve()),
+  openItemInNewTab: vi.fn(),
+  openItemInPreview: vi.fn(),
+  openImageInPreview: vi.fn(),
+  recallImageData: vi.fn(() => Promise.resolve()),
+  loadVideoWorkflow: vi.fn(() => Promise.resolve()),
+  recallVideoData: vi.fn(() => Promise.resolve()),
+  selectForCompare: vi.fn(),
+  sendToCanvas: vi.fn(() => Promise.resolve()),
+  sendImageAsControl: vi.fn(() => Promise.resolve()),
+  setItemsStarred: vi.fn(() => Promise.resolve()),
+  setImagesStarred: vi.fn(() => Promise.resolve()),
+  savePromptAsTemplate: vi.fn(),
+  sendToInitialVideo: vi.fn(),
+  useAsReferenceImage: vi.fn(),
+  useAsConditioningClip: vi.fn(),
+  useAsReferenceVideo: vi.fn(),
+  ...overrides,
+});
+
+describe('preview item menu focus', () => {
+  const successor = { ...mocks.recentImages[1], boardId: 'none' };
+  let confirmDeletion: (() => void) | null = null;
+  // Deleting the shown item as the shared actions do: it leaves the selection at once (the optimistic removal), and
+  // the item after it is selected once the server confirms.
+  const deleteShownItem = () => {
+    publishGalleryValues({ selectedImage: null, selectedImageName: null });
+
+    return new Promise<void>((resolve) => {
+      confirmDeletion = () => {
+        publishGalleryValues({ selectedImage: successor, selectedImageName: successor.imageName });
+        resolve();
+      };
+    });
+  };
+  /** Renders Preview with the real item menu, whose Delete asks first unless the user chose not to be asked. */
+  const renderWithItemMenu = async ({ asks = true, ...overrides }: Partial<ImageActions> & { asks?: boolean } = {}) => {
+    const deleteItems = vi.fn<ImageActions['deleteItems']>((items, options) =>
+      asks
+        ? mocks.imageActionOptions!.requestDeletionConfirmation!(items, deleteShownItem, {
+            canSkipFutureConfirmations: true,
+            returnFocus: options?.returnFocus,
+          })
+        : deleteShownItem()
+    );
+
+    confirmDeletion = null;
+    mocks.imageActions = createItemMenuActions({ deleteItems, ...overrides });
+    await render();
+    return deleteItems;
+  };
+  const findByText = (selector: string, text: string) =>
+    vi.waitFor(() => {
+      const element = [...document.querySelectorAll<HTMLElement>(selector)].find((candidate) =>
+        candidate.textContent?.includes(text)
+      );
+
+      expect(element).toBeDefined();
+      return element!;
+    });
+  /** The context menu event on `target`: a right-click, or the menu key on whatever holds focus. */
+  const openMenuOn = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
+      );
+      await Promise.resolve();
+    });
+  const chooseMenuItem = async (label: string) => {
+    const item = await findByText('[role="menuitem"]', label);
+
+    await act(() => userEvent.click(item));
+  };
+  /** Deletes through the open menu, confirming when asked, until the next item is shown and every overlay is gone. */
+  const deleteThroughMenu = async (asks: boolean) => {
+    await chooseMenuItem('widgets.gallery.itemMenu.deleteImage');
+
+    if (asks) {
+      const confirm = await findByText('[role="alertdialog"] button', 'widgets.gallery.deleteConfirmLabel');
+      // The closing menu hands focus back without taking it from the confirmation.
+      await expect.poll(() => document.activeElement?.closest('[role="alertdialog"]')).not.toBeNull();
+      await act(() => userEvent.click(confirm));
+    }
+
+    await vi.waitFor(() => expect(confirmDeletion).not.toBeNull());
+    await act(async () => {
+      confirmDeletion!();
+      await Promise.resolve();
+    });
+    expect(host?.querySelector(`img[alt="${successor.imageName}"]`)).not.toBeNull();
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+  };
+  const stageImage = () => host!.querySelector(`[${PREVIEW_NAV_ATTRIBUTE}]`)!.parentElement!.querySelector('img')!;
+  const shownThumb = () => host!.querySelector<HTMLButtonElement>('button[aria-current]')!;
+
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])('closes for good after Delete on the stage, and leaves focus with Preview ($preference)', async ({ asks }) => {
+    const deleteItems = await renderWithItemMenu({ asks });
+
+    await openMenuOn(stageImage());
+    await deleteThroughMenu(asks);
+
+    // The menu opened on the deleted item does not come back with the next one.
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'newest' }], expect.anything());
+    // Nothing had focus before the menu, which has no trigger: Preview takes it, so its keys still work.
+    expect(document.activeElement).toBe(getBoundary());
+  });
+
+  // Without a confirmation the removal lands in the same click that closes the menu.
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])(
+    'gives focus to Preview after Delete takes away the filmstrip thumb the menu opened from ($preference)',
+    async ({ asks }) => {
+      await renderWithItemMenu({ asks });
+      const thumb = shownThumb();
+
+      thumb.focus();
+      await openMenuOn(thumb);
+      await deleteThroughMenu(asks);
+
+      expect(thumb.isConnected).toBe(false);
+      expect(document.activeElement).toBe(getBoundary());
+    }
+  );
+
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])(
+    "gives focus to Preview after Delete from the header's ⋮, which remounts with the next item ($preference)",
+    async ({ asks }) => {
+      showsHeaderMenuButton = true;
+      await renderWithItemMenu({ asks });
+      const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
+
+      await act(() => userEvent.click(menuButton));
+      await deleteThroughMenu(asks);
+
+      expect(menuButton.isConnected).toBe(false);
+      expect(host!.querySelector('button[aria-label="Item actions"]')).not.toBeNull();
+      expect(document.activeElement).toBe(getBoundary());
+    }
+  );
+
+  it('gives focus to Preview after Delete without a confirmation takes away a neighbouring thumb', async () => {
+    const [firstPage] = mocks.galleryItemPages;
+    const listed = { ...firstPage!.items[1]!, name: 'listed', thumbnailUrl: '/images/listed/thumbnail' };
+
+    mocks.galleryItemPages = [{ ...firstPage!, items: [...firstPage!.items, listed], total: 3 }];
+    // As the shared actions remove an item only the listing holds: through the query cache, whose observers hear of
+    // it only after the menu has closed.
+    const deleteItems = vi.fn<ImageActions['deleteItems']>(() => {
+      queryClient!.setQueriesData<GalleryItemsPage>({ queryKey: ['test-items-page'] }, (page) =>
+        page ? { ...page, items: page.items.filter((item) => item.name !== listed.name), total: page.total - 1 } : page
+      );
+      return Promise.resolve();
+    });
+
+    mocks.imageActions = createItemMenuActions({ deleteItems });
+    await render();
+    const thumb = await vi.waitFor(() => {
+      const element = host!.querySelector<HTMLButtonElement>(`button[aria-label="${listed.name}"]`);
+
+      expect(element).not.toBeNull();
+      return element!;
+    });
+
+    thumb.focus();
+    await openMenuOn(thumb);
+    await chooseMenuItem('widgets.gallery.itemMenu.deleteImage');
+    await expect.poll(() => thumb.isConnected).toBe(false);
+
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: listed.name }], expect.anything());
+    await expect.poll(() => document.activeElement).toBe(getBoundary());
+  });
+
+  it("gives focus to Preview when the header's ⋮ that focus went back to goes in a later render", async () => {
+    showsHeaderMenuButton = true;
+    await renderWithItemMenu();
+    const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
+
+    await act(() => userEvent.click(menuButton));
+    await findByText('[role="menuitem"]', 'widgets.gallery.itemMenu.deleteImage');
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(menuButton);
+
+    // The selection goes from elsewhere, as when the Gallery deletes the shown item, and the ⋮ goes with it.
+    await act(async () => {
+      publishGalleryValues({ selectedImage: null, selectedImageName: null });
+      await Promise.resolve();
+    });
+
+    expect(menuButton.isConnected).toBe(false);
+    await expect.poll(() => document.activeElement).toBe(getBoundary());
+  });
+
+  it('gives focus back to the thumb the menu opened from when closing leaves it in place', async () => {
+    await renderWithItemMenu();
+    const thumb = shownThumb();
+
+    thumb.focus();
+    await openMenuOn(thumb);
+    await findByText('[role="menuitem"]', 'widgets.gallery.itemMenu.deleteImage');
+    // The menu takes focus, so closing it has focus to give back.
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+
+    expect(document.activeElement).toBe(thumb);
+  });
+
+  it('leaves focus where the chosen action moved it', async () => {
+    const elsewhere = document.createElement('input');
+    document.body.append(elsewhere);
+
+    try {
+      await renderWithItemMenu({ selectForCompare: vi.fn(() => elsewhere.focus()) });
+      const thumb = shownThumb();
+
+      thumb.focus();
+      await openMenuOn(thumb);
+      await chooseMenuItem('widgets.preview.selectForCompare');
+      await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+
+      expect(document.activeElement).toBe(elsewhere);
+    } finally {
+      elsewhere.remove();
+    }
+  });
+});
+
 describe('preview image recovery', () => {
   const imageRouteCommands = commands as typeof commands & {
     endThumbnailRouteFailures: () => Promise<void>;
@@ -4076,5 +4506,90 @@ describe('preview label clear selection', () => {
 
     expect(mocks.revealPlacedWidget).toHaveBeenCalledWith(expect.objectContaining({ typeId: 'gallery' }));
     expect(mocks.openWidget).not.toHaveBeenCalled();
+  });
+});
+
+describe('preview select for compare', () => {
+  const shown = { ...mocks.recentImages[0], boardId: 'none' };
+  const other = { ...mocks.recentImages[1], boardId: 'none' };
+  const status = () => host!.querySelector('[role="status"][aria-live="polite"]')?.textContent ?? '';
+  const hint = () => host!.querySelector<HTMLElement>('[data-preview-compare-hint]');
+  const cancelButton = () => hint()?.querySelector<HTMLButtonElement>('button[aria-label="Cancel compare"]') ?? null;
+  const isComparing = () =>
+    Array.from(host!.querySelectorAll('button')).some(
+      (button) => (button.getAttribute('aria-label') ?? button.textContent) === 'widgets.preview.exitCompare'
+    );
+
+  beforeEach(() => {
+    mocks.commands.gallery.setCompareItem.mockClear();
+    // Waiting for a second image: the comparison image is the shown image itself.
+    setGalleryValues({ compareImage: shown });
+  });
+
+  it('says it is waiting, from the persisted state alone, and calls it off from the hint', async () => {
+    await render();
+
+    expect(status()).toBe('Pick another image to compare with this one');
+    expect(hint()).not.toBeNull();
+    expect(isComparing()).toBe(false);
+
+    await act(() => userEvent.click(cancelButton()!));
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it('compares once another image is picked, the hint giving way to the comparison', async () => {
+    await render();
+    await act(async () => {
+      publishGalleryValues({ selectedImage: other, selectedImageName: other.imageName });
+      await Promise.resolve();
+    });
+
+    expect(isComparing()).toBe(true);
+    expect(hint()).toBeNull();
+    expect(status()).toBe('');
+  });
+
+  it('shows nothing while no image waits', async () => {
+    setGalleryValues({ compareImage: null });
+    await render();
+
+    expect(hint()).toBeNull();
+    expect(status()).toBe('');
+  });
+
+  it('calls it off on Esc, after an open menu takes the first press', async () => {
+    mocks.imageActions = createItemMenuActions({});
+    await render();
+    getBoundary().focus();
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'full');
+      await Promise.resolve();
+    });
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+    expect(mocks.commands.gallery.setCompareItem).not.toHaveBeenCalled();
+
+    await pressKeyOn(getBoundary(), 'Escape');
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it('closes an open comparison on Esc, and leaves Esc alone once nothing is compared', async () => {
+    setGalleryValues({ compareImage: other });
+    await render();
+    expect(isComparing()).toBe(true);
+
+    await pressKeyOn(getBoundary(), 'Escape');
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+
+    await act(async () => {
+      publishGalleryValues({ compareImage: null });
+      await Promise.resolve();
+    });
+    const press = await pressKeyOn(getBoundary(), 'Escape');
+
+    expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledOnce();
+    expect(press.defaultPrevented).toBe(false);
   });
 });

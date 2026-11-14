@@ -10,7 +10,7 @@ import {
   isLoraModelConfig,
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
-import { Field } from '@platform/ui';
+import { Field, FieldLabel } from '@platform/ui/Field';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,7 +18,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { ConceptList, ConceptRow } from './shared/ConceptRow';
-import { GenerateIssueNotes } from './shared/GenerateIssues';
+import { GenerateIssueButton } from './shared/GenerateIssues';
 
 interface GenerateConceptsContentProps {
   loraModels: LoraModelConfig[];
@@ -92,7 +92,7 @@ export const GenerateConceptsContent = ({
               // Only a missing concept gets notes, so installed rows keep their memoized props.
               issue={
                 isConceptInstalled(lora, loraModels, models.status) ? undefined : (
-                  <GenerateIssueNotes conceptKey={lora.model.key} field="concepts" section="guidance" />
+                  <GenerateIssueButton conceptKey={lora.model.key} field="concepts" section="guidance" />
                 )
               }
               lora={lora}
@@ -109,6 +109,7 @@ export const GenerateConceptsContent = ({
     // Rows left from another model stay listed, marked incompatible, so they can still be removed.
     return (
       <Stack gap="2">
+        <FieldLabel>{t('widgets.generate.concepts')}</FieldLabel>
         <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.conceptsUnsupported')}
         </Text>
@@ -121,7 +122,8 @@ export const GenerateConceptsContent = ({
     <Stack gap="2">
       <Field
         hint="concepts"
-        label={t('widgets.generate.addConcept')}
+        // Titles the concept list as a whole, as "Reference images" titles the list above it.
+        label={t('widgets.generate.concepts')}
         helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
       >
         <ModelSelect

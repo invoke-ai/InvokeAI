@@ -1,6 +1,8 @@
 import type { QueueBackendPort } from '@features/queue/core/types';
 import type { QueueItemsRetriedEvent } from '@features/queue/data/events';
 
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { withRequestDeadline } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
 
 import {
@@ -12,7 +14,6 @@ import {
 } from './mappers';
 import {
   cancelByBatchIds,
-  cancelCurrentQueueItem,
   claimQueueItemDelivery,
   cancelQueueItem,
   cancelQueueItems,
@@ -48,17 +49,31 @@ import {
  */
 const ownRetryHandlers = new Set<(payload: never) => void>();
 
+/**
+ * How long one item's cancel may take. A request the server never answers would otherwise hold cancel-current, which
+ * runs one at a time, and leave the viewer's cancel button doing nothing.
+ */
+export const CANCEL_ITEM_TIMEOUT_MS = 10_000;
+
 /** Production adapter for the queue backend port. */
 export const queueBackend: QueueBackendPort = {
   acknowledgeEnqueue: acknowledgeQueueEnqueue,
   cancelBatch: async (batchId) => (await cancelByBatchIds([batchId])).canceled,
-  cancelCurrentItem: cancelCurrentQueueItem,
   cancelQueueItems,
   cancelQueueItemsByBatchIds: async (batchIds) => {
     await cancelByBatchIds(batchIds);
   },
   cancelItem: async (itemId) => {
-    await cancelQueueItem(itemId);
+    const owner = captureAccountScope();
+    // An account change aborts the request; either way it ends, the answer belongs to the account that asked or to
+    // nobody, and the caller hears that as the account being gone.
+    const item = await withRequestDeadline(
+      (signal) => cancelQueueItem(itemId, signal),
+      CANCEL_ITEM_TIMEOUT_MS,
+      owner.signal
+    ).finally(() => assertAccountScopeCurrent(owner));
+
+    return mapQueueItemDTO(item);
   },
   cancelScopedItems: cancelScopedQueueItems,
   clearFailedItems: clearFailedQueueItems,

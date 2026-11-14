@@ -125,7 +125,7 @@ const ComponentPicker = ({
   return (
     // A fix button carries the issue id itself; without one this wrapper does, so a reveal lands on the slot.
     <Box data-issue-id={shownIssue && !shownIssue.fix ? shownIssue.id : undefined}>
-      <Field label={slot.label} helpText={slot.helpText} error={error}>
+      <Field label={slot.label} labelPlacement="inside" helpText={slot.helpText} error={error}>
         <ModelSelect
           filter={slot.filter ? filter : undefined}
           invalid={Boolean(error)}
@@ -187,7 +187,7 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
       defaultOpen={policy.defaultOpen}
       sectionId="components"
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}

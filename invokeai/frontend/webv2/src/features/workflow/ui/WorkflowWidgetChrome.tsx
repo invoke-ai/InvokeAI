@@ -24,9 +24,11 @@ import {
 } from '@features/workflow/utility';
 import { canCopyText } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { createExternalStore } from '@platform/state/externalStore';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
 import { MenuItem } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { HeaderActionDivider, HeaderHistoryButton } from '@platform/ui/PanelHeader';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookmarkIcon,
@@ -39,8 +41,10 @@ import {
   Link2OffIcon,
   LockIcon,
   PlusIcon,
+  Redo2Icon,
   RefreshCwIcon,
   TriangleAlertIcon,
+  Undo2Icon,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -208,8 +212,88 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 // Clipped, but with room for the name button's focus ring.
 const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 
+/**
+ * Below the width where every header action fits, Undo and Redo give way rather than the library actions: in the
+ * default Workflow layout of a 1280px window the center chrome row is 304px, which held the header before they
+ * arrived and no more. Their shortcuts keep working, and the ⋯ menu offers them while the header hides them. Queried
+ * on the nearest container: the center chrome row, or a panel header.
+ */
+const HEADER_HISTORY_CSS = { '@container (width < 24rem)': { display: 'none' } } as const;
+
+/**
+ * The headers that have hidden their history steps for want of room, by widget instance and region: the widget can show
+ * in several regions at once, each header at its own width, and each ⋯ menu (outside that container) asks after its
+ * own header only.
+ */
+const headerHistoryStore = createExternalStore<{ hiddenIn: Readonly<Record<string, true>> }>({ hiddenIn: {} });
+
+const getHeaderKey = ({ region, runtime }: WorkflowWidgetViewProps) => `${runtime.instanceId}\0${region}`;
+
+const setHeaderHistoryHidden = (key: string, hidden: boolean) => {
+  const { hiddenIn } = headerHistoryStore.getSnapshot();
+
+  if (Boolean(hiddenIn[key]) === hidden) {
+    return;
+  }
+
+  const { [key]: _removed, ...rest } = hiddenIn;
+  headerHistoryStore.setSnapshot({ hiddenIn: hidden ? { ...rest, [key]: true } : rest });
+};
+
+/** Tracks one header's history group: a group the narrow header hides has no width. Leaving forgets only its entry. */
+const useHeaderHistoryObserver = (key: string) =>
+  useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!element) {
+        return undefined;
+      }
+
+      const update = () => setHeaderHistoryHidden(key, element.getBoundingClientRect().width === 0);
+      // A group hidden from the start never reports a size, so read it once now.
+      update();
+      const observer = new ResizeObserver(update);
+      observer.observe(element);
+
+      return () => {
+        observer.disconnect();
+        setHeaderHistoryHidden(key, false);
+      };
+    },
+    [key]
+  );
+
+/** Undo and Redo in the ⋯ menu, for a header too narrow to show them. */
+const WorkflowHistoryMenuItems = () => {
+  const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
+  const { redo, undo } = useProjectGraphCommands();
+  // The click event must not reach a step that takes an optional target.
+  const onUndo = useCallback(() => undo(), [undo]);
+  const onRedo = useCallback(() => redo(), [redo]);
+
+  return (
+    <>
+      <Menu.Item disabled={!canUndo} value="undo" onSelect={onUndo}>
+        <Menu.ItemText>{t('widgets.workflow.toolbar.undo')}</Menu.ItemText>
+        <Menu.ItemCommand>
+          <CommandShortcut commandId="workflows.undo" />
+        </Menu.ItemCommand>
+      </Menu.Item>
+      <Menu.Item disabled={!canRedo} value="redo" onSelect={onRedo}>
+        <Menu.ItemText>{t('widgets.workflow.toolbar.redo')}</Menu.ItemText>
+        <Menu.ItemCommand>
+          <CommandShortcut commandId="workflows.redo" />
+        </Menu.ItemCommand>
+      </Menu.Item>
+      <Menu.Separator borderColor="border.subtle" />
+    </>
+  );
+};
+
 /** Entries contributed to the shared widget actions menu. */
-export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
+export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
   const session = useAuthSession();
   const { getProjectGraph } = useWorkflowUi();
@@ -219,6 +303,8 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
   const canUpdateSource = isUpdatableSource(source, session);
+  const headerKey = getHeaderKey(props);
+  const isHeaderHistoryHidden = headerHistoryStore.useSelector((snapshot) => Boolean(snapshot.hiddenIn[headerKey]));
 
   const openDetailsPanel = useCallback(() => {
     widgets.open({ region: 'left', widgetId: 'workflow' });
@@ -265,6 +351,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
         {t('widgets.labels.workflow')}
       </Menu.ItemGroupLabel>
+      {isHeaderHistoryHidden ? <WorkflowHistoryMenuItems /> : null}
       <Menu.Item value="details" onClick={openDetailsPanel}>
         {t('widgets.workflow.detailsWithEllipsis')}
       </Menu.Item>
@@ -303,7 +390,39 @@ const selectPersistenceView = (persistence: WorkflowProjectPersistence) => ({
   status: persistence.status,
 });
 
-export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
+/** Undo and redo for the editor's session history, beside the other header actions as in Canvas's header. */
+const WorkflowHistoryActions = () => {
+  const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
+  const { redo, undo } = useProjectGraphCommands();
+  const undoShortcut = useMemo(() => <CommandShortcut commandId="workflows.undo" />, [CommandShortcut]);
+  const redoShortcut = useMemo(() => <CommandShortcut commandId="workflows.redo" />, [CommandShortcut]);
+
+  return (
+    <>
+      <HeaderHistoryButton
+        available={canUndo}
+        icon={Undo2Icon}
+        label={t('widgets.workflow.toolbar.undo')}
+        shortcut={undoShortcut}
+        onStep={undo}
+      />
+      <HeaderHistoryButton
+        available={canRedo}
+        icon={Redo2Icon}
+        label={t('widgets.workflow.toolbar.redo')}
+        shortcut={redoShortcut}
+        onStep={redo}
+      />
+    </>
+  );
+};
+
+export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
+  const { region } = props;
+  const observeHeaderHistory = useHeaderHistoryObserver(getHeaderKey(props));
   const { t } = useTranslation();
   const session = useAuthSession();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
@@ -325,6 +444,9 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
   // A pending save without browser recovery has no safety net at all; say so rather than showing the same cloud.
   const persistenceLabel =
     status === 'pending' && !hasLocalRecovery ? t('widgets.workflow.persistencePendingNoRecovery') : t(view.labelKey);
+  // History steps sit wherever the editor renders, as its toolbar did: the center and the expanded bottom panel (the
+  // only bottom presentation with a header). The left region's linear form has no editor and no history keys.
+  const showsHistory = region !== 'left';
 
   return (
     <HStack gap="0.5">
@@ -340,6 +462,13 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
             <Icon as={PlusIcon} boxSize="3.5" />
           </IconButton>
         </Tooltip>
+      ) : null}
+      {showsHistory ? (
+        <HStack ref={observeHeaderHistory} css={HEADER_HISTORY_CSS} gap="0.5">
+          {region === 'center' ? <HeaderActionDivider /> : null}
+          <WorkflowHistoryActions />
+          <HeaderActionDivider />
+        </HStack>
       ) : null}
       {/* Center labels already open the project's workflows; other regions need this separate trigger and leave
           publication and persistence to the editor header. */}

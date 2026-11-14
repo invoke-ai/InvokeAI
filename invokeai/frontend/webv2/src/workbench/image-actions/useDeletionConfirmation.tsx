@@ -341,8 +341,6 @@ export const useDeletionConfirmation = (): {
         confirmLabel={t('widgets.gallery.deleteConfirmLabel')}
         finalFocusEl={returnFocus ?? undefined}
         isOpen={pendingDeletion !== null}
-        // The usage report arrives after the dialog opens; anchored at the top, it grows the dialog downward.
-        placement="top"
         title={t(titleKey, { count: itemCount })}
         onClose={settlePendingDeletion}
         onConfirm={handleConfirm}

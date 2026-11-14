@@ -39,8 +39,8 @@ const loadPopoverBody = (): Promise<InvokePopoverBodyComponent> =>
   ));
 
 /**
- * Invoke ends its attached group and sits on top of the iterations field with full control corners; the field runs a
- * tail of its frame under Invoke's leading corners so it reads as a continuing border, not a notch.
+ * Invoke ends its attached group and sits on top of the iterations field with full control corners; the field's frame
+ * runs on under Invoke's leading corners so it reads as a continuing border, not a notch.
  * Doubled specificity outranks the attached Group's `!important` corner reset.
  */
 const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;

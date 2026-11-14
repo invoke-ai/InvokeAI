@@ -7,10 +7,12 @@ import type { Project } from '@workbench/projectContracts';
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import {
+  compileDocumentLeaves,
   createDocumentModel,
   getDocumentIndex,
   getDocumentLayer,
   getDocumentLeaves,
+  isNodeHidden,
 } from '@workbench/canvas-engine/api';
 import {
   groupContract,
@@ -123,12 +125,21 @@ vi.mock('./LayerSurfaceHost', () => ({
     surface,
   }: {
     commands: LayerRowCommands;
-    surface: { kind: string; id?: string; child?: { key: string } } | null;
+    surface: {
+      kind: string;
+      id?: string;
+      child?: { key: string };
+      anchor: { height: number; width: number; x: number; y: number };
+    } | null;
   }) => {
     surfaceCommands.current = commands;
     return (
       // Hidden like the harness outputs so the tree's scroll geometry doesn't depend on this stand-in's line height.
-      <output data-testid="surface" style={{ display: 'none' }}>
+      <output
+        data-anchor={surface ? JSON.stringify(surface.anchor) : undefined}
+        data-testid="surface"
+        style={{ display: 'none' }}
+      >
         {surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}
       </output>
     );
@@ -147,8 +158,15 @@ void i18n.use(initReactI18next).init({
           layers: {
             actions: {
               collapseGroup: 'Collapse group',
+              excludeFromGeneration: 'Exclude from generation',
+              excludeGroupFromGeneration: 'Exclude group from generation',
               expandGroup: 'Expand group',
+              groupExcluded: 'Left out of generation by a group',
+              groupHidden: 'Hidden on the canvas by a group',
               groupLocked: 'Locked by a group',
+              hideGroup: 'Hide group',
+              hideLayer: 'Hide layer',
+              hideOnCanvas: 'Hide on canvas',
               hideModifiers: 'Hide modifiers',
               indent: 'Move into the group above',
               outdent: 'Move out of the group',
@@ -160,6 +178,7 @@ void i18n.use(initReactI18next).init({
               toggleLock: 'Toggle lock',
               toggleActive: 'Toggle layer active',
               toggleVisibility: 'Toggle visibility',
+              useInGeneration: 'Use in generation',
             },
             adjustments: { curves: 'Curves', saturation: 'Saturation' },
             modifiers: {
@@ -172,6 +191,8 @@ void i18n.use(initReactI18next).init({
               removeAdjustment: 'Remove adjustment',
               removeDenoise: 'Remove denoise limit',
               removeNoise: 'Remove noise',
+              parentDisabled: 'The layer is hidden',
+              parentExcluded: 'The layer is left out of generation',
               reorderAdjustment: 'Reorder adjustment',
               toggleActive: 'Toggle active',
             },
@@ -600,6 +621,14 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(document.activeElement).toBe(treeitem('Top'));
     await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
     expect(output('surface')).toBe('menu:top');
+    // Opened where a right-click would be, at a point under the row, so it shows no arrow as a context menu.
+    const row = treeitem('Top').closest('[data-layer-row-id]')!.getBoundingClientRect();
+    expect(JSON.parse(host!.querySelector<HTMLElement>('[data-testid="surface"]')!.dataset.anchor!)).toEqual({
+      height: 1,
+      width: 1,
+      x: row.left,
+      y: row.bottom,
+    });
   });
 
   it('frames the keyboard-focused row surface with its ring, not the gap below it or the guides beside it', async () => {
@@ -610,16 +639,17 @@ describe('LayersTree keyboard and accessibility', () => {
     const row = treeitem('Inner');
     expect(document.activeElement).toBe(row);
 
-    // The ring is the surface's own inset shadow, so it shares the selection fill's box: clear of the gap below the
-    // row and of the indent where the tree guides run.
+    // The ring is the platform rows' own inset ring, drawn on the surface so it shares the selection fill's box: clear
+    // of the gap below the row and of the indent where the tree guides run.
     const surface = row.querySelector<HTMLElement>('[data-layer-row-surface]')!;
-    expect(getComputedStyle(surface).boxShadow).toContain('inset');
+    const ring = getComputedStyle(surface);
+    expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual(['solid', '2px', '-2px']);
     expect(getComputedStyle(row).outlineStyle).toBe('none');
     const rowRect = row.getBoundingClientRect();
     const surfaceRect = surface.getBoundingClientRect();
     expect(surfaceRect.bottom).toBeLessThan(rowRect.bottom);
     expect(surfaceRect.left - rowRect.left).toBe(LAYER_TREE_INDENT_PX);
-    expect(getComputedStyle(treeitem('Top').querySelector('[data-layer-row-surface]')!).boxShadow).toBe('none');
+    expect(getComputedStyle(treeitem('Top').querySelector('[data-layer-row-surface]')!).outlineStyle).toBe('none');
   });
 
   it('keeps the focused row mounted and focused while scrolled far away', async () => {
@@ -694,43 +724,93 @@ describe('LayersTree selection, surfaces and structure', () => {
     expect(output('selected-layer')).toBe('none');
   });
 
-  it('ends every row with the eye then the lock, each in one column at any depth', async () => {
+  it('ends overlay rows with the dot, eye and lock and raster rows with the eye and lock, in shared columns', async () => {
     await renderTree([
       paint('top', 'Top'),
       groupContract('g', [paint('inner', 'Inner'), groupContract('h', [paint('deep', 'Deep')], { name: 'H' })], {
         name: 'G',
       }),
       layerContract('masked', 'inpaint_mask', { isHidden: true, name: 'Masked' }),
+      groupContract('mg', [layerContract('nested', 'inpaint_mask', { name: 'Nested' })], { name: 'Mask group' }),
     ]);
-    await act(() => userEvent.click(treeitem('G').querySelector('button[aria-label="Expand group"]')!));
-    await act(() => userEvent.click(treeitem('H').querySelector('button[aria-label="Expand group"]')!));
-    const ids = ['top', 'g', 'inner', 'h', 'deep', 'masked'];
+    for (const name of ['G', 'H', 'Mask group']) {
+      await act(() => userEvent.click(treeitem(name).querySelector('button[aria-label="Expand group"]')!));
+    }
+    const raster = ['top', 'g', 'inner', 'h', 'deep'];
+    const overlays = ['masked', 'mg', 'nested'];
     const rowButtons = (id: string) =>
       [...host!.querySelectorAll<HTMLButtonElement>(`[data-layer-row-id="${id}"] button`)].map((button) => ({
         label: button.getAttribute('aria-label'),
         rect: button.getBoundingClientRect(),
       }));
 
-    for (const id of ids) {
+    for (const id of raster) {
       const labels = rowButtons(id).map((button) => button.label);
       expect(labels.slice(-2)).toEqual(['Toggle layer active', 'Toggle lock']);
+      expect(labels).not.toContain('Use in generation');
+      expect(labels).not.toContain('Show on canvas');
     }
-    // The canvas-only marker appears only where it applies, ahead of the eye column rather than in it.
-    expect(
-      rowButtons('masked')
-        .map((button) => button.label)
-        .slice(-3)
-    ).toEqual(['Show on canvas', 'Toggle layer active', 'Toggle lock']);
+    // Layers and groups alike; the canvas-hidden mask carries that state on its eye, not on an extra marker.
+    for (const id of overlays) {
+      expect(rowButtons(id).map((button) => button.label)).toEqual([
+        ...(id === 'mg' ? ['Collapse group'] : []),
+        'Use in generation',
+        'Show on canvas',
+        'Toggle lock',
+      ]);
+    }
 
-    const columnLefts = (label: string) =>
-      new Set(ids.map((id) => rowButtons(id).find((button) => button.label === label)!.rect.left));
-    expect(columnLefts('Toggle layer active').size).toBe(1);
-    expect(columnLefts('Toggle lock').size).toBe(1);
+    const leftOf = (id: string, label: string) => rowButtons(id).find((button) => button.label === label)!.rect.left;
+    const eyes = new Set([
+      ...raster.map((id) => leftOf(id, 'Toggle layer active')),
+      ...overlays.map((id) => leftOf(id, 'Show on canvas')),
+    ]);
+    expect(eyes.size).toBe(1);
+    expect(new Set([...raster, ...overlays].map((id) => leftOf(id, 'Toggle lock'))).size).toBe(1);
+    expect(new Set(overlays.map((id) => leftOf(id, 'Use in generation'))).size).toBe(1);
+    // The dot is as wide as the eye beside it.
+    const dot = rowButtons('masked').find((button) => button.label === 'Use in generation')!.rect;
+    const eye = rowButtons('masked').find((button) => button.label === 'Show on canvas')!.rect;
+    expect(dot.width).toBe(eye.width);
+    expect(dot.right).toBeLessThan(eye.left);
     // Nesting indents the leading edge only.
     const thumbnailLeft = (id: string) =>
       host!.querySelector(`[data-layer-row-id="${id}"] [data-testid="thumbnail"]`)!.getBoundingClientRect().left;
     expect(thumbnailLeft('deep') - thumbnailLeft('inner')).toBe(LAYER_TREE_INDENT_PX);
     expect(thumbnailLeft('inner') - thumbnailLeft('top')).toBe(LAYER_TREE_INDENT_PX);
+  });
+
+  it('keeps a long name truncated beside the overlay controls at a narrow panel width', async () => {
+    const name = 'A regional guidance layer with a very long descriptive name';
+    await renderTree([layerContract('long', 'regional_guidance', { name })]);
+    const panel = host!.querySelector<HTMLElement>('div[style*="width: 480px"]')!;
+    panel.style.width = '220px';
+    await settle();
+    const row = treeitem(name);
+    const lock = row.querySelector('button[aria-label="Toggle lock"]')!.getBoundingClientRect();
+    const dot = row.querySelector('button[aria-label="Use in generation"]')!.getBoundingClientRect();
+    expect(lock.right).toBeLessThanOrEqual(row.getBoundingClientRect().right);
+    // The name gives way to the controls: it ends before the dot and its text is cut short.
+    const label = row.querySelector<HTMLElement>(`[title="${name}"]`)!;
+    const text = label.firstElementChild as HTMLElement;
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(dot.left);
+    expect(text.scrollWidth).toBeGreaterThan(text.clientWidth);
+  });
+
+  it('keeps a long raster name truncated before its eye, the empty dot slot included', async () => {
+    const name = 'A raster layer with a very long descriptive name that cannot fit';
+    await renderTree([paint('long', name)]);
+    const panel = host!.querySelector<HTMLElement>('div[style*="width: 480px"]')!;
+    panel.style.width = '220px';
+    await settle();
+    const row = treeitem(name);
+    const eye = row.querySelector('button[aria-label="Toggle layer active"]')!.getBoundingClientRect();
+    const lock = row.querySelector('button[aria-label="Toggle lock"]')!.getBoundingClientRect();
+    expect(lock.right).toBeLessThanOrEqual(row.getBoundingClientRect().right);
+    const label = row.querySelector<HTMLElement>(`[title="${name}"]`)!;
+    const text = label.firstElementChild as HTMLElement;
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(eye.left);
+    expect(text.scrollWidth).toBeGreaterThan(text.clientWidth);
   });
 
   it('fills a group’s leading box with its preview pile, whatever the number of cards', async () => {
@@ -917,13 +997,12 @@ describe('LayersTree selection, surfaces and structure', () => {
       [...host!.querySelectorAll<HTMLElement>(`[role="tree"] ${selector}`)].map(
         (element) => element.getBoundingClientRect().left
       );
-    const rowLefts = (label: string) =>
-      ['top', 'mask', 'mg', 'nested'].flatMap((id) =>
-        lefts(`[data-layer-row-id="${id}"] button[aria-label="${label}"]`)
-      );
+    const rowLefts = (ids: readonly string[], label: string) =>
+      ids.flatMap((id) => lefts(`[data-layer-row-id="${id}"] button[aria-label="${label}"]`));
 
-    const eyes = rowLefts('Toggle layer active');
-    const locks = rowLefts('Toggle lock');
+    // The raster eye shows and generates; an overlay's eye only shows. Either way it is the row's eye column.
+    const eyes = [...rowLefts(['top'], 'Toggle layer active'), ...rowLefts(['mask', 'mg', 'nested'], 'Show on canvas')];
+    const locks = rowLefts(['top', 'mask', 'mg', 'nested'], 'Toggle lock');
     expect(eyes).toHaveLength(4);
     expect(locks).toHaveLength(4);
     // The inpaint header's eye, and both headers' New buttons (raster has no eye).
@@ -939,22 +1018,188 @@ describe('LayersTree selection, surfaces and structure', () => {
     }
   });
 
-  it('marks an overlay hidden on the canvas only, and brings it back from the row', async () => {
-    await renderTree([
-      layerContract('shown', 'inpaint_mask', { name: 'Shown' }),
-      layerContract('masked', 'inpaint_mask', { isHidden: true, name: 'Masked' }),
-    ]);
-    const showOnCanvas = (id: string) =>
-      host!.querySelector<HTMLButtonElement>(`[data-layer-row-id="${id}"] button[aria-label="Show on canvas"]`);
-    expect(showOnCanvas('shown')).toBeNull();
-    // Still used by generation, so its own eye stays open.
-    expect(
-      host!.querySelector('[data-layer-row-id="masked"] button[aria-label="Toggle layer active"]')
-    ).toHaveAttribute('aria-pressed', 'true');
-    await act(() => userEvent.click(showOnCanvas('masked')!));
-    expect(committedEdits.at(-1)!.forward).toEqual({
-      type: 'setCanvasLayersHidden',
-      updates: [{ id: 'masked', isHidden: false }],
+  describe('overlay rows keep generation and canvas visibility apart', () => {
+    const leaf = (id: string) => compileDocumentLeaves(harnessDocument).find((entry) => entry.id === id)!;
+    const control = (id: string, label: string) =>
+      host!.querySelector<HTMLButtonElement>(`[data-layer-row-id="${id}"] button[aria-label="${label}"]`)!;
+    const dotOf = (id: string) => control(id, 'Use in generation');
+    const eyeOf = (id: string) => control(id, 'Show on canvas');
+    const state = (id: string) => {
+      const { contributionEnabled, documentHidden, layer } = leaf(id);
+      return { contributionEnabled, documentHidden, isEnabled: layer.isEnabled, isHidden: isNodeHidden(layer) };
+    };
+
+    it.each([
+      ['inpaint_mask', 'Mask'],
+      ['regional_guidance', 'Region'],
+      ['control', 'Control'],
+    ] as const)(
+      'hides a %s on the canvas yet keeps it in generation, and the dot takes it out of both',
+      async (type, name) => {
+        await renderTree([layerContract('overlay', type, { name })]);
+        expect(dotOf('overlay')).toHaveAttribute('aria-pressed', 'true');
+        expect(eyeOf('overlay')).toHaveAttribute('aria-pressed', 'true');
+
+        await act(() => userEvent.click(eyeOf('overlay')));
+        expect(state('overlay')).toEqual({
+          contributionEnabled: true,
+          documentHidden: true,
+          isEnabled: true,
+          isHidden: true,
+        });
+        expect(eyeOf('overlay')).toHaveAttribute('aria-pressed', 'false');
+        expect(eyeOf('overlay').querySelector('svg.lucide-eye-off')).not.toBeNull();
+        expect(dotOf('overlay')).toHaveAttribute('aria-pressed', 'true');
+        expect(output('selected-layer')).toBe('none');
+
+        await act(() => userEvent.click(dotOf('overlay')));
+        expect(state('overlay')).toEqual({
+          contributionEnabled: false,
+          documentHidden: true,
+          isEnabled: false,
+          isHidden: true,
+        });
+        expect(dotOf('overlay')).toHaveAttribute('aria-pressed', 'false');
+
+        // Out of generation the eye stays operable, keeping its own state for when the dot comes back on.
+        expect(eyeOf('overlay').disabled).toBe(false);
+        await act(() => userEvent.click(eyeOf('overlay')));
+        expect(state('overlay')).toEqual({
+          contributionEnabled: false,
+          documentHidden: false,
+          isEnabled: false,
+          isHidden: false,
+        });
+        // Shown, but dimmed like the muted name: an excluded layer is not drawn either.
+        const eyeColor = () => getComputedStyle(eyeOf('overlay')).color;
+        const lockColor = getComputedStyle(control('overlay', 'Toggle lock')).color;
+        await expect.poll(eyeColor).not.toBe(lockColor);
+        await act(() => userEvent.click(dotOf('overlay')));
+        expect(state('overlay')).toEqual({
+          contributionEnabled: true,
+          documentHidden: false,
+          isEnabled: true,
+          isHidden: false,
+        });
+        await expect.poll(eyeColor).toBe(lockColor);
+      }
+    );
+
+    it('drives an overlay group from its own dot and eye, and shows its members gated by it', async () => {
+      await renderTree([
+        groupContract('rg', [layerContract('member', 'regional_guidance', { name: 'Member' })], { name: 'Regions' }),
+        layerContract('loose', 'regional_guidance', { isEnabled: false, name: 'Loose' }),
+      ]);
+      await act(() => userEvent.click(treeitem('Regions').querySelector('button[aria-label="Expand group"]')!));
+      const dotFill = (id: string) => getComputedStyle(dotOf(id), '::before').backgroundColor;
+      const dotRing = (id: string) => getComputedStyle(dotOf(id), '::before').borderColor;
+      const ringStyle = (id: string) => getComputedStyle(dotOf(id), '::before').borderTopStyle;
+      const description = (id: string) => {
+        const describedBy = dotOf(id).getAttribute('aria-describedby');
+        return describedBy ? document.getElementById(describedBy)?.textContent : null;
+      };
+      expect(description('member')).toBeNull();
+      const accent = dotFill('member');
+      expect(accent).not.toBe('rgba(0, 0, 0, 0)');
+
+      await act(() => userEvent.click(dotOf('rg')));
+      expect(getDocumentIndex(harnessDocument).byId.get('rg')!.node.isEnabled).toBe(false);
+      // The member is on by itself but left out by the group: a hollow, dashed accent ring, unlike the solid ring of a
+      // dot that is off, and it says why to assistive tech rather than only reporting itself pressed.
+      expect(state('member')).toMatchObject({ contributionEnabled: false, isEnabled: true });
+      expect(dotOf('member')).toHaveAttribute('aria-pressed', 'true');
+      expect(description('member')).toBe('Left out of generation by a group');
+      await expect.poll(() => dotFill('member')).toBe('rgba(0, 0, 0, 0)');
+      expect(dotRing('member')).toBe(accent);
+      expect(ringStyle('member')).toBe('dashed');
+      expect(dotFill('loose')).toBe('rgba(0, 0, 0, 0)');
+      expect(ringStyle('loose')).toBe('solid');
+      expect(description('loose')).toBeNull();
+      await act(() => userEvent.click(dotOf('rg')));
+      expect(ringStyle('member')).toBe('solid');
+      expect(description('member')).toBeNull();
+
+      await act(() => userEvent.click(eyeOf('rg')));
+      expect(isNodeHidden(getDocumentIndex(harnessDocument).byId.get('rg')!.node)).toBe(true);
+      // Hidden by the group, still generated; the member's eye reports it and yields to the group's.
+      expect(state('member')).toEqual({
+        contributionEnabled: true,
+        documentHidden: true,
+        isEnabled: true,
+        isHidden: false,
+      });
+      expect(eyeOf('member')).toHaveAttribute('aria-pressed', 'false');
+      expect(eyeOf('member').disabled).toBe(true);
+      expect(dotOf('member').disabled).toBe(false);
+    });
+
+    it('labels the undo step by the axis each control changed, naming groups as their menus do', async () => {
+      await renderTree([
+        layerContract('mask', 'inpaint_mask', { name: 'Mask' }),
+        groupContract('mg', [layerContract('inner', 'inpaint_mask', { name: 'Inner' })], { name: 'Masks' }),
+        paint('art', 'Art'),
+        groupContract('rg', [paint('deep', 'Deep')], { name: 'Paints' }),
+      ]);
+      const labels: string[] = [];
+      const commit = vi.spyOn(engine.layers, 'commitPrepared').mockImplementation((label, edit) => {
+        labels.push(label);
+        committedEdits.push(edit);
+        dispatchExternal(edit.forward);
+        return { status: 'committed' };
+      });
+      try {
+        await act(() => userEvent.click(dotOf('mask')));
+        await act(() => userEvent.click(dotOf('mask')));
+        await act(() => userEvent.click(eyeOf('mask')));
+        await act(() => userEvent.click(control('art', 'Toggle layer active')));
+        await act(() => userEvent.click(dotOf('mg')));
+        await act(() => userEvent.click(control('rg', 'Toggle layer active')));
+      } finally {
+        commit.mockRestore();
+      }
+      expect(labels).toEqual([
+        'Exclude from generation',
+        'Use in generation',
+        'Hide on canvas',
+        'Hide layer',
+        'Exclude group from generation',
+        'Hide group',
+      ]);
+    });
+
+    it('says why an overlay child row has no effect in the overlay’s words, and a raster one in its own', async () => {
+      await renderTree([
+        layerContract('mask', 'inpaint_mask', {
+          isEnabled: false,
+          name: 'Mask',
+          noise: { isEnabled: true, level: 0.2 },
+        }),
+        layerContract('art', 'raster', {
+          adjustments: [{ id: 'a1', isEnabled: true, saturation: 0.1, type: 'hsl' }],
+          isEnabled: false,
+          name: 'Art',
+        }),
+      ]);
+      // Polled: the previous row's tooltip can still be fading out when the next one is hovered.
+      const expectTooltip = async (row: string, text: string) => {
+        const toggle = treeitem(row).querySelector('button[aria-label="Toggle active"]')!;
+        await act(() => userEvent.hover(toggle));
+        await expect
+          .poll(() => [...document.querySelectorAll('[role="tooltip"]')].map((tooltip) => tooltip.textContent))
+          .toContain(text);
+        await act(() => userEvent.unhover(toggle));
+        await expect.poll(() => document.querySelectorAll('[role="tooltip"]').length).toBe(0);
+      };
+      await expectTooltip('Noise', 'The layer is left out of generation');
+      await expectTooltip('Saturation', 'The layer is hidden');
+    });
+
+    it('keeps one tab stop with both overlay controls on the row', async () => {
+      await renderTree([layerContract('mask', 'inpaint_mask', { name: 'Mask' })]);
+      expect(tabStops()).toHaveLength(1);
+      expect(tabStops()[0]!.getAttribute('role')).toBe('treeitem');
+      await act(() => userEvent.click(dotOf('mask')));
+      expect(document.activeElement).toBe(treeitem('Mask'));
     });
   });
 
@@ -1003,6 +1248,7 @@ describe('LayersTree selection, surfaces and structure', () => {
       reportStructuralCommit: vi.fn(),
       reportPreparedCommit: vi.fn(),
       reportLayerOperation: vi.fn(),
+      reportMergeDownRefusal: vi.fn(),
       reportTransformRefusal: vi.fn(),
       t: (key) => key,
     };

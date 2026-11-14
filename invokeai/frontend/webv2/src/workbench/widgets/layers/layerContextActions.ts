@@ -12,9 +12,11 @@ import type { LucideIcon } from 'lucide-react';
 import {
   getDocumentIndex,
   getSourceContentRect,
+  isGroupNode,
   isEmptyPolygonShape,
   isHideableLayer,
   isNodeHidden,
+  isOverlayStack,
   isPixelBackedLayer,
   lookupLayerBelow,
 } from '@workbench/canvas-engine/api';
@@ -27,12 +29,12 @@ import {
   ArrowUpToLineIcon,
   BookmarkIcon,
   BookmarkMinusIcon,
+  CircleDotIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
   CropIcon,
   DropletIcon,
-  EyeClosedIcon,
   EyeIcon,
   FilmIcon,
   FingerprintPatternIcon,
@@ -323,6 +325,94 @@ const targetNodes = (context: LayerContextActionState) => {
 };
 const allTargetsEnabled = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isEnabled);
+interface EnabledToggleLabel {
+  readonly defaultLabel: string;
+  readonly icon: LucideIcon;
+  readonly key: string;
+}
+interface EnabledToggleLabels {
+  readonly off: EnabledToggleLabel;
+  readonly on: EnabledToggleLabel;
+}
+const toggleLabel = (key: string, defaultLabel: string, icon: LucideIcon): EnabledToggleLabel => ({
+  defaultLabel,
+  icon,
+  key: `widgets.layers.actions.${key}`,
+});
+// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility
+// is its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each.
+// The overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
+// leaves the layer out, which no action sets).
+const OVERLAY_LAYER: EnabledToggleLabels = {
+  off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleIcon),
+  on: toggleLabel('useInGeneration', 'Use in generation', CircleDotIcon),
+};
+const OVERLAY_GROUP: EnabledToggleLabels = {
+  off: toggleLabel('excludeGroupFromGeneration', 'Exclude group from generation', CircleIcon),
+  on: toggleLabel('useGroupInGeneration', 'Use group in generation', CircleDotIcon),
+};
+const OVERLAY_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('excludeSelectedFromGeneration', 'Exclude selected from generation', CircleIcon),
+  on: toggleLabel('useSelectedInGeneration', 'Use selected in generation', CircleDotIcon),
+};
+const RASTER_LAYER: EnabledToggleLabels = {
+  off: toggleLabel('hideLayer', 'Hide layer', EyeOffIcon),
+  on: toggleLabel('showLayer', 'Show layer', EyeIcon),
+};
+const RASTER_GROUP: EnabledToggleLabels = {
+  off: toggleLabel('hideGroup', 'Hide group', EyeOffIcon),
+  on: toggleLabel('showGroup', 'Show group', EyeIcon),
+};
+const RASTER_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('hideSelected', 'Hide selected', EyeOffIcon),
+  on: toggleLabel('showSelected', 'Show selected', EyeIcon),
+};
+const MIXED_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('turnOffSelected', 'Turn off selected', EyeOffIcon),
+  on: toggleLabel('turnOnSelected', 'Turn on selected', EyeIcon),
+};
+
+/**
+ * How turning the enabled flag of `targets` off (`turnOff`) or on is named, wherever it is offered: the row's dot or
+ * eye, the layer and group menus, and the undo step each records.
+ */
+export const enabledToggleLabel = (
+  document: Pick<CanvasDocumentContractV3, 'stacks'>,
+  targets: readonly string[],
+  turnOff: boolean
+): EnabledToggleLabel => {
+  const index = getDocumentIndex(document);
+  const entries = targets.flatMap((id) => index.byId.get(id) ?? []);
+  const overlays = entries.filter((entry) => isOverlayStack(entry.stack)).length;
+  const labels =
+    entries.length > 1
+      ? overlays === entries.length
+        ? OVERLAY_SELECTION
+        : overlays === 0
+          ? RASTER_SELECTION
+          : MIXED_SELECTION
+      : overlays === 1
+        ? isGroupNode(entries[0]!.node)
+          ? OVERLAY_GROUP
+          : OVERLAY_LAYER
+        : entries[0] && isGroupNode(entries[0].node)
+          ? RASTER_GROUP
+          : RASTER_LAYER;
+  return turnOff ? labels.off : labels.on;
+};
+const enabledActionLabel = (context: LayerContextActionState): EnabledToggleLabel =>
+  enabledToggleLabel(context.document, actionTargets(context), allTargetsEnabled(context));
+/** The overlay targets, which are the ones Hide on canvas changes, are all hidden already: the item shows them. */
+const allOverlayTargetsHidden = (context: LayerContextActionState): boolean => {
+  if (!isMultiTarget(context)) {
+    return isNodeHidden(context.layer);
+  }
+  const index = getDocumentIndex(context.document);
+  return actionTargets(context).every((id) => {
+    const entry = index.byId.get(id);
+    return !entry || !isOverlayStack(entry.stack) || isNodeHidden(entry.node);
+  });
+};
 const allTargetsLocked = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isLocked);
 const allTargetsInpaintMasks = (context: LayerContextActionState): boolean =>
@@ -528,7 +618,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
     order: 10,
     section: 'primary',
-    supportedLayerTypes: ['raster', 'control'],
+    supportedLayerTypes: ['raster', 'control', 'inpaint_mask', 'regional_guidance'],
   },
   {
     defaultLabel: 'Rename',
@@ -962,26 +1052,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
-  // One visibility model: hiding a layer takes it off the canvas and out of generation alike.
+  // Raster layers have one axis: hiding takes a layer off the canvas and out of generation alike. Overlays name the
+  // same flag for generation (see enabledToggleLabel).
   {
     defaultLabel: 'Show or hide layer',
-    getDefaultLabel: (context) =>
-      isMultiTarget(context)
-        ? allTargetsEnabled(context)
-          ? 'Hide selected'
-          : 'Show selected'
-        : context.layer.isEnabled
-          ? 'Hide layer'
-          : 'Show layer',
-    getIcon: (context) => (allTargetsEnabled(context) ? EyeOffIcon : EyeIcon),
-    getLabelKey: (context) =>
-      isMultiTarget(context)
-        ? allTargetsEnabled(context)
-          ? 'widgets.layers.actions.hideSelected'
-          : 'widgets.layers.actions.showSelected'
-        : context.layer.isEnabled
-          ? 'widgets.layers.actions.hideLayer'
-          : 'widgets.layers.actions.showLayer',
+    getDefaultLabel: (context) => enabledActionLabel(context).defaultLabel,
+    getIcon: (context) => enabledActionLabel(context).icon,
+    getLabelKey: (context) => enabledActionLabel(context).key,
     handler: ({ effects }) => effects.toggleVisibility(),
     icon: EyeOffIcon,
     id: 'toggle-visibility',
@@ -994,13 +1071,26 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   // Overlays only: off the canvas to see the image under them, still used by generation.
   {
-    defaultLabel: 'Hide on canvas only',
-    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show on canvas' : 'Hide on canvas only'),
-    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeClosedIcon),
+    defaultLabel: 'Hide on canvas',
+    getDefaultLabel: (context) =>
+      isMultiTarget(context)
+        ? allOverlayTargetsHidden(context)
+          ? 'Show selected on canvas'
+          : 'Hide selected on canvas'
+        : allOverlayTargetsHidden(context)
+          ? 'Show on canvas'
+          : 'Hide on canvas',
+    getIcon: (context) => (allOverlayTargetsHidden(context) ? EyeIcon : EyeOffIcon),
     getLabelKey: (context) =>
-      isNodeHidden(context.layer) ? 'widgets.layers.actions.showOnCanvas' : 'widgets.layers.actions.hideOnCanvas',
+      isMultiTarget(context)
+        ? allOverlayTargetsHidden(context)
+          ? 'widgets.layers.actions.showSelectedOnCanvas'
+          : 'widgets.layers.actions.hideSelectedOnCanvas'
+        : allOverlayTargetsHidden(context)
+          ? 'widgets.layers.actions.showOnCanvas'
+          : 'widgets.layers.actions.hideOnCanvas',
     handler: ({ effects }) => effects.toggleHidden(),
-    icon: EyeClosedIcon,
+    icon: EyeOffIcon,
     id: 'toggle-hidden',
     isEnabled: (context) => isOperationFree(context) && !context.hiddenByAncestor,
     isVisible: (context) => isHideableLayer(context.layer),

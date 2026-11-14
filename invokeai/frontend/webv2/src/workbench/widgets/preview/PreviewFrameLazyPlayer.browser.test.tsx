@@ -25,7 +25,8 @@ vi.mock('@platform/ui/video-player/VideoPlayer', async (importOriginal) => {
   return importOriginal();
 });
 
-vi.mock('@features/identity', () => ({
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getAuthSession: () => ({ accountEpoch: 1 }),
   refreshProtectedMediaCookie: () => Promise.resolve(false),
 }));

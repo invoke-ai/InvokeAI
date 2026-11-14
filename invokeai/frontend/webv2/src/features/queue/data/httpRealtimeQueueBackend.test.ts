@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const server = vi.hoisted(() => ({ claimQueueItemDelivery: vi.fn(), retryItemsById: vi.fn() }));
+const server = vi.hoisted(() => ({
+  cancelQueueItem: vi.fn(),
+  claimQueueItemDelivery: vi.fn(),
+  retryItemsById: vi.fn(),
+}));
 vi.mock('./serverApi', async (importOriginal) => ({ ...(await importOriginal<object>()), ...server }));
 
-import { queueBackend } from './httpRealtimeQueueBackend';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { RequestDeadlineError } from '@platform/transport/http';
+
+import { CANCEL_ITEM_TIMEOUT_MS, queueBackend } from './httpRealtimeQueueBackend';
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -59,5 +66,60 @@ describe('queueBackend delivery claims', () => {
     await expect(queueBackend.claimItemDelivery(99, 'claim', 'tab:b')).resolves.toEqual({ kind: 'held', retryInMs: 1 });
     await expect(queueBackend.claimItemDelivery(99, 'confirm', 'tab:a')).resolves.toEqual({ kind: 'delivered' });
     expect(server.claimQueueItemDelivery).toHaveBeenCalledWith(99, 'confirm', 'tab:a');
+  });
+});
+
+describe('queueBackend item cancel', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('gives up on a cancel the server never answers, aborting its request', async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    server.cancelQueueItem.mockImplementation(
+      (_itemId: number, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          requestSignal = signal;
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        })
+    );
+
+    const cancel = queueBackend.cancelItem(7);
+    const settled = expect(cancel).rejects.toBeInstanceOf(RequestDeadlineError);
+    await vi.advanceTimersByTimeAsync(CANCEL_ITEM_TIMEOUT_MS);
+
+    await settled;
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('answers for no account once the one that asked has signed out, aborting its request', async () => {
+    accountLifecycle.activate('user-a');
+    let requestSignal: AbortSignal | undefined;
+    let answer!: (dto: unknown) => void;
+    // A server that answers whatever happens to the request.
+    server.cancelQueueItem.mockImplementation(
+      (_itemId: number, signal: AbortSignal) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          answer = resolve;
+        })
+    );
+
+    const cancel = queueBackend.cancelItem(7);
+    const settled = expect(cancel).rejects.toThrow('no longer active');
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    answer({
+      batch_id: 'batch',
+      created_at: '2026-11-14T00:00:00',
+      item_id: 7,
+      session_id: 's',
+      status: 'canceled',
+      updated_at: '2026-11-14T00:00:00',
+    });
+
+    await settled;
+    expect(requestSignal?.aborted).toBe(true);
   });
 });

@@ -6,7 +6,7 @@ import type {
   PreparedDocumentEdit,
 } from '@workbench/canvas-engine/api';
 import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
-import type { CanvasOperationState } from '@workbench/canvas-operations/api';
+import type { CanvasOperationState, SamSessionSnapshot } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
@@ -180,6 +180,24 @@ const filterSession = (): FilterOperationSessionState => ({
   status: 'ready',
 });
 
+const samSession = (patch: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot => ({
+  applyPolygonRefinement: false,
+  autoProcess: true,
+  error: null,
+  hasPreview: false,
+  input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+  invert: false,
+  isolatedPreview: true,
+  layerName: 'Portrait',
+  layerType: 'raster',
+  model: 'segment-anything-2-large',
+  pointLabel: 'include',
+  retrying: false,
+  sourceRect: { height: 768, width: 1024, x: 0, y: 0 },
+  status: 'ready',
+  ...patch,
+});
+
 const createFakeOperations = () => {
   const listeners = new Set<() => void>();
   const subscribe = (listener: () => void) => {
@@ -187,16 +205,38 @@ const createFakeOperations = () => {
     return () => listeners.delete(listener);
   };
   let filter: FilterOperationSessionState | null = null;
+  let sam: SamSessionSnapshot | null = null;
   let state: CanvasOperationState = { status: 'idle' };
   return {
+    applySelectObjectSession: vi.fn(),
     cancelFilterOperation: vi.fn(),
+    cancelSelectObjectSession: vi.fn(),
     commitFilterOperation: vi.fn(),
     getFilterSessionState: () => filter,
     getOperationState: () => state,
-    getSamSessionState: () => null,
+    getSamSessionState: () => sam,
     processFilterOperation: vi.fn(),
+    processSelectObjectSession: vi.fn(() => Promise.resolve('completed' as const)),
     resetFilterOperation: vi.fn(),
+    resetSelectObjectSession: vi.fn(() => 'updated' as const),
+    saveSelectObjectSession: vi.fn(),
     setFilterOperationAutoProcess: vi.fn(),
+    /** Starts Select Object on a fake session the test then moves through its states. */
+    startSam: (patch: Partial<SamSessionSnapshot> = {}) => {
+      sam = samSession(patch);
+      state = {
+        error: null,
+        identity: { kind: 'select-object', layerId: 'layer-1', projectId: 'p' },
+        phase: 'ready',
+        status: 'active',
+      };
+      listeners.forEach((listener) => listener());
+    },
+    setSam: (patch: Partial<SamSessionSnapshot>) => {
+      sam = { ...sam!, ...patch };
+      listeners.forEach((listener) => listener());
+    },
+    updateSelectObjectSession: vi.fn(() => 'updated' as const),
     start: (running: boolean) => {
       filter = running ? filterSession() : null;
       state = running
@@ -531,7 +571,7 @@ describe('Properties pane', () => {
     // The log track spends its middle on the sizes text is set at.
     const frame = slider.element().closest<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
     const thumb = slider.element().parentElement!.querySelector('[data-part="thumb"]')!.getBoundingClientRect();
-    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 6) / (frame.width - 12);
     expect(thumbFraction).toBeGreaterThan(0.4);
     expect(thumbFraction).toBeLessThan(0.6);
     await act(() => (slider.element() as HTMLElement).focus());
@@ -596,7 +636,7 @@ describe('Properties pane', () => {
     await expect.element(page.getByRole('button', { exact: true, name: `Gradient stop at ${moved}%` })).toBeVisible();
   });
 
-  it('keeps the Position row identity across move, frame and transform, with the transform footer live', async () => {
+  it('keeps the Position row identity across move, frame and transform, with the transform actions live', async () => {
     await mount(PropertiesPane, 'layer');
     await act(() => engine!.tools.setTool('move'));
     await settle();
@@ -609,7 +649,7 @@ describe('Properties pane', () => {
     await act(() => engine!.tools.setTool('transform'));
     await settle();
     expect(page.getByRole('spinbutton', { exact: true, name: 'X' }).element()).toBe(xField);
-    // No session and no float: Apply/Cancel are pinned but disabled.
+    // No session and no float: Apply/Cancel close the Tool section, disabled.
     await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Cancel' })).toBeDisabled();
   });
@@ -692,7 +732,15 @@ describe('Properties pane', () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
     await settle();
-    await act(() => page.getByRole('slider', { exact: true, name: 'Brush size' }).element().focus());
+    const slider = page.getByRole('slider', { exact: true, name: 'Brush size' }).element();
+    await act(() => slider.focus());
+    // Scrolled down to the tool: the operation's Cancel, inline in its section above, must come into view.
+    const viewport = [...host!.querySelectorAll<HTMLElement>('*')].find(
+      (element) => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY !== 'visible'
+    );
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
     await act(() => operations!.start(true));
     await settle();
     const operationSection = host!.querySelector('[role="group"][aria-label="Operation"]')!;
@@ -702,10 +750,204 @@ describe('Properties pane', () => {
     await expect.element(cancel).toBeEnabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
     expect(document.activeElement).toBe(cancel.element());
+    const hostRect = host!.getBoundingClientRect();
+    const cancelRect = cancel.element().getBoundingClientRect();
+    expect(cancelRect.top).toBeGreaterThanOrEqual(hostRect.top);
+    expect(cancelRect.bottom).toBeLessThanOrEqual(hostRect.bottom);
     expect(host!.querySelector('[role="group"][inert]')?.getAttribute('aria-label')).toBe('Tool');
     await act(() => operations!.start(false));
     await settle();
     expect(host!.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('Select Object properties', () => {
+  beforeEach(() => resetPropertyGroupCollapse());
+
+  const operationSection = () => host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]')!;
+  const startSam = async (patch: Partial<SamSessionSnapshot> = {}, width?: number) => {
+    await mount(PropertiesPane, 'none', width ? { width } : undefined);
+    await act(() => operations!.startSam(patch));
+    await settle();
+  };
+
+  it('lays points, box and settings on pane rows and switches input type by intent', async () => {
+    await startSam();
+
+    await expect.element(page.getByRole('radiogroup', { name: 'Select by' })).toBeVisible();
+    await expect.element(page.getByRole('radio', { name: 'Include 0' })).toBeChecked();
+    await expect.element(page.getByText('Drag on the canvas')).toBeVisible();
+    expect(page.getByRole('radiogroup', { name: 'Points' }).element().getAttribute('aria-describedby')).toBeTruthy();
+    await userEvent.click(page.getByText('Settings'));
+    await expect.element(page.getByRole('combobox', { name: 'Model' })).toBeVisible();
+    for (const name of ['Refine edges', 'Auto-update preview', 'Show only the object']) {
+      await expect.element(page.getByRole('checkbox', { name })).toBeVisible();
+    }
+
+    await userEvent.click(page.getByText('Prompt', { exact: true }));
+    expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ inputType: 'prompt' });
+  });
+
+  it('labels new points from the Points row', async () => {
+    await startSam();
+
+    await userEvent.click(page.getByText('Exclude 0'));
+
+    expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ pointLabel: 'exclude' });
+  });
+
+  it('clears only the box from its row', async () => {
+    const input = {
+      bbox: { height: 8, width: 12, x: 1, y: 2 },
+      excludePoints: [{ x: 3, y: 4 }],
+      includePoints: [{ x: 1, y: 2 }],
+      type: 'visual' as const,
+    };
+    await startSam({ input });
+
+    await expect.element(page.getByText('Set', { exact: true })).toBeVisible();
+    const clear = page.getByRole('button', { name: 'Clear box' });
+    await userEvent.click(clear);
+
+    expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ input: { ...input, bbox: null } });
+
+    // Without a box the same button stays in the row, disabled rather than gone.
+    const clearElement = clear.element();
+    const clearRect = clearElement.getBoundingClientRect();
+    await act(() => operations!.setSam({ input: { ...input, bbox: null } }));
+    expect(clear.element()).toBe(clearElement);
+    expect(clearElement.getBoundingClientRect()).toEqual(clearRect);
+    await expect.element(clear).toBeDisabled();
+  });
+
+  it('finds the prompted object on Enter whatever auto-update says, and offers Find object while manual', async () => {
+    await startSam({ input: { prompt: 'cat', type: 'prompt' } });
+    const prompt = page.getByRole('textbox', { name: 'Prompt' });
+    expect(page.getByRole('button', { name: 'Find object' }).query()).toBeNull();
+
+    await userEvent.click(prompt);
+    await userEvent.keyboard('{Enter}');
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
+
+    await act(() => operations!.setSam({ autoProcess: false }));
+    await userEvent.click(page.getByRole('button', { name: 'Find object' }));
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers Find object to retry a failed run with auto-update on, until that retry has finished', async () => {
+    const input = { bbox: null, excludePoints: [], includePoints: [{ x: 4, y: 5 }], type: 'visual' as const };
+    await startSam({ input });
+    const findObject = page.getByRole('button', { name: 'Find object' });
+    expect(findObject.query()).toBeNull();
+
+    await act(() => operations!.setSam({ error: { code: 'not-ready' }, status: 'error' }));
+    await expect.element(findObject).toBeEnabled();
+    await userEvent.click(findObject);
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
+
+    // The retry clears the error as it starts; the button stays, busy, while the session says it retries.
+    await act(() => operations!.setSam({ error: null, retrying: true, status: 'processing-sam' }));
+    await expect.element(findObject).toBeDisabled();
+    await act(() => operations!.setSam({ hasPreview: true, retrying: false, status: 'ready' }));
+    expect(findObject.query()).toBeNull();
+  });
+
+  it('keeps Find object for a retry started by Enter in the prompt', async () => {
+    await startSam({
+      error: { code: 'queue', detail: 'AttributeError' },
+      input: { prompt: 'cat', type: 'prompt' },
+      status: 'error',
+    });
+    const findObject = page.getByRole('button', { name: 'Find object' });
+    await expect.element(findObject).toBeEnabled();
+
+    await userEvent.click(page.getByRole('textbox', { name: 'Prompt' }));
+    await userEvent.keyboard('{Enter}');
+    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
+    await act(() => operations!.setSam({ error: null, retrying: true, status: 'uploading' }));
+
+    await expect.element(findObject).toBeDisabled();
+  });
+
+  it('leaves a failed apply to Apply: no Find object with auto-update on', async () => {
+    await startSam({ error: { code: 'commit-failed', detail: 'commit failed' }, hasPreview: true, status: 'error' });
+
+    await expect
+      .element(page.getByRole('alert'))
+      .toHaveTextContent('Select Object could not apply or save the result.');
+    expect(page.getByRole('button', { name: 'Find object' }).query()).toBeNull();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
+  });
+
+  it('leaves Enter to an IME that is composing, and does nothing on an empty prompt', async () => {
+    await startSam({ input: { prompt: 'cat', type: 'prompt' } });
+    const prompt = page.getByRole('textbox', { name: 'Prompt' }).element();
+    const pressEnter = (init: KeyboardEventInit) =>
+      act(() => {
+        prompt.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', ...init }));
+      });
+
+    await pressEnter({ isComposing: true });
+    // Safari confirms a candidate after compositionend; keyCode 229 is the only sign.
+    await pressEnter({ keyCode: 229 } as KeyboardEventInit);
+    expect(operations!.processSelectObjectSession).not.toHaveBeenCalled();
+
+    await act(() => operations!.setSam({ input: { prompt: '  ', type: 'prompt' } }));
+    await pressEnter({});
+    expect(operations!.processSelectObjectSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Find object label while it runs and reports the phase beside the section title', async () => {
+    await startSam({ autoProcess: false, input: { prompt: 'cat', type: 'prompt' } });
+    const status = operationSection().querySelector('[role="status"]')!;
+    expect(status.textContent).toBe('');
+    const promptTop = page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top;
+
+    await act(() => operations!.setSam({ status: 'processing-sam' }));
+
+    expect(operationSection().querySelector('[role="status"]')).toBe(status);
+    expect(status.textContent).toBe('Finding object…');
+    await expect.element(page.getByRole('button', { name: 'Find object' })).toBeDisabled();
+    expect(page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top).toBe(promptTop);
+  });
+
+  it('puts an error after the groups and actions with its technical detail, leaving both in place', async () => {
+    await startSam({ input: { prompt: 'cat', type: 'prompt' } });
+    const promptTop = page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top;
+    const cancel = page.getByRole('button', { exact: true, name: 'Cancel' }).element();
+    const cancelTop = cancel.getBoundingClientRect().top;
+
+    await act(() => operations!.setSam({ error: { code: 'queue', detail: 'AttributeError' }, status: 'error' }));
+
+    const alert = page.getByRole('alert');
+    await expect.element(alert).toHaveTextContent('Select Object processing failed on the backend.');
+    const groups = operationSection().querySelectorAll('[role="group"]');
+    const lastGroup = groups[groups.length - 1]!;
+    expect(lastGroup.compareDocumentPosition(alert.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cancel.compareDocumentPosition(alert.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top).toBe(promptTop);
+    expect(cancel.getBoundingClientRect().top).toBe(cancelTop);
+    await userEvent.hover(page.getByRole('button', { name: 'Technical details' }));
+    await expect.element(page.getByText('AttributeError')).toBeVisible();
+    expect(operations!.cancelSelectObjectSession).not.toHaveBeenCalled();
+  });
+
+  it('names the source layer with the section subtitle', async () => {
+    await startSam();
+    expect(operationSection().textContent).toContain('Select ObjectPortrait · Raster layer · 1024 × 768');
+  });
+
+  it('fits the actions row in a 280 px pane with every verb showing', async () => {
+    await startSam({ autoProcess: false, hasPreview: true, status: 'processing-sam' }, 280);
+    const actions = host!.querySelector<HTMLElement>('[data-pane-action="cancel"]')!.parentElement!;
+    const hostRect = host!.getBoundingClientRect();
+    for (const name of ['Reset', 'Cancel', 'Find object', 'Apply', 'Save as']) {
+      const rect = page.getByRole('button', { exact: true, name }).element().getBoundingClientRect();
+      expect(rect.width, name).toBeGreaterThan(0);
+      expect(rect.right, name).toBeLessThanOrEqual(hostRect.right);
+    }
+    expect(actions.scrollWidth).toBeLessThanOrEqual(actions.clientWidth);
+    expect(host!.scrollWidth).toBeLessThanOrEqual(280);
   });
 });
 
@@ -1353,6 +1595,55 @@ describe('Overview pane', () => {
     await expect
       .poll(() => parseFloat(outline.style.top) + parseFloat(outline.style.height) / 2)
       .toBeCloseTo(offset.y, 0);
+  });
+
+  it('paints the viewport outline as dark, light and dark bands just inside its box', async () => {
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    engine!.surface.resize(400, 300, 1);
+    await act(async () => {
+      await userEvent.click(canvas);
+    });
+    const outline = pan.element().querySelector('div')!;
+    // The throttled glide can move any edge between measuring it and capturing the pixels.
+    await vi.waitFor(async () => {
+      const button = pan.element().getBoundingClientRect();
+      const box = outline.getBoundingClientRect();
+      const png = await page.screenshot({ element: pan.element(), save: false });
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+      const scale = bitmap.width / button.width;
+      const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      // Scan the outline's left edge at its vertical middle, from a pixel outside the box to a pixel past the bands.
+      const row = Math.round((box.top + box.height / 2 - button.top) * scale);
+      const edge = (box.left - button.left) * scale;
+      const start = Math.floor(edge - scale);
+      const pixels = context.getImageData(start, row, Math.ceil(5 * scale) + 1, 1).data;
+      // Runs of near-black and near-white pixels, in scan order; mid tones (the checkerboard) start no run.
+      const runs: { start: number; tone: 'dark' | 'light' }[] = [];
+      for (let i = 0; i < pixels.length / 4; i++) {
+        const luma = 0.2126 * pixels[i * 4]! + 0.7152 * pixels[i * 4 + 1]! + 0.0722 * pixels[i * 4 + 2]!;
+        const tone = luma < 48 ? 'dark' : luma > 208 ? 'light' : null;
+        if (tone && tone !== runs.at(-1)?.tone) {
+          runs.push({ start: start + i, tone });
+        }
+      }
+      const lightBand = runs.findIndex(
+        (run, i) => run.tone === 'light' && runs[i - 1]?.tone === 'dark' && runs[i + 1]?.tone === 'dark'
+      );
+      expect(lightBand).toBeGreaterThan(0);
+      // The light band sits one dark band inside the box edge: the outline stays within the viewport's rect.
+      const lightStart = runs[lightBand]!.start;
+      expect(lightStart).toBeGreaterThanOrEqual(edge);
+      expect(lightStart).toBeLessThanOrEqual(edge + 2 * scale);
+    });
   });
 
   it('zooms the view around the document point under the wheel', async () => {

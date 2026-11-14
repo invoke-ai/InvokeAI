@@ -2,7 +2,6 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type {
   AdjustmentRefusal,
   CanvasDocumentCapability,
-  CanvasDocumentContractV3,
   CanvasExportCapability,
   LayerUnreadable,
 } from '@workbench/canvas-engine/api';
@@ -102,11 +101,10 @@ export type UploadControlImageResult =
 
 /**
  * Uploads an image file and makes it a control layer's image at the bbox origin (`replace-image`, which detects its
- * map), recording the file's name as the image's origin. The Properties Upload button and a file dropped on the
- * canvas share it. One upload per layer at a time; `onUploaded` runs once the file is stored, for the caller to
- * refresh the gallery it now appears in. A layer that was empty when the upload started must still be, so strokes
- * drawn meanwhile are never replaced; replacing an image the layer already had is what was asked for. The upload
- * stays with the account that started it.
+ * map), recording the file's name as the image's origin, for the Properties Upload button. One upload per layer at a
+ * time; `onUploaded` runs once the file is stored, for the caller to refresh the gallery it now appears in. A layer
+ * that was empty when the upload started must still be, so strokes drawn meanwhile are never replaced; replacing an
+ * image the layer already had is what was asked for. The upload stays with the account that started it.
  */
 export const uploadControlImageFile = async (options: {
   engine: {
@@ -208,49 +206,6 @@ export const getControlUploadNotice = (outcome: UploadControlImageResult): Contr
       // The account changed on the way; the result belongs to nobody here.
       return null;
   }
-};
-
-export type ControlFileDropResolution =
-  | { status: 'accepted'; layerId: string }
-  | { status: 'refused'; notice: ControlSourceNotice };
-
-/**
- * Whether files dragged onto the canvas can fill the selected control layer: exactly one image file, the canvas
- * accepting edits, and the selected layer a control layer that is not locked (by itself or a group) and still empty.
- * `files` are the drag's file items while it hovers (their `type` is readable then, to set the drop effect), and its
- * files once dropped.
- */
-export const resolveControlFileDrop = (input: {
-  document: CanvasDocumentContractV3;
-  engine: { readonly exports: Pick<CanvasExportCapability, 'hasExportableLayerContent'> };
-  files: readonly { readonly type: string }[];
-  isCanvasLocked: boolean;
-}): ControlFileDropResolution => {
-  const { document, engine, files, isCanvasLocked } = input;
-  const refuse = (titleKey: string): ControlFileDropResolution => ({
-    notice: { kind: 'info', titleKey },
-    status: 'refused',
-  });
-  if (files.length !== 1) {
-    return refuse('widgets.canvas.fileDrop.oneFile');
-  }
-  if (!files[0]!.type.startsWith('image/')) {
-    return refuse('widgets.canvas.fileDrop.notImage');
-  }
-  if (isCanvasLocked) {
-    return refuse('widgets.layers.actions.busy');
-  }
-  const layer = getDocumentLayer(document, document.selectedLayerId);
-  if (
-    layer?.type !== 'control' ||
-    getControlImageState(layer, engine.exports.hasExportableLayerContent(layer.id)) !== 'empty'
-  ) {
-    return refuse('widgets.canvas.fileDrop.noTarget');
-  }
-  if (lookupDocumentLeaf(document, layer.id)?.effectiveLocked !== false) {
-    return refuse('widgets.layers.actions.locked');
-  }
-  return { layerId: layer.id, status: 'accepted' };
 };
 
 export type FillControlFromBboxResult =

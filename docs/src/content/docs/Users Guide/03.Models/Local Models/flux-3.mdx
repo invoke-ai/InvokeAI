@@ -130,9 +130,9 @@ Add up to **ten** reference images on the Generate tab or the Canvas and describ
 model is needed. A single reference is used at up to 4 MP; with several, each is limited to 1 MP.
 
 FLUX.3 names its references in the prompt as `<ref_image_0>`, `<ref_image_1>` and so on, for example
-`The fox from <ref_image_0> sitting next to the fox from <ref_image_1>`. Each reference card shows its tag; click
-the tag to copy it. Only enabled cards with an image are numbered, so turning a card off renumbers the cards below
-it.
+`The fox from <ref_image_0> sitting next to the fox from <ref_image_1>`. Each reference row shows its tag; click
+the tag to copy it. Only enabled references with an image are numbered, so turning one off renumbers the ones below
+it. A reference's name is only a label: the tag follows its position.
 
 In the workflow editor, wrap each image in a **Kontext Conditioning - FLUX** node and connect them, or a collection
 of them, to the **Reference Images** input of **Denoise - FLUX.3**.

@@ -617,6 +617,28 @@ describe('Linear form field entry', () => {
     expect(scale.getAttribute('aria-invalid')).toBeNull();
   });
 
+  it('keeps a field input at the same height whether or not its reset button shows', async () => {
+    const { field, value } = await renderForm();
+    const scale = field('Scale');
+    const fieldRoot = scale.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
+    const resetButton = () => fieldRoot.querySelector('button[aria-label="nodes.resetFieldToDefault"]');
+    const inputOffset = () => scale.getBoundingClientRect().top - fieldRoot.getBoundingClientRect().top;
+
+    expect(resetButton()).not.toBeNull();
+    const offsetWithReset = inputOffset();
+
+    // Emptying an optional field returns it to its default, which takes the reset button away.
+    await act(async () => {
+      scale.focus();
+      scale.select();
+      await userEvent.keyboard('{Backspace}');
+    });
+    await act(() => scale.blur());
+    expect(value('scale')).toBeUndefined();
+    expect(resetButton()).toBeNull();
+    expect(inputOffset()).toBe(offsetWithReset);
+  });
+
   it('edits an exposed scalar list row by row and reports the first empty entry', async () => {
     const { value } = await renderForm();
     // Raw i18n keys: every list row shares one accessible name, so rows are found by position.

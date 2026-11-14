@@ -12,7 +12,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+import { ReferenceImageRow } from './ReferenceImageRow';
 
 const mocks = vi.hoisted(() => {
   // A real decodable image, so the crop export's <img> loads without a backend.
@@ -83,7 +83,7 @@ const renderCard = (referenceImage: GenerateReferenceImage) => {
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <GenerationUiProvider adapter={ADAPTER}>
-            <ReferenceImageCard
+            <ReferenceImageRow
               count={1}
               index={0}
               referenceImage={referenceImage}
@@ -92,6 +92,7 @@ const renderCard = (referenceImage: GenerateReferenceImage) => {
               onMove={noop}
               onPatch={noop}
               onRemove={noop}
+              onRename={noop}
               onUseSize={noop}
             />
           </GenerationUiProvider>
@@ -115,8 +116,19 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
+/** A reference with no settings keeps Crop in its row menu. */
+const chooseCrop = async () => {
+  await act(() =>
+    userEvent.click(
+      document.querySelector<HTMLElement>('button[aria-label="widgets.generate.referenceImageMoreActions"]')!
+    )
+  );
+  await expect.poll(() => document.querySelector('[role="menuitem"][data-value="crop"]')).not.toBeNull();
+  await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="crop"]')!));
+};
+
 const openCropDialog = async (): Promise<HTMLElement> => {
-  await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="common.crop"]')!));
+  await chooseCrop();
   await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
   await expect
@@ -163,7 +175,7 @@ const spaceKey = (type: 'keydown' | 'keyup', target: EventTarget = window) =>
 
 describe('reference image crop dialog', () => {
   it('animates out instead of unmounting on close', async () => {
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="common.crop"]')!));
+    await chooseCrop();
     await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
     const dialog = document.querySelector('[role="dialog"]')!;
 

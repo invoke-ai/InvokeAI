@@ -213,7 +213,7 @@ import { createLayerExportGuards, isSupportedExportSource, layerUnreadable } fro
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
-import { createCompositeFrame, isStagingHiddenStackSelected } from './render/compositeFrame';
+import { createCompositeFrame, isInStagingHiddenStack } from './render/compositeFrame';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
@@ -391,6 +391,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     bboxGrid: stores.bboxGrid,
     bboxOptions: stores.bboxOptions,
     bboxOverlay: stores.bboxOverlay,
+    bboxPreview: stores.bboxPreview,
     brushOptions: stores.brushOptions,
     canRedo: stores.canRedo,
     canUndo: stores.canUndo,
@@ -417,6 +418,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     showBbox: stores.showBbox,
     showGrid: stores.showGrid,
     snapToGrid: stores.snapToGrid,
+    stagingHidesOverlays: stores.stagingHidesOverlays,
     textEditSession: stores.textEditSession,
     textOptions: stores.textOptions,
     transformSession: stores.transformSession,
@@ -997,6 +999,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
       isRasterCacheReady: (layer, document) => isLayerCacheReadyForOp(layer, document),
       isGestureActive: () => pipeline.isGestureActive(),
+      getTransformSessionLayerId: () => stores.transformSession.get()?.layerId ?? null,
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
@@ -1526,25 +1529,38 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const scheduler: RenderScheduler = renderController.scheduler;
 
-  /** Whether the pointer gesture in progress edits a mask or a region, which a shown staged preview otherwise hides. */
+  /** Whether the pointer gesture in progress edits a control layer, mask or region, which a staged preview hides. */
   let gestureEditsStagingHiddenStack = false;
+  /** Whether an open transform session or floating selection holds such a layer: it changes for as long as it lasts. */
+  let sessionEditsStagingHiddenStack = false;
   /**
-   * Set once per gesture, so its pointer moves read a flag. While a preview is shown, setting and clearing it each
-   * repaint in full: the stacks show above the preview, then hide again.
+   * The gesture flag is set once per gesture, so its pointer moves read a flag; the session flag follows the transform
+   * session and floating selection stores, and document changes, since a conversion or its undo moves the held layer
+   * to another stack. While a preview is shown or toggled off, the stacks showing (above the preview) or hiding again
+   * repaints in full.
    */
-  const setGestureEditsStagingHiddenStack = (edits: boolean): void => {
-    if (edits === gestureEditsStagingHiddenStack) {
-      return;
-    }
-    gestureEditsStagingHiddenStack = edits;
-    if (renderController.previews.getStaged()) {
+  const setStagingHiddenStackEdits = (gesture: boolean, session: boolean): void => {
+    const revealed = gestureEditsStagingHiddenStack || sessionEditsStagingHiddenStack;
+    gestureEditsStagingHiddenStack = gesture;
+    sessionEditsStagingHiddenStack = session;
+    if ((gesture || session) !== revealed && renderController.previews.hidesStagingOverlays()) {
       scheduler.invalidate({ all: true });
     }
   };
+  const setGestureEditsStagingHiddenStack = (edits: boolean): void =>
+    setStagingHiddenStackEdits(edits, sessionEditsStagingHiddenStack);
+  const syncSessionEditsStagingHiddenStack = (): void => {
+    const layerId = stores.transformSession.get()?.layerId ?? floatingSelection.get()?.layerId ?? null;
+    // With nothing held, no document is read: the mirror reports changes before construction completes.
+    const document = layerId === null ? null : mirror.getDocument();
+    setStagingHiddenStackEdits(gestureEditsStagingHiddenStack, !!document && isInStagingHiddenStack(document, layerId));
+  };
+  const unsubscribeTransformReveal = stores.transformSession.subscribe(syncSessionEditsStagingHiddenStack);
+  const unsubscribeFloatReveal = stores.hasFloatingSelection.subscribe(syncSessionEditsStagingHiddenStack);
   /** The pointer gesture in progress edits the selected layer in place: at its press, or later (a move's drag). */
   const beginSelectedLayerEdit = (): void => {
     const document = mirror.getDocument();
-    if (pipeline.isGestureActive() && document && isStagingHiddenStackSelected(document)) {
+    if (pipeline.isGestureActive() && document && isInStagingHiddenStack(document, document.selectedLayerId)) {
       setGestureEditsStagingHiddenStack(true);
     }
   };
@@ -1567,7 +1583,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getCheckerboardTile,
     getMaskPatternTile,
     getControlView: () => controlView.get(),
-    isEditingStagingHiddenStack: () => gestureEditsStagingHiddenStack,
+    isEditingStagingHiddenStack: () => gestureEditsStagingHiddenStack || sessionEditsStagingHiddenStack,
     layerCache,
     previews: renderController.previews,
     raster: rasterController,
@@ -1618,6 +1634,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
     isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
     previews: renderController.previews,
+    publishHidesStagingOverlays: (hidden) => stores.stagingHidesOverlays.set(hidden),
     resolveImage: imageResolver,
   });
   const {
@@ -1648,6 +1665,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => {
       editingController.transform.onDocumentChanged();
+      syncSessionEditsStagingHiddenStack();
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
       // A tool's cursor reads the selected layer (not-allowed over a locked or hidden one), which this may change.
       // Skipped until the interaction controller exists, which the cursor reads.
@@ -2619,6 +2637,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     floatingSelection.commit();
     editingController.selectionPixels.run('erase');
   };
+  const admitSelectionErase = (): boolean => editingController.selectionPixels.admitErase();
 
   /** Copy reuses the float's nonmutating masked-copy path so clipboard and lift select identical pixels. */
   const exportSelectionBlob = (): Promise<Blob | null> => {
@@ -2692,6 +2711,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);
+    cleanup.run(unsubscribeTransformReveal);
+    cleanup.run(unsubscribeFloatReveal);
     cleanup.run(unsubscribeControlViewLock);
     cleanup.run(unsubscribeCheckerColors);
     cleanup.run(unsubscribeShowGrid);
@@ -3008,6 +3029,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const selectionCapability: CanvasEngineSelectionCapability = {
     deselect,
+    admitSelectionErase,
     eraseSelection,
     fillSelection,
     getSelectionBounds: () => selection.bounds(),

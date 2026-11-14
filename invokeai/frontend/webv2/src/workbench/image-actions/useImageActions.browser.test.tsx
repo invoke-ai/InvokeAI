@@ -1903,7 +1903,11 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.itemDelete.mock.invocationCallOrder[0] ?? 0
     );
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png']);
+    // A next image may follow the request, so an open comparison is kept until it settles.
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
 
     expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
     // The rollback restored every page's total, so the re-removal lowers them across the listing again.
@@ -1913,7 +1917,10 @@ describe('mixed item mutation outcomes', () => {
       { kind: 'delete', result },
       { totals: 'listing' }
     );
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4']);
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4'], {
+      keepComparisonForSuccessor: false,
+      projectId: 'project-1',
+    });
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
@@ -1975,7 +1982,10 @@ describe('total transport failure rollback', () => {
     });
 
     // The optimistic removal happened up front, before the transport was asked.
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png']);
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
 
     // Transport failures must roll back immediately; trailing invalidation may fail too.
     expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
@@ -2316,6 +2326,39 @@ describe('primary successor after confirmed deletion', () => {
     expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
   });
 
+  it.each([
+    ['keeps an open comparison for the next image when one follows', ['primary.png', 'after.png'], true],
+    ['ends an open comparison when no next image follows', ['primary.png'], false],
+  ] as const)('%s', async (_title, names, keepsComparison) => {
+    const items = names.map((name) => galleryItem('image', name));
+    const refs = items.map(({ kind, name }) => ({ kind, name }));
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items,
+      loadOrderedRefs: () => Promise.resolve(refs),
+      selectedItemKey: 'image:primary.png',
+    };
+    const store = modelGallerySelectionStore('image:primary.png');
+    mocks.galleryRemoveItems.mockImplementation((itemKeys: GalleryItemKey[]) => store.remove(itemKeys));
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: 'primary.png' }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'primary.png' }]);
+    });
+
+    // The confirmed removal tells the store whether the next image is about to be selected: deleting the shown image of
+    // a comparison then shows the next one against the same comparison image, and otherwise ends the comparison.
+    expect(mocks.galleryRemoveItems).toHaveBeenLastCalledWith(['image:primary.png'], {
+      keepComparisonForSuccessor: keepsComparison,
+      projectId: 'project-1',
+    });
+    expect(mocks.gallerySelectItem).toHaveBeenCalledTimes(keepsComparison ? 1 : 0);
+  });
+
   it('selects the successor beside a rejected item when the host has re-rendered without the primary', async () => {
     const primary = galleryItem('image', 'primary.png');
     const rejected = galleryItem('image', 'rejected.png');
@@ -2612,7 +2655,10 @@ describe('primary successor after confirmed deletion', () => {
       await getItemActions().deleteItems(requested);
     });
 
-    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared']);
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
     expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
       ['image:failed.png', 'video:shared', 'image:successor.png'],
       successor,

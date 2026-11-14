@@ -3,14 +3,17 @@ import type { FilterOperationSessionState } from '@workbench/canvas-operations/a
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
+import { createOperationSection } from '@workbench/widgets/layers/panes/OperationSection';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { filterOperationForm } from './FilterOptions';
+
+const FilterSection = createOperationSection(filterOperationForm);
 
 const enCatalog: Record<string, unknown> = await fetch('/locales/en.json').then((response) => response.json());
 
@@ -35,6 +38,7 @@ const sessionStore = (initial: FilterOperationSessionState) => {
   const listeners = new Set<() => void>();
   return {
     getFilterSessionState: () => state,
+    processFilterOperation: vi.fn(() => Promise.resolve<'completed' | 'stale'>('completed')),
     set: (next: Partial<FilterOperationSessionState>) => {
       state = { ...state, ...next };
       listeners.forEach((listener) => listener());
@@ -64,7 +68,7 @@ const SESSION: FilterOperationSessionState = {
   status: 'ready',
 };
 
-describe('filter footer errors', () => {
+describe('filter operation errors', () => {
   let root: Root | null = null;
   let container: HTMLDivElement | null = null;
 
@@ -75,19 +79,18 @@ describe('filter footer errors', () => {
     container = null;
   });
 
-  const renderFooter = async (initial: Partial<FilterOperationSessionState>) => {
+  const renderSection = async (initial: Partial<FilterOperationSessionState>) => {
     const i18n = await createI18n();
     const store = sessionStore({ ...SESSION, ...initial });
     const engine = engineWith(store);
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    const Footer = filterOperationForm.footer;
     act(() =>
       root!.render(
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
-            <Footer engine={engine as never} />
+            <FilterSection engine={engine as never} />
           </I18nextProvider>
         </ChakraProvider>
       )
@@ -96,7 +99,7 @@ describe('filter footer errors', () => {
   };
 
   it('translates a refusal and updates an already visible error when the language changes', async () => {
-    const { i18n } = await renderFooter({ error: { code: 'over-budget' }, status: 'error' });
+    const { i18n } = await renderSection({ error: { code: 'over-budget' }, status: 'error' });
     await expect
       .element(page.getByRole('alert'))
       .toHaveTextContent('The filtered layer is too large to undo, so it was not applied.');
@@ -107,7 +110,7 @@ describe('filter footer errors', () => {
   });
 
   it('falls back to English for a refusal the language does not translate', async () => {
-    const { i18n } = await renderFooter({ error: { code: 'stale' }, status: 'error' });
+    const { i18n } = await renderSection({ error: { code: 'stale' }, status: 'error' });
     await act(() => i18n.changeLanguage('de'));
 
     await expect
@@ -116,7 +119,7 @@ describe('filter footer errors', () => {
   });
 
   it('summarizes an unexpected failure and keeps its message as technical detail', async () => {
-    await renderFooter({ error: { code: 'apply-failed', detail: 'cache failed' }, status: 'error' });
+    await renderSection({ error: { code: 'apply-failed', detail: 'cache failed' }, status: 'error' });
 
     await expect.element(page.getByRole('alert')).toHaveTextContent('The filter could not be applied.');
     const details = page.getByRole('button', { name: 'Technical details' });
@@ -124,8 +127,118 @@ describe('filter footer errors', () => {
     await expect.element(page.getByText('cache failed')).toBeVisible();
   });
 
+  it('offers Process to retry a failed run with auto-update on, until that retry has finished', async () => {
+    const { store } = await renderSection({});
+    const process = page.getByRole('button', { exact: true, name: 'Process' });
+    expect(process.query()).toBeNull();
+
+    act(() => store.set({ error: { code: 'process-failed', detail: 'graph exploded' }, status: 'error' }));
+    await expect.element(process).toBeEnabled();
+    let finish!: () => void;
+    store.processFilterOperation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve('completed');
+        })
+    );
+    await userEvent.click(process);
+    expect(store.processFilterOperation).toHaveBeenCalledOnce();
+
+    // The retry clears the error as it starts; the button stays, busy, for the run it started.
+    act(() => store.set({ error: null, status: 'processing' }));
+    await expect.element(process).toBeDisabled();
+    act(() => store.set({ status: 'ready' }));
+    await act(() => finish());
+    expect(process.query()).toBeNull();
+  });
+
+  const PREVIEW: FilterOperationSessionState['preview'] = {
+    guard: {} as never,
+    height: 10,
+    imageName: 'filtered',
+    origin: { x: 0, y: 0 },
+    rect: { height: 10, width: 10, x: 0, y: 0 },
+    width: 10,
+  };
+
+  /** Fails a run with auto-update on, then starts the retry from the keyboard on Process; resolves the run on demand. */
+  const startKeyboardRetry = async () => {
+    const { store } = await renderSection({ error: { code: 'process-failed' }, status: 'error' });
+    const process = page.getByRole('button', { exact: true, name: 'Process' });
+    let finish!: (result: 'completed' | 'stale') => void;
+    store.processFilterOperation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    process.element().focus();
+    await userEvent.keyboard('{Enter}');
+    expect(store.processFilterOperation).toHaveBeenCalledOnce();
+    act(() => store.set({ error: null, status: 'processing' }));
+    const succeed = async () => {
+      act(() => store.set({ preview: PREVIEW, status: 'ready' }));
+      await act(() => finish('completed'));
+      expect(process.query()).toBeNull();
+    };
+    const fail = async () => {
+      act(() => store.set({ error: { code: 'process-failed' }, status: 'error' }));
+      await act(() => finish('stale'));
+      await expect.element(process).toBeEnabled();
+    };
+    return { fail, store, succeed };
+  };
+
+  it('moves focus to Apply when a keyboard retry succeeds and its Process button leaves', async () => {
+    const { succeed } = await startKeyboardRetry();
+
+    await succeed();
+
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toHaveFocus();
+  });
+
+  it('leaves focus where the user moved it during the retry', async () => {
+    const { succeed } = await startKeyboardRetry();
+    const cancel = page.getByRole('button', { exact: true, name: 'Cancel' });
+    cancel.element().focus();
+
+    await succeed();
+
+    await expect.element(cancel).toHaveFocus();
+  });
+
+  it('does not move focus when Process leaves later, after the keyboard retry failed', async () => {
+    const { fail, store } = await startKeyboardRetry();
+    await fail();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    // A later run (an auto run after a setting change) succeeds, so the button leaves.
+    act(() => store.set({ error: null, preview: PREVIEW, status: 'ready' }));
+    expect(page.getByRole('button', { exact: true, name: 'Process' }).query()).toBeNull();
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve);
+        })
+    );
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('leaves a failed apply to Apply: no Process with auto-update on', async () => {
+    await renderSection({
+      error: { code: 'apply-failed', detail: 'cache failed' },
+      preview: PREVIEW,
+      status: 'error',
+    });
+
+    await expect.element(page.getByRole('alert')).toHaveTextContent('The filter could not be applied.');
+    expect(page.getByRole('button', { exact: true, name: 'Process' }).query()).toBeNull();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
+  });
+
   it('clears the error once a retry starts', async () => {
-    const { store } = await renderFooter({ error: { code: 'busy' }, status: 'error' });
+    const { store } = await renderSection({ error: { code: 'busy' }, status: 'error' });
     await expect.element(page.getByRole('alert')).toBeVisible();
 
     act(() => store.set({ error: null, status: 'committing' }));

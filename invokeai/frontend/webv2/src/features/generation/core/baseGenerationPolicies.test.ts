@@ -52,7 +52,7 @@ import {
   QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
-import { describeGenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
+import { describeGenerationIssue, type GenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
 import { collectGenerationIssueScenarios } from './generationIssues.testing';
 import { getActiveRefiner } from './sdxlRefiner';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -792,7 +792,7 @@ describe('component policies', () => {
             vae: qwenImageVae,
           })
         )
-      ).toEqual(['qwen-image model cannot use reference image 1. Turn it off, or remove it.']);
+      ).toEqual(['qwen-image model cannot use Reference image 1. Turn it off, or remove it.']);
     });
 
     it('allows text-only prompts, which is what the GGUF encoder is for', () => {
@@ -1014,7 +1014,7 @@ describe('component policies', () => {
       settings,
       'img2img'
     );
-    expect(reasons).toContain('External Model cannot use reference image 1. Turn it off, or remove it.');
+    expect(reasons).toContain('External Model cannot use Reference image 1. Turn it off, or remove it.');
     expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
   });
 
@@ -1773,7 +1773,7 @@ describe('component policies', () => {
 
     expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
     expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
-      'sd-3 model cannot use reference image 1. Turn it off, or remove it.',
+      'sd-3 model cannot use Reference image 1. Turn it off, or remove it.',
     ]);
   });
 
@@ -2379,7 +2379,7 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('sd-3 model cannot use reference image 1. Turn it off, or remove it.');
+    ).toContain('sd-3 model cannot use Reference image 1. Turn it off, or remove it.');
   });
 
   it('blocks Qwen-Image-2.1 references whose encoder has no vision tower', () => {
@@ -3510,6 +3510,42 @@ describe('generation issues', () => {
 
     for (const issue of translated) {
       expect(describeGenerationIssue((key, values) => instance.t(key, values), issue)).toBe(issue.message);
+    }
+  });
+
+  it('names a reference image in its issues as its row does: its own name, else its position', async () => {
+    const instance = i18n.createInstance();
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+    const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+    const aboutOneReference = (issues: GenerationIssue[]) =>
+      issues.filter((issue) => issue.target.referenceImageId !== undefined);
+    const named = aboutOneReference(collectGenerationIssueScenarios({ namedReferences: true }));
+
+    // Every kind: a missing image, adapter, Redux or Kontext model, a strength, an unsupported kind, a model not
+    // installed. Unnamed references keep their positional default, which the test above words.
+    expect(new Set(named.map(({ messageKey }) => messageKey?.replace('widgets.generate.issues.', '')))).toEqual(
+      new Set([
+        'referenceImageNeedsImage',
+        'referenceImageNeedsIpAdapter',
+        'referenceImageNeedsKontext',
+        'referenceImageNeedsRedux',
+        'referenceImageStrength',
+        'referenceImageUnsupported',
+        'referenceModelNotInstalled',
+      ])
+    );
+
+    for (const issue of named) {
+      const name = `Name of ${issue.target.referenceImageId}`;
+
+      expect(issue.message).toContain(name);
+      expect(issue.message).not.toMatch(/reference image \d/i);
+      expect(describeGenerationIssue(t, issue)).toBe(issue.message);
     }
   });
 

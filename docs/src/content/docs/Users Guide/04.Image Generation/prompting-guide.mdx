@@ -130,7 +130,7 @@ Negative: `photorealistic, dull colors, low detail`
 
 ## Prompt templates
 
-A prompt template is a reusable piece of prompt text, such as a photographic or artistic style, that wraps whatever you type. Apply **Photography (General)** once, and every prompt you write is sent as a photograph without you retyping the style words. Templates are available in the **Generate** panel.
+A prompt template is a reusable piece of prompt text, such as a photographic or artistic style, that wraps whatever you type. Apply **Photography (General)** once, and every prompt you write is sent as a photograph without you retyping the style words. Templates are available in the **Generate** panel and in the [**Upscale**](/users-guide/image-generation/upscale/) panel's **Detail guidance**, which share the project's prompt and its template: a template applied in one applies in the other.
 
 ### Applying a template
 
@@ -214,7 +214,7 @@ An image's metadata records the prompt that was actually used, with the template
 
 Dynamic prompts expand a single prompt into many variations. Write the parts you want to vary as a list of alternatives, and one press of **Invoke** generates an image for each variation. They are useful for brainstorming, exploring styles and subjects, and testing a model without rewriting the same prompt by hand.
 
-Dynamic prompts work in the **Generate** panel, on the Canvas and in the [**Video** panel](/users-guide/video-generation/introduction/#prompt). Only the positive prompt is expanded; the negative prompt is used as written for every variation.
+Dynamic prompts work in the **Generate** panel, on the Canvas, in the [**Upscale**](/users-guide/image-generation/upscale/) panel's Refine mode, which shares Generate's prompt and dynamic prompts settings, and in the [**Video** panel](/users-guide/video-generation/introduction/#prompt). Only the positive prompt is expanded; the negative prompt is used as written for every variation.
 
 In the **Video** panel each variation queues a full video, so **Max prompts** starts at 10 there instead of 100. Projects saved before Video supported dynamic prompts open with them off, so their prompts keep running as typed; switch on **Use dynamic prompts** to expand them.
 

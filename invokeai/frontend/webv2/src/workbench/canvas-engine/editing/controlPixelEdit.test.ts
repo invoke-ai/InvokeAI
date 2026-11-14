@@ -1,7 +1,16 @@
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasNodeContract,
+} from '@workbench/canvas-engine/contracts';
 
-import { documentFrom, groupContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  documentFrom,
+  groupContract,
+  layerContract,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { createTestStubRasterBackend, type StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -10,6 +19,7 @@ import {
   buildMaterializedPixelLayer,
   decidePixelEdit,
   isLeafPixelEditEligible,
+  leafPaintRefusal,
 } from './controlPixelEdit';
 
 const control = (overrides: Partial<CanvasControlLayerContract> = {}): CanvasControlLayerContract => ({
@@ -279,5 +289,26 @@ describe('bakePixelEditSurface', () => {
       { args: [source.canvas, sourceRect.x, sourceRect.y], op: 'drawImage' },
       { args: [1, 0, 0, 1, 0, 0], op: 'setTransform' },
     ]);
+  });
+});
+
+describe('leafPaintRefusal', () => {
+  const leafOf = (node: CanvasNodeContract) => compileDocumentLeaves(documentFrom([node]))[0]!;
+
+  it.each([
+    ['an editable mask', {}, null],
+    ['a disabled mask', { isEnabled: false }, 'layer-hidden'],
+    ['a mask hidden on the canvas', { isHidden: true }, 'layer-display-hidden'],
+    ['a locked mask', { isLocked: true }, 'layer-locked'],
+    ['a disabled, hidden, locked mask', { isEnabled: false, isHidden: true, isLocked: true }, 'layer-hidden'],
+    ['a hidden, locked mask', { isHidden: true, isLocked: true }, 'layer-display-hidden'],
+  ] as const)('answers %s with %s', (_, overrides, expected) => {
+    expect(leafPaintRefusal(leafOf(layerContract('m', 'inpaint_mask', overrides)))).toBe(expected);
+  });
+
+  it('folds a group that hides its children on the canvas, which edit refusals ignore', () => {
+    const leaf = leafOf(groupContract('g', [layerContract('m', 'inpaint_mask')], { isHidden: true }));
+    expect(leafPaintRefusal(leaf)).toBe('layer-display-hidden');
+    expect(leafEditRefusal(leaf)).toBeNull();
   });
 });

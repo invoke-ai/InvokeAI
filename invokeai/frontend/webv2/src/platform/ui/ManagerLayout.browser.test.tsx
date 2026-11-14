@@ -15,10 +15,22 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { List } from './list/List';
 import { ListItem } from './list/ListItem';
 import { listRowsFromItems } from './list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from './ManagerLayout';
+import {
+  ManagerColumn,
+  ManagerDetailHeader,
+  ManagerFilterMenu,
+  ManagerFilterResetItem,
+  ManagerLayout,
+  ManagerSearchField,
+} from './ManagerLayout';
 import { MenuContent } from './Menu';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: { count?: number }) =>
+      values?.count === undefined ? key : `${String(values.count)} active`,
+  }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -469,5 +481,67 @@ describe('ManagerLayout', () => {
       await expect.element(library()).toBeVisible();
       expect(focused()).toBe(toggle().element());
     });
+  });
+
+  it('names the icon-only filter trigger in a tooltip that leaves its menu working', async () => {
+    await render(
+      WIDE_PX,
+      <ManagerFilterMenu activeCount={1} label="Filter items">
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent>
+              <ManagerFilterResetItem activeCount={1} onReset={() => undefined} />
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </ManagerFilterMenu>
+    );
+    const trigger = page.getByRole('button', { name: 'Filter items, 1 active' });
+
+    await trigger.hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Filter items, 1 active');
+    await trigger.click();
+
+    // One trigger id serves both: the menu anchors to the button the tooltip describes.
+    const menu = page.getByRole('menu');
+    await expect.element(menu).toBeVisible();
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect.element(trigger).toHaveAttribute('aria-controls', menu.element().id);
+    await expect.element(menu).toHaveAttribute('aria-labelledby', trigger.element().id);
+    expect(await auditAccessibility(host)).toEqual([]);
+  });
+
+  it('badges the filter trigger with the active filter count, which its reset item clears', async () => {
+    const FilterHarness = () => {
+      const [count, setCount] = useState(2);
+
+      return (
+        <ManagerFilterMenu activeCount={count} closeOnSelect={false} label="Filter items">
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent>
+                <ManagerFilterResetItem activeCount={count} onReset={() => setCount(0)} />
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </ManagerFilterMenu>
+      );
+    };
+    await render(WIDE_PX, <FilterHarness />);
+    const trigger = page.getByRole('button', { name: /^Filter items/ });
+
+    // The visible badge digits are part of the name, which axe's label-in-name rule checks.
+    await expect.element(trigger).toHaveAccessibleName('Filter items, 2 active');
+    expect((trigger.element() as HTMLElement).innerText).toBe('2');
+    expect(await auditAccessibility(host)).toEqual([]);
+
+    await trigger.click();
+    const reset = page.getByRole('menuitem', { name: 'common.resetFilters' });
+    await reset.click();
+
+    await expect.element(trigger).toHaveAccessibleName('Filter items');
+    expect((trigger.element() as HTMLElement).innerText).toBe('');
+    // The menu stays open, and the reset has nothing left to clear.
+    await expect.element(reset).toHaveAttribute('aria-disabled', 'true');
   });
 });

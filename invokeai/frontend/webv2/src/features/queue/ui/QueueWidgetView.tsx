@@ -1,7 +1,8 @@
 import type { QueueActivity } from '@features/queue/core/queueActivity';
 
-import { Stack, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Stack, VisuallyHidden } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { LIST_ROW_GAP_PX } from '@platform/ui/list/listLayout';
 import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { RetryBoundary } from '@platform/ui/RetryBoundary';
 import { Scrollable } from '@platform/ui/Scrollable';
@@ -113,15 +114,16 @@ const QueueContent = () => {
     setFilter('all');
   }
 
-  // The counted filters stay put while the item lists scroll on their own.
+  // The counted filters stay put while the item lists scroll on their own. Sections bleed out of the list padding, so
+  // the extra row gap keeps row surfaces off the panel edges by the same distance that separates rows.
   return (
-    <Stack gap="3" h="full" minH="0" pt="3">
+    <Stack gap="2" h="full" minH="0" pt="2">
       {localRuns.length > 0 ? <LocalRunListPreload rows={localRunList} /> : null}
-      <Stack flexShrink={0} gap="3" px="3">
+      <Box flexShrink={0} px="2">
         <QueueFilterTabs localRunCount={shownLocalRuns.length} value={filter} onChange={setFilter} />
-      </Stack>
+      </Box>
       <Scrollable flex="1" label={t('widgets.queue.items')} minH="0" overflowX="hidden">
-        <Stack gap="3" pb="3" px="3">
+        <Stack gap="3" pb="2" px={`calc(0.5rem + ${LIST_ROW_GAP_PX}px)`}>
           <LocalRunsSection filter={filter} rows={localRunList} runs={shownLocalRuns} />
           <CurrentBatchSection filter={filter} revealRequest={revealRequest} />
           <RecentSection filter={filter} revealRequest={revealRequest} />

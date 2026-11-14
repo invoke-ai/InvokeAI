@@ -41,14 +41,19 @@ const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface PositivePromptFieldProps {
   batchCount?: number;
-  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  /** Absent on surfaces whose prompt is not batch-expanded. */
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
   /** Absent on surfaces whose model family has no prompt enhancer of its own. */
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
-  /** Whose prompt focus requests reach this field; Upscale shares Generate's. */
+  /** Whose prompt focus requests reach this field. */
   focusOwner?: PositivePromptOwner;
-  /** Absent on surfaces with no template concept (Upscale). */
+  /** Absent on surfaces with no template concept (Video). */
   promptTemplate?: PromptTemplateSnapshot | null;
+  /**
+   * Whether a template draft handed over from the gallery opens in this field's templates. The handover reveals
+   * Generate, so Upscale, which shares Generate's template, leaves it to Generate's field.
+   */
+  takesPendingTemplateDraft?: boolean;
   /** Show the merged prompt read-only instead of the authored text. */
   isTemplateViewMode?: boolean;
   onTemplateViewModeChange?: (viewMode: boolean) => void;
@@ -91,6 +96,7 @@ export const PositivePromptField = ({
   savedPromptModels,
   selectedModel,
   showSyntaxHighlighting,
+  takesPendingTemplateDraft = true,
   value,
 }: PositivePromptFieldProps) => {
   const { t } = useTranslation();
@@ -237,8 +243,16 @@ export const PositivePromptField = ({
       onApply: onApplyPromptTemplate,
       onFlatten: flattenPromptTemplate,
       onViewModeChange: onTemplateViewModeChange,
+      takesPendingDraft: takesPendingTemplateDraft,
     }),
-    [flattenPromptTemplate, isViewingMerged, onApplyPromptTemplate, onTemplateViewModeChange, promptTemplate]
+    [
+      flattenPromptTemplate,
+      isViewingMerged,
+      onApplyPromptTemplate,
+      onTemplateViewModeChange,
+      promptTemplate,
+      takesPendingTemplateDraft,
+    ]
   );
 
   const labelEnd = useMemo(

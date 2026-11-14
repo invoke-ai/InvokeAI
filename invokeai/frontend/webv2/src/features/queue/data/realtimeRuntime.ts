@@ -4,8 +4,10 @@ import type {
   InvocationStartedEvent,
   QueueItemStatusChangedEvent,
 } from '@features/queue/data/events';
+import type { QueueItemStatusChange } from '@features/queue/data/queries';
 
 import { isTerminalBackendStatus } from '@features/queue/data/events';
+import { mapQueueItemStatusChangedEvent } from '@features/queue/data/mappers';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 export interface QueueItemProgressPort {
@@ -29,16 +31,19 @@ export interface QueueRealtimeRuntime {
 }
 
 /**
- * Own one realtime subscription; coalesce list invalidations while progress frames update transient stores
- * directly.
+ * Own one realtime subscription. Status changes apply to the read model at once and invalidate it, coalesced, to
+ * reconcile; progress frames update transient stores directly.
  */
 export const createQueueRealtimeRuntime = ({
+  applyStatusChange,
   backend,
   coalesceMs = 50,
   invalidate,
   progress,
   refreshModelCache,
 }: {
+  /** Applies one item's status change to the loaded read models, which fence it against what they already hold. */
+  applyStatusChange: (change: QueueItemStatusChange) => void;
   backend: Pick<QueueBackendPort, 'on' | 'onConnectionChange'>;
   coalesceMs?: number;
   invalidate: () => void | Promise<void>;
@@ -84,6 +89,10 @@ export const createQueueRealtimeRuntime = ({
 
         if (isTerminalBackendStatus(event.status) && event.status !== 'completed') {
           progress.clear(event.item_id);
+        }
+
+        if (event.queue_status) {
+          applyStatusChange(mapQueueItemStatusChangedEvent(event));
         }
 
         scheduleInvalidation();

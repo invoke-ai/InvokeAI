@@ -322,8 +322,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const workflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
-  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
-  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
   const ui = useWorkflowUi();
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
@@ -1435,8 +1433,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
         <EditorToolbar
           arrangeScope={arrangeScope}
-          canRedo={canRedo}
-          canUndo={canUndo}
           nodeOpacity={nodeOpacity}
           tool={tool}
           updatableNodeCount={updatableNodeCount}
@@ -1444,9 +1440,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           onExportPrepare={onExportPrepare}
           onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
-          onRedo={redo}
           onToolChange={setTool}
-          onUndo={undo}
           onUpdateNodes={onUpdateNodes}
         />
         {/* An empty graph's minimap is a bare panel that reads as a broken element. */}

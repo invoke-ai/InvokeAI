@@ -31,6 +31,9 @@ export const createCompactWidgetCapacity = () => {
   };
   return {
     ...store,
+    /** The width the chip adds around `content` (padding, borders, sibling chrome); none outside a bound chip. */
+    measureInset: (content: Element) =>
+      chip ? chip.getBoundingClientRect().width - content.getBoundingClientRect().width : 0,
     bindSpacer: (element: HTMLDivElement | null) => {
       spacer = element;
       if (!element) {

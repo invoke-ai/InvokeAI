@@ -3,15 +3,38 @@ import type {
   BeginTransformResult,
   CanvasDocumentContractV3,
   CanvasEngine,
+  DocumentRefusal,
   LayerUnreadable,
   ShapeToolKind,
 } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 import type { ElementType } from 'react';
 
-import { mergeDownEligibility } from '@workbench/canvas-engine/api';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { createActionToast } from '@platform/ui/toaster';
+import { getDocumentNode, mergeDownEligibility } from '@workbench/canvas-engine/api';
 import { reportLayerOperation, type LayerOperationRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 import { CircleIcon, PenLineIcon, PentagonIcon, SquareIcon, StarIcon, TriangleIcon } from 'lucide-react';
+
+/**
+ * A command refusal the user can fix, shown the way the Canvas shows its edit refusals: an info toast only, never
+ * recorded in Notifications, and one per `key`, so pressing the key again (or holding it) replaces the toast rather
+ * than stacking another. It lives here, beside the commands that raise it, because the Canvas and its companion
+ * widgets already load this module; a module of its own would cost Canvas activation a request.
+ */
+export const showCanvasRefusalNotice = (key: string, title: string, message: string): void => {
+  createActionToast({
+    actions: [],
+    description: message,
+    id: `canvas-refusal:${key}`,
+    signal: captureAccountScope().signal,
+    title,
+    type: 'info',
+  });
+};
+
+/** Shows a refusal notice under `key`; see {@link showCanvasRefusalNotice}. */
+export type CanvasRefusalNotice = typeof showCanvasRefusalNotice;
 
 /** One hotkey row: its command id, title key and default keys. */
 export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKeys: readonly string[]];
@@ -19,13 +42,23 @@ export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKe
 /** The same layer operation is available from the Canvas and the Layers widget. */
 export const CANVAS_MERGE_DOWN_HOTKEY = ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']] as const;
 
+/**
+ * Merges the selected layer into the one below it. A layer that cannot merge is explained through `reportIneligible`
+ * (nothing selected stays silent); a merge the engine refuses or that fails goes to `report`.
+ */
 export const mergeSelectedLayerDown = (
   engine: Pick<CanvasEngine, 'layers'> | null,
   document: CanvasDocumentContractV3,
-  report: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void
+  report: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void,
+  reportIneligible: (refusal: DocumentRefusal) => void
 ): void => {
   const id = document.selectedLayerId;
-  if (!engine || !id || mergeDownEligibility(document, id).status !== 'eligible') {
+  if (!engine || !id) {
+    return;
+  }
+  const eligibility = mergeDownEligibility(document, id);
+  if (eligibility.status !== 'eligible') {
+    reportIneligible(eligibility);
     return;
   }
   void engine.layers.mergeLayerDown(id).then(
@@ -36,6 +69,64 @@ export const mergeSelectedLayerDown = (
     },
     () => report('failed')
   );
+};
+
+/** Merge down's own invalid-target reasons (`mergeDownEligibility`); the name is the layer or group they concern. */
+const MERGE_DOWN_TARGET_KEYS: Partial<
+  Record<Extract<DocumentRefusal, { status: 'invalid-target' }>['reason'], string>
+> = {
+  'bottom-of-group': 'widgets.layers.actions.mergeDownBottomOfGroup',
+  disabled: 'widgets.layers.actions.mergeDownHidden',
+  'group-below': 'widgets.layers.actions.mergeDownGroupBelow',
+  'no-layer-below': 'widgets.layers.actions.mergeDownNoLayerBelow',
+  'not-mergeable': 'widgets.layers.actions.mergeDownNotMergeable',
+};
+
+/**
+ * Says why the selected layer cannot merge down, naming the layer or group in the way, as one notice per layer and
+ * reason. The engine decides the reason; this only words it.
+ */
+export const reportMergeDownRefusal = (
+  document: CanvasDocumentContractV3,
+  refusal: DocumentRefusal,
+  notice: CanvasRefusalNotice,
+  t: TFunction
+): void => {
+  const selectedId = document.selectedLayerId;
+  if (!selectedId) {
+    return;
+  }
+  const nameOf = (id: string | undefined): string => getDocumentNode(document, id)?.name ?? '';
+  const message = ((): string | null => {
+    switch (refusal.status) {
+      case 'locked':
+        return t('widgets.layers.actions.mergeDownLocked', { name: nameOf(refusal.ids[0]) });
+      case 'wrong-type':
+        return t(
+          refusal.actual === 'group'
+            ? 'widgets.layers.actions.mergeDownGroupSelected'
+            : refusal.actual === 'inpaint_mask'
+              ? 'widgets.layers.actions.mergeDownMaskSelected'
+              : 'widgets.layers.actions.mergeDownWrongType'
+        );
+      case 'invalid-target': {
+        const key = MERGE_DOWN_TARGET_KEYS[refusal.reason];
+        return key ? t(key, { name: nameOf(refusal.targetId) }) : null;
+      }
+      case 'missing':
+      case 'unsupported':
+        // The selection is gone, or the command does not exist here: nothing the user can act on.
+        return null;
+    }
+  })();
+  if (message !== null) {
+    const reason = refusal.status === 'invalid-target' ? refusal.reason : refusal.status;
+    notice(
+      `merge-down:${selectedId}:${reason}`,
+      t('widgets.layers.actions.mergeDownRefused', { name: nameOf(selectedId) }),
+      message
+    );
+  }
 };
 
 /**
@@ -103,16 +194,24 @@ export const isCanvasToolCommand = (commandId: string): commandId is CanvasToolC
 
 export type TransformRefusal = Exclude<BeginTransformResult, 'started'>;
 
-/** Explains a refused `beginTransform`; a layer Transform cannot act on gets Transform's own reason. */
+/**
+ * Explains a refused `beginTransform` on `layer`. A layer Transform cannot act on is a refusal notice (one per layer,
+ * not recorded), not a failure; the other refusals keep the shared layer-operation error.
+ */
 export const reportTransformRefusal = (
   refusal: TransformRefusal,
-  reportError: (title: string, message: string) => void,
+  layer: { id: string; name: string },
+  report: { error: (title: string, message: string) => void; notice: CanvasRefusalNotice },
   t: TFunction
 ): void => {
   if (refusal === 'ineligible') {
-    reportError(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.transformIneligible'));
+    report.notice(
+      `transform:ineligible:${layer.id}`,
+      t('widgets.layers.actions.transformUnavailable', { name: layer.name }),
+      t('widgets.layers.actions.transformIneligible')
+    );
   } else {
-    reportLayerOperation(refusal, reportError, t);
+    reportLayerOperation(refusal, report.error, t);
   }
 };
 
@@ -125,7 +224,8 @@ export interface CanvasToolCommandContext {
   readonly swapActiveColors: () => void;
   /** Resets the pair to the black-on-white default. */
   readonly resetActiveColors: () => void;
-  readonly reportTransformRefusal: (refusal: TransformRefusal) => void;
+  /** Explains a refused Transform of the selected layer `layerId`. */
+  readonly reportTransformRefusal: (refusal: TransformRefusal, layerId: string) => void;
 }
 
 /** Runs one companion key. The color pair is a preference, not a document edit: X/D need no engine. */
@@ -159,7 +259,7 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       const result = engine.layers.beginTransform(ctx.selectedLayerId);
       // A key pressed mid-gesture is dropped quietly; the gesture already says why.
       if (result !== 'started' && result !== 'busy') {
-        ctx.reportTransformRefusal(result);
+        ctx.reportTransformRefusal(result, ctx.selectedLayerId);
       }
       return;
     }

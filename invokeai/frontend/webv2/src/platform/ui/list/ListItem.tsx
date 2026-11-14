@@ -22,6 +22,14 @@ export interface ListContextMenuAnchor {
 
 export interface ListItemProps {
   title: string;
+  /**
+   * An editor shown in place of the title, such as a rename field; it names itself. While set, the primary area is a
+   * plain container instead of a button, since a field cannot sit inside a button, and the row opens no context menu,
+   * so the field keeps the browser's text menu. Size it to the title's line so the row keeps its height. Inside a `List`
+   * the field keeps its own arrows, Home and End; the caller ends the edit (Enter, Escape, blur) and moves focus back
+   * to the row, whose button returns with the List's tab stop.
+   */
+  titleEditor?: ReactNode;
   /** Identifiers keep their tail visible; prose keeps its start. */
   titleTruncate?: 'middle' | 'end';
   /** Media or icon before the text; size it for the density (36px at comfortable and snug). */
@@ -46,6 +54,12 @@ export interface ListItemProps {
   isChecked?: boolean;
   /** Shown but inert while its page is being replaced; focus is kept so paging does not lose it. */
   isBusy?: boolean;
+  /**
+   * Shown dimmed and inert because the item itself cannot be used; say why in the row's text (a badge, say). Only its
+   * primary button stays focusable, so a List's arrow keys still reach it and assistive tech reads the reason with its
+   * name; press, checkbox, context menu, intent, actions and detail are all off.
+   */
+  isDisabled?: boolean;
   /** The row discloses content below itself; announced with aria-expanded. */
   isExpanded?: boolean;
   /** This row's context menu is open; the row keeps its hover surface so it is clear what the menu acts on. */
@@ -92,6 +106,7 @@ export const ListItem = ({
   isActive = false,
   isBusy = false,
   isChecked = false,
+  isDisabled = false,
   isExpanded,
   isMenuOpen = false,
   itemKey,
@@ -101,6 +116,7 @@ export const ListItem = ({
   setSize,
   tabIndex = 0,
   title,
+  titleEditor,
   titleTruncate = 'middle',
   trailing,
   onCheckedChange,
@@ -122,6 +138,9 @@ export const ListItem = ({
   // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
   // nothing to act on stays static.
   const isStatic = !isInteractive && (actions === undefined || actions === null);
+  const isEditingTitle = titleEditor !== undefined && titleEditor !== null;
+  const menu = isDisabled || isEditingTitle ? undefined : onContextMenu;
+  const intent = isDisabled ? undefined : onIntent;
 
   const openContextMenu = useCallback(
     (row: HTMLElement, point?: { x: number; y: number }) => {
@@ -188,7 +207,7 @@ export const ListItem = ({
       const isVirtualClick = (event.nativeEvent as { mozInputSource?: number }).mozInputSource === 0;
       const isMouseClick = pressPointerType.current === 'mouse' && event.detail > 0 && !isVirtualClick;
       pressPointerType.current = null;
-      if (isBusy) {
+      if (isBusy || isDisabled) {
         return;
       }
       if (onPress) {
@@ -197,7 +216,7 @@ export const ListItem = ({
         openContextMenu(event.currentTarget.parentElement);
       }
     },
-    [isBusy, onPress, openContextMenu]
+    [isBusy, isDisabled, onPress, openContextMenu]
   );
   // Plain text keeps to its line; a node (badge row, figures) lays itself out.
   const descriptionCss = useMemo(
@@ -214,12 +233,16 @@ export const ListItem = ({
       {leading}
       <chakra.span css={styles.body}>
         <chakra.span css={styles.titleLine}>
-          <MiddleTruncate
-            as="span"
-            css={styles.title}
-            tailGraphemes={titleTruncate === 'end' ? 0 : undefined}
-            text={title}
-          />
+          {isEditingTitle ? (
+            titleEditor
+          ) : (
+            <MiddleTruncate
+              as="span"
+              css={styles.title}
+              tailGraphemes={titleTruncate === 'end' ? 0 : undefined}
+              text={title}
+            />
+          )}
           {badges !== undefined && badges !== null ? <chakra.span css={styles.badges}>{badges}</chakra.span> : null}
         </chakra.span>
         {description !== undefined && description !== null ? (
@@ -236,12 +259,13 @@ export const ListItem = ({
       aria-setsize={setSize}
       css={styles.root}
       data-busy={isBusy || undefined}
+      data-disabled={isDisabled || undefined}
       data-list-row={itemKey}
       data-list-surface=""
       data-menu-open={isMenuOpen || undefined}
       data-static={isStatic || undefined}
       role={role}
-      onContextMenu={onContextMenu ? handleContextMenu : undefined}
+      onContextMenu={menu ? handleContextMenu : undefined}
     >
       {onCheckedChange ? (
         <chakra.div css={styles.check}>
@@ -250,7 +274,7 @@ export const ListItem = ({
             checked={isChecked}
             ids={checkIds}
             colorPalette="accent"
-            disabled={isBusy}
+            disabled={isBusy || isDisabled}
             size="sm"
             onCheckedChange={handleCheckedChange}
           >
@@ -259,32 +283,40 @@ export const ListItem = ({
           </Checkbox.Root>
         </chakra.div>
       ) : null}
-      {isInteractive ? (
+      {isInteractive && !isEditingTitle ? (
         <chakra.button
           aria-current={isActive || undefined}
-          aria-disabled={isBusy || undefined}
-          aria-expanded={onContextMenu && !onPress ? isMenuOpen : isExpanded}
-          aria-haspopup={onContextMenu && !onPress ? 'menu' : undefined}
+          aria-disabled={isBusy || isDisabled || undefined}
+          aria-expanded={menu && !onPress ? isMenuOpen : isExpanded}
+          aria-haspopup={menu && !onPress ? 'menu' : undefined}
           aria-label={pressLabel}
           css={styles.primary}
           data-list-primary=""
           tabIndex={tabIndex}
           type="button"
           onClick={handlePress}
-          onFocus={onIntent}
+          onFocus={intent}
           onPointerDown={onPress ? undefined : handlePointerDown}
-          onPointerEnter={onIntent}
+          onPointerEnter={intent}
         >
           {content}
         </chakra.button>
       ) : (
-        // Static rows (nothing to press, no menu) must not announce themselves as buttons.
+        // Static rows (nothing to press, no menu) and a row editing its title must not announce themselves as buttons.
         <chakra.div aria-current={isActive || undefined} css={styles.primary} data-list-primary="">
           {content}
         </chakra.div>
       )}
-      {actions !== undefined && actions !== null ? <chakra.div css={styles.actions}>{actions}</chakra.div> : null}
-      {detail !== undefined && detail !== null ? <chakra.div css={styles.detail}>{detail}</chakra.div> : null}
+      {actions !== undefined && actions !== null ? (
+        <chakra.div css={styles.actions} inert={isDisabled || undefined}>
+          {actions}
+        </chakra.div>
+      ) : null}
+      {detail !== undefined && detail !== null ? (
+        <chakra.div css={styles.detail} inert={isDisabled || undefined}>
+          {detail}
+        </chakra.div>
+      ) : null}
     </chakra.div>
   );
 };

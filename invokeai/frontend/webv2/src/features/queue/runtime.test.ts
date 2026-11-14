@@ -15,6 +15,7 @@ import { activeProgressTargetStore } from '@features/queue/data/activeProgressTa
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
+import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { createInitialWorkbenchState, type WorkbenchAction, workbenchReducer } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,7 +61,6 @@ const createPendingQueueItem = (): QueueItem => ({
 });
 
 const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBackendPort => ({
-  cancelCurrentItem: vi.fn(),
   cancelItem: vi.fn(),
   cancelQueueItems: vi.fn(),
   cancelQueueItemsByBatchIds: vi.fn(),
@@ -97,6 +97,7 @@ const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBack
 
 const createTestCommands = (overrides: Partial<QueueHistoryCommands> = {}): QueueHistoryCommands => ({
   markBackendCancelled: vi.fn(),
+  noteFirstProgressFrame: vi.fn(),
   markBackendSubmitted: vi.fn(),
   recordSubmissionRetry: vi.fn(),
   setCancellationPending: vi.fn(),
@@ -455,7 +456,6 @@ describe('queue runtime', () => {
       },
     ]);
     const backend: QueueBackendPort = {
-      cancelCurrentItem: vi.fn(),
       cancelItem: vi.fn(),
       cancelQueueItems: vi.fn(),
       cancelQueueItemsByBatchIds: vi.fn(),
@@ -490,6 +490,7 @@ describe('queue runtime', () => {
     };
     const commands: QueueHistoryCommands = {
       markBackendCancelled: vi.fn(),
+      noteFirstProgressFrame: vi.fn(),
       markBackendSubmitted: ({ backendBatchId, backendItemIds }) => {
         queueItem.backendBatchId = backendBatchId;
         queueItem.backendItemIds = backendItemIds;
@@ -3106,7 +3107,6 @@ describe('queue runtime video board routing', () => {
     }
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const backend: QueueBackendPort = {
-      cancelCurrentItem: vi.fn(),
       cancelItem: vi.fn(),
       cancelQueueItems: vi.fn(),
       cancelQueueItemsByBatchIds: vi.fn(),
@@ -3167,6 +3167,7 @@ describe('queue runtime video board routing', () => {
     };
     const commands: QueueHistoryCommands = {
       markBackendCancelled: vi.fn(),
+      noteFirstProgressFrame: vi.fn(),
       markBackendSubmitted: ({ backendBatchId, backendItemIds }) => {
         queueItem.backendBatchId = backendBatchId;
         queueItem.backendItemIds = backendItemIds;
@@ -3930,6 +3931,123 @@ describe('queue runtime retries', () => {
       }),
     ]);
     expect(commands.stageRetriedCanvasResults).not.toHaveBeenCalled();
+
+    await runtime.dispose();
+  });
+
+  it('moves Canvas staging on to the next image of a run on its first frame, not when it starts', async () => {
+    let state = createInitialWorkbenchState();
+    const projectId = state.activeProjectId;
+    const { canvas } = state.projects.find((project) => project.id === projectId)!;
+    const queueItem: WorkbenchQueueItem = {
+      ...createPendingQueueItem(),
+      backendItemIds: [41, 42],
+      snapshot: {
+        ...createPendingQueueItem().snapshot,
+        canvas: {
+          document: { bbox: { ...canvas.document.bbox }, height: canvas.document.height, width: canvas.document.width },
+          documentRevision: canvas.documentRevision,
+        },
+        presentation: { batchCount: 2, height: 64, width: 64 },
+      },
+      status: 'running',
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === projectId ? { ...project, queue: { items: [queueItem] } } : project
+      ),
+    };
+    const listeners = new Set<() => void>();
+    const dispatch = (action: WorkbenchAction): void => {
+      state = workbenchReducer(state, action);
+      listeners.forEach((listener) => listener());
+    };
+    dispatch({
+      mutation: { mode: 'progress', type: 'setCanvasStagingAutoSwitch' },
+      projectId,
+      type: 'applyCanvasProjectMutation',
+    });
+    const origin = buildQueueItemOrigin(queueItem.id, projectId);
+    const handlers = new Map<string, Set<(payload: never) => void>>();
+    const emit = (event: string, payload: unknown) =>
+      handlers.get(event)?.forEach((handler) => handler(payload as never));
+    const backend = createTestBackend({
+      getItem: vi.fn((id: number) =>
+        Promise.resolve({
+          batchId: 'batch',
+          id,
+          origin,
+          status: id === 41 ? ('in_progress' as const) : ('pending' as const),
+        })
+      ),
+      getResultImages: vi.fn((id: number) =>
+        Promise.resolve([
+          {
+            height: 64,
+            imageName: `result-${id}.png`,
+            imageUrl: `/result-${id}.png`,
+            queuedAt: queueItem.snapshot.submittedAt,
+            sourceQueueItemId: queueItem.id,
+            thumbnailUrl: `/result-${id}.png`,
+            width: 64,
+          },
+        ])
+      ),
+      on: vi.fn((event: string, handler: (payload: never) => void) => {
+        const eventHandlers = handlers.get(event) ?? new Set();
+        eventHandlers.add(handler);
+        handlers.set(event, eventHandlers);
+        return () => eventHandlers.delete(handler);
+      }),
+    });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend,
+      history: {
+        commands: createTestCommands({
+          markBackendCancelled: (payload) => dispatch({ ...payload, type: 'markQueueItemBackendCancelled' }),
+          noteFirstProgressFrame: (payload) => dispatch({ ...payload, type: 'noteQueueItemFirstProgressFrame' }),
+          routePartialResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemPartialResults' }),
+          routeResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemResults' }),
+          setStatus: (payload) => dispatch({ ...payload, type: 'setQueueItemStatus' }),
+        }),
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+        listStagedResults: () => getQueueStagedResults(state.projects),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    });
+    const selectedSlot = () => {
+      const project = state.projects.find((candidate) => candidate.id === projectId)!;
+      const slot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+        project.canvas.stagingArea.selectedImageIndex
+      ];
+      return slot?.kind === 'candidate' ? slot.imageName : `placeholder ${slot?.itemIndex}`;
+    };
+    const progress = (itemId: number, withFrame: boolean) => ({
+      ...completedEvent(itemId, origin, 'canvas'),
+      image: withFrame ? { dataURL: `data:image/png;base64,${itemId}`, height: 64, width: 64 } : null,
+      invocation_source_id: 'denoise',
+      message: withFrame ? 'Denoising' : 'Loading model',
+      percentage: withFrame ? 0.5 : null,
+      revision: withFrame ? 1 : null,
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(backend.getItem).toHaveBeenCalledTimes(2));
+    emit('queue_item_status_changed', completedEvent(41, origin, 'canvas'));
+    await vi.waitFor(() => expect(selectedSlot()).toBe('result-41.png'));
+
+    // The second image starts and loads its model: the first one's result stays on the canvas.
+    emit('queue_item_status_changed', { ...completedEvent(42, origin, 'canvas'), status: 'in_progress' });
+    emit('invocation_progress', progress(42, false));
+    expect(selectedSlot()).toBe('result-41.png');
+
+    emit('invocation_progress', progress(42, true));
+    expect(selectedSlot()).toBe('placeholder 2');
 
     await runtime.dispose();
   });

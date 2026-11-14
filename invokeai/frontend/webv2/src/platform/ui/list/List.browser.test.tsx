@@ -561,3 +561,88 @@ describe('List states', () => {
     expect(host.querySelector('[role="list"]')).toBeNull();
   });
 });
+
+describe('a row editing its title inside a List', () => {
+  const EditingHarness = ({ editingKey }: { editingKey: string | null }) => (
+    <ChakraProvider value={system}>
+      <button type="button">Before the list</button>
+      <List
+        density="comfortable"
+        emptyState={<span>nothing</span>}
+        label="subjects"
+        renderItem={(item: Item, rowProps: ListRowProps) => (
+          <ListItem
+            {...rowProps}
+            title={item.name}
+            titleEditor={item.id === editingKey ? <input aria-label="Rename" defaultValue={item.name} /> : undefined}
+            onPress={() => undefined}
+          />
+        )}
+        rows={rowsOf(section('main', 'Main', 5))}
+      />
+    </ChakraProvider>
+  );
+
+  it('leaves the field its own Home, End and arrows, and gives the row its tab stop back after', async () => {
+    await render(<EditingHarness editingKey={null} />);
+    // The List's tab stop is on the second row, as after using it.
+    await act(() => primaryButtons()[1]!.focus());
+
+    await render(<EditingHarness editingKey="main-1" />);
+    const field = host.querySelector<HTMLInputElement>('input[aria-label="Rename"]')!;
+    await act(() => field.focus());
+    field.setSelectionRange(2, 2);
+
+    await act(() => userEvent.keyboard('{End}'));
+    expect(field.selectionStart).toBe(field.value.length);
+    await act(() => userEvent.keyboard('{Home}'));
+    expect(field.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{ArrowDown}{ArrowUp}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(field);
+
+    // Editing done, the row's button is back and is the List's one tab stop.
+    await render(<EditingHarness editingKey={null} />);
+    const stops = primaryButtons().filter((button) => button.tabIndex === 0);
+    expect(stops).toHaveLength(1);
+    expect(stops[0]?.textContent).toContain('Main 1');
+
+    await act(() => host.querySelector<HTMLButtonElement>('button:not([data-list-primary])')!.focus());
+    await act(() => userEvent.tab());
+    expect(document.activeElement).toBe(stops[0]);
+  });
+});
+
+describe('keys from a row selection checkbox', () => {
+  it('still move between rows: arrows, Home and End', async () => {
+    const onCheckedChange = vi.fn();
+    await render(<Harness rows={rowsOf(section('main', 'Main', 5))} onCheckedChange={onCheckedChange} />);
+    const checkbox = (index: number) =>
+      host
+        .querySelectorAll<HTMLElement>('[role="listitem"]')
+        [index]!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+
+    await act(() => checkbox(0).focus());
+    await act(() => userEvent.keyboard(' '));
+    expect(onCheckedChange).toHaveBeenCalledOnce();
+
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(primaryButtons()[1]);
+
+    await act(() => checkbox(1).focus());
+    await act(() => userEvent.keyboard('{End}'));
+    await settleFrame();
+    expect(document.activeElement?.textContent).toContain('Main 4');
+
+    await act(() => checkbox(4).focus());
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await settleFrame();
+    expect(document.activeElement?.textContent).toContain('Main 3');
+
+    await act(() => checkbox(3).focus());
+    await act(() => userEvent.keyboard('{Home}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(primaryButtons()[0]);
+  });
+});

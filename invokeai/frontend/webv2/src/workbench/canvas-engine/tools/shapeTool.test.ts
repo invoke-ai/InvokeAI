@@ -781,6 +781,7 @@ describe('shape tool: mask placement', () => {
       'a mask under a locked group',
       [groupContract('group-1', [layerContract('mask-1', 'regional_guidance')], { isLocked: true })],
     ],
+    ['a mask hidden on the canvas', [layerContract('mask-1', 'inpaint_mask', { isHidden: true })]],
   ])('refuses %s without spawning a layer', (label, nodes) => {
     const h = createHarness(makeDoc({ stacks: stacksFrom(nodes), selectedLayerId: 'mask-1' }));
     const tool = createShapeTool();
@@ -790,7 +791,11 @@ describe('shape tool: mask placement', () => {
     expect(h.refusals).toEqual([
       expect.objectContaining({
         layerId: 'mask-1',
-        status: label.includes('disabled') ? 'layer-hidden' : 'layer-locked',
+        status: label.includes('disabled')
+          ? 'layer-hidden'
+          : label.includes('hidden')
+            ? 'layer-display-hidden'
+            : 'layer-locked',
       }),
     ]);
     expect(h.strokeEdit.record.commits).toHaveLength(0);

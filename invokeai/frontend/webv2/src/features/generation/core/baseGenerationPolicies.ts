@@ -2048,6 +2048,46 @@ export const getCompatibleReferenceImages = (
   });
 };
 
+/**
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
+ * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
+ * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
+ * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
+ * return the same array.
+ */
+export const reconcileReferenceImagesWithModel = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): { referenceImages: GenerateReferenceImage[]; retargetedReferenceImages: GenerateReferenceImage[] } => {
+  const referencesSupported = takesReferenceImages(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(referenceImages, model, models)
+    : referenceImages;
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
+
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+
+  return {
+    referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
+    retargetedReferenceImages,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2119,29 +2159,11 @@ const getSettingsWithCompatibleModelSelections = (
     change('concepts', 'turnedOff', stoppedConcepts);
   }
 
-  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
-  // references keeps them as they are, all switched off, for the next model that takes them.
-  const referencesSupported = takesReferenceImages(model);
-  const retargetedReferenceImages = referencesSupported
-    ? getCompatibleReferenceImages(settings.referenceImages, model, models)
-    : settings.referenceImages;
-  const enabledKept: GenerateReferenceImage[] = [];
-  let didSwitchOff = false;
-  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
-    if (!isReferenceImageActive(referenceImage)) {
-      return referenceImage;
-    }
-
-    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
-      enabledKept.push(referenceImage);
-      return referenceImage;
-    }
-
-    didSwitchOff = true;
-    return { ...referenceImage, isEnabled: false };
-  });
-  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
+  const { referenceImages: compatibleReferenceImages, retargetedReferenceImages } = reconcileReferenceImagesWithModel(
+    settings.referenceImages,
+    model,
+    models
+  );
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -2165,7 +2187,7 @@ const getSettingsWithCompatibleModelSelections = (
       (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
     );
     const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
-    const switchedOff = keptOrSwitchedOff.filter(
+    const switchedOff = compatibleReferenceImages.filter(
       (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
     ).length;
 
@@ -2316,6 +2338,20 @@ const issue = (
 });
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+
+/**
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
+ * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ */
+const referenceNameValues = (
+  referenceImage: Pick<GenerateReferenceImage, 'name'>,
+  position: number
+): Record<string, number | string> => ({
+  index: position,
+  ...(referenceImage.name === undefined ? {} : { referenceName: referenceImage.name }),
+});
+const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
+  referenceImage.name ?? `Reference image ${position}`;
 /** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
 /** One reference image: its card shows the issue. */
@@ -2424,9 +2460,9 @@ export const getGenerationModelAvailabilityIssues = (
         issue(
           `referenceImages:modelNotInstalled:${referenceImage.id}`,
           'referenceModelNotInstalled',
-          `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          `${englishReferenceName(referenceImage, index + 1)} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
           referenceImageTarget(referenceImage.id),
-          { index: index + 1, name: config.model.name },
+          { ...referenceNameValues(referenceImage, index + 1), name: config.model.name },
           { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
         )
       );
@@ -2604,9 +2640,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:unsupported:${id}`,
           'referenceImageUnsupported',
-          `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
+          `${model.name} cannot use ${englishReferenceName(referenceImage, index)}. Turn it off, or remove it.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2618,9 +2654,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsImage:${id}`,
           'referenceImageNeedsImage',
-          `Reference image ${index} needs an image.`,
+          `${englishReferenceName(referenceImage, index)} needs an image.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );
@@ -2632,9 +2668,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:needsIpAdapter:${id}`,
             'referenceImageNeedsIpAdapter',
-            `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
+            `${englishReferenceName(referenceImage, index)} needs an IP Adapter model for ${model.name}.`,
             referenceImageTarget(id),
-            { index, name: model.name },
+            { ...referenceNameValues(referenceImage, index), name: model.name },
             turnOff
           )
         );
@@ -2647,9 +2683,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:strength:${id}`,
             'referenceImageStrength',
-            `Reference image ${index} strength must be between 0 and 2.`,
+            `${englishReferenceName(referenceImage, index)} strength must be between 0 and 2.`,
             referenceImageTarget(id),
-            { index },
+            referenceNameValues(referenceImage, index),
             turnOff
           )
         );
@@ -2664,9 +2700,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsRedux:${id}`,
           'referenceImageNeedsRedux',
-          `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
+          `${englishReferenceName(referenceImage, index)} needs a FLUX Redux model for ${model.name}.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2680,9 +2716,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsKontext:${id}`,
           'referenceImageNeedsKontext',
-          `Reference image ${index} needs the selected FLUX Kontext model.`,
+          `${englishReferenceName(referenceImage, index)} needs the selected FLUX Kontext model.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );

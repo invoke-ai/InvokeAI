@@ -267,7 +267,12 @@ export const lookupLayerBelow = (document: DocumentView, id: string): CanvasLaye
   return below && !isGroupNode(below) ? below : null;
 };
 
-/** Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. */
+/**
+ * Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. A refusal says which:
+ * nothing below at the top level (`no-layer-below`) or in a group (`bottom-of-group`), a group below (`group-below`,
+ * naming it), a layer of either pair that is not paint or image pixels (`not-mergeable`), a lock (naming each locked
+ * node), or a disabled layer or ancestor group (`disabled`, naming it).
+ */
 export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId: string): MergeDownEligibility => {
   const index = getDocumentIndex(document);
   const upper = index.byId.get(upperId);
@@ -277,10 +282,18 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (isGroupNode(upper.node) || upper.stack !== 'raster') {
     return { actual: upper.node.type, expected: ['raster'], status: 'wrong-type' };
   }
-  const lower = lookupLayerBelow(document, upperId);
-  if (!lower) {
-    return { reason: 'no-layer-below', status: 'invalid-target', targetId: upperId };
+  const sibling = childrenAt(index, upper.stack, upper.parentId)?.[upper.siblingIndex + 1];
+  if (!sibling) {
+    return {
+      reason: upper.parentId === null ? 'no-layer-below' : 'bottom-of-group',
+      status: 'invalid-target',
+      targetId: upperId,
+    };
   }
+  if (isGroupNode(sibling)) {
+    return { reason: 'group-below', status: 'invalid-target', targetId: sibling.id };
+  }
+  const lower = sibling;
   const pair = [upper.node, lower];
   const unmergeable = pair.find((layer) => layer.type !== 'raster' || !isPixelBackedLayer(layer));
   if (unmergeable) {
@@ -293,9 +306,12 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (locked.length > 0) {
     return { ids: locked, status: 'locked' };
   }
-  const disabled = pair.find((layer) => !isLayerContributing(layer));
-  if (disabled || !upper.ancestorsEnabled) {
-    return { reason: 'not-mergeable', status: 'invalid-target', targetId: disabled?.id ?? upperId };
+  // Both share the upper layer's ancestors, so a disabled group gates the pair; name that group.
+  const disabledId =
+    upper.path.find((id) => !index.byId.get(id)!.node.isEnabled) ??
+    pair.find((layer) => !isLayerContributing(layer))?.id;
+  if (disabledId) {
+    return { reason: 'disabled', status: 'invalid-target', targetId: disabledId };
   }
   return { lowerId: lower.id, status: 'eligible', upperId };
 };

@@ -29,6 +29,8 @@ export interface CreatePreviewPublisherDeps {
   readonly resolveImage: ImageResolver;
   readonly decodeBlob: (blob: Blob) => Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }>;
   readonly invalidateAll: () => void;
+  /** Publishes {@link PreviewStateController.hidesStagingOverlays} after each staged change, for canvas chrome. */
+  readonly publishHidesStagingOverlays: (hidden: boolean) => void;
   readonly invalidateLayer: (layerId: string) => void;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
@@ -43,7 +45,7 @@ export interface PreviewPublisher {
   dispose(): void;
   /** Warms one full-resolution staged result without decoding it. */
   preloadStagedPreview(imageName: string): void;
-  /** Decodes and publishes a staged-generation preview; `null` clears. Never throws. */
+  /** Decodes and publishes a staged-generation preview; a hidden candidate shows none, `null` clears. Never throws. */
   setStagedPreview(input: StagedPreviewInput | null): void;
   /** Drops one layer's filter preview and invalidates it. */
   clearFilterPreview(layerId: string): void;
@@ -84,9 +86,15 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
   const stagedPreviewBlobs = createStagedPreviewBlobCache(deps.resolveImage);
   const stagedImageDecodes = new Map<string, ReturnType<CreatePreviewPublisherDeps['decodeBlob']>>();
 
+  /** The staged preview showed, hid or changed: repaint, and publish whether the overlay stacks are hidden. */
+  const stagedChanged = (): void => {
+    deps.invalidateAll();
+    deps.publishHidesStagingOverlays(previews.hidesStagingOverlays());
+  };
+
   const clearStagedPreview = (): void => {
     if (previews.clearStaged()) {
-      deps.invalidateAll();
+      stagedChanged();
     }
   };
 
@@ -233,12 +241,18 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
         clearStagedPreview();
         return;
       }
+      if ('imageName' in input && input.hidden) {
+        if (previews.hideStaged()) {
+          stagedChanged();
+        }
+        return;
+      }
       const token = previews.nextStagedToken();
       decodeStagedPreview(input, () => previews.isStagedTokenCurrent(token))
         .then((decoded) => {
           // A newer set/clear superseded this decode while it was in flight.
           if (previews.publishStaged(token, decoded)) {
-            deps.invalidateAll();
+            stagedChanged();
           }
         })
         .catch(() => {
