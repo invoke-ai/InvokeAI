@@ -323,9 +323,24 @@ export const useGalleryGridSelection = ({
         return;
       }
 
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], returnFocus, x, y });
+      setContextMenuTarget({
+        itemRefs: [toGalleryItemRef(item)],
+        items: [item],
+        listingView: gallery.galleryView,
+        returnFocus,
+        x,
+        y,
+      });
     },
-    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
+    [
+      getItemReturnFocus,
+      gallery.galleryView,
+      gallery.listingBoardId,
+      loadedItems,
+      selectedItemKeys,
+      selectedItemRefs,
+      shouldStarSelection,
+    ]
   );
 
   const getDragItems = useCallback(

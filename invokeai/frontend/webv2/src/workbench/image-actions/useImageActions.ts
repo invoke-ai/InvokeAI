@@ -6,6 +6,7 @@ import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
+  galleryDurability,
   galleryItemOrganization,
   galleryItems,
   galleryTransfers,
@@ -24,6 +25,7 @@ import {
   getGalleryAutoAddBoardId,
   getGalleryBoardLabel,
   getGalleryDeletionSuccessor,
+  getGalleryView,
   getPersistedSelectedGalleryItemKeys,
 } from '@features/gallery/contracts';
 import {
@@ -52,7 +54,7 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
 import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
@@ -136,6 +138,7 @@ export interface ImageActions extends GalleryItemActions {
   /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
+  moveUploadToMedia: (image: GalleryImage) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   /** Applies a gallery video's recorded parameters to the Video panel. */
@@ -1321,6 +1324,49 @@ export const useImageActions = ({
           imageNames.map((name) => ({ kind: 'image', name })),
           boardId
         ),
+      moveUploadToMedia: async (image) => {
+        if (image.imageCategory !== 'user') {
+          return;
+        }
+
+        const owner = captureAccountScope();
+
+        try {
+          await galleryDurability.save(image.imageName, owner.signal);
+          assertAccountScopeCurrent(owner);
+
+          // Drop the item from Uploads' action selection while keeping the primary image available to Preview.
+          const values = getLatestWidgetValues('gallery');
+          const itemKey = toGalleryItemKey({ kind: 'image', name: image.imageName });
+          const selectedKeys = getPersistedSelectedGalleryItemKeys(values);
+
+          if (getGalleryView(values) === 'assets' && selectedKeys.includes(itemKey)) {
+            commands.widgets.patchValues(
+              'gallery',
+              { selectedImageNames: selectedKeys.filter((key) => key !== itemKey) },
+              projectId,
+              'system'
+            );
+          }
+
+          await invalidateGallery(queryClient, owner);
+          assertAccountScopeCurrent(owner);
+          recordSuccess(t('widgets.gallery.itemActions.moveToMedia.success'));
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          notifications.add({
+            kind: 'error',
+            message:
+              error instanceof ApiError && error.status === 403
+                ? t('widgets.gallery.itemActions.moveToMedia.permissionDenied')
+                : toErrorMessage(error),
+            title: t('widgets.gallery.itemActions.moveToMedia.failure'),
+          });
+        }
+      },
       openImageInPreview: (image) => {
         gallery.selectImage(image, projectId);
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });

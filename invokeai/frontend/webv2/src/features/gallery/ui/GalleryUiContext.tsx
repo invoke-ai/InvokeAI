@@ -57,6 +57,8 @@ export interface GalleryItemContextMenuTarget {
   items: GalleryItem[];
   /** The board the listing the targets were selected in reads, where targets `items` omits sit. */
   listingBoardId?: string;
+  /** Present for a context menu opened on the Gallery grid. */
+  listingView?: GalleryView;
   /**
    * Where focus goes when a dialog the menu opens (a deletion's confirmation) closes, resolved then: the menu, which
    * had focus as the dialog opened, is gone by then.

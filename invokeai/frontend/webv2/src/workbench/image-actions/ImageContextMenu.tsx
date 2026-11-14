@@ -28,6 +28,7 @@ import {
   EyeIcon,
   FileJsonIcon,
   FolderIcon,
+  ImageIcon,
   ImagesIcon,
   StarIcon,
   Trash2Icon,
@@ -144,6 +145,19 @@ export const ImageContextMenu = ({
     [images, isCompleteImageTarget, itemTarget]
   );
   const returnFocus = itemTarget?.returnFocus;
+  const upload =
+    itemTarget?.listingView === 'assets' && images.length === 1 && images[0]?.imageCategory === 'user'
+      ? images[0]
+      : null;
+  const moveUploadToMedia = useCallback(() => {
+    if (!upload) {
+      return;
+    }
+
+    // This menu has no trigger. Return focus before the request so the grid can take over if the tile disappears.
+    returnFocus?.()?.focus({ preventScroll: true });
+    void actions.moveUploadToMedia(upload);
+  }, [actions, returnFocus, upload]);
   const requestDeletion = useCallback(
     (itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs, { returnFocus }),
     [actions, returnFocus]
@@ -167,6 +181,7 @@ export const ImageContextMenu = ({
       target={imageTarget}
       variant={variant}
       onClose={onClose}
+      onMoveUploadToMedia={upload ? moveUploadToMedia : undefined}
       onRequestDeletion={requestImageDeletion}
     />
   ) : (
@@ -534,6 +549,7 @@ const ImageContextMenuContent = ({
   target,
   variant,
   onClose,
+  onMoveUploadToMedia,
   onRequestDeletion,
 }: {
   actions: ImageActions;
@@ -543,6 +559,7 @@ const ImageContextMenuContent = ({
   target: ImageContextMenuTarget;
   variant: ImageContextMenuVariant;
   onClose: () => void;
+  onMoveUploadToMedia?: () => void;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const targetRef = useRef(target);
@@ -603,6 +620,7 @@ const ImageContextMenuContent = ({
                 isLoadingRecallCapabilities={isLoadingRecallCapabilities}
                 recallCapabilities={recallCapabilities}
                 variant={variant}
+                onMoveUploadToMedia={onMoveUploadToMedia}
                 onRequestDeletion={onRequestDeletion}
               />
             )}
@@ -621,6 +639,7 @@ const SingleImageMenuItems = ({
   isLoadingRecallCapabilities,
   recallCapabilities,
   variant,
+  onMoveUploadToMedia,
   onRequestDeletion,
 }: {
   actions: ImageActions;
@@ -630,6 +649,7 @@ const SingleImageMenuItems = ({
   isLoadingRecallCapabilities: boolean;
   recallCapabilities: ImageRecallCapabilities;
   variant: ImageContextMenuVariant;
+  onMoveUploadToMedia?: () => void;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const { t } = useTranslation();
@@ -692,6 +712,14 @@ const SingleImageMenuItems = ({
       />
       <Menu.Separator borderColor="border.subtle" />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
+      {onMoveUploadToMedia && (
+        <ContextMenuItem
+          icon={ImageIcon}
+          label={t('widgets.gallery.itemActions.moveToMedia.label')}
+          value="move-upload-to-media"
+          onClick={onMoveUploadToMedia}
+        />
+      )}
       <ChangeBoardSubMenu boards={boards} itemBoardIds={imageSourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
