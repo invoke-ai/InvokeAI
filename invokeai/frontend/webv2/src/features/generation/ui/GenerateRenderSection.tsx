@@ -766,8 +766,10 @@ export const GenerateRenderSection = ({
       // The seed, strength and family fields keep their values: only these have model defaults to return to.
       resetLabel={t(
         uiPolicy.schedulerVisible
-          ? 'widgets.generate.sectionMenu.resetStepsCfgAndScheduler'
-          : 'widgets.generate.sectionMenu.resetStepsAndCfg'
+          ? 'widgets.generate.sectionMenu.resetStepsGuidanceAndScheduler'
+          : 'widgets.generate.sectionMenu.resetStepsAndGuidance',
+        // Named as the field is: CFG, or Guidance on distilled-guidance models.
+        { guidance: uiPolicy.guidanceLabel }
       )}
     >
       <Stack gap="2.5">

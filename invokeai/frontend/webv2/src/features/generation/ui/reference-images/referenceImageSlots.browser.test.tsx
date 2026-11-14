@@ -6,7 +6,11 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, MouseSensor, pointerWithin, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { getGalleryItemDragData } from '@features/gallery/utility';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings, getMaxReferenceImages } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getDefaultGenerateSettings,
+  getGenerateInvocationIssues,
+  getMaxReferenceImages,
+} from '@features/generation/core/baseGenerationPolicies';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssuesProvider } from '@features/generation/ui/shared/GenerateIssues';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
@@ -69,9 +73,11 @@ const info = vi.fn();
 const undoable = vi.fn();
 const patchGenerateSettings = vi.fn();
 let storedValues: Record<string, unknown> | null = null;
+/** The installed models as the store holds them now, which an Undo reads when it runs. */
+let catalog: readonly { base: string; key: string; name: string; type: string }[] = [];
 const ADAPTER = {
   gallery: { findImage: vi.fn() },
-  models: { ModelSelect: () => null, getBaseLabel: (base: string) => base },
+  models: { ModelSelect: () => null, getBaseLabel: (base: string) => base, readCatalog: () => catalog },
   notifications: { info, undoable },
   project: { activeProjectId: 'project-1' },
   settings: { patchGenerateSettings, readGenerateValues: () => storedValues },
@@ -111,6 +117,7 @@ const render = async ({
   applyFix = vi.fn(),
   dragged = 0,
   issues = [],
+  models = NO_MODELS,
   onCommit = vi.fn(),
   onCommitImmediate = vi.fn(),
   referenceImages,
@@ -119,6 +126,7 @@ const render = async ({
   applyFix?: (fix: unknown) => void;
   dragged?: number;
   issues?: GenerationIssue[];
+  models?: readonly { base: string; key: string; name: string; type: string }[];
   onCommit?: (update: unknown) => void;
   onCommitImmediate?: (patch: unknown) => void;
   referenceImages: GenerateReferenceImage[];
@@ -134,7 +142,7 @@ const render = async ({
                 {dragged > 0 ? <DraggedSelection count={dragged} /> : null}
                 <div data-testid="section">
                   <GenerateReferenceImagesContent
-                    models={NO_MODELS}
+                    models={models}
                     visionComponents={NO_VISION_COMPONENTS}
                     referenceImages={referenceImages}
                     selectedModel={selectedModel}
@@ -168,6 +176,7 @@ beforeEach(() => {
   undoable.mockClear();
   patchGenerateSettings.mockClear();
   storedValues = null;
+  catalog = [];
 });
 
 afterEach(async () => {
@@ -210,6 +219,83 @@ describe('removing every reference', () => {
     ]);
     expect(patch.referenceImages.filter((referenceImage) => referenceImage.isEnabled)).toHaveLength(max());
     expect(patch.referenceImages.slice(max()).every((referenceImage) => !referenceImage.isEnabled)).toBe(true);
+  });
+});
+
+describe('undoing a removal after a model switch', () => {
+  const FLUX: GenerateModelConfig = {
+    base: 'flux',
+    format: 'diffusers',
+    key: 'flux-dev',
+    name: 'FLUX.1 dev',
+    type: 'main',
+  };
+  const FLUX_IP_ADAPTER = { base: 'flux', key: 'ip-adapter-flux', name: 'IP Adapter FLUX', type: 'ip_adapter' };
+  /** Removes the reference from its row, as Delete does there; the commit applies at once, as the form's does. */
+  const renderAndRemove = async (removed: GenerateReferenceImage) => {
+    let settings = { ...getDefaultGenerateSettings(SDXL), referenceImages: [removed] };
+    const onCommit = (update: unknown) => {
+      settings = typeof update === 'function' ? update(settings) : { ...settings, ...(update as object) };
+    };
+
+    await render({ onCommit, referenceImages: [removed] });
+    await act(() =>
+      host!.querySelector<HTMLElement>(`[data-reference-image-id="${removed.id}"] [data-list-primary]`)!.focus()
+    );
+    await act(() => userEvent.keyboard('{Delete}'));
+
+    expect(settings.referenceImages).toEqual([]);
+    expect(undoable).toHaveBeenCalledOnce();
+  };
+  const restoredAfterSwitchTo = async (model: GenerateModelConfig) => {
+    // Since the removal the user switched to `model`, which left no references.
+    storedValues = { ...getDefaultGenerateSettings(model), model, modelKey: model.key, referenceImages: [] };
+    await act(() => undoable.mock.calls[0]![1].onUndo());
+
+    return (patchGenerateSettings.mock.calls[0] as [{ referenceImages: GenerateReferenceImage[] }])[0].referenceImages;
+  };
+
+  it("brings an SDXL IP-Adapter reference back on FLUX's adapter installed since, as the switch would, and Invoke can run", async () => {
+    const removed = reference('palette');
+
+    await renderAndRemove(removed);
+    // Installed after the removal: the Undo reads the catalog as it is when it runs.
+    catalog = [FLUX_IP_ADAPTER];
+
+    const restored = await restoredAfterSwitchTo(FLUX);
+
+    expect(restored).toEqual([
+      {
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-L',
+          image: removed.config.image,
+          method: 'full',
+          model: FLUX_IP_ADAPTER,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+        id: 'palette',
+        isEnabled: true,
+      },
+    ]);
+    // Nothing about the references holds Invoke back (the bare FLUX fixture still lacks its encoders).
+    expect(
+      getGenerateInvocationIssues({
+        ...getDefaultGenerateSettings(FLUX),
+        model: FLUX,
+        referenceImages: restored,
+      }).filter((issue) => issue.target.section === 'guidance')
+    ).toEqual([]);
+  });
+
+  it('brings a reference back switched off on a model that takes none', async () => {
+    const COGVIEW: GenerateModelConfig = { base: 'cogview4', key: 'cogview4', name: 'CogView4', type: 'main' };
+    const removed = reference('palette');
+
+    await renderAndRemove(removed);
+
+    expect(await restoredAfterSwitchTo(COGVIEW)).toEqual([{ ...removed, isEnabled: false }]);
   });
 });
 

@@ -122,6 +122,8 @@ export interface GenerationUiAdapter {
     openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
+    /** The catalog as it is now, for an Undo that runs long after the render that offered it. */
+    readCatalog(): readonly GenerationModelCatalogItem[];
     /** Reads the catalog again, even after a read that half failed; settles when the read does. */
     refresh(): Promise<void>;
     status: 'error' | 'idle' | 'loaded' | 'loading';

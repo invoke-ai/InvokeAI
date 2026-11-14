@@ -22,6 +22,36 @@ interface GenerateIssuesValue {
 }
 
 const GenerateIssuesContext = createContext<GenerateIssuesValue | null>(null);
+/** How many Invoke-blocking issues each section holds, by section id, for the section titles. */
+const SectionIssueCountsContext = createContext<ReadonlyMap<string, number> | null>(null);
+
+const countIssuesBySection = (sections: readonly (string | undefined)[]): ReadonlyMap<string, number> => {
+  const counts = new Map<string, number>();
+
+  for (const section of sections) {
+    if (section !== undefined) {
+      counts.set(section, (counts.get(section) ?? 0) + 1);
+    }
+  }
+
+  return counts;
+};
+
+/**
+ * The section of each of a form's Invoke-blocking issues (undefined for one no section fixes), so each section's
+ * title carries its count. For forms whose fields word their own errors; Generate's provider sets it from its issues.
+ */
+export const GenerationSectionIssuesProvider = ({
+  children,
+  issueSections,
+}: {
+  children: ReactNode;
+  issueSections: readonly (string | undefined)[];
+}) => {
+  const counts = useMemo(() => countIssuesBySection(issueSections), [issueSections]);
+
+  return <SectionIssueCountsContext value={counts}>{children}</SectionIssueCountsContext>;
+};
 
 /** The form's Invoke-blocking issues, for its sections' badges and the notes under their fields. */
 export const GenerateIssuesProvider = ({
@@ -30,8 +60,13 @@ export const GenerateIssuesProvider = ({
   issues,
 }: GenerateIssuesValue & { children: ReactNode }) => {
   const value = useMemo(() => ({ applyFix, issues }), [applyFix, issues]);
+  const issueSections = useMemo(() => issues.map((issue) => issue.target.section), [issues]);
 
-  return <GenerateIssuesContext value={value}>{children}</GenerateIssuesContext>;
+  return (
+    <GenerateIssuesContext value={value}>
+      <GenerationSectionIssuesProvider issueSections={issueSections}>{children}</GenerationSectionIssuesProvider>
+    </GenerateIssuesContext>
+  );
 };
 
 const NO_ISSUES: readonly GenerationIssue[] = [];
@@ -51,9 +86,9 @@ export const areGenerationIssuesEqual = (
 
 /** How many issues a section holds, for its title's count. */
 export const useGenerateSectionIssueCount = (section: string | undefined): number => {
-  const issues = use(GenerateIssuesContext)?.issues ?? NO_ISSUES;
+  const counts = use(SectionIssueCountsContext);
 
-  return section === undefined ? 0 : issues.filter((issue) => issue.target.section === section).length;
+  return section === undefined ? 0 : (counts?.get(section) ?? 0);
 };
 
 /**
@@ -229,11 +264,6 @@ export const useGenerateSectionIssues = (section: GenerateSectionId): readonly G
 
 const ISSUE_POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
 
-/**
- * A list row's issues as one icon beside its switch: the row says something is wrong without a line of its own. Hover
- * or focus shows the messages; pressing it opens them in a popover with their one-step fixes. Renders nothing while
- * the row has no issue. A reveal from the Invoke issue list finds it by `data-issue-ids` and opens it.
- */
 /** A step an issue's popover offers beside its fix, for a problem fixed in the row itself (choosing its model). */
 export interface GenerateIssueAction {
   label: string;
@@ -241,6 +271,11 @@ export interface GenerateIssueAction {
   onSelect: () => void;
 }
 
+/**
+ * A list row's issues as one icon beside its switch: the row says something is wrong without a line of its own. Hover
+ * or focus shows the messages; pressing it opens them in a popover with their one-step fixes. Renders nothing while
+ * the row has no issue. A reveal from the Invoke issue list finds it by `data-issue-ids` and opens it.
+ */
 export const GenerateIssueButton = ({
   getAction,
   ...target

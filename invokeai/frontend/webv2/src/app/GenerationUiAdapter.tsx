@@ -19,6 +19,7 @@ import {
   getModelBaseColorPalette,
   getModelBaseLabel,
   getModelImageUrl,
+  getModelsSnapshot,
   openModelManager,
   useModelsSelector,
   useOpenModelInManager,
@@ -311,6 +312,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       getImageUrl: getModelImageUrl,
       openInModelManager: openInModelManager ?? undefined,
       openManager: (options) => openModelManager({ modelType: options?.modelType, projectId: project.activeProjectId }),
+      readCatalog: () => getModelsSnapshot().models,
       status: modelsStatus,
     }),
     [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]

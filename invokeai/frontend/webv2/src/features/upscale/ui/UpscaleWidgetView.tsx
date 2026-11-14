@@ -13,12 +13,14 @@ import {
   type ConceptModelPort,
   ConceptRow,
   type ConceptUpdate,
+  GenerationSectionIssuesProvider,
   GenerationSectionPanel,
   GenerationSettingsSection,
   removeConcept,
   SeedField,
   updateConcept,
 } from '@features/generation/components';
+import { useDynamicPrompts } from '@features/generation/react';
 import {
   type ArchitectureCapabilitiesSnapshot,
   ensureArchitectureCapabilitiesLoaded,
@@ -26,6 +28,8 @@ import {
   subscribeArchitectureCapabilities,
 } from '@features/generation/runtime';
 import {
+  getDynamicPromptsConfig,
+  getEffectivePrompts,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -48,6 +52,7 @@ import {
   getModelOnlyUpscalePlan,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleValidationIssues,
   isSpandrelModelConfig,
   isSupportedUpscaleMainModel,
   isTileControlNetCandidate,
@@ -412,6 +417,23 @@ const UpscaleModelReconciler = ({
   return null;
 };
 
+/**
+ * The section of each issue Invoke lists for these values, so each section's count matches Invoke's. The check reads
+ * the served table when it runs, so the table's revision is an argument: a memoized call (the React Compiler's
+ * included) then re-runs when the table arrives or reloads, even while `values` holds still because the models are
+ * still loading. Without the table Refine's form is held back, so no section counts anything.
+ */
+const getIssueSections = (
+  values: UpscaleWidgetValues,
+  models: readonly ModelConfig[] | undefined,
+  capabilitiesRevision: number
+): (string | undefined)[] =>
+  capabilitiesRevision === 0 && values.mode === 'refine'
+    ? []
+    : getUpscaleValidationIssues(values, models).map((issue) =>
+        issue.section ? UPSCALE_SECTION_IDS[issue.section] : undefined
+      );
+
 /** `instance` ties the sections to the header's jump menu; a view rendered outside a widget frame has none. */
 export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
@@ -487,6 +509,11 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
       ),
     }),
     [t, values]
+  );
+  // Installs are checked once models load, as Invoke checks them.
+  const issueSections = useMemo(
+    () => getIssueSections(values, modelsStatus === 'loaded' ? models : undefined, capabilitiesRevision),
+    [capabilitiesRevision, models, modelsStatus, values]
   );
   const patch = useCallback((next: Partial<UpscaleWidgetValues>) => patchValues(next), [patchValues]);
   const patchPromptDraft = useCallback((next: ProjectPromptDraftPatch) => patchDraft(next), [patchDraft]);
@@ -677,6 +704,18 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
   // Model only keeps the Refine settings as they are, hidden, so switching back restores them.
   const isRefine = values.mode === 'refine';
+  // Folded, Detail guidance still says what Generate's prompt settings make of the prompt it shares: the template
+  // wrapped around it and how many prompts it expands to. The expansion is the one Invoke counts.
+  const promptExpansion = useDynamicPrompts(
+    getEffectivePrompts(promptDraft).positivePrompt,
+    isRefine ? getDynamicPromptsConfig(promptDraft) : null
+  );
+  const templateName = promptDraft.promptTemplate?.name;
+  const promptCount = promptExpansion.count;
+  const detailGuidanceSummary = useMemo(
+    () => [templateName, promptCount > 1 ? t('topbar.invoke.summary.promptCount', { count: promptCount }) : null],
+    [promptCount, t, templateName]
+  );
   // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales;
   // the field's description says so, and re-identifying it in the Model Manager records it.
   const isNativeScaleUnknown =
@@ -811,6 +850,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
       {isRefine ? (
         <GenerationSettingsSection
           status={sharedBadge}
+          summary={detailGuidanceSummary}
           label={t('widgets.upscale.detailGuidance')}
           sectionId={UPSCALE_SECTION_IDS.detailGuidance}
         >
@@ -1053,7 +1093,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
           </Field>
         </Box>
         <CapabilitiesGate isReady={hasCapabilities || !isRefine} labels={gateLabels}>
-          {form}
+          <GenerationSectionIssuesProvider issueSections={issueSections}>{form}</GenerationSectionIssuesProvider>
         </CapabilitiesGate>
       </Stack>
     </GenerationSectionPanel>

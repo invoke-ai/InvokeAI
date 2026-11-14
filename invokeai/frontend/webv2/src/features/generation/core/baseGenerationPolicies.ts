@@ -2034,6 +2034,46 @@ export const getCompatibleReferenceImages = (
   });
 };
 
+/**
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
+ * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
+ * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
+ * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
+ * return the same array.
+ */
+export const reconcileReferenceImagesWithModel = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): { referenceImages: GenerateReferenceImage[]; retargetedReferenceImages: GenerateReferenceImage[] } => {
+  const referencesSupported = takesReferenceImages(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(referenceImages, model, models)
+    : referenceImages;
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
+
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+
+  return {
+    referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
+    retargetedReferenceImages,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2105,29 +2145,11 @@ const getSettingsWithCompatibleModelSelections = (
     change('concepts', 'turnedOff', stoppedConcepts);
   }
 
-  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
-  // references keeps them as they are, all switched off, for the next model that takes them.
-  const referencesSupported = takesReferenceImages(model);
-  const retargetedReferenceImages = referencesSupported
-    ? getCompatibleReferenceImages(settings.referenceImages, model, models)
-    : settings.referenceImages;
-  const enabledKept: GenerateReferenceImage[] = [];
-  let didSwitchOff = false;
-  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
-    if (!isReferenceImageActive(referenceImage)) {
-      return referenceImage;
-    }
-
-    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
-      enabledKept.push(referenceImage);
-      return referenceImage;
-    }
-
-    didSwitchOff = true;
-    return { ...referenceImage, isEnabled: false };
-  });
-  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
+  const { referenceImages: compatibleReferenceImages, retargetedReferenceImages } = reconcileReferenceImagesWithModel(
+    settings.referenceImages,
+    model,
+    models
+  );
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -2151,7 +2173,7 @@ const getSettingsWithCompatibleModelSelections = (
       (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
     );
     const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
-    const switchedOff = keptOrSwitchedOff.filter(
+    const switchedOff = compatibleReferenceImages.filter(
       (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
     ).length;
 

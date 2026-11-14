@@ -18,6 +18,7 @@ import {
   resolveUpscaleSubmissionValues,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleValidationIssues,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
   spandrelAutoscaleDimension,
@@ -160,6 +161,43 @@ describe('upscale settings', () => {
     const values = { ...defaults, inputImage: { height: 10, image_name: 'delete.png', width: 10 } };
 
     expect(clearDeletedUpscaleInput(values, new Set(['delete.png'])).inputImage).toBeNull();
+  });
+
+  it('places each issue in the panel section whose fields fix it', () => {
+    const installed = [model('main', 'main', 'sdxl'), model('spandrel', 'spandrel_image_to_image', 'any')];
+    const lora = { isEnabled: true, model: model('gone', 'lora', 'sdxl'), weight: 1 } as GenerateLora;
+    const values = {
+      ...createDefaultUpscaleWidgetValues(installed),
+      cfgScale: 0.5,
+      inputImage: null,
+      loras: [lora],
+      scale: 17,
+      tileSize: 1,
+    };
+
+    expect(getUpscaleValidationIssues(values, installed)).toEqual([
+      { message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' },
+      { message: 'Upscale needs a Tile or Union ControlNet compatible with the main model.', section: 'advanced' },
+      { message: 'Scale must be between 1 and 16.', section: 'source' },
+      { message: expect.stringMatching(/^Tile size must be between/), section: 'advanced' },
+      { message: expect.stringMatching(/^CFG scale must be between/), section: 'generation' },
+      { message: 'gone is no longer installed.', section: 'generation' },
+    ]);
+    // Model only shows Source & treatment alone, and its issues land there.
+    expect(getUpscaleValidationIssues({ ...values, mode: 'model-only' }, [])).toEqual([
+      { message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' },
+      { message: 'Scale must be between 1 and 16.', section: 'source' },
+      { message: 'spandrel is no longer installed.', section: 'source' },
+    ]);
+  });
+
+  it('places no issue in a section while the served table, which holds the whole form back, is missing', () => {
+    // Seeded again before the next test.
+    resetArchitectureCapabilities();
+
+    expect(getUpscaleValidationIssues(createDefaultUpscaleWidgetValues())).toEqual([
+      { message: expect.stringMatching(/^Model capabilities are not available/) },
+    ]);
   });
 });
 

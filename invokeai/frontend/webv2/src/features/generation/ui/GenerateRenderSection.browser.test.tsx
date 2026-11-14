@@ -103,6 +103,10 @@ void i18n.use(initReactI18next).init({
             render: 'Render',
             resetToDefault: 'Reset to default',
             scheduler: 'Scheduler',
+            sectionMenu: {
+              resetStepsAndGuidance: 'Reset steps and {{guidance}} to model defaults',
+              resetStepsGuidanceAndScheduler: 'Reset steps, {{guidance}} and scheduler to model defaults',
+            },
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
             useSeed: 'Use seed {{seed}}',
@@ -769,7 +773,7 @@ describe('GenerateRenderSection title defaults', () => {
     expect(isMarked()).toBe(true);
     await openMenu();
     await act(() =>
-      userEvent.click(page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetStepsCfgAndScheduler' }))
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to model defaults' }))
     );
 
     expect(onCommit).toHaveBeenLastCalledWith({
@@ -790,10 +794,22 @@ describe('GenerateRenderSection title defaults', () => {
     await settle(() => draftStore?.patchSnapshot({ steps: defaults.steps + 4 }));
     expect(isMarked()).toBe(true);
     await openMenu();
-    await act(() =>
-      userEvent.click(page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetStepsAndCfg' }))
-    );
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to model defaults' })));
 
     expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: defaults.cfgScale, steps: defaults.steps });
+  });
+
+  it('names the guidance field as the model labels it', async () => {
+    const defaults = getDefaultGenerateSettings(fluxDevModel);
+    const onCommit = await render(fluxDevModel, { steps: defaults.steps + 4 }, true);
+
+    await openMenu();
+    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to model defaults$/ });
+
+    expect(reset.element().textContent).toContain('Guidance');
+    expect(reset.element().textContent).not.toContain('CFG');
+    await act(() => userEvent.click(reset));
+
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ steps: defaults.steps }));
   });
 });

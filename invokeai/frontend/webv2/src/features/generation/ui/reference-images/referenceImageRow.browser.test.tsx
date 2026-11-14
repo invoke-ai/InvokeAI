@@ -58,6 +58,8 @@ const NO_VISION_COMPONENTS = {};
 const undoable = vi.fn();
 /** The models a model picker last offered; picking from it chooses a Redux model where Redux is offered. */
 let offeredModelTypes: readonly string[] = [];
+/** The installed models as the store holds them now; each render installs the ones it passes. */
+let catalog: readonly GenerationModelCatalogItem[] = NO_MODELS;
 const ADAPTER = {
   gallery: { findImage: vi.fn() },
   models: {
@@ -71,6 +73,7 @@ const ADAPTER = {
     },
     getBaseLabel: (base: string) => base,
     openManager,
+    readCatalog: () => catalog,
   },
   notifications: { info: vi.fn(), undoable },
   project: { activeProjectId: 'project-1' },
@@ -196,6 +199,7 @@ const render = async (
   models: readonly GenerationModelCatalogItem[] = NO_MODELS
 ) => {
   stored = initial;
+  catalog = models;
   await act(() =>
     root.render(
       <I18nextProvider i18n={i18n}>

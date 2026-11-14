@@ -2,16 +2,16 @@
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
-import { chakra, HStack, Text } from '@chakra-ui/react';
+import { HStack } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
 import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
-import { Button, Field, IconButton, Tooltip } from '@platform/ui';
-import { PlusIcon, XIcon } from 'lucide-react';
+import { Field } from '@platform/ui';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AddNegativePromptButton, RemoveNegativePromptButton } from './NegativePromptToggle';
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
 import { insertPromptText } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
@@ -137,17 +137,10 @@ export const NegativePromptField = ({
           isOpen={triggerPicker.isOpen || isViewingMerged}
           onOpenPromptTriggerPicker={triggerPicker.open}
         />
-        <Tooltip content={t('widgets.generate.negativePromptHide')}>
-          <IconButton
-            aria-label={t('widgets.generate.negativePromptHide')}
-            color="fg.muted"
-            size="sm"
-            variant="ghost"
-            onClick={() => onEnabledChange(false)}
-          >
-            <XIcon />
-          </IconButton>
-        </Tooltip>
+        <RemoveNegativePromptButton
+          label={t('widgets.generate.negativePromptHide')}
+          onClick={() => onEnabledChange(false)}
+        />
       </HStack>
     ),
     [isViewingMerged, onEnabledChange, t, triggerPicker]
@@ -162,25 +155,12 @@ export const NegativePromptField = ({
   // Keep collapsed previews discoverable without changing persisted negativePromptEnabled.
   if (!isEnabled) {
     return (
-      <Button
+      <AddNegativePromptButton
         aria-label={t('widgets.generate.enableNegativePrompt')}
-        color="fg.muted"
-        justifyContent="flex-start"
-        px="2"
-        variant="outline"
+        label={t('widgets.generate.negativePromptAdd')}
+        preview={value}
         onClick={() => onEnabledChange(true)}
-      >
-        <PlusIcon />
-        {/* On one baseline: the preview is smaller than the label, so centring their boxes would leave it high. */}
-        <chakra.span alignItems="baseline" display="flex" gap="2" minW="0">
-          <span>{t('widgets.generate.negativePromptAdd')}</span>
-          {value.trim() !== '' ? (
-            <Text as="span" color="fg.subtle" fontSize="xs" fontWeight="normal" minW="0" truncate>
-              {value}
-            </Text>
-          ) : null}
-        </chakra.span>
-      </Button>
+      />
     );
   }
 

@@ -1,7 +1,7 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Badge, Stack, Text } from '@chakra-ui/react';
+import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { getKrea2EditLoraState, isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
@@ -9,6 +9,7 @@ import {
   pickGenerateSettings,
 } from '@features/generation/ui/generateDebounce';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { TriangleAlertIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -66,17 +67,25 @@ export const GenerateGuidanceSection = ({
   const totalCount = referenceImageCount + settings.loras.length;
 
   // Whether something here cannot run, or is all switched off, holds open or folded; what is active is a summary.
-  const status = (
-    <>
-      {hasIncompatible ? (
-        <Badge colorPalette="orange" variant="surface">
-          {t('widgets.generate.incompatible')}
-        </Badge>
-      ) : null}
-      {activeCount === 0 && totalCount > 0 ? (
-        <Badge variant="surface">{t('widgets.generate.offCount', { count: totalCount })}</Badge>
-      ) : null}
-    </>
+  // Both read as the title row's own summary text, so a section's state looks the same whichever kind it is.
+  const isAllOff = activeCount === 0 && totalCount > 0;
+  const status = useMemo(
+    () => (
+      <Flex align="center" fontSize="sm" gap="2">
+        {hasIncompatible ? (
+          <Flex as="span" align="center" color="fg.warning" gap="1">
+            <Icon as={TriangleAlertIcon} aria-hidden boxSize="3" flexShrink={0} />
+            {t('widgets.generate.incompatible')}
+          </Flex>
+        ) : null}
+        {isAllOff ? (
+          <Text as="span" color="fg.muted">
+            {t('widgets.generate.offCount', { count: totalCount })}
+          </Text>
+        ) : null}
+      </Flex>
+    ),
+    [hasIncompatible, isAllOff, t, totalCount]
   );
   const summary = useMemo(
     () =>

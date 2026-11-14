@@ -109,7 +109,9 @@ let host: HTMLDivElement;
 let root: Root;
 
 vi.mock('react-i18next', () => {
-  const t = (key: string) => key;
+  // A count shows after its key, so a summary's numbers can be read.
+  const t = (key: string, values?: { count?: number }) =>
+    values?.count === undefined ? key : `${key}:${values.count}`;
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 vi.mock('@features/models', async (importOriginal) => ({
@@ -443,5 +445,34 @@ describe("Upscale's prompt templates and dynamic prompts", () => {
         { timeout: 3000 }
       )
       .toBe(true);
+  });
+});
+
+describe('Upscale Detail guidance, folded', () => {
+  const summary = () => detailGuidanceTrigger().querySelector('[data-section-summary]')?.textContent ?? null;
+  const patchPrompt = (patch: Parameters<WorkbenchInternalStore['commands']['generation']['patchPromptDraft']>[0]) =>
+    act(() => store.commands.generation.patchPromptDraft(patch, 'upscale', store.getSnapshot().activeProject.id));
+
+  it('names the prompt template Generate wraps around the shared prompt', async () => {
+    await render({ openDetailGuidance: false });
+    patchPrompt({ promptTemplate: { ...CINEMATIC } });
+
+    expect(detailGuidanceTrigger().getAttribute('aria-expanded')).toBe('false');
+    expect(summary()).toBe('Cinematic');
+    // The shared badge stays beside it.
+    expect(detailGuidanceTrigger().textContent).toContain('widgets.upscale.shared');
+  });
+
+  it('counts the prompts dynamic prompts expand the shared prompt to', async () => {
+    await render({ openDetailGuidance: false });
+    patchPrompt({ positivePrompt: 'a {red|green} fox' });
+
+    await expect.poll(summary, { timeout: 3000 }).toBe('topbar.invoke.summary.promptCount:2');
+  });
+
+  it('says nothing for a plain prompt without a template', async () => {
+    await render({ openDetailGuidance: false });
+
+    expect(summary()).toBeNull();
   });
 });

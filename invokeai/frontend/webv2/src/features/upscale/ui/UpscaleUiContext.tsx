@@ -1,4 +1,5 @@
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
+import type { UpscaleSection } from '@features/upscale/core/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { ReactNode } from 'react';
 
@@ -13,7 +14,7 @@ export const UPSCALE_SECTION_IDS = {
   detailGuidance: 'upscaleDetailGuidance',
   generation: 'upscaleGeneration',
   source: 'upscaleSource',
-} as const;
+} as const satisfies Record<UpscaleSection | 'detailGuidance', string>;
 
 /** This UI port preserves dependency direction: Upscale cannot import Workbench. */
 export interface UpscaleUiAdapter {

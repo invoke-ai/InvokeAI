@@ -22,6 +22,7 @@ import {
   getMaxReferenceImages,
   getReferenceImageUnavailableReason,
   isReferenceImageSupported,
+  reconcileReferenceImagesWithModel,
   withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
 import {
@@ -90,7 +91,7 @@ export const GenerateReferenceImagesContent = ({
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
   const { gallery, models: uiModels, notifications, project, settings } = useGenerationUi();
-  const { openManager } = uiModels;
+  const { openManager, readCatalog } = uiModels;
   const openModelManager = useCallback((modelType: string) => openManager({ modelType }), [openManager]);
   const isSupported = isReferenceImageSupported(selectedModel, visionComponents);
   const unavailableReason = getReferenceImageUnavailableReason(selectedModel, visionComponents);
@@ -184,7 +185,9 @@ export const GenerateReferenceImagesContent = ({
 
   /**
    * Puts removed references back at `at` among those there now (any added since stay), each as it was: name, crop and
-   * settings. A model that takes references gets no more running than it takes: the rest come back turned off.
+   * settings. The model and the installed adapters may have changed since, so they then meet the current ones as a
+   * switch to that model with them present would leave them: retargeted where their adapter does not fit, and switched
+   * off beyond what it runs together.
    */
   const restoreReferenceImages = useCallback(
     (removed: readonly GenerateReferenceImage[], at: number, projectId: string) => {
@@ -193,28 +196,17 @@ export const GenerateReferenceImagesContent = ({
       const kept = (values?.referenceImages ?? []).filter((referenceImage) => !removedIds.has(referenceImage.id));
       const position = Math.min(at, kept.length);
       const restored = [...kept.slice(0, position), ...removed, ...kept.slice(position)];
-      const limit =
-        values && isReferenceImageSupported(values.model, values) ? getMaxReferenceImages(values.model, values) : null;
-      let running = 0;
 
       settings.patchGenerateSettings(
         {
-          referenceImages:
-            limit === null
-              ? restored
-              : restored.map((referenceImage) => {
-                  if (!referenceImage.isEnabled) {
-                    return referenceImage;
-                  }
-
-                  running += 1;
-                  return running > limit ? { ...referenceImage, isEnabled: false } : referenceImage;
-                }),
+          referenceImages: values
+            ? reconcileReferenceImagesWithModel(restored, values.model, readCatalog()).referenceImages
+            : restored,
         },
         projectId
       );
     },
-    [settings]
+    [readCatalog, settings]
   );
 
   // Undoable, so it does not ask first: the Undo puts the reference back where it was, as it was.
