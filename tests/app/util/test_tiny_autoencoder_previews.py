@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import torch
+from PIL import Image
 
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
@@ -395,7 +396,8 @@ def test_tae_that_would_not_fit_in_vram_is_never_locked(caplog: pytest.LogCaptur
 
     assert all(_is_linear(frame, sample) for frame in frames)
     assert (load.loads, loaded.locks_taken) == (1, 0)
-    assert len(_messages(caplog, logging.INFO)) == 1
+    (message,) = _messages(caplog, logging.INFO)
+    assert "Decode previews on CPU" in message
 
 
 def test_tae_whose_decode_would_not_fit_next_to_it_is_never_locked(caplog: pytest.LogCaptureFixture) -> None:
@@ -483,14 +485,14 @@ def test_tae_frames_are_spaced_by_their_render_cost_and_the_final_frame_still_re
         clock.now += seconds
         _step(util, _sample(step), step=step)
 
-    step_after(0.0, 0)  # warm-up frame: lookup, load and lock are not a frame cost
-    step_after(0.2, 1)  # first measured frame; until now the store's 0.1 s interval applied
-    step_after(0.2, 2)  # 0.25 s after the last frame, inside k x 0.05 s = 1 s: not rendered
-    step_after(0.8, 3)  # 1.05 s after it: rendered
+    step_after(0.0, 0)  # first frame: a CPU decode is counted, without the lookup, load and lock
+    step_after(0.2, 1)  # 0.2 s after the last frame, inside k x 0.05 s = 1 s: not rendered
+    step_after(0.85, 2)  # 1.05 s after it: rendered
+    step_after(0.3, 3)  # not rendered
     step_after(0.01, 10)  # the final frame passes any interval
 
-    assert [call["percentage"] for call in services.events.emitted] == [0.0, 0.1, 0.3, 1.0]
-    assert len(decodes) == 4
+    assert [call["percentage"] for call in services.events.emitted] == [0.0, 0.2, 1.0]
+    assert len(decodes) == 3
 
 
 def test_linear_previews_keep_the_stores_interval(clock: _Clock) -> None:
@@ -514,6 +516,89 @@ def test_a_cpu_tae_is_used_although_its_lock_leaves_nothing_resident() -> None:
 
     assert load.loaded.locks_held == 1 and load.loaded.resident_weight_bytes == 0
     assert image.size == (192, 128)
+
+
+def test_a_cpu_tae_renders_where_the_same_tae_on_the_gpu_is_refused_for_vram() -> None:
+    """No VRAM is free next to the running model. A TAE with "Decode previews on CPU" gets the cache's CPU execution device, so
+    it needs none, and its decode is reserved at the 512-pixel CPU cap, not the decoder's own."""
+    sample = _sample(height=100, width=100)  # an 800-pixel image
+    gpu = _LoadedModel(_decoder(), device="cuda")  # only read by the residency decision
+    gpu_previews = _previews(_services(_Store([_tae_config()]), _Load(gpu, vram_available=0)))
+    cpu = _LoadedModel(_decoder(), device="cpu")
+    cpu_previews = _previews(_services(_Store([_tae_config()]), _Load(cpu, vram_available=0)))
+
+    assert _is_linear(gpu_previews.render(BaseModelType.StableDiffusion1, sample), sample)
+    image, size = cpu_previews.render(BaseModelType.StableDiffusion1, sample)
+
+    assert (gpu.locks_taken, cpu.locks_taken) == (0, 1)
+    assert image.size == (512, 512) and size == (800, 800)
+    assert cpu.working_mem_requests == [(3 + 2) * 64 * (512 * 512) * 4 + 5 * 2**20]
+
+
+def test_a_cpu_tae_is_paced_from_its_first_frame_without_the_step_still_queued_on_the_latents_device(
+    clock: _Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Latents on another device (`meta` stands in for the GPU) with a 5 s denoise step still queued: the CPU decode's
+    copy of them waits for it, and that wait is not the preview's cost. The first frame, which also looks the TAE up,
+    already sets the interval, so the frame after it is paced."""
+    decode_cost, queued_step = 0.3, 5.0
+    queued = [0.0]
+
+    def synchronize(device: torch.device) -> None:
+        if device.type == "meta":
+            clock.now += queued[0]
+            queued[0] = 0.0
+
+    def decode(_decoder, _sample, device=None):
+        clock.now += queued[0] + decode_cost  # the copy to the CPU waits for whatever is still queued
+        queued[0] = 0.0
+        return Image.new("RGB", (8, 8))
+
+    monkeypatch.setattr(tiny_autoencoder_previews.TorchDevice, "synchronize", synchronize)
+    monkeypatch.setattr(tiny_autoencoder_previews, "decode_preview", decode)
+    previews = _previews(_services(_Store([_tae_config()]), _load()))
+    sample = torch.empty(1, 4, 16, 24, device="meta")
+    intervals = []
+    for _frame in range(3):
+        queued[0] = queued_step
+        with previews.measure_frame():
+            previews.render(BaseModelType.StableDiffusion1, sample)
+        intervals.append(previews.min_frame_interval_s)
+
+    expected = tiny_autoencoder_previews.RENDER_COST_INTERVAL_FACTOR * decode_cost
+    assert intervals == [pytest.approx(expected)] * 3
+
+
+def test_a_gpu_tae_is_paced_only_from_its_second_frame(clock: _Clock, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first GPU frame also loads the TAE and makes the first cuDNN call, so its cost is not representative."""
+    frame_costs = iter([1.0, 0.05, 0.05])
+
+    def decode(_decoder, _sample, device=None):
+        clock.now += next(frame_costs)
+        return Image.new("RGB", (8, 8))
+
+    monkeypatch.setattr(tiny_autoencoder_previews.TorchDevice, "synchronize", lambda _device: None)
+    monkeypatch.setattr(tiny_autoencoder_previews, "decode_preview", decode)
+    loaded = _LoadedModel(_decoder(), device="cuda")  # only read by the residency decision; nothing runs on it
+    previews = _previews(_services(_Store([_tae_config()]), _Load(loaded, vram_available=2**40)))
+    intervals = []
+    for _frame in range(2):
+        with previews.measure_frame():
+            previews.render(BaseModelType.StableDiffusion1, _sample())
+        intervals.append(previews.min_frame_interval_s)
+
+    assert intervals == [None, pytest.approx(tiny_autoencoder_previews.RENDER_COST_INTERVAL_FACTOR * 0.05)]
+
+
+def test_a_gpu_tae_above_its_cap_is_reserved_at_its_own_cap_not_the_cpu_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An 800-pixel preview fits TAESD's own 1024-pixel cap; only a CPU decode is limited to 512."""
+    monkeypatch.setattr(tiny_autoencoder_previews, "decode_preview", lambda *_a, **_k: Image.new("RGB", (8, 8)))
+    loaded = _LoadedModel(_decoder(), device="cuda")  # only read by the residency decision; nothing runs on it
+    previews = _previews(_services(_Store([_tae_config()]), _Load(loaded, vram_available=2**40)))
+
+    previews.render(BaseModelType.StableDiffusion1, _sample(height=100, width=100))
+
+    assert loaded.working_mem_requests == [(3 + 2) * 64 * (800 * 800) * 4 + 5 * 2**20]
 
 
 def _slow_linear_frames(monkeypatch: pytest.MonkeyPatch, clock: _Clock, seconds: float) -> None:
@@ -560,7 +645,7 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
     services = _services(_Store([_tae_config()]), _load(decoder), previews=MemoryProgressPreviews(clock=clock))
     util, _data = _invocation(services)
 
-    for step, after in enumerate([0.0, 0.2, 1.1, 0.15, 0.15]):
+    for step, after in enumerate([0.0, 1.1, 1.1, 0.15, 0.15]):
         clock.now += after
         _step(util, _sample(step), step=step)
 
@@ -568,8 +653,9 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
     # it are 0.15 s apart again, with each linear frame's 1 s of waiting not counted as a cost.
     assert [call["percentage"] for call in services.events.emitted] == [0.0, 0.1, 0.2, 0.3, 0.4]
     assert len(decodes) == 3
-    # Only the frames after a TAE frame wait for the TAE's device; once it fell back, there is none to wait for.
-    assert len(syncs) == 2
+    # The first frame waits for the latents' device, the frames after a TAE frame for the TAE's; once it fell back,
+    # there is none to wait for.
+    assert len(syncs) == 3
 
 
 def _wan_window(frames: int = 2) -> torch.Tensor:

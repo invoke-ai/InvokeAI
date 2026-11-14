@@ -177,6 +177,7 @@ class TinyAutoencoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
     type: Literal[ModelType.TinyAutoencoder] = Field(default=ModelType.TinyAutoencoder)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     latent_channels: int = Field(description="Latent channels the decoder consumes.")
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     ARCH: ClassVar[TinyAutoencoderArch]
     """The decoder architecture this base's TAEs use."""
