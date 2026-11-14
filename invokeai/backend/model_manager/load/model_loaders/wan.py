@@ -61,7 +61,6 @@ from invokeai.backend.quantization.fp8_scaled import (
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
-from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -227,31 +226,6 @@ def _convert_wan_native_to_diffusers(state_dict: dict) -> dict:
     return converted
 
 
-def _unwrap_unquantized_to_compute_dtype(state_dict: dict) -> dict:
-    """Replace non-quantized GGMLTensor entries with plain tensors at compute_dtype.
-
-    Why: QuantStack-style GGUFs store biases (and other small tensors) as F16,
-    while Wan's ``patch_embedding`` is an ``nn.Conv3d``. ``conv3d`` isn't in
-    GGMLTensor's dispatch table, so PyTorch reads the wrapper's underlying F16
-    storage directly and crashes against bf16 latents
-    (``Input type (c10::BFloat16) and bias type (c10::Half) should be the same``).
-
-    For compatible qtypes (F16/F32/BF16) we just pre-cast to compute_dtype here —
-    they're not quantized, there's no benefit to keeping them wrapped, and
-    unwrapping them sidesteps the missing-op problem entirely. Genuinely
-    quantized tensors (Q4_K, Q6_K, etc.) stay wrapped — their on-demand
-    dequantization through the linear/addmm dispatch path still works.
-    """
-    unwrapped: dict = {}
-    for key, value in state_dict.items():
-        if isinstance(value, GGMLTensor) and value._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES:
-            # GGMLTensor.get_dequantized_tensor() already casts to compute_dtype.
-            unwrapped[key] = value.get_dequantized_tensor()
-        else:
-            unwrapped[key] = value
-    return unwrapped
-
-
 def _drop_benign_extra_keys(sd: dict, source: str, logger: Any) -> None:
     """Remove packaging weights the transformer has no use for, in place.
 
@@ -396,7 +370,8 @@ class WanGGUFCheckpointModel(ModelLoader):
 
     Mirrors the QwenImage GGUF loader pattern: ``gguf_sd_loader`` -> strip the
     ComfyUI ``model.diffusion_model.`` / ``diffusion_model.`` prefix if present
-    -> auto-detect arch from state-dict shapes -> ``init_empty_weights`` +
+    -> auto-detect arch from state-dict shapes -> ``init_empty_weights`` ->
+    ``unpack_ggml_at_load`` (non-Linear, unquantized and skip-pattern tensors) ->
     ``load_state_dict(strict=False, assign=True)``.
     """
 
@@ -440,17 +415,18 @@ class WanGGUFCheckpointModel(ModelLoader):
         if _is_native_wan_layout(sd):
             sd = _convert_wan_native_to_diffusers(sd)
 
-        # Pre-cast non-quantized tensors (F16/F32/BF16 biases, scale_shift_table,
-        # patch_embedding.weight, etc.) to compute_dtype. This avoids dtype
-        # mismatches in conv3d at the input (patch_embedding is the only Conv3d
-        # in WanTransformer3DModel; conv3d isn't in GGMLTensor's dispatch table
-        # so the wrapper's underlying storage dtype reaches PyTorch directly).
-        sd = _unwrap_unquantized_to_compute_dtype(sd)
-
+        # The config is read from the still-packed dict: `_tensor_shape` reports a GGMLTensor's logical shape.
         model_config = _build_wan_transformer_config(sd, source="GGUF state dict")
 
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)
+
+        # Unpack what must not stay a GGMLTensor: the Conv3d patch embedding (conv3d is not in its dispatch table),
+        # every unquantized tensor, and the model's declared skip modules, among them `condition_embedder`. A packed
+        # BF16 or quantized tensor reports its uint8 storage dtype, and diffusers casts the timestep to the dtype of
+        # the time embedder's first weight, so a packed weight there fails with "mat1 and mat2 must have the same
+        # dtype". Quantized block Linears stay packed and dequantize on demand.
+        unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="GGUF state dict")
