@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-07
 sidebar:
   order: 3
 ---
@@ -231,6 +231,12 @@ Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
 
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
+
+FLUX.2 BFL and kohya DoRA adapters on fused image/text QKV projections support input-axis and output-axis
+magnitudes with dense floating-point base weights, including native FP8 storage. Input-axis normalization
+uses all Q, K and V rows together. DoRA cannot patch packed int8 or NVFP4 target layers: adapter
+conversion can succeed, but generation stops at the existing incompatible-quantization check. See the
+[FLUX.2 LoRA notes](/users-guide/models/local-models/flux-2/#lora).
 
 Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` key layout, as raw PEFT adapters
 (`base_model.model.`), and in the LyCORIS `lycoris_transformer_blocks_…` and ai-toolkit

@@ -8,6 +8,7 @@ from transformers import CLIPTextModel
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
@@ -143,7 +144,17 @@ class LayerPatcher:
 
         prefix_len = len(prefix)
 
+        # Bind all projections before changing any of this adapter's weights. The temporary split
+        # patches own the norm; the CPU-cached adapter remains independent of model and generation.
+        layers: dict[str, BaseLayerPatch] = {}
         for layer_key, layer in patch.layers.items():
+            if layer_key.startswith(prefix) and isinstance(layer, FusedInputDoRALayer):
+                for key, split_layer in layer.bind(model):
+                    layers[f"{prefix}{key}"] = split_layer
+            else:
+                layers[layer_key] = layer
+
+        for layer_key, layer in layers.items():
             if not layer_key.startswith(prefix):
                 continue
 
