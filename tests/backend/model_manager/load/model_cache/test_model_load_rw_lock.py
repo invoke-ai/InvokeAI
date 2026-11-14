@@ -12,6 +12,23 @@ import pytest
 from invokeai.backend.model_manager.load.model_cache.model_cache import _ModelLoadReadWriteLock
 
 
+def test_readers_can_overlap() -> None:
+    lock = _ModelLoadReadWriteLock()
+    acquired = threading.Event()
+
+    def reader() -> None:
+        with lock.read_lock():
+            acquired.set()
+
+    with lock.read_lock():
+        thread = threading.Thread(target=reader, daemon=True)
+        thread.start()
+        overlapped = acquired.wait(timeout=10)
+    thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert overlapped, "readers were serialized"
+
+
 def test_writer_does_not_leak_waiting_count_when_wait_raises() -> None:
     """An exception out of `_cond.wait()` must not wedge every future reader."""
     lock = _ModelLoadReadWriteLock()

@@ -323,8 +323,8 @@ class TestQuantizedEncoderLoad:
         context.models.get_absolute_path.return_value = model_root
 
         def make_room(vram_bytes_needed: int) -> int:
-            # The offload is a VRAM move like any other, so it runs under the model-load *read* lock.
-            events.append("make_room" if _read_lock_held() else "make_room(wrong lock)")
+            # The public interface takes the read lock itself; its caller must not already hold it.
+            events.append("make_room" if not (_read_lock_held() or _write_lock_held()) else "make_room(wrong lock)")
             return vram_bytes_needed if vram_available is None else vram_available
 
         context.models.make_room_in_vram.side_effect = make_room

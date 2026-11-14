@@ -37,6 +37,7 @@ from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -711,6 +712,8 @@ class ModelsInterface(InvocationContextInterface):
         so the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so
         a subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             identifier: The key or ModelField representing the model to offload.
 
@@ -718,7 +721,8 @@ class ModelsInterface(InvocationContextInterface):
             The number of VRAM bytes freed.
         """
         key = identifier if isinstance(identifier, str) else identifier.key
-        return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
 
     def make_room_in_vram(self, vram_bytes_needed: int) -> int:
         """Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's
@@ -730,6 +734,8 @@ class ModelsInterface(InvocationContextInterface):
         and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
         is kept free on top of the request.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             vram_bytes_needed: The VRAM footprint the caller is about to allocate.
 
@@ -738,7 +744,8 @@ class ModelsInterface(InvocationContextInterface):
             (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
             `vram_bytes_needed` before allocating.
         """
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:

@@ -50,6 +50,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import calibration_run_id
 from invokeai.app.util.profiler import Profiler
 from invokeai.app.util.startup_utils import log_attention_backends
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.util.attention import attention_caller
 from invokeai.backend.util.device_pool import (
     GENERATION_DEVICE_POOL,
@@ -1242,7 +1243,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
         try:
             services = self._invoker.services
             if services.configuration.clear_vram_after_session and services.model_manager.load is not None:
-                services.model_manager.load.ram_cache.offload_models_from_vram_except(())
+                with MODEL_LOAD_LOCK.read_lock():
+                    services.model_manager.load.ram_cache.offload_models_from_vram_except(())
                 TorchDevice.empty_cache(force=True)
             elif worker.cancel_event.is_set():
                 TorchDevice.empty_cache()

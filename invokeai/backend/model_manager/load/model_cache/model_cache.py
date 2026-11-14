@@ -386,7 +386,8 @@ MODEL_LOAD_LOCK = _ModelLoadReadWriteLock()
 # passes. Without this, a multi-GB stream (e.g. a partially-loaded video transformer) holds the
 # read lock for its full duration, and because the lock is write-preferring, one construction
 # queued behind it stalls every VRAM move on every GPU for that long. The cap bounds any queued
-# construction's wait to roughly one pass. 1 GiB keeps the per-pass overhead (lock churn plus a
+# construction's wait during these streams to roughly one pass; full offloads and the first lock
+# pass are not paced. 1 GiB keeps the per-pass overhead (lock churn plus a
 # re-scan of the model's state dict) negligible against the transfer itself.
 VRAM_MOVE_PASS_BYTES = 1 << 30
 
@@ -3135,6 +3136,8 @@ class ModelCache:
     def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
         """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
 
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
+
         This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
         BitsAndBytes-quantized text encoder, which is pinned to the device it was quantized on and so cannot be
         managed by the cache. Such a load competes with cached models for VRAM, but never passes through `lock()`,
@@ -3170,6 +3173,8 @@ class ModelCache:
     def offload_model_from_vram(self, model_key: str) -> int:
         """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
 
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
+
         Unlike `drop_model`, the cache entry is kept, so the model stays resident in RAM and the next load does
         not have to rebuild it from disk - only re-stream its weights back to VRAM. This is useful for freeing
         VRAM after a one-shot use (e.g. a text encoder that has already produced its embeddings) before a much
@@ -3183,6 +3188,8 @@ class ModelCache:
     @synchronized
     def offload_models_from_vram_except(self, keep_model_keys: Collection[str]) -> int:
         """Move every model whose key is not in `keep_model_keys` from VRAM to RAM, keeping it cached.
+
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
 
         `keep_model_keys` are plain model keys; a kept model keeps its submodels too. As with
         `offload_model_from_vram`, the entries stay resident in RAM, so a later use re-streams weights instead of
@@ -3199,6 +3206,8 @@ class ModelCache:
     @synchronized
     def offload_unlocked_models_from_vram(self, keep_cache_keys: Collection[str] = ()) -> int:
         """Move every unlocked entry but those in `keep_cache_keys` from VRAM to RAM whole, keeping it cached.
+
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
 
         `keep_cache_keys` are exact cache keys: keeping a submodel (`<model key>:vae`) keeps none of its siblings, unlike
         `offload_models_from_vram_except`. Each entry leaves whole, where `lock()` moves out only the shortfall it

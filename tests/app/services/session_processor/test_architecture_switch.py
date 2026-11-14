@@ -76,6 +76,16 @@ def test_a_switch_keeps_what_the_new_session_names_and_moves_the_rest() -> None:
     assert freed == 3 * 2**30
 
 
+def test_architecture_switch_retains_weights_during_concurrent_construction(offload_race) -> None:
+    def switch(cache):
+        offload = ArchitectureSwitchOffload()
+        assert offload.before_session(_graph(SD1), cache) == 0
+        return offload.before_session(_graph(SD2, SHARED_VAE), cache)
+
+    assert offload_race(switch, construction_first=True) == 16
+    assert offload_race(switch, construction_first=False) == 16
+
+
 def test_the_same_architecture_moves_nothing() -> None:
     offload, cache = ArchitectureSwitchOffload(), _Cache()
     offload.before_session(_graph(SD1), cache)  # type: ignore[arg-type]
