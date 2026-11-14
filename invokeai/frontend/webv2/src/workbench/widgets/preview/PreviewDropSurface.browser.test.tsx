@@ -1,6 +1,7 @@
 import type { GalleryBoard } from '@features/gallery';
 import type * as GalleryBackend from '@features/gallery/data/backend';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
+import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import {
@@ -11,6 +12,7 @@ import {
   type GalleryVideoItem,
 } from '@features/gallery/contracts';
 import { TINY_PNG_BASE64 } from '@platform/browser/nativeDrag.testing';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -99,11 +101,17 @@ const storedVideo = (file: { name: string }, createdAt: string): GalleryVideoIte
 const LANDED = { timeout: 5_000 };
 
 const render = async ({
+  children,
+  fillsFrame = false,
   galleryValues,
   isComparing = false,
   isFollowingLive = false,
   shownKind = null,
 }: {
+  /** Rendered inside the surface after its content, such as a dialog it opened. */
+  children?: ReactNode;
+  /** Covers the whole test frame, so a centred dialog lies over the surface. */
+  fillsFrame?: boolean;
   galleryValues?: Record<string, unknown>;
   isComparing?: boolean;
   isFollowingLive?: boolean;
@@ -116,24 +124,30 @@ const render = async ({
   }
   harness.store = store;
   host = document.createElement('div');
-  host.style.height = '400px';
-  host.style.width = `${Math.min(600, window.innerWidth)}px`;
+  Object.assign(
+    host.style,
+    fillsFrame ? { inset: '0', position: 'fixed' } : { height: '400px', width: `${Math.min(600, window.innerWidth)}px` }
+  );
   document.body.append(host);
   root = createRoot(host);
-  await act(() =>
-    root!.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={new QueryClient()}>
-            <PreviewDropSurface isComparing={isComparing} isFollowingLive={isFollowingLive} shownKind={shownKind}>
-              <div data-testid="preview-content" style={{ height: '100%' }} />
-            </PreviewDropSurface>
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
-  );
-  return { projectId, store };
+  const queryClient = new QueryClient();
+  const renderWith = (extra: ReactNode) =>
+    act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <PreviewDropSurface isComparing={isComparing} isFollowingLive={isFollowingLive} shownKind={shownKind}>
+                <div data-testid="preview-content" style={{ height: '100%' }} />
+                {extra}
+              </PreviewDropSurface>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+  await renderWith(children);
+  return { projectId, rerender: renderWith, store };
 };
 
 const galleryValuesOf = (store: ReturnType<typeof createWorkbenchStore>, projectId: string) =>
@@ -171,6 +185,18 @@ const dropOn = async (zoneName: string, files: File[]) => {
   await send('dragover', transfer, at);
   return send('drop', transfer, at);
 };
+/** A confirmation Preview opened, as its delete confirmation is: a React child of the surface, portalled to the body. */
+const openConfirmation = () => (
+  <ConfirmDialog
+    body="This cannot be undone."
+    confirmLabel="Delete"
+    isOpen
+    title="Delete image?"
+    onClose={vi.fn()}
+    onConfirm={vi.fn()}
+  />
+);
+const confirmation = () => page.getByRole('alertdialog');
 /**
  * A real drag from the operating system, through the browser's own drag input, dropped on one half of the surface: the
  * left half shows, the right half compares when comparison is offered.
@@ -330,6 +356,59 @@ describe('PreviewDropSurface', () => {
     await vi.waitFor(() => expect(selectedName(store, projectId)).toBe('stored-late.png'));
     expect(store.getState().activeProjectId).toBe(switchedTo.id);
     expect(selectedName(store, switchedTo.id)).toBeNull();
+  });
+
+  it('takes no drop on a confirmation it opened, though React bubbles the drag to it, and drops once it closes', async () => {
+    harness.uploadImage.mockImplementation((file) => Promise.resolve(storedImage(file, '2026-11-10T00:00:01.000Z')));
+    const { projectId, rerender, store } = await render({ children: openConfirmation(), fillsFrame: true });
+    await expect.element(confirmation()).toBeVisible();
+    const dialog = confirmation().element().getBoundingClientRect();
+
+    // Over the dialog, which lies over the surface's show zone: a drop there would upload behind the confirmation.
+    await commands.nativeDrag({
+      files: [{ base64: TINY_PNG_BASE64, name: 'behind.png' }],
+      frameWidth: window.innerWidth,
+      points: [{ x: dialog.left + dialog.width / 2, y: dialog.top + dialog.height / 2 }],
+    });
+    expect(zone('Drop to show').elements()).toHaveLength(0);
+
+    await rerender(null);
+    expect(document.querySelector('[data-scope="dialog"]')).toBeNull();
+    await nativeDrop('left', [{ base64: TINY_PNG_BASE64, name: 'shown.png' }]);
+
+    await vi.waitFor(() => expect(selectedName(store, projectId)).toBe('stored-shown.png'), LANDED);
+    // Uploads run in drop order: had the first drop been taken, its file would lead.
+    expect(harness.uploadImage.mock.calls.map(([file]) => file.name)).toEqual(['shown.png']);
+  });
+
+  it('shows no zones over a confirmation it opened and keeps no drag after passing through it', async () => {
+    await render({ children: openConfirmation(), fillsFrame: true });
+    await expect.element(confirmation()).toBeVisible();
+    const dialog = confirmation().element();
+    const dialogTitle = page.getByText('Delete image?').element();
+    const transfer = transferOf([imageFile('one.png')]);
+    const zonesShown = () => zone('Drop to show').elements().length > 0;
+    const over = centreOf(content());
+
+    await send('dragenter', transfer, over);
+    expect(zonesShown()).toBe(true);
+    // Onto the dialog, then between its own elements: each step reaches the surface through React, none is its own.
+    await send('dragleave', transfer, { ...over, relatedTarget: dialog });
+    expect(zonesShown()).toBe(false);
+    await send('dragenter', transfer, { ...over, relatedTarget: content() }, dialog);
+    expect((await send('dragover', transfer, over, dialog)).defaultPrevented).toBe(false);
+    await send('dragleave', transfer, { ...over, relatedTarget: dialogTitle }, dialog);
+    await send('dragenter', transfer, { ...over, relatedTarget: dialog }, dialogTitle);
+    expect(zonesShown()).toBe(false);
+    expect((await send('drop', transfer, over, dialogTitle)).defaultPrevented).toBe(false);
+
+    // Back onto the surface: a new drag, which ends as it leaves.
+    await send('dragleave', transfer, { ...over, relatedTarget: content() }, dialogTitle);
+    await send('dragenter', transfer, { ...over, relatedTarget: dialogTitle });
+    expect(zonesShown()).toBe(true);
+    await send('dragleave', transfer, { ...over, relatedTarget: document.body });
+    expect(zonesShown()).toBe(false);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
   });
 
   it('ends the drag when it leaves Preview or the window, or finishes elsewhere, and ignores drags without files', async () => {

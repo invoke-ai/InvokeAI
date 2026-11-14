@@ -5,6 +5,7 @@ import type { PlacedWidgetRegionItem, WidgetPlacementInstanceMeta } from '@workb
 import { Box, Flex, Icon, Popover, Portal } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { PopoverContent, Row, Tooltip } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
 import { isModalPresent, subscribeModalPresence } from '@platform/ui/modalPresence';
@@ -163,6 +164,10 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     [startItems, endItems]
   );
   const openEnableMenu = useCallback((event: MouseEvent) => {
+    // Chips' popovers, tooltips and the bar's own menus are portalled; a right-click in them is theirs.
+    if (!isEventFromOwnDom(event)) {
+      return;
+    }
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);

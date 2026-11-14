@@ -5,6 +5,7 @@ import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/w
 
 import { Box, Flex, Icon, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useHighlightedRegion } from '@workbench/focusRegions';
@@ -77,6 +78,10 @@ export const WidgetBar = ({
   const instanceMenuTarget = instanceMenu?.projectId === projectId ? instanceMenu : null;
 
   const openEnableMenu = useCallback((event: MouseEvent) => {
+    // The rail's menus and tooltips are portalled; a right-click in them is theirs.
+    if (!isEventFromOwnDom(event)) {
+      return;
+    }
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);

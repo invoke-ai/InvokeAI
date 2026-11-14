@@ -16,6 +16,7 @@ import {
   imageIndexAvailabilityOptions,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, DropZone } from '@platform/ui';
@@ -90,7 +91,10 @@ const EMPTY_GALLERY_ITEMS: GalleryItem[] = [];
 // Module-scoped so a grid remount cannot replay an already-followed reveal.
 let lastPageFollowedRevealToken = 0;
 
-const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
+// React also bubbles drags over portalled content the grid opens, such as a tile's context menu; those are not over
+// the grid, so it neither counts nor takes them.
+const isFileDragOnGrid = (event: DragEvent): boolean =>
+  isEventFromOwnDom(event) && Array.from(event.dataTransfer.types).includes('Files');
 
 const GalleryPageError = ({
   onFocusLost,
@@ -1641,7 +1645,7 @@ export const GalleryImageGrid = ({
   }, [actions, lastVisibleRowIndex, paginationMode, rowCount, usesSparseListing]);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
-    if (!dragEventContainsFiles(event)) {
+    if (!isFileDragOnGrid(event)) {
       return;
     }
 
@@ -1651,7 +1655,7 @@ export const GalleryImageGrid = ({
   }, []);
 
   const handleDragLeave = useCallback((event: DragEvent) => {
-    if (!dragEventContainsFiles(event)) {
+    if (!isFileDragOnGrid(event)) {
       return;
     }
 
@@ -1663,13 +1667,16 @@ export const GalleryImageGrid = ({
   }, []);
 
   const handleDragOver = useCallback((event: DragEvent) => {
-    if (dragEventContainsFiles(event)) {
+    if (isFileDragOnGrid(event)) {
       event.preventDefault();
     }
   }, []);
 
   const handleDrop = useCallback(
     (event: DragEvent) => {
+      if (!isEventFromOwnDom(event)) {
+        return;
+      }
       event.preventDefault();
       dragDepthRef.current = 0;
       setIsDropActive(false);
