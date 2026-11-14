@@ -442,38 +442,49 @@ def processing() -> dict:
 
 
 def _edit_context(
-    events: list[str], loaded: list, infos: dict, *, refuse_tower: bool = False, processing: dict | None = None
+    events: list[str],
+    loaded: list,
+    infos: dict,
+    *,
+    refuse_vision_weights: bool = False,
+    processing: dict | None = None,
+    config: SimpleNamespace = _ENCODER_CONFIG,
+    tower_device: str = "cpu",
 ) -> SimpleNamespace:
-    """Records every model loaded, in order. `processing` swaps in real models by submodel type."""
+    """Records every model loaded, in order. `processing` swaps in real models by submodel type; a model
+    loaded without a submodel type is the standalone mmproj tower of a GGUF encoder."""
     from PIL import Image
 
     def load(identifier):
         loaded.append(identifier)
-        if refuse_tower and identifier.submodel_type is SubModelType.VisionEncoder:
-            raise ValueError("The GGUF Qwen3-VL encoder 'encoder' has no vision tower")
-        name = identifier.submodel_type.value
+        if refuse_vision_weights and identifier.submodel_type is SubModelType.VisionEncoder:
+            raise ValueError("The Qwen3-VL encoder 'encoder' has no vision weights")
+        name = identifier.submodel_type.value if identifier.submodel_type is not None else "vision_tower_model"
         fakes = {SubModelType.TextEncoder: _TextEncoder, SubModelType.Tokenizer: _Tokenizer}
         if processing is not None and identifier.submodel_type in processing:
             model = processing[identifier.submodel_type]
         else:
             model = fakes.get(identifier.submodel_type, object)()
         infos[name] = _RecordingInfo(name, model, events)
+        if identifier.submodel_type is None:
+            infos[name].compute_device = torch.device(tower_device)
         return infos[name]
 
     return SimpleNamespace(
-        models=SimpleNamespace(load=load, get_config=lambda _identifier: _ENCODER_CONFIG),
+        models=SimpleNamespace(load=load, get_config=lambda _identifier: config),
         util=SimpleNamespace(signal_progress=lambda _message: None),
         images=SimpleNamespace(get_pil=lambda name: Image.new("RGB", _IMAGE_SIZES.get(name, (64, 48)))),
     )
 
 
-def _edit_invocation(*image_names: str) -> Krea2TextEncoderInvocation:
+def _edit_invocation(*image_names: str, vision_tower: ModelIdentifierField | None = None) -> Krea2TextEncoderInvocation:
     from invokeai.app.invocations.fields import ImageField
 
     encoder = _identifier("encoder", ModelType.Qwen3VLEncoder)
     field = Qwen3VLEncoderField(
         tokenizer=encoder.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
         text_encoder=encoder.model_copy(update={"submodel_type": SubModelType.TextEncoder}),
+        vision_tower=vision_tower,
         loras=[],
     )
     return Krea2TextEncoderInvocation(
@@ -583,11 +594,15 @@ def test_a_reference_the_processor_refuses_fails_before_either_tower_is_read(_no
     assert [identifier.submodel_type for identifier in loaded] == [SubModelType.Tokenizer, SubModelType.Processor]
 
 
-def test_an_encoder_without_a_tower_fails_before_the_encoder_is_read(_no_lora_patching, processing) -> None:
+def test_a_non_gguf_encoder_without_vision_weights_fails_before_the_encoder_is_read(
+    _no_lora_patching, processing
+) -> None:
     loaded: list = []
 
-    with pytest.raises(ValueError, match="has no vision tower"):
-        _edit_invocation("small")._encode(_edit_context([], loaded, {}, refuse_tower=True, processing=processing))
+    with pytest.raises(ValueError, match="has no vision weights"):
+        _edit_invocation("small")._encode(
+            _edit_context([], loaded, {}, refuse_vision_weights=True, processing=processing)
+        )
 
     assert SubModelType.TextEncoder not in {identifier.submodel_type for identifier in loaded}
 
@@ -611,3 +626,72 @@ def test_the_conditioning_records_how_many_references_it_read(monkeypatch, image
     invocation.invoke(context)
 
     assert saved["data"].conditionings[0].num_reference_images == len(image_names)
+
+
+_GGUF_CONFIG = SimpleNamespace(format=ModelFormat.GGUFQuantized, name="gguf-encoder")
+_MMPROJ = _identifier("mmproj", ModelType.Qwen3VLVisionTower)
+
+
+def test_a_gguf_encoder_reads_references_through_the_selected_tower_model(monkeypatch, _no_lora_patching) -> None:
+    """The mmproj model is the tower itself, not a submodel of the encoder, and is lent under the same lock
+    order as a tower that belongs to the encoder."""
+    loaded: list = []
+    events: list[str] = []
+    infos: dict = {}
+    captured: dict = {}
+
+    def encode(inputs, text_encoder, vision_tower):
+        events.append("encode")
+        captured["vision_tower"] = vision_tower
+        return torch.zeros(1, 266, 12, 4), torch.ones(1, 266, dtype=torch.bool)
+
+    monkeypatch.setattr(
+        f"{_INVOCATION_MODULE}.tokenize_krea2_prompt_with_images",
+        lambda *_args: {"input_ids": torch.zeros(1, 300, dtype=torch.long)},
+    )
+    monkeypatch.setattr(f"{_INVOCATION_MODULE}.encode_krea2_prompt_with_images", encode)
+
+    _edit_invocation("small", vision_tower=_MMPROJ)._encode(_edit_context(events, loaded, infos, config=_GGUF_CONFIG))
+
+    tower_loads = [identifier for identifier in loaded if identifier.key == "mmproj"]
+    assert len(tower_loads) == 1 and tower_loads[0].submodel_type is None
+    assert SubModelType.VisionEncoder not in {identifier.submodel_type for identifier in loaded}
+    assert captured["vision_tower"] is infos["vision_tower_model"].model
+    assert events == [
+        "lock text_encoder",
+        "lock vision_tower_model",
+        "encode",
+        "unlock vision_tower_model",
+        "unlock text_encoder",
+    ]
+    assert infos["vision_tower_model"].working_mem_bytes == infos["text_encoder"].working_mem_bytes
+
+
+def test_a_gguf_encoder_without_a_tower_model_fails_before_anything_loads(_no_lora_patching) -> None:
+    loaded: list = []
+
+    with pytest.raises(ValueError, match="Select the Vision Tower model"):
+        _edit_invocation("small")._encode(_edit_context([], loaded, {}, config=_GGUF_CONFIG))
+
+    assert loaded == []
+
+
+def test_a_gguf_text_only_prompt_never_loads_the_tower_model(_no_lora_patching) -> None:
+    loaded: list = []
+
+    _edit_invocation(vision_tower=_MMPROJ)._encode(_edit_context([], loaded, {}, config=_GGUF_CONFIG))
+
+    assert "mmproj" not in {identifier.key for identifier in loaded if identifier.submodel_type is None}
+    assert {identifier.submodel_type for identifier in loaded} == {SubModelType.Tokenizer, SubModelType.TextEncoder}
+
+
+def test_a_tower_on_another_device_than_the_encoder_is_refused(monkeypatch, _no_lora_patching) -> None:
+    monkeypatch.setattr(
+        f"{_INVOCATION_MODULE}.tokenize_krea2_prompt_with_images",
+        lambda *_args: {"input_ids": torch.zeros(1, 300, dtype=torch.long)},
+    )
+
+    with pytest.raises(RuntimeError, match="need one device"):
+        _edit_invocation("small", vision_tower=_MMPROJ)._encode(
+            _edit_context([], [], {}, config=_GGUF_CONFIG, tower_device="meta")
+        )
