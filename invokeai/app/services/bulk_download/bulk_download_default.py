@@ -104,8 +104,9 @@ class BulkDownloadService(BulkDownloadBase):
         zip_file_path = self._bulk_downloads_folder / (zip_file_name)
 
         # Clients poll for the final name, so it must only appear once the archive is complete. The ".partial" name
-        # fails get_path's ".zip" check, and the rename within the same folder is atomic.
-        partial_path = zip_file_path.with_name(zip_file_name + ".partial")
+        # fails get_path's ".zip" check, and the rename within the same folder is atomic. The temp name is short and
+        # independent of the item id: a board-derived id can already use the whole filename length limit.
+        partial_path = self._bulk_downloads_folder / f"{uuid_string()}.zip.partial"
         try:
             with ZipFile(partial_path, "w") as zip_file:
                 for image_dto in image_dtos:

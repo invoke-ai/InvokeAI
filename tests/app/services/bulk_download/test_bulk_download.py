@@ -158,6 +158,43 @@ def test_archive_is_not_downloadable_until_complete(
     assert [p.name for p in (tmp_path / "bulk_downloads").iterdir()] == ["test.zip"]
 
 
+def test_archive_with_longest_valid_filename_is_created(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """A board download whose archive name uses the full 255-character filename limit must still work."""
+    expected_zip_path, expected_image_path, mock_image_contents = prepare_handler_test(
+        tmp_path, monkeypatch, mock_image_dto, mock_invoker
+    )
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+
+    max_filename_length = 255  # component limit of ext4, APFS and NTFS
+    # The item id is "<board name>_test" (uuid_string is patched) and the archive adds ".zip".
+    board_name = "b" * (max_filename_length - len("_test.zip"))
+    monkeypatch.setattr(
+        mock_invoker.services.board_records,
+        "get",
+        lambda *args, **kwargs: BoardRecord(
+            board_id="12345",
+            board_name=board_name,
+            user_id="test_user",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+        ),
+    )
+
+    item_id = service.generate_item_id("12345")
+    assert len(item_id + ".zip") == max_filename_length
+    service.handler(None, "12345", item_id)
+
+    zip_path = Path(service.get_path(item_id + ".zip"))
+    with ZipFile(zip_path) as zip_file:
+        assert zip_file.read(f"general/{mock_image_dto.image_name}").decode() == mock_image_contents
+    assert [p.name for p in zip_path.parent.iterdir()] == [zip_path.name]
+    assert isinstance(mock_invoker.services.events.events[-1], BulkDownloadCompleteEvent)
+
+
 def test_failed_archive_leaves_no_file_behind(
     tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
 ):
