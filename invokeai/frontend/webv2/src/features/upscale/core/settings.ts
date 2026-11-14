@@ -25,6 +25,7 @@ import {
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
+  isMossImageQwen35Encoder,
   isModelIdentifierConfig,
   isQwen3Vl4bEncoder,
   isVaeCompatibleWithGenerateModel,
@@ -188,6 +189,12 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
   accepts: isAnimaQwen35Encoder,
   field: 'qwen35EncoderModel',
   label: 'Qwen3.5 encoder',
+};
+// MOSS-Image reads the Qwen3.5 9B; the 4B Anima-3.8B uses is the same model type and its hidden size does not fit.
+const MOSS_IMAGE_QWEN35_SLOT: UpscaleComponentSlot = {
+  accepts: isMossImageQwen35Encoder,
+  field: 'qwen35EncoderModel',
+  label: 'Qwen3.5 9B encoder',
 };
 // Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
 const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
@@ -439,6 +446,22 @@ export const UPSCALE_ARCHITECTURES = {
     schedulers: ['euler'],
     takesModelGuidance: true,
     takesModelSteps: false,
+    tileControlNet: null,
+  },
+  'moss-image': {
+    // `moss_image_model_loader` takes a Diffusers install's own Qwen3.5 and VAE; any other format needs both.
+    components: (model) =>
+      model.format === 'diffusers' ? NO_COMPONENTS : { slots: [MOSS_IMAGE_QWEN35_SLOT], vae: true },
+    denoiseGrid: 16,
+    // `moss_image_denoise` clips by sigma value like FLUX, then re-spaces the window to the requested steps.
+    indexClipping: null,
+    label: 'MOSS-Image',
+    negativePrompt: 'cfg-gated',
+    // `moss_image_denoise` has no scheduler input: it steps its own shifted Euler schedule.
+    schedulers: ['euler'],
+    takesModelGuidance: true,
+    // The re-spaced window runs every step at full upscale resolution, so the served 50 is the node's own choice.
+    takesModelSteps: true,
     tileControlNet: null,
   },
   'qwen-image': {

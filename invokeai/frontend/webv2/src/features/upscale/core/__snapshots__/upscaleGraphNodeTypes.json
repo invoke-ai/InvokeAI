@@ -58,6 +58,7 @@
     "flux2_klein_model_loader vae flux2_vae_encode vae",
     "flux2_klein_text_encoder conditioning collect item",
     "flux2_vae_encode latents flux2_denoise latents",
+    "flux2_vae_encode latents moss_image_denoise latents",
     "flux_denoise latents flux_vae_decode latents",
     "flux_lora_collection_loader clip flux_text_encoder clip",
     "flux_lora_collection_loader t5_encoder flux_text_encoder t5_encoder",
@@ -84,6 +85,7 @@
     "integer value flux2_denoise seed",
     "integer value flux_denoise seed",
     "integer value krea2_denoise seed",
+    "integer value moss_image_denoise seed",
     "integer value noise seed",
     "integer value qwen_image_denoise seed",
     "integer value z_image_denoise seed",
@@ -102,6 +104,14 @@
     "main_model_loader unet lora_collection_loader unet",
     "main_model_loader vae i2l vae",
     "main_model_loader vae l2i vae",
+    "moss_image_denoise latents flux2_vae_decode latents",
+    "moss_image_model_loader qwen3_5_encoder moss_image_text_encoder qwen3_5_encoder",
+    "moss_image_model_loader transformer moss_image_denoise transformer",
+    "moss_image_model_loader vae flux2_vae_decode vae",
+    "moss_image_model_loader vae flux2_vae_encode vae",
+    "moss_image_model_loader vae moss_image_denoise vae",
+    "moss_image_text_encoder conditioning moss_image_denoise negative_conditioning",
+    "moss_image_text_encoder conditioning moss_image_denoise positive_conditioning",
     "noise noise tiled_multi_diffusion_denoise_latents noise",
     "qwen_image_denoise latents qwen_image_l2i latents",
     "qwen_image_i2l latents krea2_denoise latents",
@@ -133,6 +143,7 @@
     "string value flux2_klein_text_encoder prompt",
     "string value flux_text_encoder prompt",
     "string value krea2_text_encoder prompt",
+    "string value moss_image_text_encoder prompt",
     "string value qwen_image_text_encoder prompt",
     "string value sdxl_compel_prompt prompt",
     "string value sdxl_compel_prompt style",
@@ -287,6 +298,21 @@
         "img_resize",
         "integer",
         "lora_selector",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask"
+      ]
+    },
+    "moss-image": {
+      "nodeTypes": [
+        "core_metadata",
+        "flux2_vae_decode",
+        "flux2_vae_encode",
+        "img_resize",
+        "integer",
+        "moss_image_denoise",
+        "moss_image_model_loader",
+        "moss_image_text_encoder",
         "spandrel_image_to_image_autoscale",
         "string",
         "unsharp_mask"
@@ -550,6 +576,7 @@
         "cfg_scale": [
           1,
           2,
+          3,
           4,
           4.5,
           5.5,
@@ -584,7 +611,8 @@
         "steps": [
           28,
           30,
-          4
+          4,
+          50
         ],
         "structure": [
           0
@@ -1199,6 +1227,82 @@
         "clip",
         "unet",
         "vae"
+      ]
+    },
+    "moss_image_denoise": {
+      "inputs": [
+        "latents",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          3
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.49900000000000005
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          50
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "moss_image_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_5_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_5_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "moss_image_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_5_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
       ]
     },
     "noise": {
