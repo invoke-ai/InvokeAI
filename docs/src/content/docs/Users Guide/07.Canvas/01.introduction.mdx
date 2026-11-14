@@ -39,7 +39,7 @@ The Layers panel groups layers by type, in the stacks **Inpaint Masks**, **Regio
 
 <Image src={addLayerMenu} alt="The Add layer menu with Inpaint mask, Regional guidance, Regional reference image, Control layer, Raster layer and New group." width={500} />
 
-Each layer row has an eye button on the right. A hidden layer is off the canvas and takes no part in generation. To only get a mask, regional guidance or control layer out of view while it still affects generation, choose **Hide on canvas only** in its right-click menu. **Shift+H** does that for all of them at once so you can see the image underneath.
+Each raster layer row has an eye button on the right: a hidden raster layer is off the canvas and takes no part in generation. Mask, regional guidance and control layer rows have a dot before the eye as well. The dot decides whether the layer takes part in generation, and the eye only gets the layer out of view while it still affects generation. **Shift+H** does that for all of them at once so you can see the image underneath.
 
 ### Settings live in the Properties pane
 
@@ -120,7 +120,7 @@ Regional guidance gives one area of the image its own prompt. For example, keep 
 
 2. **Paint the region** with the **Brush**, or draw it with the **Shape** tool. It shows as a tinted overlay.
 
-3. **Enter the region's prompt.** With the layer selected, open **Properties** and scroll down to its **Layer** section. Type in **Positive prompt**, and optionally **Negative prompt**. The prompt is saved when you click away from the field.
+3. **Enter the region's prompt.** With the layer selected, open **Properties** and scroll down to its **Layer** section. Type in **Positive prompt**. To keep something out of the region as well, click **+ Negative prompt…** and type in **Negative prompt**. Each prompt is saved when you click away from its field.
 
 4. **Press Invoke.** The main prompt still describes the whole image; the regional prompt applies inside the region.
 

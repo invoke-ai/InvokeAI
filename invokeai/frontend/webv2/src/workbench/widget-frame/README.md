@@ -61,6 +61,13 @@ Command hints resolve against runtime catalog and mounted extension contribution
 - **Title bar.** Double-click maximizes or restores, and expands a collapsed window; Restore returns to windowed geometry, which maximizing never touches. Collapse and Expand are explicit buttons; Close removes the window as a marker's Remove does (an undoable layout step), sending focus to the center when it gets its view back, else to the panel the window's rail shows, else the center. Label truncates first, down to its icon; contributed widget actions then give way in a strip that scrolls, without a scrollbar, by focus, sideways scroll, or touch, so a focused action is always in view with its ring; window's own controls never shrink.
 - **Shaded bodies stay mounted.** Shaded body is hidden with React `Activity`, so its local state survives and no second copy mounts. Drafts are flushed before shading, docking, and removing, because hiding or unmounting an editor stops its flusher.
 
+## Docked bodies
+
+A left, right or bottom panel puts its widget's body in one vertical `Scrollable` (`PanelBodySlot` in `WidgetRenderer.tsx`); the manifest's `chrome.body` says how the view meets it.
+
+- **`flow` (default).** The scroll content grows with the view and is never shrunk below it, because the scroll area sizes its thumb from that element: a squeezed one leaves the scrollbar stale as sections open and fold. A view's `h="full"` means at least the body's height, never a bound.
+- **`fill`.** For views that bound their own regions: inner lists and trees that scroll themselves, resizable panes, filters or footers that stay in view. The frame wraps the view in a size-contained column, so the view's rows never count toward the body's height and the view gets exactly the body's height. Past the view's own minimum heights the overflow still spills into the body, which then scrolls instead of crushing them. Center and floating hosts give every view exactly their height, with no outer scroll, whatever the manifest says.
+
 ## Center chrome
 
 Center view's header floats over its body as two islands (`workbench/shell/CenterArea.tsx`): view menu and widget label at start, toolbar widgets and header actions at end.
