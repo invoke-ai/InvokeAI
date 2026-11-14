@@ -162,13 +162,36 @@ describe('while results are staged', () => {
   });
 
   it.each([
-    ['canvas.nudgeLeft', -1, 0],
-    ['canvas.nudgeRight', 1, 0],
-    ['canvas.nudgeUp', 0, -1],
-    ['canvas.nudgeDown', 0, 1],
-  ] as const)('%s nudges the selected layer, never steps through results', (commandId, dx, dy) => {
-    const engine = run(commandId, { hasMultipleStagingSlots: true });
+    ['canvas.nudgeLeft', 'brush', -1],
+    ['canvas.nudgeRight', 'brush', 1],
+    ['canvas.nudgeLeft', 'view', -1],
+    ['canvas.nudgeRight', 'lasso', 1],
+  ] as const)(
+    '%s with the %s tool steps through the results instead of nudging',
+    (commandId, activeTool, direction) => {
+      const engine = run(commandId, { engine: createEngine({ activeTool }), hasMultipleStagingSlots: true });
+      expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+        direction,
+        type: 'cycleStagedImage',
+      } satisfies CanvasProjectMutation);
+      expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['canvas.nudgeLeft', 'move', -1, 0],
+    ['canvas.nudgeRight', 'transform', 1, 0],
+    ['canvas.nudgeUp', 'brush', 0, -1],
+    ['canvas.nudgeDown', 'brush', 0, 1],
+  ] as const)('%s with the %s tool nudges the selected layer', (commandId, activeTool, dx, dy) => {
+    const engine = run(commandId, { engine: createEngine({ activeTool }), hasMultipleStagingSlots: true });
     expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledExactlyOnceWith(dx, dy);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('left and right nudge when only one result is staged or generating', () => {
+    const engine = run('canvas.nudgeRight', { hasMultipleStagingSlots: false });
+    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledExactlyOnceWith(1, 0);
     expect(dispatch).not.toHaveBeenCalled();
   });
 

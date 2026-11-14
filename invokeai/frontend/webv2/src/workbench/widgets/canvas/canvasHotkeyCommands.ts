@@ -6,6 +6,7 @@ import type {
   DocumentRefusal,
   LayerStackMoveKind,
   StructuralCommitResult,
+  ToolId,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 
@@ -44,7 +45,8 @@ import {
 export const CANVAS_ONLY_HOTKEYS = [
   ...CANVAS_HISTORY_HOTKEYS,
   // With several results staged or generating `alt+[` / `alt+]` step through them; otherwise they walk the layers.
-  // Bare arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
+  // Left and right step through them too unless the Move or Transform tool is active (see STAGING_NUDGE_TOOLS); the
+  // other arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
   ['canvas.prevEntity', 'widgets.canvas.commands.previousEntity', ['alt+[']],
   ['canvas.nextEntity', 'widgets.canvas.commands.nextEntity', ['alt+]']],
   ['canvas.quickSwitch', 'widgets.canvas.commands.quickSwitch', ['q']],
@@ -91,6 +93,12 @@ const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
   'canvas.nudgeUp': { dx: 0, dy: -1 },
   'canvas.nudgeUpLarge': { dx: 0, dy: -10 },
 };
+
+/**
+ * Tools that keep left/right as nudges while results are staged. With any other tool active a horizontal nudge is
+ * almost always a reach for the next result after panning or clicking the canvas, and a 1px move is easy to miss.
+ */
+const STAGING_NUDGE_TOOLS: ReadonlySet<ToolId> = new Set(['move', 'transform']);
 
 /** Command id → z-reorder direction (index 0 = top-most; "forward" moves toward 0). */
 const REORDER_KINDS: Record<string, LayerStackMoveKind> = {
@@ -144,7 +152,8 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly engine: CanvasEngine | null;
   /**
    * More than one staging slot exists, so alt+[ / alt+] step through results (a placeholder shows its progress) instead
-   * of layers. With a single slot there is nothing to step to, and they walk the layers.
+   * of layers, and left / right do too outside the Move and Transform tools. With a single slot there is nothing to step
+   * to: they walk the layers and nudge as usual.
    */
   readonly hasMultipleStagingSlots: boolean;
   readonly selectedLayerIds: readonly string[];
@@ -163,9 +172,9 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
 }
 
 /**
- * Routes one canvas command id to its effect. Staged results never lock the canvas: only alt+[ / alt+] change
- * meaning while several results are staged or generating (they step through them); every other key edits the
- * document as usual.
+ * Routes one canvas command id to its effect. Staged results never lock the canvas: only alt+[ / alt+], and left /
+ * right outside the Move and Transform tools, change meaning while several results are staged or generating (they step
+ * through them); every other key edits the document as usual.
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
@@ -175,8 +184,14 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   const selectedLayer = selected && !isGroupNode(selected.node) ? selected.node : undefined;
   const selectedFrozen = !!selected && (selected.ancestorsLocked || selected.node.isLocked);
 
-  if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nextEntity') && ctx.hasMultipleStagingSlots) {
-    dispatch({ direction: commandId === 'canvas.nextEntity' ? 1 : -1, type: 'cycleStagedImage' });
+  const stepsResults =
+    commandId === 'canvas.prevEntity' ||
+    commandId === 'canvas.nextEntity' ||
+    ((commandId === 'canvas.nudgeLeft' || commandId === 'canvas.nudgeRight') &&
+      !STAGING_NUDGE_TOOLS.has(engine?.interaction.get('activeTool') ?? 'move'));
+  if (stepsResults && ctx.hasMultipleStagingSlots) {
+    const isNext = commandId === 'canvas.nextEntity' || commandId === 'canvas.nudgeRight';
+    dispatch({ direction: isNext ? 1 : -1, type: 'cycleStagedImage' });
     return;
   }
 
