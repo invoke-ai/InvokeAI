@@ -16,6 +16,7 @@ const dataSel = (id: string): string => `&:root[data-theme=${id}]`;
 /** Selectors that apply to each theme, HIGHEST CSS priority first. */
 export const THEME_SELECTORS: Record<string, string[]> = {
   classic: [DARK_SEL, BASE_SEL], // default theme: no [data-theme=classic] rule
+  system: [dataSel('system'), LIGHT_SEL, BASE_SEL],
   light: [dataSel('light'), LIGHT_SEL, BASE_SEL],
   ultradark: [dataSel('ultradark'), DARK_SEL, BASE_SEL],
   mono: [dataSel('mono'), DARK_SEL, BASE_SEL],

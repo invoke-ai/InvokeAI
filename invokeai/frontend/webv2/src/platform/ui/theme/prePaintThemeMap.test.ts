@@ -15,7 +15,7 @@ const readPrePaintThemeMap = (): Record<string, string> => {
     throw new Error('index.html no longer declares themeColorSchemes');
   }
   return Object.fromEntries(
-    [...literal.matchAll(/(\w+):\s*'(\w+)'/g)].map((match) => [match[1] as string, match[2] as string])
+    [...literal.matchAll(/(\w+):\s*'([\w ]+)'/g)].map((match) => [match[1] as string, match[2] as string])
   );
 };
 

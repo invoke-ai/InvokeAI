@@ -12,6 +12,11 @@ const resetBrowserPointer: BrowserCommand<[]> = async ({ page }) => {
   await page.mouse.move(-1, -1);
 };
 
+/** Change the browser preference itself so CSS media queries and native system colors update together. */
+const setBrowserColorScheme: BrowserCommand<[scheme: 'light' | 'dark' | null]> = async ({ page }, scheme) => {
+  await page.emulateMedia({ colorScheme: scheme });
+};
+
 /** Drives Chromium's own IME over CDP: `compose` replaces the in-progress text, `commit` inserts the final text. */
 const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; text: string }[]]> = async (
   { context, page },
@@ -182,6 +187,7 @@ export default mergeConfig(
           imeCompose,
           mouseDragPath,
           resetBrowserPointer,
+          setBrowserColorScheme,
           startThumbnailRoute,
           stopThumbnailRoute: stopThumbnailRouteCommand,
         },

@@ -1,4 +1,4 @@
-export type WorkbenchThemeId = 'classic' | 'light' | 'osakaJade' | 'mono' | 'ultradark' | 'catppuccinMocha';
+export type WorkbenchThemeId = 'classic' | 'light' | 'osakaJade' | 'mono' | 'ultradark' | 'catppuccinMocha' | 'system';
 
 /** Keep the ramp absolute: 50 lightest, 950 darkest, matching Chakra gray. */
 export type NeutralStep = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
@@ -35,7 +35,7 @@ export interface ThemeDefinition {
   label: string;
   description: string;
   /** Native color-scheme hint for form controls, scrollbars, and `<select>` popups. */
-  colorScheme: 'dark' | 'light';
+  colorScheme: 'dark' | 'light' | 'light dark';
   colors: ThemeColors;
 }
 
@@ -192,6 +192,48 @@ const catppuccinMocha: ThemeColors = {
   control: 'oklch(32.4% 0.0319 281.98)', // Surface0
 };
 
+/** Desktop values are supplied with the entry document when the local server can read the active palette. */
+export const SYSTEM_COLORS = {
+  background: 'var(--invokeai-desktop-background, Canvas)',
+  foreground: 'var(--invokeai-desktop-foreground, CanvasText)',
+  inset: 'var(--invokeai-desktop-inset, var(--invokeai-desktop-background, Canvas))',
+  accent: 'var(--invokeai-desktop-accent, LinkText)',
+  accentContrast: 'var(--invokeai-desktop-accent-contrast, Canvas)',
+  // Native intent text stays readable even when a desktop accent is too light to be used as small text.
+  accentForeground: 'var(--invokeai-desktop-foreground, LinkText)',
+};
+
+// These endpoints swap with the browser preference, keeping the ramp absolute in either scheme.
+const systemColors: ThemeColors = {
+  neutral: Object.fromEntries(
+    Object.entries({
+      50: 100,
+      100: 97,
+      200: 94,
+      300: 85,
+      400: 68,
+      500: 54,
+      600: 43,
+      700: 34,
+      800: 24,
+      900: 12,
+      950: 0,
+    }).map(([step, light]) => [step, `color-mix(in oklab, var(--wb-system-light) ${light}%, var(--wb-system-dark))`])
+  ) as Record<NeutralStep, string>,
+  // Invert the native link/canvas pair: selection colors can have insufficient contrast for small action labels.
+  brand: { solid: SYSTEM_COLORS.accent, contrast: SYSTEM_COLORS.accentContrast },
+  accent: { solid: SYSTEM_COLORS.accent, contrast: SYSTEM_COLORS.accentContrast },
+  // The platform has no status-color pairs; reuse our readable light/dark intent colors.
+  danger: `light-dark(${light.danger}, ${classic.danger})`,
+  success: `light-dark(${light.success}, ${classic.success})`,
+  warning: `light-dark(${light.warning}, ${classic.warning})`,
+  inset: SYSTEM_COLORS.inset,
+  // Local palettes supply their own restrained elevations; browser-only mode derives them from its readable pair.
+  control: `var(--invokeai-desktop-surface, light-dark(color-mix(in oklab, ${SYSTEM_COLORS.foreground} 8%, ${SYSTEM_COLORS.background}), color-mix(in oklab, ${SYSTEM_COLORS.foreground} 20%, ${SYSTEM_COLORS.background})))`,
+  fill: `var(--invokeai-desktop-selection, light-dark(color-mix(in oklab, ${SYSTEM_COLORS.foreground} 12%, ${SYSTEM_COLORS.background}), color-mix(in oklab, ${SYSTEM_COLORS.foreground} 28%, ${SYSTEM_COLORS.background})))`,
+  grid: `color-mix(in oklab, ${SYSTEM_COLORS.foreground} 20%, ${SYSTEM_COLORS.background})`,
+};
+
 /** Registry order is Settings display order. */
 export const THEMES: ThemeDefinition[] = [
   {
@@ -200,6 +242,13 @@ export const THEMES: ThemeDefinition[] = [
     description: 'The legacy blue-on-graphite workbench.',
     colorScheme: 'dark',
     colors: classic,
+  },
+  {
+    id: 'system',
+    label: 'System',
+    description: 'Follows your local desktop palette when available, otherwise browser system colors.',
+    colorScheme: 'light dark',
+    colors: systemColors,
   },
   {
     id: 'light',
@@ -276,7 +325,11 @@ export const resolveWorkbenchThemeId = (value: unknown): WorkbenchThemeId | null
 
 /** The default panel surface of a theme (lightest end in light mode, near-darkest in dark). */
 const surfaceOf = (theme: ThemeDefinition): string =>
-  theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
+  theme.id === 'system'
+    ? SYSTEM_COLORS.background
+    : theme.colorScheme === 'light'
+      ? theme.colors.neutral[50]
+      : theme.colors.neutral[900];
 
 export const previewSwatches = (theme: ThemeDefinition): [string, string, string, string] => [
   surfaceOf(theme),
