@@ -282,6 +282,9 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
 
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');
+
 /** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
 export const usePsdExportStatus = (
   engine: CanvasCoreStoreCapability | null

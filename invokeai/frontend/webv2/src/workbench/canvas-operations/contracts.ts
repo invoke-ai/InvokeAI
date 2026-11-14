@@ -1,3 +1,4 @@
+import type { UtilityGraphExecutionStatus } from '@features/queue/utility';
 import type {
   CommitGeneratedImageResult,
   LayerExportGuard,
@@ -401,6 +402,8 @@ export interface CanvasApplicationPort {
     isGuardCurrent(guard: LayerExportGuard): boolean;
   }): CanvasOperationController;
   runGraph(options: {
+    onStatus?: (status: UtilityGraphExecutionStatus) => void;
+    prepend?: boolean;
     graph: BackendGraphContract;
     outputNodeId?: string;
     signal?: AbortSignal;

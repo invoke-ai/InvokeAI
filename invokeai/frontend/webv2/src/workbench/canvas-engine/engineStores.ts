@@ -278,7 +278,16 @@ export interface ControlLayerView {
  * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
  * `transform` drives preview and numeric controls.
  */
+export interface TransformOptions {
+  smoothing: boolean;
+  resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
+  fitMode: 'contain' | 'cover' | 'fill';
+}
+
 export interface TransformSession {
+  processing?: boolean;
+  processingPhase?: 'preparing' | 'queued' | 'resampling';
+  applyFailed?: boolean;
   layerId: string;
   startTransform: LayerTransform;
   transform: LayerTransform;
@@ -517,6 +526,8 @@ export interface EngineStores {
    * commit/cancel.
    */
   bboxPreview: ScalarStore<Rect | null>;
+  /** Transient transform preferences; not part of the persisted document. */
+  transformOptions: ScalarStore<TransformOptions>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
   /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
@@ -636,6 +647,9 @@ const transformSessionEqual = (a: TransformSession | null, b: TransformSession |
     return a === b;
   }
   return (
+    a.processing === b.processing &&
+    a.processingPhase === b.processingPhase &&
+    a.applyFailed === b.applyFailed &&
     a.layerId === b.layerId &&
     transformEqual(a.startTransform, b.startTransform) &&
     transformEqual(a.transform, b.transform)
@@ -746,6 +760,11 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
+  transformOptions: createScalarStore<TransformOptions>({
+    smoothing: false,
+    resampleMode: 'bicubic',
+    fitMode: 'contain',
+  }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),

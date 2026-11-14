@@ -905,7 +905,153 @@ describe('Tool property scrubbers', () => {
   });
 });
 
+describe('Transform tool options', () => {
+  const selectPixelLayer = async (width = 450) => {
+    await mount(PropertiesPane, 'layer', { width });
+    await act(() => {
+      harness.project = applyCanvasProjectMutation(harness.project!, {
+        type: 'updateCanvasLayerSource',
+        id: 'l0',
+        source: { type: 'paint', bitmap: { imageName: 'test.png', width: 100, height: 50 } },
+      });
+      harness.listeners.forEach((listener) => listener());
+      engine!.tools.setTool('transform');
+    });
+    await settle();
+  };
+
+  it.each([450, 320])('aligns Transform geometry rows and keeps full labels at %s pixels', async (width) => {
+    await selectPixelLayer(width);
+    const tool = page.getByRole('group', { name: 'Tool', exact: true }).element();
+    const visibleLabel = (text: string) => {
+      const labels = [...tool.querySelectorAll<HTMLElement>('p')].filter(
+        (element) => element.textContent === text && element.getClientRects().length > 0
+      );
+      expect(labels, `one visible ${text} label, without a duplicate heading`).toHaveLength(1);
+      return labels[0]!;
+    };
+    const position = visibleLabel('Position');
+    const scale = visibleLabel('Scale');
+    const rotation = visibleLabel('Rotation');
+    const resample = visibleLabel('Resample Mode');
+    const x = page.getByRole('spinbutton', { exact: true, name: 'X' }).element().getBoundingClientRect();
+    const w = page.getByRole('spinbutton', { exact: true, name: 'W %' }).element().getBoundingClientRect();
+    const angle = page.getByRole('spinbutton', { exact: true, name: 'Rotation' }).element().getBoundingClientRect();
+    expect(Math.abs(x.left - w.left)).toBeLessThan(1);
+    expect(Math.abs(x.left - angle.left)).toBeLessThan(1);
+    const centerY = (rect: DOMRect) => rect.top + rect.height / 2;
+    expect(Math.abs(centerY(position.getBoundingClientRect()) - centerY(x))).toBeLessThan(1);
+    expect(Math.abs(centerY(scale.getBoundingClientRect()) - centerY(w))).toBeLessThan(1);
+    expect(Math.abs(centerY(rotation.getBoundingClientRect()) - centerY(angle))).toBeLessThan(1);
+    const positionRow = position.parentElement!.getBoundingClientRect();
+    const scaleRow = scale.parentElement!.getBoundingClientRect();
+    const rotationRow = rotation.parentElement!.getBoundingClientRect();
+    const positionToScale = scaleRow.top - positionRow.bottom;
+    const scaleToRotation = rotationRow.top - scaleRow.bottom;
+    expect(positionToScale).toBeGreaterThan(0);
+    expect(
+      Math.abs(positionToScale - scaleToRotation),
+      'equal space between the actual geometry row edges'
+    ).toBeLessThan(1);
+    expect(resample.scrollWidth).toBeLessThanOrEqual(resample.clientWidth);
+    expect(
+      page.getByRole('spinbutton', { exact: true, name: 'Y' }).element().getBoundingClientRect().right
+    ).toBeLessThanOrEqual(tool.getBoundingClientRect().right);
+  });
+
+  it('places resampling above Position in the actual tool form and edits the active session', async () => {
+    await selectPixelLayer();
+    const tool = page.getByRole('group', { name: 'Tool', exact: true });
+    expect(tool.element().textContent!.indexOf('Resampling')).toBeLessThan(
+      tool.element().textContent!.indexOf('Position')
+    );
+    const smoothing = tool.getByRole('checkbox', { name: 'Smoothing' });
+    const resample = tool.getByRole('combobox', { name: 'Resample Mode' });
+    await expect.element(smoothing).toBeEnabled();
+    await expect.element(resample).toBeDisabled();
+    await act(() => userEvent.click(tool.getByText('Smoothing', { exact: true })));
+    await act(async () => {
+      await userEvent.click(resample);
+      await userEvent.click(page.getByRole('option', { name: 'Lanczos' }));
+    });
+    expect(engine!.interaction.get('transformOptions')).toMatchObject({ smoothing: true, resampleMode: 'lanczos' });
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
+    const direct = vi.spyOn(engine!.layers, 'commitPrepared');
+    await act(async () => {
+      await userEvent.fill(tool.getByRole('spinbutton', { exact: true, name: 'X' }), '40');
+      await userEvent.keyboard('{Enter}');
+    });
+    expect(engine!.interaction.get('transformSession')).toMatchObject({ layerId: 'l0', transform: { x: 40 } });
+    expect(direct).not.toHaveBeenCalled();
+    await act(() => userEvent.click(tool.getByRole('button', { name: 'Fit to Frame', exact: true })));
+    expect(engine!.interaction.get('transformSession')).toMatchObject({
+      layerId: 'l0',
+      transform: { rotation: 0, scaleX: 10.24, scaleY: 10.24, x: 0, y: 256 },
+    });
+    expect(engine!.history.getEntries().past).toEqual([]);
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Cancel' })));
+    expect(engine!.interaction.get('transformSession')).toBeNull();
+    expect(engine!.document.getDocument()!.stacks.raster[0]).toMatchObject({ transform: { x: 10.4 } });
+  });
+
+  it('disables numeric and Fit edits while a Transform session is pending', async () => {
+    await mount(PropertiesPane, 'layer');
+    await act(() => {
+      engine!.tools.setTool('transform');
+      engine!.stores.pendingTransformLayerId.set('l0');
+    });
+    await settle();
+    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'X' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Fit to Frame' })).toBeDisabled();
+    await expect.element(page.getByRole('checkbox', { name: 'Smoothing' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
+    await expect.element(page.getByRole('status')).toHaveTextContent('Waiting for the stroke to save…');
+    expect(engine!.history.getEntries().past).toEqual([]);
+  });
+
+  it('disables Transform inputs while processing while leaving Cancel live', async () => {
+    await selectPixelLayer();
+    await act(() =>
+      engine!.stores.transformSession.set({ ...engine!.interaction.get('transformSession')!, processing: true })
+    );
+    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'X' })).toBeDisabled();
+    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'W %' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Fit to Frame' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Cancel' })).toBeEnabled();
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Cancel' })));
+    expect(engine!.interaction.get('transformSession')).toBeNull();
+  });
+
+  it('fits a native shape in its tool preview and preserves its editable source on Apply', async () => {
+    await mount(PropertiesPane, 'shape');
+    harness.appliesMutations = true;
+    await act(() => engine!.tools.setTool('transform'));
+    await settle();
+    await expect.element(page.getByRole('checkbox', { name: 'Smoothing' })).toBeDisabled();
+    await act(async () => {
+      await userEvent.click(page.getByRole('combobox', { name: 'Fit Mode' }));
+      await userEvent.click(page.getByRole('option', { name: 'Fill', exact: true }));
+      await userEvent.click(page.getByRole('button', { name: 'Fit to Frame', exact: true }));
+    });
+    expect(engine!.history.getEntries().past).toEqual([]);
+    expect(engine!.interaction.get('transformSession')?.transform.rotation).toBe(0);
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Apply' })));
+    expect(engine!.document.getDocument()!.stacks.raster[0]).toMatchObject({
+      source: { type: 'shape' },
+      transform: { rotation: 0 },
+    });
+    expect(engine!.history.getEntries().past).toEqual(['Transform layer']);
+  });
+});
+
 describe('Transform pane', () => {
+  it('keeps resampling controls in the tool options rather than layer properties', async () => {
+    await mount(TransformPane, 'layer');
+    expect(page.getByRole('checkbox', { name: 'Smoothing' }).query()).toBeNull();
+    expect(page.getByRole('button', { name: 'Fit to Frame', exact: true }).query()).toBeNull();
+  });
+
   it('disables its fields with nothing selected and commits one patch per field for a selected layer', async () => {
     await mount(TransformPane);
     expect(host!.textContent).toContain('No layer selected');
