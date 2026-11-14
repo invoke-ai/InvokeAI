@@ -7,7 +7,12 @@ import numpy
 import torch
 from PIL import Image, ImageFilter
 
-from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
+from invokeai.app.invocations.image import (
+    ImageField,
+    MaskFromAlphaInvocation,
+    OklabUnsharpMaskInvocation,
+    OklchImageHueAdjustmentInvocation,
+)
 from invokeai.app.invocations.primitives import ImageCollectionInvocation
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
@@ -47,6 +52,51 @@ def _max_abs_diff_uint8(left: Image.Image, right: Image.Image) -> int:
     left_arr = numpy.asarray(left, dtype=numpy.int16)
     right_arr = numpy.asarray(right, dtype=numpy.int16)
     return int(numpy.abs(left_arr - right_arr).max())
+
+
+def _invoke_mask_from_alpha(input_image: Image.Image, invert: bool = False) -> list[int]:
+    context = MagicMock()
+    # Like the real context, convert to the requested mode.
+    context.images.get_pil.side_effect = lambda image_name, mode=None: (
+        input_image.convert(mode) if mode else input_image.copy()
+    )
+    context.images.save.side_effect = lambda image, image_category: SimpleNamespace(
+        image_name="out", width=image.width, height=image.height
+    )
+
+    MaskFromAlphaInvocation(image=ImageField(image_name="in"), invert=invert).invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+
+    assert saved_image.mode == "L"
+    return numpy.asarray(saved_image).reshape(-1).tolist()
+
+
+def test_mask_from_alpha_uses_the_alpha_channel() -> None:
+    input_image = Image.new("RGBA", (3, 1))
+    input_image.putdata([(10, 20, 30, 0), (10, 20, 30, 128), (10, 20, 30, 255)])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 128, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 127, 0]
+
+
+def test_mask_from_alpha_treats_an_image_without_alpha_as_opaque() -> None:
+    rgb_image = Image.new("RGB", (3, 1))
+    rgb_image.putdata([(255, 0, 0), (0, 255, 0), (0, 0, 64)])
+    grayscale_image = Image.new("L", (3, 1))
+    grayscale_image.putdata([0, 64, 200])
+
+    assert _invoke_mask_from_alpha(rgb_image) == [255, 255, 255]
+    assert _invoke_mask_from_alpha(rgb_image, invert=True) == [0, 0, 0]
+    assert _invoke_mask_from_alpha(grayscale_image) == [255, 255, 255]
+
+
+def test_mask_from_alpha_uses_palette_transparency() -> None:
+    palette_image = Image.new("P", (3, 1))
+    palette_image.putpalette([0, 0, 0, 255, 255, 255])
+    palette_image.putdata([0, 1, 0])
+    palette_image.info["transparency"] = 0
+
+    assert _invoke_mask_from_alpha(palette_image) == [0, 255, 0]
 
 
 def test_image_collection_invocation_preserves_existing_collection_values() -> None:
