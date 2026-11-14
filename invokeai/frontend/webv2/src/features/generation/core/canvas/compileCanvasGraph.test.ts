@@ -11,8 +11,10 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { withAddedReferenceImages } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
+import { syncGenerateWidgetValuesWithModels } from '@features/generation/core/settings';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
@@ -256,6 +258,36 @@ const BASE_CASES: BaseCase[] = [
 seedArchitectureCapabilities();
 
 describe('compileCanvasGraph', () => {
+  it('retains the local Kontext reference when a synced Canvas model is renamed', () => {
+    const installed = {
+      ...fluxModel,
+      hash: 'original-file',
+      name: 'FLUX.1 Kontext dev',
+      source: '/models/portrait.safetensors',
+      variant: 'dev',
+    };
+    const renamed = { ...installed, name: 'Portrait editor' };
+    const referenceImages = withAddedReferenceImages(
+      installed,
+      [],
+      [],
+      [{ id: 'reference', image: { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } } }]
+    );
+    const settings = syncGenerateWidgetValuesWithModels(
+      { ...settingsFor(installed, { ...COMPONENT_OVERRIDES.flux, referenceImages }), model: installed },
+      [renamed]
+    );
+
+    const { backendGraph } = compile(settings.model, 'img2img', { settings });
+
+    expect(settings.model.name).toBe(renamed.name);
+    expect(
+      backendGraph.edges.some(
+        ({ destination }) => destination.node_id === 'denoise_latents' && destination.field === 'kontext_conditioning'
+      )
+    ).toBe(true);
+  });
+
   describe('txt2img per base', () => {
     it.each(BASE_CASES)(
       'builds a $model.base txt2img graph sized to the bbox',
