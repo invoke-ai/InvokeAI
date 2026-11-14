@@ -74,8 +74,8 @@ def lora_sidecar_bytes(
       reads the timestep embedding), with a low-rank layer's `rank` columns beside it;
     - for any layer but a low-rank one, the `out_features x in_features` tensors `_SIDECAR_WEIGHT_COPIES` counts for
       its kind, one more from the second such layer on the module (the running sum) and two from the third (the
-      previous layer's result as well). An int8 Linear hands over only its weight's shape, so there one copy is
-      counted that is not made.
+      previous layer's result as well). A dequantizing Linear hands over only its weight's shape to any layer
+      but DoRA, which reads the weight and gets it dequantized, so for the others one copy is counted that is not made.
 
     Modules run one after another, so only the largest such update counts. On GGUF, int8 and fp8 weights every layer
     is a sidecar, kept on the device: all the sidecars' tensors are counted, plus that update. Other formats merge, but

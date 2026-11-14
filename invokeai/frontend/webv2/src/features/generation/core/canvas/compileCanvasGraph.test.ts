@@ -1,4 +1,4 @@
-import type { BackendGraphContract, GenerationProjectSettings } from '@features/generation/core/contracts';
+import type { BackendGraphContract } from '@features/generation/core/contracts';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
@@ -11,17 +11,26 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
-import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
+import type { Rect } from './types';
 
 import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
+import {
+  bbox,
+  compile,
+  COMPONENT_OVERRIDES,
+  COMPOSITING_FIXTURE,
+  PROJECT_SETTINGS,
+  qwen3Encoder,
+  qwenImageVae,
+  settingsFor,
+} from './compileCanvasGraph.testing';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -102,98 +111,6 @@ const externalModel: GenerateModelConfig = {
   provider_id: 'openai',
   type: 'external_image_generator',
 };
-
-const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
-const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = {
-  base: 'any',
-  key: 'clip',
-  name: 'CLIP Embed',
-  type: 'clip_embed',
-  variant: 'large',
-};
-const qwen3Encoder: ComponentModelConfig = {
-  base: 'any',
-  key: 'qwen3',
-  name: 'Qwen3 Encoder',
-  type: 'qwen3_encoder',
-  variant: 'qwen3_06b',
-};
-
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
-
-const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
-  ...getDefaultGenerateSettings(model),
-  seed: 1,
-  seedMode: 'fixed',
-  ...overrides,
-});
-
-/** Per-base overrides needed to pass component validation. */
-const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = {
-  flux: { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae },
-  anima: { qwen3EncoderModel: qwen3Encoder, vae: qwenImageVae },
-};
-
-const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
-
-const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
-  coherenceEdgeSize: 16,
-  coherenceMinDenoise: 0,
-  coherenceMode: 'Gaussian Blur',
-  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
-  infillMethod: 'lama',
-  infillPatchmatchDownscaleSize: 1,
-  infillTileSize: 32,
-  maskBlur: 16,
-  outputOnlyMaskedRegions: false,
-};
-
-const compile = (
-  model: GenerateModelConfig,
-  mode: CanvasCompileMode,
-  overrides: {
-    settings?: Partial<GenerateSettings>;
-    bbox?: Rect;
-    compositeImageName?: string | null;
-    maskImageName?: string | null;
-    noiseMaskImageName?: string | null;
-    compositing?: Partial<CanvasCompositingSettings>;
-    scaling?: CanvasScalingSettings;
-    strength?: number;
-    destination?: 'canvas' | 'gallery';
-    outputOnlyMaskedRegions?: boolean;
-    controlLayers?: readonly ControlLayerGraphInput[];
-    regionalGuidance?: readonly RegionalGuidanceInput[];
-    projectSettings?: Partial<GenerationProjectSettings>;
-  } = {}
-) =>
-  compileCanvasGraph({
-    bbox: overrides.bbox ?? bbox,
-    compositeImageName:
-      'compositeImageName' in overrides ? (overrides.compositeImageName ?? null) : 'canvas-composite.png',
-    compositing: {
-      ...COMPOSITING_FIXTURE,
-      outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
-      ...overrides.compositing,
-    },
-    controlLayers: overrides.controlLayers,
-    regionalGuidance: overrides.regionalGuidance,
-    scaling: overrides.scaling,
-    destination: overrides.destination ?? 'canvas',
-    maskImageName:
-      'maskImageName' in overrides ? overrides.maskImageName : mode === 'inpaint' ? 'canvas-mask.png' : null,
-    mode,
-    model,
-    noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    projectSettings: { ...PROJECT_SETTINGS, ...overrides.projectSettings },
-    settings: settingsFor(model, {
-      ...COMPONENT_OVERRIDES[model.base],
-      ...overrides.settings,
-    }),
-    strength: overrides.strength ?? 0.6,
-  });
 
 const getEdge = (graph: BackendGraphContract, targetNodeId: string, targetField: string) =>
   graph.edges.find((edge) => edge.destination.node_id === targetNodeId && edge.destination.field === targetField);
@@ -2740,6 +2657,47 @@ describe('compileCanvasGraph — regional guidance', () => {
     }
   });
 
+  const upsampler = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+  const upsamplerSettings = {
+    flux3PromptUpsamplerEnabled: true,
+    flux3PromptUpsamplerModel: upsampler,
+    positivePrompt: 'a beach at noon',
+  };
+
+  it('hands the FLUX.3 regions to the prompt upsampler and records its caption once', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: upsamplerSettings,
+    });
+
+    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
+    expect(backendGraph.nodes.prompt_upsampler?.regions).toEqual(FLUX3_ROWS);
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toEqual([
+      expect.objectContaining({ source: { field: 'value', node_id: 'prompt_upsampler' } }),
+    ]);
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')).toBeDefined();
+    // The regions are recorded for recall as they are with the layout node.
+    expect(metadata.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('still upsamples the prompt when no FLUX.3 region can be placed', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+      settings: upsamplerSettings,
+    });
+
+    expect(backendGraph.nodes.prompt_upsampler).not.toHaveProperty('regions');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('prompt_upsampler');
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toHaveLength(1);
+  });
+
   it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -2769,8 +2727,27 @@ describe('compileCanvasGraph — regional guidance', () => {
     let txt2img: BackendGraphContract;
     let inpaint: BackendGraphContract;
     let edit: BackendGraphContract;
+    let upsampledTxt2img: BackendGraphContract;
+    let upsampledEdit: BackendGraphContract;
     try {
       const settings = { positivePrompt: 'a beach at noon' };
+      const upsampled = {
+        ...settings,
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: {
+          base: 'any',
+          hash: 'blake3:pup',
+          key: 'pup',
+          name: 'FLUX.3 Prompt Upsampler',
+          supports_images: true,
+          type: 'text_llm',
+        },
+      };
+      upsampledTxt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings: upsampled }).backendGraph;
+      upsampledEdit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...upsampled, referenceImages: [reference] },
+      }).backendGraph;
       txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
       inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
       edit = compile(model, 'txt2img', {
@@ -2787,6 +2764,8 @@ describe('compileCanvasGraph — regional guidance', () => {
       edit: { ...edit, id: 'flux3_layout_canvas_edit' },
       inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
       txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+      upsampled_edit: { ...upsampledEdit, id: 'flux3_upsampled_canvas_edit' },
+      upsampled_txt2img: { ...upsampledTxt2img, id: 'flux3_upsampled_canvas_txt2img' },
     };
     await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
       '../__snapshots__/flux3LayoutCanvasGraphs.json'
