@@ -371,14 +371,16 @@ const config = defineConfig({
       },
     },
     layerStyles: {
-      // The inset dot-grid surface behind previews, the loading splash and the auth screens.
+      // The inset dot-grid surface behind previews, the loading splash and the auth screens. It matches the workflow
+      // editor's grid at 100% zoom (1.5px dots every 25px): the ramp from 0.4px to 1px carries the ink of that
+      // anti-aliased 0.75px-radius dot, where a wider gradient reads brighter.
       dotGrid: {
         value: {
           backgroundColor: 'bg.inset',
-          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+          backgroundImage: 'radial-gradient(circle, currentColor 0.4px, transparent 1px)',
           backgroundPosition: 'center',
           backgroundRepeat: 'repeat',
-          backgroundSize: '24px 24px',
+          backgroundSize: '25px 25px',
           color: 'fg.grid',
         },
       },
