@@ -22,7 +22,7 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 ### System prompts
 
-InvokeAI ships with a **Default** system prompt and several tuned for particular model families, such as FLUX.2, Z-Image, Qwen Image, Krea-2 and MOSS-Image. To add your own, click the gear button next to the System prompt selector (**Manage system prompts**) and choose **New**. A system prompt has a **Name**, the **Instructions** given to the language model, and an optional **Max output length** in tokens (300 by default).
+InvokeAI ships with a **Default** system prompt and several tuned for particular model families, such as FLUX.2, Z-Image, Qwen Image, Krea-2, MOSS-Image and the FLUX.3 prompt upsampler. To add your own, click the gear button next to the System prompt selector (**Manage system prompts**) and choose **New**. A system prompt has a **Name**, the **Instructions** given to the language model, and an optional **Max output length** in tokens (300 by default).
 
 You can duplicate, edit and delete your own system prompts. Shared system prompts, including the built-in ones, are marked **Shared**. On a multi-user installation only administrators can edit them, and changes apply to every user.
 
@@ -38,16 +38,11 @@ Install by pasting the HuggingFace ID into the Model Manager. The model is autom
 
 ### The FLUX.3 prompt upsampler
 
-Black Forest Labs' [prompt upsampler for FLUX.3](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) is a Text LLM. Install **FLUX.3 Prompt Upsampler** (~17.5 GiB) or **FLUX.3 Prompt Upsampler (int8)** (~9.1 GiB) from the starter models and pick it in Expand Prompt. It rewrites your text prompt: in the Generate panel, Expand Prompt sends it no reference images. Where Expand Prompt does send an image, such as the Video panel's first frame, it reads that image like any Text LLM that can. The [FLUX.3 page](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) lists how fast each build ran and how much VRAM it took on an RTX 4090.
+Black Forest Labs' [prompt upsampler for FLUX.3](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) is a Text LLM. Install **FLUX.3 Prompt Upsampler** (~17.5 GiB) or **FLUX.3 Prompt Upsampler (int8)** (~9.1 GiB) from the starter models and pick it in Expand Prompt. Expand Prompt rewrites your text prompt only: in the Generate panel it sends the upsampler no reference images. Where Expand Prompt does send an image, such as the Video panel's first frame, it reads that image like any Text LLM that can. The [FLUX.3 page](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) lists how fast each build ran and how much VRAM it took on an RTX 4090.
 
-Expand Prompt sends the model the system prompt you pick. The upsampler was trained with Black Forest Labs' four system prompts, published in its [`system_prompts.json`](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup/raw/3f3edb52b2c55de0d49feab28598b68f7f8e4830/system_prompts.json); `t2i` is the one for rewriting a text-to-image prompt. To use it:
+Expand Prompt ships the system prompt **FLUX.3 Prompt Upsampler**, Black Forest Labs' `t2i` prompt from the upsampler's [`system_prompts.json`](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup/raw/3f3edb52b2c55de0d49feab28598b68f7f8e4830/system_prompts.json), with a **Max output length** of 1024 tokens. With a FLUX.3 model selected, Expand Prompt preselects it together with an installed FLUX.3 upsampler, either starter build, and names the starter model to install when none is. A model or system prompt you pick in the open popover overrides the suggestion.
 
-1. Open **Manage system prompts** next to the System prompt selector and choose **New**.
-2. Paste the text of the `t2i` entry as the **Instructions**. The file is JSON, so undo its escapes as you paste: each `\n` becomes a line break and each `\"` a plain `"`.
-3. Set **Max output length** to about 1024 tokens, so a long caption is not cut off.
-4. Choose this system prompt whenever you expand a prompt with the upsampler.
-
-Expand Prompt samples its rewrite, so repeated expansions differ; Black Forest Labs' own pipeline decodes greedily.
+Expand Prompt samples its rewrite, so repeated expansions differ; Black Forest Labs' own pipeline decodes greedily. For edits with reference images and for Regional Guidance boxes, use the [prompt upsampler switch in generation](/users-guide/models/local-models/flux-3/#prompt-upsampler-in-generation), which reads both.
 
 ### Prompt enhancement for LTX-2.5
 

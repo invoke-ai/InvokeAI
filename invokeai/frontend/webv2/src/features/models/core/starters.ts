@@ -1,5 +1,5 @@
 import type { ModelSortField } from './library';
-import type { ModelTaxonomyType, StarterModel } from './types';
+import type { ModelBase, ModelTaxonomyType, StarterModel, StarterModelBundle } from './types';
 
 import { getModelBaseLabel } from './baseIdentity';
 
@@ -61,10 +61,43 @@ export const filterStarterModels = (
 
       return (
         (filters.typeFilter === null || model.type === filters.typeFilter) &&
-        (filters.baseFilter === null || model.base === filters.baseFilter) &&
+        // A preview decoder also lists the other bases sharing its latent space.
+        (filters.baseFilter === null ||
+          model.base === filters.baseFilter ||
+          model.compatible_bases?.includes(filters.baseFilter)) &&
         terms.every((term) => haystack.includes(term))
       );
     })
     .sort((a, b) => compareStarterModels(a, b, filters.sortField) * directionFactor)
     .map(({ model }) => model);
+};
+
+export interface BundlePreviewDecoder {
+  decoder: StarterModel;
+  /** The bundle's base, which the decoder serves: filtering the starters by it shows the decoder. */
+  family: ModelBase;
+}
+
+/**
+ * The missing preview decoder (Tiny AutoEncoder) for a bundle's family, or null. Bundles leave decoders out, so this
+ * is how a bundle points at one. The family is its main models' shared base; mixed or absent mains name no family.
+ */
+export const findBundlePreviewDecoder = (
+  bundle: StarterModelBundle,
+  starterModels: readonly StarterModel[]
+): BundlePreviewDecoder | null => {
+  const bases = new Set(bundle.models.filter((model) => model.type === 'main').map((model) => model.base));
+  if (bases.size !== 1) {
+    return null;
+  }
+  const [family] = bases;
+  // Wan serves two latent spaces, so its bundle can match two decoders: name the first one still missing.
+  const decoder = starterModels.find(
+    (model) =>
+      model.type === 'tiny_autoencoder' &&
+      !model.is_installed &&
+      (model.base === family || model.compatible_bases?.includes(family) === true)
+  );
+
+  return decoder ? { decoder, family } : null;
 };

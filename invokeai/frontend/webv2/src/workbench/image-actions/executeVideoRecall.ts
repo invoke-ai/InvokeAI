@@ -47,6 +47,7 @@ import {
   getVideoRecallTitle,
   parseVideoRecallRecord,
   resolveVideoSizeRecall,
+  settleMediaSizedRecall,
   type VideoRecallKind,
   type VideoRecallMediaNames,
   type VideoSizeRecallFit,
@@ -587,6 +588,9 @@ export const applyVideoRecallMetadata = async ({
         }
       }
     }
+
+    // A canvas the recorded media sized takes its target resolution from the media as they hydrated.
+    ({ fields: result.fields, values: result.values } = settleMediaSizedRecall(result));
 
     if (result.fields.length === 0) {
       commands.notifications.add({ kind: 'info', ...emptyNotice });

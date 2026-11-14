@@ -241,6 +241,9 @@ class _ExpertSwapper:
                 outgoing_info.unload_from_vram(outgoing_bytes)
             except Exception:
                 pass
+        # The handle reaches the cache record and the model: while it is alive the outgoing expert's
+        # tensors cannot be freed, and both experts would be resident through the load below.
+        outgoing_info = None
 
         # Hand the PyTorch allocator a clean slate before partial_load_to_vram measures
         # free space — the freed blocks stay pinned in the caching allocator until
@@ -665,6 +668,8 @@ class WanDenoiseInvocation(BaseInvocation):
                     active_label = _ExpertSwapper.HIGH
                     active_cfg = self.guidance_scale
 
+                # The previous expert must be unreferenced by the time `get` loads the next one.
+                transformer = None
                 transformer = swapper.get(active_label)
 
                 # Cast latents to the transformer's dtype only for the forward

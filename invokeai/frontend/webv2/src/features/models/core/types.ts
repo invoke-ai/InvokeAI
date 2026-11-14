@@ -305,6 +305,8 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  /** Other bases this model also serves, e.g. a preview decoder's bases sharing its latent space. */
+  compatible_bases?: ModelBase[];
   previous_sources?: string[];
 }
 

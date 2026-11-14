@@ -159,6 +159,7 @@ def test_direct_and_builder_contexts_preserve_lifecycle_recorder_authority() -> 
         config=built.config,
         util=built.util,
         boards=built.boards,
+        files=built.files,
         wildcards=built.wildcards,
         data=data,
         services=services,

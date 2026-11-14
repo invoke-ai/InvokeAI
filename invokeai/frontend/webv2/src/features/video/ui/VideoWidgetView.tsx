@@ -1,4 +1,5 @@
 import type {
+  VideoAspectRatioId,
   VideoConditioningClip,
   VideoReferenceItem,
   VideoSourceClip,
@@ -6,14 +7,16 @@ import type {
 } from '@features/video/core/types';
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
-import { GenerationSettingsSection, SeedField } from '@features/generation/components';
+import { AspectRatioPicker, GenerationSettingsSection, SeedField } from '@features/generation/components';
 import {
   getDynamicPromptsConfig,
+  getLockedAspectRatioSettings,
   normalizeDynamicPromptsSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import {
+  getVideoAspectRatioParts,
   getVideoDurationSeconds,
   invertVideoAspectRatioId,
   LTX2_EXTEND_CONTEXT_FRAMES,
@@ -28,10 +31,10 @@ import {
   getInitialVideoPatch,
   getReferencesPatch,
   isConditioningClipExcludingFrames,
+  isVideoAspectRatioId,
   isVideoTargetResolution,
   normalizeVideoWidgetValues,
   resolveVideoMode,
-  VIDEO_ASPECT_RATIO_IDS,
 } from '@features/video/core/settings';
 import {
   getAcceleratorLoraChangeResult,
@@ -70,9 +73,10 @@ import { useVideoUi, useVideoUiActions } from './VideoUiContext';
 
 const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
-const ASPECT_RATIO_COLLECTION = createListCollection({
-  items: VIDEO_ASPECT_RATIO_IDS.map((id) => ({ label: id, value: id })),
-});
+const getAspectRatio = (id: VideoAspectRatioId): number => {
+  const { width, height } = getVideoAspectRatioParts(id);
+  return width / height;
+};
 
 const toTargetResolution = (value: string | undefined): VideoWidgetValues['targetResolution'] | null =>
   isVideoTargetResolution(value) ? value : null;
@@ -223,11 +227,12 @@ export const VideoWidgetView = () => {
   // Stable per-field setters preserve child memo boundaries.
   const set = useMemo(
     () => ({
-      aspectRatio: ({ value }: { value: string[] }) => {
-        const aspectRatioId = value[0];
+      // Matched to a built-in the way the picker matches its tiles.
+      aspectRatio: (ratio: number) => {
+        const { aspectRatioId } = getLockedAspectRatioSettings(ratio);
 
-        if (aspectRatioId && (VIDEO_ASPECT_RATIO_IDS as readonly string[]).includes(aspectRatioId)) {
-          patch({ aspectRatioId: aspectRatioId as VideoWidgetValues['aspectRatioId'] });
+        if (isVideoAspectRatioId(aspectRatioId)) {
+          patch({ aspectRatioId });
         }
       },
       cfgScale: (cfgScale: number) => patch({ cfgScale }),
@@ -410,7 +415,6 @@ export const VideoWidgetView = () => {
       width: dimensions.width,
     });
   }, [dimensions, policy.targetResolutions, t, values.targetResolution]);
-  const aspectRatioValue = useMemo(() => [values.aspectRatioId], [values.aspectRatioId]);
   const targetResolutionValue = useMemo(() => [values.targetResolution], [values.targetResolution]);
 
   const framesSlider = useMemo(
@@ -701,13 +705,11 @@ export const VideoWidgetView = () => {
         <Stack gap="3" p="2">
           <Field helpText={derivedSizeText} label={t('widgets.video.aspectRatio')}>
             <HStack gap="1">
-              <Select
-                collection={ASPECT_RATIO_COLLECTION}
+              <AspectRatioPicker
                 disabled={hasConditioningMedia}
-                flex="1"
-                value={aspectRatioValue}
+                lockedRatio={getAspectRatio(values.aspectRatioId)}
                 valueText={derivedSourceValueText}
-                onValueChange={set.aspectRatio}
+                onChange={set.aspectRatio}
               />
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}

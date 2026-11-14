@@ -358,6 +358,97 @@ describe('WorkflowEditorView first open', () => {
   });
 });
 
+describe('WorkflowEditorView fit selection', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const nodeIds = ['node-a', 'node-b', 'outside'];
+  const graph = {
+    ...createProjectGraph('fit-selection'),
+    nodes: [addNode('node-a', 0, 0), addNode('node-b', 360, 0), addNode('outside', 1300, 0)],
+  } satisfies ProjectGraphState;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    clearWorkflowViewports();
+  });
+
+  const getNode = (id: string) => host.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)!;
+  const getFullyVisibleNodes = () => {
+    const viewport = host.getBoundingClientRect();
+    return nodeIds.filter((id) => {
+      const node = getNode(id)?.getBoundingClientRect();
+      return (
+        node &&
+        node.left >= viewport.left - 1 &&
+        node.right <= viewport.right + 1 &&
+        node.top >= viewport.top - 1 &&
+        node.bottom <= viewport.bottom + 1
+      );
+    });
+  };
+  const getSelectedNodes = () =>
+    getWorkflowFlowInstance()
+      ?.getNodes()
+      .filter((node) => node.selected)
+      .map(({ id }) => id);
+
+  it.each([
+    ['the selection rectangle', ['node-a', 'node-b']],
+    ['a selected node', ['node-a', 'node-b']],
+    ['an unselected node', ['outside']],
+  ])('fits the nodes targeted by the menu on %s without editing the graph', async (target, expectedNodes) => {
+    const adapter = await renderEditor(root, createProjectStore(graph));
+    await expect
+      .poll(() => getWorkflowViewport(getWorkflowViewportKey(PROJECT_ID, graph.id, INSTANCE_ID)))
+      .not.toBeNull();
+    expect(getFullyVisibleNodes()).toEqual(nodeIds);
+
+    await userEvent.click(host.querySelector<HTMLElement>('button[aria-label="widgets.workflow.toolbar.boxSelect"]')!);
+    const pane = host.querySelector<HTMLElement>('.react-flow__pane')!;
+    const paneRect = pane.getBoundingClientRect();
+    const first = getNode('node-a').getBoundingClientRect();
+    const last = getNode('node-b').getBoundingClientRect();
+    await userEvent.dragAndDrop(pane, pane, {
+      sourcePosition: { x: first.left - paneRect.left - 4, y: first.top - paneRect.top - 4 },
+      targetPosition: { x: last.right - paneRect.left + 4, y: last.bottom - paneRect.top + 4 },
+    });
+    await expect.poll(getSelectedNodes).toEqual(['node-a', 'node-b']);
+
+    const element =
+      target === 'the selection rectangle'
+        ? host.querySelector<HTMLElement>('.react-flow__nodesselection-rect')!
+        : getNode(target === 'a selected node' ? 'node-a' : 'outside');
+    const rect = element.getBoundingClientRect();
+    await act(() =>
+      element.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 10,
+          clientY: rect.top + 10,
+        })
+      )
+    );
+    const menuItem = document.querySelector<HTMLElement>('[role="menuitem"][data-value="fit-selection"]')!;
+    await userEvent.click(menuItem);
+
+    await expect.poll(getFullyVisibleNodes).toEqual(expectedNodes);
+    expect(getSelectedNodes()).toEqual(['node-a', 'node-b']);
+    expect(adapter.commands.editGraph).not.toHaveBeenCalled();
+
+    await userEvent.click(host.querySelector<HTMLElement>('button[aria-label="widgets.workflow.toolbar.fitView"]')!);
+    await expect.poll(getFullyVisibleNodes).toEqual(nodeIds);
+  });
+});
+
 describe('WorkflowEditorView paste', () => {
   let host: HTMLDivElement;
   let outside: HTMLButtonElement;
