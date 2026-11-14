@@ -2,78 +2,62 @@ import type { StarterInstallSource } from '@features/models';
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 
-import { Badge, Box, HStack, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
-import { getStarterModelInstallSources, useInstallActions } from '@features/models';
-import { getWorkflowRecordCategory } from '@features/workflow/data/api';
+import { Badge, Box, DataList, HStack, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
+import { getModelBaseLabel, getStarterModelInstallSources, useInstallActions } from '@features/models';
 import {
-  createLibraryWorkflow,
-  deleteLibraryWorkflow,
-  getLibraryWorkflowCached,
   getLibraryWorkflowRecord,
-  getLibraryWorkflowRecordCached,
   invalidateWorkflowLibraryCache,
   setLibraryWorkflowPublic,
-  updateLibraryWorkflow,
 } from '@features/workflow/queries';
-import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
-import {
-  useOpenAddModels,
-  useWorkflowGraphPreview,
-  useWorkflowNotifications,
-} from '@features/workflow/ui/WorkflowUiContext';
-import { parseWorkflowJson } from '@features/workflow/utility';
-import { downloadText } from '@platform/browser/downloadBlob';
+import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { useModelRequirementDeps } from '@features/workflow/ui/modelRequirementStatus';
+import { useOpenAddModels, useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import {
-  Button,
-  ConfirmDialog,
-  IconButton,
-  MenuContent,
-  RenameDialog,
-  Scrollable,
-  Tooltip,
-  useTooltipTriggerIds,
-} from '@platform/ui';
-import { CopyIcon, DownloadIcon, EllipsisIcon, GitForkIcon, PencilIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { Button, IconButton, MenuContent, Scrollable, Tooltip, useTooltipTriggerIds } from '@platform/ui';
+import { DownloadIcon, EllipsisIcon, WorkflowIcon } from 'lucide-react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
+import type { WorkflowPreviewStepperProps } from './WorkflowPreviewStepper';
+
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
+import { useWorkflowLibraryEntryActions, type WorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import {
-  getWorkflowLibraryCardId,
-  getWorkflowLibraryCardMenuContentId,
-  keepCardMenuOpenForRetarget,
-  type WorkflowCardMenuAnchor,
-} from './WorkflowLibraryCard';
+  useWorkflowPreviewModel,
+  WORKFLOW_SILHOUETTE_THUMBNAIL_CSS,
+  WorkflowAuthorNotes,
+  WorkflowInputsBadge,
+  WorkflowInputsSummary,
+  WorkflowProvenance,
+} from './WorkflowDetailOverview';
+import {
+  WORKFLOW_DETAIL_WIDE_ONLY_CSS,
+  WORKFLOW_PREVIEW_TRIGGER_CSS,
+  WorkflowDetailRailPlaceholder,
+  WorkflowDetailSheet,
+  WorkflowMissingNodePacks,
+} from './WorkflowDetailSheet';
+import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WorkflowLibraryThumbnail } from './WorkflowLibraryThumbnail';
-import {
-  resolveEntryRequirements,
-  useModelRequirementDeps,
-  WorkflowRequirementsList,
-} from './WorkflowRequirementsList';
+import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 
-/** Install missing models before offering Open; keep the detail rail mounted across selections to prevent flashing. */
+/**
+ * The selected template: preview, name with Open, facts, requirements with Install, and its standing in the library
+ * and this project. Keep the detail rail mounted across selections to prevent flashing. The narrow layout shows it as
+ * a bottom sheet (`WorkflowDetailSheet`).
+ */
 
-const DETAIL_RAIL_WIDTH = '18rem';
-const DETAIL_RAIL_CSS = {
-  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
-    width: '100%',
-  },
-  '@container workflow-library-content (width < 42rem) and (height >= 32rem)': {
-    flexBasis: '45%',
-  },
-  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
-    flex: '0 0 auto',
-    height: '20rem',
-  },
-} as const;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
+/** The large preview is wide-only; the expanded sheet's summary carries a small one. */
+const THUMBNAIL_SLOT_CSS = { ...WORKFLOW_DETAIL_WIDE_ONLY_CSS, ...WORKFLOW_SILHOUETTE_THUMBNAIL_CSS };
 
 type VisibilityState =
   | { requestId: object; previousItem: WorkflowLibraryListItem; isPublic: boolean; status: 'pending' | 'success' }
@@ -86,44 +70,56 @@ type VisibilityState =
     };
 
 export interface WorkflowLibraryDetailPanelProps {
-  /** Where a card's right-click asked for the actions menu; null while it is closed. */
-  contextMenuPoint: WorkflowCardMenuAnchor | null;
-  /** What opened the menu last, kept through its close so focus returns there. */
-  contextMenuTriggerId: string | null;
   /** Allows the authenticated owner to change visibility, only on Yours. */
   canChangeVisibility?: boolean;
   entry: WorkflowLibraryEntry | null;
-  /** Hides writes to a public template owned by another account. */
-  isReadOnly?: boolean;
+  /** Shared with the card menus, so one workflow gets one copy per press. */
+  duplicateGuard: WorkflowLibraryDuplicateGuard;
+  /** Hides writes to bundled templates and to other accounts' (`getLibraryEntryAccess`). */
+  isReadOnly: boolean;
   /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
-  onContextMenuClose: () => void;
-  onDeleted: () => void;
+  /** Receives the deleted workflow's id. */
+  onDeleted: (workflowId: string) => void;
   /** Carries the copy's id so the shell can select it once the list refreshes. */
   onDuplicated: (workflowId: string) => void;
   /** Adds the first copy, or asks what to do when the project already holds one. */
   onOpen: (item: WorkflowLibraryListItem) => void;
-  onPreview: (entry: WorkflowLibraryEntry) => void;
+  /** Enters preview mode on the entry (on a given view, else the last shown); its stage shows loading and unreadable
+   * documents too. */
+  onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   /** The project's workflows, so the rail can say when opening will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
+  /** Preview mode's stepper (`WorkflowDetailSheet`); none outside preview mode. */
+  stepper?: WorkflowPreviewStepperProps | null;
 }
 
-const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
+/** One label/value row of a detail rail's facts list. */
+export const WorkflowDetailFact = ({ children, label }: { children: ReactNode; label: string }) => (
+  <DataList.Item alignItems="center" gap="2" minW="0">
+    <DataList.ItemLabel color="fg.muted" flex="0 0 5.5rem" fontSize="xs" minW="0">
+      {label}
+    </DataList.ItemLabel>
+    <DataList.ItemValue flex="1" fontSize="xs" minW="0" overflowWrap="anywhere">
+      {children}
+    </DataList.ItemValue>
+  </DataList.Item>
+);
 
-export const WorkflowLibraryDetailPanel = ({
+/** Memoised: browsing re-renders the dialog on every range load and enrichment, rarely changing the selection. */
+export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPanel({
   canChangeVisibility = false,
-  contextMenuPoint,
-  contextMenuTriggerId,
+  duplicateGuard,
   entry,
-  isReadOnly = false,
+  isReadOnly,
   onClose,
-  onContextMenuClose,
   onDeleted,
   onDuplicated,
   onOpen,
   onPreview,
   projectWorkflows,
-}: WorkflowLibraryDetailPanelProps) => {
+  stepper,
+}: WorkflowLibraryDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Portaled action menus belong to this dialog's visible bounds, rather than the whole viewport.
   const menuPositioning = useMemo(
@@ -135,14 +131,25 @@ export const WorkflowLibraryDetailPanel = ({
   const { t } = useTranslation();
   const deps = useModelRequirementDeps();
   const notify = useWorkflowNotifications();
-  const { openDocumentInNewProject } = useWorkflowGraphPreview();
   const openAddModels = useOpenAddModels();
   const { installMany } = useInstallActions();
-  // The name is captured on request: a delete moves the selection, or empties this panel, before the dialog closes.
-  const [deleteTargetName, setDeleteTargetName] = useState<string | null>(null);
-  // Guard duplicate creation until the copy exists, including copies landing outside the visible category.
-  const [isDuplicatePending, setIsDuplicatePending] = useState(false);
-  const isDuplicatePendingRef = useRef(false);
+  // The rail's More and the sheet's More act on the selection; a card's own menu has its own instance.
+  const {
+    actionItems,
+    dialogs,
+    open: handleOpen,
+    openLabel,
+    projectCopies,
+  } = useWorkflowLibraryEntryActions({
+    duplicateGuard,
+    entry,
+    isReadOnly,
+    projectWorkflows,
+    onClose,
+    onDeleted,
+    onDuplicated,
+    onOpen,
+  });
   const [visibilityStates, setVisibilityStates] = useState<Map<string, VisibilityState>>(() => new Map());
   const visibilityInputRef = useRef<HTMLInputElement>(null);
   const restoreVisibilityFocus = useRef<string | null>(null);
@@ -155,22 +162,25 @@ export const WorkflowLibraryDetailPanel = ({
     [deps, enrichment]
   );
   const installableCount = resolved?.filter((requirement) => requirement.status === 'installable').length ?? 0;
-
-  const hasCopies = useMemo(
-    () => (entry ? planLibraryWorkflowOpen(projectWorkflows, entry.item.workflow_id).kind === 'choose' : false),
-    [entry, projectWorkflows]
+  const session = useAuthSession();
+  const templatesSnapshot = useInvocationTemplatesSnapshot();
+  const missingNodePacks = useMemo(
+    () =>
+      enrichment?.status === 'ready' && templatesSnapshot.status === 'loaded'
+        ? getMissingNodePacks(enrichment, templatesSnapshot.templates)
+        : [],
+    [enrichment, templatesSnapshot]
   );
-  const handleOpen = useCallback(() => {
-    if (entry) {
-      onOpen(entry.item);
-    }
-  }, [entry, onOpen]);
+  const dataTime = useDataTimeSnapshot(entry?.item);
+  const moreActionsIds = useTooltipTriggerIds();
 
-  const handlePreview = useCallback(() => {
-    if (entry && entry.enrichment.status === 'ready') {
-      onPreview(entry);
-    }
-  }, [entry, onPreview]);
+  const handlePreview = useCallback(() => entry && onPreview(entry.item.workflow_id), [entry, onPreview]);
+  const handlePreviewInputs = useCallback(
+    () => entry && onPreview(entry.item.workflow_id, 'inputs'),
+    [entry, onPreview]
+  );
+  const workflowDocument = enrichment?.status === 'ready' ? enrichment.document : null;
+  const previewModel = useWorkflowPreviewModel(workflowDocument);
 
   // Close the library before navigating to Add Models.
   const handleFindModel = useCallback(
@@ -218,210 +228,6 @@ export const WorkflowLibraryDetailPanel = ({
     }
   }, [deps, installMany, notify, resolved, t]);
   const handleInstall = useCallback(() => void install(), [install]);
-
-  /** Duplicate the library record directly without loading or modifying the active project graph. */
-  const duplicate = useCallback(async () => {
-    if (!entry || isDuplicatePendingRef.current) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-    const { name } = entry.item;
-
-    isDuplicatePendingRef.current = true;
-    setIsDuplicatePending(true);
-
-    try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
-        expectedRevision: entry.item.revision,
-        signal: owner.signal,
-      });
-
-      assertAccountScopeCurrent(owner);
-
-      const { id: _id, ...copy } = raw;
-      const meta = typeof copy.meta === 'object' && copy.meta !== null ? (copy.meta as Record<string, unknown>) : {};
-      const workflowId = await createLibraryWorkflow(
-        {
-          ...copy,
-          // A copy of a default is still the user's own workflow.
-          meta: { ...meta, category: 'user' },
-          name: t('workflowLibrary.duplicateName', { name: name || t('workflowLibrary.untitled') }),
-        },
-        owner.signal
-      );
-
-      assertAccountScopeCurrent(owner);
-      invalidateWorkflowLibraryCache();
-      // The copy is forced into the user category, so from the Browse tab it
-      // lands out of sight — the notice is the only thing that says it worked.
-      notify.success(t('workflowLibrary.duplicated'));
-      onDuplicated(workflowId);
-    } catch (error) {
-      if (isAccountScopeCurrent(owner)) {
-        notify.error(t('workflowLibrary.duplicateFailed'), getApiErrorMessage(error, t('common.unknownError')));
-      }
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        isDuplicatePendingRef.current = false;
-        setIsDuplicatePending(false);
-      }
-    }
-  }, [entry, notify, onDuplicated, t]);
-  const handleDuplicate = useCallback(() => void duplicate(), [duplicate]);
-
-  const [isRenameOpen, setIsRenameOpen] = useState(false);
-  const openRename = useCallback(() => setIsRenameOpen(true), []);
-  const closeRename = useCallback(() => setIsRenameOpen(false), []);
-  // A rename is a content write at the record's current revision: the live record, never a cached one, is the base.
-  const submitRename = useCallback(
-    async (nextName: string) => {
-      if (!entry || isReadOnly) {
-        return;
-      }
-
-      const owner = captureAccountScope();
-
-      try {
-        const record = await getLibraryWorkflowRecord(entry.item.workflow_id, owner.signal);
-
-        assertAccountScopeCurrent(owner);
-        await updateLibraryWorkflow(
-          entry.item.workflow_id,
-          { ...record.workflow, name: nextName },
-          { expectedRevision: record.revision, signal: owner.signal }
-        );
-        assertAccountScopeCurrent(owner);
-        invalidateWorkflowLibraryCache(entry.item.workflow_id);
-        notify.success(t('workflowLibrary.renamed'));
-      } catch (error) {
-        if (!isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        notify.error(t('workflowLibrary.renameFailed'), getApiErrorMessage(error, t('common.unknownError')));
-        // Rejecting keeps the dialog, and the typed name, open for another try.
-        throw error;
-      }
-    },
-    [entry, isReadOnly, notify, t]
-  );
-
-  const fork = useCallback(async () => {
-    if (!entry) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-
-    try {
-      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, {
-        expectedRevision: entry.item.revision,
-        signal: owner.signal,
-      });
-
-      assertAccountScopeCurrent(owner);
-
-      const { document } = parseWorkflowJson({ ...record.workflow, id: record.workflow_id });
-
-      // The port creates and activates a fresh project first, so the project
-      // the library was opened from is left exactly as it was.
-      openDocumentInNewProject(document, entry.item.name, {
-        libraryWorkflowId: record.workflow_id,
-        ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
-        revision: record.revision,
-      });
-      onClose();
-    } catch (error) {
-      if (isAccountScopeCurrent(owner)) {
-        notify.error(t('workflowLibrary.loadFailed'), getApiErrorMessage(error, t('common.unknownError')));
-      }
-    }
-  }, [entry, notify, onClose, openDocumentInNewProject, t]);
-  const handleFork = useCallback(() => void fork(), [fork]);
-
-  const download = useCallback(async () => {
-    if (!entry) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-
-    try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
-        expectedRevision: entry.item.revision,
-        signal: owner.signal,
-      });
-
-      assertAccountScopeCurrent(owner);
-      downloadText(JSON.stringify(raw, null, 2), `${toFileSlug(entry.item.name)}.json`, 'application/json');
-    } catch (error) {
-      if (isAccountScopeCurrent(owner)) {
-        notify.error(t('workflowLibrary.loadFailed'), getApiErrorMessage(error, t('common.unknownError')));
-      }
-    }
-  }, [entry, notify, t]);
-  const handleDownload = useCallback(() => void download(), [download]);
-
-  const openDeleteConfirm = useCallback(() => {
-    if (entry && !isReadOnly) {
-      setDeleteTargetName(entry.item.name || t('workflowLibrary.untitled'));
-    }
-  }, [entry, isReadOnly, t]);
-  const closeDeleteConfirm = useCallback(() => setDeleteTargetName(null), []);
-
-  // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
-  const contextMenuPositioning = useMemo(
-    () =>
-      contextMenuPoint?.kind === 'point'
-        ? {
-            ...menuPositioning,
-            getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
-            placement: 'bottom-start' as const,
-          }
-        : { ...menuPositioning, placement: 'bottom-end' as const },
-    [contextMenuPoint, menuPositioning]
-  );
-  const handleContextMenuOpenChange = useCallback(
-    (event: { open: boolean }) => {
-      if (!event.open) {
-        onContextMenuClose();
-      }
-    },
-    [onContextMenuClose]
-  );
-  // Focus returns to whatever opened the menu: the title's menu button, or the right-clicked card.
-  const contextMenuIds = useMemo(
-    () =>
-      entry
-        ? {
-            content: getWorkflowLibraryCardMenuContentId(entry.item.workflow_id),
-            trigger: contextMenuTriggerId ?? getWorkflowLibraryCardId(entry.item.workflow_id),
-          }
-        : undefined,
-    [contextMenuTriggerId, entry]
-  );
-  const moreActionsIds = useTooltipTriggerIds();
-
-  const confirmDelete = useCallback(async () => {
-    if (!entry || isReadOnly) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-
-    try {
-      await deleteLibraryWorkflow(entry.item.workflow_id, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      invalidateWorkflowLibraryCache();
-      onDeleted();
-    } catch (error) {
-      if (isAccountScopeCurrent(owner)) {
-        notify.error(t('workflowLibrary.deleteFailed'), getApiErrorMessage(error, t('common.unknownError')));
-      }
-    }
-  }, [entry, isReadOnly, notify, onDeleted, t]);
 
   const item = entry?.item ?? null;
   const tags = entry?.tags ?? [];
@@ -586,136 +392,196 @@ export const WorkflowLibraryDetailPanel = ({
     },
     [itemIsPublic, updateVisibility]
   );
-  const openLabel = hasCopies ? t('workflowLibrary.openWithEllipsis') : t('workflowLibrary.open');
+  // Visibility only means something to other accounts on a multi-user server.
+  const showVisibility = session.multiuserEnabled && item?.category === 'user';
+  const primaryBase = enrichment?.status === 'ready' ? enrichment.requirements.primaryBase : null;
+  const isCallable = item?.call_saved_workflow_compatibility?.is_callable === true;
+  const linkedRevision = projectCopies.length === 1 ? (projectCopies[0]?.source?.revision ?? null) : null;
+  const openedWhen = item?.opened_at ? formatTimeSince(item.opened_at, dataTime) : '';
+  const updatedWhen = item?.updated_at ? formatTimeSince(item.updated_at, dataTime) : '';
+  const createdWhen = item?.created_at ? formatTimeSince(item.created_at, dataTime) : '';
 
-  // One item set behind both the rail's overflow button and a card's right-click.
-  const actionItems = (
-    <>
-      <MenuActionItem
-        hint={hasCopies ? t('workflowLibrary.openExistingCopiesHint') : t('workflowLibrary.openHint')}
-        icon={WorkflowIcon}
-        label={openLabel}
-        value="open"
-        onSelect={handleOpen}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.duplicateHint')}
-        icon={CopyIcon}
-        isDisabled={isDuplicatePending}
-        label={t('workflowLibrary.duplicate')}
-        value="duplicate"
-        onSelect={handleDuplicate}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.forkIntoProjectHint')}
-        icon={GitForkIcon}
-        label={t('workflowLibrary.forkIntoProject')}
-        value="fork-into-project"
-        onSelect={handleFork}
-      />
-      <MenuActionItem
-        hint={t('workflowLibrary.downloadJsonHint')}
-        icon={DownloadIcon}
-        label={t('workflowLibrary.downloadJson')}
-        value="download-json"
-        onSelect={handleDownload}
-      />
-      {item?.category === 'user' && !isReadOnly ? (
-        <MenuActionItem
-          hint={t('workflowLibrary.renameTemplateHint')}
-          icon={PencilIcon}
-          label={t('workflowLibrary.renameWithEllipsis')}
-          value="rename"
-          onSelect={openRename}
-        />
-      ) : null}
-      {item?.category === 'user' && !isReadOnly ? (
-        // Bundled defaults are not the account's to delete.
-        <MenuActionItem
-          hint={t('workflowLibrary.deleteHint')}
-          icon={Trash2Icon}
-          label={t('workflowLibrary.delete')}
-          tone="danger"
-          value="delete"
-          onSelect={openDeleteConfirm}
-        />
-      ) : null}
-    </>
-  );
+  const readiness =
+    enrichment?.status !== 'ready'
+      ? null
+      : missingNodePacks.length > 0
+        ? t('workflowLibrary.nodePacksMissing', { count: missingNodePacks.length })
+        : installableCount > 0
+          ? t('workflowLibrary.modelsToInstall', { count: installableCount })
+          : t('workflowLibrary.readyToRun');
+  const summaryFacts = [
+    primaryBase ? getModelBaseLabel(primaryBase) : null,
+    enrichment?.status === 'ready' ? t('workflowLibrary.nodeCount', { count: enrichment.nodeCount }) : null,
+    readiness,
+    openedWhen ? t('workflowLibrary.openedWhen', { when: openedWhen }) : null,
+  ]
+    .filter((fact) => fact !== null)
+    .join(' · ');
 
   return (
     <>
       {item ? (
-        <Stack
-          borderColor="border.subtle"
-          borderWidth="1px"
-          css={DETAIL_RAIL_CSS}
+        <WorkflowDetailSheet
           ref={panelRef}
+          actions={actionItems}
           data-workflow-detail={item.workflow_id}
-          flexShrink={0}
-          gap="0"
-          minH="0"
-          rounded="md"
-          w={DETAIL_RAIL_WIDTH}
+          facts={summaryFacts}
+          menuPositioning={menuPositioning}
+          name={name}
+          openLabel={openLabel}
+          thumbnailSrc={item.thumbnail_url}
+          workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
+          stepper={stepper}
+          workflowId={item.workflow_id}
+          onOpen={handleOpen}
         >
           <Scrollable flex="1" label={name} minH="0">
-            <Stack gap="2" minW="0" p="2.5">
-              <WorkflowLibraryThumbnail
-                key={item.workflow_id}
-                canEdit={item.category === 'user' && !isReadOnly}
-                item={item}
-                workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
-              />
+            <Stack gap="2.5" minW="0" p="2.5">
+              {/* The expanded sheet's summary is its compact heading: no large preview, no second name. */}
+              <Box css={THUMBNAIL_SLOT_CSS} w="full">
+                <WorkflowLibraryThumbnail
+                  key={item.workflow_id}
+                  canEdit={!isReadOnly}
+                  item={item}
+                  workflowDocument={workflowDocument}
+                  onPreview={handlePreview}
+                />
+              </Box>
 
-              {/*
-               * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits
-               * containment without truncation.
-               */}
-              <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
-                {name}
-              </Text>
+              <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
+                {/*
+                 * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width
+                 * permits containment without truncation.
+                 */}
+                <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
+                  {name}
+                </Text>
+                <WorkflowProvenance
+                  document={workflowDocument}
+                  kind={t(
+                    item.category === 'default'
+                      ? 'workflowLibrary.preview.kindTemplate'
+                      : isReadOnly
+                        ? 'workflowLibrary.preview.kindShared'
+                        : 'workflowLibrary.preview.kindLibrary'
+                  )}
+                />
+                {openedWhen ? (
+                  <Text color="fg.muted" fontSize="xs">
+                    {t('workflowLibrary.openedWhen', { when: openedWhen })}
+                  </Text>
+                ) : null}
+              </Stack>
 
-              {item.category === 'user' ? (
-                <Stack gap="1">
-                  <HStack align="center" justify="space-between" minW="0">
-                    <Text color="fg.muted" fontSize="xs">
-                      {t('workflowLibrary.visibility')}
-                    </Text>
-                    <Badge
-                      data-workflow-visibility={visibilityUnknown ? 'unknown' : itemIsPublic ? 'public' : 'private'}
-                      variant="subtle"
-                    >
-                      {t(
-                        visibilityUnknown
-                          ? 'workflowLibrary.visibilityUnknown'
-                          : itemIsPublic
-                            ? 'workflowLibrary.public'
-                            : 'workflowLibrary.private'
-                      )}
+              {primaryBase || enrichment?.status === 'ready' || isCallable || missingNodePacks.length > 0 ? (
+                <HStack flexWrap="wrap" gap="1" minW="0">
+                  {primaryBase ? <Badge variant="subtle">{getModelBaseLabel(primaryBase)}</Badge> : null}
+                  {enrichment?.status === 'ready' ? (
+                    <Badge variant="subtle">{t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}</Badge>
+                  ) : null}
+                  <WorkflowInputsBadge model={previewModel} />
+                  {isCallable ? (
+                    <Badge data-workflow-callable variant="subtle">
+                      {t('workflowLibrary.callable')}
                     </Badge>
-                  </HStack>
-                  {canChangeVisibility && !visibilityUnknown ? (
-                    <Stack gap="1">
-                      <Switch.Root
-                        checked={itemIsPublic === true}
-                        colorPalette="accent"
-                        disabled={isVisibilityPending || visibilityUnknown}
-                        readOnly
+                  ) : null}
+                  {missingNodePacks.length > 0 ? (
+                    <Badge bg="bg.error" color="fg.error" data-workflow-missing-node-packs variant="subtle">
+                      {t('workflowLibrary.nodePacksMissing', { count: missingNodePacks.length })}
+                    </Badge>
+                  ) : null}
+                </HStack>
+              ) : null}
+
+              {item.description ? (
+                <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
+                  {item.description}
+                </Text>
+              ) : null}
+
+              {tags.length > 0 ? (
+                <HStack flexWrap="wrap" gap="1" minW="0">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="outline">
+                      {tag}
+                    </Badge>
+                  ))}
+                </HStack>
+              ) : null}
+
+              <WorkflowInputsSummary model={previewModel} onSeeAll={handlePreviewInputs} />
+              <WorkflowAuthorNotes notes={workflowDocument?.notes ?? ''} />
+              <WorkflowMissingNodePacks packs={missingNodePacks} />
+              <WorkflowRequirementsList
+                errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
+                resolved={resolved}
+                onFindModel={handleFindModel}
+              />
+              {installableCount > 0 ? (
+                <Button bg="bg.warning" color="fg.warning" size="sm" _hover={INSTALL_HOVER} onClick={handleInstall}>
+                  <DownloadIcon />
+                  {t('workflowLibrary.installModels', { count: installableCount })}
+                </Button>
+              ) : null}
+
+              <DataList.Root data-workflow-detail-facts gap="1.5" orientation="horizontal">
+                <WorkflowDetailFact label={t('workflowLibrary.factInProject')}>
+                  {projectCopies.length === 0
+                    ? t('workflowLibrary.projectCopiesNone')
+                    : linkedRevision !== null
+                      ? t('workflowLibrary.projectCopyRevision', { count: 1, revision: linkedRevision })
+                      : t('workflowLibrary.projectCopies', { count: projectCopies.length })}
+                </WorkflowDetailFact>
+                {updatedWhen ? (
+                  <WorkflowDetailFact label={t('workflowLibrary.factUpdated')}>
+                    {t('workflowLibrary.whenAtRevision', { revision: item.revision, when: updatedWhen })}
+                  </WorkflowDetailFact>
+                ) : null}
+                {createdWhen ? (
+                  <WorkflowDetailFact label={t('workflowLibrary.factCreated')}>{createdWhen}</WorkflowDetailFact>
+                ) : null}
+                {showVisibility ? (
+                  <WorkflowDetailFact label={t('workflowLibrary.visibility')}>
+                    <HStack gap="2" justify="space-between" minW="0" w="full">
+                      <Text
+                        data-workflow-visibility={visibilityUnknown ? 'unknown' : itemIsPublic ? 'public' : 'private'}
                       >
-                        <Switch.HiddenInput
-                          key={itemIsPublic ? 'public' : 'private'}
-                          onClick={handleVisibilityClick}
-                          ref={visibilityInputRef}
-                        />
-                        <Switch.Control>
-                          <Switch.Thumb />
-                        </Switch.Control>
-                        <Switch.Label srOnly>{t('workflowLibrary.publicWorkflow')}</Switch.Label>
-                      </Switch.Root>
-                      <Text color="fg.subtle" fontSize="xs">
-                        {t('workflowLibrary.publicVisibilityHelp')}
+                        {t(
+                          visibilityUnknown
+                            ? 'workflowLibrary.visibilityUnknown'
+                            : itemIsPublic
+                              ? 'workflowLibrary.public'
+                              : 'workflowLibrary.private'
+                        )}
                       </Text>
-                    </Stack>
+                      {canChangeVisibility && !visibilityUnknown ? (
+                        <Switch.Root
+                          checked={itemIsPublic === true}
+                          colorPalette="accent"
+                          disabled={isVisibilityPending || visibilityUnknown}
+                          readOnly
+                        >
+                          <Switch.HiddenInput
+                            key={itemIsPublic ? 'public' : 'private'}
+                            onClick={handleVisibilityClick}
+                            ref={visibilityInputRef}
+                          />
+                          <Switch.Control>
+                            <Switch.Thumb />
+                          </Switch.Control>
+                          <Switch.Label srOnly>{t('workflowLibrary.publicWorkflow')}</Switch.Label>
+                        </Switch.Root>
+                      ) : null}
+                    </HStack>
+                  </WorkflowDetailFact>
+                ) : null}
+              </DataList.Root>
+              {showVisibility ? (
+                <Stack gap="1">
+                  {canChangeVisibility && !visibilityUnknown ? (
+                    <Text color="fg.muted" fontSize="xs">
+                      {t('workflowLibrary.publicVisibilityHelp')}
+                    </Text>
                   ) : null}
                   {visibilityError ? (
                     <Text color="fg.error" fontSize="xs" role="alert">
@@ -733,51 +599,33 @@ export const WorkflowLibraryDetailPanel = ({
                   ) : null}
                 </Stack>
               ) : null}
-
-              {item.description ? (
-                <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
-                  {item.description}
-                </Text>
-              ) : null}
-
-              {tags.length > 0 ? (
-                <HStack flexWrap="wrap" gap="1" minW="0">
-                  {tags.map((tag) => (
-                    <Badge key={tag} variant="subtle">
-                      {tag}
-                    </Badge>
-                  ))}
-                </HStack>
-              ) : null}
-
-              <WorkflowRequirementsList
-                errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
-                resolved={resolved}
-                onFindModel={handleFindModel}
-              />
             </Stack>
           </Scrollable>
 
-          <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" p="2.5">
-            <HStack gap="2" minW="0">
-              {installableCount > 0 ? (
-                <Button
-                  bg="bg.warning"
-                  color="fg.warning"
-                  flex="1"
-                  minW="0"
-                  size="lg"
-                  _hover={INSTALL_HOVER}
-                  onClick={handleInstall}
-                >
-                  {t('workflowLibrary.installModels', { count: installableCount })}
-                </Button>
-              ) : (
-                <Button flex="1" minW="0" size="lg" onClick={handleOpen}>
-                  {openLabel}
-                </Button>
-              )}
-              <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
+          {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
+          carries Open and More instead. */}
+          <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
+            <Button
+              css={WORKFLOW_PREVIEW_TRIGGER_CSS}
+              data-workflow-preview-trigger=""
+              minW="0"
+              size="lg"
+              variant="outline"
+              w="full"
+              onClick={handlePreview}
+            >
+              <WorkflowIcon />
+              {t('workflowLibrary.preview.action')}
+            </Button>
+            <HStack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="2" minW="0">
+              <Button data-workflow-detail-open flex="1" minW="0" size="lg" onClick={handleOpen}>
+                {openLabel}
+              </Button>
+              <Menu.Root
+                ids={moreActionsIds}
+                positioning={menuPositioning}
+                onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
+              >
                 {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
                 menu never takes focus and the first pointer move onto it closes it. */}
                 <Menu.Trigger asChild>
@@ -789,77 +637,20 @@ export const WorkflowLibraryDetailPanel = ({
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>
-                    <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                    <MenuContent minW="min(13rem, var(--available-width))" maxW="var(--available-width)">
                       {actionItems}
                     </MenuContent>
                   </Menu.Positioner>
                 </Portal>
               </Menu.Root>
             </HStack>
-            <Button
-              disabled={enrichment?.status !== 'ready'}
-              size="lg"
-              variant="outline"
-              w="full"
-              onClick={handlePreview}
-            >
-              <WorkflowIcon />
-              {t('workflowLibrary.previewGraph')}
-            </Button>
           </Stack>
-
-          {/* Naming the card as the trigger makes this a nested layer of the dialog: the
-          dialog's focus trap then lets the menu keep focus, and closing returns it to the card. */}
-          <Menu.Root
-            ids={contextMenuIds}
-            open={contextMenuPoint !== null}
-            positioning={contextMenuPositioning}
-            onOpenChange={handleContextMenuOpenChange}
-            onPointerDownOutside={keepCardMenuOpenForRetarget}
-          >
-            <Portal>
-              <Menu.Positioner>
-                <MenuContent
-                  data-workflow-context-menu
-                  minW="min(16rem, var(--available-width))"
-                  maxW="var(--available-width)"
-                >
-                  {actionItems}
-                </MenuContent>
-              </Menu.Positioner>
-            </Portal>
-          </Menu.Root>
-
-          <RenameDialog
-            initialName={name}
-            isOpen={isRenameOpen && !isReadOnly}
-            label={t('workflowLibrary.templateName')}
-            submitLabel={t('workflowLibrary.rename')}
-            title={t('workflowLibrary.renameTemplateTitle')}
-            onClose={closeRename}
-            onSubmit={submitRename}
-          />
-        </Stack>
+        </WorkflowDetailSheet>
       ) : (
-        <Box
-          css={DETAIL_RAIL_CSS}
-          borderColor="border.subtle"
-          borderWidth="1px"
-          flexShrink={0}
-          minH="0"
-          rounded="md"
-          w={DETAIL_RAIL_WIDTH}
-        />
+        <WorkflowDetailRailPlaceholder />
       )}
-      {/* Outside the rail: a delete empties or retargets it while this dialog animates out. */}
-      <ConfirmDialog
-        body={t('workflowLibrary.deleteConfirmBody', { name: deleteTargetName ?? '' })}
-        confirmLabel={t('workflowLibrary.delete')}
-        isOpen={deleteTargetName !== null && !isReadOnly}
-        title={t('workflowLibrary.deleteConfirmTitle')}
-        onClose={closeDeleteConfirm}
-        onConfirm={confirmDelete}
-      />
+      {/* Outside the rail: a delete empties or retargets it while its confirmation animates out. */}
+      {dialogs}
     </>
   );
-};
+});

@@ -3418,6 +3418,9 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         };
       };
       const workflowListItem = ({ workflow: _workflow, ...item }) => workflowRecord(item);
+      const hasBeenOpened = url.searchParams.get('has_been_opened');
+      const matchesOpened = (workflow) =>
+        hasBeenOpened === null || (hasBeenOpened === 'true') === Boolean(workflow.opened_at);
       const workflowTags = (workflow) =>
         String(workflow.tags ?? '')
           .split(',')
@@ -3457,6 +3460,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           counts[tag] = [...state.workflows.values()].filter(
             (workflow) =>
               (categories.length === 0 || categories.includes(workflow.category)) &&
+              matchesOpened(workflow) &&
               workflowTags(workflow).includes(tag)
           ).length;
         }
@@ -3495,7 +3499,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, workflowRecord(workflow));
       }
 
-      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
+      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/last_run_at|\/thumbnail)?$/.exec(path);
       if (workflowMatch) {
         const workflowId = decodeURIComponent(workflowMatch[1]);
         const suffix = workflowMatch[2] ?? '';
@@ -3505,8 +3509,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(404, { detail: 'Workflow not found' });
         }
 
-        if (suffix === '/opened_at' && method === 'PUT') {
-          workflow.opened_at = timestamp(state);
+        if ((suffix === '/opened_at' || suffix === '/last_run_at') && method === 'PUT') {
+          workflow[suffix.slice(1)] = timestamp(state);
           return json(200, null);
         }
 
@@ -3630,6 +3634,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           description: content.description ?? '',
           is_public: !isMultiuserCaller(faults),
           name: content.name ?? '',
+          last_run_at: null,
           opened_at: null,
           revision: 1,
           tags: content.tags ?? '',
@@ -3660,24 +3665,27 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
-        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs last in both directions, the id
+        // breaking ties.
         const sortKey = (workflow) =>
           orderBy === 'name'
             ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
             : (workflow[orderBy] ?? null);
-        const compare = (left, right) =>
-          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const compare = (left, right) => (left === right ? 0 : left < right ? -1 : 1);
+        const compareKeys = (left, right) =>
+          left === right ? 0 : left === null ? 1 : right === null ? -1 : sign * compare(left, right);
         const items = [...state.workflows.values()]
           .filter(
             (workflow) =>
               (categories.length === 0 || categories.includes(workflow.category)) &&
               (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
               (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag))) &&
-              (isPublic === null || String(workflow.is_public) === isPublic)
+              (isPublic === null || String(workflow.is_public) === isPublic) &&
+              matchesOpened(workflow)
           )
           .sort(
             (left, right) =>
-              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+              compareKeys(sortKey(left), sortKey(right)) || sign * compare(left.workflow_id, right.workflow_id)
           );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);

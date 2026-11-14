@@ -1,3 +1,4 @@
+import type { GraphPreviewInvoke } from '@features/workflow/contracts';
 import type { GraphBearingSurfaceContract } from '@workbench/widgetContracts';
 
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -12,11 +13,14 @@ import { buildGraphPreviewSource } from './graphPreviewSource';
 
 /** Subscribe to the whole project only while the preview is open so graph compilation follows settings edits. */
 export const GraphPreviewHost = ({
+  invoke,
   isOpen,
   surface,
   onExitComplete,
   onOpenChange,
 }: {
+  /** The top bar's Invoke for this surface (`GraphPreviewInvokeScopeContext`); none without a shell to provide it. */
+  invoke?: GraphPreviewInvoke;
   isOpen: boolean;
   surface: GraphBearingSurfaceContract;
   /** Fires when the close transition has played out — the menu drops the mount here. */
@@ -43,6 +47,7 @@ export const GraphPreviewHost = ({
   return (
     <GraphPreviewDialog
       graphId={surface.graphId}
+      invoke={invoke}
       isOpen={isOpen}
       source={source}
       sourceId={surface.sourceId}

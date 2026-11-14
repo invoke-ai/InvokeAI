@@ -17,9 +17,15 @@ import { shallowEqual } from '@platform/state/selectorCore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
-import type { WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
+import type { ListWorkflowsParams, WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
 
-import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows, onLibraryWorkflowOpened } from './api';
+import {
+  getAllWorkflowTags,
+  getWorkflowTagCounts,
+  listLibraryWorkflows,
+  onLibraryWorkflowOpened,
+  onLibraryWorkflowRun,
+} from './api';
 import {
   getLibraryWorkflowCached,
   getLibraryWorkflowRecordCached,
@@ -37,18 +43,53 @@ const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
 
-/** What the library's own templates are ordered by; bundled templates always list by name. */
-export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name';
+/**
+ * Where the library browses: the account's own templates, bundled templates, public templates (multi-user), or the
+ * owned and bundled templates the account has opened.
+ */
+export type WorkflowLibraryPlace = 'user' | 'default' | 'shared' | 'recent';
+
+/** What My library and Shared are ordered by; the other places have fixed keys, see `getWorkflowLibraryOrder`. */
+export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
+
+export type WorkflowLibrarySortDirection = 'asc' | 'desc';
 
 export interface WorkflowLibraryBrowseFilter {
-  category: WorkflowLibraryCategory;
-  /** Public user workflows form a distinct view; absent keeps user listings owner scoped. */
-  isPublic?: boolean;
-  tag: string | null;
+  place: WorkflowLibraryPlace;
+  /** Any-of: a workflow carrying one of these tags matches. Kept sorted and unique, so equal selections share a view. */
+  tags: readonly string[];
   search: string;
-  /** Applies to the user category only; see `getListOrder`. */
   sort: WorkflowLibrarySort;
+  direction: WorkflowLibrarySortDirection;
 }
+
+/** A key's natural direction: dates newest first, names A to Z. */
+export const getWorkflowLibrarySortDefaultDirection = (sort: WorkflowLibrarySort): WorkflowLibrarySortDirection =>
+  sort === 'name' ? 'asc' : 'desc';
+
+/**
+ * The order a place actually lists in. Recent is always most recently opened first. Bundled templates always list by
+ * name, because the server rewrites their timestamps at every start; they take the filter's direction only while the
+ * filter's key is name, so a date order's descending direction never turns them Z to A.
+ */
+export const getWorkflowLibraryOrder = ({
+  direction,
+  place,
+  sort,
+}: Pick<WorkflowLibraryBrowseFilter, 'direction' | 'place' | 'sort'>): {
+  direction: WorkflowLibrarySortDirection;
+  sort: WorkflowLibrarySort;
+} => {
+  if (place === 'recent') {
+    return { direction: 'desc', sort: 'opened' };
+  }
+
+  if (place === 'default') {
+    return { direction: sort === 'name' ? direction : 'asc', sort: 'name' };
+  }
+
+  return { direction, sort };
+};
 
 export type WorkflowLibraryEntryEnrichment =
   | { status: 'pending' }
@@ -80,41 +121,80 @@ export interface WorkflowLibraryBrowseSnapshot {
   page: number;
   pages: number;
   total: number;
-  /** Chip counts for the current category and visibility filter. */
+  /** Tag counts for the current place, independent of the search and the checked tags. */
   tagCounts: readonly WorkflowTagCount[];
-  /** Total user-category workflows, for the one-time Browse/Yours auto-switch. */
-  userTotal: number | null;
+  /** Unfiltered totals per place, for the rail and the empty-account switch to Templates; absent until known. */
+  placeTotals: Readonly<Partial<Record<WorkflowLibraryPlace, number>>>;
   error: string | null;
 }
 
 const PER_PAGE = 20;
-const MAX_RESIDENT_ENTRIES = PER_PAGE * 3;
-const MAX_DEMAND = 48;
+/** The most consecutive metadata positions the current view keeps resident (see README). */
+export const WORKFLOW_LIBRARY_METADATA_WINDOW = PER_PAGE * 3;
+/** The most demanded identities enrichment serves at once, visible cards first. */
+export const WORKFLOW_LIBRARY_ENRICHMENT_DEMAND = 48;
 const ENRICHMENT_CONCURRENCY = 4;
 
 const PENDING_ENRICHMENT: WorkflowLibraryEntryEnrichment = { status: 'pending' };
 const EMPTY_ENTRIES: readonly WorkflowLibraryEntry[] = [];
 const EMPTY_TAG_COUNTS: readonly WorkflowTagCount[] = [];
-const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', sort: 'updated', tag: null };
+const EMPTY_TAGS: readonly string[] = [];
+const EMPTY_PLACE_TOTALS: WorkflowLibraryBrowseSnapshot['placeTotals'] = {};
+const INITIAL_FILTER: WorkflowLibraryBrowseFilter = {
+  direction: 'desc',
+  place: 'user',
+  search: '',
+  sort: 'opened',
+  tags: EMPTY_TAGS,
+};
 
-const ORDER_BY: Record<WorkflowLibrarySort, 'created_at' | 'name' | 'opened_at' | 'updated_at'> = {
+type ListOrderBy = NonNullable<ListWorkflowsParams['orderBy']>;
+
+const ORDER_BY: Record<WorkflowLibrarySort, ListOrderBy> = {
   created: 'created_at',
+  lastRun: 'last_run_at',
   name: 'name',
   opened: 'opened_at',
   updated: 'updated_at',
 };
 
-/**
- * The list order a filter asks the server for. Bundled templates always list by name: the server rewrites their
- * timestamps at every start, so their dates order nothing. Dates list newest first; names A to Z.
- */
-const getListOrder = ({
-  category,
-  sort,
-}: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: (typeof ORDER_BY)[WorkflowLibrarySort] } => {
-  const effective = category === 'default' ? 'name' : sort;
+/** The list order a filter asks the server for. */
+const getListOrder = (filter: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: ListOrderBy } => {
+  const { direction, sort } = getWorkflowLibraryOrder(filter);
 
-  return { direction: effective === 'name' ? 'ASC' : 'DESC', orderBy: ORDER_BY[effective] };
+  return { direction: direction === 'asc' ? 'ASC' : 'DESC', orderBy: ORDER_BY[sort] };
+};
+
+/**
+ * What each place reads. Shared is every account's public templates; My library and Recent stay owner scoped (the
+ * server keeps bundled templates in an owner-scoped listing).
+ */
+const PLACE_SCOPES: Record<
+  WorkflowLibraryPlace,
+  { categories: readonly WorkflowLibraryCategory[]; hasBeenOpened?: true; isPublic?: true }
+> = {
+  default: { categories: ['default'] },
+  recent: { categories: ['user', 'default'], hasBeenOpened: true },
+  shared: { categories: ['user'], isPublic: true },
+  user: { categories: ['user'] },
+};
+
+/** List parameters for a place: a single category as `category`, mixed ones as `categories`. */
+const getListScope = (place: WorkflowLibraryPlace) => {
+  const { categories, ...flags } = PLACE_SCOPES[place];
+
+  return categories.length === 1 ? { category: categories[0]!, ...flags } : { categories: [...categories], ...flags };
+};
+
+/** Sorted and unique; the previous array when the selection is unchanged, so an equal patch is a no-op. */
+const normalizeTags = (tags: readonly string[], previous: readonly string[]): readonly string[] => {
+  const next = [...new Set(tags)].sort();
+
+  if (next.length === 0) {
+    return EMPTY_TAGS;
+  }
+
+  return next.length === previous.length && next.every((tag, index) => tag === previous[index]) ? previous : next;
 };
 
 const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
@@ -124,17 +204,23 @@ const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   page: 0,
   pages: 0,
   status: 'idle',
+  placeTotals: EMPTY_PLACE_TOTALS,
   tagCounts: EMPTY_TAG_COUNTS,
   total: 0,
-  userTotal: null,
 };
 
 const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHOT);
 
+/** The place's unfiltered total, learned from any unfiltered listing of it. */
+const withPlaceTotal = (filter: WorkflowLibraryBrowseFilter, total: number) =>
+  filter.search === '' && filter.tags.length === 0 && store.getSnapshot().placeTotals[filter.place] !== total
+    ? { placeTotals: { ...store.getSnapshot().placeTotals, [filter.place]: total } }
+    : {};
+
 // #region View cache
 
 /**
- * Views already browsed (Browse, Yours, Shared, a tag or search), kept so switching back shows their metadata at once instead of refetching every row. A view older than `VIEW_FRESH_MS` is revalidated in the
+ * Views already browsed (a place, a tag selection or a search), kept so switching back shows their metadata at once instead of refetching every row. A view older than `VIEW_FRESH_MS` is revalidated in the
  * background and merged in place; library mutations drop the other views.
  */
 interface CachedBrowseView {
@@ -157,10 +243,9 @@ let currentViewFetchedAt = 0;
 
 const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
   JSON.stringify([
-    filter.category,
-    filter.isPublic,
+    filter.place,
     filter.search,
-    filter.tag,
+    filter.tags,
     getListOrder(filter).orderBy,
     getListOrder(filter).direction,
   ]);
@@ -258,6 +343,7 @@ const publishPage = (result: WorkflowLibraryPage): void => {
     pages: result.pages,
     status: 'loaded',
     total: result.total,
+    ...withPlaceTotal(store.getSnapshot().filter, result.total),
   });
   pumpEnrichment();
 };
@@ -324,17 +410,34 @@ const findEntry = (workflowId: string): WorkflowLibraryEntry | undefined =>
   selectWorkflowLibraryEntry(store.getSnapshot(), workflowId);
 
 const demandedIds = (): Set<string> =>
-  new Set([...(selectedDemand ? [selectedDemand] : []), ...visibleDemand.slice(0, MAX_DEMAND)]);
+  new Set([...(selectedDemand ? [selectedDemand] : []), ...visibleDemand.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND)]);
 
+/**
+ * Drops documents nobody demands, and gives a pending list copy of the selected workflow the selected copy's
+ * enrichment at the same revision. Every list publication (first page, range, revalidation, cached view) runs this
+ * through `pumpEnrichment`, so a card, its missing-model count and its preview never stay pending beside a rail that
+ * already shows the same revision (the enrichment loop skips the id: `findEntry` answers with the selected copy).
+ */
 const trimDocuments = (): void => {
   const demand = demandedIds();
   const snapshot = store.getSnapshot();
   const selectedEntry = selectedDemand ? (findEntry(selectedDemand) ?? null) : null;
-  const entries = snapshot.entries.map((entry) =>
-    !demand.has(entry.item.workflow_id) && entry.enrichment.status !== 'pending'
+  const inherited = selectedEntry?.enrichment.status === 'pending' ? null : selectedEntry;
+  const entries = snapshot.entries.map((entry) => {
+    if (
+      inherited &&
+      entry !== inherited &&
+      entry.enrichment.status === 'pending' &&
+      entry.item.workflow_id === inherited.item.workflow_id &&
+      entry.item.revision === inherited.item.revision
+    ) {
+      return { ...entry, enrichment: inherited.enrichment };
+    }
+
+    return !demand.has(entry.item.workflow_id) && entry.enrichment.status !== 'pending'
       ? { ...entry, enrichment: PENDING_ENRICHMENT }
-      : entry
-  );
+      : entry;
+  });
   if (selectedEntry !== snapshot.selectedEntry || entries.some((entry, index) => entry !== snapshot.entries[index])) {
     store.patchSnapshot({ entries, selectedEntry });
   }
@@ -421,7 +524,7 @@ const pumpEnrichment = (): void => {
 };
 
 export const setWorkflowLibraryVisibleDemand = (ids: readonly string[]): void => {
-  visibleDemand = ids.slice(0, MAX_DEMAND);
+  visibleDemand = ids.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND);
   pumpEnrichment();
 };
 
@@ -507,8 +610,8 @@ const loadWorkflowLibraryWindow = (start: number, end: number, force: boolean): 
   }
   // Most viewports fit aligned pages. A tall viewport can cross four pages while still needing only 60 positions.
   const alignedStart = Math.max(0, Math.min(Math.floor(start / PER_PAGE), snapshot.pages - 3)) * PER_PAGE;
-  const windowStart = end < alignedStart + MAX_RESIDENT_ENTRIES ? alignedStart : Math.max(0, start);
-  const windowEnd = Math.min(snapshot.total, windowStart + MAX_RESIDENT_ENTRIES);
+  const windowStart = end < alignedStart + WORKFLOW_LIBRARY_METADATA_WINDOW ? alignedStart : Math.max(0, start);
+  const windowEnd = Math.min(snapshot.total, windowStart + WORKFLOW_LIBRARY_METADATA_WINDOW);
   const first = Math.floor(windowStart / PER_PAGE);
   const last = Math.max(first, Math.ceil(windowEnd / PER_PAGE) - 1);
   const key = `${listGeneration}:${windowStart}:${windowEnd}:${force}`;
@@ -579,7 +682,7 @@ const loadWorkflowLibraryWindow = (start: number, end: number, force: boolean): 
       store.patchSnapshot({
         entries: mergeEntries(
           store.getSnapshot().entries,
-          items.slice(0, Math.min(MAX_RESIDENT_ENTRIES, Math.max(0, result.total - publishedStart)))
+          items.slice(0, Math.min(WORKFLOW_LIBRARY_METADATA_WINDOW, Math.max(0, result.total - publishedStart)))
         ),
         startIndex: publishedStart,
         page: Math.min(last, Math.max(0, result.pages - 1)),
@@ -625,13 +728,12 @@ const fetchPage = (
 ): Promise<WorkflowLibraryPage> =>
   listLibraryWorkflows({
     ...getListOrder(filter),
-    category: filter.category,
-    ...(filter.isPublic === undefined ? {} : { isPublic: filter.isPublic }),
+    ...getListScope(filter.place),
     page,
     perPage: PER_PAGE,
     query: filter.search || undefined,
     signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
-    tags: filter.tag ? [filter.tag] : undefined,
+    tags: filter.tags.length > 0 ? [...filter.tags] : undefined,
   });
 
 const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: AccountScope): Promise<void> => {
@@ -656,23 +758,27 @@ const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: Account
   }
 };
 
-/** Tag chips are best-effort: a failed count leaves the previous chips in place. */
-const loadTagCounts = async (
-  category: WorkflowLibraryCategory,
-  isPublic: boolean | undefined,
-  owner: AccountScope
-): Promise<void> => {
+/** Tag counts are best-effort: a failed count leaves the previous tags in place. */
+const loadTagCounts = async (place: WorkflowLibraryPlace, owner: AccountScope): Promise<void> => {
   try {
+    const { categories: placeCategories, hasBeenOpened, isPublic } = PLACE_SCOPES[place];
+    const categories = [...placeCategories];
     const publicFilter = isPublic === undefined ? {} : { isPublic };
-    const tags = await getAllWorkflowTags({ categories: [category], ...publicFilter, signal: owner.signal });
+    const tags = await getAllWorkflowTags({ categories, ...publicFilter, signal: owner.signal });
+    // The tag list has no recency filter; Recent's counts drop the tags none of its workflows carry.
     const counts =
       tags.length > 0
-        ? await getWorkflowTagCounts({ categories: [category], ...publicFilter, signal: owner.signal, tags })
+        ? await getWorkflowTagCounts({
+            categories,
+            ...publicFilter,
+            ...(hasBeenOpened ? { hasBeenOpened } : {}),
+            signal: owner.signal,
+            tags,
+          })
         : {};
 
-    // A category or visibility switch mid-flight owns the chips now.
-    const filter = store.getSnapshot().filter;
-    if (!isAccountScopeCurrent(owner) || filter.category !== category || filter.isPublic !== isPublic) {
+    // A place switch mid-flight owns the tags now.
+    if (!isAccountScopeCurrent(owner) || store.getSnapshot().filter.place !== place) {
       return;
     }
 
@@ -680,26 +786,53 @@ const loadTagCounts = async (
 
     store.patchSnapshot({ tagCounts: tagCounts.length > 0 ? tagCounts : EMPTY_TAG_COUNTS });
   } catch {
-    // Chips are decoration around the grid; the list request owns the error state.
+    // Tag counts are decoration around the grid; the list request owns the error state.
   }
 };
 
-/** Probe one user workflow to decide whether fresh accounts should open bundled defaults. */
-const probeUserTotal = async (owner: AccountScope): Promise<void> => {
-  if (store.getSnapshot().userTotal !== null) {
-    return;
+const placeTotalFlights = new Map<WorkflowLibraryPlace, Promise<void>>();
+
+/** One place's one-row probe; a caller during a probe of the same place shares it. */
+const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
+  const inflight = placeTotalFlights.get(place);
+
+  if (inflight) {
+    return inflight;
   }
 
-  try {
-    const result = await listLibraryWorkflows({ category: 'user', page: 0, perPage: 1, signal: owner.signal });
+  const owner = captureAccountScope();
+  const flight: Promise<void> = listLibraryWorkflows({
+    ...getListScope(place),
+    page: 0,
+    perPage: 1,
+    signal: owner.signal,
+  })
+    .then(
+      (result) => {
+        if (isAccountScopeCurrent(owner)) {
+          store.patchSnapshot({ placeTotals: { ...store.getSnapshot().placeTotals, [place]: result.total } });
+        }
+      },
+      () => {
+        // A failed probe leaves that total unknown.
+      }
+    )
+    .finally(() => {
+      if (placeTotalFlights.get(place) === flight) {
+        placeTotalFlights.delete(place);
+      }
+    });
 
-    if (isAccountScopeCurrent(owner)) {
-      store.patchSnapshot({ userTotal: result.total });
-    }
-  } catch {
-    // Leaves `userTotal` null: the dialog simply keeps the category it opened on.
-  }
+  placeTotalFlights.set(place, flight);
+  return flight;
 };
+
+/**
+ * One-row probes for the rail's place totals; the dialog asks once per opening. The current place's total also follows
+ * its unfiltered listings, so the dialog leaves out the place whose first page it is loading anyway.
+ */
+export const loadWorkflowLibraryPlaceTotals = (places: readonly WorkflowLibraryPlace[]): Promise<void> =>
+  Promise.all(places.map(probePlaceTotal)).then(() => undefined);
 
 /**
  * Applies a filter patch. A view browsed before comes back from the cache at once (revalidated in the background once
@@ -707,15 +840,18 @@ const probeUserTotal = async (owner: AccountScope): Promise<void> => {
  */
 export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBrowseFilter>): void => {
   const snapshot = store.getSnapshot();
-  const filter = { ...snapshot.filter, ...patch };
+  const filter = {
+    ...snapshot.filter,
+    ...patch,
+    tags: patch.tags ? normalizeTags(patch.tags, snapshot.filter.tags) : snapshot.filter.tags,
+  };
 
   if (shallowEqual(filter, snapshot.filter)) {
     return;
   }
 
   const owner = captureAccountScope();
-  const isCategoryChanged = filter.category !== snapshot.filter.category;
-  const isTagScopeChanged = isCategoryChanged || filter.isPublic !== snapshot.filter.isPublic;
+  const isTagScopeChanged = filter.place !== snapshot.filter.place;
 
   rememberCurrentView();
   rangeController?.abort();
@@ -753,6 +889,7 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
       status: 'loaded',
       tagCounts: cached.tagCounts,
       total: cached.total,
+      ...withPlaceTotal(filter, cached.total),
     });
     pumpEnrichment();
 
@@ -779,37 +916,43 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   void loadFirstPage(filter, owner);
 
   if (isTagScopeChanged) {
-    void loadTagCounts(filter.category, filter.isPublic, owner);
+    void loadTagCounts(filter.place, owner);
   }
 };
 
 /**
- * First open: page 0, the category's tag counts, and the user-total probe, in the account's stored sort so the first
- * request already comes back in order. A later open with another sort switches to it as a filter change.
+ * Every open of a template place applies the opening filter, a patch over the current one; the dialog passes its
+ * place, the account's stored order, and the session's search and tags. The first open loads page 0 and the place's
+ * tag counts in that filter, so the first request already comes back in order; a later open applies it as a filter
+ * change.
  */
-export const ensureWorkflowLibraryBrowseLoaded = (sort: WorkflowLibrarySort): Promise<void> => {
-  const { status } = store.getSnapshot();
+export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibraryBrowseFilter>): Promise<void> => {
+  const snapshot = store.getSnapshot();
 
-  if (status !== 'idle' && status !== 'error') {
-    setWorkflowLibraryBrowseFilter({ sort });
+  if (snapshot.status !== 'idle' && snapshot.status !== 'error') {
+    setWorkflowLibraryBrowseFilter(opening);
+
+    // A view outdated while nobody looked (see `onOrderTouched`) revalidates as the library opens on it again.
+    if (store.getSnapshot().filter === snapshot.filter && currentViewFetchedAt === 0) {
+      void refreshWorkflowLibraryBrowse();
+    }
 
     return initialLoadFlight.inflight() ?? Promise.resolve();
   }
 
   return initialLoadFlight.run(async () => {
     const owner = captureAccountScope();
-    const filter = { ...store.getSnapshot().filter, sort };
-
-    store.patchSnapshot({ filter });
+    const current = store.getSnapshot().filter;
+    const filter = {
+      ...current,
+      ...opening,
+      tags: opening.tags ? normalizeTags(opening.tags, current.tags) : current.tags,
+    };
 
     hasTemplateLoadFailed = false;
-    store.patchSnapshot({ error: null, status: 'loading' });
+    store.patchSnapshot({ error: null, filter, status: 'loading' });
 
-    await Promise.all([
-      loadFirstPage(filter, owner),
-      loadTagCounts(filter.category, filter.isPublic, owner),
-      probeUserTotal(owner),
-    ]);
+    await Promise.all([loadFirstPage(filter, owner), loadTagCounts(filter.place, owner)]);
   });
 };
 
@@ -929,7 +1072,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
               publishedStart - (results[0]?.page ?? 0) * PER_PAGE,
               publishedStart -
                 (results[0]?.page ?? 0) * PER_PAGE +
-                Math.min(MAX_RESIDENT_ENTRIES, Math.max(0, last.total - publishedStart))
+                Math.min(WORKFLOW_LIBRARY_METADATA_WINDOW, Math.max(0, last.total - publishedStart))
             )
           ),
           error: null,
@@ -938,6 +1081,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
           pages: last.pages,
           status: 'loaded',
           total: last.total,
+          ...withPlaceTotal(filter, last.total),
         });
         await selectedRead;
         pumpEnrichment();
@@ -955,7 +1099,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
 
     await selectedRead;
     pumpEnrichment();
-    await loadTagCounts(filter.category, filter.isPublic, owner);
+    await loadTagCounts(filter.place, owner);
   });
 
 export const getWorkflowLibraryBrowseSnapshot = (): WorkflowLibraryBrowseSnapshot => store.getSnapshot();
@@ -1031,19 +1175,52 @@ onWorkflowLibraryCacheInvalidated(() => {
   });
 });
 
-// Opening a workflow moves it to the top of every view ordered by last opened. The server may record the open after
-// the dialog is open again, so the current view refreshes now; hidden ones are dropped and fetched when revisited.
-onLibraryWorkflowOpened(() => {
+/** Holders of the listing: the library dialog while it shows a template place. */
+let browseHolds = 0;
+
+/**
+ * Marks the listing as in use until the returned release runs (once). A count rather than a flag, so a remount's
+ * release and re-hold leave it held.
+ */
+export const holdWorkflowLibraryBrowse = (): (() => void) => {
+  let isReleased = false;
+  browseHolds += 1;
+
+  return () => {
+    if (!isReleased) {
+      isReleased = true;
+      browseHolds -= 1;
+    }
+  };
+};
+
+/**
+ * Opening or running a workflow moves it to the top of every view ordered by last opened or last run; hidden views in
+ * that order are dropped and fetched when revisited. While the library is in use, the current view in that order
+ * refreshes now (the server may record the change after the dialog is open again). Otherwise it is only marked
+ * outdated, and the next opening revalidates it: runs complete all session long with nobody looking.
+ */
+const onOrderTouched = (orderBy: ListOrderBy) => (): void => {
   for (const [key, view] of viewCache) {
-    if (view.orderBy === 'opened_at') {
+    if (view.orderBy === orderBy) {
       viewCache.delete(key);
     }
   }
 
-  if (getListOrder(store.getSnapshot().filter).orderBy === 'opened_at') {
-    scheduleCurrentViewRefresh();
+  if (getListOrder(store.getSnapshot().filter).orderBy !== orderBy) {
+    return;
   }
-});
+
+  if (browseHolds > 0) {
+    scheduleCurrentViewRefresh();
+  } else {
+    currentViewFetchedAt = 0;
+    metadataGeneration = -1;
+  }
+};
+
+onLibraryWorkflowOpened(onOrderTouched('opened_at'));
+onLibraryWorkflowRun(onOrderTouched('last_run_at'));
 
 registerAccountOwnedResource({
   clear: () => {
@@ -1062,6 +1239,7 @@ registerAccountOwnedResource({
     rangeController = null;
     windowRequest += 1;
     templatesFlight = null;
+    placeTotalFlights.clear();
     hasTemplateLoadFailed = false;
     isRefreshScheduled = false;
     viewCache.clear();

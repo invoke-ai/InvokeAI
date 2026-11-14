@@ -4,32 +4,16 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
-import { flushGenerateDrafts } from '@features/generation/react';
 import { getAuthSession, getCapabilities, subscribeAuthSession } from '@features/identity';
-import { ensureModelsLoaded, openModelManager, useModelsSelector } from '@features/models';
+import { ensureModelsLoaded, openModelManager } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
-import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import {
-  createInvocationRouteInputSelector,
-  formatRoute,
-  isInvocationRouteValid,
-  localizeInvocationValidationReason,
-  resolveInvocationRouteInput,
-} from '@workbench/invocation';
-import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
 import { getActiveProjectWorkflow, getProjectWorkflowHistory } from '@workbench/projectWorkflows';
@@ -41,18 +25,10 @@ import {
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
-import {
-  useActiveProjectSelector,
-  useWorkbenchCommands,
-  useWorkbenchInternalStore,
-  useWorkbenchQueries,
-} from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands, useWorkbenchInternalStore, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
-
-const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   reduceMotion: preferences.reduceMotion,
@@ -60,7 +36,10 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
+  workflowLibraryCardSize: preferences.workflowLibraryCardSize,
+  workflowLibraryLayout: preferences.workflowLibraryLayout,
   workflowLibrarySort: preferences.workflowLibrarySort,
+  workflowLibrarySortDirection: preferences.workflowLibrarySortDirection,
   workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
@@ -125,73 +104,14 @@ const createPairedSource = <A, B>(
 };
 
 const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode }) => {
-  const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const commands = useWorkbenchCommands();
-  const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
-  const { t } = useTranslation();
-  // The preview submits under the topbar's lease, so it is unavailable while that is held.
-  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
       focusSource: (sourceId) => {
         if (sourceId) {
           openWidget(sourceId);
-        }
-      },
-      getRoute: (sourceId) => {
-        if (!sourceId) {
-          return null;
-        }
-
-        const route = resolveInvocationRouteInput(
-          routeInput,
-          'dialog',
-          { ...routeInput.invocation, sourceId, sourceLocked: true },
-          availabilityModels
-        );
-
-        const message = route.validationMessage;
-
-        return {
-          canInvoke: isInvocationRouteValid(route) && !isPreparing,
-          label: formatRoute(route),
-          validationMessage: isPreparing
-            ? t('topbar.invoke.preparing')
-            : message === undefined
-              ? undefined
-              : localizeInvocationValidationReason(message, t),
-        };
-      },
-      invoke: async (sourceId) => {
-        const owner = captureAccountScope();
-        flushGenerateDrafts();
-        try {
-          const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-
-          assertAccountScopeCurrent(owner);
-          const snapshot = queries.getSnapshot();
-          return resolveAndSubmitGraphPreviewInvocation({
-            commands,
-            formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
-            formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
-            models: availabilityModels,
-            owner,
-            prepareCanvasInvocation,
-            project: snapshot.activeProject,
-            scopedDefaults: snapshot.scopedDefaults,
-            sourceId,
-          });
-        } catch (error) {
-          if (!isAccountScopeCurrent(owner)) {
-            return false;
-          }
-
-          throw error;
         }
       },
       openDocumentInNewProject: (document, label, source) => {
@@ -204,7 +124,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         openWidget('workflow');
       },
     }),
-    [availabilityModels, commands, isPreparing, openWidget, queries, routeInput, t]
+    [commands, openWidget]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;

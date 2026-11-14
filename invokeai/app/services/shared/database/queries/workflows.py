@@ -132,8 +132,15 @@ _ORDER_COLUMNS: dict[WorkflowRecordOrderBy, ColumnElement[Any]] = {
     WorkflowRecordOrderBy.CreatedAt: _W.created_at,
     WorkflowRecordOrderBy.UpdatedAt: _W.updated_at,
     WorkflowRecordOrderBy.OpenedAt: _W.opened_at,
+    WorkflowRecordOrderBy.LastRunAt: _W.last_run_at,
     WorkflowRecordOrderBy.Name: CaseInsensitiveOrder(_W.name),
     WorkflowRecordOrderBy.IsPublic: _W.is_public,
+}
+# Workflows never opened or run sort after the others in both directions. Both dialects sort NULL lowest, and MySQL
+# has no NULLS LAST, so a leading ascending `IS NULL` term places them.
+_NULLABLE_ORDER_COLUMNS: dict[WorkflowRecordOrderBy, ColumnElement[Any]] = {
+    WorkflowRecordOrderBy.OpenedAt: _W.opened_at,
+    WorkflowRecordOrderBy.LastRunAt: _W.last_run_at,
 }
 
 _THE_WORKFLOW = _W.workflow_id == bindparam("workflow_id")
@@ -190,10 +197,14 @@ def _list(shape: _Shape, order_by: WorkflowRecordOrderBy, direction: SQLiteDirec
     # The enums are also strings, which share their cache entries: compare by value, never by identity. The workflow
     # id breaks ties, so that equal keys keep one order from page to page.
     ordering = (_ORDER_COLUMNS[order_by], _W.workflow_id)
+    nullable = _NULLABLE_ORDER_COLUMNS.get(order_by)
     statement = (
         select(*_LIST_COLUMNS)
         .where(*_conditions(shape))
-        .order_by(*(column.desc() if direction == SQLiteDirection.Descending else column.asc() for column in ordering))
+        .order_by(
+            *(() if nullable is None else (nullable.is_(None).asc(),)),
+            *(column.desc() if direction == SQLiteDirection.Descending else column.asc() for column in ordering),
+        )
     )
     if paged:
         statement = statement.limit(bindparam("limit")).offset(bindparam("offset"))

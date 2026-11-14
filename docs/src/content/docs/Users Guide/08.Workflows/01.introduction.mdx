@@ -55,8 +55,8 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | 1 | **Workflow panel** | The workflow's **form**: its most important settings as simple controls, like a Generate panel for this workflow. |
 | 2 | **View** / **Edit** | **View** uses the form. **Edit** lets you design the form, edit the workflow's details (name, description, author, tags, notes), and inspect the selected node. |
 | 3 | **Editor toolbar** | Tools for panning, box and lasso selection, and erasing nodes or connections; **Zoom in**, **Zoom out** and **Fit view**; **Arrange nodes**, which lays out the whole graph, or just the selected nodes in place, as one undoable step; **Download workflow as PNG**; and **Node opacity**. |
-| 4 | **Workflow name** | The active workflow. Click it to open the **Workflows** library. |
-| 5 | **Workflow actions** | **Add node** (**+**), **Save to library…**, the save status, settings, and the **⋯** menu with **Workflow details…**, **Rename workflow…**, **Import workflow JSON…**, **Export workflow JSON**, **New workflow** and more. |
+| 4 | **Workflow name** | The active workflow. Click it to switch to another of the project's workflows, start a **New workflow**, or choose **Workflow library…** to open the **Workflows** library. |
+| 5 | **Workflow actions** | **Add node** (**+**), **Save to library…**, the save status, settings, and the **⋯** menu with **Rename…**, **Details…** and **Save to library…** for this workflow, **Import from JSON…**, and **Export** (**Export JSON**, **Copy JSON**, **Download as PNG**). |
 | 6 | **The graph** | The workflow's nodes and connections. Drag nodes by their title bar; scroll to zoom; drag empty space to pan. |
 | 7 | **Minimap** | An overview of the whole graph for finding your way around large workflows. |
 | 8 | **Gallery and Queue** | Where results appear, with the Queue, Preview and Image Map on the right-hand rail. |
@@ -68,7 +68,7 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 * **Add a node** by pressing **Shift+A** or **Space** in the editor, or with the **+** button in its header, then search for it by name.
 * **Connect nodes** by dragging from an output on the right of one node to an input on the left of another.
 * **Choose which images are kept.** Only nodes with **Save to Gallery** checked, at the bottom of image nodes, send their images to the Gallery.
-* **Manage workflows** from the **Workflows** library: click the workflow's name in the editor's header.
+* **Switch workflows** from the workflow's name in the editor's header: its menu lists the project's workflows. **New workflow** at the bottom of that menu adds a blank one, and **Workflow library…** opens the **Workflows** library to manage them.
 
 The [Workflow Editor Reference](/users-guide/workflows/editor-reference/) covers all of this in detail, along with connectors, the library, common node patterns, community nodes and keyboard shortcuts.
 
@@ -84,7 +84,7 @@ You need an SDXL model and an SDXL VAE, such as the *sdxl-vae-fp16-fix* starter 
 
 1. Press **Alt+4** for the Workflow layout.
 
-2. Click the workflow's name at the top of the editor to open the **Workflows** library, go to **Browse**, and open **Text to Image - SDXL**. A copy is added to your project and becomes the active workflow.
+2. Click the workflow's name at the top of the editor and choose **Workflow library…** to open the **Workflows** library, go to **Templates**, and open **Text to Image - SDXL**. A copy is added to your project and becomes the active workflow.
 
 3. In the **Main Model - SDXL** node, choose your SDXL model in **Model**, and in the **VAE Model** node choose an SDXL VAE.
 
@@ -133,13 +133,13 @@ In summary, the **Image Compositor**'s settings are:
 
 A workflow with a dozen nodes is not the most convenient thing to use day to day. The **form** in the Workflow panel on the left gathers the settings you actually change into one simple panel, like the Generate panel.
 
-To add a setting to the form, click the **pin** icon at the right end of its row in the node (**Add to form**). Only settings with their own control can be pinned; connected inputs cannot.
+To add a setting to the form, point at its row in the node (or move keyboard focus into it) and click the **+** button at the right end of the row (**Add to form**). Only settings with their own control can go in the form; connected inputs cannot.
 
 <Steps>
 
 1. The SDXL workflow already puts its **Positive Prompt**, **Negative Prompt**, **Model**, VAE and board settings in the form.
 
-2. In **Image Compositor**, pin **Image Background**, **Threshold**, **X Offset** and **Y Offset**. The pins turn blue, and the settings appear at the end of the form.
+2. In **Image Compositor**, add **Image Background**, **Threshold**, **X Offset** and **Y Offset** to the form. Their names turn blue with a link mark, and the settings appear at the end of the form.
 
 3. In the Workflow panel, click **Edit**, then **Form**. Each setting is a card:
    * Drag a card's title bar to reorder it.
@@ -151,7 +151,7 @@ To add a setting to the form, click the **pin** icon at the right end of its row
 
 </Steps>
 
-<Image src={formEdit} alt="The Workflow panel in Edit mode, with the Form tab listing the pinned settings as cards and the Node Inspector below." width={380} />
+<Image src={formEdit} alt="The Workflow panel in Edit mode, with the Form tab listing the settings added to the form as cards and the Node Inspector below." width={380} />
 
 In **View**, the form works like any generation panel: change the prompt or the background and press **Invoke**. The form is part of the workflow, so it is saved with it, exported with it, and shown to anyone who opens your workflow.
 
@@ -159,7 +159,7 @@ In **View**, the form works like any generation panel: change the prompt or the 
 
 ### 5. Save and share it
 
-Use **Details** in the Workflow panel's Edit mode to give the workflow a name and description, then click **Save to library…** in the editor's header to keep it in your library for other projects. To share it, choose **Export workflow JSON** from the **⋯** menu.
+Use **Details** in the Workflow panel's Edit mode to give the workflow a name and description, then click **Save to library…** in the editor's header to keep it in your library for other projects. To share it, choose **Export** → **Export JSON** from the **⋯** menu.
 
 ## Learn more
 

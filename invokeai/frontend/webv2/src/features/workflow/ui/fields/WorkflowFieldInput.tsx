@@ -2128,6 +2128,8 @@ export const WorkflowFieldSnapshot = ({
   if (template.type.name === 'StringField') {
     return (
       <Box
+        // The node row's value well, so the export matches the editor.
+        bg="var(--wb-control-well, transparent)"
         borderColor="border"
         borderRadius="control"
         borderWidth="1px"

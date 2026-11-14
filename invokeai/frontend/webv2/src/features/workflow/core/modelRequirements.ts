@@ -1,4 +1,10 @@
-import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState } from './types';
+import type {
+  FieldInputTemplate,
+  InvocationTemplate,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowInvocationNode,
+} from './types';
 
 import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList } from './fields';
 import { isInvocationNode } from './types';
@@ -188,112 +194,169 @@ const computePrimaryBase = (requirements: readonly WorkflowModelRequirement[]): 
 };
 
 /**
- * Classify concrete model identifiers as exact requirements and empty required inputs as slots; skip
- * connection-fed inputs owned upstream.
+ * Visits the model each of a node's model fields names, and each required model field left empty; connection-fed
+ * inputs are owned upstream and skipped.
  */
+const visitNodeModelNeeds = (
+  node: WorkflowInvocationNode,
+  template: InvocationTemplate,
+  connectionTargets: ReadonlySet<string>,
+  visitExact: (value: DuckTypedModelValue, fieldName: string) => void,
+  visitSlot: (requirement: Extract<WorkflowModelRequirement, { kind: 'slot' }>, fieldName: string) => void
+): void => {
+  for (const fieldTemplate of Object.values({ ...template.inputs, ...node.data.dynamicInputTemplates })) {
+    const isLoraCollection = fieldTemplate.type.name === 'LoRAField';
+
+    if (!isModelFieldType(fieldTemplate.type) && !isLoraCollection) {
+      continue;
+    }
+
+    if (connectionTargets.has(`${node.id}::${fieldTemplate.name}`)) {
+      continue;
+    }
+
+    const value = node.data.inputs[fieldTemplate.name]?.value;
+
+    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node
+    // graphs.
+    if (isLoraCollection) {
+      const entries = toLoraFieldCollectionList(value);
+
+      for (const entry of entries) {
+        if (isLoraFieldCollectionEntry(entry) && isDuckTypedModelValue(entry.lora)) {
+          visitExact(entry.lora, fieldTemplate.name);
+        }
+      }
+
+      // An empty collection still falls through to the slot path below, so a required-but-blank
+      // field keeps describing what it needs the way every other blank model field does.
+      if (entries.length > 0) {
+        continue;
+      }
+    }
+
+    if (isDuckTypedModelValue(value)) {
+      visitExact(value, fieldTemplate.name);
+      continue;
+    }
+
+    if (!fieldTemplate.required) {
+      continue;
+    }
+
+    const base = fieldTemplate.uiModelBase?.[0] ?? null;
+    const modelType = fieldTemplate.uiModelType?.[0] ?? null;
+
+    visitSlot(
+      { base, kind: 'slot', label: buildSlotLabel(fieldTemplate, base, modelType), modelType },
+      fieldTemplate.name
+    );
+  }
+};
+
+const getConnectionTargets = (document: ProjectGraphState): Set<string> =>
+  new Set(document.edges.map((edge) => `${edge.target}::${edge.targetHandle}`));
+
+/** Classify concrete model identifiers as exact requirements and empty required inputs as slots. */
 export const extractWorkflowModelRequirements = (
   document: ProjectGraphState,
   templates: InvocationTemplates
 ): WorkflowModelRequirementSet => {
-  const connectionTargets = new Set(document.edges.map((edge) => `${edge.target}::${edge.targetHandle}`));
+  const connectionTargets = getConnectionTargets(document);
 
   const requirements: WorkflowModelRequirement[] = [];
   const exactKeyHashes = new Map<string, string | undefined>();
   const seenExactDedupeKeys = new Set<string>();
   const seenSlotSignatures = new Set<string>();
 
-  for (const node of document.nodes) {
-    if (!isInvocationNode(node)) {
-      continue;
+  const addExactRequirement = (value: DuckTypedModelValue): void => {
+    const identifier = buildIdentifier(value);
+
+    let dedupeKey = identifier.key;
+
+    if (exactKeyHashes.has(identifier.key)) {
+      const existingHash = exactKeyHashes.get(identifier.key);
+
+      if (identifier.hash !== undefined && existingHash !== undefined && existingHash !== identifier.hash) {
+        dedupeKey = `${identifier.key}::${identifier.hash}`;
+      }
+    } else {
+      exactKeyHashes.set(identifier.key, identifier.hash);
     }
 
-    const template = templates[node.data.type];
-
-    if (!template) {
-      continue;
+    if (seenExactDedupeKeys.has(dedupeKey)) {
+      return;
     }
 
-    const addExactRequirement = (value: unknown): void => {
-      if (!isDuckTypedModelValue(value)) {
-        return;
-      }
+    seenExactDedupeKeys.add(dedupeKey);
+    requirements.push({ identifier, kind: 'exact', label: identifier.name ?? identifier.key });
+  };
+  const addSlotRequirement = (requirement: Extract<WorkflowModelRequirement, { kind: 'slot' }>): void => {
+    const signature = `${requirement.base ?? ''}::${requirement.modelType ?? ''}`;
 
-      const identifier = buildIdentifier(value);
-
-      let dedupeKey = identifier.key;
-
-      if (exactKeyHashes.has(identifier.key)) {
-        const existingHash = exactKeyHashes.get(identifier.key);
-
-        if (identifier.hash !== undefined && existingHash !== undefined && existingHash !== identifier.hash) {
-          dedupeKey = `${identifier.key}::${identifier.hash}`;
-        }
-      } else {
-        exactKeyHashes.set(identifier.key, identifier.hash);
-      }
-
-      if (seenExactDedupeKeys.has(dedupeKey)) {
-        return;
-      }
-
-      seenExactDedupeKeys.add(dedupeKey);
-      requirements.push({ identifier, kind: 'exact', label: identifier.name ?? identifier.key });
-    };
-
-    for (const fieldTemplate of Object.values({ ...template.inputs, ...node.data.dynamicInputTemplates })) {
-      const isLoraCollection = fieldTemplate.type.name === 'LoRAField';
-
-      if (!isModelFieldType(fieldTemplate.type) && !isLoraCollection) {
-        continue;
-      }
-
-      if (connectionTargets.has(`${node.id}::${fieldTemplate.name}`)) {
-        continue;
-      }
-
-      const value = node.data.inputs[fieldTemplate.name]?.value;
-
-      // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node
-      // graphs.
-      if (isLoraCollection) {
-        const entries = toLoraFieldCollectionList(value);
-
-        for (const entry of entries) {
-          if (isLoraFieldCollectionEntry(entry)) {
-            addExactRequirement(entry.lora);
-          }
-        }
-
-        // An empty collection still falls through to the slot path below, so a required-but-blank
-        // field keeps describing what it needs the way every other blank model field does.
-        if (entries.length > 0) {
-          continue;
-        }
-      }
-
-      if (isDuckTypedModelValue(value)) {
-        addExactRequirement(value);
-        continue;
-      }
-
-      if (!fieldTemplate.required) {
-        continue;
-      }
-
-      const base = fieldTemplate.uiModelBase?.[0] ?? null;
-      const modelType = fieldTemplate.uiModelType?.[0] ?? null;
-      const signature = `${base ?? ''}::${modelType ?? ''}`;
-
-      if (seenSlotSignatures.has(signature)) {
-        continue;
-      }
-
+    if (!seenSlotSignatures.has(signature)) {
       seenSlotSignatures.add(signature);
-      requirements.push({ base, kind: 'slot', label: buildSlotLabel(fieldTemplate, base, modelType), modelType });
+      requirements.push(requirement);
+    }
+  };
+
+  for (const node of document.nodes) {
+    const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
+
+    if (isInvocationNode(node) && template) {
+      visitNodeModelNeeds(node, template, connectionTargets, addExactRequirement, addSlotRequirement);
     }
   }
 
   return { primaryBase: computePrimaryBase(requirements), requirements };
+};
+
+/** One model field's requirement: the model it names, or the kind it needs while empty. */
+export interface WorkflowFieldModelRequirement {
+  fieldName: string;
+  requirement: WorkflowModelRequirement;
+}
+
+/**
+ * The same requirements per invocation node and field, so a view can mark the node or the input that needs a model.
+ * A node lists each model it names and each empty required model field; nodes with neither are absent.
+ */
+export const extractNodeModelRequirements = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates
+): ReadonlyMap<string, readonly WorkflowFieldModelRequirement[]> => {
+  const connectionTargets = getConnectionTargets(document);
+  const byNode = new Map<string, WorkflowFieldModelRequirement[]>();
+
+  for (const node of document.nodes) {
+    const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
+
+    if (!isInvocationNode(node) || !template) {
+      continue;
+    }
+
+    const requirements: WorkflowFieldModelRequirement[] = [];
+
+    visitNodeModelNeeds(
+      node,
+      template,
+      connectionTargets,
+      (value, fieldName) => {
+        const identifier = buildIdentifier(value);
+        requirements.push({
+          fieldName,
+          requirement: { identifier, kind: 'exact', label: identifier.name ?? identifier.key },
+        });
+      },
+      (requirement, fieldName) => requirements.push({ fieldName, requirement })
+    );
+
+    if (requirements.length > 0) {
+      byNode.set(node.id, requirements);
+    }
+  }
+
+  return byNode;
 };
 
 export interface InstalledModelSummary {

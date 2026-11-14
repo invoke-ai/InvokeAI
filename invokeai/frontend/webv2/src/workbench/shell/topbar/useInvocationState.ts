@@ -1,6 +1,6 @@
 import type { DynamicPromptsExpansion } from '@features/generation/react';
 import type { GraphWidgetSource } from '@workbench/graphWidgets';
-import type { InvocationRoute, ResultDestination } from '@workbench/invocationContracts';
+import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useDynamicPrompts } from '@features/generation/react';
@@ -130,9 +130,15 @@ export interface InvokeOptions {
   destinationOverride?: ResultDestination;
   /** Queue ahead of the user's other pending work, as Invoke Front does. */
   prepend?: boolean;
+  /** Hears that the run has started (valid, and holding the project's preparation lease). */
+  onStarted?: () => void;
 }
 
-export const useInvocationState = (): InvocationState => {
+/**
+ * Invoke's state for the active route; given a `sourceId`, for that source's route instead, its source fixed (a graph
+ * preview's Invoke), with the active route's destination.
+ */
+export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId } = {}): InvocationState => {
   const { t } = useTranslation();
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const visibleTypeIds = useActiveProjectSelector(getVisibleWidgetTypeIds, areTypeIdSetsEqual);
@@ -143,7 +149,10 @@ export const useInvocationState = (): InvocationState => {
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
-  const { invocation } = routeInput;
+  const invocation = useMemo(
+    () => (sourceId ? { ...routeInput.invocation, sourceId, sourceLocked: true } : routeInput.invocation),
+    [routeInput.invocation, sourceId]
+  );
   const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   useMountEffect(() => {
@@ -156,8 +165,8 @@ export const useInvocationState = (): InvocationState => {
     subscribeRouteSources,
     getRouteSourcesSnapshot,
     useCallback(
-      () => resolveInvocationRouteInput(routeInput, 'global', invocation, availabilityModels),
-      [availabilityModels, invocation, routeInput]
+      () => resolveInvocationRouteInput(routeInput, sourceId ? 'dialog' : 'global', invocation, availabilityModels),
+      [availabilityModels, invocation, routeInput, sourceId]
     )
   );
   const isConnected = backendConnectionStatus === 'connected';
@@ -208,17 +217,19 @@ export const useInvocationState = (): InvocationState => {
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
+    ({ destinationOverride, onStarted, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
+        onStarted,
         prepend,
+        sourceId,
         formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
         formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,
       }),
-    [availabilityModels, commands, queries, t]
+    [availabilityModels, commands, queries, sourceId, t]
   );
 
   return {

@@ -128170,7 +128170,7 @@
       },
       "WorkflowRecordOrderBy": {
         "type": "string",
-        "enum": ["created_at", "updated_at", "opened_at", "name", "is_public"],
+        "enum": ["created_at", "updated_at", "opened_at", "last_run_at", "name", "is_public"],
         "title": "WorkflowRecordOrderBy",
         "description": "The order by options for workflow records"
       },

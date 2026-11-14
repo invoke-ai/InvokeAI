@@ -114,8 +114,6 @@ describe('Workflow UI read-port isolation', () => {
     let setGraphPreview: ((adapter: WorkflowGraphPreviewPort) => void) | null = null;
     const initialGraphPreview: WorkflowGraphPreviewPort = {
       focusSource: () => {},
-      getRoute: () => null,
-      invoke: () => Promise.resolve(false),
       openDocumentInNewProject: () => {},
       openWorkflowEditor: () => {},
     };
@@ -186,8 +184,6 @@ describe('Workflow UI read-port isolation', () => {
     await act(() =>
       setGraphPreview?.({
         focusSource: () => {},
-        getRoute: () => null,
-        invoke: () => Promise.resolve(true),
         openDocumentInNewProject: () => {},
         openWorkflowEditor: () => {},
       })
@@ -195,8 +191,6 @@ describe('Workflow UI read-port isolation', () => {
     await act(() =>
       setGraphPreview?.({
         focusSource: () => {},
-        getRoute: () => null,
-        invoke: () => Promise.resolve(false),
         openDocumentInNewProject: () => {},
         openWorkflowEditor: () => {},
       })

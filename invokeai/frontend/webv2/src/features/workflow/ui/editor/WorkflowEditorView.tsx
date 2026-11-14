@@ -5,7 +5,7 @@ import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getArrangedLayout } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
-import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
+import { flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview/flowTheme';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   useWorkflowCapabilitiesSelector,
@@ -27,6 +27,7 @@ import {
   validateConnection,
 } from '@features/workflow/utility';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { shallowEqual } from '@platform/state/selectors';
 import {
   Background,
@@ -82,6 +83,8 @@ import { fitWorkflowBounds } from './fitWorkflowBounds';
 import {
   toFlowEdges,
   toFlowNodes,
+  withCollapsedGroupSelection,
+  withCollapsedEdgeSiblings,
   withNodeSelection,
   type FlowEdgeType,
   type InvocationTemplateStatus,
@@ -111,7 +114,9 @@ import { reportNodeHover, reportNodeSelection, workflowSelectionStore } from './
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
+import { WorkflowEditorMiniMap } from './WorkflowEditorMiniMap';
 import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
+import { registerWorkflowPngExportHost } from './workflowPngExport';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
@@ -423,6 +428,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     return element;
   }, []);
   const onExportComplete = useCallback(() => setExportView(null), []);
+  // The toolbar's camera and the widget menu's Download as PNG both draw from this editor's offscreen view.
+  useMountEffect(() => registerWorkflowPngExportHost({ complete: onExportComplete, prepare: onExportPrepare }));
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
@@ -505,7 +512,9 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       }
 
       const removedNodeIds = new Set(existingNodeIds);
-      const requestedEdgeIds = new Set(edgeIds);
+      const requestedEdgeIds = new Set(
+        withCollapsedEdgeSiblings({ edges: projectGraph.edges, nodes: projectGraph.nodes }, edgeIds)
+      );
       const existingEdgeIds = projectGraph.edges
         .filter(
           (edge) =>
@@ -796,7 +805,11 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
   const deleteSelection = () => {
     const nodeIds = flowNodes.filter((node) => node.selected).map((node) => node.id);
-    const edgeIds = flowEdges.filter((edge) => edge.selected).map((edge) => edge.id);
+    // Widened as the Delete key's path is, so both delete exactly the edges a selected collapsed edge stands for.
+    const edgeIds = withCollapsedEdgeSiblings(
+      projectGraph,
+      flowEdges.filter((edge) => edge.selected).map((edge) => edge.id)
+    );
 
     if (nodeIds.length > 0) {
       editGraph({ nodeIds, type: 'removeNodes' });
@@ -884,15 +897,25 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<WorkflowFlowEdge>[]) => {
+      // Selection changes already keep collapsed siblings together before XYFlow removes the selected edges.
       const removedEdgeIds = changes.flatMap((change) => (change.type === 'remove' ? [change.id] : []));
-
       if (removedEdgeIds.length > 0) {
         editGraph({ edgeIds: removedEdgeIds, type: 'removeEdges' });
       }
 
-      setFlowModel((current) => (current ? { ...current, edges: applyEdgeChanges(changes, current.edges) } : current));
+      setFlowModel((current) =>
+        current
+          ? {
+              ...current,
+              edges: applyEdgeChanges(
+                withCollapsedGroupSelection(projectGraph, changes, current.edges) as EdgeChange<WorkflowFlowEdge>[],
+                current.edges
+              ),
+            }
+          : current
+      );
     },
-    [editGraph]
+    [editGraph, projectGraph]
   );
 
   // The edge whose end is being dragged; it must not count against its own reconnection.
@@ -953,7 +976,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     (oldEdge: WorkflowFlowEdge, connection: Connection) => {
       const edge = toDocumentEdge(connection);
 
-      if (!edge) {
+      // A collapsed edge is never reconnectable (see toFlowEdges); moving it would move one of the edges it draws for.
+      if (!edge || oldEdge.data?.collapsedEdgeIds) {
         return;
       }
 
@@ -980,7 +1004,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
       reconnectingEdgeRef.current = null;
 
-      if (!reconnecting || reconnecting.edgeId !== edge.id || reconnecting.didReconnect || state.toHandle) {
+      if (
+        !reconnecting ||
+        reconnecting.edgeId !== edge.id ||
+        reconnecting.didReconnect ||
+        state.toHandle ||
+        edge.data?.collapsedEdgeIds
+      ) {
         return;
       }
 
@@ -1236,6 +1266,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         {
           opacity: 1,
         },
+      // With a node selected, every edge it does not touch drops to a quarter so its own connections stand out.
+      // Only the live flow, a direct child: the image export's offscreen flow sits in this box too.
+      '&[data-node-selected] > .react-flow .react-flow__edge:not(.selected, .workflow-selected-node-edge, :hover) .react-flow__edge-path':
+        { opacity: 0.25 },
       '& .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path': {
         animation: 'dashdraw var(--wb-motion-duration-slow) linear var(--wb-motion-animation-iteration-count)',
         strokeDasharray: '5',
@@ -1328,6 +1362,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
     setContextMenu(null);
   }, [contextMenu, editGraph, templates]);
+  // Keyed by the id list, so edits and moves that keep the node set hand the minimap the same array.
+  const invocationNodeIdKey = useMemo(
+    () =>
+      projectGraph.nodes
+        .filter((node) => node.type === 'invocation')
+        .map((node) => node.id)
+        .join('\n'),
+    [projectGraph.nodes]
+  );
+  const invocationNodeIds = useMemo(
+    () => (invocationNodeIdKey ? invocationNodeIdKey.split('\n') : []),
+    [invocationNodeIdKey]
+  );
   const updatableNodeCount = useMemo(
     () => getUpdatableNodeIds(projectGraph, templates).length,
     [projectGraph, templates]
@@ -1376,6 +1423,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       ref={attachEditorElement}
       bg="bg.inset"
       css={editorCss}
+      data-node-selected={selectedNodeIds.length > 0 ? '' : undefined}
       h="full"
       position="relative"
       w="full"
@@ -1441,8 +1489,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           tool={tool}
           updatableNodeCount={updatableNodeCount}
           onArrangeNodes={onArrangeNodes}
-          onExportPrepare={onExportPrepare}
-          onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
           onRedo={redo}
           onToolChange={setTool}
@@ -1451,7 +1497,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         {/* An empty graph's minimap is a bare panel that reads as a broken element. */}
         {workflowShowMinimap && projectGraph.nodes.length > 0 && (!isLargeGraph || isMinimapReady) ? (
-          <FlowMiniMap />
+          <WorkflowEditorMiniMap nodeIds={invocationNodeIds} />
         ) : null}
       </ReactFlow>
       {ExportView ? (

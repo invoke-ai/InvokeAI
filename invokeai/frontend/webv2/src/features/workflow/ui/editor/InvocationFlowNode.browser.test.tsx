@@ -10,13 +10,15 @@ import type { ProjectGraphAction } from '@features/workflow/utility';
 
 import openapi from '@api/openapi.json';
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
+import { DndContext, type DragStartEvent } from '@dnd-kit/core';
 import { galleryImageUrls } from '@features/gallery/utility';
 import {
   savedWorkflowDetailQueryKey,
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
+import { flowThemeCss } from '@features/workflow/ui/graph-preview/flowTheme';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
@@ -34,7 +36,7 @@ import { createInstance } from 'i18next';
 import { act, createRef, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import type { rasterizeWorkflowImage as RasterizeWorkflowImage } from './workflowImageRaster';
 
@@ -44,6 +46,7 @@ import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode } from './InvocationFlowNode';
 import { LoopBodyBoundaryOverlay } from './LoopBodyBoundaryOverlay';
 import { NotesFlowNode } from './NotesFlowNode';
+import { WorkflowEdge as WorkflowEdgeComponent } from './WorkflowEdge';
 import {
   EXPORT_SCALE,
   exportWorkflowAsPng,
@@ -53,6 +56,12 @@ import {
 import { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import '@xyflow/react/dist/style.css';
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    mouseDragPath: (points: readonly { x: number; y: number }[], frameWidth: number) => Promise<void>;
+  }
+}
 
 const exportMocks = vi.hoisted(() => ({
   progressImage: null as null | { dataUrl: string; height: number; width: number },
@@ -382,28 +391,32 @@ describe('InvocationFlowNode chrome and export', () => {
     });
   });
 
-  it('bounds snapshots by rendered nodes instead of live editor result height', async () => {
-    const execution = createExecutionPort();
-    execution.set(completed(outputImage(400, 800)));
-    const adapter = createAdapter(execution.port);
+  it('sizes a snapshot by the nodes it renders, not by the live editor’s bounds', async () => {
+    // Live, the node is collapsed to its header; the snapshot draws every node open, so it is taller.
+    const collapsedNodes = toFlowNodes(
+      { ...projectGraph, nodes: [{ ...documentNode, data: { ...documentNode.data, isOpen: false } }] },
+      [],
+      templates
+    );
+    const adapter = createAdapter(createExecutionPort().port);
     let capturedHeight: number | undefined;
     exportMocks.rasterize.mockImplementation((_clone: HTMLElement, options: { height: number }) => {
       capturedHeight = options.height;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
 
-    await render(adapter);
+    await render(adapter, 1, false, collapsedNodes);
     const liveRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
     const liveBounds = { x: 20, y: 20, width: liveRect.width, height: liveRect.height };
-    await render(adapter, 1, true);
+    await render(adapter, 1, true, collapsedNodes);
     const snapshotRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
-    expect(snapshotRect.height).toBeLessThan(liveRect.height);
+    expect(snapshotRect.height).toBeGreaterThan(liveRect.height);
 
     await exportWorkflowAsPng({
       bounds: liveBounds,
       fallbackWorkflowName: 'Untitled Workflow',
       flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Pristine bounds',
+      workflowName: 'Collapsed live',
     });
 
     expect(capturedHeight).toBe(Math.ceil(snapshotRect.height + 200) * EXPORT_SCALE);
@@ -605,8 +618,6 @@ describe('InvocationFlowNode chrome and export', () => {
     expect(capturedClone?.textContent).not.toContain('Type: preview');
     expect(capturedClone?.textContent).not.toContain('Node pack: invokeai');
     expect(capturedClone?.textContent).not.toContain('Version: 1.0.0');
-    expect(capturedClone?.textContent).not.toContain('Classification: stable');
-    expect(capturedClone?.textContent).not.toContain('Category: Export category');
     expect(capturedClone?.textContent).not.toContain('Field: a');
     expect(capturedClone?.textContent).not.toContain('Type: Integer');
     expect(capturedClone?.textContent).not.toContain('Connection only');
@@ -676,7 +687,17 @@ describe('InvocationFlowNode chrome and export', () => {
     for (const title of titles) {
       expect(getComputedStyle(title).whiteSpace).toBe('nowrap');
       expect(title.textContent?.length).toBeGreaterThan(100);
-      expect(title.scrollHeight).toBeLessThanOrEqual(title.clientHeight);
+      // One line: every fragment of its text shares a top. (Its box is trimmed to the letters, so its ink overflows.)
+      const lineTops = new Set<number>();
+      const walker = document.createTreeWalker(title, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        for (const rect of range.getClientRects()) {
+          lineTops.add(Math.round(rect.top));
+        }
+      }
+      expect(lineTops.size).toBe(1);
     }
     const truncatedHead = invocationTitle!.firstElementChild as HTMLElement;
     expect(getComputedStyle(truncatedHead).textOverflow).toBe('ellipsis');
@@ -952,7 +973,7 @@ describe('InvocationFlowNode chrome and export', () => {
     }
   );
 
-  it('keeps running progress in the editor but omits it from the exported graph clone', async () => {
+  it('shows running progress as the one ring in the status button, and omits it from the exported graph clone', async () => {
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
     let capturedClone: HTMLElement | undefined;
@@ -968,11 +989,20 @@ describe('InvocationFlowNode chrome and export', () => {
         latestOutput: null,
         outputImageName: null,
         progress: 0.5,
-        progressMessage: null,
+        progressMessage: 'Denoising',
         status: 'running',
       })
     );
-    expect(host.querySelector('[data-node-progress-strip="true"]')).not.toBeNull();
+    const statusButton = host.querySelector<HTMLElement>('[data-node-status="running"]')!;
+    const progressRings = host.querySelectorAll('.react-flow__node [data-scope="progress"][data-part="root"]');
+    expect(statusButton.getAttribute('aria-label')).toBe('Status: Running (50%)');
+    expect(progressRings).toHaveLength(1);
+    expect(statusButton.contains(progressRings[0]!)).toBe(true);
+
+    await act(() => userEvent.hover(statusButton));
+    await vi.waitFor(() => expect(document.querySelector('[data-part="content"]')?.textContent).toContain('Denoising'));
+    expect(document.querySelector('[data-part="content"]')?.textContent).toContain('Running (50%)');
+    await act(() => userEvent.unhover(statusButton));
 
     await render(adapter, 1, true);
 
@@ -984,7 +1014,32 @@ describe('InvocationFlowNode chrome and export', () => {
       workflowName: 'Running workflow',
     });
 
-    expect(capturedClone?.querySelector('[data-node-progress-strip="true"]')).toBeNull();
+    expect(capturedClone?.querySelector('[data-node-status-indicator="true"]')).toBeNull();
+    expect(capturedClone?.querySelector('[data-scope="progress"]')).toBeNull();
+  });
+
+  it('outlines exported nodes in the theme border colour with the resting shadow', async () => {
+    const adapter = createAdapter(createExecutionPort().port);
+    let exported: { border: string; shadow: string } | undefined;
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
+      const shell = getComputedStyle(clone.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!);
+      exported = { border: shell.borderColor, shadow: shell.boxShadow };
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter, 1, true);
+    const restingBorder = getComputedStyle(
+      host.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!
+    ).borderColor;
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Outlined',
+    });
+
+    expect(exported?.border).toBe(restingBorder);
+    expect(exported?.shadow).not.toBe('none');
   });
 
   it('omits field validation diagnostics from the static export', async () => {
@@ -1684,13 +1739,13 @@ describe('InvocationFlowNode failure outcome', () => {
       )
     );
 
-    const failureIcon = await vi.waitFor(() => {
-      const icon = host.querySelector<HTMLElement>('[aria-label="Failed"]');
-      expect(icon).not.toBeNull();
-      return icon!;
+    const failureButton = await vi.waitFor(() => {
+      const button = host.querySelector<HTMLElement>('button[aria-label="Status: Failed"]');
+      expect(button).not.toBeNull();
+      return button!;
     });
 
-    await act(() => userEvent.hover(failureIcon));
+    await act(() => userEvent.hover(failureButton));
     await vi.waitFor(() =>
       expect(document.querySelector('[data-part="content"]')?.textContent).toContain(
         'Child workflow error: Child node failed'
@@ -1929,9 +1984,9 @@ describe('InvocationFlowNode field entry', () => {
         setTimeout(resolve, 0);
       });
     });
-  const rowError = (input: HTMLInputElement) =>
-    input.closest('[data-scope="field"][data-part="root"]')?.querySelector('[data-part="error-text"]')?.textContent ??
-    null;
+  /** What the node's status button says; the reason for a flagged field lives there, not under the field. */
+  const nodeStatus = () =>
+    host.querySelector('[data-node-status-indicator="true"]')?.getAttribute('aria-label') ?? null;
 
   it('keeps focus and caret in a text field while the deferred flow model catches up', async () => {
     const { field, store } = await renderEntryNode();
@@ -1957,7 +2012,7 @@ describe('InvocationFlowNode field entry', () => {
     expect(prompt.value).toBe('');
     expect(fieldValue(store, 'prompt')).toBe('');
     expect(document.activeElement).toBe(prompt);
-    expect(rowError(prompt)).toBeNull();
+    expect(nodeStatus()).toBeNull();
 
     // Undo from elsewhere (a toolbar button has focus) restores the text without pulling focus into a field.
     const weight = field('Weight');
@@ -1999,13 +2054,13 @@ describe('InvocationFlowNode field entry', () => {
     expect(weight.value).toBe('');
     expect(fieldValue(store, 'weight')).toBeUndefined();
     expect(document.activeElement).toBe(weight);
-    expect(rowError(weight)).toBe('Required value.');
+    expect(nodeStatus()).toBe('Status: Weight is required.');
 
     await keys('7{Home}-');
     await settle();
     expect(weight.value).toBe('-7');
     expect(fieldValue(store, 'weight')).toBe(-7);
-    expect(rowError(weight)).toBeNull();
+    expect(nodeStatus()).toBeNull();
 
     await keys('{Home}{Delete}');
     await settle();
@@ -2060,14 +2115,14 @@ describe('InvocationFlowNode field entry', () => {
     expect(steps.value).toBe('20.5');
     expect(fieldValue(store, 'steps')).toBe(20.5);
     expect(steps.getAttribute('aria-invalid')).toBe('true');
-    expect(rowError(steps)).toBe('Invalid value.');
+    expect(nodeStatus()).toBe('Status: Steps: Invalid value.');
 
     await keys('{Backspace}{Backspace}');
     await settle();
     expect(steps.value).toBe('20');
     expect(fieldValue(store, 'steps')).toBe(20);
     expect(steps.getAttribute('aria-invalid')).toBeNull();
-    expect(rowError(steps)).toBeNull();
+    expect(nodeStatus()).toBeNull();
   });
 });
 
@@ -2097,22 +2152,24 @@ describe('InvocationFlowNode template version', () => {
         </ChakraProvider>
       )
     );
-  const updateIcon = () => host.querySelector('.react-flow__node [role="img"][aria-label*="Version"]');
+  const statusButton = () => host.querySelector('.react-flow__node [data-node-status-indicator="true"]');
   const borderColor = () => getComputedStyle(host.querySelector<HTMLElement>('.react-flow__node > div')!).borderColor;
 
-  it('marks a node whose template moved on with a warning border and an update tooltip, and leaves a current one alone', async () => {
+  it('marks a node whose template moved on with a warning border and an update status, and leaves a current one alone', async () => {
     await render(flowNodes);
-    expect(updateIcon()).toBeNull();
+    expect(statusButton()).toBeNull();
     const currentBorder = borderColor();
 
     await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '1.1.0' } }));
-    expect(updateIcon()?.getAttribute('aria-label')).toBe('Version 1.0.0 → 1.1.0: update available');
+    expect(statusButton()?.getAttribute('aria-label')).toBe('Status: Version 1.0.0 → 1.1.0: update available');
+    expect(statusButton()?.getAttribute('data-node-status')).toBe('updatable');
     expect(borderColor()).not.toBe(currentBorder);
 
     await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '2.0.0' } }));
-    expect(updateIcon()?.getAttribute('aria-label')).toBe(
-      'Version 1.0.0 cannot be updated to 2.0.0; delete and re-add the node'
+    expect(statusButton()?.getAttribute('aria-label')).toBe(
+      'Status: Version 1.0.0 cannot be updated to 2.0.0; delete and re-add the node'
     );
+    expect(statusButton()?.getAttribute('data-node-status')).toBe('versionMismatch');
   });
 
   it('waits neutrally for node definitions and warns of an unknown type only once they have loaded', async () => {
@@ -2261,5 +2318,897 @@ describe('InvocationFlowNode batch nodes', () => {
 
     await render('None');
     expect(header().textContent).toContain('(no group)');
+  });
+});
+
+const PROBED_COLORS = [
+  'accent.fg',
+  'accent.solid',
+  'bg',
+  'bg.muted',
+  'border.error',
+  'fg.error',
+  'fg.warning',
+  'fg',
+] as const;
+
+describe('InvocationFlowNode header, states and field rows', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 1000px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const requiredInput = (
+    name: string,
+    title: string,
+    overrides: Partial<InvocationTemplate['inputs'][string]> = {}
+  ) => ({
+    ...template.inputs.a!,
+    input: 'any' as const,
+    name,
+    required: true,
+    title,
+    ...overrides,
+  });
+  const stateTemplate: InvocationTemplate = {
+    ...template,
+    description: 'Adds two numbers.',
+    inputs: {
+      a: requiredInput('a', 'A'),
+      b: requiredInput('b', 'B', { input: 'connection' }),
+    },
+  };
+  const stateNode = (id: string, x: number, value: number | undefined): WorkflowInvocationNode => ({
+    ...documentNode,
+    data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value } } },
+    id,
+    position: { x, y: 20 },
+  });
+  /** Each node's run state, as the execution port reports it. */
+  const createExecutionMap = (states: Record<string, WorkflowNodeExecutionState>) => ({
+    get: (nodeId: string) => states[nodeId] ?? null,
+    subscribe: () => () => {},
+  });
+  const render = async (
+    nodes: ReturnType<typeof toFlowNodes>,
+    execution: Pick<WorkflowUiAdapter['nodeExecution'], 'get' | 'subscribe'> = createExecutionMap({})
+  ) => {
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <WorkflowUiProvider adapter={createAdapter(execution)}>
+              <Box css={flowThemeCss} h="full" w="full">
+                <ReactFlow edges={[]} nodes={nodes} nodeTypes={nodeTypes} />
+              </Box>
+            </WorkflowUiProvider>
+            {PROBED_COLORS.map((token) => (
+              <Box key={token} color={token} data-color-probe={token} />
+            ))}
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+    // xyflow keeps a node `visibility: hidden` until it has measured it. Its box already has a size, but hit-tests and
+    // pointer events pass through it, so a test that measures or points at a node waits for every node to show.
+    await vi.waitFor(() =>
+      expect(
+        [...host.querySelectorAll<HTMLElement>('.react-flow__node')].every(
+          (element) => getComputedStyle(element).visibility === 'visible'
+        )
+      ).toBe(true)
+    );
+  };
+  const node = (id: string) => host.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)!;
+  const shell = (id: string) => node(id).querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
+  const header = (id: string) => shell(id).firstElementChild as HTMLElement;
+  const statusButton = (id: string) => node(id).querySelector<HTMLElement>('[data-node-status-indicator="true"]');
+  const panelText = () => document.querySelector('[data-scope="tooltip"][data-part="content"]')?.textContent ?? '';
+  /** A theme colour as computed styles report it, independent of how the node composes it. */
+  const themeColor = (token: (typeof PROBED_COLORS)[number]) =>
+    getComputedStyle(host.querySelector<HTMLElement>(`[data-color-probe="${token}"]`)!).color;
+  const failed: WorkflowNodeExecutionState = { ...completed(''), error: 'CUDA out of memory', status: 'failed' };
+
+  it('explains the node in its info panel on hover and on keyboard focus, and shows no status at rest', async () => {
+    const labelled = {
+      ...stateNode('info-node', 20, 4),
+      data: { ...stateNode('info-node', 20, 4).data, label: 'Sum', notes: 'Feeds the seed.' },
+    };
+    const infoTemplate = { ...stateTemplate, inputs: { a: stateTemplate.inputs.a! } };
+    await render(toFlowNodes({ ...projectGraph, nodes: [labelled] }, [], { preview: infoTemplate }));
+
+    expect(statusButton('info-node')).toBeNull();
+    const infoButton = node('info-node').querySelector<HTMLButtonElement>('button[aria-label="Show details for Sum"]')!;
+    expect(document.querySelector('[data-scope="tooltip"][data-part="content"]')).toBeNull();
+
+    await act(() => userEvent.hover(infoButton));
+    await vi.waitFor(() => expect(panelText()).toContain('Sum (Preview)'));
+    for (const line of [
+      'Type: preview',
+      'Node pack: invokeai',
+      'Version: 1.0.0',
+      'Adds two numbers.',
+      'Feeds the seed.',
+    ]) {
+      expect(panelText()).toContain(line);
+    }
+    await act(() => userEvent.unhover(infoButton));
+    await vi.waitFor(() => expect(panelText()).toBe(''));
+
+    // Tab from the collapse button: the panel opens for keyboard focus too.
+    await act(async () => {
+      node('info-node').querySelector<HTMLButtonElement>('button[aria-label="Collapse node"]')!.focus();
+      await userEvent.tab();
+    });
+    expect(document.activeElement).toBe(infoButton);
+    await vi.waitFor(() => expect(panelText()).toContain('Sum (Preview)'));
+  });
+
+  it('says in the status panel what each blocking field needs, and asks for a model by name', async () => {
+    await render(
+      toFlowNodes({ ...projectGraph, nodes: [stateNode('invalid-node', 20, undefined)] }, [], {
+        preview: stateTemplate,
+      })
+    );
+
+    const button = statusButton('invalid-node')!;
+    expect(button.getAttribute('aria-label')).toBe('Status: 2 fields need attention');
+    await act(() => userEvent.hover(button));
+    await vi.waitFor(() => expect(panelText()).toContain('A is required.'));
+    expect(panelText()).toContain('B needs a connection.');
+    expect(panelText()).not.toContain('Required value.');
+    await act(() => userEvent.unhover(button));
+
+    const modelTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        model: requiredInput('model', 'Model', {
+          input: 'direct',
+          type: { batch: false, cardinality: 'SINGLE', name: 'ModelIdentifierField' },
+        }),
+      },
+    };
+    // A compact node draws no field controls but still reports what its fields need.
+    await render(
+      toFlowNodes(
+        { ...projectGraph, nodes: [stateNode('model-node', 20, undefined)] },
+        [],
+        { preview: modelTemplate },
+        undefined,
+        true
+      )
+    );
+    expect(statusButton('model-node')?.getAttribute('aria-label')).toBe('Status: Model is required. Pick a model.');
+  });
+
+  it('draws a failed node like an invalid one and leaves a completed node’s outline alone', async () => {
+    const graph = {
+      ...projectGraph,
+      nodes: [
+        stateNode('idle-node', 20, 1),
+        stateNode('invalid-node', 340, undefined),
+        stateNode('failed-node', 660, 1),
+        { ...stateNode('completed-node', 20, 1), position: { x: 20, y: 260 } },
+      ],
+    };
+    const connected = toFlowNodes(graph, [], { preview: stateTemplate }).map((flowNode) => ({
+      ...flowNode,
+      data: { ...flowNode.data, connectedTargetHandles: flowNode.id === 'invalid-node' ? [] : ['b'] },
+    })) as ReturnType<typeof toFlowNodes>;
+    await render(connected, createExecutionMap({ 'completed-node': completed(''), 'failed-node': failed }));
+
+    const look = (id: string) => ({
+      border: getComputedStyle(shell(id)).borderColor,
+      headerBackground: getComputedStyle(header(id)).backgroundColor,
+      headerColor: getComputedStyle(header(id)).color,
+    });
+    expect(look('failed-node')).toEqual(look('invalid-node'));
+    expect(look('invalid-node').border).toBe(themeColor('border.error'));
+    expect(look('invalid-node').headerBackground).not.toBe(look('idle-node').headerBackground);
+    expect(look('completed-node')).toEqual(look('idle-node'));
+
+    expect(statusButton('idle-node')).toBeNull();
+    expect(statusButton('completed-node')?.getAttribute('aria-label')).toBe('Status: Completed');
+    const failedButton = statusButton('failed-node')!;
+    expect(failedButton.getAttribute('aria-label')).toBe('Status: Failed');
+    // No status glyph is a circle, so none reads as the circled "i" of the info button beside it.
+    const glyph = (button: HTMLElement) => button.querySelector('svg')!.getAttribute('class');
+    expect(glyph(statusButton('invalid-node')!)).toContain('lucide-triangle-alert');
+    expect(glyph(failedButton)).toContain('lucide-octagon-x');
+    expect(glyph(statusButton('completed-node')!)).toContain('lucide-check');
+    expect(glyph(node('failed-node').querySelector<HTMLElement>('[data-node-info-icon="true"]')!)).toContain(
+      'lucide-info'
+    );
+    await act(() => userEvent.hover(failedButton));
+    await vi.waitFor(() => expect(panelText()).toContain('CUDA out of memory'));
+  });
+
+  it('rings a selected node in its state colour, a focused node in a ring of its own, and outlines it on hover', async () => {
+    const outdatedNode = {
+      ...stateNode('outdated-node', 660, 1),
+      data: { ...stateNode('o', 0, 1).data, type: 'outdated' },
+    };
+    const graph = {
+      ...projectGraph,
+      nodes: [stateNode('valid-node', 20, 1), stateNode('invalid-node', 340, undefined), outdatedNode],
+    };
+    const templates = { outdated: { ...stateTemplate, type: 'outdated', version: '1.1.0' }, preview: stateTemplate };
+    const nodes = toFlowNodes(graph, [], templates).map((flowNode) => ({
+      ...flowNode,
+      data: { ...flowNode.data, connectedTargetHandles: flowNode.id === 'invalid-node' ? [] : ['b'] },
+      selected: true,
+    })) as ReturnType<typeof toFlowNodes>;
+    await render(nodes);
+
+    const shadow = (id: string) => getComputedStyle(shell(id)).boxShadow;
+    expect(shadow('valid-node')).toContain(themeColor('accent.solid'));
+    expect(shadow('invalid-node')).toContain(themeColor('border.error'));
+    expect(shadow('invalid-node')).not.toContain(themeColor('accent.solid'));
+    expect(shadow('outdated-node')).toContain(themeColor('fg.warning'));
+    expect(getComputedStyle(shell('outdated-node')).borderColor).toBe(themeColor('fg.warning'));
+    expect(shadow('outdated-node')).not.toContain(themeColor('accent.solid'));
+    expect(shadow('valid-node')).not.toContain(themeColor('fg'));
+
+    await act(async () => {
+      await userEvent.keyboard('{Shift}');
+      node('invalid-node').focus();
+    });
+    await vi.waitFor(() => expect(shadow('invalid-node')).toContain(themeColor('fg')));
+    expect(shadow('invalid-node')).toContain(themeColor('border.error'));
+
+    await render(toFlowNodes({ ...projectGraph, nodes: [stateNode('valid-node', 20, 1)] }, [], { preview: template }));
+    const restingBorder = getComputedStyle(shell('valid-node')).borderColor;
+    await act(() => userEvent.hover(shell('valid-node')));
+    await vi.waitFor(() => expect(getComputedStyle(shell('valid-node')).borderColor).toBe(themeColor('accent.solid')));
+    expect(restingBorder).not.toBe(themeColor('accent.solid'));
+  });
+
+  it('keeps the space where a node title or an output title is split, as an untrimmed label draws it', async () => {
+    const splitTemplate = {
+      ...stateTemplate,
+      outputs: { value: { ...stateTemplate.outputs.value!, title: 'Image to Latents' } },
+      title: 'Latents to Image',
+    };
+    await render(
+      toFlowNodes({ ...projectGraph, nodes: [stateNode('split-node', 20, 1)] }, [], { preview: splitTemplate })
+    );
+
+    for (const text of ['Latents to Image', 'Image to Latents']) {
+      const label = node('split-node').querySelector<HTMLElement>(`[data-full-text="${text}"]`)!;
+      const [head, tail] = [...label.children] as HTMLElement[];
+      expect(getComputedStyle(head!).whiteSpace).toBe('pre');
+      // The same label untrimmed, beside it in the same font: its spans hold their own white-space.
+      const reference = label.cloneNode(true) as HTMLElement;
+      reference.style.cssText = 'position: absolute; visibility: hidden; overflow: visible';
+      for (const span of reference.children as HTMLCollectionOf<HTMLElement>) {
+        span.style.cssText = 'text-box: normal; white-space: pre; flex-shrink: 0';
+      }
+      label.parentElement!.append(reference);
+      const width = [...reference.children].reduce((sum, span) => sum + span.getBoundingClientRect().width, 0);
+      reference.remove();
+      expect(head!.getBoundingClientRect().width + tail!.getBoundingClientRect().width).toBeCloseTo(width, 0);
+    }
+  });
+
+  it('opens rename inputs over their label without moving anything around them', async () => {
+    await render(rowNodes(4));
+    const nodeRect = () => node('row-node').getBoundingClientRect();
+    const buttonRects = () =>
+      [...header('row-node').querySelectorAll('button')].map((button) => button.getBoundingClientRect().toJSON());
+    const rowRect = () => fieldTitle('A').closest('[data-node-field-row]')!.getBoundingClientRect();
+    const before = { buttons: buttonRects(), node: nodeRect().height, row: rowRect().height };
+    const titleFontSize = parseFloat(getComputedStyle(header('row-node').querySelector('[title]')!).fontSize);
+    const labelFontSize = parseFloat(getComputedStyle(fieldTitle('A')).fontSize);
+
+    await act(() => userEvent.dblClick(header('row-node').querySelector<HTMLElement>('[title]')!));
+    const titleInput = host.querySelector<HTMLInputElement>('input[aria-label="Node label"]')!;
+    expect(document.activeElement).toBe(titleInput);
+    // Each rename input keeps the text size of the label it replaces.
+    expect(parseFloat(getComputedStyle(titleInput).fontSize)).toBe(titleFontSize);
+    expect(nodeRect().height).toBe(before.node);
+    expect(buttonRects()).toEqual(before.buttons);
+    // Its own surface, not the header's tint.
+    expect(getComputedStyle(titleInput).backgroundColor).not.toBe(getComputedStyle(header('row-node')).backgroundColor);
+    await act(() => userEvent.keyboard('{Escape}'));
+
+    await act(() => userEvent.dblClick(fieldTitle('A')));
+    const labelInput = host.querySelector<HTMLInputElement>('input[aria-label="Field label"]')!;
+    expect(parseFloat(getComputedStyle(labelInput).fontSize)).toBe(labelFontSize);
+    expect(labelInput.getBoundingClientRect().right).toBeLessThan(nodeRect().right);
+    expect(rowRect().height).toBe(before.row);
+    expect(nodeRect().height).toBe(before.node);
+    await act(() => userEvent.keyboard('{Escape}'));
+    expect(nodeRect().height).toBe(before.node);
+  });
+
+  it('sets the header’s end buttons as far from the right border as the collapse button is from the left', async () => {
+    const graph = {
+      ...projectGraph,
+      nodes: [stateNode('valid-node', 20, 1), stateNode('invalid-node', 340, undefined)],
+    };
+    await render(
+      toFlowNodes(graph, [], { preview: stateTemplate }).map((flowNode) => ({
+        ...flowNode,
+        data: { ...flowNode.data, connectedTargetHandles: flowNode.id === 'valid-node' ? ['b'] : [] },
+      })) as ReturnType<typeof toFlowNodes>
+    );
+
+    for (const id of ['valid-node', 'invalid-node']) {
+      const shellRect = shell(id).getBoundingClientRect();
+      const border = parseFloat(getComputedStyle(shell(id)).borderLeftWidth);
+      const buttons = [...header(id).querySelectorAll<HTMLElement>('button')].map((button) =>
+        button.getBoundingClientRect()
+      );
+      const startInset = buttons[0]!.left - (shellRect.left + border);
+      const endInset = shellRect.right - border - buttons.at(-1)!.right;
+      expect(startInset).toBeGreaterThan(0);
+      expect(endInset).toBeCloseTo(startInset, 1);
+    }
+  });
+
+  it('strengthens a red or amber outline on hover instead of leaving it unchanged', async () => {
+    const outdatedNode = {
+      ...stateNode('outdated-node', 340, 1),
+      data: { ...stateNode('o', 0, 1).data, type: 'outdated' },
+    };
+    const graph = { ...projectGraph, nodes: [stateNode('invalid-node', 20, undefined), outdatedNode] };
+    const templates = { outdated: { ...stateTemplate, type: 'outdated', version: '1.1.0' }, preview: stateTemplate };
+    await render(
+      toFlowNodes(graph, [], templates).map((flowNode) => ({
+        ...flowNode,
+        data: { ...flowNode.data, connectedTargetHandles: ['b'] },
+      })) as ReturnType<typeof toFlowNodes>
+    );
+
+    for (const [id, resting] of [
+      ['invalid-node', themeColor('border.error')],
+      ['outdated-node', themeColor('fg.warning')],
+    ] as const) {
+      expect(getComputedStyle(shell(id)).borderColor).toBe(resting);
+      await act(() => userEvent.hover(header(id)));
+      await vi.waitFor(() => {
+        const hovered = getComputedStyle(shell(id)).borderColor;
+        expect(hovered).not.toBe(resting);
+        expect(hovered).not.toBe(themeColor('accent.solid'));
+      });
+      await act(() => userEvent.unhover(header(id)));
+    }
+  });
+
+  /** A node with one editable field `A` (connectable) and one connection-only field `B`, fed by a connection. */
+  const rowNodes = (value: number | undefined, exposed: string[] = []) =>
+    toFlowNodes({ ...projectGraph, nodes: [stateNode('row-node', 20, value)] }, [], { preview: stateTemplate }).map(
+      (flowNode) => ({
+        ...flowNode,
+        data: { ...flowNode.data, connectedTargetHandles: ['b'], exposedFieldNames: exposed },
+      })
+    ) as ReturnType<typeof toFlowNodes>;
+  const fieldTitle = (name: string) =>
+    [...node('row-node').querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')].find((title) =>
+      title.textContent?.startsWith(name)
+    )!;
+  const rowActions = (name: string) =>
+    fieldTitle(name)
+      .closest('[data-scope="field"][data-part="root"]')!
+      .querySelector<HTMLElement>('[data-node-field-actions]')!;
+  const opacity = (element: HTMLElement) => getComputedStyle(element).opacity;
+
+  it('shows a row’s actions in legacy order on hover and on keyboard focus, and keeps them operable by keyboard', async () => {
+    const adapter = createAdapter(createExecutionMap({}));
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <WorkflowUiProvider adapter={adapter}>
+              <Box css={flowThemeCss} h="full" w="full">
+                <ReactFlow edges={[]} nodes={rowNodes(4)} nodeTypes={nodeTypes} />
+              </Box>
+            </WorkflowUiProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+
+    const actions = rowActions('A');
+    expect([...actions.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit field description',
+      'Reset A to default value',
+      'Add A to the form',
+    ]);
+    // A connection-fed row keeps only the description: there is no value to reset or put in the form.
+    expect([...rowActions('B').querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit field description',
+    ]);
+    expect(opacity(actions)).toBe('0');
+
+    await act(() => userEvent.hover(fieldTitle('A')));
+    await vi.waitFor(() => expect(opacity(actions)).toBe('1'));
+    expect(opacity(rowActions('B'))).toBe('0');
+    await act(() => userEvent.unhover(fieldTitle('A')));
+    await vi.waitFor(() => expect(opacity(actions)).toBe('0'));
+
+    // Keyboard: focus in the row's control shows the actions, and Tab reaches them.
+    const control = node('row-node').querySelector<HTMLInputElement>('input[aria-label="A"]')!;
+    await act(async () => {
+      control.focus();
+      await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Add A to the form');
+    await vi.waitFor(() => expect(opacity(actions)).toBe('1'));
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(adapter.commands.editGraph).toHaveBeenCalledWith({
+      fieldIdentifier: { fieldName: 'a', nodeId: 'row-node' },
+      type: 'exposeField',
+    });
+  });
+
+  it('marks a field in the form on its label, blue with a link, instead of a lit button', async () => {
+    await render(rowNodes(4, ['a']));
+
+    const title = fieldTitle('A');
+    expect(getComputedStyle(title).color).toBe(themeColor('accent.fg'));
+    expect(title.querySelector('[role="img"][aria-label="In the form"]')).not.toBeNull();
+    expect(getComputedStyle(fieldTitle('B')).color).not.toBe(themeColor('accent.fg'));
+    const formButton = rowActions('A').querySelector<HTMLElement>('button[aria-label="Remove A from the form"]')!;
+    expect(getComputedStyle(formButton).color).not.toBe(themeColor('accent.solid'));
+  });
+
+  it('marks an invalid field on its label and control border, with the reason on hover rather than under the field', async () => {
+    await render(rowNodes(undefined));
+
+    const title = fieldTitle('A');
+    const control = node('row-node').querySelector<HTMLInputElement>('input[aria-label="A"]')!;
+    expect(getComputedStyle(title).color).toBe(themeColor('fg.error'));
+    expect(control.getAttribute('aria-invalid')).toBe('true');
+    expect(getComputedStyle(control).borderColor).toBe(themeColor('border.error'));
+    // The value sits in the node's recessed well, a step darker than the body, and keeps its error border on it.
+    expect(getComputedStyle(control).backgroundColor).toBe(themeColor('bg'));
+    expect(themeColor('bg')).not.toBe(themeColor('bg.muted'));
+    expect(node('row-node').textContent).not.toContain('Required value.');
+    // The reason is read with the control but not drawn under it.
+    const description = node('row-node').querySelector<HTMLElement>('[data-part="error-text"]')!;
+    expect(description.textContent).toBe('A is required.');
+    // The field links it as the control's error message, as it does in the form view.
+    expect(control.getAttribute('aria-errormessage')).toBe(description.id);
+    expect(description.getBoundingClientRect().height).toBeLessThanOrEqual(1);
+
+    await act(() => userEvent.hover(title));
+    await vi.waitFor(() => expect(panelText()).toContain('A is required.'));
+  });
+
+  it('sets a last control as far from the node’s bottom as from its sides, and leaves a last label row tight', async () => {
+    const controlLast = { ...stateTemplate, inputs: { a: stateTemplate.inputs.a! } };
+    await render(toFlowNodes({ ...projectGraph, nodes: [stateNode('row-node', 20, 4)] }, [], { preview: controlLast }));
+
+    const shellElement = node('row-node').querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
+    const inner = shellElement.getBoundingClientRect();
+    const border = parseFloat(getComputedStyle(shellElement).borderBottomWidth);
+    const control = node('row-node').querySelector<HTMLElement>('[data-node-field-control]')!.getBoundingClientRect();
+    const sideGap = control.left - (inner.left + border);
+    const bottomGap = inner.bottom - border - control.bottom;
+    expect(sideGap).toBeGreaterThan(8);
+    expect(bottomGap).toBeCloseTo(sideGap, 0);
+
+    // Ending in B, a row with no control, keeps the rows' own bottom padding.
+    await render(rowNodes(4));
+    const lastRow = fieldTitle('B').closest<HTMLElement>('[data-node-field-row]')!;
+    const firstRow = fieldTitle('A').closest<HTMLElement>('[data-node-field-row]')!;
+    expect(getComputedStyle(lastRow).paddingBottom).toBe(getComputedStyle(firstRow).paddingBottom);
+  });
+
+  it('fills a text area’s faded bottom with the same well as the text area itself', async () => {
+    const promptInput = requiredInput('a', 'A', {
+      input: 'direct',
+      type: { batch: false, cardinality: 'SINGLE', name: 'StringField' },
+      uiComponent: 'textarea',
+    });
+    await render(
+      toFlowNodes(
+        {
+          ...projectGraph,
+          nodes: [
+            {
+              ...stateNode('row-node', 20, undefined),
+              data: {
+                ...stateNode('row-node', 20, undefined).data,
+                inputs: { a: { label: '', name: 'a', value: 'text' } },
+              },
+            },
+          ],
+        },
+        [],
+        { preview: { ...stateTemplate, inputs: { a: promptInput } } }
+      )
+    );
+
+    const textarea = node('row-node').querySelector<HTMLTextAreaElement>('textarea')!;
+    const fade = node('row-node').querySelector<HTMLElement>('[data-resizable-textarea-fade]')!;
+    const fadeEnd = [...getComputedStyle(fade).backgroundImage.matchAll(/(?:rgba?|oklch)\([^)]*\)/g)].at(-1)?.[0];
+    expect(getComputedStyle(textarea).backgroundColor).toBe(themeColor('bg'));
+    expect(getComputedStyle(fade).display).not.toBe('none');
+    expect(fadeEnd).toBe(getComputedStyle(textarea).backgroundColor);
+  });
+
+  it('gives each port a 24×24 grab area centred on its 12px dot', async () => {
+    await render(rowNodes(4));
+
+    const handle = node('row-node').querySelector<HTMLElement>('.react-flow__handle[data-handleid="a"]')!;
+    const dot = handle.getBoundingClientRect();
+    const centre = { x: dot.left + dot.width / 2, y: dot.top + dot.height / 2 };
+    expect(dot.width).toBe(12);
+    // 10px out is past the dot but inside the grab area; 14px out is past both.
+    expect(document.elementFromPoint(centre.x - 10, centre.y + 10)).toBe(handle);
+    expect(document.elementFromPoint(centre.x - 14, centre.y)).not.toBe(handle);
+  });
+
+  it('keeps a batch port’s grab area an upright 24×24 square, not its dot’s diamond', async () => {
+    const batchInput = requiredInput('a', 'A', {
+      input: 'connection',
+      type: { batch: true, cardinality: 'COLLECTION', name: 'IntegerField' },
+    });
+    await render(
+      toFlowNodes({ ...projectGraph, nodes: [stateNode('row-node', 20, 4)] }, [], {
+        preview: { ...stateTemplate, inputs: { a: batchInput } },
+      })
+    );
+
+    const handle = node('row-node').querySelector<HTMLElement>('.react-flow__handle[data-handleid="a"]')!;
+    expect(handle.style.transform).toContain('rotate(45deg)');
+    const dot = handle.getBoundingClientRect();
+    const centre = { x: dot.left + dot.width / 2, y: dot.top + dot.height / 2 };
+    // A corner of the upright square is inside; a diamond's tip, 16px straight out, is not.
+    expect(document.elementFromPoint(centre.x - 11, centre.y - 11)).toBe(handle);
+    expect(document.elementFromPoint(centre.x, centre.y + 16)).not.toBe(handle);
+  });
+
+  it('reports a HiDiffusion ratio order problem once while marking both ratios', async () => {
+    const denoiseTemplates = parseOpenApiToTemplates(openapi);
+    const denoise = buildInvocationNode(denoiseTemplates.denoise_latents!, { x: 0, y: 0 });
+    denoise.data.inputs.hidiffusion!.value = true;
+    denoise.data.inputs.hidiffusion_auto_ratios!.value = false;
+    denoise.data.inputs.hidiffusion_t1_ratio!.value = 0.2;
+    denoise.data.inputs.hidiffusion_t2_ratio!.value = 0.7;
+    await render(toFlowNodes({ ...projectGraph, nodes: [denoise] }, [], denoiseTemplates));
+
+    for (const name of ['hidiffusion_t1_ratio', 'hidiffusion_t2_ratio']) {
+      expect(
+        host.querySelector(`input[id="${denoise.id}-${name}-value-number-input"]`)?.getAttribute('aria-invalid')
+      ).toBe('true');
+    }
+    await act(() => userEvent.hover(host.querySelector<HTMLElement>('[data-node-status-indicator="true"]')!));
+    await vi.waitFor(() => expect(panelText()).toContain('T2 ratio must be less'));
+    expect(panelText().split('T2 ratio must be less')).toHaveLength(2);
+  });
+});
+
+describe('InvocationFlowNode collapsed ports', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 1000px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const placed = (id: string, x: number, y: number, isOpen: boolean): WorkflowInvocationNode => ({
+    ...documentNode,
+    data: { ...documentNode.data, isOpen },
+    id,
+    position: { x, y },
+  });
+  const edge = (id: string, source: string, target: string): WorkflowEdge => ({
+    id,
+    source,
+    sourceHandle: 'value',
+    target,
+    targetHandle: 'a',
+    type: 'default',
+  });
+  // a and b collapse with two edges between them; c stays open and is fed by a.
+  const graphWith = (isOpen: boolean): ProjectGraphState => ({
+    ...projectGraph,
+    edges: [edge('ab1', 'a', 'b'), edge('ab2', 'a', 'b'), edge('ac', 'a', 'c')],
+    nodes: [placed('a', 20, 20, isOpen), placed('b', 420, 20, isOpen), placed('c', 420, 260, true)],
+  });
+  const render = (graph: ProjectGraphState) =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port, projectSnapshotFor(graph))}>
+            <Box css={flowThemeCss} h="full" w="full">
+              <ReactFlow
+                edges={toFlowEdges(graph, [], 'default', undefined, templates)}
+                edgeTypes={{ default: WorkflowEdgeComponent }}
+                nodes={toFlowNodes(graph, [], templates)}
+                nodeTypes={nodeTypes}
+              />
+            </Box>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  const node = (id: string) => host.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)!;
+  const drawnEdgeIds = () =>
+    [...host.querySelectorAll<SVGElement>('.react-flow__edge')].map((element) => element.getAttribute('data-id'));
+  const centre = (rect: DOMRect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+
+  it('merges a collapsed node’s ports, draws its edges from them with a count, and restores them on expand', async () => {
+    await render(graphWith(false));
+
+    const sourcePort = node('a').querySelector<HTMLElement>('[data-collapsed-port="right"]')!;
+    expect(node('b').querySelector('[data-collapsed-port="left"]')).not.toBeNull();
+    await vi.waitFor(() => expect(drawnEdgeIds().sort()).toEqual(['ab1', 'ac']));
+    expect(host.querySelector('[data-collapsed-edge-count]')?.getAttribute('data-collapsed-edge-count')).toBe('2');
+
+    // The edge to the open node leaves the merged port's outer side.
+    const path = host.querySelector<SVGPathElement>('.react-flow__edge[data-id="ac"] .react-flow__edge-path')!;
+    const start = path.getPointAtLength(0).matrixTransform(path.getScreenCTM()!);
+    const port = sourcePort.getBoundingClientRect();
+    expect(Math.abs(start.x - port.right)).toBeLessThan(1);
+    expect(Math.abs(start.y - centre(port).y)).toBeLessThan(1);
+
+    // The field handles behind the merged port take no new connections; legacy asked for the node to be opened.
+    const hiddenHandle = node('a').querySelector<HTMLElement>('.react-flow__handle[data-handleid="value"]')!;
+    expect(getComputedStyle(hiddenHandle).visibility).toBe('hidden');
+    expect(hiddenHandle.classList.contains('connectable')).toBe(false);
+
+    await render(graphWith(true));
+    await vi.waitFor(() => expect(drawnEdgeIds().sort()).toEqual(['ab1', 'ab2', 'ac']));
+    expect(host.querySelector('[data-collapsed-port]')).toBeNull();
+    expect(host.querySelector('[data-collapsed-edge-count]')).toBeNull();
+  });
+
+  /**
+   * The middle of a label's lowercase letters, which is what a reader lines a port up with, from the font itself: a 1ex
+   * inline box standing on the label's baseline spans exactly its x-height.
+   */
+  const letterBodyCentre = (label: HTMLElement) => {
+    const text = [label, ...label.querySelectorAll<HTMLElement>('*')]
+      .reverse()
+      .find((element) =>
+        [...element.childNodes].some((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      )!;
+    const probe = document.createElement('span');
+    probe.style.cssText = 'display: inline-block; height: 1ex; vertical-align: baseline; width: 0';
+    text.append(probe);
+    const box = probe.getBoundingClientRect();
+    probe.remove();
+    return box.top + box.height / 2;
+  };
+
+  it('centres each port on its label’s letters, edges on the ports, and a collapsed node’s merged ports on its title', async () => {
+    await render(graphWith(true));
+    await vi.waitFor(() => expect(drawnEdgeIds()).toContain('ac'));
+
+    const target = node('c').querySelector<HTMLElement>('.react-flow__handle[data-handleid="a"]')!;
+    const source = node('a').querySelector<HTMLElement>('.react-flow__handle[data-handleid="value"]')!;
+    const rows = [
+      {
+        handle: target,
+        label: target.parentElement!.querySelector<HTMLElement>('[data-node-input-field-title="true"]')!,
+      },
+      {
+        handle: source,
+        label: source.parentElement!.querySelector<HTMLElement>('[data-node-output-field-title="true"]')!,
+      },
+    ];
+    for (const { handle, label } of rows) {
+      expect(Math.abs(centre(handle.getBoundingClientRect()).y - letterBodyCentre(label))).toBeLessThanOrEqual(0.5);
+    }
+
+    const path = host.querySelector<SVGPathElement>('.react-flow__edge[data-id="ac"] .react-flow__edge-path')!;
+    const start = path.getPointAtLength(0).matrixTransform(path.getScreenCTM()!);
+    const end = path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM()!);
+    expect(Math.abs(start.y - centre(source.getBoundingClientRect()).y)).toBeLessThan(1);
+    expect(Math.abs(end.y - centre(target.getBoundingClientRect()).y)).toBeLessThan(1);
+
+    await render(graphWith(false));
+    const header = node('a').querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!.firstElementChild!;
+    const title = [...header.querySelectorAll<HTMLElement>('p, span')].find(
+      (element) => element.childElementCount === 0 && element.textContent === template.title
+    )!;
+    for (const side of ['left', 'right']) {
+      const port = node('a').querySelector<HTMLElement>(`[data-collapsed-port="${side}"]`)!;
+      expect(Math.abs(centre(port.getBoundingClientRect()).y - letterBodyCentre(title))).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  it('draws every edge, as itself, in an image export of collapsed nodes', async () => {
+    const graph = graphWith(false);
+    const exportRef = createRef<HTMLDivElement>();
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port, projectSnapshotFor(graph))}>
+            <Box css={flowThemeCss} h="full" w="full">
+              <WorkflowImageExportView
+                containerRef={exportRef}
+                edges={toFlowEdges(graph, [], 'default', undefined, templates)}
+                edgeTypes={{ default: WorkflowEdgeComponent }}
+                nodes={toFlowNodes(graph, [], templates)}
+                nodeTypes={nodeTypes}
+              />
+            </Box>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+
+    const exported = () =>
+      [...exportRef.current!.querySelectorAll<SVGGElement>('.react-flow__edge')].map((element) => element.dataset.id);
+    await vi.waitFor(() => expect(exported().sort()).toEqual(['ab1', 'ab2', 'ac']));
+    expect(exportRef.current!.querySelector('[data-collapsed-edge-count]')).toBeNull();
+    const strokes = [...exportRef.current!.querySelectorAll<SVGPathElement>('.react-flow__edge-path')].map(
+      (path) => path.style.stroke
+    );
+    // IntegerField's colour, not the neutral a merged edge draws in.
+    expect(new Set(strokes)).toEqual(new Set(['rgb(248, 113, 113)']));
+  });
+
+  it('keeps a collapsed node in a large graph’s compact mode unconnectable and cheap', async () => {
+    const graph = graphWith(false);
+    const execution = createExecutionPort('a');
+    execution.set(completed(''));
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(execution.port, projectSnapshotFor(graph))}>
+            <Box css={flowThemeCss} h="full" w="full">
+              <ReactFlow
+                edges={toFlowEdges(graph, [], 'default', undefined, templates)}
+                edgeTypes={{ default: WorkflowEdgeComponent }}
+                nodes={toFlowNodes(graph, [], templates, undefined, true)}
+                nodeTypes={nodeTypes}
+              />
+            </Box>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+
+    expect(node('a').querySelector('[data-collapsed-port="right"]')).not.toBeNull();
+    const handles = [...node('a').querySelectorAll<HTMLElement>('.react-flow__handle')];
+    expect(handles.length).toBeGreaterThan(0);
+    expect(handles.some((handle) => handle.classList.contains('connectable'))).toBe(false);
+    // The completed mark is a plain image named for its state: no button, no tooltip to mount.
+    const status = node('a').querySelector<HTMLElement>('[data-node-status-indicator="true"]')!;
+    expect(status.getAttribute('role')).toBe('img');
+    expect(status.getAttribute('aria-label')).toBe('Status: Completed');
+    expect(status.closest('button, [data-scope="tooltip"]')).toBeNull();
+  });
+});
+
+describe('CurrentImageFlowNode', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    exportMocks.progressImage = null;
+  });
+
+  const image = (name: string) => ({
+    height: 2,
+    imageName: name,
+    imageUrl: `${outputImage(2, 2)}#${name}`,
+    queuedAt: '2026-01-01T00:00:00Z',
+    sourceQueueItemId: 'queue-item',
+    thumbnailUrl: outputImage(1, 1),
+    width: 2,
+  });
+  const recent = image('recent.png');
+  const chosen = image('chosen.png');
+  /** A project port whose gallery values the test changes, as the Gallery widget does. */
+  const createGalleryProject = (galleryValues: Record<string, unknown>) => {
+    let snapshot = projectSnapshotFor(currentImageGraph, galleryValues);
+    const listeners = new Set<() => void>();
+
+    return {
+      port: {
+        getSnapshot: () => snapshot,
+        subscribe: (listener: () => void) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      setGalleryValues: (next: Record<string, unknown>) => {
+        snapshot = projectSnapshotFor(currentImageGraph, next);
+        listeners.forEach((listener) => listener());
+      },
+    };
+  };
+  const render = (
+    project: ReturnType<typeof createGalleryProject>,
+    onDragStart: (event: DragStartEvent) => void = () => {}
+  ) =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider
+            adapter={
+              { ...createAdapter(createExecutionPort().port), project: project.port } as unknown as WorkflowUiAdapter
+            }
+          >
+            {/* Stands in for the shell's drag context, where gallery items are dragged. */}
+            <DndContext onDragStart={onDragStart}>
+              <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+            </DndContext>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  const shownImage = () => host.querySelector<HTMLImageElement>('.react-flow__node img')?.src ?? null;
+
+  it('shows the gallery’s selected image, passes over a selected video, and falls back to the latest image', async () => {
+    const project = createGalleryProject({ recentImages: [recent, chosen] });
+    await render(project);
+    // Nothing selected: the project's most recent image.
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+
+    await act(() =>
+      project.setGalleryValues({ recentImages: [recent, chosen], selectedImageName: 'image:chosen.png' })
+    );
+    await vi.waitFor(() => expect(shownImage()).toBe(chosen.imageUrl));
+
+    await act(() => project.setGalleryValues({ recentImages: [recent, chosen], selectedImageName: 'video:clip.mp4' }));
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+  });
+
+  it('offers the shown image as a gallery drag source', async () => {
+    const onDragStart = vi.fn();
+    await render(createGalleryProject({ recentImages: [recent] }), onDragStart);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+    const frame = host.querySelector('.react-flow__node img')!.getBoundingClientRect();
+    const from = { x: frame.left + frame.width / 2, y: frame.top + frame.height / 2 };
+
+    await commands.mouseDragPath([from, { x: from.x + 30, y: from.y + 30 }], window.innerWidth);
+    expect(onDragStart).toHaveBeenCalledOnce();
+    expect(onDragStart.mock.calls[0]![0].active.data.current).toEqual({
+      items: [{ kind: 'image', name: 'recent.png' }],
+      kind: 'gallery-item',
+    });
+
+    const source = host.querySelector('.react-flow__node img')!.closest<HTMLElement>('.nodrag');
+    expect(source).not.toBeNull();
+    // A pointer drag source only: no tab stop or button role for the canvas's keys to fight over.
+    expect(source!.getAttribute('tabindex')).toBeNull();
+    expect(source!.getAttribute('role')).toBeNull();
+  });
+
+  it('does not render again for gallery changes that leave the shown image alone', async () => {
+    const renders = vi.spyOn(exportMocks, 'progressImage', 'get');
+    const project = createGalleryProject({ recentImages: [recent], selectedBoardId: 'a' });
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+    const settled = renders.mock.calls.length;
+
+    await act(() => project.setGalleryValues({ recentImages: [recent], selectedBoardId: 'b', galleryPage: 3 }));
+    expect(renders.mock.calls.length).toBe(settled);
+    renders.mockRestore();
   });
 });

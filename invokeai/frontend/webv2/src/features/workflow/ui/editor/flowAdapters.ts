@@ -9,6 +9,7 @@ import type {
   WorkflowCurrentImageNode,
   WorkflowEdge,
   WorkflowInvocationNode,
+  WorkflowNode,
   WorkflowNotesNode,
 } from '@features/workflow/contracts';
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
@@ -352,6 +353,11 @@ export type WorkflowFlowEdgeType = FlowEdgeType | 'loop_linkage';
 
 /** The edge component names the edge from these facts, so the copy follows the UI language. */
 export interface WorkflowEdgeData extends Record<string, unknown> {
+  /**
+   * Set on the one edge drawn between two collapsed nodes: every document edge it stands for, itself first. The rest
+   * are hidden, and selecting or deleting the drawn edge acts on all of them.
+   */
+  collapsedEdgeIds?: string[];
   /** The carried field type's name; null for a loop linkage or a type no template declares. */
   fieldTypeLabel: string | null;
   pathType: FlowEdgeType;
@@ -431,6 +437,7 @@ export const getWorkflowEdgeData = (
 };
 
 const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): boolean =>
+  sameNames(a?.collapsedEdgeIds ?? EMPTY_NAMES, b.collapsedEdgeIds ?? EMPTY_NAMES) &&
   a?.fieldTypeLabel === b.fieldTypeLabel &&
   a.isBatch === b.isBatch &&
   a.isLoopLinkage === b.isLoopLinkage &&
@@ -438,6 +445,155 @@ const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): b
   a.stroke === b.stroke &&
   a.strokeDasharray === b.strokeDasharray &&
   a.strokeWidth === b.strokeWidth;
+
+const isCollapsedInvocation = (node: WorkflowNode | undefined): boolean =>
+  node?.type === 'invocation' && !node.data.isOpen;
+
+/** How collapsed nodes reshape a document's edges in the editor; the document itself is never changed. */
+export interface CollapsedEdgeLayout {
+  /** Nodes drawn collapsed. */
+  collapsedNodeIds: ReadonlySet<string>;
+  /**
+   * Each edge between two collapsed nodes, keyed to every edge between the same pair in document order (legacy's
+   * collapsed edge). The first draws for all of them; selecting or deleting any acts on all.
+   */
+  groupByEdge: ReadonlyMap<string, readonly string[]>;
+}
+
+const NO_COLLAPSED_EDGES: CollapsedEdgeLayout = { collapsedNodeIds: new Set(), groupByEdge: new Map() };
+const collapsedEdgeLayoutCache = new WeakMap<
+  ProjectGraphState['nodes'],
+  { edges: ProjectGraphState['edges']; layout: CollapsedEdgeLayout }
+>();
+
+/** Cached per document nodes and edges, which change identity only when the graph changes. */
+export const getCollapsedEdgeLayout = (document: Pick<ProjectGraphState, 'edges' | 'nodes'>): CollapsedEdgeLayout => {
+  const cached = collapsedEdgeLayoutCache.get(document.nodes);
+
+  if (cached?.edges === document.edges) {
+    return cached.layout;
+  }
+
+  const collapsedNodeIds = new Set(document.nodes.filter(isCollapsedInvocation).map((node) => node.id));
+  const groups = new Map<string, string[]>();
+
+  if (collapsedNodeIds.size > 0) {
+    for (const edge of document.edges) {
+      if (edge.type !== 'loop_linkage' && collapsedNodeIds.has(edge.source) && collapsedNodeIds.has(edge.target)) {
+        const key = `${edge.source}\u0000${edge.target}`;
+        const group = groups.get(key);
+
+        if (group) {
+          group.push(edge.id);
+        } else {
+          groups.set(key, [edge.id]);
+        }
+      }
+    }
+  }
+
+  const groupByEdge = new Map<string, readonly string[]>();
+
+  for (const ids of groups.values()) {
+    for (const id of ids) {
+      groupByEdge.set(id, ids);
+    }
+  }
+
+  const layout = collapsedNodeIds.size > 0 ? { collapsedNodeIds, groupByEdge } : NO_COLLAPSED_EDGES;
+  collapsedEdgeLayoutCache.set(document.nodes, { edges: document.edges, layout });
+
+  return layout;
+};
+
+/** Edge ids widened to every document edge a collapsed edge stands for, so selection and deletion act on all. */
+export const withCollapsedEdgeSiblings = (
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  edgeIds: readonly string[]
+): string[] => {
+  const { groupByEdge } = getCollapsedEdgeLayout(document);
+
+  return groupByEdge.size === 0 ? [...edgeIds] : [...new Set(edgeIds.flatMap((id) => groupByEdge.get(id) ?? [id]))];
+};
+
+/**
+ * Edge changes with each collapsed group selected as one. A group follows its drawn edge: its state after this batch
+ * (its current state, or the change addressed to it) goes to every member. Changes addressed to hidden members are
+ * dropped: xyflow reports them only because their state differs, as when a click re-selects the drawn edge and
+ * xyflow deselects everything else, so they would otherwise overturn the drawn edge. One lookup per call; the changes
+ * pass through untouched when nothing is collapsed.
+ */
+export const withCollapsedGroupSelection = <Change extends { id?: string; type: string }>(
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  changes: readonly Change[],
+  edges: readonly { id: string; selected?: boolean }[]
+): (Change | { id: string; selected: boolean; type: 'select' })[] => {
+  const { groupByEdge } = getCollapsedEdgeLayout(document);
+
+  if (groupByEdge.size === 0 || !changes.some((change) => change.type === 'select')) {
+    return [...changes];
+  }
+
+  const drawnChanges = new Map<string, boolean>();
+  const touchedGroups = new Set<readonly string[]>();
+  const kept = changes.filter((change) => {
+    const group = change.type === 'select' && change.id !== undefined ? groupByEdge.get(change.id) : undefined;
+
+    if (!group) {
+      return true;
+    }
+
+    touchedGroups.add(group);
+
+    if (group[0] === change.id) {
+      drawnChanges.set(change.id, (change as unknown as { selected: boolean }).selected);
+      return true;
+    }
+
+    return false;
+  });
+
+  if (touchedGroups.size === 0) {
+    return kept;
+  }
+
+  const isSelected = new Map(edges.map((edge) => [edge.id, edge.selected ?? false]));
+  const memberChanges: { id: string; selected: boolean; type: 'select' }[] = [];
+
+  for (const group of touchedGroups) {
+    const drawnId = group[0]!;
+    const selected = drawnChanges.get(drawnId) ?? isSelected.get(drawnId) ?? false;
+
+    for (const id of group.slice(1)) {
+      if ((isSelected.get(id) ?? false) !== selected) {
+        memberChanges.push({ id, selected, type: 'select' });
+      }
+    }
+  }
+
+  return [...kept, ...memberChanges];
+};
+
+/**
+ * Which ends of an edge may be dragged to reconnect it. An end at a collapsed node's merged port stays put, as legacy's
+ * did: that port stands for every field, so a drag there could not say which connection moves, and an edge between two
+ * collapsed nodes may stand for several connections. The end at an open node still moves, as one ordinary edge.
+ */
+const getReconnectableEnds = (
+  edge: WorkflowEdge,
+  collapsedNodeIds: ReadonlySet<string>
+): WorkflowFlowEdge['reconnectable'] => {
+  const isSourceCollapsed = collapsedNodeIds.has(edge.source);
+  const isTargetCollapsed = collapsedNodeIds.has(edge.target);
+
+  return isSourceCollapsed && isTargetCollapsed
+    ? false
+    : isSourceCollapsed
+      ? 'target'
+      : isTargetCollapsed
+        ? 'source'
+        : undefined;
+};
 
 export const toFlowEdges = (
   document: ProjectGraphState,
@@ -449,10 +605,20 @@ export const toFlowEdges = (
   index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges)
 ): WorkflowFlowEdge[] => {
   const previousById = new Map(previousEdges.map((edge) => [edge.id, edge]));
+  const { collapsedNodeIds, groupByEdge } = getCollapsedEdgeLayout(document);
 
   return getEdgesWithLoopLinkageAliases(document.nodes, document.edges).map((edge) => {
     const previous = previousById.get(edge.id);
-    const data = getWorkflowEdgeData(document, edge, edgeType, templates, index);
+    const collapsedGroup = groupByEdge.get(edge.id);
+    const hidden = collapsedGroup !== undefined && collapsedGroup[0] !== edge.id ? true : undefined;
+    const typedData = getWorkflowEdgeData(document, edge, edgeType, templates, index);
+    // The edge keeps its own type data, so a view drawing every node open (the image export) draws it as itself.
+    const data: WorkflowEdgeData = collapsedGroup ? { ...typedData, collapsedEdgeIds: [...collapsedGroup] } : typedData;
+    const reconnectable = getReconnectableEnds(edge, collapsedNodeIds);
+    // A group is selected as one: its drawn edge and the edges it stands for always agree.
+    const selected = collapsedGroup
+      ? collapsedGroup.some((id) => previousById.get(id)?.selected)
+      : (previous?.selected ?? false);
     const flowType: WorkflowFlowEdgeType = edge.type === 'loop_linkage' ? 'loop_linkage' : edgeType;
     const isConnectedToSelectedNode = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
     const animated = isConnectedToSelectedNode && !reduceMotion ? true : undefined;
@@ -468,6 +634,9 @@ export const toFlowEdges = (
       previous.targetHandle === edge.targetHandle &&
       previous.animated === animated &&
       previous.className === className &&
+      previous.hidden === hidden &&
+      previous.reconnectable === reconnectable &&
+      (previous.selected ?? false) === selected &&
       isSameEdgeData(previous.data, data) &&
       previous.style === style
     ) {
@@ -479,7 +648,9 @@ export const toFlowEdges = (
       animated,
       className,
       data,
-      selected: previous?.selected ?? false,
+      hidden,
+      reconnectable,
+      selected,
       source: edge.source,
       sourceHandle: edge.sourceHandle,
       style,

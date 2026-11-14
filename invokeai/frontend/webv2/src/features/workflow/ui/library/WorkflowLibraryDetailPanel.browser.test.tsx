@@ -13,13 +13,26 @@ import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/ut
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
-import { act, StrictMode, type ReactNode } from 'react';
+import { act, StrictMode, type ComponentProps, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { loadGraphPreview } from './libraryPreviewSource';
+import { useWorkflowLibraryDuplicateGuard } from './useWorkflowLibraryEntryActions';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
+
+/**
+ * The rail as the template panes mount it, with their duplicate guard. Write access is the panes' decision
+ * (`getLibraryEntryAccess`); for this single-user owner, only the account's own templates are writable.
+ */
+const PanesRail = (props: Omit<ComponentProps<typeof WorkflowLibraryDetailPanel>, 'duplicateGuard' | 'isReadOnly'>) => (
+  <WorkflowLibraryDetailPanel
+    {...props}
+    duplicateGuard={useWorkflowLibraryDuplicateGuard()}
+    isReadOnly={props.entry?.item.category !== 'user'}
+  />
+);
 
 /**
  * Use mutable catalog fixtures but real install-source expansion to verify deduplicated catalog sources reach
@@ -105,6 +118,20 @@ const pickedGalleryItem = vi.hoisted(() => ({
   current: { kind: 'image', name: 'picked.gif', thumbnailUrl: '' } as Record<string, unknown>,
 }));
 
+/** Visibility is a multi-user notion; most cases here are an owner on a multi-user server. */
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
 // Node definitions are loaded, so a template's document compiles for the snapshot.
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -143,14 +170,11 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
   'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
   'workflowLibrary.deleteFailed': 'Failed to delete workflow',
-  'workflowLibrary.deleteHint': 'Removes it from your library',
   'workflowLibrary.downloadJson': 'Download JSON',
-  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
   'workflowLibrary.rename': 'Rename',
   'workflowLibrary.renameFailed': 'Rename failed',
-  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
   'workflowLibrary.renameTemplateTitle': 'Rename template',
   'workflowLibrary.renameWithEllipsis': 'Rename…',
   'workflowLibrary.renamed': 'Template renamed',
@@ -164,12 +188,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.thumbnailUpdateFailed': 'Failed to update thumbnail',
   'workflowLibrary.thumbnailUpdated': 'Thumbnail updated',
   'workflowLibrary.thumbnailUpdating': 'Updating thumbnail…',
-  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
   'workflowLibrary.findModel': 'Find {{name}} in the model manager',
   'workflowLibrary.forkIntoProject': 'Fork into new project',
-  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.installQueued': 'Model installs queued',
@@ -178,9 +200,8 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
-  'workflowLibrary.openHint': 'Adds a copy to this project',
   'workflowLibrary.openWithEllipsis': 'Open…',
-  'workflowLibrary.previewGraph': 'Preview graph',
+  'workflowLibrary.preview.action': 'Preview',
   'workflowLibrary.requirementInstallable': 'Not installed',
   'workflowLibrary.requirementInstalled': 'Installed',
   'workflowLibrary.requirementInstalling': 'Installing…',
@@ -195,6 +216,12 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
   'workflowLibrary.visibilityUnknown': 'Visibility unknown',
   'workflowLibrary.retry': 'Retry',
+  'workflowLibrary.modelsToInstall_one': '{{count}} model to install',
+  'workflowLibrary.modelsToInstall_other': '{{count}} models to install',
+  'workflowLibrary.nodeCount_one': '{{count}} node',
+  'workflowLibrary.nodeCount_other': '{{count}} nodes',
+  'workflowLibrary.openedWhen': 'Opened {{when}}',
+  'workflowLibrary.readyToRun': 'Ready to run',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -207,7 +234,9 @@ const translate = (key: string, options?: Record<string, unknown>): string => {
   return interpolate(plural ?? TRANSLATIONS[key] ?? key, options);
 };
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { language: 'en', resolvedLanguage: 'en' }, t: translate }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -375,10 +404,10 @@ describe('WorkflowLibraryDetailPanel', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onClose: () => void;
-  let onDeleted: () => void;
+  let onDeleted: (workflowId: string) => void;
   let onDuplicated: (workflowId: string) => void;
   let onOpen: (item: WorkflowLibraryEntry['item']) => void;
-  let onPreview: (selected: WorkflowLibraryEntry) => void;
+  let onPreview: (workflowId: string) => void;
 
   /** See `WorkflowLibraryDialog.browser.test.tsx`: keeps Chakra's observer-driven commits inside the act scope. */
   const settleFrame = () =>
@@ -396,14 +425,11 @@ describe('WorkflowLibraryDetailPanel', () => {
         <WorkflowUiProvider adapter={ADAPTER}>
           <GalleryHostProvider host={GALLERY_HOST}>
             <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-              <WorkflowLibraryDetailPanel
-                contextMenuPoint={null}
-                contextMenuTriggerId={null}
+              <PanesRail
                 entry={selected}
                 canChangeVisibility={canChangeVisibility}
                 projectWorkflows={projectWorkflows}
                 onClose={onClose}
-                onContextMenuClose={NOOP}
                 onDeleted={onDeleted}
                 onDuplicated={onDuplicated}
                 onOpen={onOpen}
@@ -465,7 +491,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     });
   };
 
-  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[data-menu-item="${value}"]`);
+  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
 
   const clickMenuItem = async (value: string) => {
     await openMenu();
@@ -473,10 +499,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     const item = menuItem(value);
     expect(item, `no menu item "${value}"`).not.toBeNull();
 
-    await act(async () => {
-      item?.click();
-      await settleFrame();
-    });
+    // Zag selects only the highlighted item, so this takes a real pointer click, which hovers it first.
+    await act(() => userEvent.click(item!));
+    await act(settleFrame);
   };
 
   beforeEach(() => {
@@ -488,6 +513,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     onDuplicated = vi.fn((_workflowId: string) => {});
     onOpen = vi.fn();
     onPreview = vi.fn();
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
     accountLifecycle.invalidate();
 
     models.activeInstallSources.current = new Set();
@@ -953,15 +979,46 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item);
   });
 
-  it('swaps the primary action for an install when starter models can fill the gaps', async () => {
+  it('offers an install under the requirements when starter models can fill the gaps, keeping Open', async () => {
     await renderPanel(IMAGE_TO_VIDEO);
 
     expect(requirementStatuses()).toEqual(['installable', 'installable', 'installed']);
     // The rows say which state they are in, not just how they are styled.
     expect(document.querySelectorAll('[aria-label="Not installed"]')).toHaveLength(2);
     expect(document.querySelectorAll('[aria-label="Installed"]')).toHaveLength(1);
-    expect(buttonWithText('Install 2 models')).not.toBeUndefined();
-    expect(buttonWithText('Open')).toBeUndefined();
+    const install = buttonWithText('Install 2 models');
+    const requirements = document.querySelector('[data-requirement-status]')!;
+    expect(requirements.compareDocumentPosition(install!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(buttonWithText('Open')).not.toBeUndefined();
+  });
+
+  it('summarises the template on one line for the narrow layout’s sheet, with its own Open', async () => {
+    const summary = () => panel()!.querySelector<HTMLElement>('[data-detail-sheet-summary]')!;
+    const summaryFacts = () => summary().querySelectorAll('p')[1]?.textContent;
+
+    await renderPanel(IMAGE_TO_VIDEO);
+    expect(summary().textContent).toContain('Image to video');
+    expect(summaryFacts()).toBe('3 nodes · 2 models to install');
+
+    const openedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    await renderPanel({ ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, opened_at: openedAt } });
+    expect(summaryFacts()).toMatch(/^1 node · Ready to run · Opened \S/);
+
+    await act(async () => {
+      summary().querySelector<HTMLButtonElement>('[data-detail-sheet-open]')!.click();
+      await settleFrame();
+    });
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ workflow_id: TEXT_TO_IMAGE.item.workflow_id })
+    );
+  });
+
+  it('leaves visibility out of the rail on a single-user server', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    await renderPanel(TEXT_TO_IMAGE, NO_COPIES, true);
+
+    expect(document.querySelector('[data-workflow-visibility]')).toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
   });
 
   it('queues one install per source, deduped across requirements that share a dependency', async () => {
@@ -1100,10 +1157,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     await openMenu();
     expect(menuItem('duplicate')?.getAttribute('aria-disabled')).toBe('true');
 
-    await act(async () => {
-      menuItem('duplicate')?.click();
-      await settleFrame();
-    });
+    // Forced past the pointer's actionability wait, so the press reaches the disabled item.
+    await act(() => userEvent.click(menuItem('duplicate')!, { force: true }));
+    await act(settleFrame);
 
     await act(async () => {
       release(RAW_WORKFLOW);
@@ -1236,9 +1292,6 @@ describe('WorkflowLibraryDetailPanel', () => {
   it('deletes only after the confirmation is accepted', async () => {
     await renderPanel(TEXT_TO_IMAGE);
 
-    await openMenu();
-    expect(menuItem('delete')?.textContent).toContain('Removes it from your library');
-
     await clickMenuItem('delete');
 
     const confirm = document.querySelector<HTMLElement>('[role="alertdialog"]');
@@ -1257,7 +1310,7 @@ describe('WorkflowLibraryDetailPanel', () => {
 
     expect(queries.deleteLibraryWorkflow).toHaveBeenCalledWith('wf-text-to-image', expect.anything());
     expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledTimes(1);
-    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(onDeleted).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
   });
 
   it('animates the delete confirmation out when the deleted workflow leaves the panel', async () => {
@@ -1309,12 +1362,12 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
   });
 
-  it('hands the selected entry to the preview action', async () => {
+  it('asks to preview the selected workflow', async () => {
     await renderPanel(IMAGE_TO_VIDEO);
 
-    await clickButton('Preview graph');
+    await clickButton('Preview');
 
-    expect(onPreview).toHaveBeenCalledWith(IMAGE_TO_VIDEO);
+    expect(onPreview).toHaveBeenCalledWith(IMAGE_TO_VIDEO.item.workflow_id);
   });
 
   it('links only the rows the account is missing, and takes them to Add Models', async () => {

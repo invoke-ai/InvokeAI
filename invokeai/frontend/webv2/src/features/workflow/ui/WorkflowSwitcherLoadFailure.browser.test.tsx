@@ -1,0 +1,155 @@
+import type { ProjectWorkflowSource } from '@features/workflow/core/types';
+import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
+import type * as DeferredModuleModule from '@platform/react/deferredModule';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { createProjectGraph } from '@features/workflow/utility';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { system } from '@theme/system';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
+
+import { WorkflowUiProvider } from './WorkflowUiContext';
+import { setWorkflowLibraryOpen, workflowUiStore } from './workflowUiStore';
+import { WorkflowWidgetLabel } from './WorkflowWidgetChrome';
+
+// The later open's real import resolves from the module cache rather than an on-demand transform under suite load.
+await import('@platform/ui/ScrollableMenuContent');
+
+// The switcher's scrolling list loads on first use. Here its chunk fails to load at first, as a stale or dropped chunk
+// does: the import rejects. Its own file, because a page keeps a module that has loaded, and the rejection comes from
+// the deferred module's import seam: a `vi.mock` factory that rejects is not an import failure in browser mode, since
+// Vitest's module interception reports it as an unhandled error and never answers the request.
+const scrollableChunk = vi.hoisted(() => ({ fails: false, rejected: 0 }));
+vi.mock('@platform/react/deferredModule', async (importOriginal) => {
+  const actual = await importOriginal<typeof DeferredModuleModule>();
+
+  return {
+    ...actual,
+    // The scrolling list is the only deferred module the switcher renders.
+    createDeferredModule: <Module,>(importModule: () => Promise<Module>) =>
+      actual.createDeferredModule(() => {
+        if (!scrollableChunk.fails) {
+          return importModule();
+        }
+        scrollableChunk.rejected += 1;
+        return Promise.reject(new TypeError('Failed to fetch dynamically imported module'));
+      }),
+  };
+});
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useAuthSession: () => ({ multiuserEnabled: false, phase: 'ready', user: null }),
+}));
+
+const TRANSLATIONS: Record<string, string> = {
+  'widgets.workflow.inThisProject': 'In this project',
+  'widgets.workflow.libraryWithEllipsis': 'Workflow library…',
+  'widgets.workflow.newWorkflow': 'New workflow',
+};
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      key === 'widgets.workflow.switchWorkflowTrigger' ? `Switch ${String(options?.name)}` : (TRANSLATIONS[key] ?? key),
+  }),
+}));
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const workflow = (id: string, name: string, source?: ProjectWorkflowSource) => ({
+  document: { ...createProjectGraph(id), name },
+  source,
+});
+const WORKFLOWS = [workflow('workflow-1', 'Text 2 Image'), workflow('workflow-2', 'Upscale')];
+const SNAPSHOT = {
+  activeWorkflow: WORKFLOWS[1]!,
+  activeWorkflowId: 'workflow-2',
+  galleryValues: {},
+  id: 'project-1',
+  isWorkflowRunning: false,
+  projectGraph: WORKFLOWS[1]!.document,
+  workflowValues: {},
+  workflows: WORKFLOWS,
+};
+
+describe('the workflow switcher when its scrolling list fails to load', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const commands = { createWorkflow: vi.fn(() => 'workflow-3'), selectWorkflow: vi.fn() };
+
+  beforeEach(async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    commands.createWorkflow.mockClear();
+    setWorkflowLibraryOpen(false);
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
+    const adapter = {
+      commands,
+      project: { getSnapshot: () => SNAPSHOT, subscribe: () => () => {} },
+    } as unknown as WorkflowUiAdapter;
+    await act(() =>
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider adapter={adapter}>
+              <WorkflowWidgetLabel region="center" />
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        </QueryClientProvider>
+      )
+    );
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    setWorkflowLibraryOpen(false);
+  });
+
+  const trigger = () => page.getByRole('button', { name: 'Switch Upscale' });
+  const menu = () => document.querySelector<HTMLElement>('[role="menu"]');
+  const choices = () => [...document.querySelectorAll('[role="menuitemradio"]')].map((item) => item.textContent);
+  const themedList = () => menu()?.querySelector('[data-scope="scroll-area"]') ?? null;
+  const library = () => document.querySelector<HTMLElement>('[data-value="workflow-library"]')!;
+  const openMenu = async () => {
+    await act(() => userEvent.click(trigger()));
+    await vi.waitFor(() => expect(menu()).toBeVisible());
+    // Measured once the menu's open animation has settled.
+    await act(() =>
+      Promise.all(
+        menu()!
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished)
+      )
+    );
+  };
+  const expectLibraryOnThisProject = () =>
+    expect(workflowUiStore.getSnapshot()).toMatchObject({
+      isLibraryOpen: true,
+      librarySelection: { projectId: 'project-1', workflowId: 'workflow-2' },
+      libraryTab: 'project',
+    });
+
+  it('keeps every row and both actions when the list fails, and uses it on a later open', async () => {
+    scrollableChunk.fails = true;
+    await openMenu();
+    await vi.waitFor(() => expect(scrollableChunk.rejected).toBeGreaterThan(0));
+    expect(themedList()).toBeNull();
+    expect(choices()).toEqual(['Text 2 Image', 'Upscale']);
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'New workflow' })));
+    expect(commands.createWorkflow).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(menu()).toBeNull());
+
+    await openMenu();
+    await act(() => userEvent.click(library()));
+    expectLibraryOnThisProject();
+    await vi.waitFor(() => expect(menu()).toBeNull());
+
+    scrollableChunk.fails = false;
+    await openMenu();
+    await vi.waitFor(() => expect(themedList()).not.toBeNull());
+  });
+});
