@@ -211,3 +211,36 @@ def test_sd3_and_qwen_image_onetrainer_files_with_top_level_layers_are_not_flux(
 
 def test_flux_onetrainer_fixture_is_the_onetrainer_format():
     assert flux_format_from_state_dict(_non_block_fixture_state_dict()) is FluxLoRAFormat.OneTrainer
+
+
+@pytest.mark.parametrize(
+    "layer",
+    [
+        "single_transformer_blocks_0_attn_to_qkv_mlp_proj",
+        "transformer_blocks_0_ff_linear_in",
+    ],
+)
+@pytest.mark.parametrize("with_x_embedder", [False, True])
+def test_flux2_named_onetrainer_blocks_are_not_flux1_onetrainer(layer: str, with_x_embedder: bool):
+    """FLUX.2's block layers are not in FLUX.1's parsing tree: claimed as FLUX.1 they would fail at load."""
+    state_dict = {
+        f"lora_transformer_{layer}.lora_down.weight": torch.empty(4, 16),
+        f"lora_transformer_{layer}.lora_up.weight": torch.empty(16, 4),
+    }
+    if with_x_embedder:
+        state_dict["lora_transformer_x_embedder.lora_down.weight"] = torch.empty(4, 128)
+        state_dict["lora_transformer_x_embedder.lora_up.weight"] = torch.empty(16, 4)
+
+    assert not is_state_dict_likely_in_flux_onetrainer_format(state_dict)
+    assert flux_format_from_state_dict(state_dict) is None
+
+
+def test_qwen_image_onetrainer_blocks_are_not_flux1_onetrainer():
+    """Qwen-Image's block layers (`img_mlp`, `img_mod`, ...) are not FLUX.1's, whose parsing tree would reject them at
+    load."""
+    state_dict = {
+        k: v for k, v in _onetrainer_legacy_state_dict(_meta_qwen_image(), lambda name: True).items() if "_blocks_" in k
+    }
+    assert state_dict
+
+    assert flux_format_from_state_dict(state_dict) is None

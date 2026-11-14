@@ -52,6 +52,19 @@ FLUX_ONETRAINER_NON_BLOCK_KEY_REGEX = (
 )
 
 
+def _is_convertible_onetrainer_block_key(key: str) -> bool:
+    """True for a block key whose module the converter's parsing tree can split. FLUX.2's block names
+    (`to_qkv_mlp_proj`, `ff_linear_in`, ...) and other families' do not split, and would fail at conversion."""
+    if not re.match(FLUX_ONETRAINER_TRANSFORMER_KEY_REGEX, key):
+        return False
+    module = key.split(".", 1)[0].removeprefix("lora_")
+    try:
+        insert_periods_into_kohya_key(module, flux_transformer_kohya_parsing_tree)
+    except ValueError:
+        return False
+    return True
+
+
 def is_state_dict_likely_in_flux_onetrainer_format(state_dict: dict[str | int, Any]) -> bool:
     """Checks if the provided state dict is likely in the OneTrainer FLUX LoRA format.
 
@@ -71,7 +84,7 @@ def is_state_dict_likely_in_flux_onetrainer_format(state_dict: dict[str | int, A
         if not isinstance(k, str):
             continue
         if (
-            re.match(FLUX_ONETRAINER_TRANSFORMER_KEY_REGEX, k)
+            _is_convertible_onetrainer_block_key(k)
             or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
             or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
         ):

@@ -203,6 +203,11 @@ def _layers(keys: dict[str, Any], *layer_names: str) -> dict[str, Any]:
 
 
 _KLEIN_4B_KOHYA = flux2_lora_kohya_non_block_format.state_dict_keys
+_FLUX1_IMG_IN_128 = {
+    "lora_unet_img_in.alpha": [],
+    "lora_unet_img_in.lora_down.weight": [16, 128],
+    "lora_unet_img_in.lora_up.weight": [3072, 16],
+}
 
 
 @pytest.mark.parametrize(
@@ -252,6 +257,17 @@ _KLEIN_4B_KOHYA = flux2_lora_kohya_non_block_format.state_dict_keys
             "LoRA_LyCORIS_FLUX_Config",
             None,
         ),
+        # A 128-wide `img_in` is Klein's latent, but a block that exists only in FLUX.1 (its single block's 21504-wide
+        # linear1, its 12288-wide MLP, its per-block modulation) settles the file as FLUX.1 (FLUX.1 Fill/Control take
+        # 128 on `img_in` too).
+        *(
+            (
+                {**_layers(flux_lora_kohya_format.state_dict_keys, block), **_FLUX1_IMG_IN_128},
+                "LoRA_LyCORIS_FLUX_Config",
+                None,
+            )
+            for block in ("single_blocks_0_linear1", "double_blocks_0_img_mlp_0", "double_blocks_0_img_mod_lin")
+        ),
     ],
     ids=[
         "klein-single-block-and-modulation",
@@ -260,6 +276,9 @@ _KLEIN_4B_KOHYA = flux2_lora_kohya_non_block_format.state_dict_keys
         "flux1-single-block-only",
         "klein-lokr-whole-w1",
         "flux1-lokr-whole-w1",
+        "flux1-single-block-with-img-in-128",
+        "flux1-mlp-with-img-in-128",
+        "flux1-block-modulation-with-img-in-128",
     ],
 )
 def test_a_partial_kohya_lora_is_identified_by_the_layers_it_has(
@@ -282,7 +301,8 @@ def _kohya(layer: str, in_dim: int, out_dim: int, rank: int = 16) -> dict[str, A
 
 
 _ATTN_PROJ = "double_blocks_0_img_attn_proj"  # 3072 x 3072 in FLUX.1 and Klein 4B: says nothing on its own
-# A block layer that names no hidden size outright (a Klein 9B MLP output: 6 x 4096 in, 4096 out)
+# A block layer that names no hidden size outright: a Klein 9B MLP output, 3 x 4096 = 12288 in (as FLUX.1's MLP output
+# takes) and 4096 out.
 _MLP_OUT = "double_blocks_0_img_mlp_2"
 
 
@@ -330,17 +350,17 @@ _MLP_OUT = "double_blocks_0_img_mlp_2"
         ),
         # Klein 9B (hidden size 4096) shows in the hidden-sized axis of any non-block layer, and `img_in`'s 128 channels.
         (
-            {**_kohya("time_in_out_layer", 4096, 4096), **_kohya(_MLP_OUT, 24576, 4096)},
+            {**_kohya("time_in_out_layer", 4096, 4096), **_kohya(_MLP_OUT, 12288, 4096)},
             "LoRA_LyCORIS_Flux2_Config",
             Flux2VariantType.Klein9B,
         ),
         (
-            {**_kohya("img_in", 128, 4096), **_kohya(_MLP_OUT, 24576, 4096)},
+            {**_kohya("img_in", 128, 4096), **_kohya(_MLP_OUT, 12288, 4096)},
             "LoRA_LyCORIS_Flux2_Config",
             Flux2VariantType.Klein9B,
         ),
         (
-            {**_kohya("final_layer_adaLN_modulation_1", 4096, 8192), **_kohya(_MLP_OUT, 24576, 4096)},
+            {**_kohya("final_layer_adaLN_modulation_1", 4096, 8192), **_kohya(_MLP_OUT, 12288, 4096)},
             "LoRA_LyCORIS_Flux2_Config",
             Flux2VariantType.Klein9B,
         ),
@@ -388,7 +408,7 @@ _MLP_OUT = "double_blocks_0_img_mlp_2"
             {
                 "lora_unet_img_in.lokr_w1": [4, 2],
                 "lora_unet_img_in.lokr_w2": [1024, 64],
-                **_kohya(_MLP_OUT, 24576, 4096),
+                **_kohya(_MLP_OUT, 12288, 4096),
             },
             "LoRA_LyCORIS_Flux2_Config",
             Flux2VariantType.Klein9B,

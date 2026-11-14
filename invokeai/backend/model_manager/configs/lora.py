@@ -335,6 +335,52 @@ def _kohya_non_block_widths(state_dict: dict[str | int, Any]) -> Iterator[tuple[
             yield layer, "out", out_dim
 
 
+_KOHYA_FLUX1_BLOCK_MODULATION_REGEX = re.compile(
+    r"lora_unet_(double_blocks_\d+_(img|txt)_mod_lin|single_blocks_\d+_modulation_lin)\."
+)
+# The block layers whose shape depends on the MLP: the MLP input and output, a single block's fused linear1 (q, k, v and
+# the MLP input) and its linear2 (attention output and MLP). The whole (in, out) shape is compared, because one axis
+# alone can repeat in FLUX.2: Klein 9B's MLP output takes 4096 * 3 = 12288 inputs, as FLUX.1's does.
+_KOHYA_FLUX1_BLOCK_SHAPE_REGEX = re.compile(
+    r"(lora_unet_(?:double_blocks_\d+_(?:img|txt)_mlp_(?P<mlp>[02])|single_blocks_\d+_linear(?P<linear>[12])))\."
+)
+_FLUX1_MLP_WIDTH = _FLUX1_HIDDEN_SIZE * _FLUX1_MLP_RATIO
+_KOHYA_FLUX1_BLOCK_SHAPES = {
+    ("mlp", "0"): (_FLUX1_HIDDEN_SIZE, _FLUX1_MLP_WIDTH),
+    ("mlp", "2"): (_FLUX1_MLP_WIDTH, _FLUX1_HIDDEN_SIZE),
+    ("linear", "1"): (_FLUX1_HIDDEN_SIZE, 3 * _FLUX1_HIDDEN_SIZE + _FLUX1_MLP_WIDTH),
+    ("linear", "2"): (_FLUX1_HIDDEN_SIZE + _FLUX1_MLP_WIDTH, _FLUX1_HIDDEN_SIZE),
+}
+
+
+def _kohya_layer_shape(state_dict: dict[str | int, Any], prefix: str) -> tuple[int | None, int | None]:
+    """(in, out) of a kohya layer, from `lora_down`/`lora_up` or from its LyCORIS operands."""
+    down, up = state_dict.get(f"{prefix}.lora_down.weight"), state_dict.get(f"{prefix}.lora_up.weight")
+    if down is not None or up is not None:
+        return (down.shape[1] if down is not None else None, up.shape[0] if up is not None else None)
+    return _lycoris_in_dim(state_dict, prefix), _lycoris_out_dim(state_dict, prefix)
+
+
+def _has_kohya_flux1_only_blocks(state_dict: dict[str | int, Any]) -> bool:
+    """True if a kohya file holds a block layer that FLUX.2 does not have, or one shaped as FLUX.1's: per-block
+    modulations (FLUX.2 has the shared ones only), or FLUX.1's MLP and single-block shapes, which Klein's 3x MLP ratio
+    with a gated input changes."""
+    seen: set[str] = set()
+    for key in state_dict:
+        if not isinstance(key, str) or not key.startswith("lora_unet_"):
+            continue
+        if _KOHYA_FLUX1_BLOCK_MODULATION_REGEX.match(key):
+            return True
+        match = _KOHYA_FLUX1_BLOCK_SHAPE_REGEX.match(key)
+        if not match or match[1] in seen:
+            continue
+        seen.add(match[1])
+        kind = ("mlp", match["mlp"]) if match["mlp"] else ("linear", match["linear"])
+        if _kohya_layer_shape(state_dict, match[1]) == _KOHYA_FLUX1_BLOCK_SHAPES[kind]:
+            return True
+    return False
+
+
 def _is_flux2_lora(mod: ModelOnDisk) -> bool:
     """Check if a FLUX-format LoRA is specifically for FLUX.2 (Klein) rather than FLUX.1.
 
@@ -495,10 +541,12 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
 
     # Kohya format: layers outside the blocks. FLUX.2's 128 latent channels on `img_in` or `final_layer_linear`, or a
     # hidden-sized axis other than 3072 (Klein 9B), mark FLUX.2 for a LoRA that trains little else.
+    # FLUX.1-shaped blocks in the same file veto this: a block that exists only in FLUX.1 settles the base.
     for layer, axis, width in _kohya_non_block_widths(state_dict):
-        if _KOHYA_NON_BLOCK_HIDDEN_AXIS[layer] == axis and width != _FLUX1_HIDDEN_SIZE:
-            return True
-        if _KOHYA_NON_BLOCK_LATENT_AXIS.get(layer) == axis and width == _FLUX2_LATENT_CHANNELS:
+        flux2_width = (_KOHYA_NON_BLOCK_HIDDEN_AXIS[layer] == axis and width != _FLUX1_HIDDEN_SIZE) or (
+            _KOHYA_NON_BLOCK_LATENT_AXIS.get(layer) == axis and width == _FLUX2_LATENT_CHANNELS
+        )
+        if flux2_width and not _has_kohya_flux1_only_blocks(state_dict):
             return True
 
     # Kohya format: check transformer block dimensions (hidden_size and MLP ratio).
