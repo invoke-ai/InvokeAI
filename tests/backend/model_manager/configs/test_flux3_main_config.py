@@ -27,6 +27,7 @@ from tests.backend.model_manager.load.state_dicts import (
     flux3_klein_keys,
     flux3_klein_nvfp4_bfl_keys,
     flux3_klein_nvfp4_comfy_keys,
+    flux3_klein_torchao_fp8_keys,
 )
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors, write_shrunk_safetensors
 
@@ -125,18 +126,22 @@ _RELEASED_QUANTIZED = {
     "nvfp4-comfy": flux3_klein_nvfp4_comfy_keys,
     "nvfp4-bfl": flux3_klein_nvfp4_bfl_keys,
     "fp8r": flux3_klein_fp8r_keys,
+    "torchao-fp8": flux3_klein_torchao_fp8_keys,
 }
 
 
 def _write_release(path: Path, fixture, *, base: bool = False) -> Path:
     """A captured release as a small complete file: identification reads its markers' bytes and its metadata, the
     `_quantization_metadata` block included, beyond the tensor entries. Klein Base's builds are Klein's layout
-    without the flow-map embedder `ref_time_in` (checked on their headers)."""
+    without the flow-map embedder, `ref_time_in` in Black Forest Labs' names and `target_timestep_embedder` in
+    diffusers' (checked on the release headers; the diffusers-named Base is assumed to follow, no such file exists)."""
     metadata = dict(fixture.metadata)
     if layer_hints := getattr(fixture, "layer_hints", None):
         metadata["_quantization_metadata"] = json.dumps({"layers": layer_hints})
     keys = {
-        key: entry for key, entry in fixture.state_dict_keys.items() if not (base and key.startswith("ref_time_in."))
+        key: entry
+        for key, entry in fixture.state_dict_keys.items()
+        if not (base and key.startswith(("ref_time_in.", "target_timestep_embedder.")))
     }
     return write_shrunk_safetensors(path, keys, markers=getattr(fixture, "markers", None), metadata=metadata)
 
@@ -153,7 +158,7 @@ def test_a_released_quantized_single_file_installs_as_flux3(tmp_path: Path, name
     # (The nvfp4 builds get it too, from their fp8 block scales, and the loader skips it: a known issue of the shared
     # install default, documented on the FLUX.3 page.)
     fp8_storage = getattr(result.config.default_settings, "fp8_storage", None)
-    if name == "fp8r":
+    if name in ("fp8r", "torchao-fp8"):
         assert fp8_storage is True
     elif name == "int8-convrot":
         assert fp8_storage is not True
@@ -231,11 +236,17 @@ _REFUSED = {
         {},
         "do not divide its input width 128",
     ),
-    "torchao": (
-        {_Q: {"_weight_qdata": ([3072, 3072], "F8_E4M3"), "_weight_scale": ([3072, 1], "F32")}},
+    "torchao-int8": (
+        {_Q: {"_weight_qdata": ([3072, 3072], "I8"), "_weight_scale": ([3072, 1], "F32")}},
         {},
         {},
-        "torchao",
+        "torch.int8, not float8_e4m3fn",
+    ),
+    "torchao-blockwise": (
+        {_Q: {"_weight_qdata": ([3072, 3072], "F8_E4M3"), "_weight_scale": ([3072, 24], "F32")}},
+        {},
+        {},
+        "not per-tensor or block-wise scales",
     ),
     # bitsandbytes NF4 flattens the packed weight and keeps its state beside it.
     "bitsandbytes": (
@@ -289,7 +300,39 @@ def test_a_quantized_single_file_the_loader_cannot_build_is_refused(tmp_path: Pa
     assert any(reason in str(error) for error in result.invalid_matches), result.invalid_matches
 
 
-def test_a_torchao_export_is_refused_rather_than_installed_as_unknown(tmp_path: Path) -> None:
+def _torchao(dtype: str, scale_columns: int = 1) -> dict[str, tuple[list[int], str]]:
+    """unsloth's torchao FP8 layout, with its quantized payloads re-typed as another torchao build would store them."""
+    keys = dict(flux3_klein_torchao_fp8_keys.state_dict_keys)
+    for key, (shape, _) in flux3_klein_torchao_fp8_keys.state_dict_keys.items():
+        if key.endswith("._weight_qdata"):
+            keys[key] = (shape, dtype)
+        elif key.endswith("._weight_scale"):
+            keys[key] = ([shape[0], scale_columns], "F32")
+    return keys
+
+
+@pytest.mark.parametrize(
+    ("keys", "reason"),
+    [
+        (_torchao("I8"), "torch.int8, not float8_e4m3fn"),
+        (_torchao("F8_E4M3", 24), "not per-tensor or block-wise scales"),
+    ],
+    ids=["int8", "blockwise"],
+)
+def test_a_torchao_build_flux3_cannot_load_is_refused_rather_than_installed_as_unknown(
+    tmp_path: Path, keys: dict[str, tuple[list[int], str]], reason: str
+) -> None:
+    """unsloth's INT8 and block-wise builds keep the FP8 build's key names, so they are recognized as FLUX.3 and then
+    refused by name; the message names only what loads."""
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys))
+
+    assert result.config is None
+    assert any(reason in str(error) and "unsloth's FP8 build" in str(error) for error in result.invalid_matches), (
+        result.all_matches
+    )
+
+
+def test_a_native_torchao_export_is_refused_rather_than_installed_as_unknown(tmp_path: Path) -> None:
     """torchao quantizes every linear, the modulation the fingerprint looks at included, and stores each one without
     a `.weight`; the file must still be recognized as FLUX.3 for its refusal to be reached."""
     keys: dict[str, tuple[list[int], str]] = {}
@@ -304,7 +347,51 @@ def test_a_torchao_export_is_refused_rather_than_installed_as_unknown(tmp_path: 
     result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys))
 
     assert result.config is None
-    assert any("torchao" in str(error) for error in result.invalid_matches), result.all_matches
+    assert any("under Black Forest Labs' key names" in str(error) for error in result.invalid_matches), (
+        result.all_matches
+    )
+
+
+def test_int8_markers_beside_torchao_layers_are_refused(tmp_path: Path) -> None:
+    """The int8 pairing check reads `.weight`/`.weight_scale` pairs, which torchao layers do not have until they are
+    translated; the mix is refused on the header all the same."""
+    keys = dict(flux3_klein_torchao_fp8_keys.state_dict_keys)
+    layer = "txt_mode_blocks.0.attn.to_q"
+    del keys[f"{layer}.weight"]
+    keys.update({f"{layer}.weight": ([3072, 3072], "I8"), f"{layer}.weight_scale": ([3072, 1], "F32")})
+    keys[f"{layer}.comfy_quant"] = ([72], "U8")
+
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys, markers={layer: _INT8_MARKER}))
+
+    assert result.config is None
+    assert any("mixes int8 and torchao" in str(error) for error in result.invalid_matches), result.invalid_matches
+
+
+def test_a_torchao_klein_that_quantizes_its_flow_map_embedder_is_still_klein(tmp_path: Path) -> None:
+    keys = dict(flux3_klein_torchao_fp8_keys.state_dict_keys)
+    shape, _ = keys.pop("target_timestep_embedder.linear_1.weight")
+    keys["target_timestep_embedder.linear_1._weight_qdata"] = (shape, "F8_E4M3")
+    keys["target_timestep_embedder.linear_1._weight_scale"] = ([shape[0], 1], "F32")
+
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys))
+
+    assert isinstance(result.config, Main_Checkpoint_Flux3_Config)
+    assert result.config.variant is Flux3VariantType.Klein
+
+
+def test_diffusers_key_names_alone_are_not_a_flux3_single_file(tmp_path: Path) -> None:
+    """The torchao build is the only single file under diffusers' names that is read as FLUX.3. The same layout in
+    plain bf16 is not recognized, so no new format is opened beside it."""
+    keys: dict[str, tuple[list[int], str]] = {}
+    for key, (shape, dtype) in flux3_klein_torchao_fp8_keys.state_dict_keys.items():
+        if key.endswith("._weight_scale"):
+            continue
+        keys[key.replace("._weight_qdata", ".weight")] = (shape, "BF16" if dtype == "F8_E4M3" else dtype)
+
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys))
+
+    assert not any(isinstance(match, Main_Checkpoint_Flux3_Config) for match in result.all_matches)
+    assert not isinstance(result.config, Main_Checkpoint_Flux3_Config)
 
 
 def test_a_lora_with_flux3_names_is_not_a_main_model(tmp_path: Path) -> None:

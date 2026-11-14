@@ -6,8 +6,9 @@ picture and get the same answer, so a file installs exactly when the loader can 
 at install with the reason rather than failing at the first render.
 
 The builds that load are Black Forest Labs' bf16 file with its ``variants/fp8r`` (fp8 with one scale per row) and
-``variants/nvfp4`` (NVIDIA ModelOpt's layout), and Comfy-Org's bf16, ``int8_convrot`` and nvfp4 repackages. None of
-them mixes two schemes. A file mixing int8 with nvfp4 or with scaled fp8 is refused rather than supported on
+``variants/nvfp4`` (NVIDIA ModelOpt's layout), Comfy-Org's bf16, ``int8_convrot`` and nvfp4 repackages, and unsloth's
+torchao FP8 build (float8_e4m3fn with one scale per output row, under diffusers' key names). None of them mixes two
+schemes. A file mixing int8 with nvfp4 or with scaled fp8 is refused rather than supported on
 speculation; nvfp4 beside scaled fp8 loads, since the loader takes each of them its own way.
 """
 
@@ -16,8 +17,11 @@ from typing import Any
 
 import torch
 
+from invokeai.backend.flux3.conversion import is_flux3_diffusers_layout
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_WEIGHT_DTYPES,
+    TORCHAO_QDATA_SUFFIX,
+    find_torchao_fp8_problem,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
     strip_layer_path_prefix,
@@ -43,8 +47,6 @@ _INPUT_WIDTH_WEIGHTS = ("emb_in.image.weight", "emb_in.image_cond.weight", "txt_
 # bitsandbytes keeps a 4-bit layer's quantization state beside its packed `uint8` weight.
 _BITSANDBYTES_STATE = (".absmax", ".quant_map", ".quant_state")
 
-_TORCHAO_PAYLOAD_SUFFIX = "._weight_qdata"
-
 
 def flux3_header_layers(metadata: Mapping[str, Any] | None, keys: Collection[Any]) -> dict[str, Any]:
     """The layers a FLUX.3 file's header names, under the prefix-stripped names in ``keys``: ComfyUI's
@@ -61,13 +63,14 @@ def reject_unloadable_quantization(
 ) -> None:
     """Refuse a FLUX.3 single file whose quantization the loader cannot build, naming the reason (ValueError).
 
-    ``state_dict`` holds the file's tensors under their prefix-stripped native names; meta tensors will do, since names,
-    dtypes and shapes are all that is read. ``header_layers`` is :func:`flux3_header_layers` of it, and ``markers`` are
-    its ``.comfy_quant`` markers, decoded, by layer.
+    ``state_dict`` holds the file's tensors under their prefix-stripped names, native or, for the torchao build,
+    diffusers'; meta tensors will do, since names, dtypes and shapes are all that is read. ``header_layers`` is
+    :func:`flux3_header_layers` of it, and ``markers`` are its ``.comfy_quant`` markers, decoded, by layer.
 
     Each refusal is of a file that would otherwise load and generate noise, or fail mid-render:
 
-    - torchao's tensor subclasses, which leave no ``.weight`` to load;
+    - torchao's tensor subclasses that ``translate_torchao_fp8_layers`` cannot rename to scaled fp8
+      (:func:`find_torchao_fp8_problem`: INT8, per-tensor or block-wise scales, half-present pairs);
     - bitsandbytes 4-bit state, and any packed ``uint8`` weight that is not a named nvfp4 layer;
     - an fp8 weight scale in a spelling the key conversion does not carry, which would be left behind as its weight is
       renamed, and the weight loaded unscaled (AWQ's ``pre_quant_scale`` beside an fp8 weight among them);
@@ -76,15 +79,22 @@ def reject_unloadable_quantization(
       rotation group that is not a power of 4 or does not divide the input width);
     - what :func:`find_nvfp4_layers` refuses: AWQ, nvfp4 layers no header or marker names, malformed or half-stored
       ones;
-    - int8 mixed with nvfp4 or with scaled fp8;
+    - torchao tensors under Black Forest Labs' key names;
+    - int8 mixed with nvfp4, scaled fp8 or torchao;
     - packed input embedders, whose stored width is not the model's.
     """
-    keys = list(state_dict)
-    torchao = sorted(key for key in keys if key.endswith(_TORCHAO_PAYLOAD_SUFFIX))
-    if torchao:
+    if problem := find_torchao_fp8_problem(state_dict):
         raise ValueError(
-            f"This FLUX.3 file is saved as torchao-quantized tensors (e.g. '{torchao[0]}'), which is not supported. "
-            f"{_INSTEAD}"
+            f"This FLUX.3 file is saved as torchao-quantized tensors that InvokeAI cannot load: {problem}. Only "
+            "torchao float8_e4m3fn weights with one scale per output row load, as in unsloth's FP8 build. A file "
+            f"missing one half of a weight/scale pair is probably incomplete: download it again. {_INSTEAD}"
+        )
+    keys = list(state_dict)
+    torchao = sorted(key for key in keys if key.endswith(TORCHAO_QDATA_SUFFIX))
+    if torchao and not is_flux3_diffusers_layout(state_dict):
+        raise ValueError(
+            f"This FLUX.3 file is saved as torchao-quantized tensors (e.g. '{torchao[0]}') under Black Forest Labs' "
+            "key names. Only unsloth's FP8 build, which uses diffusers' key names, loads. " + _INSTEAD
         )
     bitsandbytes = sorted(key for key in keys if any(state in key for state in _BITSANDBYTES_STATE))
     if bitsandbytes:
@@ -123,6 +133,8 @@ def reject_unloadable_quantization(
             f"'{packed[0]}'), a packing InvokeAI does not read, such as bitsandbytes NF4. {_INSTEAD}"
         )
 
+    if int8_markers and torchao:
+        raise ValueError(f"This FLUX.3 file mixes int8 and torchao layers, which no release does. {_INSTEAD}")
     if int8_markers and nvfp4:
         raise ValueError(f"This FLUX.3 file mixes int8 and nvfp4 layers, which no release does. {_INSTEAD}")
     if int8_markers:

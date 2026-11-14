@@ -1,7 +1,8 @@
 """Native FLUX.3 state dicts, converted to diffusers' ``Flux3Transformer2DModel``.
 
-Every single-file FLUX.3 build InvokeAI loads uses Black Forest Labs' own key names: BFL's
-``model.safetensors`` and its quantized ``variants/``, the ComfyUI repackages, and the GGUF conversions. The
+Every single-file FLUX.3 build InvokeAI loads uses Black Forest Labs' own key names -- BFL's
+``model.safetensors`` and its quantized ``variants/``, the ComfyUI repackages, and the GGUF conversions -- except
+unsloth's torchao FP8 build, which is saved under diffusers' names and is not converted (:func:`is_flux3_diffusers_layout`). The
 renames are a port of diffusers' ``convert_flux3_transformer_checkpoint_to_diffusers`` (``single_file_utils.py``
 in diffusers 0.42.1). Reading the structure from the weights, rather than assuming the released one, is
 InvokeAI's: a finetune that changes the depth must not load as the first N blocks of the released model.
@@ -277,20 +278,31 @@ def _count_blocks(state_dict: Mapping[str, Any], prefix: str) -> int:
     return len(indices)
 
 
-def flux3_transformer_config(state_dict: Mapping[str, Any]) -> dict[str, Any]:
-    """The ``Flux3Transformer2DModel`` config of a native FLUX.3 state dict, read from its tensor shapes.
+def is_flux3_diffusers_layout(state_dict: Mapping[str, Any]) -> bool:
+    """Whether a state dict already uses diffusers' names, as unsloth's torchao FP8 build does, rather than BFL's.
 
-    Only shapes are read, so this works on meta tensors and on packed GGUF tensors alike. The feedforward width is
-    taken from ``mlp_in``'s output rows, which no supported quantization packs. A loader that takes packed nvfp4
-    layers out of the state dict reads this first: ``mlp_in`` is one of them. The input widths are read off the
-    embedders, which no supported build packs (``flux3/checkpoint_quantization.py`` refuses one that does).
+    Such a file needs no conversion: its rows are in diffusers' order too, so the output adaLN must not be swapped.
     """
-    hidden_size, in_channels = _shape(state_dict, "emb_in.image.weight")
-    cond_in_channels = _shape(state_dict, "emb_in.image_cond.weight")[1]
-    joint_attention_dim = _shape(state_dict, "txt_in.weight")[1]
-    timestep_channels = _shape(state_dict, "time_in.in_layer.weight")[1]
-    head_dim = _shape(state_dict, "single_blocks.0.norm.query_norm.scale")[0]
-    mlp_hidden = _shape(state_dict, "single_blocks.0.mlp_in.weight")[0] // 2
+    return "x_embedders.image.weight" in state_dict
+
+
+def flux3_transformer_config(state_dict: Mapping[str, Any]) -> dict[str, Any]:
+    """The ``Flux3Transformer2DModel`` config of a FLUX.3 state dict, read from its tensor shapes.
+
+    Native (BFL) names, or diffusers' where :func:`is_flux3_diffusers_layout` says so: every key is looked up under
+    the name the file uses. Only shapes are read, so this works on meta tensors and on packed GGUF tensors alike. The
+    feedforward width is taken from ``mlp_in``'s output rows, which no supported quantization packs. A loader that
+    takes packed nvfp4 layers out of the state dict reads this first: ``mlp_in`` is one of them. The input widths are
+    read off the embedders, which no supported build packs (``flux3/checkpoint_quantization.py`` refuses one that
+    does).
+    """
+    name = flux3_native_key_to_diffusers if is_flux3_diffusers_layout(state_dict) else str
+    hidden_size, in_channels = _shape(state_dict, name("emb_in.image.weight"))
+    cond_in_channels = _shape(state_dict, name("emb_in.image_cond.weight"))[1]
+    joint_attention_dim = _shape(state_dict, name("txt_in.weight"))[1]
+    timestep_channels = _shape(state_dict, name("time_in.in_layer.weight"))[1]
+    head_dim = _shape(state_dict, name("single_blocks.0.norm.query_norm.scale"))[0]
+    mlp_hidden = _shape(state_dict, name("single_blocks.0.mlp_in.weight"))[0] // 2
 
     if hidden_size % head_dim != 0:
         raise ValueError(f"FLUX.3 hidden size {hidden_size} is not a multiple of its head width {head_dim}.")
@@ -300,9 +312,9 @@ def flux3_transformer_config(state_dict: Mapping[str, Any]) -> dict[str, Any]:
             "released checkpoint; this checkpoint is not supported."
         )
 
-    num_layers = _count_blocks(state_dict, "txt_mode_blocks.")
+    num_layers = _count_blocks(state_dict, name("txt_mode_blocks."))
     for mode in ("image", "image_cond"):
-        mode_layers = _count_blocks(state_dict, f"content_mode_blocks.{mode}.")
+        mode_layers = _count_blocks(state_dict, name(f"content_mode_blocks.{mode}."))
         if mode_layers != num_layers:
             raise ValueError(
                 f"The FLUX.3 checkpoint has {mode_layers} '{mode}' blocks but {num_layers} text blocks; the per-mode "
@@ -313,12 +325,12 @@ def flux3_transformer_config(state_dict: Mapping[str, Any]) -> dict[str, Any]:
         "in_channels": in_channels,
         "cond_in_channels": cond_in_channels,
         "num_layers": num_layers,
-        "num_single_layers": _count_blocks(state_dict, "single_blocks."),
+        "num_single_layers": _count_blocks(state_dict, name("single_blocks.")),
         "attention_head_dim": head_dim,
         "num_attention_heads": hidden_size // head_dim,
         "joint_attention_dim": joint_attention_dim,
         "timestep_channels": timestep_channels,
         "mlp_ratio": mlp_hidden / hidden_size,
         "axes_dims_rope": FLUX3_AXES_DIMS_ROPE,
-        "flow_map": FLUX3_NATIVE_FLOW_MAP_KEY in state_dict,
+        "flow_map": name(FLUX3_NATIVE_FLOW_MAP_KEY) in state_dict,
     }
