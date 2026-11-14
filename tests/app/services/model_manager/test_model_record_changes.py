@@ -732,8 +732,11 @@ def test_a_role_view_of_an_unchanged_record_is_current_and_loads_once(harness: _
 def test_a_load_affecting_update_drops_the_primary_and_role_entries(harness: _Harness) -> None:
     _add_text_llm(harness)
     record = harness.store.get_model(KEY)
-    harness.manager.load.load_model(record)
-    harness.manager.load.load_model(view_as(record, ModelType.Qwen35Encoder))
+    for config in (record, view_as(record, ModelType.Qwen35Encoder)):
+        # Used and released, as a node does. A wrapper dropped unused releases its first-use hold on the cache's
+        # worker thread, and an update that runs before that thread only marks the entry stale.
+        with harness.manager.load.load_model(config):
+            pass
     assert len(_cached_entries(harness)) == 2
 
     harness.manager.update_model_record(KEY, ModelRecordChanges(path="llm/other.safetensors"))
