@@ -30,13 +30,15 @@ const DOT_GATED = {
   borderStyle: 'dashed',
   borderWidth: '1.5px',
 };
-const DOT_UNCHECKED = { ...DOT_BASE, bg: 'transparent', borderColor: 'border.emphasized' };
+// Off is the faintest state of an on/off control, so its ring keeps at least 3:1 against every row fill in every theme
+// (LayerActiveDot.browser.test.tsx measures it); grey and hollow, it still reads apart from the filled accent of on.
+const DOT_UNCHECKED = { ...DOT_BASE, bg: 'transparent', borderColor: 'fg.muted' };
 // The button fills like the ghost icon buttons beside it. A dot that is on keeps its accent under the pointer: the
 // darker hover accent of a plain ToggleDot sinks into that fill and reads as the dot switching off.
 const HOVER_FILL = 'gray.hoverTint/10';
 const HOVER_CHECKED = { bg: HOVER_FILL };
 const HOVER_GATED = { bg: HOVER_FILL };
-const HOVER_UNCHECKED = { _before: { borderColor: 'fg.muted' }, bg: HOVER_FILL };
+const HOVER_UNCHECKED = { _before: { borderColor: 'fg' }, bg: HOVER_FILL };
 // Read-only while editing is locked: the dot dims as disabled icon buttons do and takes no hover fill.
 const HOVER_NONE = {};
 const dimmed = (style: typeof DOT_BASE) => ({ ...style, opacity: 0.5 });

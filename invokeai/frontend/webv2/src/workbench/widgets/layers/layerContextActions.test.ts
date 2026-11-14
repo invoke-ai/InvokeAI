@@ -8,6 +8,7 @@ import type {
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { createControlLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { CircleDotIcon, CircleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -960,6 +961,11 @@ describe('toggle-visibility', () => {
       const layer = makeLayer(type);
       expect(labelOf(layer)).toBe('Exclude from generation');
       expect(labelOf({ ...layer, isEnabled: false })).toBe('Use in generation');
+      // The row dot's shapes: a plain ring for off, a dot for on; the dashed ring belongs to a group leaving it out.
+      const iconOf = (target: CanvasLayerContract) =>
+        byId(getLayerContextActions(makeState(target)), 'toggle-visibility').icon;
+      expect(iconOf(layer)).toBe(CircleIcon);
+      expect(iconOf({ ...layer, isEnabled: false })).toBe(CircleDotIcon);
     }
   );
 

@@ -281,7 +281,7 @@ const FilterActions = ({ engine }: ToolFormProps) => {
           : {
               disabled: !eligibility.canProcess,
               label: t('widgets.layers.rasterFilter.process'),
-              loading: session.status === 'processing',
+              loading: running || session.status === 'processing',
               onRun: run,
             }
       }

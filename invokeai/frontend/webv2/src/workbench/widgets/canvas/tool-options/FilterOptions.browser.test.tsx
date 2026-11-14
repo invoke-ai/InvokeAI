@@ -152,17 +152,83 @@ describe('filter operation errors', () => {
     expect(process.query()).toBeNull();
   });
 
+  const PREVIEW: FilterOperationSessionState['preview'] = {
+    guard: {} as never,
+    height: 10,
+    imageName: 'filtered',
+    origin: { x: 0, y: 0 },
+    rect: { height: 10, width: 10, x: 0, y: 0 },
+    width: 10,
+  };
+
+  /** Fails a run with auto-update on, then starts the retry from the keyboard on Process; resolves the run on demand. */
+  const startKeyboardRetry = async () => {
+    const { store } = await renderSection({ error: { code: 'process-failed' }, status: 'error' });
+    const process = page.getByRole('button', { exact: true, name: 'Process' });
+    let finish!: (result: 'completed' | 'stale') => void;
+    store.processFilterOperation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    process.element().focus();
+    await userEvent.keyboard('{Enter}');
+    expect(store.processFilterOperation).toHaveBeenCalledOnce();
+    act(() => store.set({ error: null, status: 'processing' }));
+    const succeed = async () => {
+      act(() => store.set({ preview: PREVIEW, status: 'ready' }));
+      await act(() => finish('completed'));
+      expect(process.query()).toBeNull();
+    };
+    const fail = async () => {
+      act(() => store.set({ error: { code: 'process-failed' }, status: 'error' }));
+      await act(() => finish('stale'));
+      await expect.element(process).toBeEnabled();
+    };
+    return { fail, store, succeed };
+  };
+
+  it('moves focus to Apply when a keyboard retry succeeds and its Process button leaves', async () => {
+    const { succeed } = await startKeyboardRetry();
+
+    await succeed();
+
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toHaveFocus();
+  });
+
+  it('leaves focus where the user moved it during the retry', async () => {
+    const { succeed } = await startKeyboardRetry();
+    const cancel = page.getByRole('button', { exact: true, name: 'Cancel' });
+    cancel.element().focus();
+
+    await succeed();
+
+    await expect.element(cancel).toHaveFocus();
+  });
+
+  it('does not move focus when Process leaves later, after the keyboard retry failed', async () => {
+    const { fail, store } = await startKeyboardRetry();
+    await fail();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    // A later run (an auto run after a setting change) succeeds, so the button leaves.
+    act(() => store.set({ error: null, preview: PREVIEW, status: 'ready' }));
+    expect(page.getByRole('button', { exact: true, name: 'Process' }).query()).toBeNull();
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve);
+        })
+    );
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('leaves a failed apply to Apply: no Process with auto-update on', async () => {
     await renderSection({
       error: { code: 'apply-failed', detail: 'cache failed' },
-      preview: {
-        guard: {} as never,
-        height: 10,
-        imageName: 'filtered',
-        origin: { x: 0, y: 0 },
-        rect: { height: 10, width: 10, x: 0, y: 0 },
-        width: 10,
-      },
+      preview: PREVIEW,
       status: 'error',
     });
 

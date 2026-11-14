@@ -1,9 +1,12 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop */
+import type { MouseEvent } from 'react';
+
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { ChevronDownIcon } from 'lucide-react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const APPLY_MENU_POSITIONING = { placement: 'bottom-end' } as const;
@@ -26,6 +29,10 @@ export interface OperationRunAction {
 /**
  * The verbs of a running canvas operation, one row after its form's groups: Reset at the start; Cancel, the manual run
  * and Apply (with its save-as menu) at the end. Status and errors live in the Operation section, not here.
+ *
+ * A retry's run button leaves the row once its run succeeds. When that run was started from the focused button and
+ * focus has nowhere else to be (the button went, or went disabled while busy, and nothing took focus since), focus
+ * moves to Apply, or to Cancel while Apply is disabled, so a keyboard user is not left on the page body.
  */
 export const OperationActions = ({
   applying,
@@ -57,6 +64,51 @@ export const OperationActions = ({
 }) => {
   const { t } = useTranslation();
   const saveAsIds = useTooltipTriggerIds();
+  const applyRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const runStartedFocused = useRef(false);
+  const runLoading = run?.loading ?? false;
+  // Renewed with every `run`, so React re-attaches it on each render that keeps the button: a render that shows the
+  // button idle again means the run the user started settled with the button staying (it failed, or the button still
+  // offers a run), and the hand-off is dropped. Cleanup that finds the button gone hands focus over a microtask later,
+  // after the same commit may have enabled Apply; StrictMode's extra mount attach runs before any run.
+  const runButtonRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (!node) {
+        return undefined;
+      }
+      if (!runLoading) {
+        runStartedFocused.current = false;
+      }
+      return () => {
+        queueMicrotask(() => {
+          if (node.isConnected || !runStartedFocused.current) {
+            return;
+          }
+          runStartedFocused.current = false;
+          const { activeElement, body } = node.ownerDocument;
+          if (activeElement !== null && activeElement !== body) {
+            return;
+          }
+          const target = applyRef.current && !applyRef.current.disabled ? applyRef.current : cancelRef.current;
+          if (target?.isConnected && !target.disabled) {
+            target.focus();
+          }
+        });
+      };
+    },
+    // `run` is a fresh object each render; depending on it re-attaches the ref on every render, which is the point.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [run, runLoading]
+  );
+  const onRun = run?.onRun;
+  const onRunClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      runStartedFocused.current = event.currentTarget === event.currentTarget.ownerDocument.activeElement;
+      onRun?.();
+    },
+    [onRun]
+  );
   return (
     <Flex align="center" gap="1" minW="0" w="full">
       {/*
@@ -67,6 +119,7 @@ export const OperationActions = ({
         {t('common.reset')}
       </Button>
       <Button
+        ref={cancelRef}
         data-pane-action="cancel"
         disabled={!canCancel}
         flexShrink={0}
@@ -79,6 +132,7 @@ export const OperationActions = ({
       </Button>
       {run ? (
         <Button
+          ref={runButtonRef}
           disabled={run.disabled}
           flexShrink={1}
           loading={run.loading}
@@ -90,7 +144,7 @@ export const OperationActions = ({
           minW="0"
           px="2"
           spinnerPlacement="start"
-          onClick={run.onRun}
+          onClick={onRunClick}
         >
           <Text as="span" truncate>
             {run.label}
@@ -99,6 +153,7 @@ export const OperationActions = ({
       ) : null}
       <Flex flexShrink={0}>
         <Button
+          ref={applyRef}
           data-pane-action="apply"
           disabled={!canApply}
           loading={applying}

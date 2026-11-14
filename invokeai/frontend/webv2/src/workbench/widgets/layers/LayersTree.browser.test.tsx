@@ -5,7 +5,6 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { rowFocusRing } from '@theme/recipes';
 import { system } from '@theme/system';
 import {
   compileDocumentLeaves,
@@ -50,7 +49,6 @@ import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSe
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
 import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX, LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { clearLayerPropertiesRequest, requestLayerProperties } from './layerPropertiesRequestStore';
-import { TREE_ROW_FOCUS } from './LayerRowSurface';
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
@@ -643,7 +641,6 @@ describe('LayersTree keyboard and accessibility', () => {
 
     // The ring is the platform rows' own inset ring, drawn on the surface so it shares the selection fill's box: clear
     // of the gap below the row and of the indent where the tree guides run.
-    expect(TREE_ROW_FOCUS['& > [data-layer-row-surface]']).toBe(rowFocusRing);
     const surface = row.querySelector<HTMLElement>('[data-layer-row-surface]')!;
     const ring = getComputedStyle(surface);
     expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual(['solid', '2px', '-2px']);

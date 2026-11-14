@@ -29,7 +29,6 @@ import {
   ArrowUpToLineIcon,
   BookmarkIcon,
   BookmarkMinusIcon,
-  CircleDashedIcon,
   CircleDotIcon,
   CircleIcon,
   CircleOffIcon,
@@ -342,16 +341,18 @@ const toggleLabel = (key: string, defaultLabel: string, icon: LucideIcon): Enabl
 });
 // Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility
 // is its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each.
+// The overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
+// leaves the layer out, which no action sets).
 const OVERLAY_LAYER: EnabledToggleLabels = {
-  off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleDashedIcon),
+  off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleIcon),
   on: toggleLabel('useInGeneration', 'Use in generation', CircleDotIcon),
 };
 const OVERLAY_GROUP: EnabledToggleLabels = {
-  off: toggleLabel('excludeGroupFromGeneration', 'Exclude group from generation', CircleDashedIcon),
+  off: toggleLabel('excludeGroupFromGeneration', 'Exclude group from generation', CircleIcon),
   on: toggleLabel('useGroupInGeneration', 'Use group in generation', CircleDotIcon),
 };
 const OVERLAY_SELECTION: EnabledToggleLabels = {
-  off: toggleLabel('excludeSelectedFromGeneration', 'Exclude selected from generation', CircleDashedIcon),
+  off: toggleLabel('excludeSelectedFromGeneration', 'Exclude selected from generation', CircleIcon),
   on: toggleLabel('useSelectedInGeneration', 'Use selected in generation', CircleDotIcon),
 };
 const RASTER_LAYER: EnabledToggleLabels = {
@@ -1052,7 +1053,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   // Raster layers have one axis: hiding takes a layer off the canvas and out of generation alike. Overlays name the
-  // same flag for generation (see ENABLED_TOGGLE_LABELS).
+  // same flag for generation (see enabledToggleLabel).
   {
     defaultLabel: 'Show or hide layer',
     getDefaultLabel: (context) => enabledActionLabel(context).defaultLabel,
