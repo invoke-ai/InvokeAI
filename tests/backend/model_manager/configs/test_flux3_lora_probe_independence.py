@@ -19,13 +19,18 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
-from invokeai.backend.model_manager.configs.lora import LoRA_Diffusers_Flux3_Config, LoRA_LyCORIS_Flux3_Config
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.configs.lora import (
+    LoRA_Diffusers_Flux3_Config,
+    LoRA_LyCORIS_Flux2_Config,
+    LoRA_LyCORIS_Flux3_Config,
+)
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType
 from invokeai.backend.patches.lora_conversions import flux3_lora_constants as constants
 from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from tests.backend.model_manager.load.state_dicts import flux3_klein_keys
 from tests.backend.patches.lora_conversions.lora_state_dicts import (
+    flux2_lora_kohya_non_block_format,
     flux3_lora_aitoolkit_format,
     flux3_lora_comfy_alpha_format,
     flux3_lora_diffusers_format,
@@ -36,7 +41,13 @@ from tests.backend.patches.lora_conversions.lora_state_dicts import (
     flux_lora_aitoolkit_format,
     flux_lora_diffusers_format,
     flux_lora_kohya_format,
+    flux_lora_onetrainer_non_block_format,
     flux_lora_xlabs_format,
+    qwen_image_lora_kohya_format,
+)
+from tests.backend.patches.lora_conversions.test_flux_onetrainer_lora_conversion_utils import (
+    _meta_sd3,
+    _onetrainer_legacy_state_dict,
 )
 
 _DTYPES = {"BF16": torch.bfloat16, "F32": torch.float32, "F8_E4M3": torch.float8_e4m3fn}
@@ -156,6 +167,9 @@ def _flux2_klein_native() -> dict[str, list[int]]:
         (flux_lokr_bfl_format.state_dict_keys, "LoRA_LyCORIS_Flux2_Config"),
         (_flux2_klein_diffusers(), "LoRA_LyCORIS_Flux2_Config"),
         (_flux2_klein_native(), "LoRA_LyCORIS_Flux2_Config"),
+        (flux2_lora_kohya_non_block_format.state_dict_keys, "LoRA_LyCORIS_Flux2_Config"),
+        (flux_lora_onetrainer_non_block_format.state_dict_keys, "LoRA_LyCORIS_FLUX_Config"),
+        (qwen_image_lora_kohya_format.state_dict_keys, "LoRA_LyCORIS_QwenImage_Config"),
     ],
     ids=[
         "flux1-ai-toolkit",
@@ -166,10 +180,283 @@ def _flux2_klein_native() -> dict[str, list[int]]:
         "flux2-bfl-lokr",
         "flux2-klein-diffusers",
         "flux2-klein-native",
+        "flux2-klein-kohya-with-non-block-layers",
+        "flux1-onetrainer-with-non-block-layers",
+        "qwen-image-kohya",
     ],
 )
 def test_a_flux1_or_flux2_lora_keeps_its_config(keys: dict[str, list[int]], claimed_by: str, tmp_path: Path) -> None:
     assert _claimed_by(_state_dict(keys), tmp_path) == [claimed_by]
+
+
+def test_a_kohya_lora_with_non_block_layers_is_a_klein_4b_lora(tmp_path: Path) -> None:
+    """`txt_in` of the layers outside the blocks is what tells Klein 4B (7680 inputs) from FLUX.1 (#10030)."""
+    config = _probe(LoRA_LyCORIS_Flux2_Config, _state_dict(flux2_lora_kohya_non_block_format.state_dict_keys), tmp_path)
+
+    assert config.base is BaseModelType.Flux2
+    assert config.variant is Flux2VariantType.Klein4B
+
+
+def _layers(keys: dict[str, Any], *layer_names: str) -> dict[str, Any]:
+    """The fixture's keys of the named kohya layers only (a LoRA that trains just those)."""
+    return {k: v for k, v in keys.items() if k.split(".")[0] in {f"lora_unet_{name}" for name in layer_names}}
+
+
+_KLEIN_4B_KOHYA = flux2_lora_kohya_non_block_format.state_dict_keys
+
+
+@pytest.mark.parametrize(
+    ("keys", "claimed_by", "variant"),
+    [
+        # The shared modulation exists in FLUX.2 only; the fused linear1 of a Klein 4B single block is 27648 wide where
+        # FLUX.1's is 21504 (a mismatch at apply time if it were read as FLUX.1).
+        (
+            _layers(
+                _KLEIN_4B_KOHYA, "single_blocks_0_linear1", "single_blocks_0_linear2", "single_stream_modulation_lin"
+            ),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(_KLEIN_4B_KOHYA, "single_blocks_0_linear1", "single_blocks_0_linear2"),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(_KLEIN_4B_KOHYA, "double_stream_modulation_img_lin", "double_blocks_0_txt_attn_qkv"),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(flux_lora_kohya_format.state_dict_keys, "single_blocks_0_linear1", "single_blocks_0_linear2"),
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        # LoKr with a whole `lokr_w1`, whose single key carries both widths: (4 x 6912) by (4 x 768) is Klein 4B's
+        # 27648 x 3072 linear1, (4 x 5376) by (4 x 768) FLUX.1's 21504 x 3072.
+        (
+            {
+                "lora_unet_single_blocks_0_linear1.lokr_w1": [4, 4],
+                "lora_unet_single_blocks_0_linear1.lokr_w2": [6912, 768],
+                "lora_unet_single_blocks_0_linear1.alpha": [],
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            {
+                "lora_unet_single_blocks_0_linear1.lokr_w1": [4, 4],
+                "lora_unet_single_blocks_0_linear1.lokr_w2": [5376, 768],
+                "lora_unet_single_blocks_0_linear1.alpha": [],
+            },
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+    ],
+    ids=[
+        "klein-single-block-and-modulation",
+        "klein-single-block-only",
+        "klein-modulation-and-txt-attn",
+        "flux1-single-block-only",
+        "klein-lokr-whole-w1",
+        "flux1-lokr-whole-w1",
+    ],
+)
+def test_a_partial_kohya_lora_is_identified_by_the_layers_it_has(
+    keys: dict[str, Any], claimed_by: str, variant: Flux2VariantType | None, tmp_path: Path
+) -> None:
+    assert keys
+    state_dict = _state_dict(keys)
+
+    assert _claimed_by(state_dict, tmp_path) == [claimed_by]
+    if variant is not None:
+        assert _probe(LoRA_LyCORIS_Flux2_Config, state_dict, tmp_path).variant is variant
+
+
+def _kohya(layer: str, in_dim: int, out_dim: int, rank: int = 16) -> dict[str, Any]:
+    return {
+        f"lora_unet_{layer}.alpha": [],
+        f"lora_unet_{layer}.lora_down.weight": [rank, in_dim],
+        f"lora_unet_{layer}.lora_up.weight": [out_dim, rank],
+    }
+
+
+_ATTN_PROJ = "double_blocks_0_img_attn_proj"  # 3072 x 3072 in FLUX.1 and Klein 4B: says nothing on its own
+# A block layer that names no hidden size outright (a Klein 9B MLP output: 6 x 4096 in, 4096 out)
+_MLP_OUT = "double_blocks_0_img_mlp_2"
+
+
+@pytest.mark.parametrize(
+    ("keys", "claimed_by", "variant"),
+    [
+        # `img_in` takes 128 latent channels in FLUX.2 and 64 in FLUX.1 (reviewer's reproducer, #10206).
+        (
+            _layers(_KLEIN_4B_KOHYA, "img_in", _ATTN_PROJ),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            _layers(_KLEIN_4B_KOHYA, "final_layer_linear", _ATTN_PROJ),
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            {**_kohya("img_in", 64, 3072), **_kohya(_ATTN_PROJ, 3072, 3072)},
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        (
+            {**_kohya("final_layer_linear", 3072, 64), **_kohya(_ATTN_PROJ, 3072, 3072)},
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        # FLUX.1 Fill's `img_in` takes 384 channels (latents, masked image and mask): not FLUX.2's 128.
+        (
+            {**_kohya("img_in", 384, 3072), **_kohya(_ATTN_PROJ, 3072, 3072)},
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        # Same shapes in FLUX.1 and Klein 4B: either model takes them, so FLUX.1 stays the answer.
+        (
+            _layers(
+                _KLEIN_4B_KOHYA,
+                "time_in_in_layer",
+                "time_in_out_layer",
+                "final_layer_adaLN_modulation_1",
+                _ATTN_PROJ,
+            ),
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        # Klein 9B (hidden size 4096) shows in the hidden-sized axis of any non-block layer, and `img_in`'s 128 channels.
+        (
+            {**_kohya("time_in_out_layer", 4096, 4096), **_kohya(_MLP_OUT, 24576, 4096)},
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein9B,
+        ),
+        (
+            {**_kohya("img_in", 128, 4096), **_kohya(_MLP_OUT, 24576, 4096)},
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein9B,
+        ),
+        (
+            {**_kohya("final_layer_adaLN_modulation_1", 4096, 8192), **_kohya(_MLP_OUT, 24576, 4096)},
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein9B,
+        ),
+        # The variant comes from the non-block layer alone (the block layer beside it has no hidden size to read).
+        (
+            {**_kohya("img_in", 128, 3072), **_kohya(_MLP_OUT, 9216, 3072)},
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        # LoHa: (3072 x r) by (r x 128), twice.
+        (
+            {
+                "lora_unet_img_in.hada_w1_a": [3072, 4],
+                "lora_unet_img_in.hada_w1_b": [4, 128],
+                "lora_unet_img_in.hada_w2_a": [3072, 4],
+                "lora_unet_img_in.hada_w2_b": [4, 128],
+                **_kohya(_ATTN_PROJ, 3072, 3072),
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        # LoKr: whole or factorized operands, the 128 inputs of `img_in` as 2 x 64 (FLUX.1's 64 as 2 x 32).
+        (
+            {
+                "lora_unet_img_in.lokr_w1": [3, 2],
+                "lora_unet_img_in.lokr_w2": [1024, 64],
+                **_kohya(_ATTN_PROJ, 3072, 3072),
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        (
+            {
+                "lora_unet_img_in.lokr_w1_a": [3, 4],
+                "lora_unet_img_in.lokr_w1_b": [4, 2],
+                "lora_unet_img_in.lokr_w2_a": [1024, 4],
+                "lora_unet_img_in.lokr_w2_b": [4, 64],
+                **_kohya(_ATTN_PROJ, 3072, 3072),
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+        # Klein 9B: img_in is (4 x 1024) by (2 x 64) = 4096 x 128.
+        (
+            {
+                "lora_unet_img_in.lokr_w1": [4, 2],
+                "lora_unet_img_in.lokr_w2": [1024, 64],
+                **_kohya(_MLP_OUT, 24576, 4096),
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein9B,
+        ),
+        (
+            {
+                "lora_unet_img_in.lokr_w1": [3, 2],
+                "lora_unet_img_in.lokr_w2": [1024, 32],
+                **_kohya(_ATTN_PROJ, 3072, 3072),
+            },
+            "LoRA_LyCORIS_FLUX_Config",
+            None,
+        ),
+        (
+            {
+                "lora_unet_final_layer_linear.lokr_w1": [2, 3],
+                "lora_unet_final_layer_linear.lokr_w2": [64, 1024],
+                **_kohya(_ATTN_PROJ, 3072, 3072),
+            },
+            "LoRA_LyCORIS_Flux2_Config",
+            Flux2VariantType.Klein4B,
+        ),
+    ],
+    ids=[
+        "klein-img-in",
+        "klein-final-layer-linear",
+        "flux1-img-in",
+        "flux1-final-layer-linear",
+        "flux1-fill-img-in",
+        "shared-shapes-stay-flux1",
+        "klein9b-time-in",
+        "klein9b-img-in",
+        "klein9b-final-layer-adaln",
+        "klein-variant-from-img-in",
+        "klein-loha-img-in",
+        "klein-lokr-img-in-whole",
+        "klein-lokr-img-in-factorized",
+        "klein9b-lokr-img-in",
+        "flux1-lokr-img-in",
+        "klein-lokr-final-layer-linear",
+    ],
+)
+def test_a_kohya_lora_is_identified_by_the_shape_of_its_non_block_layers(
+    keys: dict[str, Any], claimed_by: str, variant: Flux2VariantType | None, tmp_path: Path
+) -> None:
+    """A layer outside the blocks that takes other widths in FLUX.2 than in FLUX.1 identifies the family, though the
+    block layers beside it fit both."""
+    state_dict = _state_dict(keys)
+
+    assert _claimed_by(state_dict, tmp_path) == [claimed_by]
+    if variant is not None:
+        assert _probe(LoRA_LyCORIS_Flux2_Config, state_dict, tmp_path).variant is variant
+
+
+def test_an_sd3_kohya_folder_with_a_final_layer_is_not_claimed_as_flux2(tmp_path: Path) -> None:
+    """SD3 names its last layer `final_layer_linear` too, 1536 wide: not a Klein hidden size. Only a FLUX kohya file is
+    read for its non-block layers."""
+    keys = {**_kohya("joint_blocks_0_x_block_attn_qkv", 1536, 4608), **_kohya("final_layer_linear", 1536, 64)}
+
+    assert _claimed_by(_state_dict(keys), tmp_path, folder=True) == ["LoRA_Diffusers_SD3_Config"]
+
+
+def test_an_sd3_onetrainer_lora_with_top_level_layers_is_not_claimed_as_flux(tmp_path: Path) -> None:
+    """SD3's top-level layers and double blocks are named like FLUX's, which OneTrainer's LEGACY_LORA keys keep; only
+    FLUX has single blocks."""
+    state_dict = _onetrainer_legacy_state_dict(_meta_sd3(), lambda name: True)
+
+    assert "LoRA_LyCORIS_FLUX_Config" not in _claimed_by(state_dict, tmp_path)
 
 
 def test_a_distillation_extract_is_refused_with_its_reason(tmp_path: Path) -> None:

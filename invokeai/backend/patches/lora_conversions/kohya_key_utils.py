@@ -28,34 +28,36 @@ def insert_periods_into_kohya_key(key: str, parsing_tree: ParsingTree) -> str:
     > "module_a.module_b.0.attn.to_k"
     ```
     """
-    # Split key into parts by underscore.
-    parts = key.split("_")
-
-    # Build up result by walking through parsing tree and parts.
-    result_parts: list[str] = []
-    current_part = ""
-    current_tree = parsing_tree
-
-    for part in parts:
-        if len(current_part) > 0:
-            current_part = current_part + "_"
-        current_part += part
-
-        if current_part in current_tree:
-            # Match found.
-            current_tree = current_tree[current_part]
-            result_parts.append(current_part)
-            current_part = ""
-        elif current_part.isnumeric() and INDEX_PLACEHOLDER in current_tree:
-            # Match found with index placeholder.
-            current_tree = current_tree[INDEX_PLACEHOLDER]
-            result_parts.append(current_part)
-            current_part = ""
-
-    if len(current_part) > 0:
+    result_parts = _split_kohya_key(key.split("_"), parsing_tree)
+    if result_parts is None:
         raise ValueError(f"Key {key} does not match parsing tree {parsing_tree}.")
-
     return ".".join(result_parts)
+
+
+def _split_kohya_key(parts: list[str], parsing_tree: ParsingTree) -> list[str] | None:
+    """Splits underscore-separated key parts into the module names of a parsing tree, or returns None if they do not
+    fit it.
+
+    The shortest module name that fits wins, and a longer one is tried when the rest of the key does not fit below
+    the shorter one: `ff_context_net_0_proj` is `ff_context`, though `ff` is a sibling in the tree too.
+    """
+    # A leading empty part (a double underscore in the key) belongs to no name.
+    while parts and not parts[0]:
+        parts = parts[1:]
+    if not parts:
+        return []
+    for end in range(1, len(parts) + 1):
+        name = "_".join(parts[:end])
+        if name in parsing_tree:
+            subtree = parsing_tree[name]
+        elif end == 1 and name.isnumeric() and INDEX_PLACEHOLDER in parsing_tree:
+            subtree = parsing_tree[INDEX_PLACEHOLDER]
+        else:
+            continue
+        rest = _split_kohya_key(parts[end:], subtree)
+        if rest is not None:
+            return [name, *rest]
+    return None
 
 
 def kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> bool:

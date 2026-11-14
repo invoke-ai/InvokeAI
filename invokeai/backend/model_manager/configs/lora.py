@@ -1,6 +1,6 @@
 import re
 from abc import ABC
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import (
     Any,
@@ -290,6 +290,57 @@ def _lycoris_out_dim(state_dict: dict[str | int, Any], key_prefix: str) -> int |
     return lokr_dim if lokr_dim is not None else _loha_dim(state_dict, key_prefix, 0)
 
 
+# Kohya layers outside the blocks (the keys of `FLUX_KOHYA_NON_BLOCK_LAYERS`) whose shape tells FLUX.1 from FLUX.2.
+# Layers that are in no table, and those that are only in the hidden-axis table at 3072, have the same shape in FLUX.1
+# and Klein 4B and stay ambiguous: they apply to either without a shape error, so the FLUX.1 fallback stands for them.
+# The axis ("in" or "out") that is the transformer's hidden size: 3072 in FLUX.1 and Klein 4B, 4096 in Klein 9B.
+_KOHYA_NON_BLOCK_HIDDEN_AXIS = {
+    "img_in": "out",
+    "time_in_in_layer": "out",
+    "time_in_out_layer": "in",
+    "guidance_in_in_layer": "out",
+    "guidance_in_out_layer": "in",
+    "final_layer_linear": "in",
+    "final_layer_adaLN_modulation_1": "in",
+}
+# The axis that is the latent channels, 128 in both Klein variants. FLUX.1 differs (64, and 384 on `img_in` of FLUX.1
+# Fill, which adds the masked image), so only 128 is evidence of FLUX.2; any other width leaves the FLUX.1 fallback.
+# (FLUX.1 Canny/Depth-dev and BFL control LoRAs also take 128 on `img_in`; they are no supported FLUX.1 variant here,
+# and such a file fails on FLUX.1 either way.)
+_KOHYA_NON_BLOCK_LATENT_AXIS = {"img_in": "in", "final_layer_linear": "out"}
+_FLUX2_LATENT_CHANNELS = 128
+
+
+def _kohya_non_block_widths(state_dict: dict[str | int, Any]) -> Iterator[tuple[str, str, int]]:
+    """Yield (layer, axis, width) for each width a kohya layer outside the blocks reveals, as the block checks read it:
+    from `lora_down`/`lora_up`, or from the LyCORIS operands (a whole `lokr_w1` reveals both axes).
+
+    Only for a FLUX kohya file: `final_layer_linear`, `img_in` and the like are other families' module names too.
+    """
+    # Imported here: the conversion module reaches the model loaders, which import the configs.
+    from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
+        is_state_dict_likely_in_flux_kohya_format,
+    )
+
+    if not is_state_dict_likely_in_flux_kohya_format(state_dict):
+        return
+    for key in state_dict:
+        if not isinstance(key, str) or not key.startswith("lora_unet_"):
+            continue
+        layer, _, param = key.removeprefix("lora_unet_").partition(".")
+        if layer not in _KOHYA_NON_BLOCK_HIDDEN_AXIS:
+            continue
+        prefix = key.rsplit(".", 1)[0]
+        if param == "lora_down.weight":
+            yield layer, "in", state_dict[key].shape[1]
+        elif param == "lora_up.weight":
+            yield layer, "out", state_dict[key].shape[0]
+        if key.endswith(_LYCORIS_IN_DIM_SUFFIXES) and (in_dim := _lycoris_in_dim(state_dict, prefix)) is not None:
+            yield layer, "in", in_dim
+        if key.endswith(_LYCORIS_OUT_DIM_SUFFIXES) and (out_dim := _lycoris_out_dim(state_dict, prefix)) is not None:
+            yield layer, "out", out_dim
+
+
 def _is_flux2_lora(mod: ModelOnDisk) -> bool:
     """Check if a FLUX-format LoRA is specifically for FLUX.2 (Klein) rather than FLUX.1.
 
@@ -423,6 +474,38 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
                 in_dim = _lycoris_in_dim(state_dict, layer_prefix)
                 if in_dim is not None:
                     return in_dim in _FLUX2_VEC_IN_DIMS
+
+    # Kohya format: the shared modulations exist only in FLUX.2 (FLUX.1 modulates per block), and a single block's
+    # `linear1` fuses q, k, v and the MLP input, so its width gives the hidden size and the MLP ratio (FLUX.1's is
+    # hidden_size * (3 + _FLUX1_MLP_RATIO)). This covers LoRAs that train no double block and no embedder.
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if key.startswith(("lora_unet_double_stream_modulation_", "lora_unet_single_stream_modulation_")):
+            return True
+        if key.startswith("lora_unet_single_blocks_") and "_linear1." in key:
+            in_dim = out_dim = None
+            if key.endswith("lora_down.weight"):
+                in_dim = state_dict[key].shape[1]
+            elif key.endswith("lora_up.weight"):
+                out_dim = state_dict[key].shape[0]
+            # Not elif: a whole `lokr_w1` is in both suffix lists and gives both widths.
+            if key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+                in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
+            if key.endswith(_LYCORIS_OUT_DIM_SUFFIXES):
+                out_dim = _lycoris_out_dim(state_dict, key.rsplit(".", 1)[0])
+            if in_dim is not None and in_dim != _FLUX1_HIDDEN_SIZE:
+                return True
+            if out_dim is not None and out_dim != _FLUX1_HIDDEN_SIZE * (3 + _FLUX1_MLP_RATIO):
+                return True
+
+    # Kohya format: layers outside the blocks. FLUX.2's 128 latent channels on `img_in` or `final_layer_linear`, or a
+    # hidden-sized axis other than 3072 (Klein 9B), mark FLUX.2 for a LoRA that trains little else.
+    for layer, axis, width in _kohya_non_block_widths(state_dict):
+        if _KOHYA_NON_BLOCK_HIDDEN_AXIS[layer] == axis and width != _FLUX1_HIDDEN_SIZE:
+            return True
+        if _KOHYA_NON_BLOCK_LATENT_AXIS.get(layer) == axis and width == _FLUX2_LATENT_CHANNELS:
+            return True
 
     # Kohya format: check transformer block dimensions (hidden_size and MLP ratio).
     # This handles LoRAs that only target transformer blocks (no txt_in/vector_in/context_embedder).
@@ -593,6 +676,27 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)
+
+    # No double block: the hidden size is also the input width of a single block's fused `linear1` and of the shared
+    # modulations.
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if not key.startswith("lora_unet_") or not (
+            "_single_blocks_" in key and "_linear1." in key or "_stream_modulation_" in key
+        ):
+            continue
+        if key.endswith("lora_down.weight"):
+            return _variant_from_hidden_size(state_dict[key].shape[1])
+        elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
+            if in_dim is not None:
+                return _variant_from_hidden_size(in_dim)
+
+    # Layers outside the blocks: their hidden-sized axis.
+    for layer, axis, width in _kohya_non_block_widths(state_dict):
+        if _KOHYA_NON_BLOCK_HIDDEN_AXIS[layer] == axis:
+            return _variant_from_hidden_size(width)
 
     return None
 
