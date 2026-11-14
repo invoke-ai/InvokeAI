@@ -1,7 +1,7 @@
 ---
 title: Which memory option do I need?
 description: Pick your GPU, VRAM and model format to see which of Invoke's memory options apply, and compare GGUF, int8, nvfp4, SDNQ, NF4 and FP8 in one table.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-13
 sidebar:
   label: Which option do I need?
   order: 1
@@ -35,7 +35,9 @@ around it; close games and other GPU programs while generating, and read the
 </MemoryOption>
 <MemoryOption id="low-vram-mode" title="Low-VRAM mode is already on">
 On NVIDIA, AMD and Intel GPUs, Invoke streams the layers of a model too large for your VRAM from RAM as they are needed.
-Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lists the settings that tune it.
+Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lists the settings that tune it. On an
+NVIDIA or AMD (ROCm) GPU, [Async Weight Streaming](/configuration/optimization/async-weight-streaming/) makes the streamed steps
+faster, with identical images.
 </MemoryOption>
 <MemoryOption id="fp8-storage" title="Turn on FP8 Storage for full-precision models that don't fit">
 On NVIDIA, AMD and Intel GPUs (not Apple silicon or the CPU), with a full-precision model: a per-model setting in the

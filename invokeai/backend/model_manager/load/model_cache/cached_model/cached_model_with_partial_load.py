@@ -1,3 +1,4 @@
+import threading
 import weakref
 from contextlib import contextmanager
 from typing import Iterator
@@ -11,6 +12,7 @@ from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
     analyze_state_dict,
     move_shared,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
@@ -42,6 +44,20 @@ class CachedModelWithPartialLoad:
         # Assigned for real at the end of __init__; initialized here so the acquire-failure path
         # below can call release_shared_weights(), which reads it, before that assignment runs.
         self._cpu_state_dict: dict[str, torch.Tensor] | None = None
+        # The page-locked CPU weights this model streams with `async_weight_streaming`; created on the first load that
+        # leaves streaming weights in RAM. `release_pinned_weights()` releases them on eviction, the finalizer if the
+        # wrapper is dropped without one.
+        self._pin_holder: weight_streaming.PinHolder | None = None
+        self._pin_release_finalizer: weakref.finalize | None = None
+        # Set on eviction. An evicted record can still finish a lock that was under way; it must not pin again, as
+        # nothing would release that before the wrapper is collected.
+        self._pinning_retired = False
+        # Whether weights moved since the pins were last brought up to date (`pin_streamed_weights`).
+        self._pins_stale = True
+        # Serializes `pin_streamed_weights`: two threads locking this model at once (a session and the image index
+        # worker) would otherwise both create a holder, or one would return while the other's update still runs.
+        # Releases do not take it: eviction must not wait behind a slow first pin.
+        self._pin_lock = threading.Lock()
 
         model_state_dict = model.state_dict()
         # A CPU read-only copy of the model's state dict. Used for faster model unloads from VRAM, and to speed up LoRA
@@ -76,6 +92,13 @@ class CachedModelWithPartialLoad:
             model_state_dict
         )
         self._state_dict_keys_by_module_prefix = self._group_state_dict_keys_by_module_prefix(model_state_dict)
+        # What `cast_to_device` could stream asynchronously at most; bounds the VRAM reserve of a streaming lock.
+        self._streamable_bytes = sum(
+            self._state_dict_bytes[key]
+            for key, tensor in model_state_dict.items()
+            if key not in self._keys_in_modules_that_do_not_support_autocast
+            and weight_streaming.is_streamable_tensor(tensor)
+        )
 
         # In multi-GPU mode, share a single canonical CPU copy of the weights across the per-device
         # caches instead of keeping one copy per device (see SharedCpuWeightsStore). If another
@@ -211,6 +234,7 @@ class CachedModelWithPartialLoad:
             yield
         except BaseException:
             self._cur_vram_bytes = None
+            self._pins_stale = True
             self._set_autocast_enabled_in_all_modules(True)
             raise
 
@@ -248,6 +272,96 @@ class CachedModelWithPartialLoad:
             self._shared_store.release(self._shared_key, self._cpu_state_dict)
             self._shared_store = None
             self._shared_key = None
+
+    def release_pinned_weights(self) -> bool:
+        """Release this model's page-locked CPU weights (see `pin_streamed_weights`); whether it had any. Called on
+        eviction; idempotent. Storages another holder (a wrapper on another GPU sharing these weights) still uses stay
+        pinned."""
+        # Set first: a `pin_streamed_weights` running concurrently checks it again after registering and undoes that.
+        self._pinning_retired = True
+        if self._pin_release_finalizer is not None:
+            self._pin_release_finalizer.detach()
+            self._pin_release_finalizer = None
+        holder, self._pin_holder = self._pin_holder, None
+        return holder is not None and weight_streaming.PINNED_STORAGES.release(holder)
+
+    def _streams_weights(self) -> bool:
+        return not self._pinning_retired and weight_streaming.can_stream_weights_to(
+            self._compute_device, has_ram_copy=self._cpu_state_dict is not None
+        )
+
+    def weight_streaming_reserve_bytes(self) -> int:
+        """VRAM a lock that leaves streamed weights in RAM needs beyond the model's resident weights and the working
+        memory: the copies in flight, at most `weight_streaming.STREAM_BUDGET_BYTES`. The layer being computed needs
+        no reserve, the synchronous path holds it as well."""
+        if self._streamable_bytes == 0 or not self._streams_weights():
+            return 0
+        if not weight_streaming.PINNED_STORAGES.can_register():
+            return 0
+        return min(weight_streaming.STREAM_BUDGET_BYTES, self._streamable_bytes)
+
+    def pin_streamed_weights(self) -> None:
+        """Page-lock the CPU-resident weights the custom modules stream, so `cast_to_device` copies them
+        asynchronously (`async_weight_streaming`), and mark them as streamed by this lock. What earlier locks pinned
+        stays pinned (see `PinnedStorageRegistry`): models that take turns in VRAM pay for registration once.
+
+        Called by the holder of a settled lock, outside the global load lock and the cache's lock: page-locking
+        weights that are still only mapped from their file reads them into RAM (about 2.5 s/GiB measured), which
+        must not stall other models' construction or this device's cache. The lock keeps the residency fixed.
+
+        Only with a RAM copy: its tensors are the ones the parameters point to while offloaded, and they stay put
+        across loads and unloads. Without one, offloaded weights are fresh allocations on every unload.
+        """
+        with self._pin_lock:
+            self._pin_streamed_weights_locked()
+
+    def mark_streamed_weights_idle(self) -> None:
+        """Called by the cache when the model's last lock ends: its pins stay, but another model's registration may
+        reclaim them under the pinned-RAM cap."""
+        holder = self._pin_holder
+        if holder is not None:
+            weight_streaming.PINNED_STORAGES.idle(holder)
+
+    def _pin_streamed_weights_locked(self) -> None:
+        registry = weight_streaming.PINNED_STORAGES
+        if not self._streams_weights():
+            # Also covers the setting being switched off while pins are held.
+            holder = self._pin_holder
+            if holder is not None:
+                registry.release(holder)
+                self._pins_stale = True
+            return
+        holder = self._pin_holder
+        if not self._pins_stale and holder is not None and registry.activate(holder):
+            return  # Nothing moved since the last lock, and all it streams is still pinned.
+        if holder is None:
+            holder = weight_streaming.PinHolder()
+            # Like the shared-weights finalizer: must not reference `self`, and only enqueues (GC context).
+            finalizer = weakref.finalize(self, registry.release_deferred, holder)
+            finalizer.atexit = False
+            self._pin_holder, self._pin_release_finalizer = holder, finalizer
+        self._pins_stale = False
+        ram_copy = self._cpu_state_dict
+        assert ram_copy is not None  # `_streams_weights` requires it.
+        # Only storages of the RAM copy: they live as long as this wrapper, so the registry holding them keeps nothing
+        # alive that would otherwise be freed (a holder may have cast weights in place, see `restore_counted_dtypes`).
+        streamed = [
+            tensor.untyped_storage()
+            for key, tensor in self._model.state_dict().items()
+            if tensor.device.type == "cpu"
+            and key not in self._keys_in_modules_that_do_not_support_autocast
+            and weight_streaming.is_streamable_tensor(tensor)
+            and key in ram_copy
+            and ram_copy[key].untyped_storage().data_ptr() == tensor.untyped_storage().data_ptr()
+        ]
+        try:
+            registry.update(holder, streamed)
+        except BaseException:
+            self._pins_stale = True
+            raise
+        if self._pinning_retired:
+            # Evicted while registering: `release_pinned_weights` may have released before this update.
+            registry.release(holder)
 
     def total_bytes(self) -> int:
         """Get the total size (in bytes) of all the weights in the model."""
@@ -298,6 +412,8 @@ class CachedModelWithPartialLoad:
             self._move_non_persistent_buffers_to_device(self._compute_device)
             if keys_to_repair:
                 self._cur_vram_bytes = None
+        if keys_to_repair:
+            self._pins_stale = True
         return repaired_required_tensors
 
     def restore_counted_dtypes(self) -> None:
@@ -494,6 +610,9 @@ class CachedModelWithPartialLoad:
             # in the vram_bytes_loaded tracking.
             self._move_non_persistent_buffers_to_device(self._compute_device)
 
+        if keys_to_load:
+            self._pins_stale = True
+
         return vram_bytes_loaded, truncated
 
     @torch.no_grad()
@@ -544,4 +663,7 @@ class CachedModelWithPartialLoad:
             # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
             # layers.
             self._set_autocast_enabled_in_all_modules(True)
+
+        if keys_to_offload:
+            self._pins_stale = True
         return vram_bytes_freed

@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     FirstUseClaim,
     ModelCache,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.working_memory import probe
@@ -212,6 +213,10 @@ class LoadedModelWithoutConfig:
             locked = True
             self._end_first_use_window()
             self.repair_required_tensors_on_device()
+            cached_model = self._cache_record.cached_model
+            if isinstance(cached_model, CachedModelWithPartialLoad):
+                # Outside the global load lock and the cache's lock, see `pin_streamed_weights`.
+                cached_model.pin_streamed_weights()
         except BaseException:
             if locked:
                 self._cache.unlock(self._cache_record)
@@ -226,6 +231,9 @@ class LoadedModelWithoutConfig:
         self._cache.unlock(self._cache_record)
         if probe.armed:
             probe.unlocked(self._cache, self._cache_record)
+        cached_model = self._cache_record.cached_model
+        if isinstance(cached_model, CachedModelWithPartialLoad):
+            weight_streaming.release_side_pool(cached_model.compute_device)
 
     def __enter__(self) -> AnyModel:
         self._lock_on_device(None)
@@ -351,11 +359,17 @@ class LoadedModelWithoutConfig:
         Full-load-only entries ignore the requested byte count and unload all weights.
         """
         with MODEL_LOAD_LOCK.read_lock():
-            return self._cache.unload_model_from_vram(
+            freed = self._cache.unload_model_from_vram(
                 self._cache_record,
                 vram_bytes_to_free,
                 keep_required_weights_in_vram=keep_required_weights_in_vram,
             )
+        cached_model = self._cache_record.cached_model
+        if freed and self._cache_record.is_locked and isinstance(cached_model, CachedModelWithPartialLoad):
+            # A node that makes room within its lock (a second expert or branch) runs on: what this moved to RAM
+            # streams from now on. Outside the locks, as in `_lock_on_device`.
+            cached_model.pin_streamed_weights()
+        return freed
 
 
 class LoadedModel(LoadedModelWithoutConfig):
