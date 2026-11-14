@@ -84,10 +84,15 @@ export {
 } from './data/events';
 
 export {
-  getFollowedProgressSession,
+  getAutoSwitchFollowedLive,
   getQueueActiveSessions,
   getQueueProgressSessions,
+  isAutoSwitchPinHeld,
   isGalleryProgressItem,
+  pickAutoSwitch,
+  selectsLandedResult,
+  type AutoSwitchLiveSlot,
+  type AutoSwitchMode,
   type QueueActiveSession,
   type QueueProgressSession,
 } from './core/activeSessions';

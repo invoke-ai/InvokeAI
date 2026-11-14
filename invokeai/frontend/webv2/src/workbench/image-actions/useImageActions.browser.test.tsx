@@ -1906,6 +1906,7 @@ describe('mixed item mutation outcomes', () => {
     // A next image may follow the request, so an open comparison is kept until it settles.
     expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png'], {
       keepComparisonForSuccessor: true,
+      projectId: 'project-1',
     });
 
     expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
@@ -1918,6 +1919,7 @@ describe('mixed item mutation outcomes', () => {
     );
     expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4'], {
       keepComparisonForSuccessor: false,
+      projectId: 'project-1',
     });
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
@@ -1982,6 +1984,7 @@ describe('total transport failure rollback', () => {
     // The optimistic removal happened up front, before the transport was asked.
     expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png'], {
       keepComparisonForSuccessor: true,
+      projectId: 'project-1',
     });
 
     // Transport failures must roll back immediately; trailing invalidation may fail too.
@@ -2351,6 +2354,7 @@ describe('primary successor after confirmed deletion', () => {
     // a comparison then shows the next one against the same comparison image, and otherwise ends the comparison.
     expect(mocks.galleryRemoveItems).toHaveBeenLastCalledWith(['image:primary.png'], {
       keepComparisonForSuccessor: keepsComparison,
+      projectId: 'project-1',
     });
     expect(mocks.gallerySelectItem).toHaveBeenCalledTimes(keepsComparison ? 1 : 0);
   });
@@ -2651,7 +2655,10 @@ describe('primary successor after confirmed deletion', () => {
       await getItemActions().deleteItems(requested);
     });
 
-    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared'], { keepComparisonForSuccessor: true });
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
     expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
       ['image:failed.png', 'video:shared', 'image:successor.png'],
       successor,

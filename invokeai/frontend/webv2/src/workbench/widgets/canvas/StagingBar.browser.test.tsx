@@ -1,10 +1,15 @@
 import '@fontsource/inter/index.css';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { QueueItemProgress } from '@features/queue/contracts';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/api';
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
+import type { WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { createInstance } from 'i18next';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -105,6 +110,7 @@ const renderStagingBar = async (
     isGenerating = false,
     isSavingToGallery = false,
     onAccept = noop,
+    onStopGenerating = noop,
     onCycle = noop,
     onDiscardSelected = noop,
     onSaveToGallery = () => Promise.resolve(),
@@ -113,6 +119,7 @@ const renderStagingBar = async (
     isGenerating?: boolean;
     isSavingToGallery?: boolean;
     onAccept?: () => void;
+    onStopGenerating?: () => void;
     onCycle?: (direction: -1 | 1) => void;
     onDiscardSelected?: () => void;
     onSaveToGallery?: (imageName: string) => Promise<void>;
@@ -148,7 +155,6 @@ const renderStagingBar = async (
                   selectedSlot={selectedSlot}
                   slots={slots}
                   onAccept={onAccept}
-                  onCancelQueueItem={noop}
                   onCycle={onCycle}
                   onDiscardAll={noop}
                   onDiscardSelected={onDiscardSelected}
@@ -157,6 +163,7 @@ const renderStagingBar = async (
                   onSaveToGallery={onSaveToGallery}
                   onSaveToLayerAndContinue={onSaveToLayerAndContinue}
                   onSetAutoSwitch={noop}
+                  onStopGenerating={onStopGenerating}
                   onToggleThumbnails={noop}
                   onToggleVisibility={noop}
                 />
@@ -452,11 +459,18 @@ describe('StagingBar thumbnail strip', () => {
     await expect.element(page.getByRole('button', { exact: true, name: 'Save to gallery' })).toBeDisabled();
   });
 
+  const visibleStopButtons = (overlay: HTMLElement) =>
+    [...overlay.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (button) =>
+        (button.getAttribute('aria-label') ?? button.textContent?.trim()) ===
+          i18n.t('widgets.canvas.staging.stopGenerating') && button.getBoundingClientRect().width > 0
+    );
+
   it.each([
-    { canvasWidth: 800, iconOnly: false },
+    { canvasWidth: 1000, iconOnly: false },
     { canvasWidth: 360, iconOnly: true },
   ])(
-    'shows one Cancel for a running slot at $canvasWidth px, labelled only when there is room',
+    'shows one Stop generating at $canvasWidth px, labelled only when there is room',
     async ({ canvasWidth, iconOnly }) => {
       const { overlay } = await renderStagingBar(
         2,
@@ -467,20 +481,69 @@ describe('StagingBar thumbnail strip', () => {
         (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
         { canvasWidth, isGenerating: true }
       );
-      const visibleCancels = [...overlay.querySelectorAll<HTMLButtonElement>('button')].filter(
-        (button) =>
-          (button.getAttribute('aria-label') ?? button.textContent?.trim()) === 'Cancel' &&
-          button.getBoundingClientRect().width > 0
-      );
+      const stops = visibleStopButtons(overlay);
 
-      expect(visibleCancels).toHaveLength(1);
-      // The icon-only one carries its name (and so its tooltip); the labelled one shows the word itself.
-      expect(visibleCancels[0]!.hasAttribute('aria-label')).toBe(iconOnly);
-      expect(visibleCancels[0]!.getBoundingClientRect().right).toBeLessThanOrEqual(
-        overlay.getBoundingClientRect().right
-      );
+      expect(stops).toHaveLength(1);
+      // The icon-only one carries its name (and so its tooltip); the labelled one shows the words themselves.
+      expect(stops[0]!.hasAttribute('aria-label')).toBe(iconOnly);
+      expect(stops[0]!.getBoundingClientRect().right).toBeLessThanOrEqual(overlay.getBoundingClientRect().right);
     }
   );
+
+  it('keeps a long Stop generating label and every result action inside a wide canvas', async () => {
+    i18n.addResource(
+      'en',
+      'translation',
+      'widgets.canvas.staging.stopGenerating',
+      'Stop generating the remaining images'
+    );
+    try {
+      const { overlay } = await renderStagingBar(
+        3,
+        0,
+        noop,
+        noop,
+        noop,
+        (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+        { canvasWidth: 1000, isGenerating: true }
+      );
+      const bounds = overlay.getBoundingClientRect();
+
+      expect(visibleStopButtons(overlay)[0]?.textContent?.trim()).toBe('Stop generating the remaining images');
+      for (const control of overlay.querySelectorAll<HTMLElement>('button')) {
+        const rect = control.getBoundingClientRect();
+        if (rect.width > 1 && !control.closest('[data-scope="scroll-area"]')) {
+          expect(rect.left).toBeGreaterThanOrEqual(bounds.left);
+          expect(rect.right).toBeLessThanOrEqual(bounds.right);
+        }
+      }
+    } finally {
+      i18n.addResource('en', 'translation', 'widgets.canvas.staging.stopGenerating', 'Stop generating');
+    }
+  });
+
+  it('stops generating while a finished result is selected and the next image of its run starts', async () => {
+    const onStopGenerating = vi.fn();
+    await renderStagingBar(
+      2,
+      0,
+      noop,
+      noop,
+      noop,
+      (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+      { isGenerating: true, onStopGenerating }
+    );
+
+    await page.getByRole('button', { exact: true, name: 'Stop generating' }).click();
+
+    expect(onStopGenerating).toHaveBeenCalledOnce();
+  });
+
+  it('offers no Stop generating once every image has finished', async () => {
+    const { overlay } = await renderStagingBar(2, 0);
+
+    expect(visibleStopButtons(overlay)).toEqual([]);
+  });
 });
 
 describe('StagingBar focus', () => {
@@ -518,7 +581,6 @@ describe('StagingBar focus', () => {
                 selectedSlot={selected}
                 slots={remaining}
                 onAccept={noop}
-                onCancelQueueItem={noop}
                 onCycle={noop}
                 onDiscardAll={() => setRemaining([])}
                 onDiscardSelected={discardSelected}
@@ -527,6 +589,7 @@ describe('StagingBar focus', () => {
                 onSaveToGallery={() => Promise.resolve()}
                 onSaveToLayerAndContinue={noop}
                 onSetAutoSwitch={noop}
+                onStopGenerating={() => setRemaining((current) => current.filter((slot) => slot.kind === 'candidate'))}
                 onToggleThumbnails={noop}
                 onToggleVisibility={noop}
               />
@@ -537,7 +600,7 @@ describe('StagingBar focus', () => {
     );
   };
 
-  const renderCanvas = async (slotCount: number) => {
+  const renderCanvas = async (slotCount: number, slotAt: (index: number) => CanvasStagingSlot = makeSlot) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -545,7 +608,7 @@ describe('StagingBar focus', () => {
       root?.render(
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
-            <CanvasWithStaging slots={Array.from({ length: slotCount }, (_, index) => makeSlot(index))} />
+            <CanvasWithStaging slots={Array.from({ length: slotCount }, (_, index) => slotAt(index))} />
           </ChakraProvider>
         </I18nextProvider>
       )
@@ -575,6 +638,16 @@ describe('StagingBar focus', () => {
     expect(document.activeElement).toBe(surface);
   });
 
+  it('keeps focus with the results when Stop generating goes with the last image still to come', async () => {
+    const { thumbnails } = await renderCanvas(2, (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)));
+
+    await userEvent.click(page.getByRole('button', { exact: true, name: 'Stop generating' }));
+    await nextFrame();
+
+    expect(page.getByRole('button', { exact: true, name: 'Stop generating' }).elements()).toEqual([]);
+    expect(document.activeElement).toBe(thumbnails()[0]);
+  });
+
   it('returns focus to the thumbnail a dismissed menu opened from', async () => {
     const { thumbnails } = await renderCanvas(3);
 
@@ -600,17 +673,19 @@ describe('StagingBar keys', () => {
     return { reached, stop: () => window.removeEventListener('keydown', listener) };
   };
 
-  it('selects the thumbnail the keyboard is on and steps focus between thumbnails, keeping keys from the canvas', async () => {
+  it('picks with the arrows, moving focus with the pick, and keeps keys from the canvas', async () => {
     const onCycle = vi.fn();
     const onSelectImage = vi.fn();
     const { thumbnails } = await renderStagingBar(3, 0, noop, noop, onSelectImage, makeSlot, { onCycle });
     const window = watchWindow();
     try {
-      await act(() => thumbnails[1]!.focus());
-      expect(onSelectImage).toHaveBeenLastCalledWith(1);
+      // Focus alone picks nothing.
+      await act(() => thumbnails[0]!.focus());
+      expect(onSelectImage).not.toHaveBeenCalled();
+      await act(() => userEvent.keyboard('{ArrowRight}'));
+      expect(document.activeElement).toBe(thumbnails[1]);
       await act(() => userEvent.keyboard('{ArrowRight}'));
       expect(document.activeElement).toBe(thumbnails[2]);
-      expect(onSelectImage).toHaveBeenLastCalledWith(2);
       // Wrapping, as the step buttons do.
       await act(() => userEvent.keyboard('{ArrowRight}'));
       expect(document.activeElement).toBe(thumbnails[0]);
@@ -620,8 +695,15 @@ describe('StagingBar keys', () => {
       window.stop();
     }
 
+    expect(onSelectImage.mock.calls).toEqual([[1], [2], [0], [2]]);
     expect(onCycle).not.toHaveBeenCalled();
     expect(window.reached).toEqual([]);
+  });
+
+  it('takes one Tab stop for the strip: the selected thumbnail', async () => {
+    const { thumbnails } = await renderStagingBar(3, 1);
+
+    expect(thumbnails.map((thumbnail) => thumbnail.tabIndex)).toEqual([-1, 0, -1]);
   });
 
   it('steps the selection from the bar buttons, and Delete discards the selected result', async () => {
@@ -677,4 +759,212 @@ describe('StagingBar keys', () => {
     expect(onCycle).not.toHaveBeenCalled();
     expect(window.reached).toEqual(['Alt', 'ArrowRight', 'b']);
   });
+});
+
+describe('StagingBar picks and Auto-switch', () => {
+  type Mode = 'latest' | 'off' | 'progress';
+
+  /** A run of three images on the canvas: two results staged, the third still generating. */
+  const createStagedState = (mode: Mode): WorkbenchState => {
+    const state = createInitialWorkbenchState();
+    const project = state.projects[0]!;
+    const result = (backendItemId: number) => ({
+      height: 512,
+      imageName: `result-${backendItemId}`,
+      imageUrl: TRANSPARENT_PIXEL,
+      placement: { height: 512, opacity: 1, width: 512, x: 0, y: 0 },
+      queuedAt: '2026-01-01T00:00:00.000Z',
+      sourceBackendItemId: backendItemId,
+      sourceQueueItemId: 'run-1',
+      thumbnailUrl: TRANSPARENT_PIXEL,
+      width: 512,
+    });
+    const run = {
+      backendItemIds: [11, 12, 13],
+      cancellable: true,
+      completedBackendItemIds: [11, 12],
+      id: 'run-1',
+      snapshot: {
+        canvas: {
+          document: { bbox: { height: 512, width: 512, x: 0, y: 0 }, height: 1024, width: 1024 },
+          documentRevision: project.canvas.documentRevision,
+        },
+        destination: 'canvas',
+        graph: { id: 'graph', label: 'Generate' },
+        presentation: { batchCount: 3, height: 512, width: 512 },
+        sourceId: 'generate',
+        submittedAt: '2026-01-01T00:00:00.000Z',
+      },
+      status: 'running',
+    } as unknown as WorkbenchQueueItem;
+    const pendingImages = [result(11), result(12)];
+
+    return {
+      ...state,
+      projects: [
+        {
+          ...project,
+          canvas: {
+            ...project.canvas,
+            stagingArea: {
+              ...project.canvas.stagingArea,
+              autoSwitchMode: mode,
+              isVisible: true,
+              pendingImageIds: pendingImages.map((image) => image.imageName),
+              pendingImages,
+              selectedImageIndex: 1,
+            },
+          },
+          queue: { items: [run] },
+        },
+      ],
+    };
+  };
+
+  /** The bar wired to the workbench reducer, as the canvas widget wires it. */
+  const WiredStagingBar = ({ initial }: { initial: WorkbenchState }) => {
+    const [state, setState] = useState(initial);
+    const project = state.projects[0]!;
+    const { stagingArea } = project.canvas;
+    const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
+    const selectedSlot = slots[stagingArea.selectedImageIndex];
+    const mutate = (mutation: CanvasProjectMutation) =>
+      setState((current) =>
+        workbenchReducer(current, { mutation, projectId: project.id, type: 'applyCanvasProjectMutation' })
+      );
+
+    return (
+      <Box h="400px" position="relative" w={`${CANVAS_WIDTH}px`}>
+        {/* Where Tab starts from: the canvas, before the bar. */}
+        <button data-testid="before-bar" type="button">
+          Canvas
+        </button>
+        <CanvasBottomOverlay.Root>
+          <CanvasBottomOverlay.Staging>
+            <StagingBar
+              antialiasProgressImages={false}
+              areThumbnailsVisible
+              autoSwitchMode={stagingArea.autoSwitchMode}
+              canAccept
+              hasMultipleSlots={slots.length > 1}
+              isGenerating
+              isSavingToGallery={false}
+              isVisible
+              selectedCandidate={selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined}
+              selectedImageIndex={stagingArea.selectedImageIndex}
+              selectedSlot={selectedSlot}
+              slots={slots}
+              onAccept={noop}
+              onCycle={(direction) => mutate({ direction, type: 'cycleStagedImage' })}
+              onDiscardAll={noop}
+              onDiscardSelected={noop}
+              onPreloadCandidate={noop}
+              onSelectImage={(imageIndex) => mutate({ imageIndex, type: 'setStagedImageIndex' })}
+              onSaveToGallery={() => Promise.resolve()}
+              onSaveToLayerAndContinue={noop}
+              onSetAutoSwitch={(mode) => mutate({ mode, type: 'setCanvasStagingAutoSwitch' })}
+              onStopGenerating={noop}
+              onToggleThumbnails={noop}
+              onToggleVisibility={noop}
+            />
+          </CanvasBottomOverlay.Staging>
+        </CanvasBottomOverlay.Root>
+      </Box>
+    );
+  };
+
+  const renderWired = async (mode: Mode) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <WiredStagingBar initial={createStagedState(mode)} />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+  };
+  const autoSwitch = () => page.getByRole('button', { name: /^Auto-switch:/ });
+  const thumbnail = (number: number) =>
+    page.getByRole('button', { exact: true, name: `Select staged candidate ${number}` });
+
+  it.each(['latest', 'progress'] as const)(
+    'clicking off the newest result under %s turns Auto-switch Off',
+    async (mode) => {
+      await renderWired(mode);
+
+      await thumbnail(1).click();
+
+      await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: Off');
+      await expect.element(thumbnail(1)).toHaveAttribute('aria-current', 'true');
+    }
+  );
+
+  it('passes the strip with Tab in one stop, picking nothing and leaving Auto-switch as it was', async () => {
+    await renderWired('latest');
+    const visited: Element[] = [];
+
+    await act(() => host!.querySelector<HTMLElement>('[data-testid="before-bar"]')!.focus());
+    for (let step = 0; step < 12; step += 1) {
+      await userEvent.keyboard('{Tab}');
+      if (document.activeElement) {
+        visited.push(document.activeElement);
+      }
+    }
+
+    const thumbnailsVisited = visited.filter((element) => element.hasAttribute('data-staging-thumbnail'));
+    expect(new Set(thumbnailsVisited).size).toBe(1);
+    expect(thumbnailsVisited[0]?.getAttribute('aria-label')).toBe('Select staged candidate 2');
+    expect(visited.some((element) => element.getAttribute('aria-label') === 'Accept to layer')).toBe(true);
+    await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: Newest');
+    await expect.element(thumbnail(2)).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('an arrow from the selected thumbnail is a pick: off the newest, Auto-switch turns Off', async () => {
+    await renderWired('latest');
+
+    await act(() => (thumbnail(2).element() as HTMLElement).focus());
+    await userEvent.keyboard('{ArrowLeft}');
+
+    await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: Off');
+    await expect.element(thumbnail(1)).toHaveAttribute('aria-current', 'true');
+    expect(document.activeElement).toBe(thumbnail(1).element());
+  });
+
+  it("right-clicking an older result's thumbnail is a pick too", async () => {
+    await renderWired('progress');
+
+    await act(() => {
+      thumbnail(1)
+        .element()
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    });
+
+    await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: Off');
+    await expect.element(thumbnail(1)).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('stepping off the newest result with the bar arrows turns Auto-switch Off', async () => {
+    await renderWired('latest');
+
+    await page.getByRole('button', { exact: true, name: 'Previous staged candidate' }).click();
+
+    await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: Off');
+    await expect.element(thumbnail(1)).toHaveAttribute('aria-current', 'true');
+  });
+
+  it.each(['off', 'latest', 'progress'] as const)(
+    'clicking the image still generating under %s follows it: Auto-switch In progress',
+    async (mode) => {
+      await renderWired(mode);
+
+      await thumbnail(3).click();
+
+      await expect.element(autoSwitch()).toHaveAccessibleName('Auto-switch: In progress');
+      await expect.element(thumbnail(3)).toHaveAttribute('aria-current', 'true');
+    }
+  );
 });

@@ -372,7 +372,7 @@ export const useImageActions = ({
       const before = captureGalleryWidgetKeyValues(queries.getSnapshot().projects);
 
       // The request decides whether a next image is selected; until it settles an open comparison waits for it.
-      gallery.removeItems(itemKeys, { keepComparisonForSuccessor: true });
+      gallery.removeItems(itemKeys, { keepComparisonForSuccessor: true, projectId });
 
       return diffGalleryWidgetKeyValues(before, queries.getSnapshot().projects);
     };
@@ -586,6 +586,7 @@ export const useImageActions = ({
           // next image, a comparison left without a selection ends here.
           gallery.removeItems(result.succeeded.map(toGalleryItemKey), {
             keepComparisonForSuccessor: successor !== null,
+            projectId,
           });
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));

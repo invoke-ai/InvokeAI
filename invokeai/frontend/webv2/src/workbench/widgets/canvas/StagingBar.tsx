@@ -11,7 +11,6 @@ import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
-import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
 import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
 import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import {
@@ -71,9 +70,10 @@ const COMPACT_SR_ONLY_CSS = { [COMPACT]: SR_ONLY } as const;
 const NARROW_SR_ONLY_CSS = { [NARROW]: SR_ONLY } as const;
 /** Gone while narrow: group rules (the icons' spacing still separates the groups) and labelled buttons. */
 const NARROW_HIDDEN_CSS = { [NARROW]: { display: 'none' } } as const;
-const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } } as const;
 /** Buttons whose text goes while narrow keep a square icon footprint. */
 const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
+/** Closer controls once narrow: a finished result's actions and Stop generating fit side by side. */
+const NARROW_BAR_CSS = { [NARROW]: { gap: '0.5' } } as const;
 /** Marks a thumbnail with its slot index, for roving focus and focus restore. */
 const THUMBNAIL_ATTR = 'data-staging-thumbnail';
 /** Marks the previous/next buttons, a focus target once no thumbnail shows. */
@@ -97,7 +97,8 @@ interface StagingBarProps {
   selectedSlot: CanvasStagingSlot | undefined;
   slots: CanvasStagingSlot[];
   onAccept: () => void;
-  onCancelQueueItem: (queueItemId: string) => void;
+  /** Stops every run still generating results for this canvas. */
+  onStopGenerating: () => void;
   onCycle: (direction: -1 | 1) => void;
   onDiscardAll: () => void;
   onDiscardSelected: () => void;
@@ -129,7 +130,6 @@ export const StagingBar = ({
   selectedSlot,
   slots,
   onAccept,
-  onCancelQueueItem,
   onCycle,
   onDiscardAll,
   onDiscardSelected,
@@ -138,6 +138,7 @@ export const StagingBar = ({
   onSaveToGallery,
   onSaveToLayerAndContinue,
   onSetAutoSwitch,
+  onStopGenerating,
   onToggleThumbnails,
   onToggleVisibility,
 }: StagingBarProps) => {
@@ -151,7 +152,9 @@ export const StagingBar = ({
     setContextMenuTarget(null);
   }
   const hasSlots = slots.length > 0;
-  const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
+  // Whatever is selected: a finished result stays selected while the next image of its run starts.
+  const canStopGenerating = slots.some((slot) => slot.kind === 'placeholder');
+  const stopGeneratingLabel = t('widgets.canvas.staging.stopGenerating');
   const acceptLabel = t('widgets.canvas.acceptToLayer');
   const acceptMenuIds = useTooltipTriggerIds();
   const thumbnailsLabel = areThumbnailsVisible
@@ -200,6 +203,11 @@ export const StagingBar = ({
     onDiscardAll();
     keepFocusWithResults();
   };
+  // The button goes with the last placeholder; focus stays with the results.
+  const stopGenerating = () => {
+    onStopGenerating();
+    keepFocusWithResults();
+  };
   // A menu with no trigger restores focus nowhere; send it back to the thumbnail it opened from.
   const closeContextMenu = () => {
     const slotId = contextMenuTarget?.slot.id;
@@ -210,9 +218,9 @@ export const StagingBar = ({
     });
   };
 
-  // With focus in the bar, the arrows step through results and Delete discards the focused one, which is the
-  // selected one (focusing a thumbnail selects it); the canvas's own keys (nudge, delete the layer or selected
-  // pixels) never act on the document from here.
+  // With focus in the bar, the arrows step through results and Delete discards the selected one (the thumbnail Tab or
+  // an arrow puts focus on); the canvas's own keys (nudge, delete the layer or selected pixels) never act on the
+  // document from here.
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (
       event.altKey ||
@@ -236,10 +244,11 @@ export const StagingBar = ({
       const direction = event.key === 'ArrowLeft' ? -1 : 1;
       const index = thumbnail ? Number(thumbnail.getAttribute(THUMBNAIL_ATTR)) : Number.NaN;
       if (Number.isInteger(index)) {
-        // Roving focus: the next thumbnail takes focus, which selects it.
-        event.currentTarget
-          .querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${(index + direction + slots.length) % slots.length}"]`)
-          ?.focus();
+        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it. Tab only ever reaches
+        // the selected thumbnail, so passing through the strip picks nothing.
+        const next = (index + direction + slots.length) % slots.length;
+        onSelectImage(next);
+        event.currentTarget.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${next}"]`)?.focus();
       } else {
         onCycle(direction);
       }
@@ -307,6 +316,7 @@ export const StagingBar = ({
                     antialiasProgressImages={antialiasProgressImages}
                     index={index}
                     isSelected={index === selectedImageIndex}
+                    isTabStop={areThumbnailsVisible}
                     slot={slot}
                     onContextMenu={(event) => {
                       if (slot.kind !== 'candidate') {
@@ -337,14 +347,40 @@ export const StagingBar = ({
         </ScrollArea.Root>
       ) : null}
 
-      <CanvasOptionsBar>
+      <CanvasOptionsBar css={NARROW_BAR_CSS}>
+        {/* First, beside the status it acts on and away from the result's own actions: it stops every run still
+            generating for this canvas, not the result shown. Labelled while there is room, an icon once compact. */}
+        {canStopGenerating ? (
+          <>
+            {/* The one label that gives way to a long translation: it shortens, and the tooltip says it in full. */}
+            <Tooltip content={stopGeneratingLabel}>
+              <Button css={WIDE_ONLY_CSS} flexShrink="1" minW="0" variant="ghost" onClick={stopGenerating}>
+                <CircleStopIcon />
+                <Box as="span" minW="0" truncate>
+                  {stopGeneratingLabel}
+                </Box>
+              </Button>
+            </Tooltip>
+            <Tooltip content={stopGeneratingLabel}>
+              <IconButton
+                aria-label={stopGeneratingLabel}
+                css={COMPACT_ONLY_CSS}
+                variant="ghost"
+                onClick={stopGenerating}
+              >
+                <CircleStopIcon />
+              </IconButton>
+            </Tooltip>
+          </>
+        ) : null}
+
         {/* Results keep coming in and waiting here while the canvas stays editable; the status says how many. */}
         <Tooltip content={statusLabel}>
           <HStack
             color="fg.muted"
             // Once compact a running batch keeps its spinner; otherwise the status goes, since the counter shows the
-            // count, and it still reads the sentence.
-            css={isGenerating ? undefined : COMPACT_SR_ONLY_CSS}
+            // count, and it still reads the sentence. Once narrow, the stop button's icon says a run is going in its place.
+            css={isGenerating ? (canStopGenerating ? NARROW_SR_ONLY_CSS : undefined) : COMPACT_SR_ONLY_CSS}
             flexShrink="0"
             gap="1.5"
             position="relative"
@@ -416,31 +452,6 @@ export const StagingBar = ({
               valueCss={NARROW_SR_ONLY_CSS}
               onChange={onSetAutoSwitch}
             />
-
-            {cancelableQueueItemId ? (
-              <>
-                {/* Labelled while there is room; an icon with the tooltip once narrow, as Discard all does. */}
-                <Button
-                  css={NARROW_HIDDEN_CSS}
-                  flexShrink="0"
-                  variant="ghost"
-                  onClick={() => onCancelQueueItem(cancelableQueueItemId)}
-                >
-                  <CircleStopIcon />
-                  {t('common.cancel')}
-                </Button>
-                <Tooltip content={t('common.cancel')}>
-                  <IconButton
-                    aria-label={t('common.cancel')}
-                    css={NARROW_ONLY_CSS}
-                    variant="ghost"
-                    onClick={() => onCancelQueueItem(cancelableQueueItemId)}
-                  >
-                    <CircleStopIcon />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : null}
 
             {selectedCandidate ? (
               <>
@@ -550,6 +561,7 @@ const StagingThumbnail = ({
   antialiasProgressImages,
   index,
   isSelected,
+  isTabStop,
   slot,
   onContextMenu,
   onPreloadCandidate,
@@ -558,6 +570,8 @@ const StagingThumbnail = ({
   antialiasProgressImages: boolean;
   index: number;
   isSelected: boolean;
+  /** Whether the strip takes a Tab stop at all: not while its thumbnails are hidden. */
+  isTabStop: boolean;
   slot: CanvasStagingSlot;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onPreloadCandidate: (imageName: string) => void;
@@ -599,10 +613,10 @@ const StagingThumbnail = ({
       rounded="md"
       shadow={isSelected ? '0 0 0 1px {colors.accent.solid}' : 'md'}
       style={{ aspectRatio: '1 / 1' }}
+      // One stop for the strip: the selected thumbnail; the arrows move between them.
+      tabIndex={isSelected && isTabStop ? 0 : -1}
       onClick={onSelect}
       onContextMenu={onContextMenu}
-      // Focus follows selection: the bar's keys act on the thumbnail the keyboard is on.
-      onFocus={isSelected ? undefined : onSelect}
     >
       {slot.kind === 'candidate' ? (
         <img

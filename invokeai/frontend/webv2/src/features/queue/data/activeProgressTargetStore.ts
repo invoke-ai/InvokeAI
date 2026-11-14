@@ -5,20 +5,28 @@ import { createExternalStore } from '@platform/state/externalStore';
 
 /**
  * Track concurrent slots in start order. Settling slots preserve the final frame until results land; multi-slot
- * surfaces exclude them to avoid transient extra tiles.
+ * surfaces exclude them to avoid transient extra tiles. Framed slots have shown a frame of their own: live surfaces
+ * follow a slot only from then on, so model loading and text encoding never replace the previous result.
  */
 export interface ActiveProgressTargetSink {
   clear(target?: QueueItemProgressTarget): void;
+  /** The slot's first frame of its own arrived; it stays framed until cleared. */
+  markFramed(target: QueueItemProgressTarget): void;
   set(target: QueueItemProgressTarget): void;
   settle(target: QueueItemProgressTarget): void;
 }
 
 interface ActiveProgressTargetsSnapshot {
+  framedTargets: QueueItemProgressTarget[];
   settlingTargets: QueueItemProgressTarget[];
   targets: QueueItemProgressTarget[];
 }
 
-const store = createExternalStore<ActiveProgressTargetsSnapshot>({ settlingTargets: [], targets: [] });
+const store = createExternalStore<ActiveProgressTargetsSnapshot>({
+  framedTargets: [],
+  settlingTargets: [],
+  targets: [],
+});
 
 const isSameTarget = (left: QueueItemProgressTarget, right: QueueItemProgressTarget): boolean =>
   left.queueItemId === right.queueItemId && left.itemIndex === right.itemIndex;
@@ -31,11 +39,11 @@ const without = (targets: QueueItemProgressTarget[], target: QueueItemProgressTa
 
 export const activeProgressTargetStore: ActiveProgressTargetSink = {
   clear(target) {
-    const { settlingTargets, targets } = store.getSnapshot();
+    const { framedTargets, settlingTargets, targets } = store.getSnapshot();
 
     if (!target) {
-      if (targets.length > 0 || settlingTargets.length > 0) {
-        store.patchSnapshot({ settlingTargets: [], targets: [] });
+      if (targets.length > 0 || settlingTargets.length > 0 || framedTargets.length > 0) {
+        store.patchSnapshot({ framedTargets: [], settlingTargets: [], targets: [] });
       }
 
       return;
@@ -43,11 +51,21 @@ export const activeProgressTargetStore: ActiveProgressTargetSink = {
 
     const remaining = without(targets, target);
     const remainingSettling = without(settlingTargets, target);
+    const remainingFramed = without(framedTargets, target);
 
     store.patchSnapshot({
       ...(remaining.length !== targets.length ? { targets: remaining } : {}),
       ...(remainingSettling.length !== settlingTargets.length ? { settlingTargets: remainingSettling } : {}),
+      ...(remainingFramed.length !== framedTargets.length ? { framedTargets: remainingFramed } : {}),
     });
+  },
+  markFramed(target) {
+    activeProgressTargetStore.set(target);
+    const { framedTargets } = store.getSnapshot();
+
+    if (!includes(framedTargets, target)) {
+      store.patchSnapshot({ framedTargets: [...framedTargets, target] });
+    }
   },
   set(target) {
     const { settlingTargets, targets } = store.getSnapshot();
@@ -110,6 +128,12 @@ export const useActiveProgressTargets = (): QueueItemProgressTarget[] =>
 /** Every followable slot — running ones first, then settling ones. */
 export const useFollowedProgressTargets = (): QueueItemProgressTarget[] => store.useSelector(selectFollowedTargets);
 
+/** Every running or settling slot that has shown a frame of its own. */
+export const useFramedProgressTargets = (): QueueItemProgressTarget[] =>
+  store.useSelector((snapshot) => snapshot.framedTargets);
+
 export const getActiveProgressTargets = (): QueueItemProgressTarget[] => store.getSnapshot().targets;
 
 export const getFollowedProgressTargets = (): QueueItemProgressTarget[] => selectFollowedTargets(store.getSnapshot());
+
+export const getFramedProgressTargets = (): QueueItemProgressTarget[] => store.getSnapshot().framedTargets;

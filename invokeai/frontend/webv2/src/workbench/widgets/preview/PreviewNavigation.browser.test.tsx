@@ -189,7 +189,8 @@ const mocks = vi.hoisted(() => {
       requestDeletionConfirmation?: DeletionConfirmationModule.RequestDeletionConfirmation;
     },
     recentImages,
-    bridgeProgressImage: null as unknown,
+    /** Slots that have shown a frame of their own; every followed slot unless a test says otherwise. */
+    framedProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     runningProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     slotProgressImage: undefined as unknown,
     useActiveProgressTarget: vi.fn(() => null as unknown),
@@ -249,18 +250,20 @@ const mockProgressTargets = () => {
   return target ? [target] : [];
 };
 
+const mockFollowedProgressTargets = () =>
+  [...(mocks.runningProgressTargets ?? []), ...mockProgressTargets()].filter(
+    (target, index, all) =>
+      all.findIndex((other) => other.queueItemId === target.queueItemId && other.itemIndex === target.itemIndex) ===
+      index
+  );
+
 vi.mock('@features/queue/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useActiveProgressTarget: () => mocks.useActiveProgressTarget(),
   useActiveProgressTargets: () => mocks.runningProgressTargets ?? mockProgressTargets(),
-  useFollowedProgressTargets: () =>
-    [...(mocks.runningProgressTargets ?? []), ...mockProgressTargets()].filter(
-      (target, index, all) =>
-        all.findIndex((other) => other.queueItemId === target.queueItemId && other.itemIndex === target.itemIndex) ===
-        index
-    ),
+  useFollowedProgressTargets: () => mockFollowedProgressTargets(),
+  useFramedProgressTargets: () => mocks.framedProgressTargets ?? mockFollowedProgressTargets(),
   useProgressImage: () => mocks.useProgressImage(),
-  useQueueItemBridgeProgressImage: () => mocks.bridgeProgressImage,
   // The slot's own frame: derived from the "latest" mock by target unless a test overrides it.
   useQueueItemProgressImage: (queueItemId: string, itemIndex: number) => {
     if (mocks.slotProgressImage !== undefined) {
@@ -960,7 +963,7 @@ beforeEach(() => {
   ];
   mocks.useActiveProgressTarget.mockReturnValue(null);
   mocks.useProgressImage.mockReturnValue(null);
-  mocks.bridgeProgressImage = null;
+  mocks.framedProgressTargets = undefined;
   mocks.runningProgressTargets = undefined;
   mocks.slotProgressImage = undefined;
 });
@@ -3233,25 +3236,62 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.galleryItemFilters.every((filter) => filter.boardId !== 'board-live')).toBe(true);
   });
 
-  it('keeps following a completed slot while its result is still routing', async () => {
-    // Keep settling results in the single live frame after backend completion and before gallery arrival; do not
-    // tile them.
-    mocks.project.queue.items = [queueItem];
+  it("holds the finished slot's last frame while its result routes, then shows the result until the next first frame", async () => {
+    // Slot 1 completed and its result is still on its way; slot 2 runs but is loading its model.
+    const slotOne = { itemIndex: 1, queueItemId: 'queue-item-live' };
+    const slotTwo = { itemIndex: 2, queueItemId: 'queue-item-live' };
+    const resultOfSlotOne = { ...mocks.recentImages[0]!, sourceQueueItemId: 'queue-item-live' };
+    const stageSources = () =>
+      [...host!.querySelectorAll<HTMLImageElement>('img:not([data-preview-filmstrip] img)')].map((image) =>
+        image.getAttribute('src')
+      );
+    const statusLines = () => [...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent);
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2], completedBackendItemIds: [1] }];
     mocks.project.settings.viewerAutoSwitch = 'progress';
-    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
-    mocks.runningProgressTargets = [];
+    mocks.useActiveProgressTarget.mockReturnValue(slotOne);
+    mocks.runningProgressTargets = [slotTwo];
+    mocks.framedProgressTargets = [slotOne];
     mocks.useProgressImage.mockReturnValue({
-      dataUrl: 'data:image/png;base64,',
+      dataUrl: 'data:image/png;base64,slot-one-last',
       height: 64,
-      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      target: slotOne,
       width: 64,
     });
+    setGalleryValues({ selectedImage: legacyImage('oldest', '2026-07-20T00:00:00.000Z'), selectedImageName: 'oldest' });
+
+    await render();
+    expect(stageSources().filter((src) => src?.startsWith('data:image/png'))).toEqual([
+      'data:image/png;base64,slot-one-last',
+    ]);
+
+    // Routing lands: the settling slot is released and its result selected; slot 2 still has no frame.
+    mocks.useActiveProgressTarget.mockReturnValue(null);
+    mocks.framedProgressTargets = [];
+    mocks.useProgressImage.mockReturnValue(null);
+    publishGalleryValues({
+      recentImages: [resultOfSlotOne, ...mocks.recentImages.slice(1)],
+      selectedImage: legacyImage('newest', resultOfSlotOne.queuedAt),
+      selectedImageName: 'newest',
+    });
+    await rerender();
+
+    expect(stageSources()).toContain(resultOfSlotOne.imageUrl);
+    expect(stageSources().some((src) => src?.startsWith('data:image/png'))).toBe(false);
+    expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
+    expect(statusLines()).toContain('widgets.preview.startingAnnouncement');
+  });
+
+  it('shows a session starting before its first frame when nothing is selected, saying so', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.viewerAutoSwitch = 'progress';
+    mocks.runningProgressTargets = [{ itemIndex: 1, queueItemId: 'queue-item-live' }];
+    mocks.framedProgressTargets = [];
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
 
     await render();
 
-    expect(
-      host?.querySelectorAll<HTMLImageElement>('img[src^="data:image/png"]:not([data-preview-filmstrip] img)')
-    ).toHaveLength(1);
+    expect(host!.textContent).not.toContain('widgets.preview.noGallerySelection');
+    expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
   });
 
   it('keeps the same-root preview through child gaps and browser focus changes until the next denoising step', async () => {
@@ -3290,6 +3330,11 @@ describe('preview keyboard navigation boundary', () => {
               mocks.useActiveProgressTarget.mockReturnValue(null);
               mocks.runningProgressTargets = [];
             }
+          },
+          markFramed: (target) => {
+            activeTarget = target;
+            mocks.useActiveProgressTarget.mockReturnValue(target);
+            mocks.runningProgressTargets = [target];
           },
           set: (target) => {
             activeTarget = target;
@@ -3516,7 +3561,7 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('follows a running slot over a settling one so a concurrent session is never hidden', async () => {
+  it('follows a running slot with a frame of its own over a settling one so a concurrent session is never hidden', async () => {
     // Multi-GPU: slot 1 completed and is settling, slot 2 is still streaming.
     // The single-frame preview must show slot 2 live, not slot 1's static frame.
     mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2] }];
@@ -3529,31 +3574,42 @@ describe('preview keyboard navigation boundary', () => {
       target: { itemIndex: 2, queueItemId: 'queue-item-live' },
       width: 64,
     });
-    mocks.bridgeProgressImage = { dataUrl: 'data:image/png;base64,slot-one', height: 64, width: 64 };
 
     await render();
 
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-two"]')).not.toBeNull();
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-one"]')).toBeNull();
+    expect(
+      [...host!.querySelectorAll<HTMLImageElement>('img[src^="data:image/png"]:not([data-preview-filmstrip] img)')].map(
+        (image) => image.getAttribute('src')
+      )
+    ).toEqual(['data:image/png;base64,slot-two']);
   });
 
-  it("bridges to the next slot of a batch with the previous slot's last frame", async () => {
-    // Bridge a newly followed frameless slot with the previous frame until its first progress arrives.
+  it("shows a finished batch image, not the next slot, until that slot's first frame, saying what it waits for", async () => {
+    // Slot 1's result has landed and is selected; slot 2 runs but is still loading its model.
+    const finished = mocks.recentImages[0]!;
     mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2], completedBackendItemIds: [1] }];
     mocks.project.settings.viewerAutoSwitch = 'progress';
-    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 2, queueItemId: 'queue-item-live' });
-    mocks.useProgressImage.mockReturnValue({
-      dataUrl: 'data:image/png;base64,slot-one',
-      height: 64,
-      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
-      width: 64,
-    });
-    mocks.bridgeProgressImage = { dataUrl: 'data:image/png;base64,bridge', height: 64, width: 64 };
+    mocks.runningProgressTargets = [{ itemIndex: 2, queueItemId: 'queue-item-live' }];
+    mocks.framedProgressTargets = [];
+    mocks.slotProgressImage = null;
 
     await render();
 
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,bridge"]')).not.toBeNull();
-    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,slot-one"]')).toBeNull();
+    const stageSources = () =>
+      [...host!.querySelectorAll<HTMLImageElement>('img:not([data-preview-filmstrip] img)')].map((image) =>
+        image.getAttribute('src')
+      );
+    expect(stageSources()).toContain(finished.imageUrl);
+    expect(stageSources().some((src) => src?.startsWith('data:image/png'))).toBe(false);
+    expect(host?.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
+
+    // The first frame of its own: the Preview follows the slot from here.
+    mocks.framedProgressTargets = [{ itemIndex: 2, queueItemId: 'queue-item-live' }];
+    mocks.slotProgressImage = { dataUrl: 'data:image/png;base64,slot-two-first', height: 64, width: 64 };
+    await rerender();
+
+    expect(stageSources()).toEqual(['data:image/png;base64,slot-two-first']);
+    expect(host?.querySelector('[data-preview-starting-cue]')).toBeNull();
   });
 
   it('keeps every concurrent session in the filmstrip, follows the newest session, and pins on request', async () => {
@@ -3600,6 +3656,39 @@ describe('preview keyboard navigation boundary', () => {
     mocks.runningProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
     await rerender();
     // The pinned session settled, so the pin releases and the stage moves on.
+    expect(followControls.pinnedSessionId).toBeNull();
+    expect(followedThumb()).toBe('queue-item-live:1');
+  });
+
+  it('shows a picked session before its first frame, over the selected result, until it stops running', async () => {
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2] }];
+    mocks.project.settings.viewerAutoSwitch = 'progress';
+    mocks.runningProgressTargets = [
+      { queueItemId: queueItem.id, itemIndex: 1 },
+      { queueItemId: queueItem.id, itemIndex: 2 },
+    ];
+    // Slot 1 streams; slot 2 has started but shows nothing of its own yet.
+    mocks.framedProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,slot-one',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: queueItem.id },
+      width: 64,
+    });
+    const followedThumb = () =>
+      host!.querySelector<HTMLElement>('[data-preview-live-thumb][aria-current="true"]')?.dataset.previewLiveThumb;
+    await render();
+    expect(followedThumb()).toBe('queue-item-live:1');
+
+    await act(() => followControls.follow('queue-item-live:2'));
+    expect(mocks.commands.account.updateProjectPreferences).toHaveBeenCalledWith({ viewerAutoSwitch: 'progress' });
+    await rerender();
+    expect(followedThumb()).toBe('queue-item-live:2');
+    expect(host!.querySelector('[data-preview-starting-cue]')).not.toBeNull();
+
+    // It finishes: the pin goes, and the newest running session with a frame is followed again.
+    mocks.runningProgressTargets = [{ queueItemId: queueItem.id, itemIndex: 1 }];
+    await rerender();
     expect(followControls.pinnedSessionId).toBeNull();
     expect(followedThumb()).toBe('queue-item-live:1');
   });

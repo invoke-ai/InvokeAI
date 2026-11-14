@@ -627,3 +627,39 @@ describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
     expect(ran).toEqual(['gallery.galleryNavRight']);
   });
 });
+
+describe('WorkbenchHotkeyRuntime and a held key', () => {
+  const pressCancel = (repeat: boolean) =>
+    act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          code: 'KeyX',
+          key: 'X',
+          repeat,
+          shiftKey: true,
+        })
+      );
+      await Promise.resolve();
+    });
+
+  it('runs a once-per-press command once while its key is held, and again on the next press', async () => {
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('app.cancelQueueItem'),
+        id: 'app.cancelQueueItem',
+        title: 'Cancel current or next queue item',
+      });
+    });
+
+    await pressCancel(false);
+    // The browser's auto-repeat while Shift+X stays down.
+    await pressCancel(true);
+    await pressCancel(true);
+    expect(ran).toEqual(['app.cancelQueueItem']);
+
+    await pressCancel(false);
+    expect(ran).toEqual(['app.cancelQueueItem', 'app.cancelQueueItem']);
+  });
+});

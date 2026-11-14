@@ -410,7 +410,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
   const saveStagedImageAndContinue = useCallback(() => commitSelectedStagedImage(true), [commitSelectedStagedImage]);
-  const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
   const cycleStagedImage = useCallback(
     (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),
     [canvasDispatch]
@@ -620,7 +619,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
                 selectedSlot={selectedSlot}
                 slots={stagingSlots}
                 onAccept={acceptStagedImage}
-                onCancelQueueItem={cancelQueueItem}
                 onCycle={cycleStagedImage}
                 onDiscardAll={discardAllStagedImages}
                 onDiscardSelected={discardSelectedStagedImage}
@@ -629,6 +627,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
                 onSaveToGallery={saveStagedResult}
                 onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
+                onStopGenerating={stagingRecovery.stopGenerating}
                 onToggleThumbnails={toggleStagingThumbnails}
                 onToggleVisibility={toggleStagingVisibility}
               />

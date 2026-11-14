@@ -101,7 +101,8 @@ export const QueueCluster = () => {
     setIsCancelHovered(false);
     setIsShiftHeld(false);
   }, []);
-  // Shift-click reaches every item, so it confirms first; a plain click stops only the running one and does not.
+  // Shift-click reaches every item, so it confirms first; a plain click stops one item, the running one or between
+  // items the next one waiting (the button's name says which), and does not.
   const handleCancelClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       if (event.shiftKey && cancelAll && !cancelAll.disabled) {
@@ -146,7 +147,7 @@ export const QueueCluster = () => {
           </Button>
         </QueueButtonTooltip>
 
-        {/* Always present, so the cluster keeps its width and the control its place; disabled with nothing running. */}
+        {/* Always present, so the cluster keeps its width and the control its place; disabled with nothing to stop. */}
         {cancelCurrent ? (
           <Tooltip
             content={

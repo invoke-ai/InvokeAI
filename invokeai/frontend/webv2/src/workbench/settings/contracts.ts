@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
@@ -43,11 +44,8 @@ export interface ProjectSettings {
   viewerAutoSwitch: ViewerAutoSwitchMode;
 }
 
-/**
- * `latest`: each finished result takes the selection. `progress`: the same, and live frames show while it runs.
- * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
- */
-export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
+/** The Preview's Auto-switch: the shared policy's modes (`AutoSwitchMode`, rules in `@features/queue/contracts`). */
+export type ViewerAutoSwitchMode = AutoSwitchMode;
 
 /** {@link ProjectSettings} with every layered flag resolved: project pin, then the user's default, then built-in. */
 export type EffectiveProjectSettings = Required<ProjectSettings>;

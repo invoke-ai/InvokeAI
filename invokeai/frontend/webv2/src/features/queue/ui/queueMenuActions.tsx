@@ -7,6 +7,7 @@ import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { queueCommands } from '@features/queue/publicApi';
 import { noteQueueCancelRequested, type QueueCancelRequest } from '@features/queue/runtime/cancelRequests';
 import { getApiErrorMessage } from '@platform/transport/http';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   BrushCleaningIcon,
   ListOrderedIcon,
@@ -22,8 +23,9 @@ import { useTranslation } from 'react-i18next';
 
 import type { QueueUiNotificationPort, QueueViewer } from './QueueUiContext';
 
+import { cancelCurrentQueueItem, getCancelCurrentTarget } from './cancelCurrent';
 import { requestQueueConfirmation, type QueueConfirmation } from './queueConfirmationStore';
-import { refreshQueue, useIsProcessorPaused, useNowNextItems, useQueueCounts } from './queueDataStore';
+import { refreshQueue, useIsProcessorPaused, useNowNextItems, useQueueCounts, useRecentItems } from './queueDataStore';
 import {
   translateScoped,
   useQueueActionScope,
@@ -114,6 +116,7 @@ const withRunningItemKept = (t: TFunction, text: string, keepsRunningItem: boole
 export const getQueueActionDescriptors = ({
   canManageProcessor,
   counts,
+  cancelCurrentTarget,
   hasRunningItem,
   includeOpenQueue,
   isConnected,
@@ -124,6 +127,8 @@ export const getQueueActionDescriptors = ({
 }: {
   canManageProcessor: boolean;
   counts: QueueActionCounts;
+  /** What cancel-current would stop (`getCancelCurrentTarget`): the running item, the next waiting one, or nothing. */
+  cancelCurrentTarget: 'in_progress' | 'pending' | null;
   hasRunningItem: boolean;
   includeOpenQueue: boolean;
   isConnected: boolean;
@@ -152,11 +157,13 @@ export const getQueueActionDescriptors = ({
     {
       confirmation: null,
       destructive: true,
-      disabled: !isConnected || !hasRunningItem,
+      disabled: !isConnected || cancelCurrentTarget === null,
       group: 'cancel',
       icon: XIcon,
       id: 'cancel-current',
-      label: t('widgets.queue.cancelCurrentItem'),
+      // Says which it will stop: between items it is the next one waiting.
+      label:
+        cancelCurrentTarget === 'pending' ? t('widgets.queue.cancelNextItem') : t('widgets.queue.cancelCurrentItem'),
     },
     {
       confirmation: {
@@ -287,8 +294,10 @@ const withCancelNote = async (request: QueueCancelRequest, send: () => Promise<v
 /** The queue's actions for the viewer, bound to the active scope. */
 export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue?: boolean } = {}): QueueAction[] => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const serverCounts = useQueueCounts();
-  const { current } = useNowNextItems();
+  const { current, next } = useNowNextItems();
+  const recentItems = useRecentItems();
   const isPaused = useIsProcessorPaused();
   const queryScope = useQueueQueryScope();
   const scope = useQueueActionScope();
@@ -304,6 +313,10 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   } = useQueueUi();
   const counts = useMemo(() => getQueueActionCounts(serverCounts, scope, viewer), [scope, serverCounts, viewer]);
   const hasRunningItem = current?.status === 'in_progress' && canManageItem(current);
+  const cancelCurrentTarget = useMemo(
+    () => getCancelCurrentTarget({ current, items: recentItems, next }, canManageItem),
+    [canManageItem, current, next, recentItems]
+  );
   const localProjectId = scope.kind === 'project' ? activeProjectId : null;
   const localUnsubmitted = useScopedLocalRuns().length;
 
@@ -352,29 +365,33 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
             )
         ),
       'cancel-current': async () => {
-        if (!current || current.status !== 'in_progress' || !canManageItem(current)) {
-          notify.info(
-            t('widgets.queue.noCurrentItem'),
-            translateScoped(t, 'widgets.queue.noCurrentItemDescription', scope)
-          );
-          return;
-        }
+        const outcome = await cancelCurrentQueueItem({ canManageItem, client: queryClient, scope: queryScope });
 
-        await withCancelNote({ itemId: current.id, kind: 'item' }, () => queueCommands.cancelItem(current.id))
-          .then(() => refreshQueue())
-          .then(() =>
+        switch (outcome.kind) {
+          case 'canceled':
             notify.success(
               t('widgets.queue.cancellationRequested'),
-              getQueueItemReadModelLabel(current) || t('widgets.queue.itemTitle', { id: current.id })
-            )
-          )
-          .catch(
+              getQueueItemReadModelLabel(outcome.item) || t('widgets.queue.itemTitle', { id: outcome.item.id })
+            );
+            return;
+          case 'nothing':
+            notify.info(
+              t('widgets.queue.noCurrentItem'),
+              translateScoped(t, 'widgets.queue.noCurrentItemDescription', scope)
+            );
+            return;
+          case 'failed':
             reportFailure(
               notify,
               t('widgets.queue.failedToCancelCurrentItem'),
               t('widgets.queue.couldNotCancelCurrentItem')
-            )
-          );
+            )(outcome.error);
+            return;
+          // A press while one is in flight, or one an account change overtook, reports nothing.
+          case 'busy':
+          case 'superseded':
+            return;
+        }
       },
       'clear-failed': async () => {
         await queueCommands
@@ -460,6 +477,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
     localUnsubmitted,
     notify,
     openQueue,
+    queryClient,
     queryScope,
     scope,
     t,
@@ -470,6 +488,8 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
       getQueueActionDescriptors({
         canManageProcessor,
         counts,
+        cancelCurrentTarget:
+          cancelCurrentTarget?.status === 'pending' ? 'pending' : cancelCurrentTarget ? 'in_progress' : null,
         hasRunningItem,
         includeOpenQueue,
         isConnected,
@@ -491,6 +511,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
         };
       }),
     [
+      cancelCurrentTarget,
       canManageProcessor,
       counts,
       hasRunningItem,

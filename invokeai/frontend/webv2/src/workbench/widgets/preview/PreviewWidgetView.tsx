@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import type { QueueActiveSession, QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import {
   galleryImages,
@@ -35,7 +35,7 @@ import { useGalleryImageRecovery, useHostGalleryBoards } from '@features/gallery
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
-  useQueueItemBridgeProgressImage,
+  useQueueItemProgress,
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
@@ -207,14 +207,24 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [galleryValues.semanticImageQuery]
   );
   const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
+  // With nothing selected to keep showing, a session that has not produced a frame yet is still the thing to show.
   const activeGalleryPlaceholder =
-    livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ?? null;
+    livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ??
+    (selectedItem === null ? livePreview.startingSession : null);
   const shouldFollowLive = activeGalleryPlaceholder !== null;
   const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
   const isComparing =
     !shouldFollowLive && selectedItem?.kind === 'image' && compareImage !== null && compareImageKey !== selectedItemKey;
   // Select for compare on the shown image: the comparison image is the selection itself until a second one is picked.
   const isCompareArmed = !shouldFollowLive && selectedItem?.kind === 'image' && compareImageKey === selectedItemKey;
+  // The session the stage says is starting: one shown before its first frame, or one the shown result waits on.
+  const startingCueSession = activeGalleryPlaceholder
+    ? activeGalleryPlaceholder.hasOwnFrame
+      ? null
+      : activeGalleryPlaceholder
+    : selectedItem && !isComparing && !isCompareArmed
+      ? livePreview.startingSession
+      : null;
   const { i18n, t } = useTranslation();
   const navigationBoundaryRef = useRef<HTMLDivElement | null>(null);
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
@@ -682,9 +692,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         tabIndex={0}
         w="full"
       >
-        {/* Mounted throughout, so arming is announced once as its text arrives; the hint itself repeats it visually. */}
+        {/* Mounted throughout, so arming, or a gap before the next image's first frame, is announced once as its text
+            arrives, whatever the progress messages the hint shows meanwhile; the hints repeat it visually. */}
         <Text aria-live="polite" role="status" srOnly>
-          {isCompareArmed ? t('widgets.preview.compareArmedHint') : ''}
+          {isCompareArmed
+            ? t('widgets.preview.compareArmedHint')
+            : startingCueSession
+              ? t('widgets.preview.startingAnnouncement')
+              : ''}
         </Text>
         {isComparing || isCompareArmed ? (
           <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
@@ -715,6 +730,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               item={selectedItem}
               loupeControlsRef={loupeControlsRef}
               shouldAntialiasProgressImage={antialiasProgressImages}
+              startingSession={startingCueSession}
               swipe={swipeNavigation}
               onCancelCompare={isCompareArmed ? exitCompare : undefined}
               onContextMenu={openItemContextMenu}
@@ -725,6 +741,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               filmstrip={filmstrip}
               isItemCurrent={isItemCurrent}
               item={selectedItem}
+              startingSession={startingCueSession}
               swipe={swipeNavigation}
               videoControllerRef={videoControllerRef}
               videoLoop={isVideoLooping}
@@ -848,6 +865,8 @@ interface SelectedMediaPreviewProps {
   onCancelCompare?: () => void;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   onContextMenu: (x: number, y: number) => void;
+  /** A session starting without a frame yet, which the stage says it waits for while the selection stays shown. */
+  startingSession?: QueueActiveSession | null;
   swipe?: PreviewSwipeNavigation;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
   videoLoop?: boolean;
@@ -883,6 +902,7 @@ const SelectedMediaPreview = ({
   placeholderSrc,
   shouldAntialiasHoldImage,
   source,
+  startingSession,
   swipe,
   onContextMenu,
   videoControllerRef,
@@ -927,7 +947,11 @@ const SelectedMediaPreview = ({
         onVideoLoopChange={onVideoLoopChange}
       />
       {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
-      {onCancelCompare ? <PreviewCompareArmedHint density={density} onCancel={onCancelCompare} /> : null}
+      {onCancelCompare ? (
+        <PreviewCompareArmedHint density={density} onCancel={onCancelCompare} />
+      ) : startingSession ? (
+        <PreviewStartingCue density={density} session={startingSession} />
+      ) : null}
     </Flex>
     {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
   </PreviewMediaScaffold>
@@ -1051,14 +1075,7 @@ const LivePreview = ({
 }) => {
   // Use the followed slot's own frame so another slot's progress or release cannot replace it.
   const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
-  // The previous slot's last frame stands in until this slot produces one of
-  // its own (model load, text encoding) — otherwise a sequential batch drops
-  // to an empty card between items.
-  const bridgeProgressImage = useQueueItemBridgeProgressImage(placeholder.queueItemId);
-  const previewImage = useStreamingImageSource({
-    heldLiveImage: progressImageToStreamingSource(bridgeProgressImage),
-    liveImage: progressImageToStreamingSource(progressImage),
-  });
+  const previewImage = useStreamingImageSource({ liveImage: progressImageToStreamingSource(progressImage) });
   const source = useMemo<PreviewMediaSource | null>(
     () =>
       previewImage
@@ -1082,8 +1099,56 @@ const LivePreview = ({
         source={source}
         variant="framed"
       />
+      {/* Followed before its first frame only when pinned, or with nothing else to show. */}
+      {placeholder.hasOwnFrame ? null : <PreviewStartingCue density={density} session={placeholder} />}
       {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={null} /> : null}
     </PreviewMediaScaffold>
+  );
+};
+
+/**
+ * Says what a session that has no frame of its own yet is doing, in its run's own progress message, in place of a
+ * frame the Preview does not switch to until there is one. In the stage's top hint slot, without a control. Model
+ * loads are not named: the server reports them without the session they are for. The Preview's status line announces
+ * the gap once; the message here changes as the session prepares.
+ */
+const PreviewStartingCue = ({ density, session }: { density: PreviewDensity; session: QueueActiveSession }) => {
+  const { t } = useTranslation();
+  const label = useQueueItemProgress(session.queueItemId)?.message.trim() || t('widgets.preview.starting');
+
+  return (
+    <Box
+      data-preview-starting-cue=""
+      display="flex"
+      insetInline="2"
+      justifyContent="center"
+      pointerEvents="none"
+      position="absolute"
+      top={COMPARE_HINT_TOP}
+      zIndex="1"
+    >
+      <HStack
+        animationDuration="fast"
+        animationName="fade-in"
+        bg="bg.panel"
+        borderColor="border.subtle"
+        borderWidth="1px"
+        boxShadow="sm"
+        gap="1.5"
+        maxW="full"
+        minW="0"
+        px="2.5"
+        py="1"
+        rounded="full"
+        _motionReduce={COMPARE_HINT_MOTION_REDUCE}
+      >
+        <Spinner color="fg.muted" flexShrink={0} />
+        {/* A minimal Preview shows the spinner alone; the words stay for assistive technology. */}
+        <Text color="fg.muted" fontSize="md" minW="0" srOnly={density === 'minimal'} truncate>
+          {label}
+        </Text>
+      </HStack>
+    </Box>
   );
 };
 

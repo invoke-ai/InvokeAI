@@ -33,6 +33,7 @@ export interface QueueServerItemDTO {
   session_id: string;
   started_at?: string | null;
   status: QueueItemStatus;
+  status_sequence?: number | null;
   updated_at: string;
   user_display_name?: string | null;
   user_email?: string | null;

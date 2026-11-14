@@ -32,6 +32,7 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
   };
   const commands: QueueHistoryCommands = {
     markBackendCancelled: vi.fn(),
+    noteFirstProgressFrame: vi.fn(),
     markBackendSubmitted: vi.fn(),
     recordError: vi.fn(),
     recordSubmissionRetry: vi.fn(),
@@ -52,7 +53,6 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
   };
   const backend: QueueBackendPort = {
     cancelBatch: vi.fn(),
-    cancelCurrentItem: vi.fn(),
     cancelItem: vi.fn(),
     cancelQueueItems: vi.fn(),
     cancelQueueItemsByBatchIds: vi.fn(),

@@ -29,7 +29,7 @@ import { invalidateGalleryItems, patchGalleryItemCaches } from '@features/galler
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { GALLERY_PINNED_FOOTER_PX } from '@features/gallery/ui/galleryGridLayout';
 import { isGalleryImageDragData } from '@features/gallery/utility';
-import { getFollowedProgressSession } from '@features/queue/contracts';
+import { getAutoSwitchFollowedLive } from '@features/queue/contracts';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -42,6 +42,7 @@ import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
 import { PreviewFrame } from '@workbench/widgets/preview/PreviewFrame';
 import { createInstance } from 'i18next';
 import { act, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -448,6 +449,8 @@ const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
     <button data-testid="context-return-focus" type="button" onClick={() => target?.returnFocus?.()?.focus()}>
       Close dialog
     </button>
+    {/* The open menu's portalled layer: a React child of the grid, outside its DOM. */}
+    {target ? createPortal(<div data-testid="context-menu-layer">Menu</div>, document.body) : null}
   </>
 );
 const NoopProvider = ({ children }: { children: ReactNode }) => children;
@@ -486,7 +489,16 @@ const createAdapter = (
     progressSessions,
     pinnedProgressSessionId,
     followedProgressSessionId: liveFollowEnabled
-      ? (getFollowedProgressSession(progressSessions, pinnedProgressSessionId)?.id ?? null)
+      ? // Every live session in these fixtures is running and has shown a frame of its own.
+        (getAutoSwitchFollowedLive(
+          'progress',
+          progressSessions.map((session) => ({
+            hasOwnFrame: true,
+            id: session.id,
+            state: session.state,
+          })),
+          pinnedProgressSessionId
+        )?.id ?? null)
       : null,
     followProgressSession,
     notifications: { add: noop, reportError: noop },
@@ -1894,6 +1906,35 @@ describe('GalleryImageGrid upload drop zone', () => {
     await interact(() => gridRoot?.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer })));
 
     expect(host?.textContent).toContain('Drop media to Uncategorized');
+  });
+
+  it('takes no files dragged over a context menu it opened, and shows no drop zone after passing through it', async () => {
+    await renderGallery(createGallery({ items: [createItem('image', 'menu.png')] }));
+    await interact(() =>
+      getButton('Select menu.png for preview').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+    const menu = document.querySelector('[data-testid="context-menu-layer"]')!;
+    const gridRoot = host!.querySelector('[role="list"]')!.closest('[data-scope="scroll-area"]')!.parentElement!;
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(['image'], 'image.png', { type: 'image/png' }));
+    const send = async (type: string, target: Element, relatedTarget: Element | null = null) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer, relatedTarget });
+      await interact(() => target.dispatchEvent(event));
+      return event;
+    };
+    const dropZoneShown = () => host!.textContent!.includes('Drop media to');
+
+    await send('dragenter', gridRoot);
+    expect(dropZoneShown()).toBe(true);
+    // Onto the menu: React bubbles its drag events to the grid, which neither counts nor takes them.
+    await send('dragenter', menu, gridRoot);
+    await send('dragleave', gridRoot, menu);
+    expect(dropZoneShown()).toBe(false);
+    expect((await send('dragover', menu)).defaultPrevented).toBe(false);
+    expect((await send('drop', menu)).defaultPrevented).toBe(false);
+    expect(actionMocks.uploadFiles).not.toHaveBeenCalled();
   });
 
   it('turns a true-empty, non-searching, non-virtual board into a click/drop upload target', async () => {

@@ -5,6 +5,7 @@ import type { TFunction } from 'i18next';
 import {
   ALL_READABLE_BOARDS_ID,
   isDateBoardId,
+  parseGalleryItemKey,
   toGalleryItemKey,
   type GalleryItem,
   type GalleryItemKey,
@@ -173,19 +174,50 @@ const isSameGalleryListing = (left: Record<string, unknown>, right: Record<strin
   gallerySemanticReferenceKey(getGallerySemanticImageQuery(left)) ===
     gallerySemanticReferenceKey(getGallerySemanticImageQuery(right));
 
+const getPrimaryGalleryItemKey = (values: Record<string, unknown>): GalleryItemKey | null => {
+  if (typeof values.selectedImageName === 'string') {
+    return toGalleryItemKey(parseGalleryItemKey(values.selectedImageName));
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? toGalleryItemKey(selectedItem) : null;
+};
+
 /**
- * Gallery values as every write leaves them: the search scope settled, and a selection the write left in place
- * dropped when the write changed which items the listing holds (board, view, search, scope, starred or media filter).
- * Selection acts on what is on screen, so Delete never reaches items another board or filter hides; clearing a search
- * drops it too. The primary item stays for Preview; the grid acts on it only while it is listed. A write that sets the
- * selection itself (its list, or the listing stamp every selection writes), such as a reveal landing on its item,
- * keeps it. The values themselves when nothing changes.
+ * Whether a write moved the primary item onto the comparison image the values already held. Select for compare waits
+ * for its second image only when the comparison image is set on the selected one; a selection landing on it (a
+ * Ctrl/Cmd-click, a range, a deletion's successor) would compare it with itself, so the comparison ends instead.
+ */
+const movesPrimaryOntoComparison = (previous: Record<string, unknown>, next: Record<string, unknown>): boolean => {
+  if (!next.compareImage || next.compareImage !== previous.compareImage) {
+    return false;
+  }
+
+  const compareImage = getGalleryCompareImage(next);
+  const primaryKey = getPrimaryGalleryItemKey(next);
+
+  return (
+    compareImage !== null &&
+    primaryKey === toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) &&
+    primaryKey !== getPrimaryGalleryItemKey(previous)
+  );
+};
+
+/**
+ * Gallery values as every write leaves them: the search scope settled, a comparison ended by a selection that lands on
+ * its comparison image, and a selection the write left in place dropped when the write changed which items the listing
+ * holds (board, view, search, scope, starred or media filter). Selection acts on what is on screen, so Delete never
+ * reaches items another board or filter hides; clearing a search drops it too. The primary item stays for Preview; the
+ * grid acts on it only while it is listed. A write that sets the selection itself (its list, or the listing stamp every
+ * selection writes), such as a reveal landing on its item, keeps it. The values themselves when nothing changes.
  */
 export const settleGalleryValues = (
   previous: Record<string, unknown>,
   next: Record<string, unknown>
 ): Record<string, unknown> => {
-  const settled = settleGallerySearchScope(next);
+  const scoped = settleGallerySearchScope(next);
+  const settled = movesPrimaryOntoComparison(previous, scoped) ? { ...scoped, compareImage: null } : scoped;
   const setsSelection =
     settled.selectedImageNames !== previous.selectedImageNames ||
     settled.selectedImageQuery !== previous.selectedImageQuery;

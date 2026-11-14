@@ -4,6 +4,7 @@ import type {
   QueueEnqueueGenerateRequest,
   QueueEnqueueResult,
   QueueEnqueueWorkflowRequest,
+  QueueItemProgressTarget,
   QueueResultImage,
   QueueResultImageOptions,
   QueueRunOrigin,
@@ -101,6 +102,11 @@ export interface QueueCoordinatorCallbacks {
   onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void | Promise<void>;
   /** Fired when one backend item in a local batch is canceled. */
   onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
+  /**
+   * Fired once per slot when its first progress frame of its own arrives: what live surfaces wait for before they
+   * leave the previous slot's result.
+   */
+  onFirstProgressFrame?(target: QueueItemProgressTarget): void;
   /** Coalesced signal that completed generations may have added gallery images. */
   onGalleryRefresh(): void;
 }
@@ -220,6 +226,8 @@ interface RunProgressState {
 
 interface WaitState {
   frameGates: Map<number, { revision: number | null; sessionId: string }>;
+  /** The slot has shown a frame of its own in its current leg. */
+  hasOwnFrame: boolean;
   hasWorkflowCall: boolean;
   localQueueItemId: string;
   origin: QueueRunOrigin | null;
@@ -623,8 +631,7 @@ export const createQueueCoordinator = (
     }
 
     if (outcome.status === 'completed') {
-      // Hold the frame before routing so decoded results and the next frameless slot can replace it without
-      // blanking.
+      // Hold the frame before routing so the decoding result can replace it without blanking.
       progressImage.hold(progressTarget);
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
 
@@ -659,6 +666,7 @@ export const createQueueCoordinator = (
       if (queueItem.status === 'in_progress' || (queueItem.status === 'waiting' && wait.hasWorkflowCall)) {
         activeProgressTarget.set(target);
       } else if ((queueItem.status === 'pending' || queueItem.status === 'waiting') && !wait.hasWorkflowCall) {
+        wait.hasOwnFrame = false;
         activeProgressTarget.clear(target);
       }
     }
@@ -687,7 +695,7 @@ export const createQueueCoordinator = (
     }
 
     return new Promise<TerminalOutcome>((settle) => {
-      waits.set(backendItemId, { frameGates: new Map(), ...context, localQueueItemId, settle });
+      waits.set(backendItemId, { frameGates: new Map(), hasOwnFrame: false, ...context, localQueueItemId, settle });
       replayNodeEvents(backendItemId);
       replayProgressEvent(backendItemId);
     });
@@ -829,6 +837,7 @@ export const createQueueCoordinator = (
       // their revisions start over.
       if (event.status === 'pending' || event.status === 'waiting') {
         if (wait && !wait.hasWorkflowCall) {
+          wait.hasOwnFrame = false;
           activeProgressTarget.clear(getProgressImageTarget(wait.localQueueItemId, event.item_id));
         }
         wait?.frameGates.clear();
@@ -932,6 +941,12 @@ export const createQueueCoordinator = (
 
     if (event.image?.dataURL) {
       progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width }, target);
+
+      if (!wait.hasOwnFrame) {
+        wait.hasOwnFrame = true;
+        activeProgressTarget.markFramed(target);
+        callbacks.onFirstProgressFrame?.(target);
+      }
     }
 
     const state = runProgress.get(wait.localQueueItemId);

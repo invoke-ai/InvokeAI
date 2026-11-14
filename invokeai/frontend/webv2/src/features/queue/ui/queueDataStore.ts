@@ -4,7 +4,9 @@ import type {
   QueueItemDetailReadModel,
   QueueItemReadModel,
   QueueQueryScope,
+  QueueReadModel,
 } from '@features/queue/core/types';
+import type { QueryClient } from '@tanstack/react-query';
 
 import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { invalidateQueueQueries } from '@features/queue/data/queries';
@@ -66,6 +68,10 @@ export const useQueueOpenWorkElsewhere = (projectItems: QueueItem[]): number => 
 
 /** Invalidate queue data; TanStack Query deduplicates concurrent callers. */
 export const refreshQueue = (): Promise<void> => invalidateQueueQueries(queryClient);
+
+/** The scope's read model as the server has it now, whatever the age of the cached one; null when it cannot say. */
+export const readQueueReadModel = (client: QueryClient, scope: QueueQueryScope): Promise<QueueReadModel | null> =>
+  client.fetchQuery({ ...getQueueReadModelOptions(scope, onQueueRead), staleTime: 0 });
 
 /** Imperative prefetch for non-React composition roots. */
 export const ensureQueueLoaded = (scope: QueueQueryScope = {}): void => {

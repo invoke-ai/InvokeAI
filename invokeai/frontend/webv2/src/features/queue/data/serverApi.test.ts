@@ -8,7 +8,6 @@ const transport = vi.hoisted(() => ({
 vi.mock('@platform/transport/http', () => transport);
 
 import {
-  cancelCurrentQueueItem,
   cancelQueueItems,
   cancelScopedQueueItems,
   clearFailedQueueItems,
@@ -35,11 +34,6 @@ describe('queue command account ownership', () => {
       name: 'clear scoped',
       resolveFirst: { item_ids: [11], limit: 1, offset: 0 },
       run: () => clearScopedQueue({ originPrefix: 'webv2:p:a:' }),
-    },
-    {
-      name: 'cancel current',
-      resolveFirst: { item_id: 11, status: 'in_progress' },
-      run: () => cancelCurrentQueueItem(),
     },
     {
       name: 'cancel scoped',

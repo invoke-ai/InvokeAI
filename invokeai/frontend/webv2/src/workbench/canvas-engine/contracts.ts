@@ -534,6 +534,10 @@ export interface CanvasSnapshotContract {
 }
 
 export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
+  /**
+   * Auto-switch, the values of the shared policy's `AutoSwitchMode` (`@features/queue/contracts`). Spelled out here: a
+   * persisted canvas schema owns its own values, and the canvas engine does not depend on the queue feature.
+   */
   autoSwitchMode: 'off' | 'latest' | 'progress';
 }
 

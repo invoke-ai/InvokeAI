@@ -88,6 +88,10 @@ export const WorkbenchHotkeyRuntime = () => {
       event.preventDefault();
     }
 
+    if (event.repeat && hotkey.ignoreRepeat) {
+      return;
+    }
+
     executeHotkey(hotkey, source);
   });
 

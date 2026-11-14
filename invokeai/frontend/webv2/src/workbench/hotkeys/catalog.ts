@@ -57,7 +57,11 @@ const hotkey = (
   category: HotkeyCategory,
   id: string,
   defaultKeys: string[],
-  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+  {
+    ignoreRepeat,
+    scope = categoryScopes[category],
+    title = formatHotkeyTitle(id),
+  }: { ignoreRepeat?: boolean; scope?: HotkeyScope; title?: string } = {}
 ): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
@@ -67,6 +71,7 @@ const hotkey = (
     commandId,
     defaultKeys,
     id: commandId,
+    ...(ignoreRepeat ? { ignoreRepeat } : {}),
     preventDefault: true,
     scope,
     title,
@@ -141,8 +146,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectEditPreset', ['alt+2']),
   hotkey('app', 'selectVideoPreset', ['alt+3']),
   hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
-  hotkey('app', 'cancelQueueItem', ['shift+x']),
-  hotkey('app', 'clearQueue', ['mod+shift+x'], { title: 'Cancel all queue items' }),
+  // Each press stops one item; holding the key must not walk down the queue.
+  hotkey('app', 'cancelQueueItem', ['shift+x'], { ignoreRepeat: true, title: 'Cancel current or next queue item' }),
+  hotkey('app', 'clearQueue', ['mod+shift+x'], { ignoreRepeat: true, title: 'Cancel all queue items' }),
   // The ids keep "Tab" so saved bindings survive; each opens a widget, wherever the layout keeps it.
   hotkey('app', 'selectGenerateTab', ['1'], { title: 'Open Generate' }),
   hotkey('app', 'selectCanvasTab', ['2'], { title: 'Open Canvas' }),
