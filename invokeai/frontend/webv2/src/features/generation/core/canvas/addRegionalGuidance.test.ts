@@ -395,6 +395,12 @@ describe('addRegionalGuidance — SD1', () => {
     expect(hasEdge(g, 'clip_skip', 'clip', 'rg_neg_cond_r1', 'clip')).toBe(true);
   });
 
+  it.each([null, ''])('adds no negative conditioning for a region whose negative prompt is %j', (negativePrompt) => {
+    const g = run(sdBaseGraph(), { base: 'sd-1', regions: [region({ negativePrompt })] });
+    expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
+    expect(g.edges.some((e) => e.destination.node_id === 'neg_cond_collect')).toBe(false);
+  });
+
   it('autoNegative inverts the mask and re-encodes the positive prompt into the negative collector', () => {
     const g = run(sdBaseGraph(), { base: 'sd-1', regions: [region({ autoNegative: true })] });
     const invert = nodesOfType(g, 'invert_tensor_mask');
@@ -598,6 +604,10 @@ describe('getRegionalGuidanceRejectionReason', () => {
 
   it('rejects a region with no prompt and no reference images', () => {
     expect(getRegionalGuidanceRejectionReason({ ...params, positivePrompt: null })).toMatch(/no prompt or reference/);
+    // An added negative prompt left empty carries nothing either.
+    expect(getRegionalGuidanceRejectionReason({ ...params, negativePrompt: '', positivePrompt: null })).toMatch(
+      /no prompt or reference/
+    );
   });
 
   it('accepts an SD region that only carries a negative prompt or a reference image', () => {
