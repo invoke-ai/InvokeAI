@@ -1650,7 +1650,7 @@
     "library": "Model library",
     "libraryMaintenance": "Model library maintenance",
     "linkedModel": "Linked model",
-    "linkedToCurrentSelection": "Linked to the current selection",
+    "linkedToModel": "Linked to {{name}}",
     "loadingModels": "Loading models…",
     "manageApiKeys": "Manage API keys",
     "manageModels": "Manage models",

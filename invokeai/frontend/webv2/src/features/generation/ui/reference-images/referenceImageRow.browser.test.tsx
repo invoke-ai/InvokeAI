@@ -58,13 +58,24 @@ const NO_VISION_COMPONENTS = {};
 const undoable = vi.fn();
 /** The models a model picker last offered; picking from it chooses a Redux model where Redux is offered. */
 let offeredModelTypes: readonly string[] = [];
+/** The model the picker was last told to rank related models against. */
+let offeredRelatedTo: string | null | undefined;
 /** The installed models as the store holds them now; each render installs the ones it passes. */
 let catalog: readonly GenerationModelCatalogItem[] = NO_MODELS;
 const ADAPTER = {
   gallery: { findImage: vi.fn() },
   models: {
-    ModelSelect: ({ modelTypes, onChange }: { modelTypes: string[]; onChange: (model: unknown) => void }) => {
+    ModelSelect: ({
+      modelTypes,
+      onChange,
+      relatedTo,
+    }: {
+      modelTypes: string[];
+      onChange: (model: unknown) => void;
+      relatedTo?: string | null;
+    }) => {
       offeredModelTypes = modelTypes;
+      offeredRelatedTo = relatedTo;
       return (
         <button type="button" onClick={() => onChange(modelTypes.includes('flux_redux') ? REDUX : null)}>
           Model picker
@@ -300,6 +311,16 @@ describe('reference image rows', () => {
     await pressOn(rowButton('a'), '{ArrowRight}');
     expect(chevron.getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement).toBe(rowButton('a'));
+  });
+
+  it('ranks the reference model picker against the active main model', async () => {
+    offeredRelatedTo = undefined;
+    await render([reference('a')]);
+    await act(() =>
+      row('a').querySelector<HTMLButtonElement>('button[aria-label="Reference image 1 settings"]')!.click()
+    );
+
+    expect(offeredRelatedTo).toBe(SDXL.key);
   });
 
   it('updates the summary live as the step window changes', async () => {

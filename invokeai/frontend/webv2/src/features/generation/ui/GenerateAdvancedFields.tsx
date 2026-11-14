@@ -274,6 +274,7 @@ export const GenerateAdvancedFields = ({
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
                   placeholder={t('widgets.generate.modelDefault')}
+                  relatedTo={selectedModel?.key ?? null}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
                 />

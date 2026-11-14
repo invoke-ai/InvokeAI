@@ -480,6 +480,7 @@ const ReferenceImageRowBase = ({
     <ReferenceModelSelect
       config={modelConfig}
       disabled={!isEnabled}
+      relatedTo={selectedModel?.key ?? null}
       selectedBase={selectedBase}
       strengthOnly={strengthOnly}
       onConfigChange={changeConfig}
@@ -996,11 +997,14 @@ const ReferenceModelSelect = ({
   config,
   disabled,
   onConfigChange,
+  relatedTo,
   selectedBase,
   strengthOnly,
 }: {
   config: ModelBackedConfig;
   disabled: boolean;
+  /** The active main model, so models linked to it rank first. */
+  relatedTo: string | null;
   selectedBase: string | undefined;
   strengthOnly: boolean;
   onConfigChange: (config: GenerateReferenceImageConfig) => void;
@@ -1044,6 +1048,7 @@ const ReferenceModelSelect = ({
             // A Kontext reference may switch to Redux on FLUX, as it always could.
             modelTypes={modelTypes}
             placeholder={t('widgets.generate.selectModel')}
+            relatedTo={relatedTo}
             value={config.model?.key ?? null}
             onChange={selectReferenceModel}
           />

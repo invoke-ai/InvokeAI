@@ -26781,6 +26781,12 @@ export type components = {
              */
             qwen3_vl_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Vision Tower
+             * @description Qwen3-VL 4B vision tower (the llama.cpp mmproj file). Lets a GGUF encoder read edit reference images.
+             * @default null
+             */
+            qwen3_vl_vision_tower_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
              * type
              * @default krea2_model_loader
              * @constant
@@ -27179,7 +27185,7 @@ export type components = {
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
             /**
              * Reference Images
-             * @description Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.
+             * @description Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). A GGUF encoder reads them through the selected Vision Tower model (the mmproj file).
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];
@@ -33340,7 +33346,7 @@ export type components = {
         };
         /**
          * Main_Checkpoint_QwenImage21_Config
-         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot).
+         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot).
          */
         Main_Checkpoint_QwenImage21_Config: {
             /**
@@ -44713,7 +44719,7 @@ export type components = {
             /** @description Info to load text_encoder submodel */
             text_encoder: components["schemas"]["ModelIdentifierField"];
             /**
-             * @description Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)
+             * @description Info to load the vision tower of a GGUF encoder, which has none of its own
              * @default null
              */
             vision_tower?: components["schemas"]["ModelIdentifierField"] | null;

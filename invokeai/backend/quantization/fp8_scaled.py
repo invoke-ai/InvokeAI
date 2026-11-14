@@ -513,6 +513,106 @@ def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:
     return scale.flatten()
 
 
+TORCHAO_QDATA_SUFFIX = "._weight_qdata"
+TORCHAO_SCALE_SUFFIX = "._weight_scale"
+
+
+def find_torchao_fp8_problem(sd: Mapping[Any, Any]) -> str | None:
+    """Why ``sd`` holds torchao layers that cannot be translated, or None if it holds none or all are fine.
+
+    torchao's serialized ``Float8Tensor`` (unsloth's FP8 builds) stores each quantized Linear as
+    ``<layer>._weight_qdata`` (``float8_e4m3fn``, ``[out, in]``) plus ``<layer>._weight_scale`` (float32, one
+    per output row) in place of ``<layer>.weight``. Only that layout is accepted; per-tensor and block-wise
+    scales, int8 payloads (which add a ``_weight_zero_point``) and half-present pairs are named and refused
+    rather than guessed at. Reads only key names, dtypes and shapes, so it also works on meta tensors.
+    """
+    keys = {key for key in sd if isinstance(key, str)}
+    # Any other `<layer>._weight_<name>` (a zero point, `_weight_act_pre_scale`, ...) is state this decode does
+    # not apply, and a loader that ignores extras would then compute the layer wrongly without saying so.
+    extras = {
+        layer: name
+        for layer, sep, name in (key.rpartition("._weight_") for key in keys)
+        if sep and name not in ("qdata", "scale")
+    }
+    for key in sorted(keys):
+        if key.endswith(TORCHAO_SCALE_SUFFIX):
+            layer = key[: -len(TORCHAO_SCALE_SUFFIX)]
+            if layer + TORCHAO_QDATA_SUFFIX not in keys:
+                return f"'{layer}' has a torchao scale but no quantized weight"
+            continue
+        if not key.endswith(TORCHAO_QDATA_SUFFIX):
+            continue
+        layer = key[: -len(TORCHAO_QDATA_SUFFIX)]
+        qdata = sd[key]
+        if layer in extras:
+            if extras[layer] == "zero_point":
+                return f"'{layer}' carries a zero point (an integer torchao quantization)"
+            return f"'{layer}' carries torchao tensor '_weight_{extras[layer]}', which is not supported"
+        if qdata.dtype != FP8_DTYPE:
+            return f"'{layer}' is stored as {qdata.dtype}, not float8_e4m3fn"
+        if qdata.dim() != 2:
+            return f"'{layer}' has a {qdata.dim()}-D quantized weight, expected 2-D"
+        if f"{layer}.weight" in keys:
+            return f"'{layer}' has both a quantized and a plain weight"
+        scale = sd.get(layer + TORCHAO_SCALE_SUFFIX)
+        if scale is None:
+            return f"'{layer}' has a quantized weight but no torchao scale"
+        out = qdata.shape[0]
+        if scale.dtype != torch.float32:
+            return f"'{layer}' has a {scale.dtype} scale, expected float32"
+        if tuple(scale.shape) not in ((out, 1), (out,)):
+            return (
+                f"'{layer}' has a scale of shape {tuple(scale.shape)}; only one scale per output row "
+                f"({out} rows) is supported, not per-tensor or block-wise scales"
+            )
+    return None
+
+
+def translate_torchao_fp8_layers(sd: dict[Any, Any]) -> int:
+    """Rename torchao fp8 layers in place to the ComfyUI scaled-fp8 form; return how many there were.
+
+    ``<layer>._weight_qdata`` becomes ``<layer>.weight`` and ``<layer>._weight_scale`` becomes
+    ``<layer>.weight_scale``, so the rest of the scaled-fp8 pipeline applies. Tensors are renamed,
+    never copied.
+
+    The scale is per output row. A loader that renames keys after translating must carry the scale along
+    (:func:`detach_layer_sidechannel` / :func:`reattach_layer_sidechannel`), and anything that permutes a
+    weight's rows must permute the scale the same way. A state dict without torchao keys is left alone (returns 0).
+
+    Raises ``ValueError`` for a layout :func:`find_torchao_fp8_problem` names.
+    """
+    problem = find_torchao_fp8_problem(sd)
+    if problem is not None:
+        raise ValueError(f"Unsupported torchao fp8 checkpoint: {problem}.")
+    layers = [
+        key[: -len(TORCHAO_QDATA_SUFFIX)] for key in sd if isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX)
+    ]
+    for layer in layers:
+        sd[f"{layer}.weight"] = sd.pop(layer + TORCHAO_QDATA_SUFFIX)
+        # torchao writes the per-row scale as `[out, 1]`. `_normalize_weight_scale` keeps a 2-D scale as
+        # block-wise, which `is_matmul_usable_scale` rejects, and the split would then silently fold the
+        # layer to bf16. Flat `[out]` is the per-output-channel form.
+        sd[f"{layer}.weight_scale"] = sd.pop(layer + TORCHAO_SCALE_SUFFIX).reshape(-1)
+    return len(layers)
+
+
+def clone_unreplaced_tensors(sd: dict[Any, Any], before: Mapping[Any, Any]) -> int:
+    """Clone every tensor in ``sd`` that is still the very object ``before`` held; return how many.
+
+    ``before`` is a shallow ``dict(sd)`` taken ahead of a fold and cast. Those leave a tensor in place when
+    nothing needed changing (a bf16 weight cast to bf16 is the same object), and ``load_file`` tensors are slices of
+    one file mapping, so each kept one pins the whole mapping for the model's cached life without the cache's size
+    calculation seeing it. Tensors the fold or cast replaced are already fresh and are not copied again. Their
+    storage cannot tell the two apart: every ``load_file`` tensor reports its own storage and size.
+    """
+    cloned = 0
+    for key, tensor in sd.items():
+        if before.get(key) is tensor and isinstance(tensor, torch.Tensor):
+            sd[key] = tensor.clone()
+            cloned += 1
+    return cloned
+
+
 def reject_undecoded_mx_scale(path: str, scale: Any) -> None:
     """Refuse an MX exponent grid to anything that is about to multiply it as a number.
 

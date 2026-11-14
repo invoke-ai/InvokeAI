@@ -136,6 +136,7 @@ export const GenerateConceptsContent = ({
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }
+          relatedTo={selectedModel?.key ?? null}
           value={null}
           onChange={addLora}
         />

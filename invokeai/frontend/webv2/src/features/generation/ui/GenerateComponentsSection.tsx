@@ -136,6 +136,7 @@ const ComponentPicker = ({
               ? t('widgets.generate.selectComponent')
               : (slot.placeholder ?? t('widgets.generate.modelDefault'))
           }
+          relatedTo={ctx.model.key}
           value={selectedValue}
           onChange={onChange}
         />

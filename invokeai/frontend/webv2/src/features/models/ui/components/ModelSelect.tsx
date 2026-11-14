@@ -14,6 +14,7 @@ import {
   Stack,
   Text,
   useFieldContext,
+  VisuallyHidden,
 } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
@@ -107,6 +108,7 @@ export const ModelSelect = ({
   modelTypes,
   onChange,
   placeholder,
+  relatedTo = null,
   scopeLabel: scopeLabelOverride,
   showManagerButton = true,
   size = 'md',
@@ -127,6 +129,8 @@ export const ModelSelect = ({
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
+  /** Key of the model whose links rank this picker: its related models come first and carry a link icon. */
+  relatedTo?: string | null;
   /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
   scopeLabel?: string;
   showManagerButton?: boolean;
@@ -160,7 +164,10 @@ export const ModelSelect = ({
     (bases: ReadonlySet<string>) => setPickerBaseFilters(pickerId, [...bases]),
     [pickerId]
   );
-  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? value : null);
+  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? relatedTo : null);
+  const relatedToName = useModelsSelector((snapshot) =>
+    relatedTo === null ? null : (snapshot.modelsByKey.get(relatedTo)?.name ?? null)
+  );
   const relatedKeys = useMemo<ReadonlySet<string>>(
     () => (relatedKeyList ? new Set(relatedKeyList) : EMPTY_KEYS),
     [relatedKeyList]
@@ -252,12 +259,13 @@ export const ModelSelect = ({
       <ModelOptionContent
         enableDescription={enableModelDescriptions}
         isRelated={relatedKeys.has(model.key)}
+        relatedToName={relatedToName}
         model={model}
         showType={hasMixedTypes}
         state={state}
       />
     ),
-    [enableModelDescriptions, hasMixedTypes, relatedKeys]
+    [enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
   );
 
   return (
@@ -551,16 +559,20 @@ const ModelOptionContent = ({
   enableDescription,
   isRelated,
   model,
+  relatedToName,
   showType,
   state,
 }: {
   enableDescription: boolean;
   isRelated: boolean;
   model: ModelConfig;
+  relatedToName: string | null;
   showType: boolean;
   state: PickerOptionState;
 }) => {
   const { t } = useTranslation();
+  const linkedLabel =
+    relatedToName === null ? t('models.linkedModel') : t('models.linkedToModel', { name: relatedToName });
   const showDetail = !state.isCompact;
 
   return (
@@ -579,17 +591,14 @@ const ModelOptionContent = ({
       <Stack flex="1" gap="0" minW="0">
         <HStack gap="1.5" minW="0">
           {isRelated ? (
-            <Tooltip content={t('models.linkedToCurrentSelection')}>
-              <Icon
-                as={LinkIcon}
-                aria-label={t('models.linkedModel')}
-                boxSize="3"
-                color="accent.solid"
-                flexShrink={0}
-              />
+            <Tooltip content={linkedLabel}>
+              <Icon as={LinkIcon} aria-hidden boxSize="3" color="accent.solid" flexShrink={0} />
             </Tooltip>
           ) : null}
           <MiddleTruncate fontSize="md" minW="0" text={model.name} />
+          {/* Options take their accessible name from their text, and focus stays in the search field, so the tooltip
+              alone never reaches screen readers or keyboard users. */}
+          {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
               {getModelTypeLabel(model.type)}
