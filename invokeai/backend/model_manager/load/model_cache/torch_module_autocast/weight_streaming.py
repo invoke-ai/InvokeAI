@@ -328,8 +328,10 @@ class PinnedStorageRegistry:
     share (`SharedCpuWeightsStore`) are registered once and held once per holder. Each storage is registered by its
     exact byte range (see `_registration_self_test`), so every copy from it lies inside its registration.
 
-    A holder keeps what it registered across loads and unloads: registering and unregistering cost about 0.04 s/GiB
-    on Windows (RTX 4090) and more on Linux, and models that take turns in VRAM would pay that on every lock. `update` marks what a
+    A holder keeps what it registered across loads and unloads, so models that take turns in VRAM do not pay for
+    registration on every lock: about 0.03 s/GiB for memory already private, measured on Windows (RTX 4090) and Linux
+    (RTX PRO 6000), and 0.3 to 0.4 s/GiB the first time for weights still mapped from their file, whose pages the
+    driver makes private. `update` marks what a
     lock streams, `idle` marks the end of the model's last lock. A storage that no active holder streams is
     reclaimable: when a registration would pass `PINNED_RAM_CAP_BYTES`, reclaimable storages are unregistered, the
     longest unused first, and only as many as that registration needs.
@@ -415,11 +417,14 @@ class PinnedStorageRegistry:
         Takes no lock; the next registry call applies it, before it looks for room."""
         self._deferred.put((holder, False))
 
-    def release(self, holder: PinHolder) -> None:
-        """Release everything ``holder`` holds. Best effort: never raises on a failing device."""
+    def release(self, holder: PinHolder) -> bool:
+        """Release everything ``holder`` holds; whether it held anything. Best effort: never raises on a failing
+        device."""
         with self._registration_lock:
             self._drain_deferred_locked()
+            held = bool(holder.keys)
             self._release_holder_locked(holder)
+            return held
 
     def release_deferred(self, holder: PinHolder) -> None:
         """Post a release without taking a lock. The only entry point that is safe from GC context."""

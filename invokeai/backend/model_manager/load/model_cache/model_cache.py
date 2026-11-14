@@ -626,6 +626,8 @@ class ModelCache:
         self._last_activity_time: Optional[float] = None
         self._timeout_timer: Optional[threading.Timer] = None
         self._shutdown_event = threading.Event()
+        # Whether `_delete_cache_entry` has said once that a model left with page-locked weights.
+        self._pinned_eviction_logged = False
         self._deferred_work_queue: queue.SimpleQueue[object] = queue.SimpleQueue()
         self._deferred_work_thread: Optional[threading.Thread] = None
         self._deferred_work_finalizer: Optional[weakref.finalize] = None
@@ -3061,7 +3063,16 @@ class ModelCache:
         # Last, after the bookkeeping above: it waits for the device. It does not raise, but a hang or
         # an interrupt there must not leave the record half removed.
         if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
-            cache_entry.cached_model.release_pinned_weights()
+            had_pins = cache_entry.cached_model.release_pinned_weights()
+            if had_pins and not self._pinned_eviction_logged and not self._shutdown_event.is_set():
+                # Its next load page-locks the weights again, which can cost more than streaming saves when it
+                # happens between the images of one generation (measured on Linux with an 8 GB RAM cache).
+                self._pinned_eviction_logged = True
+                self._logger.info(
+                    f"async_weight_streaming: {cache_entry.key} left the RAM cache with page-locked weights; loading "
+                    "it again locks them again. If that happens between images, raise max_cache_ram_gb so the models "
+                    "of one generation fit."
+                )
 
     def _notify_models_cleared(
         self,

@@ -273,17 +273,17 @@ class CachedModelWithPartialLoad:
             self._shared_store = None
             self._shared_key = None
 
-    def release_pinned_weights(self) -> None:
-        """Release this model's page-locked CPU weights (see `pin_streamed_weights`). Called on eviction;
-        idempotent. Storages another holder (a wrapper on another GPU sharing these weights) still uses stay pinned."""
+    def release_pinned_weights(self) -> bool:
+        """Release this model's page-locked CPU weights (see `pin_streamed_weights`); whether it had any. Called on
+        eviction; idempotent. Storages another holder (a wrapper on another GPU sharing these weights) still uses stay
+        pinned."""
         # Set first: a `pin_streamed_weights` running concurrently checks it again after registering and undoes that.
         self._pinning_retired = True
         if self._pin_release_finalizer is not None:
             self._pin_release_finalizer.detach()
             self._pin_release_finalizer = None
         holder, self._pin_holder = self._pin_holder, None
-        if holder is not None:
-            weight_streaming.PINNED_STORAGES.release(holder)
+        return holder is not None and weight_streaming.PINNED_STORAGES.release(holder)
 
     def _streams_weights(self) -> bool:
         return not self._pinning_retired and weight_streaming.can_stream_weights_to(

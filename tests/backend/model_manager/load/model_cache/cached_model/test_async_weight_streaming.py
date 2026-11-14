@@ -345,6 +345,10 @@ def test_eviction_from_the_model_cache_releases_the_pins(streaming):
 
         assert not streaming.holds_anything()
         assert not any(s.is_pinned() for s in offloaded)
+        # Its next load locks the weights again: said once, so a RAM cache too small for a generation shows.
+        logged = cache._logger.logger  # The mock behind the cache's prefixing adapter.
+        hints = [c for c in logged.method_calls if "max_cache_ram_gb" in str(c)]
+        assert len(hints) == 1
     finally:
         cache.shutdown()
 
