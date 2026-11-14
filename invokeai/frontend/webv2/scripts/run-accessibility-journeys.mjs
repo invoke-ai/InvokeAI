@@ -393,7 +393,7 @@ const runShortcutGuideJourney = async (browser) => {
       await waitForRenderedMedia(page, { canvas: true });
       const viewTool = page
         .getByRole('toolbar', { exact: true, name: 'Tools' })
-        .getByRole('button', { exact: true, name: 'View' });
+        .getByRole('button', { exact: true, name: 'Pan' });
       await viewTool.click();
       const guide = page.locator('footer').getByRole('button', { exact: true, name: 'Shortcuts' });
       await guide.waitFor();
@@ -1260,7 +1260,7 @@ const runLayersPanesJourney = async (browser) => {
       .getByRole('tabpanel', { exact: true, name: 'Properties' })
       .getByRole('slider', { exact: true, name: 'Brush size' })
       .waitFor();
-    await tools.getByRole('button', { exact: true, name: 'View' }).click();
+    await tools.getByRole('button', { exact: true, name: 'Pan' }).click();
     await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).waitFor();
 
     // Pointer: activate every non-default pane across the three blocks.

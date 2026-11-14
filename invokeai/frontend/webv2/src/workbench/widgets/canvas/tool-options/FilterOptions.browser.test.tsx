@@ -8,7 +8,7 @@ import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { filterOperationForm } from './FilterOptions';
@@ -38,6 +38,7 @@ const sessionStore = (initial: FilterOperationSessionState) => {
   const listeners = new Set<() => void>();
   return {
     getFilterSessionState: () => state,
+    processFilterOperation: vi.fn(() => Promise.resolve<'completed' | 'stale'>('completed')),
     set: (next: Partial<FilterOperationSessionState>) => {
       state = { ...state, ...next };
       listeners.forEach((listener) => listener());
@@ -124,6 +125,50 @@ describe('filter operation errors', () => {
     const details = page.getByRole('button', { name: 'Technical details' });
     await userEvent.hover(details);
     await expect.element(page.getByText('cache failed')).toBeVisible();
+  });
+
+  it('offers Process to retry a failed run with auto-update on, until that retry has finished', async () => {
+    const { store } = await renderSection({});
+    const process = page.getByRole('button', { exact: true, name: 'Process' });
+    expect(process.query()).toBeNull();
+
+    act(() => store.set({ error: { code: 'process-failed', detail: 'graph exploded' }, status: 'error' }));
+    await expect.element(process).toBeEnabled();
+    let finish!: () => void;
+    store.processFilterOperation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve('completed');
+        })
+    );
+    await userEvent.click(process);
+    expect(store.processFilterOperation).toHaveBeenCalledOnce();
+
+    // The retry clears the error as it starts; the button stays, busy, for the run it started.
+    act(() => store.set({ error: null, status: 'processing' }));
+    await expect.element(process).toBeDisabled();
+    act(() => store.set({ status: 'ready' }));
+    await act(() => finish());
+    expect(process.query()).toBeNull();
+  });
+
+  it('leaves a failed apply to Apply: no Process with auto-update on', async () => {
+    await renderSection({
+      error: { code: 'apply-failed', detail: 'cache failed' },
+      preview: {
+        guard: {} as never,
+        height: 10,
+        imageName: 'filtered',
+        origin: { x: 0, y: 0 },
+        rect: { height: 10, width: 10, x: 0, y: 0 },
+        width: 10,
+      },
+      status: 'error',
+    });
+
+    await expect.element(page.getByRole('alert')).toHaveTextContent('The filter could not be applied.');
+    expect(page.getByRole('button', { exact: true, name: 'Process' }).query()).toBeNull();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
   });
 
   it('clears the error once a retry starts', async () => {

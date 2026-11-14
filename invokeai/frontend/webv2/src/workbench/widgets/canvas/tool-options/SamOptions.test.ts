@@ -37,6 +37,7 @@ const snapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapsh
   layerType: 'raster',
   model: 'segment-anything-2-large',
   pointLabel: 'include',
+  retrying: false,
   sourceRect: { height: 20, width: 20, x: 0, y: 0 },
   status: 'ready',
   ...overrides,
@@ -68,7 +69,7 @@ describe('getSamActionEligibility', () => {
     });
     expect(
       getSamActionEligibility(
-        snapshot({ error: { code: 'unknown', detail: 'commit failed' }, hasPreview: true, status: 'error' })
+        snapshot({ error: { code: 'commit-failed', detail: 'commit failed' }, hasPreview: true, status: 'error' })
       )
     ).toMatchObject({
       canApply: true,
@@ -127,6 +128,7 @@ describe('Select Object status copy', () => {
     'output-dimension',
     'decode',
     'locked',
+    'commit-failed',
     'unknown',
   ] as const)('maps %s errors to localized primary copy', (code) => {
     const key = getSamErrorTranslationKey(code).split('.').at(-1);

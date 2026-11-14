@@ -297,6 +297,8 @@ export interface SelectObjectSessionState<T> {
   isolatedPreview: boolean;
   status: SelectObjectSessionStatus;
   error: SamSessionError | null;
+  /** A run asked for after a failed run is still in flight. */
+  retrying: boolean;
   preview: SelectObjectSessionPreview<T> | null;
   sourceGuard: LayerExportGuard | null;
 }

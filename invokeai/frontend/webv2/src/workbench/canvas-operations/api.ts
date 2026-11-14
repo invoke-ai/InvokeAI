@@ -97,3 +97,4 @@ export {
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';
+export { isSamRunError } from './selectObjectSession';

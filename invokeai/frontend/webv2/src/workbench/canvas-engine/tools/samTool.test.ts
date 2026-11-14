@@ -23,6 +23,7 @@ const visualSnapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSession
   layerType: 'raster',
   model: 'segment-anything-2-large',
   pointLabel: 'include',
+  retrying: false,
   sourceRect,
   status: 'ready',
   ...overrides,

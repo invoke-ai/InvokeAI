@@ -13,6 +13,7 @@ import { Select } from '@platform/ui/Select';
 import {
   getCanvasOperations,
   isSamDocumentInputValid,
+  isSamRunError,
   type CanvasOperationCapability,
   type SamSessionErrorCode,
   type SamSessionSnapshot,
@@ -55,6 +56,7 @@ const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
   'adjustment-error': 'widgets.layers.selectObject.errorAdjustment',
   'adjustment-over-budget': 'widgets.layers.selectObject.errorAdjustmentOverBudget',
   'adjustment-too-large': 'widgets.layers.selectObject.errorAdjustmentTooLarge',
+  'commit-failed': 'widgets.layers.selectObject.errorCommitFailed',
   decode: 'widgets.layers.selectObject.errorDecode',
   empty: 'widgets.layers.selectObject.errorEmpty',
   invalid: 'widgets.layers.selectObject.errorInvalid',
@@ -146,7 +148,7 @@ const SamInputSettings = ({ engine }: ToolFormProps) => {
   const runOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !isImeComposing(event.nativeEvent) && eligibility.canProcess) {
       event.preventDefault();
-      void operations.processSelectObjectSession();
+      getSamActionHandlers(operations).process();
     }
   };
   return (
@@ -313,6 +315,11 @@ const useSamStatus = (engine: ToolFormProps['engine']): OperationStatus | null =
   };
 };
 
+/**
+ * Find object is the manual run while auto-update is off. With auto-update on it is the retry after a failed run, the
+ * only way to run the same input again, and stays while that retry runs (`retrying`), whether the button or Enter in
+ * the prompt started it, so it shows the retry's progress.
+ */
 const SamActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
@@ -329,7 +336,7 @@ const SamActions = ({ engine }: ToolFormProps) => {
       canReset={eligibility.canReset}
       canSave={eligibility.canSave}
       run={
-        session.autoProcess
+        session.autoProcess && !session.retrying && !(session.error && isSamRunError(session.error.code))
           ? null
           : {
               disabled: !eligibility.canProcess,

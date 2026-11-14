@@ -22,7 +22,7 @@ import {
 import { useFilterSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { LayerFilterControls } from '@workbench/widgets/layers/LayerFilterControls';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OperationActions } from './OperationActions';
@@ -87,6 +87,33 @@ const FILTER_ERROR_TRANSLATION_KEYS: Record<FilterSessionErrorCode, string> = {
 
 export const getFilterErrorTranslationKey = (code: FilterSessionErrorCode): string =>
   FILTER_ERROR_TRANSLATION_KEYS[code];
+
+const FILTER_ERROR_FROM_RUN: Record<FilterSessionErrorCode, boolean> = {
+  aborted: false,
+  'apply-failed': false,
+  busy: false,
+  disabled: true,
+  empty: true,
+  locked: false,
+  missing: true,
+  'not-ready': true,
+  'over-budget': false,
+  'process-failed': true,
+  'source-adjustment-error': true,
+  'source-adjustment-over-budget': true,
+  'source-adjustment-too-large': true,
+  'source-over-budget': true,
+  'source-unreadable': true,
+  stale: true,
+  unsupported: true,
+};
+
+/**
+ * Whether running the filter again is the error's retry: a run reported it (reading the source or filtering it).
+ * Apply's own refusals and failures are retried by Apply. Codes both report count as run errors: a stale preview must
+ * be filtered again, and the rest fail while reading the source, before any backend work.
+ */
+export const isFilterRunError = (code: FilterSessionErrorCode): boolean => FILTER_ERROR_FROM_RUN[code];
 
 const useFilterDraft = (engine: ToolFormProps['engine']) => {
   const operations = getCanvasOperations(engine);
@@ -218,10 +245,15 @@ const useFilterStatus = (engine: ToolFormProps['engine']): OperationStatus | nul
   };
 };
 
+/**
+ * Process is the manual run while auto-update is off. With auto-update on it is the retry after a failed run, the only
+ * way to run the same settings again, and stays for the run it started so the click shows its progress.
+ */
 const FilterActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
   const { operations, reset } = useFilterDraft(engine);
+  const [running, setRunning] = useState(false);
   const onApply = useCallback(
     () => void operations.commitFilterOperation('apply', galleryDurability.makeCanvasAsset),
     [operations]
@@ -230,6 +262,10 @@ const FilterActions = ({ engine }: ToolFormProps) => {
   if (!session) {
     return null;
   }
+  const run = () => {
+    setRunning(true);
+    void operations.processFilterOperation().finally(() => setRunning(false));
+  };
   const eligibility = getFilterActionEligibility(session);
   const saveTargets = getFilterSaveTargetEligibility(eligibility);
   return (
@@ -240,13 +276,13 @@ const FilterActions = ({ engine }: ToolFormProps) => {
       canReset={eligibility.canReset}
       canSave={eligibility.canSave}
       run={
-        session.autoProcess
+        session.autoProcess && !running && !(session.error && isFilterRunError(session.error.code))
           ? null
           : {
               disabled: !eligibility.canProcess,
               label: t('widgets.layers.rasterFilter.process'),
               loading: session.status === 'processing',
-              onRun: () => void operations.processFilterOperation(),
+              onRun: run,
             }
       }
       saveAsLabel={t('widgets.layers.rasterFilter.applyAs')}

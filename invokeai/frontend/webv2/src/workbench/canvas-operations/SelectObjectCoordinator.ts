@@ -44,6 +44,7 @@ export const createSelectObjectOperationCoordinator = (
       autoProcess: state.autoProcess,
       error: state.error,
       hasPreview: state.preview !== null,
+      retrying: state.retrying,
       layerName: startContext.layerName,
       layerType: startContext.layerType,
       input:
@@ -165,7 +166,7 @@ export const createSelectObjectOperationCoordinator = (
       result.status === 'locked'
         ? { code: 'locked' }
         : {
-            code: 'unknown',
+            code: 'commit-failed',
             detail: result.status === 'failed' ? result.message : `Select Object commit is ${result.status}.`,
           }
     );
@@ -181,7 +182,7 @@ export const createSelectObjectOperationCoordinator = (
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (finishCommit(owner)) {
-        owner.session.reportError({ code: 'unknown', detail: message });
+        owner.session.reportError({ code: 'commit-failed', detail: message });
       }
       return { message, status: 'failed' };
     }
@@ -302,7 +303,7 @@ export const createSelectObjectOperationCoordinator = (
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (finishCommit(owner)) {
-          owner.session.reportError({ code: 'unknown', detail: message });
+          owner.session.reportError({ code: 'commit-failed', detail: message });
         }
         return { message, status: 'failed' };
       }
@@ -363,7 +364,7 @@ export const createSelectObjectOperationCoordinator = (
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (finishCommit(owner)) {
-          owner.session.reportError({ code: 'unknown', detail: message });
+          owner.session.reportError({ code: 'commit-failed', detail: message });
         }
         return { message, status: 'failed' };
       }

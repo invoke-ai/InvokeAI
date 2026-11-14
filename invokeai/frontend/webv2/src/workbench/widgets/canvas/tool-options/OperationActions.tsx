@@ -46,7 +46,7 @@ export const OperationActions = ({
   canCancel: boolean;
   canReset: boolean;
   canSave: boolean;
-  /** The manual run, offered only while the preview does not update by itself. */
+  /** The manual run, offered while the preview does not update by itself or to retry a run that failed. */
   run: OperationRunAction | null;
   /** Names the save-as menu trigger. */
   saveAsLabel: string;

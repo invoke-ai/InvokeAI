@@ -1,11 +1,11 @@
 /**
- * Freehand lasso keeps drag corners, coalescing only exact straight runs. Polygon lasso spans clicks and closes on
- * double-click, Enter or first-vertex proximity. Both commit through `commitSelection` with shared modifier/persistent-op resolution.
+ * Freehand lasso thins its drag by sub-pixel screen spacing and straight runs, keeping corners. Polygon lasso spans
+ * clicks and closes on double-click, Enter or first-vertex proximity. Both commit through `commitSelection` with shared modifier/persistent-op resolution.
  * Previews never dispatch. Temporary tool switches preserve polygon sessions; real switches cancel them. Selection
  * history is owned by the engine wrapper.
  */
 
-import type { Vec2 } from '@workbench/canvas-engine/types';
+import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
 import { polygonBounds, polygonToSvgPath } from '@workbench/canvas-engine/freehand';
 import { selectionOpFor } from '@workbench/canvas-engine/selection/selectionOpMode';
@@ -17,31 +17,57 @@ import { movePolyline, polylinePreview, pressPolyline, startPolyline, type Polyl
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/** Keep subpixel corners and winding; only redundant points on a forward straight run may be dropped. */
-const appendFreehandPoint = (points: Vec2[], point: Vec2): void => {
-  const last = points[points.length - 1];
-  if (last && last.x === point.x && last.y === point.y) {
+const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * Least on-screen gap (CSS px) between a kept freehand point and the one before it. Below a pixel, so it never removes
+ * an outline the user can see, at any zoom; it only collapses dense pointer samples (high-rate mice, pens) that would
+ * otherwise each become a vertex the preview copies and strokes on every frame.
+ */
+export const FREEHAND_MIN_SPACING_PX = 0.5;
+
+/** A freehand drag in progress: document points, with the screen point each was sampled at. */
+interface FreehandSession {
+  kind: 'freehand';
+  points: Vec2[];
+  screenPoints: Vec2[];
+}
+
+/**
+ * The last point gives way to a new sample while both lie within `FREEHAND_MIN_SPACING_PX` of the point before it;
+ * once one leaves that radius the last point stays. Every dropped sample lies within the spacing of a kept point, so
+ * thinning moves the outline by less than the spacing and keeps corners and reversals beyond it, and the outline
+ * always ends at the latest sample. Redundant points on a forward straight run are dropped too.
+ */
+const appendFreehandPoint = (session: FreehandSession, sample: PointerInput): void => {
+  const { points, screenPoints } = session;
+  const point = sample.documentPoint;
+  const screen = sample.screenPoint;
+  const end = points.length - 1;
+  const last = points[end]!;
+  if (last.x === point.x && last.y === point.y) {
     return;
   }
-  const previous = points[points.length - 2];
-  if (previous && last) {
+  const previous = points[end - 1];
+  const previousScreen = screenPoints[end - 1];
+  if (previous && previousScreen) {
+    const withinSpacing =
+      distance(previousScreen, screenPoints[end]!) < FREEHAND_MIN_SPACING_PX &&
+      distance(previousScreen, screen) < FREEHAND_MIN_SPACING_PX;
     const dx = last.x - previous.x;
     const dy = last.y - previous.y;
     const nextDx = point.x - last.x;
     const nextDy = point.y - last.y;
-    if (dx * nextDy === dy * nextDx && dx * nextDx + dy * nextDy > 0) {
-      points[points.length - 1] = { x: point.x, y: point.y };
+    const forwardStraight = dx * nextDy === dy * nextDx && dx * nextDx + dy * nextDy > 0;
+    if (withinSpacing || forwardStraight) {
+      points[end] = { x: point.x, y: point.y };
+      screenPoints[end] = { x: screen.x, y: screen.y };
       return;
     }
   }
   points.push({ x: point.x, y: point.y });
+  screenPoints.push({ x: screen.x, y: screen.y });
 };
-
-/** A freehand drag in progress. */
-interface FreehandSession {
-  kind: 'freehand';
-  points: Vec2[];
-}
 
 /** A polygon vertex-placing session spanning multiple clicks. */
 interface PolygonSession extends PolylineSession {
@@ -154,7 +180,7 @@ export const createLassoTool = (): Tool => {
         if (session) {
           return;
         }
-        session = { kind: 'freehand', points: [{ ...input.documentPoint }] };
+        session = { kind: 'freehand', points: [{ ...input.documentPoint }], screenPoints: [{ ...input.screenPoint }] };
         publishPreview(ctx);
         return;
       }
@@ -185,7 +211,7 @@ export const createLassoTool = (): Tool => {
         }
       } else {
         for (const sample of batch) {
-          appendFreehandPoint(session.points, sample.documentPoint);
+          appendFreehandPoint(session, sample);
         }
       }
       publishPreview(ctx);
@@ -196,7 +222,7 @@ export const createLassoTool = (): Tool => {
       if (!session || session.kind === 'polygon') {
         return;
       }
-      appendFreehandPoint(session.points, input.documentPoint);
+      appendFreehandPoint(session, input);
       const polygon = session.points;
       reset();
       clearPreview(ctx);

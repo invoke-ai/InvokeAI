@@ -19503,7 +19503,7 @@ describe('Select Object canvas engine integration', () => {
     ).resolves.toEqual({ message: 'promotion failed', status: 'failed' });
 
     expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({
-      error: { code: 'unknown', detail: 'promotion failed' },
+      error: { code: 'commit-failed', detail: 'promotion failed' },
       hasPreview: true,
     });
     expect(getCanvasOperations(h.engine).stores.samSession.get()?.input).toEqual(previewInput);
@@ -19529,7 +19529,7 @@ describe('Select Object canvas engine integration', () => {
     ).resolves.toEqual({ status: 'stale' });
 
     expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({
-      error: { code: 'unknown', detail: 'Select Object commit is stale.' },
+      error: { code: 'commit-failed', detail: 'Select Object commit is stale.' },
       hasPreview: true,
     });
     expect(getCanvasOperations(h.engine).stores.samSession.get()?.input).toEqual(previewInput);
