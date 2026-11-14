@@ -110,3 +110,82 @@ def test_loader_rejects_a_qwen3_vl_encoder_of_the_wrong_size(variant, match: str
 
     with pytest.raises(ValueError, match=match):
         Krea2ModelLoaderInvocation(model=main, vae_model=vae, qwen3_vl_encoder_model=encoder).invoke(_context(configs))
+
+
+def _tower_configs(
+    encoder_format: ModelFormat, tower_type: ModelType, tower_variant: Qwen3VLVariantType
+) -> dict[str, SimpleNamespace]:
+    return {
+        "main": _config(BaseModelType.Krea2, ModelType.Main, ModelFormat.Checkpoint),
+        "vae": _config(BaseModelType.QwenImage, ModelType.VAE, ModelFormat.Checkpoint),
+        "encoder": _config(BaseModelType.Any, ModelType.Qwen3VLEncoder, encoder_format, Qwen3VLVariantType.Qwen3VL_4B),
+        "tower": _config(BaseModelType.Any, tower_type, ModelFormat.GGUFQuantized, tower_variant),
+    }
+
+
+def _tower_loader(with_tower: bool = True) -> Krea2ModelLoaderInvocation:
+    return Krea2ModelLoaderInvocation(
+        model=_model("main", BaseModelType.Krea2, ModelType.Main),
+        vae_model=_model("vae", BaseModelType.QwenImage, ModelType.VAE),
+        qwen3_vl_encoder_model=_model("encoder", BaseModelType.Any, ModelType.Qwen3VLEncoder),
+        qwen3_vl_vision_tower_model=(
+            _model("tower", BaseModelType.Any, ModelType.Qwen3VLVisionTower) if with_tower else None
+        ),
+    )
+
+
+def test_loader_hands_the_vision_tower_beside_a_gguf_encoder_to_the_field() -> None:
+    configs = _tower_configs(ModelFormat.GGUFQuantized, ModelType.Qwen3VLVisionTower, Qwen3VLVariantType.Qwen3VL_4B)
+
+    field = _tower_loader().invoke(_context(configs)).qwen3_vl_encoder
+
+    assert field.vision_tower is not None
+    assert field.vision_tower.key == "tower"
+
+
+@pytest.mark.parametrize(
+    ("encoder_format", "tower_type", "tower_variant", "match"),
+    [
+        (
+            ModelFormat.GGUFQuantized,
+            ModelType.Qwen3VLVisionTower,
+            Qwen3VLVariantType.Qwen3VL_8B,
+            "Krea-2 reads references with the 4B one",
+        ),
+        (
+            ModelFormat.GGUFQuantized,
+            ModelType.Qwen3VLEncoder,
+            Qwen3VLVariantType.Qwen3VL_4B,
+            "is not a Qwen3-VL vision tower",
+        ),
+        (
+            ModelFormat.Qwen3VLEncoder,
+            ModelType.Qwen3VLVisionTower,
+            Qwen3VLVariantType.Qwen3VL_4B,
+            "pairs only with a GGUF Qwen3-VL encoder",
+        ),
+    ],
+)
+def test_loader_refuses_a_vision_tower_that_does_not_fit(
+    encoder_format: ModelFormat, tower_type: ModelType, tower_variant: Qwen3VLVariantType, match: str
+) -> None:
+    configs = _tower_configs(encoder_format, tower_type, tower_variant)
+
+    with pytest.raises(ValueError, match=match):
+        _tower_loader().invoke(_context(configs))
+
+
+def test_loader_refuses_a_vision_tower_without_a_standalone_encoder() -> None:
+    """The Diffusers pipeline's own encoder brings a tower; a stale selection must not pass silently."""
+    configs = _tower_configs(ModelFormat.GGUFQuantized, ModelType.Qwen3VLVisionTower, Qwen3VLVariantType.Qwen3VL_4B)
+    configs["main"] = _config(BaseModelType.Krea2, ModelType.Main, ModelFormat.Diffusers)
+    loader = _tower_loader().model_copy(update={"qwen3_vl_encoder_model": None})
+
+    with pytest.raises(ValueError, match="pairs only with a GGUF Qwen3-VL encoder"):
+        loader.invoke(_context(configs))
+
+
+def test_loader_leaves_the_vision_tower_empty_when_none_is_selected() -> None:
+    configs = _tower_configs(ModelFormat.GGUFQuantized, ModelType.Qwen3VLVisionTower, Qwen3VLVariantType.Qwen3VL_4B)
+
+    assert _tower_loader(with_tower=False).invoke(_context(configs)).qwen3_vl_encoder.vision_tower is None
