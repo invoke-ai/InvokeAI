@@ -158,7 +158,43 @@ def detect_wan_lora_variant(state_dict: dict) -> WanLoRAVariantType | None:
         # Any other inner_dim is uncharted — bail rather than guess.
         return None
 
+    # A LoKR attention layer states the same dimension as the Kronecker product of its two operands, whole or
+    # factorized — SimpleTuner's LyCORIS files hold no low-rank pair at all (#10174).
+    for key, _tensor in state_dict.items():
+        if not isinstance(key, str) or not (key.endswith("attn1_to_q.lokr_w1") or key.endswith("attn1_to_q.lokr_w1_a")):
+            continue
+        prefix = key[: -len("lokr_w1_a") if key.endswith("lokr_w1_a") else -len("lokr_w1")]
+        operand_dims = []
+        for operand in ("w1", "w2"):
+            dims = _lokr_operand_shape(state_dict, prefix, operand)
+            if dims is None:
+                break
+            operand_dims.append(dims)
+        if len(operand_dims) != 2:
+            continue
+        inner_dim = max(operand_dims[0][0] * operand_dims[1][0], operand_dims[0][1] * operand_dims[1][1])
+        if inner_dim == 5120:
+            return WanLoRAVariantType.A14B
+        if inner_dim == 3072:
+            return WanLoRAVariantType.Wan5B
+        return None
+
     return None
+
+
+def _lokr_operand_shape(state_dict: dict, key_prefix: str, operand: str) -> tuple[int, int] | None:
+    """A LoKR operand's (rows, cols), stored whole (`lokr_w1`) or as a low-rank pair (`_a` @ `_b`)."""
+    whole = state_dict.get(f"{key_prefix}lokr_{operand}")
+    if whole is not None:
+        shape = getattr(whole, "shape", None)
+        return (int(shape[0]), int(shape[1])) if shape is not None and len(shape) >= 2 else None
+    a, b = state_dict.get(f"{key_prefix}lokr_{operand}_a"), state_dict.get(f"{key_prefix}lokr_{operand}_b")
+    if a is None or b is None:
+        return None
+    a_shape, b_shape = getattr(a, "shape", None), getattr(b, "shape", None)
+    if a_shape is None or b_shape is None or len(a_shape) < 2 or len(b_shape) < 2:
+        return None
+    return int(a_shape[0]), int(b_shape[1])
 
 
 def has_non_wan_architecture_keys(str_keys: list[str]) -> bool:

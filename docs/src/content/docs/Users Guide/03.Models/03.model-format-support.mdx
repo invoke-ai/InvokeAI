@@ -229,6 +229,12 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
 
+SimpleTuner's LyCORIS training writes its layers with the model's own module names flattened behind a `lycoris_`
+prefix (for example `lycoris_single_transformer_blocks_0_attn_to_k.lokr_w1`). Files in this layout are recognized
+on FLUX.1 (both `lycoris_` and `lycoris__` spellings), FLUX.2, SDXL, Z-Image and Wan, as they already were on
+SD 3 / 3.5; FLUX.3's own flattened names are a different layout and are still not recognized, as noted on its
+family page.
+
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 

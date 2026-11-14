@@ -74,6 +74,7 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_non_ltx2_architecture_keys,
     has_unsupported_ltx2_lora_variant_keys,
 )
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import lycoris_flat_family
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
     find_minimax_h3_lora_defect,
     has_minimax_h3_lora_keys,
@@ -707,6 +708,8 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
                 "lora_te1_",
                 "lora_te2_",
                 "lora_transformer_",
+                # SimpleTuner's LyCORIS flattens the model's own module names behind this prefix (#10174).
+                "lycoris_",
             },
         )
 
@@ -746,6 +749,15 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
         # Same for SD 3 LoRAs that train CLIP-L and CLIP-G: kohya's te1 + te2 layers read as SDXL.
         if is_sd3_lora(state_dict):
             raise NotAMatchError("model looks like an SD 3 LoRA, not an SD 1/2/XL LoRA")
+
+        # SimpleTuner's LyCORIS flattens the model's own module names behind `lycoris_` (#10174). FLUX.1 and SDXL
+        # are the families this base detection serves; FLUX.2, Z-Image and Wan have their own probes, and names
+        # that settle nothing fall through to the Stable Diffusion heuristics below.
+        flat_family = lycoris_flat_family(state_dict)
+        if flat_family == "flux1":
+            return BaseModelType.Flux
+        if flat_family == "sdxl":
+            return BaseModelType.StableDiffusionXL
 
         # If we've gotten here, we assume that the model is a Stable Diffusion model
         token_vector_length = lora_token_vector_length(state_dict)
@@ -801,6 +813,10 @@ class LoRA_LyCORIS_Flux2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
         if _get_flux_lora_format(mod) and _is_flux2_lora(mod):
             return BaseModelType.Flux2
+        # SimpleTuner's LyCORIS flat keys: FLUX.2 Klein's own module names (`to_qkv_mlp_proj`, `ff.linear_in`) say
+        # so, whatever the tensor shapes can (#10174).
+        if lycoris_flat_family(mod.load_state_dict()) == "flux2":
+            return BaseModelType.Flux2
         raise NotAMatchError("model is not a FLUX.2 LoRA")
 
 
@@ -838,6 +854,11 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         # Check for Kohya format first
         if is_state_dict_likely_z_image_kohya_lora(state_dict):
+            return
+
+        # SimpleTuner's LyCORIS flattens the module names behind `lycoris_` (`lycoris_layers_0_attention_to_k`);
+        # the family detection resolves them and keeps Ideogram 4's same-named blocks out by width (#10174).
+        if lycoris_flat_family(state_dict) == "z_image":
             return
 
         # Check for Z-Image specific LoRA patterns (dot-notation formats)
@@ -886,6 +907,9 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         # Check for Kohya format
         if is_state_dict_likely_z_image_kohya_lora(state_dict):
+            return BaseModelType.ZImage
+        # SimpleTuner's LyCORIS flat names (#10174)
+        if lycoris_flat_family(state_dict) == "z_image":
             return BaseModelType.ZImage
 
         # Check for Z-Image transformer layer patterns (dot-notation formats)
@@ -1564,7 +1588,9 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_wan_keys = has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)
+        has_wan_keys = (
+            has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys) or lycoris_flat_family(state_dict) == "wan"
+        )
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
             {
@@ -1591,9 +1617,10 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)) and not has_non_wan_architecture_keys(
-            str_keys
-        ):
+        has_wan_keys = (
+            has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys) or lycoris_flat_family(state_dict) == "wan"
+        )
+        if has_wan_keys and not has_non_wan_architecture_keys(str_keys):
             return BaseModelType.Wan
 
         raise NotAMatchError("model does not look like a Wan LoRA")
