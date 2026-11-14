@@ -149,6 +149,15 @@ export const Combobox = ({
     },
     [onValueChange]
   );
+  // Zag announces the result count to screen readers as the query settles.
+  const translations = useMemo(
+    () => ({
+      loading: t('common.loading'),
+      noResults: noResultsText ?? t('common.noOptionsFound'),
+      resultsCount: (count: number) => t('common.matchCount', { count }),
+    }),
+    [noResultsText, t]
+  );
   const handleSelect = useCallback(
     ({ itemValue }: { itemValue: string }) => {
       if (itemValue === value) {
@@ -175,6 +184,7 @@ export const Combobox = ({
       positioning={COMBOBOX_POSITIONING}
       scrollToIndexFn={scrollHighlightedIntoView}
       selectionBehavior="replace"
+      translations={translations}
       value={selectedValues}
       onInputValueChange={handleInputValueChange}
       onOpenChange={handleOpenChange}

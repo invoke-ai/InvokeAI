@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import type { UseCommandReturn } from '@chakra-ui/react';
+import type { ReactNode, RefObject } from 'react';
 
-import { HStack, Icon, Kbd, Portal, Spacer, Text, chakra } from '@chakra-ui/react';
+import { Command, HStack, Icon, Kbd, Portal, Spacer, Text, chakra, useCombobox } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
@@ -11,9 +12,15 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CommandPaletteRowsHandle } from './CommandPaletteRows';
-import type { PaletteEntry, PaletteSearchProvider, PaletteStage } from './entries';
+import type { NavigablePaletteRow, PaletteEntry, PaletteSearchProvider, PaletteStage } from './entries';
+import type { CommandPaletteController } from './useCommandPaletteController';
 
-import { CommandPaletteRows, getCommandPaletteRowDomId } from './CommandPaletteRows';
+import {
+  COMMAND_PALETTE_RESULTS_ID,
+  COMMAND_PALETTE_RESULTS_LABEL_ID,
+  CommandPaletteRows,
+  getCommandPaletteRowDomId,
+} from './CommandPaletteRows';
 import { getCommandPaletteReturnFocusElement } from './paletteStore';
 import { COMMAND_PALETTE_INPUT_ID, useCommandPaletteController } from './useCommandPaletteController';
 
@@ -25,6 +32,15 @@ const NAV_HINT_KEYS = ['arrowup', 'arrowdown'];
 const ENTER_HINT_KEYS = ['enter'];
 const ESC_HINT_KEYS = ['esc'];
 const TAB_HINT_KEYS = ['tab'];
+const COMBOBOX_IDS = {
+  content: COMMAND_PALETTE_RESULTS_ID,
+  input: COMMAND_PALETTE_INPUT_ID,
+  item: getCommandPaletteRowDomId,
+  label: COMMAND_PALETTE_RESULTS_LABEL_ID,
+};
+const NO_VALUE: string[] = [];
+/** The palette's own status region announces results; the combobox's English one stays silent. */
+const SILENT_RESULT_ANNOUNCEMENTS = { loading: '', noResults: '', resultsCount: () => '' };
 
 /** Hints never wrap; a `shrink` hint truncates its label when a long translation leaves no room. */
 const FooterHint = ({ children, keys, shrink = false }: { children: string; keys: string[]; shrink?: boolean }) => (
@@ -42,6 +58,53 @@ const StagePreviewLifetime = ({ stage }: { stage: PaletteStage }) => {
   useMountEffect(() => stage.clearPreview);
 
   return null;
+};
+
+/**
+ * Binds palette state to the command combobox, which stays open inline in the dialog. Palette state owns the query
+ * and the highlight, where none means the first row, so the combobox's clears are ignored; row actions decide whether
+ * the palette closes. Built on `useCombobox`, whose defaults keep what the palette needs (no auto-highlight, which
+ * would leave a stage's current option on entry; arrows that wrap), where `useCommand` forces the opposite and cannot
+ * silence the combobox's untranslated result announcements.
+ */
+const usePaletteCommand = (
+  controller: CommandPaletteController,
+  rowsRef: RefObject<CommandPaletteRowsHandle | null>
+): UseCommandReturn<NavigablePaletteRow> => {
+  const { collection, isBusy, onQueryChange, onRowActive, onSelectRow } = controller;
+  const combobox = useCombobox({
+    collection,
+    disableLayer: true,
+    highlightedValue: controller.activeRowId,
+    ids: COMBOBOX_IDS,
+    inputValue: controller.query,
+    loading: isBusy,
+    onHighlightChange: (details) => {
+      if (details.highlightedValue) {
+        onRowActive(details.highlightedValue);
+      }
+    },
+    onInputValueChange: (details) => onQueryChange(details.inputValue),
+    onSelect: (details) => onSelectRow(details.itemValue),
+    open: true,
+    scrollToIndexFn: ({ index }) => {
+      const row = collection.at(index);
+
+      if (row) {
+        rowsRef.current?.scrollToRow(row.id);
+      }
+    },
+    selectionBehavior: 'preserve',
+    translations: SILENT_RESULT_ANNOUNCEMENTS,
+    value: NO_VALUE,
+  });
+
+  return {
+    combobox,
+    command: undefined,
+    loading: isBusy,
+    selectItem: (row) => onSelectRow(row.id),
+  };
 };
 
 export const CommandPaletteDialog = ({
@@ -112,12 +175,7 @@ const CommandPaletteContent = ({
   const controller = useCommandPaletteController({ entries, onClose, providers });
   const rowsRef = useRef<CommandPaletteRowsHandle>(null);
   const modEnterHintKeys = useMemo(() => [modifierKeyLabel, 'enter'], [modifierKeyLabel]);
-  const handleSearchKeyDown = controller.onSearchKeyDown;
-  const onSearchKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) =>
-      handleSearchKeyDown(event, (index) => rowsRef.current?.scrollToIndex(index)),
-    [handleSearchKeyDown]
-  );
+  const command = usePaletteCommand(controller, rowsRef);
 
   let emptyState: ReactNode = null;
 
@@ -163,133 +221,129 @@ const CommandPaletteContent = ({
           onKeyDown={controller.onContentKeyDown}
         >
           <Dialog.Title srOnly>{t('commandPalette.title')}</Dialog.Title>
-          <HStack
-            borderBottomWidth="1px"
-            borderColor="border.emphasized"
-            // Inside the content's 1px border, so the focus outline follows its rounded top corners.
-            borderTopRadius="calc({radii.l3} - 1px)"
-            flexShrink={0}
-            gap="2.5"
-            h="12"
-            outline="2px solid transparent"
-            outlineOffset="-2px"
-            px="3"
-            _focusWithin={INPUT_FOCUS_WITHIN_STYLE}
-          >
-            <Icon as={SearchIcon} boxSize="4" color="fg.muted" flexShrink={0} />
-            {controller.chipLabel ? (
-              <chakra.button
-                alignItems="center"
-                aria-label={t('commandPalette.actions.closeScope', { label: controller.chipLabel })}
-                bg="bg.emphasized"
-                borderRadius="sm"
+          {/* Unstyled: the parts keep the palette's own layout; the root only adds a flex column. */}
+          <Command.RootProvider display="flex" flexDirection="column" minH="0" unstyled value={command}>
+            <Command.Control
+              alignItems="center"
+              borderBottomWidth="1px"
+              borderColor="border.emphasized"
+              // Inside the content's 1px border, so the focus outline follows its rounded top corners.
+              borderTopRadius="calc({radii.l3} - 1px)"
+              display="flex"
+              flexShrink={0}
+              gap="2.5"
+              h="12"
+              outline="2px solid transparent"
+              outlineOffset="-2px"
+              px="3"
+              _focusWithin={INPUT_FOCUS_WITHIN_STYLE}
+            >
+              <Command.Indicator color="fg.muted" display="flex" flexShrink={0}>
+                <Icon as={SearchIcon} boxSize="4" />
+              </Command.Indicator>
+              {controller.chipLabel ? (
+                <chakra.button
+                  alignItems="center"
+                  aria-label={t('commandPalette.actions.closeScope', { label: controller.chipLabel })}
+                  bg="bg.emphasized"
+                  borderRadius="sm"
+                  color="fg"
+                  display="inline-flex"
+                  flexShrink={0}
+                  fontSize="md"
+                  fontWeight="600"
+                  gap="1"
+                  px="1.5"
+                  py="0.5"
+                  title={t('commandPalette.actions.backToAll')}
+                  type="button"
+                  onClick={controller.onPopOverlay}
+                >
+                  {controller.chipLabel}
+                  <Icon as={XIcon} boxSize="3" color="fg.muted" />
+                </chakra.button>
+              ) : null}
+              <Command.Input
+                autoFocus
+                name="command-palette-query"
+                type="search"
+                aria-describedby={controller.dateInvalidHint ? DATE_HINT_ID : undefined}
+                aria-invalid={controller.dateInvalidHint ? true : undefined}
+                aria-label={t('commandPalette.inputLabel')}
+                bg="transparent"
                 color="fg"
-                display="inline-flex"
-                flexShrink={0}
-                fontSize="md"
-                fontWeight="600"
-                gap="1"
-                px="1.5"
-                py="0.5"
-                title={t('commandPalette.actions.backToAll')}
-                type="button"
-                onClick={controller.onPopOverlay}
-              >
-                {controller.chipLabel}
-                <Icon as={XIcon} boxSize="3" color="fg.muted" />
-              </chakra.button>
-            ) : null}
-            <chakra.input
-              autoComplete="off"
-              autoFocus
-              id={COMMAND_PALETTE_INPUT_ID}
-              name="command-palette-query"
-              spellCheck={false}
-              type="search"
-              aria-activedescendant={
-                controller.activeRowId ? getCommandPaletteRowDomId(controller.activeRowId) : undefined
-              }
-              aria-controls="command-palette-results"
-              aria-describedby={controller.dateInvalidHint ? DATE_HINT_ID : undefined}
-              aria-expanded="true"
-              aria-invalid={controller.dateInvalidHint ? true : undefined}
-              aria-label={t('commandPalette.inputLabel')}
-              bg="transparent"
-              color="fg"
-              flex="1"
-              fontSize="lg"
-              outline="none"
-              placeholder={controller.placeholder}
-              role="combobox"
-              value={controller.query}
-              w="full"
-              _placeholder={INPUT_PLACEHOLDER_STYLE}
-              onChange={controller.onSearchChange}
-              onKeyDown={onSearchKeyDown}
-            />
-            {controller.dateInvalidHint ? (
-              <Text color="fg.error" flexShrink={0} fontSize="md" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
-                {controller.dateInvalidHint}
-              </Text>
-            ) : controller.dateSummary ? (
-              <Text
-                bg="bg.emphasized"
-                borderRadius="sm"
-                color="fg.muted"
-                flexShrink={0}
-                fontSize="md"
-                id={DATE_HINT_ID}
-                px="1.5"
-                py="0.5"
-                role="status"
-              >
-                {controller.dateSummary}
-              </Text>
-            ) : null}
-          </HStack>
-          <Text aria-live="polite" role="status" srOnly>
-            {controller.statusMessage}
-          </Text>
-          {controller.rows.length === 0 ? (
-            emptyState
-          ) : (
-            <CommandPaletteRows
-              ref={rowsRef}
-              activeRowId={controller.activeRowId}
-              isBusy={controller.isBusy}
-              rows={controller.rows}
-              onActive={controller.onRowActive}
-              onRun={controller.onRowRun}
-            />
-          )}
-          <HStack
-            borderColor="border.emphasized"
-            borderTopWidth="1px"
-            color="fg.subtle"
-            flexShrink={0}
-            fontSize="md"
-            gap="4"
-            h="8"
-            hideBelow="sm"
-            px="3"
-          >
-            <FooterHint keys={NAV_HINT_KEYS}>{t('commandPalette.footer.navigate')}</FooterHint>
-            <FooterHint keys={ENTER_HINT_KEYS}>
-              {controller.stage ? t('commandPalette.footer.pick') : t('commandPalette.footer.run')}
-            </FooterHint>
-            {controller.secondaryHint ? (
-              <FooterHint keys={modEnterHintKeys} shrink>
-                {controller.secondaryHint}
+                flex="1"
+                fontSize="lg"
+                outline="none"
+                placeholder={controller.placeholder}
+                w="full"
+                _placeholder={INPUT_PLACEHOLDER_STYLE}
+                onKeyDown={controller.onSearchKeyDown}
+              />
+              {controller.dateInvalidHint ? (
+                <Text color="fg.error" flexShrink={0} fontSize="md" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
+                  {controller.dateInvalidHint}
+                </Text>
+              ) : controller.dateSummary ? (
+                <Text
+                  bg="bg.emphasized"
+                  borderRadius="sm"
+                  color="fg.muted"
+                  flexShrink={0}
+                  fontSize="md"
+                  id={DATE_HINT_ID}
+                  px="1.5"
+                  py="0.5"
+                  role="status"
+                >
+                  {controller.dateSummary}
+                </Text>
+              ) : null}
+            </Command.Control>
+            <Text aria-live="polite" role="status" srOnly>
+              {controller.statusMessage}
+            </Text>
+            {controller.rows.length === 0 ? (
+              emptyState
+            ) : (
+              <CommandPaletteRows
+                ref={rowsRef}
+                activeRowId={controller.activeRowId}
+                isBusy={controller.isBusy}
+                rows={controller.rows}
+              />
+            )}
+            <Command.Footer
+              alignItems="center"
+              borderColor="border.emphasized"
+              borderTopWidth="1px"
+              color="fg.subtle"
+              display="flex"
+              flexShrink={0}
+              fontSize="md"
+              gap="4"
+              h="8"
+              hideBelow="sm"
+              px="3"
+            >
+              <FooterHint keys={NAV_HINT_KEYS}>{t('commandPalette.footer.navigate')}</FooterHint>
+              <FooterHint keys={ENTER_HINT_KEYS}>
+                {controller.stage ? t('commandPalette.footer.pick') : t('commandPalette.footer.run')}
               </FooterHint>
-            ) : null}
-            {controller.hasScopeRows || controller.activeRow?.kind === 'scope' ? (
-              <FooterHint keys={TAB_HINT_KEYS}>{t('commandPalette.footer.scope')}</FooterHint>
-            ) : null}
-            <Spacer />
-            <FooterHint keys={ESC_HINT_KEYS}>
-              {controller.isOverlayOpen ? t('commandPalette.footer.back') : t('commandPalette.footer.close')}
-            </FooterHint>
-          </HStack>
+              {controller.secondaryHint ? (
+                <FooterHint keys={modEnterHintKeys} shrink>
+                  {controller.secondaryHint}
+                </FooterHint>
+              ) : null}
+              {controller.hasScopeRows || controller.activeRow?.kind === 'scope' ? (
+                <FooterHint keys={TAB_HINT_KEYS}>{t('commandPalette.footer.scope')}</FooterHint>
+              ) : null}
+              <Spacer />
+              <FooterHint keys={ESC_HINT_KEYS}>
+                {controller.isOverlayOpen ? t('commandPalette.footer.back') : t('commandPalette.footer.close')}
+              </FooterHint>
+            </Command.Footer>
+          </Command.RootProvider>
         </Dialog.Content>
       </Dialog.Positioner>
     </Portal>

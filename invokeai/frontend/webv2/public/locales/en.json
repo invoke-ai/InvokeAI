@@ -194,6 +194,8 @@
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
     "noOptionsFound": "No matches",
+    "matchCount_one": "{{count}} match",
+    "matchCount_other": "{{count}} matches",
     "openSelector": "Open selector",
     "searchOptions": "Search…",
     "undo": "Undo",

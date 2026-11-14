@@ -24,6 +24,9 @@ void i18n.use(initReactI18next).init({
     en: {
       translation: {
         common: {
+          loading: 'Loading…',
+          matchCount_one: '{{count}} match',
+          matchCount_other: '{{count}} matches',
           noOptionsFound: 'No matches',
           openSelector: 'Open selector',
           searchOptions: 'Search…',
@@ -138,6 +141,19 @@ describe('Combobox', () => {
 
     await setInputValue(input, 'not-a-scheduler');
     expect(document.body.textContent).toContain('No matches');
+  });
+
+  it('announces the settled result count in the app language', async () => {
+    const { input } = await renderCombobox();
+    const announcement = () =>
+      [...document.querySelectorAll('[data-live-announcer][role="status"]')].map((node) => node.textContent).join('');
+
+    await interact(() => input.click());
+    await setInputValue(input, 'e');
+    await vi.waitFor(() => expect(announcement()).toBe('2 matches'), { timeout: 3000 });
+
+    await setInputValue(input, 'not-a-scheduler');
+    await vi.waitFor(() => expect(announcement()).toBe('No matches'), { timeout: 3000 });
   });
 
   it('keeps an option that matches secondary server-search text', async () => {

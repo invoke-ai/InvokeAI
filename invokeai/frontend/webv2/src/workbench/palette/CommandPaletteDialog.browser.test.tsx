@@ -4,12 +4,13 @@ import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing
 import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { IS_MAC_OS } from '@workbench/hotkeys/keys';
 import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
@@ -285,6 +286,9 @@ describe('CommandPaletteDialog interaction', () => {
     expect(input.spellcheck).toBe(false);
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Command palette');
     expect(input.getAttribute('aria-controls')).toBe('command-palette-results');
+    await expect
+      .element(page.getByRole('listbox', { name: 'Command palette results' }))
+      .toHaveAttribute('id', 'command-palette-results');
 
     await act(() => userEvent.fill(input, '>'));
     expect(document.body.textContent).toContain('First command');
@@ -412,7 +416,7 @@ describe('CommandPaletteDialog interaction', () => {
       ],
     });
     const listbox = document.getElementById('command-palette-results')!;
-    const viewport = listbox.parentElement!;
+    const viewport = listbox.closest<HTMLElement>('[data-part="viewport"]')!;
     const scrollbar = viewport.parentElement!.querySelector<HTMLElement>(':scope > [data-part="scrollbar"]')!;
     const thumb = scrollbar.querySelector<HTMLElement>('[data-part="thumb"]')!;
     /** Zag sizes the thumb to the visible share of the track. */
@@ -844,6 +848,118 @@ describe('CommandPaletteDialog interaction', () => {
         { signal: expect.any(AbortSignal) }
       );
     });
+  });
+
+  it('moves the highlight with wrapping arrows and clamped pages, leaving Home/End to the caret', async () => {
+    const entries = Array.from({ length: 30 }, (_, index) =>
+      entry(`command-${index}`, `Command ${String(index).padStart(2, '0')}`)
+    );
+    const { input } = await renderPalette({ entries });
+    const highlighted = () => document.getElementById(input.getAttribute('aria-activedescendant') ?? '');
+    const expectHighlighted = (title: string) =>
+      waitFor(() => {
+        expect(highlighted()?.textContent).toBe(title);
+        expect(highlighted()?.getAttribute('aria-selected')).toBe('true');
+      });
+
+    await expectHighlighted('Command 00');
+    // Wrapping lands on a row outside the rendered window; the list scrolls it in.
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await expectHighlighted('Command 29');
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expectHighlighted('Command 00');
+    await act(() => userEvent.keyboard('{PageDown}'));
+    await expectHighlighted('Command 08');
+    await act(() => userEvent.keyboard('{PageUp}{PageUp}'));
+    await expectHighlighted('Command 00');
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expectHighlighted('Command 01');
+    expect(document.querySelectorAll('[role="option"][aria-selected="true"]')).toHaveLength(1);
+
+    await act(() => userEvent.type(input, 'Command'));
+    await expectHighlighted('Command 00');
+    input.setSelectionRange(3, 3);
+    await act(() => userEvent.keyboard('{ArrowDown}{Home}'));
+    expect(input.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{End}'));
+    expect(input.selectionStart).toBe('Command'.length);
+    await expectHighlighted('Command 01');
+  });
+
+  it('highlights on hover and runs on click without taking focus from the search field', async () => {
+    const betaRun = vi.fn();
+    const { input, onClose } = await renderPalette({
+      entries: [entry('alpha', 'Alpha'), entry('beta', 'Beta', betaRun)],
+    });
+    const beta = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Beta'
+    )!;
+
+    await act(() => userEvent.hover(beta));
+    await waitFor(() => expect(input.getAttribute('aria-activedescendant')).toBe(beta.id));
+
+    await act(() => userEvent.click(beta));
+    expect(betaRun).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('leaves keys that compose IME text to the composition', async () => {
+    const run = vi.fn();
+    const { input } = await renderPalette({
+      entries: [entry('first', 'First command', run), entry('second', 'Second command')],
+    });
+    const highlighted = () => document.getElementById(input.getAttribute('aria-activedescendant') ?? '')?.textContent;
+    const composingKeyDown = (key: string, flag: 'isComposing' | 'keyCode229') => {
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        isComposing: flag === 'isComposing',
+        key,
+      });
+
+      if (flag === 'keyCode229') {
+        Object.defineProperty(event, 'keyCode', { value: 229 });
+      }
+      input.dispatchEvent(event);
+    };
+
+    for (const flag of ['isComposing', 'keyCode229'] as const) {
+      await act(() => composingKeyDown('PageDown', flag));
+      expect(highlighted()).toBe('First command');
+      await act(() => composingKeyDown('Enter', flag));
+      expect(run).not.toHaveBeenCalled();
+    }
+
+    await act(() => userEvent.keyboard('{PageDown}'));
+    expect(highlighted()).toBe('Second command');
+  });
+
+  it('runs the primary action on a click with Ctrl or ⌘ held, keeping the secondary on Mod+Enter', async () => {
+    for (const modifier of ['Control', 'Meta'] as const) {
+      // macOS reads a Ctrl+click as a context-menu click, which runs nothing.
+      const clickRuns = IS_MAC_OS && modifier === 'Control' ? 0 : 1;
+      const run = vi.fn();
+      const secondaryRun = vi.fn();
+      await renderPalette({
+        entries: [
+          { ...entry('first', 'First command', run), secondary: { label: 'Open Elsewhere', run: secondaryRun } },
+        ],
+      });
+      const option = document.querySelector<HTMLElement>('[role="option"]')!;
+
+      await act(() => userEvent.click(option, { modifiers: [modifier] }));
+      expect(run).toHaveBeenCalledTimes(clickRuns);
+      expect(secondaryRun).not.toHaveBeenCalled();
+
+      await act(() => userEvent.keyboard(`{${modifier}>}{Enter}{/${modifier}}`));
+      expect(secondaryRun).toHaveBeenCalledOnce();
+      expect(run).toHaveBeenCalledTimes(clickRuns);
+
+      await act(() => root?.unmount());
+      host?.remove();
+      root = null;
+    }
   });
 
   it('drives stage preview from navigation and restores it on Escape and unmount', async () => {

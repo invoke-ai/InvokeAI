@@ -108,9 +108,11 @@ export type PaletteRow =
   | { kind: 'provider-error'; id: string; providerKey: string; label: string; retry: () => void }
   | { kind: 'scope'; id: string; providerKey: string; label: string };
 
+export type NavigablePaletteRow = Exclude<PaletteRow, { kind: 'label' }>;
+
 export interface ActivePaletteRow {
   index: number;
-  row: Exclude<PaletteRow, { kind: 'label' }>;
+  row: NavigablePaletteRow;
 }
 
 export const getNavigablePaletteRows = (rows: readonly PaletteRow[]): ActivePaletteRow[] =>

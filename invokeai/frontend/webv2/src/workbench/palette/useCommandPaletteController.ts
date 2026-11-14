@@ -1,12 +1,12 @@
-import type { ChangeEvent, KeyboardEvent } from 'react';
+import type { ListCollection } from '@chakra-ui/react';
+import type { KeyboardEvent } from 'react';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { describeDateRange, findInvalidDateToken, formatIsoDate } from '@platform/search/dateTokens';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage } from './entries';
-import type { ScrollToIndex } from './usePaletteNavigation';
+import type { NavigablePaletteRow, PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage } from './entries';
 
 import { STAGE_ENTRY_ID_PREFIX } from './entries';
 import { PaletteDebouncer } from './paletteDebouncer';
@@ -30,6 +30,8 @@ export interface CommandPaletteController {
   activeRow: PaletteRow | undefined;
   activeRowId: string | null;
   chipLabel: string | null;
+  /** The navigable rows, in order, as the combobox's items. */
+  collection: ListCollection<NavigablePaletteRow>;
   /** Inline feedback for an unparseable date token value, or null. */
   dateInvalidHint: string | null;
   /** Formatted label of the applied date range, or null. */
@@ -39,11 +41,11 @@ export interface CommandPaletteController {
   onContentKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   /** Pop the active scope/stage back to the root palette (chip dismiss). */
   onPopOverlay: () => void;
+  onQueryChange: (query: string) => void;
   onRetry: () => void;
   onRowActive: (rowId: string) => void;
-  onRowRun: (row: PaletteRow) => void;
-  onSearchChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>, scrollToIndex: ScrollToIndex) => void;
+  onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onSelectRow: (rowId: string) => void;
   placeholder: string;
   query: string;
   rows: PaletteRow[];
@@ -203,11 +205,6 @@ export const useCommandPaletteController = ({
     stage,
   });
 
-  const onSearchChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => replaceQuery(event.currentTarget.value),
-    [replaceQuery]
-  );
-
   const onRetry = useCallback(() => {
     scopedQueryResult?.retry();
     focusInput();
@@ -246,6 +243,7 @@ export const useCommandPaletteController = ({
     activeRow: navigation.activeRow,
     activeRowId: navigation.activeRowId,
     chipLabel: stage ? stage.title : (scopeProvider?.label ?? null),
+    collection: navigation.collection,
     dateInvalidHint,
     dateSummary,
     hasScopeRows: rows.some((row) => row.kind === 'scope'),
@@ -253,11 +251,11 @@ export const useCommandPaletteController = ({
     isOverlayOpen: resolvedMode.kind !== 'root',
     onContentKeyDown: navigation.onContentKeyDown,
     onPopOverlay: popOverlay,
+    onQueryChange: replaceQuery,
     onRetry,
     onRowActive: navigation.onRowActive,
-    onRowRun: navigation.onRowRun,
-    onSearchChange,
     onSearchKeyDown: navigation.onSearchKeyDown,
+    onSelectRow: navigation.onSelectRow,
     placeholder: stage
       ? t('commandPalette.placeholders.stage')
       : scopeProvider
