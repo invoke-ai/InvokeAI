@@ -1,5 +1,7 @@
 import type { WorkflowForm } from '@features/workflow/contracts';
 
+import { isFormContainerElement } from '@features/workflow/utility';
+
 /**
  * Resolve drop IDs into pure reparent commands; use maintained parentId links rather than scanning containers and
  * commit at drag end.
@@ -34,7 +36,7 @@ export const isFormDescendantOrSelf = (form: WorkflowForm, ancestorId: string, c
     return true;
   }
   const ancestor = form.elements[ancestorId];
-  if (ancestor?.type !== 'container') {
+  if (!isFormContainerElement(ancestor)) {
     return false;
   }
   return ancestor.data.children.some((childId) => isFormDescendantOrSelf(form, childId, candidateId));
@@ -126,7 +128,7 @@ export const resolveFormDrop = (
 ): { parentId: string; index: number } | null => {
   if (target.kind === 'into') {
     const container = form.elements[target.containerId];
-    if (container?.type !== 'container' || isFormDescendantOrSelf(form, activeId, target.containerId)) {
+    if (!isFormContainerElement(container) || isFormDescendantOrSelf(form, activeId, target.containerId)) {
       return null;
     }
     return { index: container.data.children.length, parentId: target.containerId };
@@ -140,7 +142,7 @@ export const resolveFormDrop = (
     return null;
   }
   const parent = form.elements[parentId];
-  if (parent?.type !== 'container') {
+  if (!isFormContainerElement(parent)) {
     return null;
   }
   const index = parent.data.children.indexOf(target.elementId);

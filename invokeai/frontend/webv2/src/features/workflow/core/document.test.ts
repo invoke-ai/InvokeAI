@@ -356,6 +356,40 @@ describe('projectGraphReducer', () => {
     const shuffledField = next.form.elements[field?.id ?? ''];
 
     expect(shuffledField?.type === 'node-field' && shuffledField.data.showShuffle).toBe(true);
+
+    next = projectGraphReducer(next, { content: 'Section A', elementType: 'collapsible', type: 'addFormElement' });
+    const collapsible = getFormChildren(next.form).find((candidate) => candidate.type === 'collapsible');
+    expect(collapsible?.type === 'collapsible' && collapsible.data).toEqual({
+      children: [],
+      content: 'Section A',
+    });
+
+    next = projectGraphReducer(next, {
+      content: 'Renamed Section A',
+      elementId: collapsible?.id ?? '',
+      type: 'setFormElementContent',
+    });
+    const renamedCollapsible = next.form.elements[collapsible?.id ?? ''];
+    expect(renamedCollapsible?.type === 'collapsible' && renamedCollapsible.data).toEqual({
+      children: [],
+      content: 'Renamed Section A',
+    });
+
+    // Reparent the row container into the collapsible section and verify getFormChildren + removeFormElement.
+    next = projectGraphReducer(next, {
+      elementId: container?.id ?? '',
+      index: 0,
+      parentId: collapsible?.id ?? '',
+      type: 'moveFormElementTo',
+    });
+    expect(getFormChildren(next.form, collapsible?.id).map((child) => child.id)).toEqual([container?.id]);
+
+    const afterRemove = projectGraphReducer(next, {
+      elementId: collapsible?.id ?? '',
+      type: 'removeFormElement',
+    });
+    expect(afterRemove.form.elements[collapsible?.id ?? '']).toBeUndefined();
+    expect(afterRemove.form.elements[container?.id ?? '']).toBeUndefined();
   });
 
   it('updates metadata via patch', () => {

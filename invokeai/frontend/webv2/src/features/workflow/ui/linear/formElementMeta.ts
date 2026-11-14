@@ -1,10 +1,25 @@
 import type { WorkflowFormElement } from '@features/workflow/contracts';
 import type { LucideIcon } from 'lucide-react';
 
-import { Columns2Icon, CrosshairIcon, HeadingIcon, MinusIcon, Rows2Icon, TextIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  Columns2Icon,
+  CrosshairIcon,
+  HeadingIcon,
+  MinusIcon,
+  Rows2Icon,
+  TextIcon,
+} from 'lucide-react';
 
 /** Share names/icons across cards, ghosts, and Add menus; row and column containers have distinct identities. */
-export type FormElementMetaKey = 'container-column' | 'container-row' | 'divider' | 'heading' | 'node-field' | 'text';
+export type FormElementMetaKey =
+  | 'collapsible'
+  | 'container-column'
+  | 'container-row'
+  | 'divider'
+  | 'heading'
+  | 'node-field'
+  | 'text';
 
 export interface FormElementMeta {
   icon: LucideIcon;
@@ -13,6 +28,7 @@ export interface FormElementMeta {
 }
 
 export const FORM_ELEMENT_META: Record<FormElementMetaKey, FormElementMeta> = {
+  collapsible: { icon: ChevronDownIcon, labelKey: 'widgets.workflow.formBuilder.elements.collapsible' },
   'container-column': { icon: Columns2Icon, labelKey: 'widgets.workflow.formBuilder.elements.containerColumn' },
   'container-row': { icon: Rows2Icon, labelKey: 'widgets.workflow.formBuilder.elements.containerRow' },
   divider: { icon: MinusIcon, labelKey: 'widgets.workflow.formBuilder.elements.divider' },
@@ -28,6 +44,7 @@ export const ADDABLE_FORM_ELEMENT_KEYS = [
   'divider',
   'container-column',
   'container-row',
+  'collapsible',
 ] as const satisfies readonly FormElementMetaKey[];
 
 export type AddableFormElementKey = (typeof ADDABLE_FORM_ELEMENT_KEYS)[number];

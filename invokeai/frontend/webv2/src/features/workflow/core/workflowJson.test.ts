@@ -344,6 +344,54 @@ describe('parseWorkflowJson tolerance', () => {
     });
   });
 
+  it('round-trips collapsible container elements with nested containers and drops fields for missing nodes', () => {
+    const { document, warnings } = parseWorkflowJson({
+      edges: [],
+      form: {
+        elements: {
+          c1: {
+            data: { children: ['r1', 'missing_field'], content: 'Section 1' },
+            id: 'c1',
+            parentId: 'root',
+            type: 'collapsible',
+          },
+          r1: {
+            data: { children: [], layout: 'row' },
+            id: 'r1',
+            parentId: 'c1',
+            type: 'container',
+          },
+          missing_field: {
+            data: { fieldIdentifier: { fieldName: 'steps', nodeId: 'missing' } },
+            id: 'missing_field',
+            parentId: 'c1',
+            type: 'node-field',
+          },
+          h1: { data: { content: 'Static' }, id: 'h1', parentId: 'root', type: 'heading' },
+          root: { data: { children: ['c1', 'h1'], layout: 'column' }, id: 'root', type: 'container' },
+        },
+        rootElementId: 'root',
+      },
+      name: 'Collapsible Form',
+      nodes: [],
+      version: '1.0.0',
+    });
+
+    expect(warnings).toEqual(['Removed a form field that referenced a missing node.']);
+    expect(document.form.elements.c1).toEqual({
+      data: { children: ['r1'], content: 'Section 1' },
+      id: 'c1',
+      parentId: 'root',
+      type: 'collapsible',
+    });
+    expect(document.form.elements.h1).toEqual({
+      data: { content: 'Static' },
+      id: 'h1',
+      parentId: 'root',
+      type: 'heading',
+    });
+  });
+
   it('migrates pre-form exposedFields into form elements', () => {
     const { document, warnings } = parseWorkflowJson({
       edges: [],

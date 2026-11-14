@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/core';
 import {
   isInvocationNode,
+  type CollapsibleFormElement,
   type ContainerFormElement,
   type InvocationTemplates,
   type NodeFieldFormElement,
@@ -217,7 +218,12 @@ const BuilderCardBase = ({
             {title}
           </Text>
           <Box flex="1" />
-          <HStack flexShrink={0} gap="0" onPointerDown={(event) => event.stopPropagation()}>
+          <HStack
+            flexShrink={0}
+            gap="0"
+            onKeyDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             {extraActions}
             <Tooltip content={t('widgets.workflow.formBuilder.remove')}>
               <IconButton
@@ -275,7 +281,13 @@ const ContainerDropZoneBody = ({
 };
 
 /** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
-const ContainerDropZoneBase = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
+const ContainerDropZoneBase = ({
+  container,
+  isEmpty,
+}: {
+  container: ContainerFormElement | CollapsibleFormElement;
+  isEmpty: boolean;
+}) => {
   const { activeElementId, form } = use(BuilderDndContext);
   const canDrop = activeElementId !== null && !isFormDescendantOrSelf(form, activeElementId, container.id);
   const { setNodeRef } = useDroppable({
@@ -401,6 +413,36 @@ const BuilderElementBase = ({
           title={title}
         >
           <Stack align={isRow ? 'stretch' : undefined} direction={isRow ? 'row' : 'column'} gap="2" w="full">
+            {getFormChildren(projectGraph.form, element.id).map((child) => (
+              <BuilderElement
+                key={child.id}
+                element={child}
+                hoveredNodeId={hoveredNodeId}
+                invalidElementIds={invalidElementIds}
+                projectGraph={projectGraph}
+                selectedNodeIds={selectedNodeIds}
+              />
+            ))}
+            <ContainerDropZone container={element} isEmpty={element.data.children.length === 0} />
+          </Stack>
+        </BuilderCard>
+      );
+    }
+    case 'collapsible': {
+      return (
+        <BuilderCard element={element} title={title}>
+          <Stack gap="2" w="full">
+            <Input
+              aria-label={t('widgets.workflow.formBuilder.collapsibleLabel')}
+              fontSize="sm"
+              fontWeight="600"
+              placeholder={t('widgets.workflow.formBuilder.collapsiblePlaceholder')}
+              value={element.data.content}
+              variant="flushed"
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                editGraph({ content: event.currentTarget.value, elementId: element.id, type: 'setFormElementContent' })
+              }
+            />
             {getFormChildren(projectGraph.form, element.id).map((child) => (
               <BuilderElement
                 key={child.id}
@@ -736,7 +778,7 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
     >
       <BuilderDndContext value={dndContextValue}>
         <BuilderDropTargetContext value={dropTarget}>
-          <Stack gap="2" p="3" w="full">
+          <Stack gap="2" p="1.5" w="full">
             {rootChildren.length === 0 ? (
               <Text color="fg.muted" fontSize="xs">
                 {t('widgets.workflow.formBuilder.empty')}
