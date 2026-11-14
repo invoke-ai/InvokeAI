@@ -1,4 +1,4 @@
-import type { SamSessionSnapshot } from '@workbench/canvas-operations/api';
+import type { CanvasOperationCapability, SamSessionSnapshot } from '@workbench/canvas-operations/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -53,23 +53,31 @@ describe('Select Object retry focus', () => {
     container = null;
   });
 
-  /** A Select Object section whose first auto run failed; `succeed` plays the retry through to a ready preview. */
-  const renderFailedSession = async () => {
+  type SetSession = (next: Partial<SamSessionSnapshot>) => void;
+  type ProcessResult = Awaited<ReturnType<CanvasOperationCapability['processSelectObjectSession']>>;
+
+  /** The session clears the error as the retry starts and keeps `retrying` until it settles. */
+  const startRetry = (set: SetSession): ProcessResult => {
+    set({ error: null, retrying: true, status: 'processing-sam' });
+    return 'published';
+  };
+
+  /**
+   * A Select Object section whose first auto run failed; `succeed` plays the retry through to a ready preview.
+   * `process` is what Find object does to the session, the run's progress by default.
+   */
+  const renderFailedSession = async (process: (set: SetSession) => ProcessResult = startRetry) => {
     const i18n = createInstance();
     await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: enCatalog } } });
     let state = SESSION;
     const listeners = new Set<() => void>();
-    const set = (next: Partial<SamSessionSnapshot>) => {
+    const set: SetSession = (next) => {
       state = { ...state, ...next };
       listeners.forEach((listener) => listener());
     };
     const operations = {
       getSamSessionState: () => state,
-      processSelectObjectSession: vi.fn(() => {
-        // The session clears the error as the retry starts and keeps `retrying` until it settles.
-        set({ error: null, retrying: true, status: 'processing-sam' });
-        return Promise.resolve('completed' as const);
-      }),
+      processSelectObjectSession: vi.fn(() => Promise.resolve(process(set))),
       subscribeSamSession: (listener: () => void) => {
         listeners.add(listener);
         return () => listeners.delete(listener);
@@ -122,6 +130,49 @@ describe('Select Object retry focus', () => {
     await userEvent.keyboard('{Enter}');
     await expect.element(findObject).toBeDisabled();
     fail();
+    await expect.element(findObject).toBeEnabled();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    // A later auto run succeeds after an input change, so the button leaves.
+    act(() => set({ error: null, hasPreview: true, status: 'ready' }));
+    expect(findObject.query()).toBeNull();
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve);
+        })
+    );
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('moves focus to Apply when a keyboard retry succeeds before it renders as running', async () => {
+    const { findObject } = await renderFailedSession((set) => {
+      set({ error: null, hasPreview: true, status: 'ready' });
+      return 'published';
+    });
+    findObject.element().focus();
+    await userEvent.keyboard('{Enter}');
+    expect(findObject.query()).toBeNull();
+
+    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toHaveFocus();
+  });
+
+  it.each([
+    { name: 'is refused', process: (): ProcessResult => 'deduped' },
+    {
+      name: 'fails before it renders as running',
+      process: (set: SetSession): ProcessResult => {
+        startRetry(set);
+        set({ error: { code: 'queue' }, retrying: false, status: 'error' });
+        return 'error';
+      },
+    },
+  ])('does not move focus when Find object leaves later, after a keyboard retry that $name', async ({ process }) => {
+    const { findObject, operations, set } = await renderFailedSession(process);
+    findObject.element().focus();
+    await userEvent.keyboard('{Enter}');
+    expect(operations.processSelectObjectSession).toHaveBeenCalledOnce();
     await expect.element(findObject).toBeEnabled();
     (document.activeElement as HTMLElement | null)?.blur();
 

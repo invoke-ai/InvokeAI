@@ -1,6 +1,4 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop */
-import type { MouseEvent } from 'react';
-
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
@@ -30,9 +28,9 @@ export interface OperationRunAction {
  * The verbs of a running canvas operation, one row after its form's groups: Reset at the start; Cancel, the manual run
  * and Apply (with its save-as menu) at the end. Status and errors live in the Operation section, not here.
  *
- * A retry's run button leaves the row once its run succeeds. When that run was started from the focused button and
- * focus has nowhere else to be (the button went, or went disabled while busy, and nothing took focus since), focus
- * moves to Apply, or to Cancel while Apply is disabled, so a keyboard user is not left on the page body.
+ * A retry's run button leaves the row once its run succeeds. When the button leaves while it has focus, or leaves after
+ * a run that began while it had focus and nothing took focus since it went disabled, focus moves to Apply, or to Cancel
+ * while Apply is disabled, so a keyboard user is not left on the page body.
  */
 export const OperationActions = ({
   applying,
@@ -68,10 +66,11 @@ export const OperationActions = ({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const runStartedFocused = useRef(false);
   const runLoading = run?.loading ?? false;
-  // Re-attached when loading changes: the button going idle while it stays means the run the user started settled
-  // with the button kept (it failed, or the button still offers a run), and the hand-off is dropped. Cleanup that
-  // finds the button gone hands focus over a microtask later, after the same commit may have enabled Apply;
-  // StrictMode's extra mount attach runs before any run.
+  // Re-attached when loading changes. Cleanup runs before the commit removes or disables the button, so it reads
+  // whether the button still has focus: an idle attachment's cleanup records it for the run now starting (focus falls
+  // to the body once the busy button is disabled) or, finding the button gone, judges a run that settled before it
+  // rendered as busy. A run that never shows as busy, refused or settled in one render, leaves nothing recorded. The
+  // hand-off waits a microtask, after the same commit may have enabled Apply.
   const runButtonRef = useCallback(
     (node: HTMLButtonElement | null) => {
       if (!node) {
@@ -81,13 +80,18 @@ export const OperationActions = ({
         runStartedFocused.current = false;
       }
       return () => {
+        const focused = node.ownerDocument.activeElement === node;
+        if (!runLoading) {
+          runStartedFocused.current = focused;
+        }
         queueMicrotask(() => {
-          if (node.isConnected || !runStartedFocused.current) {
+          if (node.isConnected) {
             return;
           }
+          const handOff = runLoading ? runStartedFocused.current : focused;
           runStartedFocused.current = false;
           const { activeElement, body } = node.ownerDocument;
-          if (activeElement !== null && activeElement !== body) {
+          if (!handOff || (activeElement !== null && activeElement !== body)) {
             return;
           }
           const target = applyRef.current && !applyRef.current.disabled ? applyRef.current : cancelRef.current;
@@ -98,14 +102,6 @@ export const OperationActions = ({
       };
     },
     [runLoading]
-  );
-  const onRun = run?.onRun;
-  const onRunClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      runStartedFocused.current = event.currentTarget === event.currentTarget.ownerDocument.activeElement;
-      onRun?.();
-    },
-    [onRun]
   );
   return (
     <Flex align="center" gap="1" minW="0" w="full">
@@ -142,7 +138,7 @@ export const OperationActions = ({
           minW="0"
           px="2"
           spinnerPlacement="start"
-          onClick={onRunClick}
+          onClick={run.onRun}
         >
           <Text as="span" truncate>
             {run.label}
