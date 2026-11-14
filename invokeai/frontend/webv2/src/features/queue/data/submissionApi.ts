@@ -13,7 +13,7 @@ import { mapWithConcurrency } from '@platform/core/concurrency';
 import { addOutputImageNames, getOutputImageNames } from '@platform/core/outputImages';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
-import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson, sleep } from '@platform/transport/http';
 
 import type { QueueImageDTO, QueueServerItemDTO, QueueVideoDTO } from './serverTypes';
 
@@ -119,21 +119,94 @@ export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Pro
   return mapEnqueueResult(result);
 };
 
+/** One utility call owns one immutable payload/key, including every admission replay. */
 export const enqueueUtility = async (request: {
   graph: QueueEnqueueWorkflowRequest['graph'];
   origin: string;
+  idempotencyKey: string;
   /** Put the item ahead of queued generations. */
   prepend?: boolean;
-}): Promise<{ enqueued: number; itemIds: number[] }> => {
-  const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
-    body: JSON.stringify({
-      batch: { graph: request.graph, origin: request.origin, runs: 1 },
-      prepend: request.prepend === true,
-    }),
-    method: 'POST',
+}): Promise<{ enqueued: number; itemIds: number[]; acknowledge: () => void }> => {
+  const owner = captureAccountScope();
+  const { idempotencyKey } = request;
+  const body = JSON.stringify({
+    batch: { graph: request.graph, origin: request.origin, idempotency_key: idempotencyKey, runs: 1 },
+    prepend: request.prepend === true,
   });
-
-  return { enqueued: result.enqueued ?? 0, itemIds: result.item_ids ?? [] };
+  const requestSignal = () => AbortSignal.any([owner.signal, AbortSignal.timeout(10_000)]);
+  // Only the runtime can decide that ids were retained (or scheduled for malformed-response cleanup).
+  let acknowledgementStarted = false;
+  const acknowledge = (): void => {
+    if (acknowledgementStarted) {
+      return;
+    }
+    acknowledgementStarted = true;
+    void (async () => {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        assertAccountScopeCurrent(owner);
+        try {
+          await apiFetch('/api/v1/queue/default/enqueue_batch/acknowledge', {
+            body: JSON.stringify({ idempotency_key: idempotencyKey }),
+            headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            signal: requestSignal(),
+          });
+          return;
+        } catch (error) {
+          if (
+            attempt === 4 ||
+            (error instanceof ApiError && error.status < 500 && error.status !== 408 && error.status !== 429)
+          ) {
+            return;
+          }
+          await sleep(1_000 * 2 ** attempt, owner.signal);
+        }
+      }
+    })().catch(() => undefined);
+  };
+  const mapUtility = (result: { enqueued?: number; item_ids?: number[] }) => ({
+    acknowledge,
+    enqueued: result.enqueued ?? 0,
+    itemIds: result.item_ids ?? [],
+  });
+  for (let attempt = 0; ; attempt += 1) {
+    assertAccountScopeCurrent(owner);
+    try {
+      const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>(
+        '/api/v1/queue/default/enqueue_batch',
+        { body, method: 'POST', signal: requestSignal() }
+      );
+      assertAccountScopeCurrent(owner);
+      return mapUtility(result);
+    } catch (cause) {
+      assertAccountScopeCurrent(owner);
+      // Conflicts, validation and receipt quotas are definitive rejections, never a reason to mint another key.
+      if (cause instanceof ApiError && cause.status < 500 && cause.status !== 408) {
+        throw cause;
+      }
+      try {
+        const query = new URLSearchParams({ idempotency_key: idempotencyKey });
+        const receipt = mapEnqueueResult(
+          await apiFetchJson<unknown>(`/api/v1/queue/default/enqueue_batch/receipt?${query}`, {
+            signal: requestSignal(),
+          }),
+          true
+        );
+        assertAccountScopeCurrent(owner);
+        return { acknowledge, enqueued: receipt.enqueued, itemIds: receipt.itemIds };
+      } catch {
+        assertAccountScopeCurrent(owner);
+        if (attempt >= 2) {
+          throw new Error(
+            'Utility admission could not be confirmed. Backend work may still be running; trying again creates a new operation.',
+            { cause }
+          );
+        }
+        await sleep(1_000 * 2 ** attempt, owner.signal);
+        // Even a 404 can race the original commit. Replay the frozen payload with its original key.
+      }
+    }
+  }
 };
 
 const getResultImageNames = (queueItem: QueueServerItemDTO, options?: QueueResultImageOptions): string[] => {
@@ -230,6 +303,7 @@ const getResultImage = async (
   imageName: string,
   queuedAt: string,
   sourceQueueItemId: string,
+  sourceBackendItemId: number,
   signal: AbortSignal
 ): Promise<QueueResultImage | null> => {
   try {
@@ -243,6 +317,7 @@ const getResultImage = async (
       imageUrl: absolutizeApiUrl(image.image_url),
       isIntermediate: image.is_intermediate,
       queuedAt,
+      sourceBackendItemId,
       sourceQueueItemId,
       thumbnailUrl: absolutizeApiUrl(image.thumbnail_url),
       width: image.width,
@@ -268,7 +343,7 @@ export const getResultImages = async (
   const images = await mapWithConcurrency(
     getResultImageNames(item, options),
     8,
-    (imageName) => getResultImage(imageName, queuedAt, sourceQueueItemId, owner.signal),
+    (imageName) => getResultImage(imageName, queuedAt, sourceQueueItemId, itemId, owner.signal),
     { signal: owner.signal }
   );
 
