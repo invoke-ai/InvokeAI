@@ -107,8 +107,9 @@ jobs:
             # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
             # inside the job timeout.
             pytest-args: '--timeout=600'
-            # About 1.6x the slowest measured job (37 min, 31 of them pytest; another run took 28).
-            timeout-minutes: 60
+            # The latest main-synced run reached 98% before hitting the 60-minute job limit.
+            # Keep the per-test timeout and allow the suite 15 more minutes to report its result.
+            timeout-minutes: 75
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.

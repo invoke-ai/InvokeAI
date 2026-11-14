@@ -235,26 +235,20 @@ valid. A loaded terminal legacy state may retain its empty in-memory ledger for 
 `dump_execution_state()` upgrades missing loop buckets in the versioned snapshot.
 
 `IfInvocation` now declares the same seam for branch activation: it emits one frame-scoped activation token for the
-selected branch, and the graph state validates and persists it after invocation. Fresh graphs with one ordinary-node
-`If`, the exact one-level nested shape with two `If` nodes where the inner value feeds one outer branch and has no
-other consumer, the exact bounded three-`If` chain with direct inner-to-middle-to-outer branch edges, the exact
-four-`If` nested chain, or exactly two, exactly three, or exactly four independent ordinary-node sibling `If`s compile
-opaque, frame-local activation dependencies in graph state. The three- and four-`If` admissions require `default`
-edges, all branch inputs (`condition`, `true_input`, `false_input`) on each `If`. The three-`If` chain permits one
-extra `middle If.value` edge to an ordinary leaf consumer with no outputs; that leaf inherits only the outer branch
-dependency. Other inner/middle outputs must be direct nested branch edges, and the four-`If` chain permits no extra
-output fan-out. Five-or-more nested `If`s, other fan-out, mixed shapes outside the bounded per-item
-`Iterate`/`If`/`Collect` topology, loop-containing `For`/`ForReturn`, saved-workflow, legacy, and five-or-more sibling
-shapes use the compatibility scheduler with the dedicated `_IfActivationController` fallback. Legacy snapshots retain
-their generic compatibility projection. Legacy skipped-state projection remains only for old snapshots. Fresh
-materialization prepares the condition boundary, resolves the activation token, and attaches only the selected branch
-input; unselected branch nodes remain unprepared. The generic and compatibility adapters consume the same decisions and
-append-only execution edges; no type-specific branch scheduler prunes edges or propagates skips. Legacy skipped-state
-metadata remains only for snapshots that already contain the old projection. `apply()` replaces the activation token by
-stable identity, and activation effects are excluded from stream handling. Graph state derives branch membership for
-the supported fresh shape; the fallback controller retains it for unsupported and legacy shapes. Author-time activation
-ports and literal successor IDs remain absent, while unsupported loop shapes and saved-workflow control flow remain on
-their compatibility paths until differential coverage proves their generic replacements.
+selected branch, and the graph state validates and persists it after invocation. Fresh ordinary-node `If` graphs are
+eager by default: both branch paths may be admitted and evaluated after the condition gate resolves, while the pending
+`If` attaches and hydrates only the selected branch input. Lazy execution is limited to two exact shapes: one root
+ordinary `If` with no control-flow nodes or iterator axes and private branch dependency closures, and a six-node,
+seven-edge single-axis `Iterate`/`If`/`Collect` graph. In the mixed graph, one inputless collection producer feeds one
+`Iterate`; its `item` directly feeds `If.condition` and one producer for each branch; each branch producer consumes
+that same item and outputs only to its corresponding branch input; and `If.value` is the sole input to a terminal
+`Collect.item`. No extra nodes or edges are admitted. The generic and
+compatibility adapters consume the same frame-local dependency decisions and append-only execution edges; no
+type-specific branch scheduler prunes edges or propagates skips. Legacy snapshots retain their generic compatibility
+projection and old skipped-state metadata. Loop-containing `For`/`ForReturn`, saved-workflow control flow, and other
+unsupported mixed shapes retain compatibility ownership. `apply()` replaces activation tokens by stable identity, and
+activation effects are excluded from stream handling. Author-time activation ports and literal successor IDs remain
+absent.
 
 The engine keeps compatibility materialization and queue readiness for loop-containing graphs outside the routing
 matrix and for existing snapshots. Admitted fresh `For` graphs use the generic opaque plan/scheduler plus
@@ -267,8 +261,9 @@ rehydration, source completion, and failure parity. Nine-level or deeper chains,
 sibling nested loops, and unsupported mixed shapes remain compatibility-owned. The exact fresh two-sibling
 `For`/`ForReturn` `CollectionConcat` fan-in shape, the exact fresh three-level serial nested-`For` shape with its
 bounded static `CollectionConcat` producer, and the exact fresh four-level serial nested-`For` shape are
-generic-routed. The execution engine does not modify any file under `invokeai/frontend/...`, including generated
-schemas; the existing frontend/backend external interface remains stable. Branch-membership analysis remains internal,
+generic-routed. The only frontend/API artifacts changed are generated OpenAPI and TypeScript declarations for the
+optional persisted `prepared_iteration_axes` field in the queue-session response. Author-time workflow JSON and
+invocation contracts are unchanged. Branch-membership analysis remains internal,
 while fresh execution no longer creates skipped-state projection and old snapshots retain it for compatibility.
 
 The frontend and backend validate the same boundary rules. Saved workflows preserve node types, field handles, and the

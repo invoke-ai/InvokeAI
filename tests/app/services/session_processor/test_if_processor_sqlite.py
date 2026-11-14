@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from contextlib import contextmanager
 from threading import Condition, Event
@@ -19,6 +20,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import create_edge
@@ -89,7 +91,7 @@ def _insert_session(queue: SessionQueue, graph: Graph) -> int:
             """,
             (
                 "default",
-                session.model_dump_json(warnings=False, exclude_none=True),
+                json.dumps(dump_execution_state(session)),
                 session.id,
                 str(uuid.uuid4()),
                 None,
@@ -185,15 +187,18 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=_PROCESSOR_TIMEOUT)
+        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=_PROCESSOR_TIMEOUT), completed_sources
         assert session_persisted.wait(timeout=_PROCESSOR_TIMEOUT)
 
         queue_item = queue.get_queue_item(item_id)
         assert queue_item.status == "canceled"
         assert queue.get_current("default") is None
-        assert completed_sources == ["condition", selected_branch, "if"]
-        assert _completed_source_ids(queue_item.session) == completed_sources
+        assert set(completed_sources) == {"condition", selected_branch, "if"}
+        if_index = completed_sources.index("if")
+        assert completed_sources.index("condition") < if_index
+        assert completed_sources.index(selected_branch) < if_index
         assert unselected_branch not in completed_sources
+        assert _completed_source_ids(queue_item.session) == completed_sources
         assert "sink" not in completed_sources
         assert not queue_item.session.is_complete()
         _assert_if_activation_token(queue_item.session, expected_field=selected_field)
@@ -277,7 +282,10 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
     assert completed_item.status == "completed"
     assert completed_item.session.is_complete()
     completed_sources = _completed_source_ids(completed_item.session)
-    assert completed_sources == ["condition", selected_branch, "if", "sink"]
+    assert set(completed_sources) == {"condition", selected_branch, "if", "sink"}
+    if_index = completed_sources.index("if")
+    assert completed_sources.index("condition") < if_index
+    assert completed_sources.index(selected_branch) < if_index
     assert unselected_branch not in completed_sources
     [sink_execution_id] = completed_item.session.source_prepared_mapping["sink"]
     assert completed_item.session.results[sink_execution_id].value == sink_value
@@ -333,9 +341,11 @@ def test_if_early_cancellation_before_resolution_does_not_run_any_branch_continu
     canceled_item = queue.get_queue_item(item_id)
     assert canceled_item.status == "canceled"
     assert queue.get_current("default") is None
-    assert completed_sources == ["condition", selected_branch]
-    assert _completed_source_ids(canceled_item.session) == completed_sources
+    assert completed_sources[0] == "condition"
+    assert completed_sources[-1] == selected_branch
     assert unselected_branch not in completed_sources
+    assert _completed_source_ids(canceled_item.session) == completed_sources
+    assert selected_branch in completed_sources
     assert "if" not in completed_sources
     assert "sink" not in completed_sources
     assert "if" not in _completed_source_ids(canceled_item.session)
