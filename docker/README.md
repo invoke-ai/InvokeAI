@@ -19,8 +19,12 @@ docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/inv
 **ROCm (AMD GPU):**
 
 ```bash
-docker run --device /dev/kfd --device /dev/dri --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
+docker run --device /dev/kfd --device /dev/dri \
+  --env RENDER_GROUP_ID=$(getent group render | cut -d: -f3) \
+  --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
 ```
+
+`RENDER_GROUP_ID` must match the host's `render` group. Without it, Invoke can't access the GPU.
 
 Open `http://localhost:9090` in your browser once the container finishes booting, install some models, and generate away!
 

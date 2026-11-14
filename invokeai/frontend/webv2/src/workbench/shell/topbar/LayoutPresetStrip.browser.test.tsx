@@ -188,7 +188,6 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
   });
 
-  // The menu's layer must be gone before an admin dialog mounts, or zag dismisses the dialog as nested above it.
   it.each(['save-as', 'edit'] as const)(
     'animates the %s dialog out instead of unmounting it on close',
     async (kind) => {

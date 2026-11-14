@@ -7,13 +7,13 @@ import { useTranslation } from 'react-i18next';
 
 const ISSUES_URL = 'https://github.com/invoke-ai/InvokeAI/issues';
 
-const acknowledge = () => void patchWorkbenchPreferences({ alphaNoticeAcknowledged: true });
+const acknowledge = () => void patchWorkbenchPreferences({ betaNoticeAcknowledged: true });
 
 /** Wait for account preferences before showing the notice; dismissal follows the account. */
-export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
+export const BetaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const isOpen = useWorkbenchSettingsSelector(
-    (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.alphaNoticeAcknowledged
+    (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.betaNoticeAcknowledged
   );
   const dismissRef = useRef<HTMLButtonElement | null>(null);
   const handleOpenChange = useCallback((event: { open: boolean }) => {
@@ -38,15 +38,15 @@ export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => v
         <Dialog.Positioner>
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>{t('alphaNotice.title')}</Dialog.Title>
+              <Dialog.Title>{t('betaNotice.title')}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="2">
-                <Text fontSize="md">{t('alphaNotice.body')}</Text>
+                <Text fontSize="md">{t('betaNotice.body')}</Text>
                 <Text fontSize="md">
-                  {t('alphaNotice.reportPrefix')}{' '}
+                  {t('betaNotice.reportPrefix')}{' '}
                   <Link color="accent.fg" href={ISSUES_URL} rel="noreferrer" target="_blank">
-                    {t('alphaNotice.reportLink')}
+                    {t('betaNotice.reportLink')}
                   </Link>
                   .
                 </Text>
@@ -54,7 +54,7 @@ export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => v
             </Dialog.Body>
             <Dialog.Footer>
               <Button ref={dismissRef} colorPalette="accent" variant="solid" onClick={acknowledge}>
-                {t('alphaNotice.dismiss')}
+                {t('betaNotice.dismiss')}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

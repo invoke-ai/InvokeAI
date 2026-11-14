@@ -377,6 +377,32 @@ def test_loader_rejects_forged_non_wan_t5_identifier() -> None:
         )
 
 
+@pytest.mark.parametrize("t5_format", [ModelFormat.WanT5Encoder, ModelFormat.GGUFQuantized])
+def test_loader_wires_a_standalone_wan_t5_encoder_in_either_format(t5_format: ModelFormat) -> None:
+    """The diffusers folder and the llama.cpp GGUF both serve the tokenizer and the encoder."""
+    output = _invoke(
+        _config("main", WanVariantType.T2V_A14B, "high"),
+        t5_config=SimpleNamespace(name="t5", base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=t5_format),
+    )
+
+    assert (output.wan_t5_encoder.tokenizer.key, output.wan_t5_encoder.tokenizer.submodel_type) == ("t5", "tokenizer")
+    assert (output.wan_t5_encoder.text_encoder.key, output.wan_t5_encoder.text_encoder.submodel_type) == (
+        "t5",
+        "text_encoder",
+    )
+
+
+def test_loader_rejects_a_flux_t5_gguf_in_the_wan_encoder_slot() -> None:
+    """T5 v1.1 and UMT5 GGUFs share a format; only the type keeps FLUX's encoder out of Wan."""
+    with pytest.raises(ValueError, match="Wan T5"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high"),
+            t5_config=SimpleNamespace(
+                name="flux-t5", base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.GGUFQuantized
+            ),
+        )
+
+
 def test_loader_rejects_forged_non_wan_vae_identifier() -> None:
     with pytest.raises(ValueError, match="Wan VAE"):
         _invoke(

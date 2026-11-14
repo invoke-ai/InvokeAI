@@ -430,8 +430,9 @@ qwen3_vl_encoder_8b = StarterModel(
 
 # More Qwen3-VL encoder builds, pinned to commits. The 4B is what Krea-2 and FLUX.3 condition on, the 8B what Ideogram 4
 # and Qwen-Image-2.1 condition on; the two are not interchangeable. The GGUF files hold the language tower only (the
-# vision tower lives in a separate mmproj file), so they encode text but cannot read Krea-2 edit reference images.
-# Qwen-Image-2.1 edits read them through the 8B's mmproj, installed as `qwen3_vl_vision_tower_8b`.
+# vision tower lives in a separate mmproj file), so they encode text but read edit reference images only through
+# that file: Krea-2 through the 4B's mmproj (`qwen3_vl_vision_tower_4b`), Qwen-Image-2.1 through the 8B's
+# (`qwen3_vl_vision_tower_8b`).
 _QWEN3_VL_KREA2 = (
     "https://huggingface.co/Comfy-Org/Krea-2/resolve/588feaf955b08b9ac4723eeb751752ab045dba71/text_encoders"
 )
@@ -450,8 +451,8 @@ _QWEN3_VL_8B_USE = (
     "interchangeable."
 )
 _QWEN3_VL_GGUF_NOTE = (
-    "The GGUF holds the language tower only, so it encodes text and cannot read Krea-2 edit reference images; use a "
-    "safetensors encoder for those."
+    "The GGUF holds the language tower only, so it encodes text; edit reference images need the matching Vision Tower "
+    "model beside it (4B: Krea-2, 8B: Qwen-Image-2.1)."
 )
 
 qwen3_vl_encoder_4b_bf16 = StarterModel(
@@ -546,6 +547,16 @@ qwen3_vl_vision_tower_8b = StarterModel(
     format=ModelFormat.GGUFQuantized,
 )
 
+qwen3_vl_vision_tower_4b = StarterModel(
+    name="Qwen3-VL 4B Vision Tower",
+    base=BaseModelType.Any,
+    source=f"{_QWEN3_VL_4B_GGUF}/mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+    description="The vision tower (llama.cpp mmproj, F16) of Qwen3-VL 4B. Select it as the Vision Tower beside a GGUF "
+    "Qwen3-VL 4B encoder so Krea-2 can read edit reference images. Not needed with other encoders. ~0.8GB",
+    type=ModelType.Qwen3VLVisionTower,
+    format=ModelFormat.GGUFQuantized,
+)
+
 # region Wan 2.2 (local)
 # Shared components — all Wan 2.2 variants use the UMT5-XXL text encoder. A14B
 # (both T2V and I2V) uses a 16-channel VAE; TI2V-5B uses a 48-channel VAE. The
@@ -558,6 +569,16 @@ wan_22_t5_encoder = StarterModel(
     "Required when running a GGUF Wan main without a Diffusers Component Source. (~11GB)",
     type=ModelType.WanT5Encoder,
     format=ModelFormat.WanT5Encoder,
+)
+
+wan_22_t5_encoder_gguf_q8_0 = StarterModel(
+    name="Wan T5 Encoder (UMT5-XXL, GGUF Q8_0)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/umt5-xxl-encoder-gguf/resolve/main/umt5-xxl-encoder-Q8_0.gguf",
+    description="UMT5-XXL text encoder for all Wan 2.2 variants, GGUF Q8_0 quantized: about half the size of "
+    "the Diffusers encoder, with its tokenizer built in. (~6GB)",
+    type=ModelType.WanT5Encoder,
+    format=ModelFormat.GGUFQuantized,
 )
 
 # DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.

@@ -28,7 +28,6 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, QwenImage21VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
     QWEN_IMAGE_21_LORA_NORM_PREFIX,
     QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
@@ -36,7 +35,6 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_ut
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
 from invokeai.backend.quantization.dequantizing_linear import (
-    DequantizingLinear,
     peak_dequant_transient_bytes,
     requires_sidecar_patching,
 )
@@ -445,7 +443,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             dtype,
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
-        self._refuse_dora_on_int8(context, transformer_info.model)
         working_memory += self._lora_working_memory(
             context,
             transformer_info.model,
@@ -624,21 +621,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             per_sample_rows=dict.fromkeys(_PER_SAMPLE_LINEARS, _TIMESTEP_ROWS),
             dtype=dtype,
         )
-
-    def _refuse_dora_on_int8(self, context: InvocationContext, transformer: torch.nn.Module) -> None:
-        """Fail before loading the transformer onto the device, not at the first step: a DoRA layer normalizes the
-        updated weight, and an int8 Linear's packed buffers never form one (`DoRALayer.get_parameters` raises)."""
-        loras = [lora for lora in self.transformer.loras if lora.weight != 0]
-        if not loras:
-            return
-        modules = dict(transformer.named_modules())
-        for lora in loras:
-            for key, layer in context.models.load(lora.lora).model.layers.items():
-                if isinstance(layer, DoRALayer) and isinstance(modules.get(key.partition("-")[2]), DequantizingLinear):
-                    raise ValueError(
-                        f"LoRA '{lora.lora.name}' has DoRA layers, which do not run on an int8 transformer. Use it "
-                        "with a Qwen-Image-2.1 transformer in another format, such as bf16, fp8 or GGUF."
-                    )
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.transformer.loras:

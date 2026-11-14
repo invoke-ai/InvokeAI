@@ -188,6 +188,19 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), {})).toBe(false);
   });
 
+  it('treats a managed file as a direct input addressed by its file id', () => {
+    const file = input({ type: single('FileField') });
+
+    expect(isDirectInputField(file)).toBe(true);
+    expect(isWorkflowFieldValueValid(file, { file_id: 'file-1' })).toBe(true);
+    expect(isWorkflowFieldValueValid(file, {})).toBe(false);
+    expect(isWorkflowFieldValueValid(file, { file_id: '' })).toBe(false);
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: file, value: undefined })).toBe(
+      'Required value.'
+    );
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: file, value: {} })).toBe('Invalid value.');
+  });
+
   it('validates image collections as lists of image refs and keeps video collections on the non-null check', () => {
     const videos = input({ type: { batch: false, cardinality: 'COLLECTION', name: 'VideoField' } });
     const images = input({ type: { batch: false, cardinality: 'COLLECTION', name: 'ImageField' } });

@@ -20,6 +20,7 @@ import {
   Stack,
   Text,
   type TextProps,
+  useFieldContext,
 } from '@chakra-ui/react';
 import {
   formatAspectRatio,
@@ -34,6 +35,7 @@ import {
 } from '@features/generation/core/aspectRatioPresets';
 import { ASPECT_RATIO_MAP, ASPECT_RATIO_OPTIONS } from '@features/generation/core/settings';
 import { Button, IconButton } from '@platform/ui/Button';
+import { useFieldLabelId } from '@platform/ui/Field';
 import { PopoverContent } from '@platform/ui/Popover';
 import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
@@ -52,7 +54,14 @@ interface Size {
   height: number;
 }
 
-export interface AspectRatioPickerProps {
+interface AspectRatioPickerCommonProps {
+  disabled?: boolean;
+  /** Shown on the trigger in place of the chosen ratio, e.g. the media that decides it while disabled. */
+  valueText?: ReactNode;
+}
+
+/** Built-ins, Free, and the account's saved ratios with their add and edit form. */
+export interface AspectRatioPickerFullProps extends AspectRatioPickerCommonProps {
   /** The live size: the Free thumbnail's shape and the Add ratio form's prefill. */
   currentSize: Size;
   /** The ratio the lock holds, or null while unlocked (Free). */
@@ -63,6 +72,18 @@ export interface AspectRatioPickerProps {
   /** A ratio to lock, or null for Free. Not called for the ratio already chosen. */
   onChange: (ratio: number | null) => void;
 }
+
+/** The built-in ratio grid only: no Free and no saved ratios. */
+export interface AspectRatioPickerFixedProps extends AspectRatioPickerCommonProps {
+  currentSize?: never;
+  lockedRatio: number;
+  presets?: never;
+  getSizeForRatio?: never;
+  /** A built-in's ratio. Not called for the ratio already chosen. */
+  onChange: (ratio: number) => void;
+}
+
+export type AspectRatioPickerProps = AspectRatioPickerFullProps | AspectRatioPickerFixedProps;
 
 type FormSubject = { mode: 'add' } | { mode: 'edit'; preset: AspectRatioPreset };
 
@@ -411,28 +432,37 @@ const GroupLabel = ({ children, id }: { children: ReactNode; id: string }) => (
 /**
  * The aspect ratio control: built-in ratios as a grid of shapes, the account's saved ratios as rows, and an inline
  * form to add or edit one. Choosing applies at once and closes; callers own what a ratio does to the size.
+ * Without `presets` it offers the built-in grid alone.
  */
-export const AspectRatioPicker = ({
-  currentSize,
-  getSizeForRatio,
-  lockedRatio,
-  presets,
-  onChange,
-}: AspectRatioPickerProps) => {
+export const AspectRatioPicker = (props: AspectRatioPickerProps) => {
+  const { disabled, lockedRatio, valueText: valueTextOverride } = props;
+  // Like Select, an enclosing Field's label names the trigger and its disabled state applies; else a hidden label does.
+  const field = useFieldContext();
+  const fieldLabelId = useFieldLabelId();
+  const full = props.presets ? props : null;
+  const savedPresets = full?.presets.presets ?? [];
   const { i18n, t } = useTranslation();
   const locale = i18n.resolvedLanguage;
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormSubject | null>(null);
   const { containerRef, focus: focusKey, registerTarget } = useDeferredFocus();
-  const labelId = useId();
+  const hiddenLabelId = useId();
+  const labelId = fieldLabelId ?? hiddenLabelId;
   const valueId = useId();
   const builtInsId = useId();
   const savedId = useId();
   const tileRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const currentRatio = currentSize.height > 0 ? currentSize.width / currentSize.height : 1;
-  const match = lockedRatio === null ? null : matchAspectRatio(lockedRatio, presets.presets);
-  const builtIns = ASPECT_RATIO_OPTIONS.map((id) => ({ id, ratio: id === 'Free' ? null : ASPECT_RATIO_MAP[id].ratio }));
+  const currentRatio = full
+    ? full.currentSize.height > 0
+      ? full.currentSize.width / full.currentSize.height
+      : 1
+    : (lockedRatio ?? 1);
+  const match = lockedRatio === null ? null : matchAspectRatio(lockedRatio, savedPresets);
+  const builtIns = ASPECT_RATIO_OPTIONS.filter((id) => full || id !== 'Free').map((id) => ({
+    id,
+    ratio: id === 'Free' ? null : ASPECT_RATIO_MAP[id].ratio,
+  }));
   // The built-in equal to the locked ratio is current even while a saved ratio names it, so choosing either closes.
   const lockedBuiltInId = lockedRatio === null ? 'Free' : getLockedAspectRatioSettings(lockedRatio).aspectRatioId;
   const currentTileIndex =
@@ -478,7 +508,8 @@ export const AspectRatioPicker = ({
 
   const choose = (ratio: number | null, isCurrent: boolean) => {
     if (!isCurrent) {
-      onChange(ratio);
+      // Only Free is null, and the built-ins-only grid has no Free tile.
+      (props.onChange as (ratio: number | null) => void)(ratio);
     }
 
     setIsOpen(false);
@@ -500,6 +531,12 @@ export const AspectRatioPicker = ({
   };
 
   const submitForm = (draft: AspectRatioPresetDraft) => {
+    if (!full) {
+      return;
+    }
+
+    const { presets } = full;
+
     if (form?.mode === 'edit') {
       presets.update(form.preset.id, draft);
       setForm(null);
@@ -518,6 +555,11 @@ export const AspectRatioPicker = ({
   // Deleting is undoable (the port reports it with Undo), so it asks nothing. Focus moves to the next row's delete,
   // the previous one's after the last row, or Add ratio once none are left.
   const deletePreset = (preset: AspectRatioPreset) => {
+    if (!full) {
+      return;
+    }
+
+    const { presets } = full;
     const index = presets.presets.findIndex((candidate) => candidate.id === preset.id);
     const neighbour = presets.presets[index + 1] ?? presets.presets[index - 1];
 
@@ -552,10 +594,7 @@ export const AspectRatioPicker = ({
     tileRefs.current[0] ??
     null;
 
-  // A new ratio starts from the locked ratio (a snapped size is only close to it), else from the size itself.
-  const addTerms = getAspectRatioTerms(lockedRatio ?? currentRatio);
-
-  const formFor = (subject: FormSubject) =>
+  const formFor = (subject: FormSubject, getSizeForRatio: (ratio: number) => Size) =>
     subject.mode === 'edit' ? (
       <PresetForm
         key={subject.preset.id}
@@ -571,7 +610,8 @@ export const AspectRatioPicker = ({
       <PresetForm
         getSizeForRatio={getSizeForRatio}
         registerFocusTarget={registerTarget}
-        initial={{ label: '', terms: addTerms }}
+        // A new ratio starts from the locked ratio (a snapped size is only close to it), else from the size itself.
+        initial={{ label: '', terms: getAspectRatioTerms(lockedRatio ?? currentRatio) }}
         submitLabel={t('common.add')}
         title={t('widgets.generate.aspectRatioAdd')}
         onCancel={closeForm}
@@ -581,6 +621,8 @@ export const AspectRatioPicker = ({
 
   return (
     <Popover.Root
+      // The field label's `for` points at its control, so the trigger takes that id.
+      ids={fieldLabelId && field ? { trigger: field.ids.control } : undefined}
       initialFocusEl={getInitialFocus}
       lazyMount
       open={isOpen}
@@ -595,13 +637,16 @@ export const AspectRatioPicker = ({
       }}
       onOpenChange={handleOpenChange}
     >
-      <Text hidden id={labelId}>
-        {t('widgets.generate.aspectRatio')}
-      </Text>
+      {fieldLabelId ? null : (
+        <Text hidden id={hiddenLabelId}>
+          {t('widgets.generate.aspectRatio')}
+        </Text>
+      )}
       <Popover.Trigger asChild>
         <Button
           aria-labelledby={`${labelId} ${valueId}`}
           css={TRIGGER_CSS}
+          disabled={disabled || field?.disabled}
           flex="1"
           justifyContent="space-between"
           minW="0"
@@ -610,8 +655,12 @@ export const AspectRatioPicker = ({
           w="full"
         >
           <HStack as="span" gap="2" id={valueId} minW="0">
-            <AspectRatioPreview boxSize="5" ratio={lockedRatio ?? currentRatio} />
-            {valueText}
+            {valueTextOverride ?? (
+              <>
+                <AspectRatioPreview boxSize="5" ratio={lockedRatio ?? currentRatio} />
+                {valueText}
+              </>
+            )}
           </HStack>
           <Icon as={ChevronDownIcon} aria-hidden boxSize="3" color="fg.muted" flexShrink={0} />
         </Button>
@@ -670,54 +719,60 @@ export const AspectRatioPicker = ({
                     );
                   })}
                 </Grid>
-                <Separator borderColor="border.subtle" />
-                <GroupLabel id={savedId}>{t('widgets.generate.aspectRatioYourRatios')}</GroupLabel>
-                {presets.presets.length === 0 && form?.mode !== 'add' ? (
-                  <Text color="fg.subtle" fontSize="sm" px="1">
-                    {t('widgets.generate.aspectRatioYourRatiosEmpty')}
-                  </Text>
-                ) : presets.presets.length > 0 ? (
-                  <Scrollable contentProps={SAVED_LIST_CONTENT_PROPS} maxH="12rem">
-                    <Stack aria-labelledby={savedId} gap="0.5" role="group">
-                      {presets.presets.map((preset) =>
-                        form?.mode === 'edit' && form.preset.id === preset.id ? (
-                          formFor(form)
-                        ) : (
-                          <PresetRow
-                            key={preset.id}
-                            registerFocusTarget={registerTarget}
-                            isCurrent={preset.id === currentPresetId}
-                            preset={preset}
-                            ratioText={formatPresetRatio(preset)}
-                            sizeText={formatSize(getSizeForRatio(getAspectRatioPresetRatio(preset)))}
-                            onChoose={() => choose(getAspectRatioPresetRatio(preset), preset.id === currentPresetId)}
-                            onDelete={() => deletePreset(preset)}
-                            onEdit={() => openForm({ mode: 'edit', preset })}
-                          />
-                        )
-                      )}
-                    </Stack>
-                  </Scrollable>
+                {full ? (
+                  <>
+                    <Separator borderColor="border.subtle" />
+                    <GroupLabel id={savedId}>{t('widgets.generate.aspectRatioYourRatios')}</GroupLabel>
+                    {full.presets.presets.length === 0 && form?.mode !== 'add' ? (
+                      <Text color="fg.subtle" fontSize="sm" px="1">
+                        {t('widgets.generate.aspectRatioYourRatiosEmpty')}
+                      </Text>
+                    ) : full.presets.presets.length > 0 ? (
+                      <Scrollable contentProps={SAVED_LIST_CONTENT_PROPS} maxH="12rem">
+                        <Stack aria-labelledby={savedId} gap="0.5" role="group">
+                          {full.presets.presets.map((preset) =>
+                            form?.mode === 'edit' && form.preset.id === preset.id ? (
+                              formFor(form, full.getSizeForRatio)
+                            ) : (
+                              <PresetRow
+                                key={preset.id}
+                                registerFocusTarget={registerTarget}
+                                isCurrent={preset.id === currentPresetId}
+                                preset={preset}
+                                ratioText={formatPresetRatio(preset)}
+                                sizeText={formatSize(full.getSizeForRatio(getAspectRatioPresetRatio(preset)))}
+                                onChoose={() =>
+                                  choose(getAspectRatioPresetRatio(preset), preset.id === currentPresetId)
+                                }
+                                onDelete={() => deletePreset(preset)}
+                                onEdit={() => openForm({ mode: 'edit', preset })}
+                              />
+                            )
+                          )}
+                        </Stack>
+                      </Scrollable>
+                    ) : null}
+                    {form?.mode === 'add' ? (
+                      formFor(form, full.getSizeForRatio)
+                    ) : full.presets.isFull ? (
+                      <Text color="fg.subtle" fontSize="sm" px="1">
+                        {t('widgets.generate.aspectRatioListFull', { count: MAX_ASPECT_RATIO_PRESETS })}
+                      </Text>
+                    ) : (
+                      <Button
+                        ref={registerTarget}
+                        data-focus-key="add"
+                        justifyContent="start"
+                        px="1.5"
+                        variant="ghost"
+                        onClick={() => openForm({ mode: 'add' })}
+                      >
+                        <PlusIcon />
+                        {t('widgets.generate.aspectRatioAdd')}
+                      </Button>
+                    )}
+                  </>
                 ) : null}
-                {form?.mode === 'add' ? (
-                  formFor(form)
-                ) : presets.isFull ? (
-                  <Text color="fg.subtle" fontSize="sm" px="1">
-                    {t('widgets.generate.aspectRatioListFull', { count: MAX_ASPECT_RATIO_PRESETS })}
-                  </Text>
-                ) : (
-                  <Button
-                    ref={registerTarget}
-                    data-focus-key="add"
-                    justifyContent="start"
-                    px="1.5"
-                    variant="ghost"
-                    onClick={() => openForm({ mode: 'add' })}
-                  >
-                    <PlusIcon />
-                    {t('widgets.generate.aspectRatioAdd')}
-                  </Button>
-                )}
               </Stack>
             </Popover.Body>
           </PopoverContent>
