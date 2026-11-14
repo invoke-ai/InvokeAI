@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-10
 sidebar:
   order: 3
 ---
@@ -56,11 +56,13 @@ reader's error; if the file is incomplete or corrupt, download it again.
   `int4_tensorwise`, which most builds mix with int8 layers. **nvfp4** and **fp8 scaled** mean ComfyUI's checkpoint
   layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. FLUX.3 also loads Black Forest
   Labs' own builds: the nvfp4 export in NVIDIA ModelOpt's layout and `fp8r` (fp8 with one scale per row). It refuses
-  AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1 and FLUX.3, torchao exports such as unsloth's FP8
-  builds are refused at install. MOSS-Image loads Comfy-Org's int8 build and GGUFs; its fp8, nvfp4 and w4a8
-  transformers, and unsloth's torchao builds, are refused at install, unscaled fp8 included. ComfyUI's other low-bit
-  layouts (`w4a8`, `w6a8`, SVDQuant) are not supported; Krea-2,
-  Qwen-Image and Wan 2.2 refuse them at install.
+  AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1, unsloth's torchao FP8 builds (fp8 weights with one
+  scale per output row) load as fp8 scaled; other torchao layouts, such as per-tensor or block-wise fp8 and INT8
+  builds, are refused at install. FLUX.3 refuses every torchao export at install. Ideogram 4 refuses the torchao
+  exports it recognizes; one that also quantized the projections Ideogram 4 is recognized by does not install as
+  Ideogram 4 at all. MOSS-Image loads Comfy-Org's int8 build and GGUFs; its fp8, nvfp4 and w4a8 transformers, and
+  unsloth's torchao builds, are refused at install, unscaled fp8 included. ComfyUI's other low-bit layouts (`w4a8`,
+  `w6a8`, SVDQuant) are not supported; Krea-2, Qwen-Image and Wan 2.2 refuse them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
@@ -104,7 +106,8 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 FLUX.1 takes CLIP-L only.
 
 The Qwen3-VL and Qwen2.5-VL GGUF encoders are the language model only. The Qwen3-VL `mmproj` vision file installs
-as its own **Qwen3-VL Vision Tower** model, which Qwen-Image-2.1 edits read reference images through; a Qwen2.5-VL
+as its own **Qwen3-VL Vision Tower** model, which Krea-2 (the 4B file) and Qwen-Image-2.1 (the 8B file) edits read
+reference images through beside a GGUF encoder; a Qwen2.5-VL
 `mmproj` file is refused. Without the vision tower, Qwen-Image Edit cannot read reference images with the Qwen2.5-VL GGUF encoder and says so
 before generating. A Qwen2-VL GGUF, the previous generation under the same llama.cpp architecture name, is refused.
 Qwen3-VL nvfp4 single files keep their layers packed: ComfyUI's `qwen3vl_8b_nvfp4`, and repacks that name their nvfp4
@@ -237,6 +240,10 @@ Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` 
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
+
+On Z-Image, Qwen-Image and Anima, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
+`lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
+on bitsandbytes NF4/LLM.int8 bases.
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.
