@@ -50,8 +50,7 @@ ComfyUI's `int8_tensorwise` builds, rotated (`int8_convrot`) or not, load for th
 encoder. Comfy-Org publishes `int8_convrot` transformers for Qwen Image Edit 2509 and 2511; the Qwen2.5-VL int8
 encoders are community uploads. The int8 layers stay int8 in memory (about half the bf16 size) and are dequantized
 layer by layer as they run, on every device. That is the default: on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
-can run them on the int8 tensor cores instead. The main benefit is memory; no speed-up is promised. DoRA LoRAs do not
-run on an int8 transformer. A file whose int8 layers carry only a `{"convrot": true}` marker, with no format, is
+can run them on the int8 tensor cores instead. The main benefit is memory; no speed-up is promised. A file whose int8 layers carry only a `{"convrot": true}` marker, with no format, is
 refused at install for the transformer and when the encoder loads. Int4 builds are refused at install.
 
 ## Installing
@@ -163,19 +162,21 @@ Image**; connect an **Image to Latents - Qwen Image** node to the **Reference La
 
 Qwen Image LoRAs (diffusers PEFT, Kohya, LoKR and LoHA formats) are supported and apply to the transformer and,
 when the file has text-encoder layers, to the Qwen2.5-VL encoder too. This holds for every encoder build,
-including the **Encoder quantization** setting. DoRA layers on the encoder need unpacked weights: they fail
-with int8 or nf4 quantization and with packed nvfp4 encoders, so set **Encoder quantization** to **None** and
-use a bf16 or fp8 encoder. A LoRA that holds only text-encoder layers is not recognized on install.
+including the **Encoder quantization** setting. DoRA layers on the encoder work on bf16, fp8, int8-convrot and nvfp4 encoders, but fail
+with the bitsandbytes int8 or nf4 **Encoder quantization** setting; set it to **None** to use them. A LoRA that holds only text-encoder layers is not recognized on install.
 
 In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**. Route the
 encoder through the LoRA node as well as the transformer: connect the node's **Qwen VL Encoder** output to
 the prompt nodes, otherwise the LoRA's text-encoder layers stay unused. The LoRA node logs a warning when it sees this.
 
+DoRA LoRAs apply with their magnitudes in the `lora_A`/`lora_B` layout (LyCORIS `dora_scale`, PEFT
+`lora_magnitude_vector`, ai-toolkit `.magnitude`) as well as in the kohya layout. DoRA runs on the GGUF, fp8, int8 and nvfp4 transformers, but not on bitsandbytes NF4 or LLM.int8 weights.
+
 Plain LoRAs, LoKR and LoHA files saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw
 PEFT adapters (`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers
 (`img_mod`, `txt_mod`, `img_mlp`, `txt_mlp`), as files in these layouts usually do. Other model families use the
 same key prefixes, so a file in these layouts that trains only attention layers is not recognized and installs as
-an unknown model, and so do PEFT DoRA files. LyCORIS and ai-toolkit files whose keys start with
+an unknown model. LyCORIS and ai-toolkit files whose keys start with
 `lycoris_transformer_blocks_` or `lora_transformer_transformer_blocks_` are recognized only when they train those
 modules. Without them, a `lycoris_` file installs as an unknown model, and a `lora_transformer_transformer_blocks_`
 file installs as a FLUX LoRA, the spelling OneTrainer uses for FLUX. A learned `scalar` in a LoRA, LoKR or LoHA

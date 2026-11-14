@@ -70,8 +70,8 @@ _NON_IDEOGRAM4_ANTI_RES = (
 )
 
 # Low-rank and LoKR parameter names the conversion builds layers from. LoHA has not been seen for this family, and
-# DoRA is refused: the sidecar wrappers of the quantized builds (GGUF, int8, fp8, nf4) hand a patch only a
-# placeholder weight, and DoRA needs the real one.
+# DoRA is refused: the conversion fuses split q/k/v layers into one low-rank layer on `qkv`, which cannot carry a
+# magnitude per projection, and nf4 builds cannot run DoRA at all (bitsandbytes weights cannot be dequantized for it).
 IDEOGRAM4_LORA_PARAM_NAMES = (
     "lora_A.weight",
     "lora_B.weight",

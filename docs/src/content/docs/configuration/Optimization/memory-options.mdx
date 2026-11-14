@@ -112,8 +112,8 @@ in RAM.
 | [FP8 Storage](/configuration/optimization/fp8-storage/), on a full-precision model | 8 on the GPU | About half | Yes | Same or slightly slower | NVIDIA, AMD and Intel GPUs | Yes |
 | fp8, scaled fp8 | 8 | About half, with FP8 Storage (on after install) | Yes | Unpacked per layer; faster with [FP8 Compute](/configuration/optimization/fp8-compute/) on RTX 40 and newer | Every device; unpacked to BF16 on the CPU and Apple silicon | Yes; with FP8 Compute only while fully in VRAM |
 | MXFP8 | 8.25 | Full size: unpacked at load | Yes | Baseline | Every device | Yes |
-| int8 (`int8_convrot`) | 8 | About half | Yes, except DoRA | 0.75–0.97×; 1.3–2× with [int8 Compute](/configuration/optimization/int8-compute/) on RTX 30 and newer | Every device | Yes |
-| nvfp4 | 4.5 | About 28% | Yes, except DoRA | Unpacked per layer; no FP4 math | Every device | Yes |
+| int8 (`int8_convrot`) | 8 | About half | Yes | 0.75–0.97×; 1.3–2× with [int8 Compute](/configuration/optimization/int8-compute/) on RTX 30 and newer | Every device | Yes |
+| nvfp4 | 4.5 | About 28% | Yes | Unpacked per layer; no FP4 math | Every device | Yes |
 | GGUF | 4.5 (Q4_K) to 8.5 (Q8_0) | About 28–53% | Yes | Unpacked per layer | Every device | Yes |
 | [SDNQ](/configuration/optimization/sdnq-quantization/) | 4–5, plus the SVD correction | About a third | Yes | Unpacked per layer | Every device | Yes |
 | NF4 (bitsandbytes) | 4, plus block scales | About 28% | Yes, except DoRA | Unpacked per layer | NVIDIA and AMD GPUs; not macOS; untested on Intel GPUs and the CPU | Yes |
@@ -123,5 +123,6 @@ in RAM.
 - **Which models come in which format** is listed in [Model Format Support](/users-guide/models/model-format-support/).
   Sizes, starter models and measured speeds are on each model family's page.
 - **LoRAs** run beside the quantized layers rather than being merged into them, so a LoRA works on every format; DoRA
-  patches fail on int8, nvfp4 and NF4.
+  patches work wherever the weight can be dequantized (GGUF, SDNQ, int8, nvfp4, fp8) and fail on bitsandbytes NF4 and
+  LLM.int8. DoRA layers on a quantized transformer dequantize their weight again on every step, so they are slower than plain LoRA layers: with a 400-layer DoRA LoRA, Anima-2.9B int8 denoises 1024² in 30 steps in about 30 s, against 18 s with the same LoRA as plain LoRA.
 - On a GPU, every format works with Low-VRAM mode, which streams from RAM whatever doesn't fit in VRAM.

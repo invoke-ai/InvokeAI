@@ -27,7 +27,9 @@ SAFETENSORS_DTYPES: dict[str, torch.dtype] = {
     "U8": torch.uint8,
     "I8": torch.int8,
     "F8_E4M3": torch.float8_e4m3fn,
+    "F8_E4M3FNUZ": torch.float8_e4m3fnuz,
     "F8_E5M2": torch.float8_e5m2,
+    "F8_E5M2FNUZ": torch.float8_e5m2fnuz,
     "U16": torch.uint16,
     "I16": torch.int16,
     "BF16": torch.bfloat16,
@@ -38,8 +40,18 @@ SAFETENSORS_DTYPES: dict[str, torch.dtype] = {
     "U64": torch.uint64,
     "I64": torch.int64,
     "F64": torch.float64,
+    "C64": torch.complex64,
 }
-"""safetensors dtype names mapped to their torch equivalents."""
+"""safetensors dtype names mapped to their torch equivalents: every dtype `safetensors.torch` reads but F4, because the
+single-file loaders read through the header, and a missing name fails a file `load_file` loads -- at generation, since
+identification falls back to the full load and installs it. The sub-byte formats (F4, F6_E2M3, F6_E3M2) are absent:
+their header shapes count 4- and 6-bit elements, which no torch dtype stores one per element. `load_file` reads F4 as
+`float4_e2m1fn_x2` with the last dimension halved; no loader casts such a tensor, so it is refused here by name."""
+
+# MXFP8 exponent grids, which loaders refuse by name (`fp8_scaled.reject_undecoded_mx_scale`), so they have to get as
+# far as that check. Guarded like `fp8_scaled._MX_SCALE_DTYPES`: older torch builds lack the dtype.
+if hasattr(torch, "float8_e8m0fnu"):
+    SAFETENSORS_DTYPES["F8_E8M0"] = torch.float8_e8m0fnu
 
 
 def read_safetensors_header(path: Path) -> dict[str, Any]:
@@ -63,22 +75,27 @@ def read_safetensors_header(path: Path) -> dict[str, Any]:
     return header
 
 
-def _safetensors_meta_state_dict(path: Path) -> StateDict:
+def safetensors_meta_state_dict(path: Path) -> StateDict:
     """Build a state dict of `meta` tensors from a safetensors file's header.
 
     Identification only ever reads keys, shapes and dtypes off a state dict - never tensor data - so loading
     the tensors costs the model's full size in RAM for every probe and buys nothing. The header is a few KB at
-    the front of the file, and `meta` tensors carry the shape and dtype without any storage behind them.
+    the front of the file, and `meta` tensors carry the shape and dtype without any storage behind them. A loader
+    uses it the same way, to decide which tensors to read and how much RAM they need before reading any.
 
     Raises:
-        Exception: The header could not be parsed, or names a dtype with no torch equivalent. Callers should
-            fall back to loading the file for real.
+        OSError: The file could not be read.
+        ValueError: The header could not be parsed, or names a dtype with no entry in `SAFETENSORS_DTYPES`.
+            Identification falls back to loading the file for real.
     """
     header = read_safetensors_header(path)
-    return {
-        key: torch.empty(info["shape"], dtype=SAFETENSORS_DTYPES[info["dtype"]], device="meta")
-        for key, info in header.items()
-    }
+    state_dict: StateDict = {}
+    for key, info in header.items():
+        dtype = SAFETENSORS_DTYPES.get(info["dtype"])
+        if dtype is None:
+            raise ValueError(f"{path.name} stores '{key}' as {info['dtype']}, a dtype this build cannot read.")
+        state_dict[key] = torch.empty(info["shape"], dtype=dtype, device="meta")
+    return state_dict
 
 
 def unwrap_state_dict(checkpoint: dict[Any, Any]) -> StateDict:
@@ -236,7 +253,7 @@ class ModelOnDisk:
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
                 else:
                     try:
-                        checkpoint = _safetensors_meta_state_dict(path)
+                        checkpoint = safetensors_meta_state_dict(path)
                     except Exception:
                         logger.debug(f"Could not read the safetensors header of {path}, loading the whole file")
                         checkpoint = safetensors.torch.load_file(path)
