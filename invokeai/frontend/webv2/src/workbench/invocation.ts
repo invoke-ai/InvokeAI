@@ -223,7 +223,7 @@ const overlapsFrame = (bounds: FrameRect, frame: FrameRect): boolean =>
  * (readiness only has an estimate of its extent) and so is anything at zero opacity, its own or a group's. The one
  * remaining approximation is transparent pixels inside a layer's bounds, which this treats as content.
  */
-const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
+export const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
   const { bbox } = document;
 
   if (bbox.width <= 0 || bbox.height <= 0) {
@@ -280,7 +280,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
   // input while another source is. This runs on every project change, over leaves the document index caches; raster
   // layers are measured only for the model they gate.
   const measuresRaster =
-    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
+    isGenerateModelConfig(generateValues.model) && generateValues.model.type === 'external_image_generator';
   const canvasLayers = compileContributingLayers(project.canvas.document);
 
   return {
@@ -326,7 +326,8 @@ const isWidgetMounted = (input: InvocationRouteInput, widgetId: WidgetId): boole
 const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
   models?: readonly ModelConfig[],
-  canvasBbox?: InvocationRouteInput['canvasBbox']
+  canvasBbox?: InvocationRouteInput['canvasBbox'],
+  canvasRasterInFrame = false
 ): InvocationValidationReason[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
@@ -343,7 +344,7 @@ const getGenerateSnapshotValidationReasons = (
   // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
   return [
     ...getGenerateInvocationIssues(values, {
-      ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
+      ...(canvasBbox ? { canvasFrame: canvasBbox, canvasRasterInFrame } : {}),
       ...(models ? { models } : {}),
     }).map((generationIssue) => ({ generationIssue })),
     ...(layoutDraftReason === null ? [] : [layoutDraftReason]),
@@ -419,7 +420,9 @@ export const resolveInvocationRouteInput = (
 
   if (sourceId === 'canvas') {
     // Canvas shares Generate readiness and additionally requires a nonzero generation frame.
-    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
+    validationReasons.push(
+      ...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox, input.canvasRasterInFrame)
+    );
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
       validationReasons.push({ routeIssue: { kind: 'emptyCanvasFrame' } });

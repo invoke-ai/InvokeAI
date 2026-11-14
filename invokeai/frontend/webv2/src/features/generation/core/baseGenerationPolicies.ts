@@ -3058,12 +3058,20 @@ export const getGenerationValidationReasons = (
 /**
  * What blocks Invoke for Generate's values, shared by the Invoke route and the Generate form so the two always agree.
  * With a Canvas frame, a hosted provider is checked at the size it will be asked for (its own size nearest the frame),
- * and one without text to image as the edit the Canvas will ask for. `models` adds the installed-model checks; leave it
+ * and raster-backed requests use the edit mode the Canvas will ask for. `models` adds the installed-model checks; leave it
  * out while the catalog is unread, which would otherwise name every model as missing.
  */
 export const getGenerateInvocationIssues = (
   values: GenerateSettings & { model: GenerateModelConfig },
-  { canvasFrame, models }: { canvasFrame?: { height: number; width: number }; models?: readonly ModelConfig[] } = {}
+  {
+    canvasFrame,
+    canvasRasterInFrame = false,
+    models,
+  }: {
+    canvasFrame?: { height: number; width: number };
+    canvasRasterInFrame?: boolean;
+    models?: readonly ModelConfig[];
+  } = {}
 ): GenerationIssue[] => {
   const { model } = values;
   const providerModes =
@@ -3077,7 +3085,10 @@ export const getGenerateInvocationIssues = (
       providerModes !== null && canvasFrame
         ? { ...values, ...resolveExternalCanvasRequestSize(model, canvasFrame) }
         : values,
-      providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img'
+      providerModes !== null &&
+        (!providerModes.includes('txt2img') || (canvasRasterInFrame && providerModes.includes('img2img')))
+        ? 'img2img'
+        : 'txt2img'
     ),
     ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
   ];

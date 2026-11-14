@@ -269,7 +269,12 @@ export const GenerateSettingsForm = ({
       const issues = getGenerateInvocationIssues(
         { ...current, model: selectedModel },
         {
-          ...(isCanvasSource ? { canvasFrame: { height: current.height, width: current.width } } : {}),
+          ...(isCanvasSource
+            ? {
+                canvasFrame: { height: current.height, width: current.width },
+                canvasRasterInFrame: ui.project.canvasRasterInFrame,
+              }
+            : {}),
           // An unread catalog would name every model as missing.
           ...(models.length > 0 ? { models } : {}),
         }
@@ -277,7 +282,7 @@ export const GenerateSettingsForm = ({
 
       return issues.length > 0 ? issues : NO_ISSUES;
     },
-    [isCanvasSource, models, selectedModel]
+    [isCanvasSource, models, selectedModel, ui.project.canvasRasterInFrame]
   );
   const issues = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectIssues, areGenerationIssuesEqual);
   // Read when the fix runs, so it acts on the latest values rather than those the note rendered with.
