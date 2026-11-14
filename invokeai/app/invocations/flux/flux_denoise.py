@@ -357,6 +357,8 @@ class FluxDenoiseInvocation(BaseInvocation):
 
             if self.control_lora is not None:
                 img_cond = self._prep_structural_control_img_cond(context)
+                if img_cond is not None:
+                    img_cond = img_cond.to(device=device, dtype=inference_dtype)
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
@@ -891,7 +893,6 @@ class FluxDenoiseInvocation(BaseInvocation):
         cond_img = np.array(cond_img)
         cond_img = torch.from_numpy(cond_img).float() / 127.5 - 1.0
         cond_img = einops.rearrange(cond_img, "h w c -> 1 c h w")
-        cond_img = cond_img.to(device=device, dtype=dtype)
 
         # Load the mask and resize it to the target image size.
         mask = context.tensors.load(self.fill_conditioning.mask.tensor_name)
@@ -900,7 +901,8 @@ class FluxDenoiseInvocation(BaseInvocation):
         assert mask.dim() == 3
         assert mask.shape[0] == 1
         mask = tv_resize(mask, size=[self.height, self.width], interpolation=tv_transforms.InterpolationMode.NEAREST)
-        mask = mask.to(device=device, dtype=dtype)
+        # Mask on the pixels' device before encoding; a cpu_only VAE need not share the session device.
+        mask = mask.to(device=cond_img.device, dtype=cond_img.dtype)
         mask = einops.rearrange(mask, "1 h w -> 1 1 h w")
 
         # Prepare image conditioning.
@@ -908,6 +910,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         vae_info = context.models.load(self.controlnet_vae.vae)
         cond_img = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=cond_img)
         cond_img = pack(cond_img)
+        mask = mask.to(cond_img)
 
         # Prepare mask conditioning.
         mask = mask[:, 0, :, :]
@@ -916,7 +919,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         mask = pack(mask)
 
         # Merge image and mask conditioning.
-        img_cond = torch.cat((cond_img, mask), dim=-1)
+        img_cond = torch.cat((cond_img, mask), dim=-1).to(device=device, dtype=dtype)
         return img_cond
 
     def _normalize_ip_adapter_fields(self) -> list[IPAdapterField]:

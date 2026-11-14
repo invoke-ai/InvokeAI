@@ -113,6 +113,7 @@ class KontextExtension:
         canvas_w = 0  # Running canvas width
 
         vae_info = self._context.models.load(self._vae_field.vae)
+        vae_device = vae_info.compute_device
 
         for idx, kontext_field in enumerate(self.kontext_conditioning):
             image = self._context.images.get_pil(kontext_field.image.image_name)
@@ -130,18 +131,17 @@ class KontextExtension:
             # Convert from [0, 1] to [-1, 1] range expected by VAE
             image_tensor = image_tensor * 2.0 - 1.0
             image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
-            image_tensor = image_tensor.to(self._device)
 
             # Continue with VAE encoding
             # Don't sample from the distribution for reference images - use the mean (matching ComfyUI)
             estimated_working_memory = estimate_vae_working_memory_flux(
-                operation="encode", image_tensor=image_tensor, vae=vae_info.model
+                operation="encode", image_tensor=image_tensor, vae=vae_info.model, device=vae_device
             )
 
             with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
                 assert isinstance(vae, AutoencoderKL)
                 vae_dtype = next(iter(vae.parameters())).dtype
-                image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+                image_tensor = image_tensor.to(device=vae_device, dtype=vae_dtype)
 
                 def encode_reference(x: torch.Tensor = image_tensor) -> torch.Tensor:
                     # `.mode()` is the distribution mean without noise -- `sample=False` on the
