@@ -16,13 +16,6 @@ import { useTranslation } from 'react-i18next';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { closeLayoutPresetManager, openLayoutPresetDelete, openLayoutPresetEdit } from './layoutPresetManagerStore';
 
-/**
- * The edit and delete dialogs stack over the manager, and focus outside a modal that traps it is never the user
- * leaving. Under StrictMode a dialog mounted open traps focus twice, so on close one trap returns focus into the
- * closing edit dialog after its layer has left the stack; the manager must not read that as a reason to close.
- */
-const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.preventDefault();
-
 /** The account-wide layout preset editor, rendered lazily from the top bar. */
 export const LayoutPresetManagerDialogBody = ({
   isOpen,
@@ -57,14 +50,7 @@ export const LayoutPresetManagerDialogBody = ({
   }, []);
 
   return (
-    <Dialog.Root
-      lazyMount
-      open={isOpen}
-      unmountOnExit
-      onExitComplete={onExitComplete}
-      onFocusOutside={keepOpenOnFocusOutside}
-      onOpenChange={handleOpenChange}
-    >
+    <Dialog.Root lazyMount open={isOpen} unmountOnExit onExitComplete={onExitComplete} onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

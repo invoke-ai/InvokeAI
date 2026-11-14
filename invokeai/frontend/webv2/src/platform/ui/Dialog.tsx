@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-restricted-imports -- the one wrapper the restriction routes every dialog through
 import { Dialog as ChakraDialog, useDialogContext } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useCallback } from 'react';
 
 import { registerModalPresence } from './modalPresence';
 
@@ -28,12 +29,33 @@ const keepOpenThroughMenuTeardown = (event: LayerDismissEvent) => {
   }
 };
 
-const DialogRoot = ({ children, ...props }: Dialog.RootProps) => (
-  <ChakraDialog.Root {...props} onRequestDismiss={keepOpenThroughMenuTeardown}>
-    {props.modal === false ? null : <ModalPresence />}
-    {children}
-  </ChakraDialog.Root>
-);
+type FocusOutsideEvent = Parameters<NonNullable<ChakraDialog.RootProps['onFocusOutside']>>[0];
+
+/**
+ * A modal dialog traps focus, so focus landing outside it is never the user leaving: it is a programmatic move or a
+ * stale trap. Under StrictMode a dialog mounted open traps focus twice: a lazily loaded one's first mount returns focus
+ * to its opener mid-open, and when one stacked over another closes, a trap returns focus into it after its layer left
+ * the stack. Only a press outside and Escape dismiss a modal dialog; the caller's handler still sees the event first.
+ */
+const DialogRoot = ({ children, onFocusOutside, ...props }: Dialog.RootProps) => {
+  const isModal = props.modal !== false;
+  const handleFocusOutside = useCallback(
+    (event: FocusOutsideEvent) => {
+      onFocusOutside?.(event);
+      if (isModal) {
+        event.preventDefault();
+      }
+    },
+    [isModal, onFocusOutside]
+  );
+
+  return (
+    <ChakraDialog.Root {...props} onFocusOutside={handleFocusOutside} onRequestDismiss={keepOpenThroughMenuTeardown}>
+      {isModal ? <ModalPresence /> : null}
+      {children}
+    </ChakraDialog.Root>
+  );
+};
 
 /**
  * Chakra's dialog parts with a root that announces modal presence while open, so application shortcuts behind it

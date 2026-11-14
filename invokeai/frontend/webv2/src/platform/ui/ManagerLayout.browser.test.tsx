@@ -506,8 +506,8 @@ describe('ManagerLayout', () => {
     const menu = page.getByRole('menu');
     await expect.element(menu).toBeVisible();
     await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(trigger.element().getAttribute('aria-controls')).toBe(menu.element().id);
-    expect(menu.element().getAttribute('aria-labelledby')).toBe(trigger.element().id);
+    await expect.element(trigger).toHaveAttribute('aria-controls', menu.element().id);
+    await expect.element(menu).toHaveAttribute('aria-labelledby', trigger.element().id);
     expect(await auditAccessibility(host)).toEqual([]);
   });
 
