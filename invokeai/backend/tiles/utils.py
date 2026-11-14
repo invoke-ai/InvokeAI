@@ -113,7 +113,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     # Calc the path of the seam
     # could offer options for larger search than just 1 pixel by adjusting lpos and rpos
     for ypos in range(max_y - 2, -1, -1):
-        lowest_pos = lowest_energy_line[ypos + 1]
+        lowest_pos = int(lowest_energy_line[ypos + 1])  # int: a uint16 scalar would wrap at 0 under NumPy 2
         lpos = lowest_pos - 1
         rpos = lowest_pos + 1
         lpos = np.clip(lpos, min_x, max_x - 1)

@@ -41,17 +41,20 @@ dependencies = [
   "gguf",
   # Not on Windows ARM64: the only win_arm64 mediapipe wheel (0.10.35+) is the Tasks-API build without the
   # legacy `solutions` API the face preprocessor and Face Tools use; those nodes report the platform when run.
+  # 0.10.14 is the last release with that `solutions` API and no numpy<2 bound (0.10.15-0.10.21 declare numpy<2;
+  # `solutions` is gone from 0.10.31 on).
   "mediapipe==0.10.14; (sys_platform != 'win32' or platform_machine != 'ARM64')",  # needed for "mediapipeface" controlnet model
   "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
                                           # loader depends on private surface (Tekkenizer internals) that
                                           # moves across majors, so cap below 2.x (validated against 1.11.6)
   "tiktoken==0.13.0; sys_platform == 'win32' and platform_machine == 'ARM64'",   # mistral-common dependency; self-built win_arm64 wheel (see invoke-win-arm64-wheels)
-  "numpy<2.0.0; (sys_platform != 'win32' or platform_machine != 'ARM64')",
+  "numpy>=2.0; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "numpy>=2.3,<2.4; sys_platform == 'win32' and platform_machine == 'ARM64'",   # first win_arm64 wheels are 2.3; <2.4 is mistral-common's cap on 3.12
   "onnx==1.22.0",
   "onnxruntime==1.19.2; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "onnxruntime>=1.24.2; sys_platform == 'win32' and platform_machine == 'ARM64'",   # CPU execution provider only; no GPU build exists for win_arm64
-  "opencv-contrib-python; (sys_platform != 'win32' or platform_machine != 'ARM64')",
+  # 4.12 is the first 4.x that needs numpy 2. 5.x is deferred: it has no win_arm64 wheel and changes warpAffine.
+  "opencv-contrib-python>=4.12,<5; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "opencv-contrib-python==4.11.0.86; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "imageio[ffmpeg]>=2.37; (sys_platform != 'win32' or platform_machine != 'ARM64')",  # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
   # imageio-ffmpeg's wheels exist only to bundle an ffmpeg binary, and there is none for win_arm64: the sdist builds a
@@ -136,10 +139,8 @@ dependencies = [
 
   # Semantic image index (image map / semantic search).
   # numba is a umap-learn transitive, pinned to the range this stack has been
-  # exercised against rather than for numpy compatibility: every release from
-  # 0.59 to at least 0.63 accepts the numpy 1.26.x resolved under numpy<2.0
-  # above (0.62 widened its floor back to >=1.22). Raise the ceiling once a
-  # newer numba has been run against the image map, not just resolved.
+  # exercised against. numba <0.62 caps numpy at 2.2.x on non-ARM (mistral-common caps it below 2.4 on
+  # Python 3.12). Raise the ceiling once a newer numba has been run against the image map, not just resolved.
   # Not on Windows ARM64: numba/llvmlite ship win_arm64 wheels for Python 3.14 only. The image map falls back to a
   # PCA projection there (see image_index/projection.py).
   "umap-learn~=0.5.7; (sys_platform != 'win32' or platform_machine != 'ARM64')",

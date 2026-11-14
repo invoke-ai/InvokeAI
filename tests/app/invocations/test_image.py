@@ -7,7 +7,12 @@ import numpy
 import torch
 from PIL import Image, ImageFilter
 
-from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
+from invokeai.app.invocations.image import (
+    ImageField,
+    ImageHueAdjustmentInvocation,
+    OklabUnsharpMaskInvocation,
+    OklchImageHueAdjustmentInvocation,
+)
 from invokeai.app.invocations.primitives import ImageCollectionInvocation
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
@@ -449,3 +454,25 @@ def test_dilate_keeps_16_bit_grayscale_mode() -> None:
     assert saved_image.mode == "I;16"
     saved = numpy.asarray(saved_image)
     assert saved[2, 1] == 40000 and saved[1, 2] == 40000 and saved[0, 0] == 0
+
+
+def test_image_hue_adjustment_wraps_hue_channel_at_256() -> None:
+    # Hue 90 degrees is a shift of 64 on PIL's 0..255 hue scale; 200 and 255 must wrap around.
+    hues = [0, 100, 191, 192, 200, 255]
+    expected_hues = [64, 164, 255, 0, 8, 63]
+    hsv = numpy.zeros((1, len(hues), 3), dtype=numpy.uint8)
+    hsv[..., 1] = 255
+    hsv[..., 2] = 255
+    hsv[0, :, 0] = hues
+    expected = numpy.array(hsv)
+    expected[0, :, 0] = expected_hues
+
+    context = _build_context(Image.fromarray(hsv, mode="HSV").convert("RGB"))
+    # The input is routed through HSV by the node, so use the exact RGB of the HSV image as the source.
+    context.images.get_pil.return_value = Image.fromarray(hsv, mode="HSV")
+
+    ImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=90).invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+
+    expected_image = Image.fromarray(expected, mode="HSV").convert("RGBA")
+    assert numpy.array_equal(numpy.asarray(saved_image), numpy.asarray(expected_image))
