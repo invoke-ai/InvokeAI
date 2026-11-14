@@ -70,6 +70,7 @@ export const PreviewDropSurface = ({
   const queryClient = useQueryClient();
   const startDroppedFileUpload = useDroppedFileUpload({
     pendingKey: 'widgets.preview.dropPending',
+    surface: 'preview',
     uploadingKey: 'widgets.preview.dropUploading',
   });
   const importDroppedFiles = useCallback(

@@ -1,4 +1,5 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
+import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { createLogger } from '@platform/logging/logger';
@@ -6,7 +7,7 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 import { toaster } from '@platform/ui/toaster';
 import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** What a dropped upload is fenced to, captured at the drop. */
@@ -22,20 +23,34 @@ const UPLOADING_NOTICE_DELAY_MS = 400;
 
 const uploadLogger = createLogger({ area: 'file-drop-upload', namespace: 'gallery' });
 
+// Uploads under way, by account lifetime, surface and project. Module-held: a surface's host is rebuilt when the
+// project changes (a floating window is keyed by project), and the new instance must still see the upload. The account
+// epoch keeps a stale lifetime's upload from holding the new one, and each key admits one upload, so the upload that
+// added it is the only one that removes it.
+const pendingUploads = new Set<string>();
+
 /**
- * Runs the upload of files dropped on a surface (Canvas, Preview), loading its code on demand. While one is under way
- * for the open project, a further drop on the surface is refused with `pendingKey`'s notice, so a slow upload is never
- * doubled; past a moment a progress notice (`uploadingKey`, with the file count) shows until it ends.
+ * Runs the upload of files dropped on a surface (Canvas, Preview), loading its code on demand. Each surface, named by
+ * its widget (`surface`; neither allows a second instance per project), runs one upload per project at a time: while one
+ * is under way for the open project, a further drop on that surface is refused with `pendingKey`'s notice, even after
+ * the surface remounts, so a slow upload is never doubled; other projects and surfaces go ahead. Past a moment a
+ * progress notice (`uploadingKey`, with the file count) shows until the upload ends.
  * The drop's account, project and gallery values are captured at the drop, so nothing that changes while the code
  * loads or the files upload can retarget it. Code that cannot load (offline, or replaced by a newer deploy) is
  * reported as an upload that did not start; `runFailedMessage` names a failure of the work itself.
  */
-export const useDroppedFileUpload = ({ pendingKey, uploadingKey }: { pendingKey: string; uploadingKey: string }) => {
+export const useDroppedFileUpload = ({
+  pendingKey,
+  surface,
+  uploadingKey,
+}: {
+  pendingKey: string;
+  surface: WidgetTypeId;
+  uploadingKey: string;
+}) => {
   const { t } = useTranslation();
   const { notifications } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
-  // The project an upload is under way for; another project's drops go ahead.
-  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
 
   return useCallback(
     <Module>(
@@ -52,13 +67,15 @@ export const useDroppedFileUpload = ({ pendingKey, uploadingKey }: { pendingKey:
     ) => {
       const { activeProject, scopedDefaults } = queries.getSnapshot();
       const projectId = activeProject.id;
-      if (pendingProjectId === projectId) {
+      const owner = captureAccountScope();
+      const uploadKey = JSON.stringify([owner.epoch, surface, projectId]);
+      if (pendingUploads.has(uploadKey)) {
         notifications.add({ kind: 'info', title: t(pendingKey) });
         return;
       }
       const context: DroppedFileUploadContext = {
         galleryValues: getResolvedProjectWidgetValues(activeProject, 'gallery', scopedDefaults),
-        owner: captureAccountScope(),
+        owner,
         projectId,
       };
       // The notice says what happened in the user's words; the cause goes to the log, not into the notice.
@@ -68,7 +85,7 @@ export const useDroppedFileUpload = ({ pendingKey, uploadingKey }: { pendingKey:
           notifications.add({ kind: 'error', title: message });
         }
       };
-      setPendingProjectId(projectId);
+      pendingUploads.add(uploadKey);
       const toastId = createItemId('file-drop-upload');
       const timer = setTimeout(() => {
         // Infinite: the notice goes when the upload ends, however it ends.
@@ -79,7 +96,9 @@ export const useDroppedFileUpload = ({ pendingKey, uploadingKey }: { pendingKey:
           type: 'loading',
         });
       }, UPLOADING_NOTICE_DELAY_MS);
-      void load()
+      // From a settled promise, so a load that throws at once still ends the upload below.
+      void Promise.resolve()
+        .then(load)
         .then(
           (module) =>
             isAccountScopeCurrent(context.owner)
@@ -90,9 +109,9 @@ export const useDroppedFileUpload = ({ pendingKey, uploadingKey }: { pendingKey:
         .finally(() => {
           clearTimeout(timer);
           toaster.dismiss(toastId);
-          setPendingProjectId((current) => (current === projectId ? null : current));
+          pendingUploads.delete(uploadKey);
         });
     },
-    [notifications, pendingKey, pendingProjectId, queries, t, uploadingKey]
+    [notifications, pendingKey, queries, surface, t, uploadingKey]
   );
 };

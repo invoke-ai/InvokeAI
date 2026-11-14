@@ -39,20 +39,29 @@ const renderStart = async () => {
   const Probe = ({ ref }: { ref: Ref<ReturnType<typeof useDroppedFileUpload>> }) => {
     const start = useDroppedFileUpload({
       pendingKey: 'widgets.preview.dropPending',
+      surface: 'preview',
       uploadingKey: 'widgets.preview.dropUploading',
     });
     useImperativeHandle(ref, () => start, [start]);
     return null;
   };
   root = createRoot(document.createElement('div'));
-  await act(() =>
-    root!.render(
-      <I18nextProvider i18n={i18n}>
-        <Probe ref={startRef} />
-      </I18nextProvider>
-    )
-  );
-  return { start: () => startRef.current!, store: harness.store };
+  // A new key mounts a new hook instance, as a surface's host does when it is rebuilt for another project.
+  const render = (key: number) =>
+    act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <Probe key={key} ref={startRef} />
+        </I18nextProvider>
+      )
+    );
+  let mounts = 0;
+  await render(mounts);
+  return {
+    remount: () => render(++mounts),
+    start: () => startRef.current!,
+    store: harness.store,
+  };
 };
 
 describe('useDroppedFileUpload', () => {
@@ -77,6 +86,25 @@ describe('useDroppedFileUpload', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it('reports code that fails to load at once like any other, and takes a new drop after it', async () => {
+    const { start, store } = await renderStart();
+    const drop = (load: () => Promise<object>) =>
+      act(() => {
+        start()([new File(['x'], 'one.png', { type: 'image/png' })], { load, run, runFailedMessage: 'unused' });
+      });
+    const run = vi.fn(() => Promise.resolve());
+
+    await drop(() => {
+      throw new Error('import refused');
+    });
+    await vi.waitFor(() =>
+      expect(store.getState().notifications[0]).toMatchObject({ kind: 'error', title: 'No files uploaded. 1 failed.' })
+    );
+
+    await drop(() => Promise.resolve({}));
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  });
+
   it('names a failure of the work itself with the caller’s message, and takes a new drop once it ended', async () => {
     const { start, store } = await renderStart();
     const drop = (run: () => Promise<void>) =>
@@ -99,5 +127,78 @@ describe('useDroppedFileUpload', () => {
     const run = vi.fn(() => Promise.resolve());
     await drop(run);
     await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  });
+
+  it('holds each project to one upload at a time, however the user moves between projects', async () => {
+    const { remount, start, store } = await renderStart();
+    const started: { finish: () => void; projectId: string }[] = [];
+    const settle = () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    const pendingNotices = () =>
+      store
+        .getState()
+        .notifications.filter(
+          (notice) => notice.title === 'The files you dropped are still uploading. Try again when they are done.'
+        ).length;
+    const drop = () =>
+      act(async () => {
+        start()([new File(['x'], 'one.png', { type: 'image/png' })], {
+          load: () => Promise.resolve({}),
+          run: (_module, { projectId }) =>
+            new Promise<void>((resolve) => {
+              started.push({ finish: resolve, projectId });
+            }),
+          runFailedMessage: 'unused',
+        });
+        // Past the lazy load, so an accepted drop has reached its run.
+        await settle();
+      });
+    const finish = (index: number) =>
+      act(async () => {
+        started[index]!.finish();
+        await settle();
+      });
+    const projectA = store.getState().activeProjectId;
+
+    await drop();
+    let projectB = '';
+    await act(() => {
+      projectB = store.commands.projects.create().id;
+    });
+    // A's surface host goes with the project switch; the one B gets must still know A's upload.
+    await remount();
+    await drop();
+    await act(() => {
+      store.commands.projects.switchTo(projectA);
+    });
+    await drop();
+
+    expect(started.map(({ projectId }) => projectId)).toEqual([projectA, projectB]);
+    expect(pendingNotices()).toBe(1);
+
+    // A's first upload ending frees A only.
+    await finish(0);
+    await drop();
+    await act(() => {
+      store.commands.projects.switchTo(projectB);
+    });
+    await drop();
+    expect(started.map(({ projectId }) => projectId)).toEqual([projectA, projectB, projectA]);
+    expect(pendingNotices()).toBe(2);
+
+    // B's ending frees B, and A's second upload still holds A.
+    await finish(1);
+    await drop();
+    await act(() => {
+      store.commands.projects.switchTo(projectA);
+    });
+    await drop();
+    expect(started.map(({ projectId }) => projectId)).toEqual([projectA, projectB, projectA, projectB]);
+    expect(pendingNotices()).toBe(3);
+
+    await finish(2);
+    await finish(3);
   });
 });

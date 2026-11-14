@@ -202,6 +202,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const queryClient = useQueryClient();
   const startDroppedFileUpload = useDroppedFileUpload({
     pendingKey: 'widgets.canvas.fileDrop.pending',
+    surface: 'canvas',
     uploadingKey: 'widgets.canvas.fileDrop.uploading',
   });
   const importDroppedFiles = useCallback(
