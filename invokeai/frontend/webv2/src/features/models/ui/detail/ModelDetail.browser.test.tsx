@@ -103,6 +103,19 @@ describe('ModelDetail', () => {
       )
     );
 
+  it('shows preserved source links once alongside the original download source', async () => {
+    const source = 'https://example.com/model';
+    setModelsSnapshotForTests({
+      models: [{ ...MAIN, source_url: source, source_urls: [source, 'https://example.org/model'] }],
+      status: 'loaded',
+    });
+    await renderDetail(MAIN.key);
+
+    const links = [...host.querySelectorAll<HTMLAnchorElement>('a[target="_blank"]')];
+    expect(links.map((link) => link.href)).toEqual([source, 'https://example.org/model']);
+    expect(host.textContent).toContain(MAIN.source);
+  });
+
   it('places working memory last, after the trigger phrases', async () => {
     await renderDetail(MAIN.key);
 

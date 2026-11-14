@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 flux_vae = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-schnell"],
     name="FLUX.1-schnell_ae",
     base=BaseModelType.Flux,
     source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
@@ -26,6 +27,7 @@ flux_vae = StarterModel(
 )
 
 taef1 = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taef1"],
     name="TAEF1 (FLUX.1 preview decoder)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/madebyollin/taef1/resolve/b1b2d00e9e440cfbf3dedb34266864da86016ceb/diffusion_pytorch_model.safetensors",
@@ -37,6 +39,7 @@ taef1 = StarterModel(
 # NVIDIA PiD decoders (https://huggingface.co/nvidia/PiD). Code is Apache-2.0; weights are NSCLv1 (non-commercial /
 # research). Each is a 4x super-resolution decoder that replaces the regular VAE decode and needs the Gemma-2 encoder.
 pid_decoder_flux_2k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder FLUX (2K)",
     base=BaseModelType.Flux,
     source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_flux_distill_4step/model_ema_bf16.pth",
@@ -48,6 +51,7 @@ pid_decoder_flux_2k = StarterModel(
 )
 
 pid_decoder_flux_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder FLUX (2K to 4K)",
     base=BaseModelType.Flux,
     source="nvidia/PiD::checkpoints_deprecated/PiD_res2kto4k_sr4x_official_flux_distill_4step/model_ema_bf16.pth",
@@ -61,6 +65,7 @@ pid_decoder_flux_2kto4k = StarterModel(
 # Comfy-Org's single-file builds of PiD 1.5, pinned to a commit. Only the 4-step (distilled) files: the repo's
 # names without `_4step` are the undistilled teachers, which the config refuses.
 pid_1_5_decoder_flux_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder FLUX (2K to 4K)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux1_1024_to_4096_4step_bf16.safetensors",
@@ -72,6 +77,7 @@ pid_1_5_decoder_flux_2kto4k = StarterModel(
 )
 
 pid_1_5_decoder_flux_2kto4k_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/PixelDiT"],
     name="PiD 1.5 Decoder FLUX (2K to 4K, int8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux1_1024_to_4096_4step_int8_convrot.safetensors",
@@ -84,6 +90,10 @@ pid_1_5_decoder_flux_2kto4k_int8 = StarterModel(
 
 # region: Main
 flux_schnell_quantized = StarterModel(
+    source_urls=[
+        "https://huggingface.co/InvokeAI/flux_schnell",
+        "https://huggingface.co/black-forest-labs/FLUX.1-schnell",
+    ],
     name="FLUX.1 schnell (quantized)",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_schnell::transformer/bnb_nf4/flux1-schnell-bnb_nf4.safetensors",
@@ -93,6 +103,7 @@ flux_schnell_quantized = StarterModel(
 )
 
 flux_dev_quantized = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/flux_dev"],
     name="FLUX.1 dev (quantized)",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_dev::transformer/bnb_nf4/flux1-dev-bnb_nf4.safetensors",
@@ -102,6 +113,10 @@ flux_dev_quantized = StarterModel(
 )
 
 flux_schnell = StarterModel(
+    source_urls=[
+        "https://huggingface.co/InvokeAI/flux_schnell",
+        "https://huggingface.co/black-forest-labs/FLUX.1-schnell",
+    ],
     name="FLUX.1 schnell",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_schnell::transformer/base/flux1-schnell.safetensors",
@@ -116,6 +131,7 @@ flux_schnell = StarterModel(
 # A reupload at the same path that changed or dropped that flag would be derotated wrongly, and the
 # result loads cleanly, logs its layer count and generates noise.
 flux_dev_int8 = StarterModel(
+    source_urls=["https://huggingface.co/AX1Y2JP/FLUX.1-dev-INT8-ConvRot"],
     name="FLUX.1 dev (int8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/AX1Y2JP/FLUX.1-dev-INT8-ConvRot/resolve/01a17db182d52088b222d615ce54729fa090b378/flux1-dev-int8-convrot.safetensors",
@@ -129,6 +145,7 @@ flux_dev_int8 = StarterModel(
 
 # Kijai's plain e4m3fn casts: the weights are stored in fp8 without per-tensor scales.
 flux_schnell_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Kijai/flux-fp8", "https://huggingface.co/black-forest-labs/FLUX.1-schnell"],
     name="FLUX.1 schnell (fp8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
@@ -140,6 +157,7 @@ flux_schnell_fp8 = StarterModel(
 )
 
 flux_dev_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Kijai/flux-fp8"],
     name="FLUX.1 dev (fp8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
@@ -151,6 +169,7 @@ flux_dev_fp8 = StarterModel(
 )
 
 flux_dev = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/flux_dev"],
     name="FLUX.1 dev",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_dev::transformer/base/flux1-dev.safetensors",
@@ -160,6 +179,10 @@ flux_dev = StarterModel(
 )
 
 flux_schnell_sdnq = StarterModel(
+    source_urls=[
+        "https://huggingface.co/Disty0/FLUX.1-schnell-SDNQ-uint4-svd-r32",
+        "https://huggingface.co/black-forest-labs/FLUX.1-schnell",
+    ],
     name="FLUX.1 schnell (SDNQ uint4 + SVD)",
     base=BaseModelType.Flux,
     source="Disty0/FLUX.1-schnell-SDNQ-uint4-svd-r32",
@@ -170,6 +193,7 @@ flux_schnell_sdnq = StarterModel(
 )
 
 flux_kontext = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev"],
     name="FLUX.1 Kontext dev",
     base=BaseModelType.Flux,
     source="https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/resolve/main/flux1-kontext-dev.safetensors",
@@ -179,6 +203,10 @@ flux_kontext = StarterModel(
 )
 
 flux_kontext_quantized = StarterModel(
+    source_urls=[
+        "https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF",
+        "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev",
+    ],
     name="FLUX.1 Kontext dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf",
@@ -188,6 +216,10 @@ flux_kontext_quantized = StarterModel(
 )
 
 flux_kontext_fp8 = StarterModel(
+    source_urls=[
+        "https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI",
+        "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev",
+    ],
     name="FLUX.1 Kontext dev (fp8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/795e390e4a1200720e40af3780d5d8b96bc13ae3/"
@@ -200,6 +232,7 @@ flux_kontext_fp8 = StarterModel(
 )
 
 flux_krea = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/FLUX.1-Krea-dev"],
     name="FLUX.1 Krea dev",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev.safetensors",
@@ -209,6 +242,7 @@ flux_krea = StarterModel(
 )
 
 flux_krea_quantized = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF"],
     name="FLUX.1 Krea dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
@@ -218,6 +252,7 @@ flux_krea_quantized = StarterModel(
 )
 
 flux_krea_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Flux-1-Krea-Dev"],
     name="FLUX.1 Krea dev (fp8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/Comfy-Org/Flux-1-Krea-Dev/resolve/d9d7c421e64d3a80b16a79c0fdc9989bfdaa6f01/split_files/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors",
@@ -230,6 +265,7 @@ flux_krea_fp8 = StarterModel(
 # A community repack, pinned to a commit for the same reason as FLUX.1 dev (int8) above: the decode follows the
 # file's own `comfy_quant` marker, and a reupload at the same path could change what that marker says.
 flux_krea_int8 = StarterModel(
+    source_urls=["https://huggingface.co/rockerBOO/flux.1-krea-dev-convrot-int8"],
     name="FLUX.1 Krea dev (int8)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/rockerBOO/flux.1-krea-dev-convrot-int8/resolve/b1487ea0f81f052852e9230537baefee8c2f73d6/flux1-krea-dev-int8convrot.safetensors",
@@ -241,6 +277,7 @@ flux_krea_int8 = StarterModel(
 )
 
 ip_adapter_flux = StarterModel(
+    source_urls=["https://huggingface.co/XLabs-AI/flux-ip-adapter-v2"],
     name="Standard Reference (XLabs FLUX IP-Adapter v2)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/XLabs-AI/flux-ip-adapter-v2/resolve/main/ip_adapter.safetensors",
@@ -250,6 +287,7 @@ ip_adapter_flux = StarterModel(
 )
 
 union_cnet_flux = StarterModel(
+    source_urls=["https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union"],
     name="FLUX.1-dev-Controlnet-Union",
     base=BaseModelType.Flux,
     source="InstantX/FLUX.1-dev-Controlnet-Union",
@@ -260,6 +298,7 @@ union_cnet_flux = StarterModel(
 # endregion
 # region Control LoRA
 flux_canny_control_lora = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-Canny-dev-lora"],
     name="Hard Edge Detection (Canny)",
     base=BaseModelType.Flux,
     source="black-forest-labs/FLUX.1-Canny-dev-lora::flux1-canny-dev-lora.safetensors",
@@ -268,6 +307,7 @@ flux_canny_control_lora = StarterModel(
 )
 
 flux_depth_control_lora = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-Depth-dev-lora"],
     name="Depth Map",
     base=BaseModelType.Flux,
     source="black-forest-labs/FLUX.1-Depth-dev-lora::flux1-depth-dev-lora.safetensors",
@@ -277,6 +317,7 @@ flux_depth_control_lora = StarterModel(
 
 # region FLUX Redux
 flux_redux = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev"],
     name="FLUX Redux",
     base=BaseModelType.Flux,
     source="black-forest-labs/FLUX.1-Redux-dev::flux1-redux-dev.safetensors",
@@ -287,6 +328,7 @@ flux_redux = StarterModel(
 
 # region FLUX Fill
 flux_fill = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev"],
     name="FLUX Fill",
     base=BaseModelType.Flux,
     source="black-forest-labs/FLUX.1-Fill-dev::flux1-fill-dev.safetensors",

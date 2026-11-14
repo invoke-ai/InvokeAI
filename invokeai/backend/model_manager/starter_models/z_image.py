@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 z_image_turbo = StarterModel(
+    source_urls=["https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"],
     name="Z-Image Turbo",
     base=BaseModelType.ZImage,
     source="Tongyi-MAI/Z-Image-Turbo",
@@ -21,6 +22,7 @@ z_image_turbo = StarterModel(
 )
 
 z_image_turbo_quantized = StarterModel(
+    source_urls=["https://huggingface.co/leejet/Z-Image-Turbo-GGUF"],
     name="Z-Image Turbo (quantized)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
@@ -31,6 +33,7 @@ z_image_turbo_quantized = StarterModel(
 )
 
 z_image_turbo_q8 = StarterModel(
+    source_urls=["https://huggingface.co/leejet/Z-Image-Turbo-GGUF"],
     name="Z-Image Turbo (Q8)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q8_0.gguf",
@@ -41,6 +44,7 @@ z_image_turbo_q8 = StarterModel(
 )
 
 z_image_turbo_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/z_image_turbo"],
     name="Z-Image Turbo (NVFP4)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_nvfp4.safetensors",
@@ -50,6 +54,7 @@ z_image_turbo_nvfp4 = StarterModel(
 )
 
 z_image_turbo_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Z-Image-Turbo"],
     name="Z-Image Turbo (int8)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/Comfy-Org/Z-Image-Turbo/resolve/6fc90a3b1b653e935a0d175e260736de25b84df5/split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
@@ -61,6 +66,7 @@ z_image_turbo_int8 = StarterModel(
 )
 
 z_image_turbo_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Kijai/Z-Image_comfy_fp8_scaled"],
     name="Z-Image Turbo (fp8)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/Kijai/Z-Image_comfy_fp8_scaled/resolve/952c72754beb38038a35c87a03a6da85d8232278/"
@@ -72,6 +78,7 @@ z_image_turbo_fp8 = StarterModel(
 )
 
 z_image_turbo_sdnq = StarterModel(
+    source_urls=["https://huggingface.co/Disty0/Z-Image-Turbo-SDNQ-uint4-svd-r32"],
     name="Z-Image Turbo (SDNQ uint4 + SVD)",
     base=BaseModelType.ZImage,
     source="Disty0/Z-Image-Turbo-SDNQ-uint4-svd-r32",
@@ -82,6 +89,7 @@ z_image_turbo_sdnq = StarterModel(
 )
 
 z_image_controlnet_union = StarterModel(
+    source_urls=["https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1"],
     name="Z-Image ControlNet Union",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
@@ -90,6 +98,7 @@ z_image_controlnet_union = StarterModel(
 )
 
 z_image_controlnet_tile = StarterModel(
+    source_urls=["https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1"],
     name="Z-Image ControlNet Tile",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Tile-2.1-8steps.safetensors",

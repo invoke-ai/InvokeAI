@@ -8,6 +8,7 @@ from invokeai.backend.model_manager.taxonomy import (
 
 # region CogView4
 cogview4 = StarterModel(
+    source_urls=["https://huggingface.co/THUDM/CogView4-6B"],
     name="CogView4",
     base=BaseModelType.CogView4,
     source="THUDM/CogView4-6B",

@@ -593,6 +593,10 @@ const createLocalModels = (count) =>
       source: `fixtures/models/fixture-model-${id}.safetensors`,
       source_type: 'path',
       source_url: null,
+      source_urls:
+        index === 0
+          ? ['https://example.invalid/models/fixture-model', 'https://example.invalid/models/fixture-model-quantized']
+          : [],
       ...(type === 'lora' ? { trigger_phrases: [`fixture-style-${id}`] } : {}),
       ...(type === 'main' ? { trigger_phrases: null } : {}),
       type,

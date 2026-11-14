@@ -360,6 +360,7 @@ const STARTER_MODEL = {
   is_installed: false,
   name: 'Fixture Starter',
   source: 'https://example.invalid/fixture-starter.safetensors',
+  source_urls: ['https://example.invalid/models/fixture-starter'],
   type: 'main',
 };
 
@@ -380,7 +381,17 @@ const STARTER_MODELS_RESPONSE = {
   starter_bundles: {
     'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
     sdxl: {
-      models: [{ ...STARTER_MODEL, base: 'sdxl', name: 'Fixture Starter XL' }],
+      models: [
+        {
+          ...STARTER_MODEL,
+          base: 'sdxl',
+          name: 'Fixture Starter XL',
+          source_urls: [
+            'https://example.invalid/models/fixture-starter-xl',
+            'https://example.invalid/models/fixture-starter-xl-quantized',
+          ],
+        },
+      ],
       name: 'SDXL',
     },
   },

@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.taxonomy import (
 # Comfy-Org's single-file releases: the transformer alone, paired with a standalone encoder and
 # VAE. The prompt enhancer is only in the diffusers pipelines above.
 ernie_image_mistral_encoder = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/ERNIE-Image"],
     name="ERNIE-Image Ministral Encoder",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/ERNIE-Image/resolve/main/text_encoders/ministral-3-3b.safetensors",
@@ -24,6 +25,7 @@ ernie_image_mistral_encoder = StarterModel(
 
 # region ERNIE-Image
 ernie_image = StarterModel(
+    source_urls=["https://huggingface.co/baidu/ERNIE-Image"],
     name="ERNIE-Image",
     base=BaseModelType.ErnieImage,
     source="baidu/ERNIE-Image",
@@ -35,6 +37,7 @@ ernie_image = StarterModel(
 )
 
 ernie_image_turbo = StarterModel(
+    source_urls=["https://huggingface.co/baidu/ERNIE-Image-Turbo"],
     name="ERNIE-Image Turbo",
     base=BaseModelType.ErnieImage,
     source="baidu/ERNIE-Image-Turbo",
@@ -46,6 +49,7 @@ ernie_image_turbo = StarterModel(
 )
 
 ernie_image_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/ERNIE-Image"],
     name="ERNIE-Image (single file)",
     base=BaseModelType.ErnieImage,
     source="https://huggingface.co/Comfy-Org/ERNIE-Image/resolve/main/diffusion_models/ernie-image.safetensors",
@@ -58,6 +62,7 @@ ernie_image_single_file = StarterModel(
 )
 
 ernie_image_turbo_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/ERNIE-Image"],
     name="ERNIE-Image Turbo (single file)",
     base=BaseModelType.ErnieImage,
     source="https://huggingface.co/Comfy-Org/ERNIE-Image/resolve/main/diffusion_models/ernie-image-turbo.safetensors",
@@ -77,6 +82,7 @@ _UNSLOTH_TURBO_GGUF = (
 _UNSLOTH_GGUF = "https://huggingface.co/unsloth/ERNIE-Image-GGUF/resolve/7b6dfaae7389b463d7fb4669e33c560d36ad108c"
 
 ernie_image_turbo_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/ERNIE-Image-Turbo-GGUF"],
     name="ERNIE-Image Turbo (GGUF, Q4_K_M)",
     base=BaseModelType.ErnieImage,
     source=f"{_UNSLOTH_TURBO_GGUF}/ernie-image-turbo-Q4_K_M.gguf",
@@ -91,6 +97,7 @@ ernie_image_turbo_gguf_q4_k_m = StarterModel(
 )
 
 ernie_image_turbo_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/ERNIE-Image-Turbo-GGUF"],
     name="ERNIE-Image Turbo (GGUF, Q8_0)",
     base=BaseModelType.ErnieImage,
     source=f"{_UNSLOTH_TURBO_GGUF}/ernie-image-turbo-Q8_0.gguf",
@@ -105,6 +112,7 @@ ernie_image_turbo_gguf_q8_0 = StarterModel(
 )
 
 ernie_image_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/ERNIE-Image-GGUF"],
     name="ERNIE-Image (GGUF, Q4_K_M)",
     base=BaseModelType.ErnieImage,
     source=f"{_UNSLOTH_GGUF}/ernie-image-Q4_K_M.gguf",
@@ -118,6 +126,7 @@ ernie_image_gguf_q4_k_m = StarterModel(
 )
 
 ernie_image_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/ERNIE-Image-GGUF"],
     name="ERNIE-Image (GGUF, Q8_0)",
     base=BaseModelType.ErnieImage,
     source=f"{_UNSLOTH_GGUF}/ernie-image-Q8_0.gguf",

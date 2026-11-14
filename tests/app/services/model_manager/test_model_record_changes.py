@@ -219,6 +219,7 @@ def _identify(model_file: Path, overrides: Optional[dict[str, object]] = None, /
     [
         pytest.param(ModelRecordChanges(name="renamed"), False, id="name"),
         pytest.param(ModelRecordChanges(description="described"), False, id="description"),
+        pytest.param(ModelRecordChanges(source_urls=["https://example.com/model"]), False, id="source_urls"),
         pytest.param(ModelRecordChanges(trigger_phrases={"a phrase"}), False, id="trigger_phrases"),
         pytest.param(
             ModelRecordChanges(default_settings=MainModelDefaultSettings(steps=12)), False, id="generation_default"
@@ -308,6 +309,7 @@ def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
             name="My model",
             description="mine",
             cover_image="cover.webp",
+            source_urls=["https://example.com/model", "https://example.com/quantized"],
             trigger_phrases={"a phrase"},
             default_settings=MainModelDefaultSettings(cpu_only=cpu_only, fp8_storage=fp8_storage, steps=12),
         )
@@ -321,6 +323,7 @@ def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
     assert (updated.key, updated.path, updated.name, updated.description) == (KEY, MODEL_PATH, "My model", "mine")
     assert updated.trigger_phrases == {"a phrase"}
     assert updated.cover_image == "cover.webp"
+    assert updated.source_urls == ["https://example.com/model", "https://example.com/quantized"]
     assert (updated.source, updated.source_type) == ("local-source", ModelSourceType.Path)
     assert updated.default_settings is not None
     assert (updated.default_settings.cpu_only, updated.default_settings.fp8_storage) == (cpu_only, fp8_storage)

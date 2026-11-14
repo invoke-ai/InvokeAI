@@ -886,6 +886,7 @@ class ModelConfigFactory:
         fields["hash"] = _overrides.get("hash") or mod.hash()
         fields["key"] = _overrides.get("key") or uuid_string()
         fields["description"] = _overrides.get("description")
+        fields["source_urls"] = _overrides.get("source_urls") or []
         fields["file_size"] = _overrides.get("file_size") or mod.size()
 
         return fields
