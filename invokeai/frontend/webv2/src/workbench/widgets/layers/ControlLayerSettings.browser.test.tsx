@@ -1094,6 +1094,25 @@ describe('ControlLayerSettings and the capability table', () => {
     ).toContain('This layer is checked once model capabilities have loaded.');
   });
 
+  it('checks the layer as soon as the table arrives, with nothing else changing', async () => {
+    accountLifecycle.invalidate();
+    const layer = detectedLayer('depth', 'depth_anything_depth_estimation');
+    // Without exportable content the panel judges the layer on its own, not in Invoke's sequence.
+    await render(layer, { engine: engineWith([layer], { hasContent: false }) });
+    const statusTexts = () =>
+      page
+        .getByRole('status')
+        .elements()
+        .map((element) => element.textContent);
+
+    expect(statusTexts()).toContain('This layer is checked once model capabilities have loaded.');
+
+    await loadCapabilities();
+
+    expect(statusTexts()).not.toContain('This layer is checked once model capabilities have loaded.');
+    expect(host!.textContent).toContain(DEPTH_A.name);
+  });
+
   it('keeps the retry and its focus through a retry that fails again, then hands focus to the panel', async () => {
     accountLifecycle.invalidate();
     getArchitectureCapabilities.mockRejectedValueOnce(new Error('Fixture capability outage.'));

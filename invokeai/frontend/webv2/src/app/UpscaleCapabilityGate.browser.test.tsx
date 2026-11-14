@@ -266,6 +266,72 @@ describe('Upscale section issues', () => {
   });
 });
 
+describe('Upscale field limits from the served table', () => {
+  it("bounds CFG by the model's served cap as soon as the table arrives, while the model list is still loading", async () => {
+    let serveTable: (rows: ArchitectureCapabilitiesRow[]) => void = noop;
+    getArchitectureCapabilities.mockReturnValue(
+      new Promise((resolve) => {
+        serveTable = resolve;
+      })
+    );
+    // `flux2_denoise` takes guidance up to 20.
+    const flux2Dev = {
+      base: 'flux2',
+      format: 'diffusers',
+      hash: 'f',
+      key: 'flux2-dev',
+      name: 'FLUX.2 dev',
+      type: 'main',
+      variant: 'dev',
+    };
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      cfgScale: 25,
+      model: flux2Dev as never,
+    });
+    modelSnapshot.status = 'loading';
+
+    try {
+      await renderUpscale();
+      await settle(() => serveTable(architectureCapabilitiesFixture));
+
+      expect(host.textContent).toContain('widgets.upscale.cfgScale must be between 1 and 20.');
+    } finally {
+      modelSnapshot.status = 'loaded';
+    }
+  });
+});
+
+describe('Upscale scheduler options from the served table', () => {
+  it("lists the model's served schedulers as soon as the table arrives, while the model list is still loading", async () => {
+    let serveTable: (rows: ArchitectureCapabilitiesRow[]) => void = noop;
+    getArchitectureCapabilities.mockReturnValue(
+      new Promise((resolve) => {
+        serveTable = resolve;
+      })
+    );
+    // FLUX.1 runs the flow schedulers, whose Heun is the second-order one.
+    const flux = { base: 'flux', format: 'diffusers', hash: 'x', key: 'flux-dev', name: 'FLUX.1 dev', type: 'main' };
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      model: flux as never,
+      scheduler: 'heun',
+    });
+    modelSnapshot.status = 'loading';
+
+    try {
+      await renderUpscale();
+      await settle(() => serveTable(architectureCapabilitiesFixture));
+
+      expect(host.querySelector<HTMLInputElement>('input[aria-label="widgets.upscale.scheduler"]')?.value).toBe(
+        'Heun (2nd order)'
+      );
+    } finally {
+      modelSnapshot.status = 'loaded';
+    }
+  });
+});
+
 describe('Upscale without the served architecture table', () => {
   it('keeps Model only usable, since it reads no main-model capabilities, and holds back only Refine', async () => {
     store.commands.widgets.patchValues('upscale', {

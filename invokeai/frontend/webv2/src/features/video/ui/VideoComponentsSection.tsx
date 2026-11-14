@@ -24,6 +24,8 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Fragment, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { VIDEO_SECTION_IDS } from './VideoUiContext';
+
 const coerceSlotValue = (
   slot: VideoComponentSlotPolicy,
   candidate: ModelConfig | null
@@ -205,7 +207,7 @@ export const VideoComponentsSection = memo(function VideoComponentsSection({
     <GenerationSettingsSection
       defaultOpen={policy.defaultOpen}
       label={t('widgets.video.components')}
-      sectionId="video-components"
+      sectionId={VIDEO_SECTION_IDS.components}
     >
       <Stack gap="2.5">
         {policy.slots.map((slot) => (

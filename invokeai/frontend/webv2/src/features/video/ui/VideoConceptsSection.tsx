@@ -19,6 +19,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areVideoLorasEquivalent, areVideoModelsEquivalent } from './videoComparators';
+import { VIDEO_SECTION_IDS } from './VideoUiContext';
 
 /** Graph compilation routes LoRAs to experts from their probed tags; the UI supplies no target override. */
 
@@ -71,7 +72,7 @@ export const VideoConceptsSection = memo(
     );
 
     return (
-      <GenerationSettingsSection label={t('widgets.video.concepts')} sectionId="video-concepts" defaultOpen>
+      <GenerationSettingsSection label={t('widgets.video.concepts')} sectionId={VIDEO_SECTION_IDS.concepts} defaultOpen>
         <Stack gap="2.5">
           <ModelSelect
             disabled={!model}

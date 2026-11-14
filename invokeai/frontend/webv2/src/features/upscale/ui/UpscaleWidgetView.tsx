@@ -418,10 +418,52 @@ const UpscaleModelReconciler = ({
 };
 
 /**
+ * Each range field's error. CFG and Steps take their bounds from the served table, read when this runs, so its
+ * revision is an argument: the React Compiler infers a memo's dependencies from what the callback reads, and a table
+ * read through a function call is not one of them, so the bounds would stay those of the table before it loaded.
+ */
+const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues, _capabilitiesRevision: number) => ({
+  cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
+  creativity: getRangeError(
+    t('widgets.upscale.creativity'),
+    values.creativity,
+    UPSCALE_CREATIVITY_MIN,
+    UPSCALE_CREATIVITY_MAX
+  ),
+  scale: getRangeError(t('widgets.upscale.scale'), values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX),
+  seed: getRangeError(t('widgets.upscale.seed'), values.seed, 0, SEED_MAX),
+  steps: getRangeError(t('widgets.upscale.steps'), values.steps, upscaleMinSteps(values.model), 1000),
+  structure: getRangeError(
+    t('widgets.upscale.structure'),
+    values.structure,
+    UPSCALE_STRUCTURE_MIN,
+    UPSCALE_STRUCTURE_MAX
+  ),
+  tileOverlap: getRangeError(
+    t('widgets.upscale.tileOverlap'),
+    values.tileOverlap,
+    UPSCALE_TILE_OVERLAP_MIN,
+    UPSCALE_TILE_OVERLAP_MAX
+  ),
+  tileSize: getRangeError(t('widgets.upscale.tileSize'), values.tileSize, UPSCALE_TILE_SIZE_MIN, UPSCALE_TILE_SIZE_MAX),
+});
+
+/**
+ * The scheduler choices, the scheduler the pass runs, and the highest CFG it takes, all read from the served table
+ * when this runs; the revision is an argument for the reason `getFieldErrors` gives.
+ */
+const getServedSamplingFields = (model: MainModelConfig | null, scheduler: string, _capabilitiesRevision: number) => ({
+  cfgScaleMax: upscaleMaxCfgScale(model),
+  scheduler: coerceUpscaleScheduler(model, scheduler),
+  schedulerOptions: upscaleSchedulerOptions(model),
+});
+
+/**
  * The section of each issue Invoke lists for these values, so each section's count matches Invoke's. The check reads
- * the served table when it runs, so the table's revision is an argument: a memoized call (the React Compiler's
- * included) then re-runs when the table arrives or reloads, even while `values` holds still because the models are
- * still loading. Without the table Refine's form is held back, so no section counts anything.
+ * the served table when it runs, so the table's revision is an argument: the React Compiler infers a memo's
+ * dependencies from what its callback reads, and the table read inside the check is not one, so without the argument
+ * the memo would not re-run when the table arrives or reloads while `values` holds still (the models still loading).
+ * Without the table Refine's form is held back, so no section counts anything.
  */
 const getIssueSections = (
   values: UpscaleWidgetValues,
@@ -477,39 +519,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
         .join('|'),
     [models]
   );
-  const errors = useMemo(
-    () => ({
-      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
-      creativity: getRangeError(
-        t('widgets.upscale.creativity'),
-        values.creativity,
-        UPSCALE_CREATIVITY_MIN,
-        UPSCALE_CREATIVITY_MAX
-      ),
-      scale: getRangeError(t('widgets.upscale.scale'), values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX),
-      seed: getRangeError(t('widgets.upscale.seed'), values.seed, 0, SEED_MAX),
-      steps: getRangeError(t('widgets.upscale.steps'), values.steps, upscaleMinSteps(values.model), 1000),
-      structure: getRangeError(
-        t('widgets.upscale.structure'),
-        values.structure,
-        UPSCALE_STRUCTURE_MIN,
-        UPSCALE_STRUCTURE_MAX
-      ),
-      tileOverlap: getRangeError(
-        t('widgets.upscale.tileOverlap'),
-        values.tileOverlap,
-        UPSCALE_TILE_OVERLAP_MIN,
-        UPSCALE_TILE_OVERLAP_MAX
-      ),
-      tileSize: getRangeError(
-        t('widgets.upscale.tileSize'),
-        values.tileSize,
-        UPSCALE_TILE_SIZE_MIN,
-        UPSCALE_TILE_SIZE_MAX
-      ),
-    }),
-    [t, values]
-  );
+  const errors = useMemo(() => getFieldErrors(t, values, capabilitiesRevision), [capabilitiesRevision, t, values]);
   // Installs are checked once models load, as Invoke checks them.
   const issueSections = useMemo(
     () => getIssueSections(values, modelsStatus === 'loaded' ? models : undefined, capabilitiesRevision),
@@ -681,9 +691,10 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
   // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
   // graph will really run. Where one is left there is nothing to choose, and the field goes.
-  const schedulerOptions = useMemo(() => upscaleSchedulerOptions(values.model), [values.model]);
-  const scheduler = coerceUpscaleScheduler(values.model, values.scheduler);
-  const cfgScaleMax = upscaleMaxCfgScale(values.model);
+  const { cfgScaleMax, scheduler, schedulerOptions } = useMemo(
+    () => getServedSamplingFields(values.model, values.scheduler, capabilitiesRevision),
+    [capabilitiesRevision, values.model, values.scheduler]
+  );
   const gateLabels = useMemo(
     () => ({
       loadFailed: t('widgets.upscale.capabilitiesLoadFailed'),

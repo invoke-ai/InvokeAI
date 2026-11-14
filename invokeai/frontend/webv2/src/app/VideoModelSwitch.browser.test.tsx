@@ -472,6 +472,62 @@ describe('video model switch confirmation', () => {
   });
 });
 
+describe('Video section issues', () => {
+  const section = (id: string) => host.querySelector<HTMLElement>(`.generate-section[data-generate-section="${id}"]`)!;
+  const chip = (id: string) =>
+    section(id).querySelector<HTMLElement>(':scope > [data-part="trigger"] [data-section-chip]')!;
+  const issues = (id: string) => section(id).querySelector(':scope > [data-part="trigger"] [data-section-issues]');
+  /** The number on the title, which assistive tech skips. */
+  const shownCount = (id: string) => issues(id)?.querySelector(':scope > span[aria-hidden]')?.textContent ?? null;
+  /** What assistive tech reads in its place. */
+  const spokenCount = (id: string) => issues(id)?.querySelector(':scope > :not([aria-hidden])')?.textContent ?? null;
+
+  it('counts an issue in each section that can fix it, tints those, and leaves the rest plain', async () => {
+    await render();
+    // The extension opens with 17 frames of the initial video, so 17 frames continue nothing: raise Frames under
+    // Dimensions, or lower the context under Initial video.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 17 }));
+
+    for (const id of ['video-dimensions', 'video-source']) {
+      expect(shownCount(id), id).toBe('1');
+      expect(spokenCount(id), id).toBe('1 issue');
+      expect(chip(id).hasAttribute('data-issues'), id).toBe(true);
+    }
+    expect(issues('video-render')).toBeNull();
+    expect(chip('video-render').hasAttribute('data-issues')).toBe(false);
+    // The chip eases into its tint.
+    await expect
+      .poll(() => getComputedStyle(chip('video-dimensions')).backgroundColor)
+      .not.toBe(getComputedStyle(chip('video-render')).backgroundColor);
+
+    // A render-only issue counts there alone.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 121, steps: 0 }));
+
+    expect(issues('video-dimensions')).toBeNull();
+    expect(issues('video-source')).toBeNull();
+    expect(shownCount('video-render')).toBe('1');
+  });
+
+  it('counts nothing in a section whose control for the issue is hidden', async () => {
+    const ti2v = model('wan-ti2v', 'wan', 'main', 'Wan 2.2 TI2V 5B', { variant: 'ti2v_5b' });
+    modelStore.set([...catalog, ti2v]);
+    await render();
+    // TI2V-5B cannot aim an extension at an end frame, and shows no last-frame field to clear it from.
+    await act(() =>
+      store.commands.widgets.patchValues('video', {
+        ...getDefaultVideoSettings(ti2v as never, [...catalog, ti2v] as never),
+        lastFrameImage: LAST_FRAME,
+        model: ti2v,
+        modelKey: ti2v.key,
+        sourceVideo: SOURCE_VIDEO,
+      })
+    );
+
+    expect(shownCount('video-source')).toBe('1');
+    expect(issues('video-frames')).toBeNull();
+  });
+});
+
 describe('video model field without a model', () => {
   // The picker's install action reads the library itself; the field's message has to agree with it.
   const renderEmpty = () =>

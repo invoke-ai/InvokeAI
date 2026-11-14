@@ -25,11 +25,14 @@ const GenerateIssuesContext = createContext<GenerateIssuesValue | null>(null);
 /** How many Invoke-blocking issues each section holds, by section id, for the section titles. */
 const SectionIssueCountsContext = createContext<ReadonlyMap<string, number> | null>(null);
 
-const countIssuesBySection = (sections: readonly (string | undefined)[]): ReadonlyMap<string, number> => {
+/** Section ids are plain identifiers, so a line break separates them. */
+const SECTION_KEY_SEPARATOR = '\n';
+
+const countIssuesBySection = (sectionsKey: string): ReadonlyMap<string, number> => {
   const counts = new Map<string, number>();
 
-  for (const section of sections) {
-    if (section !== undefined) {
+  for (const section of sectionsKey.split(SECTION_KEY_SEPARATOR)) {
+    if (section !== '') {
       counts.set(section, (counts.get(section) ?? 0) + 1);
     }
   }
@@ -39,7 +42,8 @@ const countIssuesBySection = (sections: readonly (string | undefined)[]): Readon
 
 /**
  * The section of each of a form's Invoke-blocking issues (undefined for one no section fixes), so each section's
- * title carries its count. For forms whose fields word their own errors; Generate's provider sets it from its issues.
+ * title carries its count; an issue two sections can fix is listed once for each. For forms whose fields word their
+ * own errors; Generate's provider sets it from its issues.
  */
 export const GenerationSectionIssuesProvider = ({
   children,
@@ -48,7 +52,10 @@ export const GenerationSectionIssuesProvider = ({
   children: ReactNode;
   issueSections: readonly (string | undefined)[];
 }) => {
-  const counts = useMemo(() => countIssuesBySection(issueSections), [issueSections]);
+  // Keyed by content, as `areGenerationIssuesEqual` keeps Generate's list: a re-validation on every keystroke that finds
+  // the same issues keeps the counts' identity, so the section titles re-render only when a count changes.
+  const sectionsKey = issueSections.map((section) => section ?? '').join(SECTION_KEY_SEPARATOR);
+  const counts = useMemo(() => countIssuesBySection(sectionsKey), [sectionsKey]);
 
   return <SectionIssueCountsContext value={counts}>{children}</SectionIssueCountsContext>;
 };

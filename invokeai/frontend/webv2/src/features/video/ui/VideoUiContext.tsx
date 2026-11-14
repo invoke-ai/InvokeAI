@@ -1,8 +1,22 @@
 import type { GalleryItemRef, GalleryVideoItem } from '@features/gallery';
 import type { VideoWidgetValues } from '@features/video/core/types';
+import type { VideoSection } from '@features/video/core/videoPolicies';
 import type { ReactNode } from 'react';
 
 import { createContext, use, useMemo } from 'react';
+
+/** The persisted open state of each Video section, kept with Generate's under the same per-user preference. */
+export const VIDEO_SECTION_IDS = {
+  components: 'video-components',
+  concepts: 'video-concepts',
+  conditioningClip: 'video-conditioning-clip',
+  dimensions: 'video-dimensions',
+  frames: 'video-frames',
+  guidance: 'video-guidance',
+  references: 'video-references',
+  render: 'video-render',
+  source: 'video-source',
+} as const satisfies Record<VideoSection, string>;
 
 /** Workbench supplies this UI port because features cannot import workbench. */
 export interface VideoUiAdapter {
