@@ -120,7 +120,7 @@ extra pass over the weights on every load.
 
 - **unsloth's FP8 build** (`flux-3-image-klein-FP8.safetensors`, Klein only) is fp8 with one scale per output row,
   saved under Diffusers' key names, and behaves like fp8r: on a GPU with fp8 support it stays fp8 with FP8 Storage or
-  [`fp8_compute`](/configuration/optimization/fp8-storage/#fp8-compute) (with `fp8_compute` on fp8 hardware the
+  [`fp8_compute`](/configuration/optimization/fp8-compute/) (with `fp8_compute` on fp8 hardware the
   matmul runs directly on the fp8 weights), and it is expanded to bf16 as the model loads otherwise. unsloth's INT8 build and other
   torchao layouts, such as per-tensor or block-wise fp8, are refused at install with a message saying why. A
   Diffusers-named file that is not a torchao export is not recognized.
