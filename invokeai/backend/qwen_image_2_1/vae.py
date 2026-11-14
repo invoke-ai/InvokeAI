@@ -18,7 +18,7 @@ from invokeai.backend.util.devices import device_has_dedicated_vram
 from invokeai.backend.util.vae_working_memory import should_pretile_vae_decode
 from invokeai.backend.working_memory.coefficients import find_entry, shipped_data
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
-from invokeai.backend.working_memory.fit import Line, convolution_line
+from invokeai.backend.working_memory.fit import SHIPPED_MARGIN, Line, convolution_line
 from invokeai.backend.working_memory.platform import Platform, platform_for, priced_as
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
@@ -74,10 +74,12 @@ def _line(features: Mapping[str, FeatureValue]) -> Line | None:
     if line.sits_on is not None:
         beneath, tile_area = line.sits_on
         size = tile_area if features.get("conv_backend") == "miopen" else line.size
-        # shortcut: on MIOpen nothing here grows with the frame, but bf16 tile peaks do: on the W7900, measured to 5120px,
-        # by ~78 B/px at a 512px tile, ~136 at 768 and ~220 at 1024 between 4096 and 5120px (fp32 flat), which passes
-        # the reservation near 5472px (512px tiles) and 5856px (768 and 1024); the RX 9060 XT is measured to 3072px
-        # only. Past the measured frames the reservation is not guaranteed; measure 6144px and up and add a frame term.
+        # shortcut: on MIOpen nothing here grows with the frame, but tile peaks do: on the W7900 bf16 decodes grow by ~78
+        # B/px at a 512px tile, ~136 at 768 and ~220 at 1024 between 4096 and 5120px (fp32 flat), which passes the
+        # reservation near 5472px (512px tiles) and 5856px (768 and 1024). The reservation covers the measured frames
+        # only. W7900: decodes to 5120px, encodes to 4096px, every dtype and tile. RX 9060 XT (Windows), largest frame
+        # per tile 512/768/1024: bf16 decodes 6144 at each; fp32 decodes 5120/2048/none; bf16 encodes 2048/2048/5120;
+        # fp32 encodes -/-/4096. Past them it is not guaranteed; measure larger frames, add a frame term if they pass it.
         return line._replace(size=size, sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
     return line._replace(suffix=_untiled_line(line.suffix, line.size, features))
 
@@ -145,7 +147,8 @@ def estimate_working_memory(
 @functools.cache
 def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> tuple[tuple[int, int, int, int], ...]:
     """The shipped untiled points of `operation` in `dtype` that cap the line where `platform` is priced, as (area,
-    bytes, height, width) by area; the larger where two shapes share an area."""
+    bytes, height, width) by area; the larger where two shapes share an area. A platform with none (cuDNN under
+    `cudaMallocAsync`) reads its backend's native allocator's, which `priced_as` documents as the larger."""
     data = shipped_data().values()
     entries = [entry for file in data for entry in file.coefficients]
     priced = {key: str(value) for key, value in dataclasses.asdict(priced_as(platform)).items()}
@@ -167,6 +170,8 @@ def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> t
                 height, width = cast(int, features["height"]), cast(int, features["width"])
                 if point.measured_bytes > peaks.get(height * width, (0,))[0]:
                     peaks[height * width] = (point.measured_bytes, height, width)
+    if not peaks and platform.allocator != "native":
+        return _measured_untiled_peaks(operation, dataclasses.replace(platform, allocator="native"), dtype)
     return tuple((area, *peak) for area, peak in sorted(peaks.items()))
 
 
@@ -178,16 +183,20 @@ def untiled_peak_bytes(
     The reservation carries up to 1.3x headroom over the measured points; deciding to tile on it would tile frames
     that fit, and tiled output is not pixel-identical. So within the measured untiled points of the platform the device
     is priced as (each OS-specific entry has its own) this is the chord between the two neighbouring points, in bytes,
-    and past the last one that point's bytes plus what the reservation grows by from it. One point decides from its own
-    size on: cuDNN's, so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves, and
-    a 1152px one on 10.56 GiB rather than 10.98. Below the first point it is the reservation, which keeps the line's
-    base that a proportional scaling of the point would drop, but never more than the first point's bytes, so the
-    decision does not fall as a frame grows into it; with no point at all, the reservation.
+    and past the last one that point's bytes plus what the peak grows by from it. One point decides from its own size
+    on: cuDNN's, so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves. Where no
+    point decides, the peak is the reservation without `fit.SHIPPED_MARGIN`: below the first point (which keeps the
+    line's base that a proportional scaling of the point would drop, but never more than the first point's bytes, so
+    the decision does not fall as a frame grows into it), its growth past the last, and with no point at all. On cuDNN
+    only the bf16 decode stand-in carries that margin (raised to its 1024px point x1.05); the fp32 decode, both encodes
+    and decode_large_bf16 are the original pricing without one, so there this is a ~5% discount, which the ceiling's
+    10% headroom covers. cuDNN is measured at 1024px only: its growth past that rests on the stand-in slope.
     """
     peaks = _measured_untiled_peaks(operation, platform_for(device), _dtype(element_size))
 
     def reserved(height: int, width: int) -> int:
-        return estimate_working_memory(operation, height, width, None, element_size, device).reservation_bytes
+        reservation = estimate_working_memory(operation, height, width, None, element_size, device).reservation_bytes
+        return int(reservation / (1 + SHIPPED_MARGIN))
 
     area = height * width
     if not peaks:

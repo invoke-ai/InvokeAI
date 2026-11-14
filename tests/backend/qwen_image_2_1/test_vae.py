@@ -26,7 +26,9 @@ from invokeai.backend.qwen_image_2_1.vae import (
 from invokeai.backend.util import wddm
 from invokeai.backend.util.qwen_image_vae import patch_qwen_image_vae_tiling
 from invokeai.backend.working_memory import platform as platform_module
+from invokeai.backend.working_memory.bounds import MAX_OVER_RESERVATION
 from invokeai.backend.working_memory.coefficients import shipped_data
+from invokeai.backend.working_memory.fit import SHIPPED_MARGIN
 
 
 def _decode(alpha: torch.Tensor) -> torch.Tensor:
@@ -119,6 +121,30 @@ def _tile_term(height: int, width: int, tile: int | None) -> float:
 GIB = 1024**3
 
 
+def _peak(operation: str, size: int, element_size: int) -> int:
+    """A reservation without the shipped margin: the untiled peak the tiling decision prices where no point decides."""
+    return int(_reserved(operation, size, None, element_size, GPU) / (1 + SHIPPED_MARGIN))
+
+
+_W7900 = {"conv_backend": "miopen", "allocator": "native"}
+
+
+def _measured(
+    platform: dict[str, str], operation: str, dtype: str, height: int, width: int, tile: int | None = None
+) -> int:
+    """The shipped point's measured bytes, so a re-measure or a refit does not break what the test states."""
+    return next(
+        point.measured_bytes
+        for data in shipped_data().values()
+        for point in data.points
+        if point.estimator == SPEC.id
+        and point.platform == platform
+        and point.features["operation"] == operation
+        and point.features["dtype"] == dtype
+        and (point.features["height"], point.features["width"], point.features["tile"]) == (height, width, tile)
+    )
+
+
 def _pin(monkeypatch: pytest.MonkeyPatch, conv_backend: str, allocator: str = "native", os: str = "linux") -> None:
     """Pin the platform a `GPU` estimate prices: the convolution backend, and the allocator and OS rather than the
     host's allocator backend and variables."""
@@ -145,9 +171,9 @@ def test_on_cuda_an_untiled_operation_is_priced_on_the_stand_in(
 ) -> None:
     _pin(monkeypatch, "cudnn")
     assert _reserved(operation, size, None, element_size, GPU) == expected
-    # With no point of this operation and dtype to read, the tiling decision prices the same figure.
+    # With no point of this operation and dtype to read, the tiling decision prices that figure without the margin.
     if (operation, element_size) != ("decode", 2):
-        assert untiled_peak_bytes(operation, size, size, element_size, GPU) == expected
+        assert untiled_peak_bytes(operation, size, size, element_size, GPU) == _peak(operation, size, element_size)
     # A tile covering the frame runs the single pass, and is priced as one.
     assert _reserved(operation, size, size, element_size, GPU) == expected
 
@@ -177,8 +203,8 @@ def test_on_rocm_a_decode_is_priced_above_the_original_and_an_encode_below_it(mo
     _pin(monkeypatch, "miopen")
     original = 1024 * 1024 * 4000 * 2 + 615 * 2**20
     assert _reserved("encode", 1024, None, 2, GPU) < original < _reserved("decode", 1024, None, 2, GPU)
-    # The measured W7900 decode peaks 11.81 GiB at 1024px (12.68 GB reserved): the reservation covers it.
-    assert _reserved("decode", 1024, None, 2, GPU) >= _ROCM_DECODE_1024
+    # The reservation covers the W7900's measured 1024px decode.
+    assert _reserved("decode", 1024, None, 2, GPU) >= _measured(_W7900, "decode", "bf16", 1024, 1024)
     # A VAE on the CPU of a ROCm build is not on MIOpen.
     assert _reserved("decode", 1024, None, 2, CPU) == 8396 * 1024 * 1024 + 615 * 2**20
 
@@ -196,8 +222,14 @@ def test_a_tile_is_clamped_to_the_frame_per_axis(monkeypatch: pytest.MonkeyPatch
     # A 512x1536 frame in 1024px tiles runs tiles of 512x1024, and a 1536x512 one tiles of 1024x512.
     assert _tile_term(512, 1536, 1024) == _tile_term(512, 1024, None)
     assert _tile_term(1536, 512, 1024) == _tile_term(1024, 512, None)
-    # What tiling adds grows with the tile on MIOpen, so it is the same for both.
+    # What tiling adds grows with the tile on MIOpen, so it is the same for both, and less than a whole tile's.
     assert _reserved_frame(1536, 512, 1024) == _reserved_frame(512, 1536, 1024)
+
+    def tiled(height: int, width: int) -> float:
+        estimate = estimate_working_memory("decode", height, width, 1024, 2, GPU)
+        return next(term.bytes for term in estimate.terms if term.name == "tiled")
+
+    assert tiled(512, 1536) < tiled(1024, 1536)
 
 
 def test_a_tile_prices_below_the_frame_it_covers_in_part(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -207,28 +239,23 @@ def test_a_tile_prices_below_the_frame_it_covers_in_part(monkeypatch: pytest.Mon
 
 
 @pytest.mark.parametrize(
-    ("conv_backend", "allocator", "os", "frame", "tile", "measured_gib"),
+    ("conv_backend", "allocator", "os", "frame", "tile"),
     [
-        ("cudnn", "native", "linux", 2048, 1024, 8.38),
-        ("cudnn", "native", "linux", 2048, 768, 5.27),
-        ("cudnn", "native", "linux", 2048, 512, 2.68),
-        ("miopen", "native", "linux", 3072, 512, 4.25),
-        ("miopen", "native", "windows", 3072, 512, 4.25),
-        ("miopen", "native", "windows", 1536, 512, 4.24),
-        ("miopen", "expandable", "windows", 2048, 512, 2.88),
+        ("cudnn", "native", "linux", 2048, 1024),
+        ("cudnn", "native", "linux", 2048, 768),
+        ("cudnn", "native", "linux", 2048, 512),
+        ("miopen", "native", "linux", 3072, 512),
+        ("miopen", "native", "windows", 3072, 512),
+        ("miopen", "native", "windows", 1536, 512),
+        ("miopen", "expandable", "windows", 2048, 512),
     ],
 )
-def test_a_measured_tile_is_reserved_with_the_shipped_margin(
-    conv_backend: str,
-    allocator: str,
-    os: str,
-    frame: int,
-    tile: int,
-    measured_gib: float,
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_measured_tile_is_reserved(
+    conv_backend: str, allocator: str, os: str, frame: int, tile: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _pin(monkeypatch, conv_backend, allocator, os)
-    assert _reserved("decode", frame, tile, 2, GPU) >= 1.05 * measured_gib * GIB
+    platform = {"conv_backend": conv_backend, "allocator": allocator} | ({"os": os} if os == "windows" else {})
+    assert _reserved("decode", frame, tile, 2, GPU) >= _measured(platform, "decode", "bf16", frame, frame, tile)
 
 
 def test_on_miopen_a_bf16_decode_past_the_step_prices_on_its_own_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -245,12 +272,11 @@ def test_on_miopen_a_bf16_decode_past_the_step_prices_on_its_own_line(monkeypatc
     # Exactly at the step is still below it.
     assert per_pixel(1000, 1580) == low
     assert per_pixel(1264, 1264) == per_pixel(1280, 1280) == large
-    # 1024x1536 peaks at 17.68 GiB: a 20 GiB card can reserve it.
-    assert (
-        1.05 * 17.68 * GIB <= estimate_working_memory("decode", 1024, 1536, None, 2, GPU).reservation_bytes < 20 * GIB
-    )
-    # A 1024px bf16 decode measures 11.81 GiB on the W7900: its reservation stays close to that.
-    assert 1.05 * 11.81 * GIB <= _reserved("decode", 1024, None, 2, GPU) <= 1.1 * 11.81 * GIB
+    # Both sides of the step are reserved within the shared bound of what they measured.
+    for height, width in ((1024, 1024), (1024, 1536)):
+        measured = _measured(_W7900, "decode", "bf16", height, width)
+        reserved = estimate_working_memory("decode", height, width, None, 2, GPU).reservation_bytes
+        assert measured <= reserved <= MAX_OVER_RESERVATION * measured
 
 
 def test_only_a_known_element_size_is_priced() -> None:
@@ -260,30 +286,26 @@ def test_only_a_known_element_size_is_priced() -> None:
         untiled_peak_bytes("decode", 1024, 1024, 8, CPU)
 
 
-# W7900 bf16 untiled peaks, as measured (reserved bytes).
-_ROCM_DECODE_1024 = 12683575296
-_ROCM_DECODE_1088 = 14847836160
-_ROCM_ENCODE_1536 = 11362369536
-
-
 def test_on_rocm_the_tiling_decision_follows_the_measured_untiled_curve(monkeypatch: pytest.MonkeyPatch) -> None:
     _pin(monkeypatch, "miopen")
+    decode_1024 = _measured(_W7900, "decode", "bf16", 1024, 1024)
+    decode_1088 = _measured(_W7900, "decode", "bf16", 1088, 1088)
     # Measured points are their measured bytes; between two, the chord in bytes.
-    assert untiled_peak_bytes("decode", 1024, 1024, 2, GPU) == _ROCM_DECODE_1024
+    assert untiled_peak_bytes("decode", 1024, 1024, 2, GPU) == decode_1024
     between = (1024 * 1088 - 1024 * 1024) / (1088 * 1088 - 1024 * 1024)
-    expected = _ROCM_DECODE_1024 + (_ROCM_DECODE_1088 - _ROCM_DECODE_1024) * between
+    expected = decode_1024 + (decode_1088 - decode_1024) * between
     assert untiled_peak_bytes("decode", 1024, 1088, 2, GPU) == pytest.approx(expected, abs=1)
-    # Past the last measured area (1600px) it is that point plus what the reservation grows by from it.
+    # Past the last measured area (1600px) it is that point plus what the peak grows by from it.
     last = untiled_peak_bytes("decode", 1600, 1600, 2, GPU)
-    grown = _reserved("decode", 2048, None, 2, GPU) - _reserved("decode", 1600, None, 2, GPU)
+    grown = _peak("decode", 2048, 2) - _peak("decode", 1600, 2)
     assert untiled_peak_bytes("decode", 2048, 2048, 2, GPU) == last + grown
 
-    # On a card that holds 12.5 GiB a measured 11.81 GiB decode stays whole, though it reserves 12.86 GiB; and an encode
-    # reads its own curve (10.58 GiB at 1536px), not the decode's (32.6 GiB).
-    monkeypatch.setattr(vae_module, "should_pretile_vae_decode", lambda device, needed: needed > 12.5 * GIB)
-    assert _reserved("decode", 1024, None, 2, GPU) > 12.5 * GIB
+    # On a card that holds less than the 1024px decode reserves but more than it measured, it stays whole; and an encode
+    # reads its own curve, not the decode's (32.6 GiB at 1536px).
+    ceiling = (decode_1024 + _reserved("decode", 1024, None, 2, GPU)) // 2
+    monkeypatch.setattr(vae_module, "should_pretile_vae_decode", lambda device, needed: needed > ceiling)
     assert choose_tile_size("decode", 1024, 1024, 2, GPU, tiled=False, tile_size=768, auto_tile=True) is None
-    assert untiled_peak_bytes("encode", 1536, 1536, 2, GPU) == _ROCM_ENCODE_1536
+    assert untiled_peak_bytes("encode", 1536, 1536, 2, GPU) == _measured(_W7900, "encode", "bf16", 1536, 1536)
     assert choose_tile_size("encode", 1536, 1536, 2, GPU, tiled=False, tile_size=768, auto_tile=True) is None
     assert choose_tile_size("decode", 1536, 1536, 2, GPU, tiled=False, tile_size=768, auto_tile=True) == 768
 
@@ -369,48 +391,46 @@ def test_below_its_first_point_the_tiling_decision_takes_the_reservation(monkeyp
     _pin(monkeypatch, "miopen")
     # The W7900's first untiled fp32 decode is at 1024px; scaled down to 512px through the origin it would drop the
     # line's base.
-    assert untiled_peak_bytes("decode", 512, 512, 4, GPU) == _reserved("decode", 512, None, 4, GPU)
+    assert untiled_peak_bytes("decode", 512, 512, 4, GPU) == _peak("decode", 512, 4)
 
 
-@pytest.mark.parametrize(
-    ("conv_backend", "allocator", "os", "below", "first"),
-    # Just below the first untiled bf16 decode the reservation lies above that point's bytes: 1008px against the RTX
-    # 4090's 1024px, 496x512 against the RX 9060 XT's 512px.
-    [("cudnn", "native", "linux", (1008, 1008), 1024), ("miopen", "native", "windows", (496, 512), 512)],
-)
-def test_the_tiling_decision_never_falls_as_a_frame_grows_into_the_first_point(
-    conv_backend: str, allocator: str, os: str, below: tuple[int, int], first: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _pin(monkeypatch, conv_backend, allocator, os)
-    at_point = untiled_peak_bytes("decode", first, first, 2, GPU)
-    assert estimate_working_memory("decode", *below, None, 2, GPU).reservation_bytes > at_point
-    assert untiled_peak_bytes("decode", *below, 2, GPU) == at_point
+def test_the_tiling_decision_never_falls_as_a_frame_grows_into_the_first_point(monkeypatch: pytest.MonkeyPatch) -> None:
+    _pin(monkeypatch, "miopen", "native", "windows")
+    # Just below the RX 9060 XT's first untiled bf16 decode, 512px, even the reservation without its margin lies above
+    # that point's bytes at 496x512.
+    at_point = untiled_peak_bytes("decode", 512, 512, 2, GPU)
+    reserved = estimate_working_memory("decode", 496, 512, None, 2, GPU).reservation_bytes
+    assert reserved / (1 + SHIPPED_MARGIN) > at_point
+    assert untiled_peak_bytes("decode", 496, 512, 2, GPU) == at_point
 
 
 def test_one_point_decides_the_tiling_decision_from_its_size_on(monkeypatch: pytest.MonkeyPatch) -> None:
     _pin(monkeypatch, "miopen", "expandable", "windows")
-    # One untiled fp32 decode is measured on this platform: 9.16 GiB at 768px. Past it, the point plus the reservation's
-    # growth from it.
+    # One untiled fp32 decode is measured on this platform: 9.16 GiB at 768px. Past it, the point plus the peak's growth
+    # from it.
     at_point = untiled_peak_bytes("decode", 768, 768, 4, GPU)
     assert at_point == pytest.approx(9.16 * GIB, rel=0.002)
-    grown = _reserved("decode", 1024, None, 4, GPU) - _reserved("decode", 768, None, 4, GPU)
+    grown = _peak("decode", 1024, 4) - _peak("decode", 768, 4)
     assert untiled_peak_bytes("decode", 1024, 1024, 4, GPU) == at_point + grown
 
 
+@pytest.mark.parametrize("allocator", ["native", "cudaMallocAsync"])
 @pytest.mark.parametrize(
     ("size", "total_gib", "tiled"),
     [
-        # 8.38 GiB measured at 1024px; 1152px peaks near 10.56 GiB, under the 10.8 GiB ceiling of a 12 GiB card,
+        # 8.38 GiB measured at 1024px; 1152px peaks near 10.45 GiB, under the 10.8 GiB ceiling of a 12 GiB card,
         # though it reserves 10.98.
         (1152, 12, False),
-        # Below the point, the reservation: 7.57 GiB, over the 7.2 GiB ceiling (8.38 scaled through the origin is 7.12).
+        # Below the point, the reservation without its margin: 6.99 GiB at 928px, under the 7.2 GiB ceiling of an 8 GiB
+        # card though it reserves 7.33; 7.21 GiB at 944px, over it.
+        (928, 8, False),
         (944, 8, True),
     ],
 )
 def test_on_nvidia_the_tiling_decision_grows_from_the_measured_point(
-    size: int, total_gib: int, tiled: bool, monkeypatch: pytest.MonkeyPatch
+    size: int, total_gib: int, tiled: bool, allocator: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _pin(monkeypatch, "cudnn")
+    _pin(monkeypatch, "cudnn", allocator)
     monkeypatch.setattr(wddm, "local_video_memory", lambda device: None)
     monkeypatch.setattr(
         torch.cuda, "get_device_properties", lambda device: SimpleNamespace(total_memory=total_gib * GIB)
@@ -432,7 +452,21 @@ def test_on_nvidia_a_1024px_decode_tiles_on_its_measured_bytes(
     assert choose_tile_size("decode", 1024, 1024, 2, GPU, tiled=False, tile_size=0, auto_tile=True) == expected
 
 
-def test_the_tiling_decision_reads_the_larger_of_two_shapes_of_one_area(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_under_cuda_malloc_async_the_tiling_decision_reads_the_native_allocators_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # cudaMallocAsync has no untiled point of its own; native, which needs more, decides for it.
+    expected = {}
+    for allocator in ("native", "cudaMallocAsync"):
+        _pin(monkeypatch, "cudnn", allocator)
+        expected[allocator] = [untiled_peak_bytes("decode", size, size, 2, GPU) for size in (1008, 1024, 1152)]
+    assert expected["cudaMallocAsync"] == expected["native"]
+
+
+@pytest.mark.parametrize("wider_first", [False, True])
+def test_the_tiling_decision_reads_the_larger_of_two_shapes_of_one_area(
+    wider_first: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _pin(monkeypatch, "miopen")
     expected = untiled_peak_bytes("decode", 1024, 1024, 2, GPU)
     data = dict(shipped_data())
@@ -445,14 +479,15 @@ def test_the_tiling_decision_reads_the_larger_of_two_shapes_of_one_area(monkeypa
         and point.features["dtype"] == "bf16"
         and point.features["height"] == point.features["width"] == 1024
     )
-    # A 512x2048 decode, the same area as 1024x1024, measured after it at twice its bytes.
+    # A 512x2048 decode, the same area as 1024x1024, at twice its bytes, read before or after it.
     wider = measured.model_copy(
         update={
             "features": {**measured.features, "height": 512, "width": 2048},
             "measured_bytes": 2 * measured.measured_bytes,
         }
     )
-    data["qwen_image_2_1_vae.json"] = file.model_copy(update={"points": [*file.points, wider]})
+    points = [wider, *file.points] if wider_first else [*file.points, wider]
+    data["qwen_image_2_1_vae.json"] = file.model_copy(update={"points": points})
     monkeypatch.setattr(vae_module, "shipped_data", lambda: data)
     vae_module._measured_untiled_peaks.cache_clear()
     try:
@@ -519,7 +554,8 @@ _RX9060XT_OVER_W7900 = {
     ("native", "decode_fp32"): 12463374336 / 13457424384,  # the 2048px fp32 decode at a 768px tile
     ("expandable", "decode_fp32"): 10634657792 / 13457424384,
     ("native", "tiled_encode_fp32"): 6784286720 / 6784286720,  # the 2048px fp32 encode at a 1024px tile
-    ("expandable", "tiled_encode_fp32"): 5391777792 / 6784286720,
+    # Expandable over native, the larger of the two measured fp32 encodes at a 1024px tile (4096px; 2048px is 0.7947).
+    ("expandable", "tiled_encode_fp32"): 5601492992 / 6863978496,
 }
 
 

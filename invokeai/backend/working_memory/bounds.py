@@ -176,8 +176,9 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "vae.qwen_image_2_1-miopen,native-decode-bf16-2048x2048-tile768-AMDRadeonProW7900DualSlot-reserved_peak": 1.32,
         "vae.qwen_image_2_1-miopen,native-decode-bf16-3072x3072-tile768-AMDRadeonProW7900DualSlot-reserved_peak": 1.31,
         "vae.qwen_image_2_1-miopen,native-decode-bf16-4096x4096-tile768-AMDRadeonProW7900DualSlot-reserved_peak": 1.32,
-        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-2048x2048-tile512-AMDRadeonRX9060XT-reserved_peak": 1.51,
-        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-512x1536-tile1024-AMDRadeonRX9060XT-reserved_peak": 1.48,
+        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-2048x2048-tile512-AMDRadeonRX9060XT-reserved_peak": 1.55,
+        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-4096x4096-tile512-AMDRadeonRX9060XT-reserved_peak": 1.40,
+        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-512x1536-tile1024-AMDRadeonRX9060XT-reserved_peak": 1.50,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to: their
