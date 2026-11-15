@@ -58,7 +58,6 @@ from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
     describe_refusal,
     has_flux3_lora_keys,
     misshapen_flux3_layers,
-    peft_scale,
     read_flux3_lora_keys,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
@@ -80,6 +79,14 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import 
     has_non_minimax_h3_architecture_keys,
     has_unsupported_minimax_h3_lora_variant_keys,
 )
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import (
+    describe_refusal as describe_moss_image_lora_refusal,
+)
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import has_moss_image_lora_keys
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import (
+    unsupported_keys as moss_image_unsupported_lora_keys,
+)
+from invokeai.backend.patches.lora_conversions.peft_adapter_utils import peft_scale
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
     unsupported_keys as qwen_image_21_unsupported_lora_keys,
 )
@@ -988,6 +995,11 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         if patches_ideogram4_width(state_dict):
             raise NotAMatchError("model patches Ideogram 4 widths, not a Z-Image LoRA")
 
+        # MOSS-Image keeps its blocks under `layers.N` too, so the prefixes below admit its LoRAs; its `proj.q`..
+        # `ffn_down` and embedder modules are what tell the two apart.
+        if has_moss_image_lora_keys(state_dict):
+            raise NotAMatchError("model looks like a MOSS-Image LoRA, not a Z-Image LoRA")
+
         # Check for Kohya format first
         if is_state_dict_likely_z_image_kohya_lora(state_dict):
             return
@@ -1586,7 +1598,7 @@ def _raise_unless_flux3_lora(state_dict: dict[str | int, Any], metadata: dict[st
     if refused:
         raise InvalidMatchError(describe_refusal(refused))
     try:
-        peft_scale(metadata)
+        peft_scale(metadata, family="FLUX.3")
     except ValueError as e:
         raise InvalidMatchError(str(e)) from None
 
@@ -1611,6 +1623,47 @@ class LoRA_LyCORIS_Flux3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         if has_flux3_lora_keys(mod.load_state_dict()):
             return BaseModelType.Flux3
         raise NotAMatchError("model does not look like a FLUX.3 LoRA")
+
+
+def _raise_unless_moss_image_lora(state_dict: dict[str | int, Any], metadata: dict[str, str]) -> None:
+    """`NotAMatchError` for a file that is no MOSS-Image LoRA; `InvalidMatchError`, naming the keys that do not apply, for
+    one that does not apply in full or whose header asks for a scaling this does not apply (`peft_scale`).
+
+    `InvalidMatchError` because the file is a MOSS-Image LoRA: the installer names the reason instead of registering an
+    unknown model, and the patcher would skip a layer it cannot apply with a log line, not an error.
+    """
+    if not has_moss_image_lora_keys(state_dict):
+        raise NotAMatchError("model does not look like a MOSS-Image LoRA")
+    refused = moss_image_unsupported_lora_keys(state_dict)
+    if refused:
+        raise InvalidMatchError(describe_moss_image_lora_refusal(refused))
+    try:
+        peft_scale(metadata, family="MOSS-Image")
+    except ValueError as e:
+        raise InvalidMatchError(str(e)) from None
+
+
+class LoRA_LyCORIS_MossImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for MOSS-Image LoRA files: ai-toolkit, ComfyUI, kohya/LyCORIS, DiffSynth and diffusers/PEFT key
+    layouts, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers
+    header or one describing a PEFT LoRA (`peft_scale`).
+
+    No variant: Base and SFT share the transformer's geometry, so a LoRA trained on either runs on both. Its blocks'
+    `proj.q`..`ffn_down` and the embedders and modulations exist in no other supported transformer, which makes the
+    match exclusive; see `moss_image_lora_constants`.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        _raise_unless_moss_image_lora(mod.load_state_dict(), mod.metadata())
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if has_moss_image_lora_keys(mod.load_state_dict()):
+            return BaseModelType.MossImage
+        raise NotAMatchError("model does not look like a MOSS-Image LoRA")
 
 
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -2196,6 +2249,22 @@ class LoRA_Diffusers_Flux3_Config(LoRA_Diffusers_Config_Base, Config_Base):
         raise_for_override_fields(cls, override_fields)
         path_to_weight_file = cls._get_weight_file_or_raise(mod)
         _raise_unless_flux3_lora(mod.load_state_dict(path_to_weight_file), mod.metadata(path_to_weight_file))
+        return cls(**override_fields)
+
+
+class LoRA_Diffusers_MossImage_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for a MOSS-Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a
+    repository-id install of a diffusers trainer's output leaves it. The file is held to what
+    `LoRA_LyCORIS_MossImage_Config` holds a single file to."""
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        _raise_unless_moss_image_lora(mod.load_state_dict(path_to_weight_file), mod.metadata(path_to_weight_file))
         return cls(**override_fields)
 
 

@@ -227,7 +227,8 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | ERNIE-Image | ✓ (ai-toolkit/ComfyUI, diffusers/PEFT; LoKR and LoHA too, DoRA is refused) | ✗ | |
 | SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused) | ✗ | |
 | Ideogram 4 | ✓ (ai-toolkit/ComfyUI, kohya and diffusers files and Diffusers folders, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
-| CogView4, MOSS-Image | ✗ | ✗ | |
+| MOSS-Image | ✓ (diffusers/PEFT, ComfyUI/ai-toolkit and kohya files and Diffusers folders; LyCORIS LoKr and LoHa and DoRA too, as noted on the family page) | ✗ | |
+| CogView4 | ✗ | ✗ | |
 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
@@ -250,7 +251,7 @@ Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` 
 
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
 
-On Z-Image, Qwen-Image and Anima, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
+On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
 on bitsandbytes NF4/LLM.int8 bases.
 
