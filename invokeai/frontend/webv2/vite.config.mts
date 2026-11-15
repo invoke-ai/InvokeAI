@@ -181,8 +181,6 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
   '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
-  // Preview and the deferred Canvas engine share zoom geometry; keep its existing boot request folded in.
-  '/workbench/panZoom.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
@@ -264,9 +262,6 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/queue/runtime/coordinator.ts',
   '/features/queue/runtime/deliveryClaims.ts',
   '/features/queue/runtime/receiptAcknowledgements.ts',
-  // Image actions already load utility graphs at boot; the deferred Canvas engine shares the same runtime.
-  '/features/queue/utility.ts',
-  '/features/queue/runtime/utilityGraph.ts',
   '/features/queue/ui/useDeviceLabel.ts',
   '/features/upscale/core/settings.ts',
   '/features/upscale/ui/UpscaleUiContext.tsx',
@@ -418,6 +413,37 @@ const IMAGE_MAP_DATA_MODULES = [
   '/workbench/image-map/indexProgress.ts',
 ] as const;
 
+// Canvas, Preview and image actions share these commands. Keep their geometry/queue dependencies with this lazy
+// command group so they neither enter editor boot nor add standalone widget-activation requests.
+const CANVAS_COMMAND_SHARED_MODULES = [
+  '/workbench/canvas-engine/document/layerFactories.ts',
+  '/workbench/canvas-engine/render/alphaBounds.ts',
+  '/workbench/canvas-engine/samCoordinates.ts',
+  '/workbench/canvas-engine/vectorDefaults.ts',
+  '/workbench/canvas-operations/api.ts',
+  '/workbench/canvas-operations/backend/canvasImages.ts',
+  '/workbench/canvas-operations/compositeForGeneration.ts',
+  '/workbench/canvas-operations/controlDetectionStatusStore.ts',
+  '/workbench/canvas-operations/controlSourceActions.ts',
+  '/workbench/canvas-operations/createCanvasFromImages.ts',
+  '/workbench/canvas-operations/createFromBbox.ts',
+  '/workbench/canvas-operations/exportCanvasComposite.ts',
+  '/workbench/canvas-operations/filterGraphs.ts',
+  '/workbench/canvas-operations/filterPreferences.ts',
+  '/workbench/canvas-operations/generationComposite.ts',
+  '/workbench/canvas-operations/generationCompositePlan.ts',
+  '/workbench/canvas-operations/importGalleryImages.ts',
+  '/workbench/canvas-operations/operationAccess.ts',
+  '/workbench/canvas-operations/samGraph.ts',
+  '/workbench/canvas-operations/saveCanvasToGallery.ts',
+  '/workbench/canvas-operations/saveStagedResultToGallery.ts',
+  '/workbench/widgets/layers/layerOps.ts',
+  '/workbench/widgets/layers/selectedModel.ts',
+  '/workbench/panZoom.ts',
+  '/features/queue/utility.ts',
+  '/features/queue/runtime/utilityGraph.ts',
+] as const;
+
 // Group Canvas/Layer interaction dependencies to avoid extra text-tool activation requests.
 const CANVAS_LAYER_SHARED_MODULES = [
   '/features/workflow/core/layerWorkflow.ts',
@@ -552,6 +578,12 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
+            {
+              includeDependenciesRecursively: false,
+              name: 'canvas-commands',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, CANVAS_COMMAND_SHARED_MODULES),
+            },
             {
               includeDependenciesRecursively: false,
               name: 'canvas-layer-shared',

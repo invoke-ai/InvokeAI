@@ -362,9 +362,7 @@ export interface CanvasBezierPathContract {
 }
 
 /** Editable guide geometry; no raster source and no contribution to image generation. */
-export const DEFAULT_VECTOR_GUIDE_COLOR = '#5aafff';
-export const DEFAULT_VECTOR_STROKE_COLOR = '#000000';
-export const DEFAULT_VECTOR_STROKE_WIDTH = 50;
+export { DEFAULT_VECTOR_GUIDE_COLOR, DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from './vectorDefaults';
 
 export interface CanvasVectorLayerContract extends CanvasLayerBaseContract {
   type: 'vector';
