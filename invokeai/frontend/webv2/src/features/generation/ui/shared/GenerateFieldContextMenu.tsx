@@ -16,7 +16,7 @@ interface GenerateFieldContextMenuProps {
   /** Disables the reset entry and hides the modified dot; the menu still opens for Copy value. */
   isAtDefault?: boolean;
   onReset?: () => void;
-  /** Reset entry text; defaults to "Reset to model default". */
+  /** Reset entry text, naming where the value comes from; defaults to "Reset to default". */
   resetLabel?: string;
   /**
    * What the dot lines up with: a field's control (28px tall), or a switch row's first line (the switch's height).
@@ -94,7 +94,7 @@ export const GenerateFieldContextMenu = ({
   const { t } = useTranslation();
   const { anchor: point, close, onRequestDismiss, open } = useContextMenu();
   const copyUnavailableReason = canCopyText() ? undefined : t('common.copyUnavailable');
-  const resetText = resetLabel ?? t('widgets.generate.resetToModelDefault');
+  const resetText = resetLabel ?? t('widgets.generate.resetToDefault');
   const isModified = onReset !== undefined && !isAtDefault;
   const dotLabel = t('widgets.generate.resetFieldNamed', { field: fieldLabel, reset: resetText });
 

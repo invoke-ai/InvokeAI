@@ -25,8 +25,6 @@ import {
   cloneGenerateWidgetValues,
   deriveAspectRatioId,
   getDefaultLoraWeight,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
   isValidMossImageSkipLayers,
@@ -861,31 +859,6 @@ describe('LoRA settings helpers', () => {
     const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
     expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
     expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
-  });
-});
-
-describe('model defaults', () => {
-  it('uses shared VAE compatibility for cross-base default VAEs', () => {
-    const zImageModel: MainModelConfig = {
-      base: 'z-image',
-      default_settings: { vae: 'flux-vae' },
-      key: 'z-image',
-      name: 'Z-Image',
-      type: 'main',
-    };
-    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-
-    expect(getModelDefaultVae(zImageModel, [fluxVae])).toBe(fluxVae);
-  });
-
-  it('distinguishes absent VAE defaults from explicit VAE defaults', () => {
-    expect(hasModelDefaultVae({ base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' })).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: null }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: 'vae' }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(true);
   });
 });
 

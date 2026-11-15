@@ -29,6 +29,7 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
+  VaeModelConfig,
 } from './types';
 
 import {
@@ -57,6 +58,7 @@ import {
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
+  isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
@@ -678,6 +680,67 @@ export const getSettingsWithModelDefaults = (
     width: modelDefaults.width,
   };
 };
+
+/** The VAE a model's defaults choose, classified; each context states what it does with `missing`. */
+export type ModelDefaultVae =
+  /** Sets none, or the "default" sentinel where the VAE is a required component with nothing bundled. */
+  | { kind: 'none' }
+  /**
+   * Names a VAE that is not installed or does not fit the model. `hasBundledVae` says whether the model and settings
+   * have a bundled VAE to fall back to (the VAE component is not required).
+   */
+  | { kind: 'missing'; hasBundledVae: boolean }
+  /** `null` is the bundled VAE, which the "default" sentinel asks for wherever there is one. */
+  | { kind: 'apply'; vae: VaeModelConfig | null };
+
+/** Whether the model and settings need a VAE component, having no bundled VAE (or component source) to use. */
+const isVaeComponentRequired = (model: MainModelConfig, settings: GenerateSettings): boolean => {
+  const vaeSlotPolicy = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return Boolean(vaeSlotPolicy?.required?.(getComponentPolicyContext(model, settings)));
+};
+
+/**
+ * The one classification of a model's default VAE. The Model Manager stores "default" when the VAE default is on with
+ * no VAE picked: that is the bundled VAE, which only a model whose VAE is a required component lacks. Requiredness
+ * follows the component policy, so it reads the settings (a component source can bundle one).
+ */
+export const resolveModelDefaultVae = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  vaeModels: readonly VaeModelConfig[]
+): ModelDefaultVae => {
+  const key = (model.default_settings as { vae?: unknown } | null | undefined)?.vae;
+
+  if (model.type !== 'main' || typeof key !== 'string') {
+    return { kind: 'none' };
+  }
+
+  const hasBundledVae = !isVaeComponentRequired(model, settings);
+
+  if (key === '' || key === 'default') {
+    return hasBundledVae ? { kind: 'apply', vae: null } : { kind: 'none' };
+  }
+
+  const vae = vaeModels.find(
+    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+  );
+
+  return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
+};
+
+/**
+ * Recall's policy (a model switch from recalled parameters or an image, and graph export): the model's default VAE,
+ * else the bundled VAE when the default cannot apply, as recall always did, so an image made with the bundled VAE is
+ * reproduced. Only where the VAE is required and nothing is bundled does the current VAE stay (`undefined`), since
+ * clearing it would leave the form unable to run.
+ */
+export const getRecallDefaultVae = (defaultVae: ModelDefaultVae): VaeModelConfig | null | undefined =>
+  defaultVae.kind === 'apply'
+    ? defaultVae.vae
+    : defaultVae.kind === 'missing' && defaultVae.hasBundledVae
+      ? null
+      : undefined;
 
 export type GenerateComponentValueKey =
   | 't5EncoderModel'

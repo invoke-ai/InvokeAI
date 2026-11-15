@@ -35,6 +35,7 @@ vi.mock('./GenerationUiContext', () => ({
         summary: <span data-testid="strength-badge">75%</span>,
         field: <div data-testid="strength-field" />,
       }),
+    models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { render: true }, setSectionsOpen: vi.fn() },
   }),
@@ -105,7 +106,11 @@ void i18n.use(initReactI18next).init({
             scheduler: 'Scheduler',
             sectionMenu: {
               resetStepsAndGuidance: 'Reset steps and {{guidance}} to model defaults',
+              resetStepsAndGuidanceBase: 'Reset steps and {{guidance}} to {{base}} defaults',
               resetStepsGuidanceAndScheduler: 'Reset steps, {{guidance}} and scheduler to model defaults',
+              resetStepsGuidanceAndSchedulerBase: 'Reset steps, {{guidance}} and scheduler to {{base}} defaults',
+              resetStepsGuidanceAndSchedulerMixed:
+                'Reset steps, {{guidance}} and scheduler to model and {{base}} defaults',
             },
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
@@ -773,7 +778,7 @@ describe('GenerateRenderSection title defaults', () => {
     expect(isMarked()).toBe(true);
     await openMenu();
     await act(() =>
-      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to model defaults' }))
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to SD 1.x defaults' }))
     );
 
     expect(onCommit).toHaveBeenLastCalledWith({
@@ -794,7 +799,9 @@ describe('GenerateRenderSection title defaults', () => {
     await settle(() => draftStore?.patchSnapshot({ steps: defaults.steps + 4 }));
     expect(isMarked()).toBe(true);
     await openMenu();
-    await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to model defaults' })));
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to qwen-image defaults' }))
+    );
 
     expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: defaults.cfgScale, steps: defaults.steps });
   });
@@ -804,12 +811,30 @@ describe('GenerateRenderSection title defaults', () => {
     const onCommit = await render(fluxDevModel, { steps: defaults.steps + 4 }, true);
 
     await openMenu();
-    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to model defaults$/ });
+    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to flux defaults$/ });
 
     expect(reset.element().textContent).toContain('Guidance');
     expect(reset.element().textContent).not.toContain('CFG');
     await act(() => userEvent.click(reset));
 
     expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ steps: defaults.steps }));
+  });
+
+  it.each([
+    [{ steps: 20 }, 'Reset steps, CFG and scheduler to model and SD 1.x defaults'],
+    [{ cfg_scale: 5, scheduler: 'ddim', steps: 20 }, 'Reset steps, CFG and scheduler to model defaults'],
+  ])('names where the reset takes its values from when the model sets %o', async (defaultSettings, label) => {
+    const model: MainModelConfig = { ...sd1Model, default_settings: defaultSettings };
+    const onCommit = await render(model, { steps: 33 }, true);
+
+    await openMenu();
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: label })));
+
+    // The values are what they were: the model's where it sets them, the base's otherwise.
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: getDefaultGenerateSettings(model).cfgScale,
+      scheduler: getDefaultGenerateSettings(model).scheduler,
+      steps: 20,
+    });
   });
 });

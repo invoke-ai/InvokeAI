@@ -41,6 +41,8 @@ import {
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isReferenceImageSupported,
   isComponentCompatibleWithModel,
   isGenerateModelSelectable,
@@ -1435,6 +1437,43 @@ describe('component policies', () => {
     expect(
       getSettingsWithModelDefaults(createSettings(createModel('sdxl'), { loras }), createModel('flux')).loras
     ).toBe(loras);
+  });
+
+  describe('a default VAE', () => {
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const resolve = (base: string, vae: string | null | undefined, vaeModels: VaeModelConfig[] = [fluxVae]) => {
+      const model = createModel(base, vae === undefined ? {} : { default_settings: { vae } });
+
+      return resolveModelDefaultVae(model, createSettings(model), vaeModels);
+    };
+
+    it('applies one that is installed and fits, by shared VAE compatibility', () => {
+      // Cross-base by the shared rule: Z-Image takes the FLUX VAE.
+      expect(resolve('z-image', 'flux-vae')).toEqual({ kind: 'apply', vae: fluxVae });
+      expect(resolve('sdxl', undefined)).toEqual({ kind: 'none' });
+      expect(resolve('sdxl', null)).toEqual({ kind: 'none' });
+    });
+
+    // Bundled: SDXL has no VAE slot; SD3's is an optional override. Required: FLUX.1's VAE is a component.
+    it.each([
+      ['sdxl', 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'default', { kind: 'apply', vae: null }],
+      ['flux', 'default', { kind: 'none' }],
+      ['sdxl', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      // Installed, but for another family.
+      ['sdxl', 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['flux', 'gone', { hasBundledVae: false, kind: 'missing' }],
+    ] as const)('classifies %s with %s by whether a VAE is bundled', (base, vae, expected) => {
+      expect(resolve(base, vae)).toEqual(expected);
+    });
+
+    it('recalls the bundled VAE for one that cannot apply, and keeps the current VAE only where one is required', () => {
+      expect(getRecallDefaultVae({ kind: 'apply', vae: fluxVae })).toBe(fluxVae);
+      expect(getRecallDefaultVae({ hasBundledVae: true, kind: 'missing' })).toBeNull();
+      expect(getRecallDefaultVae({ hasBundledVae: false, kind: 'missing' })).toBeUndefined();
+      expect(getRecallDefaultVae({ kind: 'none' })).toBeUndefined();
+    });
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {

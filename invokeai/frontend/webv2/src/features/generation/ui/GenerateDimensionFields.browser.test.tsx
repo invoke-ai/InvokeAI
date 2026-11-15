@@ -43,6 +43,7 @@ vi.mock('./GenerationUiContext', () => ({
       save: vi.fn(),
       update: vi.fn(),
     },
+    models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionsOpen: vi.fn() },
   }),
@@ -71,7 +72,14 @@ void i18n.use(initReactI18next).init({
             resetSizeOptimalForCurrentRatio: 'Optimal size for current ratio',
             resetSizeOptimalForRatio: 'Optimal size for {{ratio}}',
             resetSizeSquareNative: 'Square at native size',
+            resetToBaseDefault: 'Reset to {{base}} default',
+            resetToModelAndBaseDefault: 'Reset to model and {{base}} default',
             resetToModelDefault: 'Reset to model default',
+            sectionMenu: {
+              resetSize: 'Reset size to model defaults',
+              resetSizeBase: 'Reset size to {{base}} defaults',
+              resetSizeMixed: 'Reset size to model and {{base}} defaults',
+            },
             size: 'Size',
             sizePreviewHandle: 'Resize',
             swapWidthAndHeight: 'Swap width and height',
@@ -713,7 +721,7 @@ describe('GenerateDimensionFields title defaults', () => {
     });
     await expect.element(page.getByRole('menu')).toBeVisible();
   };
-  const resetItem = () => page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetSize' });
+  const resetItem = () => page.getByRole('menuitem', { name: 'Reset size to model defaults' });
 
   it('marks a size off the model default and resets it from the title menu', async () => {
     const portraitModel: MainModelConfig = { ...sd1Model, default_settings: { height: 768, width: 640 } };
@@ -725,6 +733,28 @@ describe('GenerateDimensionFields title defaults', () => {
 
     expect(onResetSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ height: 768, width: 640 }));
     await vi.waitFor(() => expect(isMarked()).toBe(false));
+  });
+
+  it("names the base as the source of the size for a model that sets none, and resets to the base's size", async () => {
+    const { onResetSize } = await render({ height: 768, width: 512 }, sd1Model);
+
+    await openMenu();
+    await userEvent.click(page.getByRole('menuitem', { name: 'Reset size to SD 1.x defaults' }));
+
+    const { height, width } = getDefaultGenerateSettings(sd1Model);
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ height, width }));
+    await userEvent.click(page.getByRole('slider', { name: 'Width' }), { button: 'right' });
+    await expect.element(page.getByRole('menuitem', { name: 'Reset to SD 1.x default' })).toBeInTheDocument();
+  });
+
+  it('names both sources for a model that sets one side of the size', async () => {
+    await render({ height: 768, width: 512 }, { ...sd1Model, default_settings: { width: 640 } });
+
+    await openMenu();
+    await expect.element(page.getByRole('menuitem', { name: 'Reset size to model and SD 1.x defaults' })).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(page.getByRole('slider', { name: 'Width' }), { button: 'right' });
+    await expect.element(page.getByRole('menuitem', { name: 'Reset to model and SD 1.x default' })).toBeInTheDocument();
   });
 
   it('neither marks nor offers a reset without a model to take defaults from', async () => {

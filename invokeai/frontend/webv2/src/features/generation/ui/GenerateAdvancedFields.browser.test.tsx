@@ -19,6 +19,7 @@ import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 vi.mock('./GenerationUiContext', () => ({
   GenerationModelSelect: () => null,
   useGenerationUi: () => ({
+    models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     sectionPreferences: { sectionsOpen: { advanced: true }, setSectionsOpen: vi.fn() },
   }),
 }));
@@ -385,8 +386,7 @@ describe('GenerateAdvancedFields Krea-2 reference K/V cache', () => {
   const kvCacheInput = () => switchByLabel('Reference K/V cache')?.querySelector<HTMLInputElement>('input') ?? null;
 
   const kvCacheDot = () =>
-    host?.querySelector<HTMLElement>('[data-modified-dot][aria-label="Reset to model default: Reference K/V cache"]') ??
-    null;
+    host?.querySelector<HTMLElement>('[data-modified-dot][aria-label="Reset to default: Reference K/V cache"]') ?? null;
 
   it('marks the switch with the dot while it applies and is on, and resets it', async () => {
     const onCommit = await render(krea2Model, false, {
@@ -491,8 +491,9 @@ describe('GenerateAdvancedFields reset dots', () => {
   // VAE, VAE precision and seamless tiling show per the architecture capabilities.
   seedArchitectureCapabilities();
 
-  const dot = (field: string) =>
-    host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label="Reset to model default: ${field}"]`) ?? null;
+  // Named by where the reset takes its value from: these models set no defaults of their own.
+  const dot = (field: string, reset = 'Reset to default') =>
+    host?.querySelector<HTMLElement>(`[data-modified-dot][aria-label="${reset}: ${field}"]`) ?? null;
 
   it('resets VAE precision from its dot, not a separate button, and hands focus to the select', async () => {
     const defaults = getDefaultGenerateSettings(sd1Model);
@@ -501,11 +502,18 @@ describe('GenerateAdvancedFields reset dots', () => {
     });
 
     expect(host?.querySelector('button[aria-label="Use model default VAE precision"]')).toBeNull();
-    await settle(() => dot('VAE precision')?.click());
+    await settle(() => dot('VAE precision', 'Reset to SD 1.x default')?.click());
 
     expect(onCommit).toHaveBeenCalledExactlyOnceWith({ vaePrecision: defaults.vaePrecision });
-    expect(dot('VAE precision')).toBeNull();
+    expect(dot('VAE precision', 'Reset to SD 1.x default')).toBeNull();
     await vi.waitFor(() => expect(document.activeElement).toBe(selectByLabel('VAE precision')));
+  });
+
+  it('names the model as the source of a VAE precision it sets', async () => {
+    await render({ ...sd1Model, default_settings: { vae_precision: 'fp16' } }, false, { vaePrecision: 'fp32' });
+
+    expect(dot('VAE precision', 'Reset to model default')).not.toBeNull();
+    expect(dot('VAE precision', 'Reset to SD 1.x default')).toBeNull();
   });
 
   it('resets a chosen VAE to the bundled one from its dot', async () => {
@@ -513,10 +521,17 @@ describe('GenerateAdvancedFields reset dots', () => {
     await render(sd1Model, false, { vae });
 
     expect(host?.querySelector('button[aria-label="Use model default VAE"]')).toBeNull();
-    await settle(() => dot('VAE')?.click());
+    await settle(() => dot('VAE', 'Use the bundled VAE')?.click());
 
     expect(onCommitImmediate).toHaveBeenCalledExactlyOnceWith({ vae: null });
-    expect(dot('VAE')).toBeNull();
+    expect(dot('VAE', 'Use the bundled VAE')).toBeNull();
+  });
+
+  it("marks no change for the VAE the model's defaults name, as Apply model defaults sets it", async () => {
+    const vae = { base: 'sd-1', key: 'vae-1', name: 'Custom VAE', type: 'vae' } as unknown as GenerateSettings['vae'];
+    await render({ ...sd1Model, default_settings: { vae: 'vae-1' } }, false, { vae });
+
+    expect(dot('VAE', 'Use the bundled VAE')).toBeNull();
   });
 
   it.each([
@@ -604,7 +619,7 @@ describe('GenerateAdvancedFields reset dots', () => {
     expect(dot('HiDiffusion: Automatic ratios')).toBeNull();
   });
 
-  it('resets PiD steps to the model default from its dot', async () => {
+  it('resets PiD steps to the default from its dot', async () => {
     const defaults = getDefaultGenerateSettings(qwenImageModel);
     const onCommit = await render(qwenImageModel, false, { pidMode: 'fit', pidSteps: defaults.pidSteps + 1 });
 
@@ -624,7 +639,7 @@ describe('GenerateAdvancedFields reset dots', () => {
     expect(host?.querySelector('.generate-section [data-section-changed]')).toBeNull();
   });
 
-  it('resets PiD and encoder quantization to the model defaults from their dots', async () => {
+  it('resets PiD and encoder quantization to the defaults from their dots', async () => {
     const defaults = getDefaultGenerateSettings(qwenImageModel);
     const onCommit = await render(qwenImageModel, false, { pidMode: 'fit', qwenImageEncoderQuantization: 'int8' });
 

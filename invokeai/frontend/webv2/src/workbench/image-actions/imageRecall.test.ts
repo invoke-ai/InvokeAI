@@ -320,6 +320,42 @@ describe('image recall', () => {
     expect(result?.fields).toContain('seed');
   });
 
+  describe("the recorded model's default VAE", () => {
+    const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
+    const recall = (current: GenerateWidgetValues, model: MainModelConfig, vaeModels: VaeModelConfig[]) =>
+      buildImageRecallSettings({
+        currentValues: current,
+        image,
+        kind: 'all',
+        // No VAE recorded, so only the model's default could change it.
+        metadata: { model: { key: model.key }, positive_prompt: 'a recalled prompt' },
+        models: [model, ...vaeModels],
+        supportedModels: [model],
+        vaeModels,
+      });
+
+    it("keeps a family's required VAE for the 'default' sentinel", () => {
+      const model = { ...fluxModel, default_settings: { vae: 'default' } };
+      const result = recall(createValues({ model: fluxModel, modelKey: fluxModel.key, vae: fluxVae }), model, [
+        fluxVae,
+      ]);
+
+      expect(result?.values.vae).toEqual(fluxVae);
+    });
+
+    // An image made with the bundled VAE records none; recalling it must not keep another VAE.
+    it('uses the bundled VAE when the default names one that is not installed, as recall always has', () => {
+      const model = { ...sdxlModel, default_settings: { vae: 'gone' } };
+      const result = recall(createValues({ model: sdxlModel, modelKey: sdxlModel.key, vae: sdxlVae }), model, [
+        sdxlVae,
+      ]);
+
+      expect(result?.values.vae).toBeNull();
+    });
+  });
+
   it('recalls reference images from metadata, re-targeting configs to the effective model', () => {
     // The metadata model is not installed, so the current SDXL model stays
     // selected and the Qwen reference config is rebuilt for SDXL.

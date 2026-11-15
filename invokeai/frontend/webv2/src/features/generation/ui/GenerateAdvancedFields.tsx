@@ -27,11 +27,12 @@ import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
-import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
+import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
+import { getFieldResetLabel, isModelDefaultVae } from './shared/modelDefaultSettings';
 
 interface GenerateAdvancedFieldsProps {
   draft: GenerateDraft;
@@ -96,6 +97,7 @@ export const GenerateAdvancedFields = ({
   selectedModel,
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
+  const { models } = useGenerationUi();
   const fieldLabel = useRecipe({ recipe: fieldLabelRecipe });
   const seamlessLabelId = useId();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
@@ -261,7 +263,9 @@ export const GenerateAdvancedFields = ({
             <GenerateFieldContextMenu
               fieldLabel={t('widgets.generate.vae')}
               copyValue={() => settings.vae?.name ?? t('widgets.generate.modelDefault')}
-              isAtDefault={!settings.vae}
+              // The VAE the model's defaults name is no change from them, as Apply model defaults sets it.
+              isAtDefault={!settings.vae || isModelDefaultVae(selectedModel, settings.vae)}
+              resetLabel={t('widgets.generate.useBundledVae')}
               onReset={() => onCommitImmediate({ vae: null })}
             >
               <Field
@@ -286,6 +290,7 @@ export const GenerateAdvancedFields = ({
               fieldLabel={t('widgets.generate.vaePrecision')}
               copyValue={() => settings.vaePrecision.toUpperCase()}
               isAtDefault={modelDefaults !== null && settings.vaePrecision === modelDefaults.vaePrecision}
+              resetLabel={getFieldResetLabel('vaePrecision', selectedModel, models.getBaseLabel, t)}
               onReset={modelDefaults ? () => onCommit({ vaePrecision: modelDefaults.vaePrecision }) : undefined}
             >
               <Field hint="vaePrecision" label={t('widgets.generate.vaePrecision')} labelPlacement="inside">
@@ -335,6 +340,7 @@ export const GenerateAdvancedFields = ({
               isAtDefault={
                 modelDefaults !== null && settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier
               }
+              resetLabel={getFieldResetLabel('cfgRescaleMultiplier', selectedModel, models.getBaseLabel, t)}
               onReset={
                 modelDefaults ? () => onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier }) : undefined
               }

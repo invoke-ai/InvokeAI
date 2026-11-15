@@ -64,6 +64,7 @@ import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection'
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
+import { type DefaultSource, getDefaultSource, getFieldResetLabel } from './shared/modelDefaultSettings';
 import { SeedField as SharedSeedField } from './shared/SeedField';
 import { useDynamicPrompts } from './useDynamicPrompts';
 
@@ -610,6 +611,20 @@ const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
+/** The section reset's wording by where its values come from. */
+const RENDER_RESET_LABEL_KEYS = {
+  withScheduler: {
+    base: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerBase',
+    mixed: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerMixed',
+    model: 'widgets.generate.sectionMenu.resetStepsGuidanceAndScheduler',
+  },
+  withoutScheduler: {
+    base: 'widgets.generate.sectionMenu.resetStepsAndGuidanceBase',
+    mixed: 'widgets.generate.sectionMenu.resetStepsAndGuidanceMixed',
+    model: 'widgets.generate.sectionMenu.resetStepsAndGuidance',
+  },
+} as const satisfies Record<string, Record<DefaultSource, string>>;
+
 export const GenerateRenderSection = ({
   draft,
   onCommit,
@@ -617,7 +632,7 @@ export const GenerateRenderSection = ({
   selectedModel,
 }: GenerateRenderSectionProps) => {
   const { t } = useTranslation();
-  const { CanvasDenoisingStrength: CanvasDenoisingStrengthSlot, project } = useGenerationUi();
+  const { CanvasDenoisingStrength: CanvasDenoisingStrengthSlot, models, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectRenderSettings);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const uiPolicy = getGenerationUiPolicy(selectedModel);
@@ -659,6 +674,22 @@ export const GenerateRenderSection = ({
   const isAtModelDefaults =
     modelDefaultsPatch !== null &&
     Object.entries(modelDefaultsPatch).every(([key, value]) => settings[key as keyof typeof settings] === value);
+  const resetLabel = (setting: 'scheduler' | 'steps' | 'cfgScale') =>
+    getFieldResetLabel(setting, selectedModel, models.getBaseLabel, t);
+  const sectionSettings: ('scheduler' | 'steps' | 'cfgScale')[] = uiPolicy.schedulerVisible
+    ? ['steps', 'cfgScale', 'scheduler']
+    : ['steps', 'cfgScale'];
+  const sectionSource = selectedModel ? getDefaultSource(selectedModel, sectionSettings) : 'base';
+  const baseLabel = selectedModel?.type === 'main' ? models.getBaseLabel(selectedModel.base) : null;
+  // An external model's fallbacks belong to no base, so they are plain defaults.
+  const sectionResetLabel =
+    sectionSource !== 'model' && baseLabel === null
+      ? t('widgets.generate.sectionMenu.reset')
+      : t(RENDER_RESET_LABEL_KEYS[uiPolicy.schedulerVisible ? 'withScheduler' : 'withoutScheduler'][sectionSource], {
+          base: baseLabel,
+          // Named as the field is: CFG, or Guidance on distilled-guidance models.
+          guidance: uiPolicy.guidanceLabel,
+        });
 
   const renderFields = (strengthField: ReactNode) => (
     <>
@@ -666,6 +697,7 @@ export const GenerateRenderSection = ({
         fieldLabel={t('widgets.generate.steps')}
         copyValue={() => String(settings.steps)}
         isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
+        resetLabel={resetLabel('steps')}
         onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
       >
         <ScrubberField
@@ -685,6 +717,7 @@ export const GenerateRenderSection = ({
         fieldLabel={uiPolicy.guidanceLabel}
         copyValue={() => String(settings.cfgScale)}
         isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
+        resetLabel={resetLabel('cfgScale')}
         onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
       >
         <ScrubberField
@@ -736,6 +769,7 @@ export const GenerateRenderSection = ({
           fieldLabel={t('widgets.generate.scheduler')}
           copyValue={() => settings.scheduler}
           isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
+          resetLabel={resetLabel('scheduler')}
           onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
         >
           <Field hint="scheduler" label={t('widgets.generate.scheduler')} labelPlacement="inside">
@@ -764,13 +798,7 @@ export const GenerateRenderSection = ({
       summary={[settings.steps, `${uiPolicy.guidanceLabel} ${settings.cfgScale}`, canvas?.summary, seedSummary]}
       onReset={modelDefaultsPatch ? () => onCommit(modelDefaultsPatch) : undefined}
       // The seed, strength and family fields keep their values: only these have model defaults to return to.
-      resetLabel={t(
-        uiPolicy.schedulerVisible
-          ? 'widgets.generate.sectionMenu.resetStepsGuidanceAndScheduler'
-          : 'widgets.generate.sectionMenu.resetStepsAndGuidance',
-        // Named as the field is: CFG, or Guidance on distilled-guidance models.
-        { guidance: uiPolicy.guidanceLabel }
-      )}
+      resetLabel={sectionResetLabel}
     >
       <Stack gap="2.5">
         <GenerateIssueNotes section="render" />

@@ -19,10 +19,10 @@ Below the model and prompt, the panel's settings are grouped into sections, such
 * With a title focused, **↑** and **↓** move to the previous and next title, **Home** and **End** to the first and last, **→** opens the section, **←** folds it, and **Enter** or **Space** toggles it.
 * A folded section shows a summary of its values after its title, such as the size, or the steps, CFG and seed. Open, it shows its fields instead. Badges that flag something, such as **Incompatible** in Guidance or **Shared** in Upscale, show either way.
 * A section whose settings differ from their defaults has a dot on its title. A section holding a problem that stops Invoke from running turns its title red and shows how many problems it holds.
-* **Right-click** a title (or press the menu key or Shift+F10 while it has focus) for **Fold others**, **Expand all** or **Fold all**, **Copy summary**, which copies the title and its summary, and, where the section can reset its settings, a reset item that names what it resets: **Reset size to model defaults** in Size, **Reset steps, CFG and scheduler to model defaults** in Render, **Reset to provider defaults** in a hosted model's options, and **Reset section to defaults** in the Canvas compositing section.
+* **Right-click** a title (or press the menu key or Shift+F10 while it has focus) for **Fold others**, **Expand all** or **Fold all**, **Copy summary**, which copies the title and its summary, and, where the section can reset its settings, a reset item that names what it resets and where the values come from: **Reset size to model defaults** in Size (*to SDXL defaults*, or another family, when the model sets no size; *to model and SDXL defaults* when it sets only a width or a height), **Reset steps, CFG and scheduler to model defaults** in Render (*to SDXL defaults*, or another family, when the model sets none of them; *to model and SDXL defaults* when it sets some), **Reset to provider defaults** in a hosted model's options, and **Reset section to defaults** in the Canvas compositing section.
 * **Jump to section**, the list button in the panel's title bar, lists the sections in order. Choosing one opens it and brings it to the top of the panel.
 
-A field whose value differs from its default shows a small dot in the margin to its left. Click the dot to reset the field; the field keeps the keyboard focus. You can also right-click the field (or press the menu key or Shift+F10 while it has focus) and choose its reset item, or **Copy value**. Fields show the dot in Size, Render, Refiner and Advanced, including the VAE, VAE precision and the on/off settings there; a setting that is switched off or not used shows no dot.
+A field whose value differs from its default shows a small dot in the margin to its left. Click the dot to reset the field; the field keeps the keyboard focus. You can also right-click the field (or press the menu key or Shift+F10 while it has focus) and choose its reset item, or **Copy value**. The reset names where its value comes from: **Reset to model default** when the model's default settings set that value, **Reset to SDXL default** (or the model's family) when they do not, and **Reset to default** for settings no model sets, such as HiDiffusion. Fields show the dot in Size, Render, Refiner and Advanced, including the VAE, VAE precision and the on/off settings there; a setting that is switched off or not used shows no dot.
 
 ## Setting the image size
 
@@ -38,7 +38,7 @@ The **Size** section sets the width and height of the image.
   * **Model default** — the size set in the model's default settings. It appears only when the model sets one. A locked ratio stays locked and takes the default size's ratio; an unlocked one stays unlocked.
   * **Native square** — a 1:1 square at the model's native size, such as 1024×1024 for SDXL and FLUX or 512×512 for SD 1.5, with the ratio locked.
 
-  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way.
+  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way; for a model that sets no size the item reads **Reset to** its family's **default** and sets the family's native size, and for one that sets only a width or a height it reads **Reset to model and** family **default** and sets the model's side with the family's value for the other.
 
 When the Canvas is where you generate, the section says *Linked to the canvas frame*: the width, height and aspect lock are the generation frame's, and the frame's aspect lock is this one. Any change here, typed, dragged or reset, resizes the frame around its center, and while the canvas is open that resize is a canvas step, so undoing it on the canvas puts the frame and the size back. Resizing the frame on the canvas changes these fields; a frame you resize freely leaves the ratio **Free** even when it happens to match a preset, so only a ratio you choose or lock holds.
 
@@ -58,7 +58,7 @@ The **Render** section controls how the image is generated. Each slider has a ma
 
 ### Scheduler
 
-The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. When you have picked another scheduler, the dot to the left of the field switches back to the model's own choice.
+The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. When you have picked another scheduler, the dot to the left of the field switches back to the default: the model's own choice when it sets one, otherwise its family's.
 
 ### Seed
 
@@ -94,7 +94,7 @@ The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model 
 
 The **Advanced** section appears for models with extra options. Each setting you have changed from the model's default shows the reset dot, and while the section is folded its title shows how many of them there are. Depending on the model it can include:
 
-* **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. Other families set their VAE in the Components section.
+* **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. The VAE's dot, **Use the bundled VAE**, returns to the VAE bundled with the model; it does not show for the VAE the model's default settings name. Other families set their VAE in the Components section.
 * **CLIP skip** and **CFG rescale** — SD 1.5 and SD 2.x only.
 * **HiDiffusion** — improves structure at large sizes for SD 1.5 and SDXL; see [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
 * **Color compensation** — SDXL only.
@@ -107,7 +107,14 @@ Two output filters live in the Generate widget's settings (the cog in its header
 
 ### Resetting to defaults
 
-Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts and concepts are left alone, and a notification offers **Undo** to bring your earlier values back. The button is disabled when your settings already match the defaults.
+Each model can have default settings, which you set in the Model Manager. The ↺ button in the Generate panel's title bar, **Reset settings**, opens a menu with two choices, each saying under its name what it would change, such as *Steps 30 → 8, CFG 7 → 1*:
+
+* **Apply model defaults** applies only the values the model sets there: any of size, steps, CFG or guidance, scheduler, VAE, VAE precision and CFG rescale. A setting the model leaves unset keeps your value, so a model with no default size leaves your size alone; the menu lists what the model does not set. When the model sets only a width or only a height, that side is applied as if you typed it: a locked aspect ratio carries the other side along, an unlocked one leaves it. The choice is unavailable when the model's values already hold or the model sets no defaults, and it says which.
+* **Reset everything to defaults** resets all of those settings: to the model's values where it sets them, and to Invoke's defaults for its family everywhere else, size included. Your VAE stays unless the model sets one; a reset that locks the aspect ratio says so (*Aspect ratio Free → 1:1*).
+
+A default VAE set to the model's own ("Default VAE" in the Model Manager) means the VAE bundled with the model, and either choice returns to it, except for families such as FLUX.1 whose VAE is a separate, required component. A VAE the model names but that is not installed, or does not fit the model, is never applied: both choices keep your VAE, and the menu says so. Recalling an image or parameters that switch to such a model uses the bundled VAE instead, so an image made with it is reproduced; only where a VAE is required and none is bundled does your VAE stay. Newly installed models come with their family's recommended values filled in as their default settings, size included, so **Apply model defaults** sets the size for them until you clear Width and Height under **Default Settings** in the Model Manager.
+
+Either way your prompts and concepts are left alone, and a notification lists what changed and offers **Undo** to bring your earlier values back.
 
 To return to the settings of an earlier image instead, open **Use** in the Preview's header, or right-click the image in the Gallery or Preview and open **Reuse from image**. **All settings** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix image** does the same with a new seed; and **Use prompt**, **Use seed** and **Use size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 

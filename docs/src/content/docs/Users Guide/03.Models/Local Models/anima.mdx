@@ -68,7 +68,7 @@ and generation needs it. Its starter model (~4.8 GB) installs together with Anim
 only Qwen3.5 4B encoders: MOSS-Image's Qwen3.5 9B installs under the same type but does not work with Anima-3.8B. The connector
 runs once per denoising step, so Anima-3.8B is slower per step than Anima-2.9B (about 1.3 against 1.7
 iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds memory while the prompt
-is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
+is encoded. **Apply model defaults** sets 40 steps at CFG 6, the settings of the author's reference
 workflow.
 
 [FP8 Storage](/configuration/optimization/fp8-storage/) changes Anima-3.8B's images more than Anima's: at

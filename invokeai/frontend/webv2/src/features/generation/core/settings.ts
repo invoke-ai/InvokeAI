@@ -24,7 +24,6 @@ import type {
 } from './types';
 
 import { sanitizeBatchCount } from './batch';
-import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import {
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
   DEFAULT_KREA2_REBALANCE_WEIGHTS,
@@ -205,6 +204,16 @@ export const calculateNewSize = (
 export const isAspectRatioLocked = (
   settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
 ): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
+/** The ratio a lock enforces, preferring the stored value and falling back to the current dimensions. */
+export const getActiveAspectRatio = (
+  settings: Pick<GenerateSettings, 'aspectRatioValue' | 'height' | 'width'>
+): number =>
+  settings.aspectRatioValue > 0
+    ? settings.aspectRatioValue
+    : settings.height > 0
+      ? settings.width / settings.height
+      : 1;
 
 /** How far apart two ratios may be and still count as the same one. */
 export const ASPECT_RATIO_TOLERANCE = 0.0001;
@@ -695,20 +704,6 @@ const syncModelIdentifierWithModels = <T extends ComponentModelConfig | null>(
     ? (currentModel as T)
     : value;
 };
-
-export const getModelDefaultVae = (
-  model: GenerateModelConfig,
-  vaeModels: readonly VaeModelConfig[]
-): VaeModelConfig | null => {
-  const defaultVaeKey = (model.default_settings as { vae?: string | null } | null | undefined)?.vae;
-
-  return defaultVaeKey
-    ? (vaeModels.find((vae) => vae.key === defaultVaeKey && isVaeCompatibleWithGenerateModel(model, vae)) ?? null)
-    : null;
-};
-
-export const hasModelDefaultVae = (model: GenerateModelConfig): boolean =>
-  typeof (model.default_settings as { vae?: unknown } | null | undefined)?.vae === 'string';
 
 export const cloneGenerateWidgetValues = (
   values: GenerateWidgetValues
