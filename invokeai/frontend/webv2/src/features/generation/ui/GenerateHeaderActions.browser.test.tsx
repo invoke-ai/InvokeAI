@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { MainModelConfig } from '@features/generation/core/types';
 import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import type * as MenuModule from '@platform/ui/Menu';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
@@ -12,10 +13,35 @@ import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { GenerateHeaderActions } from './GenerateHeaderActions';
+
+// Each test starts with the items unloaded, as a page does: the loaders the module creates are swapped for fresh ones.
+const menuParts = vi.hoisted(() => ({
+  loaders: [] as { getSnapshot: () => { status: string }; reset: () => void }[],
+}));
+vi.mock('@platform/ui/Menu', async (importOriginal) => {
+  const original = await importOriginal<typeof MenuModule>();
+
+  return {
+    ...original,
+    createMenuPartLoader: <Part,>(importPart: () => Promise<Part>) => {
+      let current = original.createMenuPartLoader(importPart);
+      const loader = {
+        getSnapshot: () => current.getSnapshot(),
+        load: () => current.load(),
+        reset: () => {
+          current = original.createMenuPartLoader(importPart);
+        },
+        subscribe: (listener: () => void) => current.subscribe(listener),
+      };
+      menuParts.loaders.push(loader);
+      return loader;
+    },
+  };
+});
 
 seedArchitectureCapabilities();
 
@@ -30,6 +56,8 @@ await i18n.use(initReactI18next).init({
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+beforeEach(() => menuParts.loaders.forEach((loader) => loader.reset()));
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -94,7 +122,52 @@ const openMenu = async () => {
   await expect.element(page.getByRole('menu')).toBeVisible();
 };
 
+/** Waits for the warm-up that pointing at or focusing the button starts, without loading the items itself. */
+const settleWarmUp = () =>
+  vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']));
+
+/** Records whether the placeholder ever mounts while `open` runs. */
+const placeholdersDuring = async (open: () => Promise<unknown>): Promise<Node[]> => {
+  const placeholders: Node[] = [];
+  const observer = new MutationObserver(() =>
+    placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))
+  );
+  observer.observe(document.body, { childList: true, subtree: true });
+  await open();
+  observer.disconnect();
+
+  return placeholders;
+};
+
 describe('GenerateHeaderActions', () => {
+  it("opens on its items' first frame once pointing at the button has loaded them", async () => {
+    await render(turbo);
+    await userEvent.hover(trigger());
+    await settleWarmUp();
+
+    const placeholders = await placeholdersDuring(async () => {
+      await userEvent.click(trigger());
+      await expect.element(item('Apply model defaults')).toBeVisible();
+    });
+
+    expect(placeholders).toEqual([]);
+    expect(page.getByRole('menu').element().getAttribute('aria-busy')).toBe('false');
+  });
+
+  it("opens from the keyboard on its items' first frame once focusing the button has loaded them", async () => {
+    await render(turbo);
+    await act(() => (trigger().element() as HTMLButtonElement).focus());
+    await settleWarmUp();
+
+    const placeholders = await placeholdersDuring(async () => {
+      await userEvent.keyboard('{Enter}');
+      await expect.element(item('Apply model defaults')).toBeVisible();
+    });
+
+    expect(placeholders).toEqual([]);
+    expect(page.getByRole('menu').element().getAttribute('aria-busy')).toBe('false');
+  });
+
   it("says what applying changes, changes only the model's own values, and undoes them in one step", async () => {
     const { patchGenerateSettings, undoable, values } = await render(turbo);
 
@@ -140,6 +213,7 @@ describe('GenerateHeaderActions', () => {
     const { undoable, values } = await render(turbo);
 
     await act(() => (trigger().element() as HTMLButtonElement).focus());
+    await settleWarmUp();
     await userEvent.keyboard('{Enter}');
     await expect
       .element(item('Reset everything to defaults'))

@@ -296,6 +296,7 @@
     "viewJson": "View JSON",
     "widgetViewUnavailable": "Widget view unavailable.",
     "loading": "Loading…",
+    "menuPartLoadFailed": "Couldn't load. Open the menu again to retry.",
     "seedMode": {
       "label": "Seed mode",
       "random": "Random",

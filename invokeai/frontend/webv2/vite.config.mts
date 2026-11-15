@@ -421,8 +421,10 @@ const WIDGET_HOST_MODULES = [
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
-// The image menus and actions the Gallery and Preview boot with. The lazy Canvas reaches only their import notices and
-// reference append, so without the group Rolldown splits those out, costing every editor boot a request.
+// The image menus and actions the Gallery and Preview boot with, which the lazy queue recall chunks (the queue row and
+// details actions, the staging menu's recall verbs, the queue's Recall all) import as well. The lazy Canvas reaches only
+// their import notices and reference append, so without the group Rolldown splits those out, costing every editor boot
+// a request.
 const IMAGE_ACTIONS_MODULES = [
   '/workbench/canvas-operations/canvasImportNotice.ts',
   '/workbench/image-actions/ContextSubMenu.tsx',

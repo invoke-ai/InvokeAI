@@ -7,10 +7,10 @@ import { getQueueItemReadModelLabel } from '@features/queue/core/itemLabels';
 import { parseQueueItemOriginProjectId } from '@features/queue/data/events';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import { ListItem } from '@platform/ui/list/ListItem';
-import { MenuActionItem, MenuContent, useContextMenu } from '@platform/ui/Menu';
+import { ListItem, type ListContextMenuAnchor } from '@platform/ui/list/ListItem';
+import { MenuContent, MenuPartPlaceholder, useContextMenu, useMenuPart } from '@platform/ui/Menu';
 import { ChevronRightIcon } from 'lucide-react';
-import { memo, Suspense, useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CancelQueueItemButton } from './CancelQueueItemButton';
@@ -31,7 +31,7 @@ const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
 export const QueueItemRow = memo(
   ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
     const { t } = useTranslation();
-    const { canManageItem, canViewItemDetails, isProjectOpen, preloadItemActions } = useQueueUi();
+    const { canManageItem, canViewItemDetails, isProjectOpen, itemRecallMenuGroup, preloadItemActions } = useQueueUi();
     const [expanded, setExpanded] = useState(false);
     // Safari and Firefox on macOS do not focus a clicked button; the row's A key acts on the focused row. A click must
     // not show the keyboard ring: `focusVisible: false` says so where supported (Firefox), and elsewhere script focus
@@ -45,8 +45,20 @@ export const QueueItemRow = memo(
     const menu = useContextMenu();
     // Kept through the exit animation: the anchor clears the moment the menu closes.
     const { release: releaseMenu, value: shownMenuAnchor } = useExitRetainedValue(menu.anchor);
-    // Warm the actions chunk on intent so the first expand has nothing to wait for.
-    const preload = useCallback(() => preloadItemActions?.(), [preloadItemActions]);
+    // Warm the actions and the menu's recall entries on intent, so the first expand or menu has nothing to wait for.
+    const preload = useCallback(() => {
+      preloadItemActions?.();
+      itemRecallMenuGroup.load();
+    }, [itemRecallMenuGroup, preloadItemActions]);
+    // The keyboard's menu key and assistive technology open the menu without intent first.
+    const { open: openContextMenu } = menu;
+    const openMenu = useCallback(
+      (anchor: ListContextMenuAnchor) => {
+        itemRecallMenuGroup.load();
+        openContextMenu(anchor);
+      },
+      [itemRecallMenuGroup, openContextMenu]
+    );
     const consumedRevealRequestIdRef = useRef<number | null>(null);
     const duration = formatDuration(item.startedAt, item.completedAt);
     const age = formatCompactAge(item.completedAt ?? item.createdAt);
@@ -147,7 +159,7 @@ export const QueueItemRow = memo(
               />
             ) : undefined
           }
-          onContextMenu={canExpand ? menu.open : undefined}
+          onContextMenu={canExpand ? openMenu : undefined}
           onIntent={canExpand ? preload : undefined}
           onPress={canExpand ? toggle : undefined}
         />
@@ -193,15 +205,6 @@ const RunningItemProgress = ({ message, percentage }: { message: string; percent
   return <QueueStepProgress message={caption} percentage={percentage} />;
 };
 
-const ignoreSelect = () => undefined;
-
-/** A disabled entry in the menu's place, so the menu holds only menu items while its entries load. */
-const MenuEntriesLoading = () => {
-  const { t } = useTranslation();
-
-  return <MenuActionItem disabled label={t('common.loading')} value="loading" onSelect={ignoreSelect} />;
-};
-
 /** Mounted only while open or closing, so a long queue keeps one menu machine, and one recall read, at most. */
 const QueueItemContextMenu = ({
   anchor,
@@ -218,7 +221,8 @@ const QueueItemContextMenu = ({
   onRequestDismiss: (event: Event) => void;
   open: boolean;
 }) => {
-  const { ItemRecallMenuGroup } = useQueueUi();
+  const { itemRecallMenuGroup } = useQueueUi();
+  const recall = useMenuPart(itemRecallMenuGroup);
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => ({ height: 1, width: 1, x: anchor.x, y: anchor.y }),
@@ -247,11 +251,9 @@ const QueueItemContextMenu = ({
     >
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="13rem" py="1">
+          <MenuContent aria-busy={recall.status === 'loading'} minW="13rem" py="1">
             {/* The menu opens at once, so Escape and an outside press work while its entries load. */}
-            <Suspense fallback={<MenuEntriesLoading />}>
-              <ItemRecallMenuGroup item={item} />
-            </Suspense>
+            {recall.status === 'loaded' ? <recall.part item={item} /> : <MenuPartPlaceholder status={recall.status} />}
           </MenuContent>
         </Menu.Positioner>
       </Portal>

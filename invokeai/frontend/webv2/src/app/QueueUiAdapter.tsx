@@ -7,6 +7,7 @@ import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
 import { getQueueItemAccess, QueueUiProvider, type QueueLocalRun, type QueueUiAdapter } from '@features/queue/react';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { areArraysEqual, shallowEqual } from '@platform/state/selectors';
+import { createMenuPartLoader } from '@platform/ui/Menu';
 import { useQueryClient } from '@tanstack/react-query';
 import { isUnsubmittedQueueItem } from '@workbench/canvasStagingView';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
@@ -23,9 +24,9 @@ import { useTranslation } from 'react-i18next';
 
 const importQueueItemActions = () => import('@workbench/queue-integration/QueueItemActions');
 const QueueItemActions = lazy(() => importQueueItemActions().then((module) => ({ default: module.QueueItemActions })));
-// The row menu's recall entries share the details' chunk, so the row's hover warms both.
-const QueueItemRecallMenuGroup = lazy(() =>
-  importQueueItemActions().then((module) => ({ default: module.QueueItemRecallMenuGroup }))
+// The row menu's recall entries share the details' chunk: one request warms both.
+const queueItemRecallMenuGroup = createMenuPartLoader(() =>
+  importQueueItemActions().then((module) => module.QueueItemRecallMenuGroup)
 );
 
 const toQueueLocalRun = (projectId: string, item: QueueItem): QueueLocalRun => {
@@ -93,7 +94,6 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       activeProjectId,
       activeProjectName,
       ItemActions: QueueItemActions,
-      ItemRecallMenuGroup: QueueItemRecallMenuGroup,
       canManageInvocationCache: canManageAppConfig,
       canManageModelCache: canManageModels,
       canManageProcessor: canManageModels,
@@ -103,11 +103,13 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       cancelLocalRuns: (projectId) => queue.cancelUnsubmitted(projectId ?? undefined),
       isConnected,
       isProjectOpen: (projectId) => openProjectIds.includes(projectId),
+      itemRecallMenuGroup: queueItemRecallMenuGroup,
       loadingModel,
       localRuns,
       notify,
       openQueue: () => openWorkbenchWidget('queue'),
-      preloadItemActions: () => void importQueueItemActions(),
+      // A failed warm-up is no error: the details' own load reports it when they open.
+      preloadItemActions: () => void importQueueItemActions().catch(() => undefined),
       queueJobsScope,
       recallAllFromItem: (item) => {
         // Taken at the press: the recall's module may still be loading when the account or project changes.

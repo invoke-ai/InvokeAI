@@ -1,9 +1,10 @@
 import type { CanvasCandidateSlot } from '@workbench/canvasStagingView';
 
 import { Menu, Portal } from '@chakra-ui/react';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { createMenuPartLoader, MenuActionItem, MenuContent, MenuPartPlaceholder, useMenuPart } from '@platform/ui/Menu';
 import { CheckIcon, SaveIcon, XIcon } from 'lucide-react';
-import { lazy, Suspense, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface StagingItemContextMenuTarget {
@@ -12,21 +13,12 @@ export interface StagingItemContextMenuTarget {
   y: number;
 }
 
-// The recall verbs and the queue item read behind them load with the menu, off the Canvas's startup: the queue rows'
-// and details' menus share them lazily too.
-const StagingItemRecallGroup = lazy(() =>
-  import('./StagingItemRecallGroup').then((module) => ({ default: module.StagingItemRecallGroup }))
+// The recall verbs and the queue item read behind them load on demand, off the Canvas's startup (the queue rows' and
+// details' menus load them too). Pointing at or focusing a staged result warms them; the menu loads them as it opens.
+const stagingItemRecall = createMenuPartLoader(() =>
+  import('./StagingItemRecallGroup').then((module) => module.StagingItemRecallGroup)
 );
-
-const ignoreSelect = () => undefined;
-
-/** A disabled entry in the recall verbs' place, so the menu holds only menu items while they load. */
-const RecallEntriesLoading = () => {
-  const { t } = useTranslation();
-
-  return <MenuActionItem disabled label={t('common.loading')} value="loading" onSelect={ignoreSelect} />;
-};
-const RECALL_ENTRIES_FALLBACK = <RecallEntriesLoading />;
+export const loadStagingItemRecall = stagingItemRecall.load;
 
 export const StagingItemContextMenu = ({
   canAccept,
@@ -44,6 +36,9 @@ export const StagingItemContextMenu = ({
   target: StagingItemContextMenuTarget;
 }) => {
   const { t } = useTranslation();
+  const recall = useMenuPart(stagingItemRecall);
+  // Mounted only while open, so mounting is the open: whoever opens the menu, its verbs load.
+  useMountEffect(stagingItemRecall.load);
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => ({ height: 1, width: 1, x: target.x, y: target.y }),
@@ -64,11 +59,13 @@ export const StagingItemContextMenu = ({
     <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={onOpenChange}>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="13rem" py="1">
+          <MenuContent aria-busy={recall.status === 'loading'} minW="13rem" py="1">
             {/* The menu opens at once, so its other items, Escape and an outside press work while the verbs load. */}
-            <Suspense fallback={RECALL_ENTRIES_FALLBACK}>
-              <StagingItemRecallGroup slot={target.slot} />
-            </Suspense>
+            {recall.status === 'loaded' ? (
+              <recall.part slot={target.slot} />
+            ) : (
+              <MenuPartPlaceholder status={recall.status} />
+            )}
             <Menu.Separator borderColor="border.subtle" />
             <MenuActionItem
               icon={SaveIcon}

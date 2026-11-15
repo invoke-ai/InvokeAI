@@ -21,6 +21,7 @@ import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
 
 const contextMenu = vi.hoisted(() => ({
+  loadRecall: vi.fn(),
   targets: [] as { slotId: string; x: number; y: number }[],
 }));
 const queueProgress = vi.hoisted(() => ({ current: null as QueueItemProgress | null }));
@@ -29,6 +30,7 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
   useQueueItemProgress: () => queueProgress.current,
 }));
 vi.mock('./StagingItemContextMenu', () => ({
+  loadStagingItemRecall: contextMenu.loadRecall,
   StagingItemContextMenu: ({
     onClose,
     target,
@@ -277,6 +279,19 @@ describe('StagingBar thumbnail strip', () => {
     expect(onSelectImage).toHaveBeenCalledWith(2);
     expect(contextMenu.targets.at(-1)).toEqual({ slotId: 'slot-2', x: 120, y: 80 });
     expect(document.querySelector('[data-testid="staging-context-menu"]')).not.toBeNull();
+  });
+
+  it("warms a staged result's recall verbs when it is pointed at or focused", async () => {
+    const { thumbnails } = await renderStagingBar(3, 0);
+
+    for (const event of [
+      new PointerEvent('pointerover', { bubbles: true }),
+      new FocusEvent('focusin', { bubbles: true }),
+    ]) {
+      contextMenu.loadRecall.mockClear();
+      await interact(() => thumbnails[1]!.dispatchEvent(event));
+      expect(contextMenu.loadRecall).toHaveBeenCalled();
+    }
   });
 
   it('shows the spinner on the executing placeholder until its progress is known', async () => {

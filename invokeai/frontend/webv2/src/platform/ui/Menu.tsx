@@ -14,8 +14,9 @@ import {
   useMenuItemContext,
 } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { createExternalStore } from '@platform/state/externalStore';
-import { createContext, useCallback, useContext, useId, useMemo, useRef } from 'react';
+import { createExternalStore, createExternalStoreCore } from '@platform/state/externalStore';
+import { createContext, useCallback, useContext, useId, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { IconButton, useUnavailableControl } from './Button';
 import { MiddleTruncate } from './MiddleTruncate';
@@ -251,6 +252,62 @@ export const MenuActionItem = ({
     >
       {content}
     </MenuItem>
+  );
+};
+
+export type MenuPartSnapshot<Part> = { part: Part; status: 'loaded' } | { status: 'failed' | 'idle' | 'loading' };
+
+export interface MenuPartLoader<Part> {
+  getSnapshot: () => MenuPartSnapshot<Part>;
+  /** Starts the import unless it has loaded or is under way; after a failure, imports again. Never throws or rejects. */
+  load: () => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+/**
+ * Loads part of a menu on demand into state, not through `lazy()`: a lazy boundary suspends on the open's first render
+ * even when its module has loaded, and React holds back the reveal, so the menu would open on its placeholder. Once
+ * loaded the part stays, so every later open renders it on its first frame. Call `load` on intent and on open.
+ */
+export const createMenuPartLoader = <Part,>(importPart: () => Promise<Part>): MenuPartLoader<Part> => {
+  const store = createExternalStoreCore<MenuPartSnapshot<Part>>({ status: 'idle' });
+
+  return {
+    getSnapshot: store.getSnapshot,
+    load: () => {
+      const { status } = store.getSnapshot();
+
+      if (status === 'idle' || status === 'failed') {
+        store.setSnapshot({ status: 'loading' });
+        // An importer that throws at once fails like one that rejects, rather than leaving the part loading for good.
+        new Promise<Part>((resolve) => {
+          resolve(importPart());
+        }).then(
+          (part) => store.setSnapshot({ part, status: 'loaded' }),
+          () => store.setSnapshot({ status: 'failed' })
+        );
+      }
+    },
+    subscribe: store.subscribe,
+  };
+};
+
+export const useMenuPart = <Part,>(loader: MenuPartLoader<Part>): MenuPartSnapshot<Part> =>
+  useSyncExternalStore(loader.subscribe, loader.getSnapshot, loader.getSnapshot);
+
+const ignoreSelect = () => undefined;
+
+/** A disabled item in the place of a part still loading or that failed to, so the menu holds only menu items. */
+export const MenuPartPlaceholder = ({ status }: { status: MenuPartSnapshot<unknown>['status'] }) => {
+  const { t } = useTranslation();
+
+  return (
+    <MenuActionItem
+      disabled
+      label={t(status === 'failed' ? 'common.menuPartLoadFailed' : 'common.loading')}
+      value="menu-part-placeholder"
+      onSelect={ignoreSelect}
+    />
   );
 };
 

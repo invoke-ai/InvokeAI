@@ -15,8 +15,7 @@ import { clampDimension, getActiveAspectRatio, isAspectRatioLocked } from '@feat
 import {
   doesModelSetDefault,
   getDefaultSizePatch,
-  getOwnDefaults,
-  isFiniteNumber,
+  getDefaultSource,
   type ModelDefaultSetting,
 } from './modelDefaultSettings';
 
@@ -54,8 +53,6 @@ const isShown = (setting: DescribedSetting, model: GenerateModelConfig): boolean
   }
 };
 
-type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
-
 /**
  * The model's size, as typing its values into the fields would set it. With only one side set, that side is typed: a
  * locked ratio carries the other side along, an unlocked one leaves it.
@@ -63,14 +60,14 @@ type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
 const getOwnSizePatch = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  defaults: Dimensions
+  defaults: Pick<GenerateSettings, 'height' | 'width'>
 ): Partial<GenerateSettings> => {
-  const own = getOwnDefaults(model);
-  const hasWidth = isFiniteNumber(own.width);
-
-  if (hasWidth && isFiniteNumber(own.height)) {
+  if (getDefaultSource(model, ['size']) === 'model') {
     return getDefaultSizePatch(settings, defaults);
   }
+
+  // The model sets one side.
+  const hasWidth = Number.isFinite((model.default_settings as { width?: unknown } | null | undefined)?.width);
 
   const isLocked = isAspectRatioLocked(settings);
   const ratio = getActiveAspectRatio(settings);

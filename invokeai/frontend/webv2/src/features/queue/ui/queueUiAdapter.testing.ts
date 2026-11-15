@@ -1,3 +1,5 @@
+import { createMenuPartLoader } from '@platform/ui/Menu';
+
 import type { QueueLocalRun, QueueUiAdapter } from './QueueUiContext';
 import type { QueueWidgetRuntime } from './QueueWidgetView';
 
@@ -6,7 +8,6 @@ const noLoadingModel = { getLabel: (): string | null => null, subscribe: () => (
 /** A single-user adapter that can manage everything, connected, with nothing queued locally. */
 export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}): QueueUiAdapter => ({
   ItemActions: () => null,
-  ItemRecallMenuGroup: () => null,
   activeProjectId: null,
   activeProjectName: null,
   canManageInvocationCache: false,
@@ -18,6 +19,7 @@ export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}
   cancelLocalRuns: () => undefined,
   isConnected: true,
   isProjectOpen: () => true,
+  itemRecallMenuGroup: createMenuPartLoader(() => Promise.resolve(() => null)),
   loadingModel: noLoadingModel,
   localRuns: [],
   notify: { error: () => undefined, info: () => undefined, success: () => undefined },

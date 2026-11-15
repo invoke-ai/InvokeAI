@@ -36,7 +36,11 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
-import { StagingItemContextMenu, type StagingItemContextMenuTarget } from './StagingItemContextMenu';
+import {
+  loadStagingItemRecall,
+  StagingItemContextMenu,
+  type StagingItemContextMenuTarget,
+} from './StagingItemContextMenu';
 import { CANVAS_SURFACE_ATTR } from './surfaceFocus';
 
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
@@ -617,6 +621,9 @@ const StagingThumbnail = ({
       tabIndex={isSelected && isTabStop ? 0 : -1}
       onClick={onSelect}
       onContextMenu={onContextMenu}
+      // A staged result's menu offers recall; warm it on intent.
+      onFocus={slot.kind === 'candidate' ? loadStagingItemRecall : undefined}
+      onPointerEnter={slot.kind === 'candidate' ? loadStagingItemRecall : undefined}
     >
       {slot.kind === 'candidate' ? (
         <img

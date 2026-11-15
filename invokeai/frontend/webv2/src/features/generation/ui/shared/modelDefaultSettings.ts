@@ -16,10 +16,9 @@ export type ModelDefaultSetting =
 
 type OwnDefaults = NonNullable<Extract<GenerateModelConfig, { type: 'main' }>['default_settings']>;
 
-export const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-export const getOwnDefaults = (model: GenerateModelConfig): OwnDefaults =>
-  (model.default_settings ?? {}) as OwnDefaults;
+const getOwnDefaults = (model: GenerateModelConfig): OwnDefaults => (model.default_settings ?? {}) as OwnDefaults;
 
 /** Where a reset takes its values from: the model's own defaults, the base's, or both. */
 export type DefaultSource = 'base' | 'mixed' | 'model';
