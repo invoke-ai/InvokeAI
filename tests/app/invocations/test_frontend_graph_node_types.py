@@ -107,7 +107,7 @@ SUPPORTED_BASE_COUNTS = {"generate": 17, "video": 3, "upscale": 9}
 
 # Floors separating "the fixture records literals" from "it records a fraction of them". Set just
 # under the current numbers (generate: 83 node types carrying 400 scalar values; video: 25 carrying
-# 142; upscale: 62 carrying 259) rather than far below them: a recording bug that dropped most of the
+# 142; upscale: 62 carrying 258) rather than far below them: a recording bug that dropped most of the
 # values while keeping the names would otherwise leave every annotation check below passing over a
 # short list. They are not per-architecture expectations, so removing an architecture means lowering
 # them deliberately.
