@@ -258,7 +258,7 @@ const BASE_CASES: BaseCase[] = [
 seedArchitectureCapabilities();
 
 describe('compileCanvasGraph', () => {
-  it('retains the local Kontext reference when a synced Canvas model is renamed', () => {
+  it('uses a local Kontext reference added after a synced Canvas model is renamed', () => {
     const installed = {
       ...fluxModel,
       hash: 'original-file',
@@ -278,14 +278,25 @@ describe('compileCanvasGraph', () => {
       [renamed]
     );
 
-    const { backendGraph } = compile(settings.model, 'img2img', { settings });
+    const withSecondReference = withAddedReferenceImages(settings.model, [], settings.referenceImages, [
+      { id: 'second', image: { original: { image: { height: 768, image_name: 'second.png', width: 512 } } } },
+    ]);
+    const { backendGraph } = compile(settings.model, 'img2img', {
+      settings: { ...settings, referenceImages: withSecondReference },
+    });
 
     expect(settings.model.name).toBe(renamed.name);
-    expect(
-      backendGraph.edges.some(
-        ({ destination }) => destination.node_id === 'denoise_latents' && destination.field === 'kontext_conditioning'
-      )
-    ).toBe(true);
+    expect(backendGraph.edges).toContainEqual(
+      expect.objectContaining({
+        destination: { node_id: 'denoise_latents', field: 'kontext_conditioning' },
+      })
+    );
+    expect(Object.values(backendGraph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
   });
 
   describe('txt2img per base', () => {

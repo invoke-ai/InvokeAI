@@ -1138,6 +1138,8 @@ describe('compileGenerateGraph', () => {
 
   it.each([
     ['hf_repo_id', 'black-forest-labs/FLUX.1-Kontext-dev:fp16'],
+    ['url', 'https://www.huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/tree/main'],
+    ['path', '/models/FLUX.1-Kontext-dev/'],
     ['url', 'https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf'],
     [
       'url',
@@ -1171,7 +1173,7 @@ describe('compileGenerateGraph', () => {
     expect(referenceImages[0]?.config.type).toBe('ip_adapter');
   });
 
-  it('preserves a local Kontext reference through a display-only catalog rename', () => {
+  it('preserves and adds local Kontext references after a display-only catalog rename', () => {
     const installed = {
       ...fluxKontextModel,
       hash: 'original-file',
@@ -1195,15 +1197,39 @@ describe('compileGenerateGraph', () => {
       model: { key: renamed.key, name: renamed.name },
       type: 'flux_kontext_reference_image',
     });
-    const graph = compile(synced.model, synced);
+    const second = {
+      id: 'second-reference',
+      image: { original: { image: { ...refImage.original.image, image_name: 'second.png' } } },
+    };
+    const referenceImages = withAddedReferenceImages(synced.model, [], synced.referenceImages, [second]);
+    const graph = compile(synced.model, { ...synced, referenceImages });
+
     expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')).toBeDefined();
+    expect(Object.values(graph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
 
     const anotherModel = { ...renamed, key: 'different-install', name: 'FLUX dev' };
     expect(() => compile(anotherModel, synced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(anotherModel, [], synced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
 
     const replacement = { ...renamed, hash: 'replacement-file', name: 'FLUX dev' };
     const replaced = syncGenerateWidgetValuesWithModels(synced, [replacement]);
     expect(() => compile(replaced.model, replaced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(replaced.model, [], replaced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
+
+    const otherVariant = { ...renamed, variant: 'schnell' };
+    const updated = syncGenerateWidgetValuesWithModels(synced, [otherVariant]);
+    expect(withAddedReferenceImages(updated.model, [], updated.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
   });
 
   it('wires FLUX.2 built-in reference images into denoise', () => {
