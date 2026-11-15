@@ -317,6 +317,6 @@ def test_a_flat_file_with_a_key_of_no_family_is_refused() -> None:
     try:
         lora_model_from_lycoris_flat_state_dict(_state_dict(keys))
     except ValueError as error:
-        assert "some_module_nobody_has" in str(error)
+        assert "not in a recognized SimpleTuner LyCORIS flat-key layout" in str(error)
     else:
-        raise AssertionError("a layer that matches no module must be refused, not dropped")
+        raise AssertionError("a file with a name of no family must be refused, not patched in part")

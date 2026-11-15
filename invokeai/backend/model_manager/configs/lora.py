@@ -74,7 +74,11 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_non_ltx2_architecture_keys,
     has_unsupported_ltx2_lora_variant_keys,
 )
-from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import lycoris_flat_family
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import (
+    lycoris_flat_family,
+    resolve_lycoris_flat_module,
+    split_lycoris_flat_key,
+)
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
     find_minimax_h3_lora_defect,
     has_minimax_h3_lora_keys,
@@ -227,6 +231,11 @@ _LYCORIS_OUT_DIM_SUFFIXES = (
 )
 _BFL_LYCORIS_ATTN_IN_SUFFIXES = tuple(f".img_attn.proj{suffix}" for suffix in _LYCORIS_IN_DIM_SUFFIXES)
 _BFL_LYCORIS_MLP_OUT_SUFFIXES = tuple(f".img_mlp.0{suffix}" for suffix in _LYCORIS_OUT_DIM_SUFFIXES)
+
+# FLUX.2 modules whose input dimension is the transformer's hidden size: every block shares that width, whatever
+# variant it belongs to, so any one of them settles the variant. The feed-forward layers carry their own width
+# instead, which is why they are not listed.
+_FLUX2_HIDDEN_SIZE_MODULE_TAILS = ("attn.to_add_out", "attn.to_qkv_mlp_proj")
 
 
 def _lokr_operand_dim(
@@ -590,6 +599,23 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             return _variant_from_hidden_size(state_dict[key].shape[1])
         # LyCORIS variant
         elif "_img_attn_proj." in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
+            if in_dim is not None:
+                return _variant_from_hidden_size(in_dim)
+
+    # SimpleTuner's LyCORIS flat keys: the flattened names resolve to the very modules the dotted checks above
+    # spell out, so read the same in-dimension off them (#10174). Without this the flat path records no variant,
+    # and a Klein 9B file is then offered for Klein 4B, where every layer misses.
+    if lycoris_flat_family(state_dict) == "flux2":
+        for key in state_dict:
+            if not isinstance(key, str) or not key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+                continue
+            split = split_lycoris_flat_key(key)
+            if split is None:
+                continue
+            module = resolve_lycoris_flat_module("flux2", split[0])
+            if module is None or not module.endswith(_FLUX2_HIDDEN_SIZE_MODULE_TAILS):
+                continue
             in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)

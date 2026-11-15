@@ -18,7 +18,7 @@
 # This file imports nothing from the config package, which keeps it free of cycles.
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, Literal
 
 import torch
@@ -205,6 +205,13 @@ SDXL_UNET_MODULE_TEMPLATES = (
         for tail in _SDXL_ATTENTION_TAILS
     )
     + tuple(f"mid_block.attentions.{{j}}.transformer_blocks.{{k}}.{tail}" for tail in _SDXL_ATTENTION_TAILS)
+    # `proj_in`/`proj_out` sit on the attention block itself, outside the transformer stack, and SDXL's
+    # `AttnProcessor2_0` holds both as Linears. LyCORIS's fuller presets train them, so a file with one has to
+    # resolve it rather than stay unknown.
+    + tuple(
+        f"{stage}_blocks.{{i}}.attentions.{{j}}.{tail}" for stage in ("down", "up") for tail in ("proj_in", "proj_out")
+    )
+    + tuple(f"mid_block.attentions.{{j}}.{tail}" for tail in ("proj_in", "proj_out"))
     + tuple(f"{stage}_blocks.{{i}}.resnets.{{j}}.{tail}" for stage in ("down", "up") for tail in _SDXL_RESNET_TAILS)
     + tuple(f"mid_block.resnets.{{j}}.{tail}" for tail in _SDXL_RESNET_TAILS)
     + (
@@ -247,10 +254,13 @@ _FLAT_TEMPLATE_RE: dict[LycorisFlatFamily, dict[str, re.Pattern[str]]] = {
 }
 
 # A transformer block past the single stack of SD 1.x/SD 2.x UNet attentions: the depth that identifies SDXL, the
-# same rule `_state_dict_looks_like_sdxl_unet_lora` applies to kohya's `lora_unet_` spelling.
+# same rule `_state_dict_looks_like_sdxl_unet_lora` applies to kohya's `lora_unet_` spelling. SD 1/2 names every
+# attention's single transformer block `transformer_blocks_0`, so the index is what separates the two families and
+# a match alone settles nothing.
 _SDXL_DEEP_ATTENTION_RE = re.compile(
     r"^(?:(?:down|up)_blocks_\d+_attentions_\d+|mid_block_attentions_\d+)_transformer_blocks_(\d+)_"
 )
+_SDXL_DEEP_ATTENTION_MIN_INDEX = 2
 
 
 def resolve_lycoris_flat_module(family: LycorisFlatFamily, flat_name: str) -> str | None:
@@ -271,7 +281,9 @@ def _flattened_name_resolves_only_in(family: LycorisFlatFamily, flat_name: str) 
     """True for names only ``family``'s module list holds — the evidence a file is of that family.
 
     SD 3's flat spelling counts as a neighbour here: FLUX.1's double blocks share SD 3's module names, so those
-    names identify neither (`sd3_lokr_simpletuner_format` is an SD 3 file holding exactly them).
+    names identify neither (`sd3_lokr_simpletuner_format` is an SD 3 file holding exactly them). So does any model
+    outside these five families: diffusers' Chroma shares FLUX.1's block names, so an attention-only Chroma file in
+    that naming is taken for FLUX.1 (a known limitation, listed in the docs).
     """
     if resolve_lycoris_flat_module(family, flat_name) is None:
         return False
@@ -280,6 +292,16 @@ def _flattened_name_resolves_only_in(family: LycorisFlatFamily, flat_name: str) 
     return all(
         other is family or resolve_lycoris_flat_module(other, flat_name) is None for other in _FAMILY_MODULE_TEMPLATES
     )
+
+
+def _sdxl_attention_depth(flat_names: Iterable[str]) -> int:
+    """The deepest `transformer_blocks` index the name set reaches inside an attention block, or -1."""
+    depth = -1
+    for flat_name in flat_names:
+        match = _SDXL_DEEP_ATTENTION_RE.match(flat_name + "_")
+        if match is not None:
+            depth = max(depth, int(match.group(1)))
+    return depth
 
 
 def _candidate_family(layers: dict[str, dict[str, torch.Tensor]]) -> LycorisFlatFamily | None:
@@ -292,9 +314,10 @@ def _candidate_family(layers: dict[str, dict[str, torch.Tensor]]) -> LycorisFlat
         return None
     family = matches[0]
 
-    if family == "sdxl" and not any(_SDXL_DEEP_ATTENTION_RE.match(flat_name + "_") for flat_name in layers):
-        # A LoRA confined to the shallow attention blocks is indistinguishable from SD 1/2 by structure alone
-        # (the limitation `_state_dict_looks_like_sdxl_unet_lora` documents).
+    if family == "sdxl" and _sdxl_attention_depth(layers) < _SDXL_DEEP_ATTENTION_MIN_INDEX:
+        # SD 1/2's UNets hold a single transformer block per attention, so their flattened names sit at index 0
+        # inside the very templates SDXL shares with them: depth is what separates the two families, the rule
+        # `_state_dict_looks_like_sdxl_unet_lora` documents. Without it every SD 1/2 file would install as SDXL.
         return None
     if family == "z_image" and any(
         (shape := layer_delta_shape(values)) is not None
@@ -307,23 +330,13 @@ def _candidate_family(layers: dict[str, dict[str, torch.Tensor]]) -> LycorisFlat
     return family
 
 
-def lycoris_flat_candidate_family(state_dict: Mapping[str | int, Any]) -> LycorisFlatFamily | None:
-    """The family a state dict's exclusive names point to, whatever else it holds.
-
-    The conversion resolves every name against this family and names any it cannot place, so a refused file says
-    which layer is the problem. The probes use `lycoris_flat_family`, which additionally requires every name to
-    resolve: a file with a key of no family is not identified at all.
-    """
-    layers = group_lycoris_flat_layers(state_dict)
-    return None if layers is None else _candidate_family(layers)
-
-
 def lycoris_flat_family(state_dict: Mapping[str | int, Any]) -> LycorisFlatFamily | None:
     """Which family's transformer a SimpleTuner LyCORIS flat-key state dict was trained for, or ``None``.
 
     ``None`` covers everything this layout does not settle: state dicts of other layouts, files whose names no
     family holds, files with a name of no family, and files whose names several families share without one
-    only-this-family name to break the tie.
+    only-this-family name to break the tie. A claimed file therefore resolves in full, which is what both the
+    probes and the conversion rely on.
     """
     layers = group_lycoris_flat_layers(state_dict)
     if layers is None:

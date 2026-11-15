@@ -22,13 +22,15 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Wan_Config
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanLoRAVariantType
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Flux2_Config, LoRA_LyCORIS_Wan_Config
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelType, WanLoRAVariantType
 from tests.backend.patches.lora_conversions.lora_state_dicts import (
     flux1_lycoris_flat_lokr_double_underscore_format,
     flux1_lycoris_flat_lokr_format,
     flux2_lycoris_flat_lokr_format,
     sd3_lokr_simpletuner_format,
+    sd15_lycoris_flat_lokr_format,
+    sd21_lycoris_flat_lokr_format,
     sdxl_lycoris_flat_lokr_format,
     wan_lycoris_flat_lokr_format,
     z_image_lycoris_flat_lokr_format,
@@ -123,6 +125,49 @@ def test_the_wan_flat_layout_records_its_variant_from_lokr_widths() -> None:
     assert LoRA_LyCORIS_Wan_Config.from_model_on_disk(mod, overrides).variant is WanLoRAVariantType.A14B
 
 
+def test_the_flux2_flat_layout_records_its_variant_from_lokr_widths() -> None:
+    """FLUX.2's flat names carry the hidden size the dotted spellings are read for, so Klein 9B is recorded.
+
+    Without it the file is offered for Klein 4B too, where every layer misses and generation fails.
+    """
+    mod, overrides = _mod(_state_dict(flux2_lycoris_flat_lokr_format.state_dict_keys), "flux2-lokr")
+
+    variant = LoRA_LyCORIS_Flux2_Config.from_model_on_disk(mod, overrides).variant
+
+    assert variant is Flux2VariantType.Klein9B
+
+
+_SD1_SD2_SHAPES = {
+    "sd15-attention": sd15_lycoris_flat_lokr_format.state_dict_keys,
+    "sd15-attention-and-ff": sd15_lycoris_flat_lokr_format.attention_and_ff_state_dict_keys,
+    "sd21-attention": sd21_lycoris_flat_lokr_format.state_dict_keys,
+    "sd21-attention-and-ff": sd21_lycoris_flat_lokr_format.attention_and_ff_state_dict_keys,
+}
+
+
+@pytest.mark.parametrize("shape", list(_SD1_SD2_SHAPES))
+def test_an_sd1_or_sd2_flat_file_is_claimed_by_no_config(shape: str) -> None:
+    """SD 1.x/2.x attentions hold one transformer block, at index 0 inside SDXL's own templates.
+
+    The names resolve in SDXL's list and in no other family's, so depth is the only thing that keeps these files
+    off SDXL. Without it they install as SDXL LoRAs whose layers then miss or mismatch on a real SDXL UNet.
+    """
+    assert _accepting_lora_configs(_state_dict(_SD1_SD2_SHAPES[shape]), shape) == []
+
+
+def test_the_sdxl_depth_rule_still_claims_a_file_past_the_first_block() -> None:
+    """The same SD 1.5 names at transformer-block index 2 are SDXL's: the fix must not reject real SDXL files.
+
+    `sdxl_lycoris_flat_lokr_format` reaches indices 3 and 5, so this pins the boundary itself.
+    """
+    keys = {
+        key.replace("_transformer_blocks_0_", "_transformer_blocks_2_"): value
+        for key, value in sd15_lycoris_flat_lokr_format.state_dict_keys.items()
+    }
+
+    assert _accepting_lora_configs(_state_dict(keys), "sd15-at-depth-2") == ["LoRA_LyCORIS_SDXL_Config"]
+
+
 def test_the_sd3_flat_layout_is_still_sd3() -> None:
     """The one flat `lycoris_` layout identified before this change must not move."""
     sd = _state_dict(sd3_lokr_simpletuner_format.state_dict_keys)
@@ -138,3 +183,16 @@ def test_a_flat_lycoris_file_that_resolves_in_no_family_stays_unidentified() -> 
         "lycoris_totally_unseen_module.lokr_w2": ([384, 384], "BF16"),
     }
     assert _accepting_lora_configs(_state_dict(keys), "unseen") == []
+
+
+def test_a_flat_lycoris_file_mixing_family_names_with_one_unknown_name_stays_unidentified() -> None:
+    """One name that resolves nowhere keeps the whole file out, so no layer is ever patched onto nothing.
+
+    A file is identified only when every name resolves in the one family its exclusive names point to. Here that
+    family is FLUX.1, but the stray name means the file is either damaged or not what its names suggest.
+    """
+    keys = dict(flux1_lycoris_flat_lokr_format.state_dict_keys)
+    keys["lycoris_some_module_nobody_has.lokr_w1"] = ([8, 8], "BF16")
+    keys["lycoris_some_module_nobody_has.lokr_w2"] = ([384, 384], "BF16")
+
+    assert _accepting_lora_configs(_state_dict(keys), "flux1-with-stray-name") == []

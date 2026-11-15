@@ -7,8 +7,8 @@ converter, whose `lora_unet_blocks_<idx>_<tail>` names the flattened names alrea
 converter's flattened `lora_unet_` keys. FLUX.2 Klein and Z-Image take diffusers module paths as their patch keys
 directly, which is what their converters produce from the dotted spellings.
 
-A file is refused rather than half-applied: any key that names no module of the claimed family raises, so a layer
-can never be silently dropped and the LoRA quietly do less than it should.
+A file is refused rather than half-applied: the layout is claimed only when every name resolves in one family, so
+a file with a name of no family, or of another family, is refused whole rather than patched in part.
 """
 
 from collections.abc import Mapping
@@ -24,7 +24,7 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import (
     LycorisFlatFamily,
     group_lycoris_flat_layers,
-    lycoris_flat_candidate_family,
+    lycoris_flat_family,
     resolve_lycoris_flat_module,
 )
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
@@ -49,7 +49,7 @@ def lora_model_from_lycoris_flat_state_dict(
     ``base`` is the base the model was registered with; a disagreement with the keys raises, like the FLUX.3
     re-identification guard, instead of mapping layers onto the wrong model.
     """
-    family = lycoris_flat_candidate_family(state_dict)
+    family = lycoris_flat_family(state_dict)
     if family is None:
         raise ValueError("LoRA model is not in a recognized SimpleTuner LyCORIS flat-key layout")
     if base is not None and base is not _FAMILY_BASES[family]:
@@ -63,11 +63,9 @@ def lora_model_from_lycoris_flat_state_dict(
     resolved: dict[str, dict[str, torch.Tensor]] = {}
     for flat_name, values in layers.items():
         module = resolve_lycoris_flat_module(family, flat_name)
-        if module is None:
-            raise ValueError(
-                f"LoRA layer 'lycoris_{flat_name}' targets no {_FAMILY_BASES[family].value} module; "
-                "the file is truncated, edited, or not this family's."
-            )
+        # `lycoris_flat_family` claimed the file only because every name resolved in this family, so a layer can
+        # never be dropped here for want of a module: the file is refused whole, before any layer is built.
+        assert module is not None
         resolved[module] = values
 
     return _FAMILY_BUILDERS[family](resolved)
