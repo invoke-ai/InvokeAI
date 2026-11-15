@@ -38,6 +38,7 @@ import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
   getH3ModeSwitchSettings,
+  getEffectiveVideoModel,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getAutoDurationBounds,
@@ -205,7 +206,7 @@ export const VideoWidgetView = () => {
         const detected = registered && isMainModelConfig(registered) ? registered : latest.model;
         removedTurbo = latest.acceleratorEnabled;
         const next = getH3ModeSwitchSettings(latest, detected, models, checked);
-        return { ...next, model: { ...latest.model, variant: next.h3SelectedTask } };
+        return next;
       });
       if (blocked) {
         toaster.create({
@@ -588,12 +589,12 @@ export const VideoWidgetView = () => {
         <HStack px="2" py="1" justify="space-between">
           <Text fontSize="sm">
             {t('widgets.video.h3Mode', {
-              mode: values.model.variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
-              source: values.h3ModeOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
+              mode: getEffectiveVideoModel(values.model, values).variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
+              source: values.h3TaskOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
             })}
           </Text>
           <Switch.Root
-            checked={values.h3ModeOverride === true}
+            checked={values.h3TaskOverride !== undefined}
             disabled={modelsStatus !== 'loaded'}
             onCheckedChange={toggleH3Mode}
           >

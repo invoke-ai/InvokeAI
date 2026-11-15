@@ -20,6 +20,7 @@ import {
   getH3ModeSwitchSettings,
   findLtx2DistilledLora,
   getDefaultVideoSettings,
+  getVideoSettingsWithModelDefaults,
   getEffectiveVideoTiming,
   getVideoComponentSectionPolicy,
   getVideoDimensions,
@@ -2820,6 +2821,28 @@ describe('what a model switch discards', () => {
 });
 
 describe('H3 picker preselection', () => {
+  it('reset clears the override and restores detected-task Turbo without losing prompt or user LoRAs', () => {
+    const model = h3Model('checkpoint', 'hybrid');
+    const turbo = { base: 'minimax-h3', key: 'turbo-fl', name: 'MiniMax H3 Turbo LoRA', type: 'lora' as const };
+    const refTurbo = { ...turbo, key: 'turbo-ref', name: 'MiniMax H3 Ref2V Turbo LoRA' };
+    const style = { ...turbo, key: 'style', name: 'Ink wash' };
+    const models = [model, turbo, refTurbo, style];
+    const initial = {
+      ...getDefaultVideoSettings(model),
+      positivePrompt: 'keep me',
+      loras: [{ model: style, weight: 0.7, isEnabled: true }],
+      h3TaskOverride: 'ref2va' as const,
+    };
+    const accelerated = getAcceleratorToggleResult(initial, model, models, true).settings;
+    expect(accelerated.acceleratorLoraKeys).toEqual([refTurbo.key]);
+    const reset = getVideoSettingsWithModelDefaults(accelerated, model, models);
+    expect(reset.h3TaskOverride).toBeUndefined();
+    expect(reset.acceleratorLoraKeys).toEqual([turbo.key]);
+    expect(reset.positivePrompt).toBe('keep me');
+    expect(reset.loras).toContainEqual(initial.loras[0]);
+    expect(reset.loras.some((entry) => entry.model.key === refTurbo.key)).toBe(false);
+  });
+
   it.each(['fl2va', 'ref2va'])('restores normal sampling after switching a Turbo %s task', (variant) => {
     const model: MainModelConfig = { ...h3Model('checkpoint', `h3-${variant}`), variant };
     const owned = {
@@ -2840,7 +2863,7 @@ describe('H3 picker preselection', () => {
       acceleratorLoraKeys: [],
       loras: [],
       steps: 50,
-      h3ModeOverride: true,
+      h3TaskOverride: variant === 'ref2va' ? 'fl2va' : 'ref2va',
     });
   });
 
@@ -2855,7 +2878,8 @@ describe('H3 picker preselection', () => {
     const settings = { ...getDefaultVideoSettings(previous), references };
     const switched = getVideoModelSelectionResult({
       currentSettings: settings,
-      model: { ...candidate, variant: 'ref2va' },
+      model: candidate,
+      h3TaskOverride: 'ref2va',
       models: [previous, candidate],
     });
     expect(switched.settings.references).toEqual(references);
@@ -2875,11 +2899,11 @@ describe('H3 picker preselection', () => {
     const settings = { ...getDefaultVideoSettings(previous), h3HybridBaseModel: base };
     const result = getVideoModelSelectionResult({
       currentSettings: settings,
-      model: { ...target, variant: 'ref2va' },
+      model: target,
       models: [previous, target, base],
-      h3TargetOverride: true,
+      h3TaskOverride: 'ref2va',
     });
-    expect(result.settings.h3ModeOverride).toBe(true);
+    expect(result.settings.h3TaskOverride).toBe('ref2va');
     expect(result.settings.h3HybridBaseModel).toBeNull();
     expect(result.losses).toContainEqual({ key: 'h3HybridBaseModel', count: 1 });
   });

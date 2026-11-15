@@ -10,7 +10,8 @@ import { GenerationUiProvider, type GenerationUiAdapter } from '@features/genera
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { useUpscaleUi, type UpscaleUiAdapter } from '@features/upscale/ui/UpscaleUiContext';
 import { UpscaleWidgetView } from '@features/upscale/ui/UpscaleWidgetView';
-import { createDefaultVideoWidgetValues } from '@features/video';
+import { createDefaultVideoWidgetValues, getVideoSettingsWithModelDefaults } from '@features/video';
+import { VideoHeaderActions } from '@features/video/ui/VideoHeaderActions';
 import { useVideoUi, type VideoUiAdapter } from '@features/video/ui/VideoUiContext';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
@@ -83,11 +84,13 @@ vi.mock('@features/models/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ModelSelect: ({
     modelTypes,
+    filter,
     onChange,
     pickerHeader,
     onPickerClose,
   }: {
     modelTypes?: readonly string[];
+    filter?: (model: ModelConfig) => boolean;
     onChange: (model: unknown) => void;
     pickerHeader?: ReactNode;
     onPickerClose?: () => void;
@@ -114,6 +117,14 @@ vi.mock('@features/models/react', async (importOriginal) => ({
         {open && (
           <div>
             {pickerHeader}
+            <button
+              type="button"
+              data-testid="pick-diffusers"
+              disabled={filter ? !filter(models[0]!) : false}
+              onClick={() => onChange(models[0])}
+            >
+              Diffusers
+            </button>
             <button
               type="button"
               data-testid="dismiss-model"
@@ -197,7 +208,14 @@ const render = async (widget: Widget) => {
               <VideoUiAdapterProvider>
                 <UpscaleUiAdapterProvider>
                   <CaptureAdapters />
-                  {widget === 'video' ? <VideoWidgetView /> : <UpscaleWidgetView />}
+                  {widget === 'video' ? (
+                    <>
+                      <VideoHeaderActions />
+                      <VideoWidgetView />
+                    </>
+                  ) : (
+                    <UpscaleWidgetView />
+                  )}
                 </UpscaleUiAdapterProvider>
               </VideoUiAdapterProvider>
             </DndContext>
@@ -225,6 +243,7 @@ const step = (row: HTMLElement) =>
     ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
 
 beforeEach(() => {
+  modelSnapshot.models = models;
   store = createWorkbenchStore();
   host = document.createElement('div');
   document.body.append(host);
@@ -239,6 +258,67 @@ afterEach(async () => {
 });
 
 describe('concept drafts through widget adapters', () => {
+  it.each(['wan', 'ltx-2', 'diffusers-only', 'components-only'])(
+    'hides the H3 picker header with %s and no selectable H3 checkpoint',
+    async (kind) => {
+      await render('video');
+      const catalogModel =
+        kind === 'components-only'
+          ? { ...models[0]!, components_only: true }
+          : kind === 'diffusers-only'
+            ? models[0]!
+            : model(kind, kind, 'main');
+      await act(() => {
+        modelSnapshot.models = [catalogModel];
+        store.commands.widgets.patchValues('video', { positivePrompt: 'refresh catalog' });
+      });
+      await act(() => host.querySelector<HTMLButtonElement>('[data-testid="open-model"]')!.click());
+      expect(host.textContent).not.toContain('widgets.video.h3LoadMode');
+    }
+  );
+
+  it('offers Diffusers only in Detected mode and retains catalog identity on selection', async () => {
+    await render('video');
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="open-model"]')!.click());
+    expect(host.textContent).toContain('widgets.video.h3LoadMode');
+    const diffusers = host.querySelector<HTMLButtonElement>('[data-testid="pick-diffusers"]')!;
+    expect(diffusers.disabled).toBe(false);
+    await act(() =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Ref2VA')!.click()
+    );
+    expect(diffusers.disabled).toBe(true);
+    await act(() =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent === 'widgets.video.h3Detected')!
+        .click()
+    );
+    expect(diffusers.disabled).toBe(false);
+    await act(() => diffusers.click());
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
+      model: models[0],
+      h3TaskOverride: undefined,
+    });
+  });
+
+  it('enables Reset for an explicit task choice and clears it back to Detected', async () => {
+    await render('video');
+    const checkpoint = { ...models[1]!, variant: 'fl2va', type: 'main' as const };
+    modelSnapshot.models = [...models.filter((entry) => entry.key !== checkpoint.key), checkpoint];
+    const defaults = createDefaultVideoWidgetValues([checkpoint, ...modelSnapshot.models]);
+    await act(() =>
+      store.commands.widgets.patchValues('video', {
+        ...getVideoSettingsWithModelDefaults(defaults, checkpoint, modelSnapshot.models),
+        model: checkpoint,
+        h3TaskOverride: 'fl2va',
+      })
+    );
+    const reset = host.querySelector<HTMLButtonElement>('[aria-label="widgets.video.resetAllToModelDefaults"]')!;
+    expect(reset.disabled).toBe(false);
+    await act(() => reset.click());
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video').h3TaskOverride).toBeUndefined();
+    expect(reset.disabled).toBe(true);
+  });
+
   it.each(['upscale', 'video'] as const)(
     'flushes sibling %s drafts without losing same-turn settings changes',
     async (widget) => {
@@ -359,9 +439,8 @@ describe('concept drafts through widget adapters', () => {
     ).toBe('true');
     await act(() => host.querySelector<HTMLButtonElement>('[data-testid="pick-unknown"]')!.click());
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
-      h3SelectedTask: 'fl2va',
-      h3ModeOverride: false,
-      model: { variant: 'fl2va' },
+      h3TaskOverride: undefined,
+      model: { variant: 'novel_task' },
     });
   });
 
@@ -372,7 +451,7 @@ describe('concept drafts through widget adapters', () => {
       store.commands.widgets.patchValues('video', {
         model: checkpoint,
         modelKey: checkpoint.key,
-        h3SelectedTask: 'fl2va',
+        h3TaskOverride: undefined,
         componentSourceModel: models[0],
       })
     );
@@ -390,8 +469,7 @@ describe('concept drafts through widget adapters', () => {
     const current = getProjectWidgetValues(store.getSnapshot().activeProject, 'video');
     expect(current).toMatchObject({
       positivePrompt: 'newest prompt',
-      h3SelectedTask: 'ref2va',
-      h3ModeOverride: true,
+      h3TaskOverride: 'ref2va',
       acceleratorEnabled: false,
     });
     expect(currentLoras('video').find((lora) => lora.model.key === 'video-second')?.weight).toBe(0.55);
@@ -404,7 +482,7 @@ describe('concept drafts through widget adapters', () => {
       store.commands.widgets.patchValues('video', {
         model: checkpoint,
         modelKey: checkpoint.key,
-        h3SelectedTask: 'fl2va',
+        h3TaskOverride: undefined,
         componentSourceModel: models[0],
       })
     );
@@ -417,7 +495,7 @@ describe('concept drafts through widget adapters', () => {
       label.querySelector<HTMLInputElement>('input')!.click();
     });
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
-      h3SelectedTask: 'fl2va',
+      h3TaskOverride: undefined,
       references: [reference],
     });
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'widgets.video.h3ClearModeInputs' }));

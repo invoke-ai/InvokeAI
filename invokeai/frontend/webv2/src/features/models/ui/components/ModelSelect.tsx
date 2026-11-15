@@ -44,7 +44,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMPTY_BASES: ReadonlySet<string> = new Set();
@@ -144,6 +144,7 @@ export const ModelSelect = ({
   const loadError = useModelsSelector((snapshot) => snapshot.error);
   const loadStatus = useModelsSelector((snapshot) => snapshot.status);
   const [isOpen, setIsOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
   const field = useFieldContext();
   const fieldControlProps = field?.getInputProps();
@@ -268,6 +269,7 @@ export const ModelSelect = ({
   return (
     <Box className={className} minW="0" w="full">
       <Popover.Root
+        initialFocusEl={() => contentRef.current?.querySelector<HTMLInputElement>('input[role="combobox"]') ?? null}
         ids={id ? { trigger: id } : undefined}
         // Like Select: closed pickers hold no list, virtualizer or observers, and each open starts a fresh search.
         lazyMount
@@ -356,6 +358,7 @@ export const ModelSelect = ({
         <Portal>
           <Popover.Positioner>
             <PopoverContent
+              ref={contentRef}
               aria-label={listLabel}
               css={dropdownContent}
               maxH="min(24rem, var(--available-height))"

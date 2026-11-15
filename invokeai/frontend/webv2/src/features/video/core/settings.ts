@@ -355,13 +355,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     isVideoSourceClip(values.sourceVideo) ? values.sourceVideo.video_name : undefined
   );
   const hasReferences = references.length > 0;
-  // Defer healing a conflicting legacy override until the user resolves it; migration needs both inputs.
-  const preserveLegacyConflict =
-    values.h3ModeOverride === true && values.h3SelectedTask !== 'fl2va' && values.h3SelectedTask !== 'ref2va';
-  const firstFrameImage =
-    (!hasReferences || preserveLegacyConflict) && isImageWithDims(values.firstFrameImage)
-      ? values.firstFrameImage
-      : null;
+  const firstFrameImage = !hasReferences && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
   const effectiveFirstFrame = hasReferences ? null : firstFrameImage;
   // A first frame and a source video are mutually exclusive; if a stale
   // project somehow holds both, the first frame wins deterministically.
@@ -402,9 +396,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     stgScale: hasFiniteNumber(values, 'stgScale') ? (values.stgScale as number) : null,
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
-    h3ModeOverride: values.h3ModeOverride === true,
-    h3SelectedTask:
-      values.h3SelectedTask === 'fl2va' || values.h3SelectedTask === 'ref2va' ? values.h3SelectedTask : undefined,
+    h3TaskOverride:
+      values.h3TaskOverride === 'fl2va' || values.h3TaskOverride === 'ref2va' ? values.h3TaskOverride : undefined,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(
@@ -422,10 +415,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     autoDuration,
     acceleratorEnabled,
     acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
-    lastFrameImage:
-      (!hasReferences || preserveLegacyConflict) && isImageWithDims(values.lastFrameImage)
-        ? values.lastFrameImage
-        : null,
+    lastFrameImage: !hasReferences && isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
     loras,
     modelKey: typeof values.modelKey === 'string' ? values.modelKey : '',
     negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
@@ -489,6 +479,7 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
 
   // Strict only over the keys normalize would have to invent.
   return (
+    values.h3TaskOverride === normalized.h3TaskOverride &&
     isSeedMode(values.seedMode) &&
     isVideoAspectRatioId(values.aspectRatioId) &&
     isVideoTargetResolution(values.targetResolution) &&
@@ -550,13 +541,7 @@ export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues |
   const model = isMainModelConfig(values.model) ? values.model : null;
   return {
     ...settings,
-    model:
-      model?.base === 'minimax-h3' &&
-      model.format === 'checkpoint' &&
-      settings.h3SelectedTask &&
-      model.variant !== settings.h3SelectedTask
-        ? { ...model, variant: settings.h3SelectedTask }
-        : model,
+    model,
   };
 };
 

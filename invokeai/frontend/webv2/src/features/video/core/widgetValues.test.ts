@@ -2,8 +2,9 @@ import type { GenerationModelCatalogItem, MainModelConfig } from '@features/gene
 
 import { describe, expect, it } from 'vitest';
 
+import { compileVideoGraph } from './graph';
 import { normalizeVideoWidgetValues } from './settings';
-import { getAcceleratorToggleResult } from './videoPolicies';
+import { getAcceleratorToggleResult, getVideoModelPolicy, getVideoComponentSectionPolicy } from './videoPolicies';
 import {
   createDefaultVideoWidgetValues,
   getVideoWidgetValidationReasons,
@@ -62,6 +63,63 @@ describe('createDefaultVideoWidgetValues', () => {
 });
 
 describe('syncVideoWidgetValuesWithModels', () => {
+  it.each([
+    ['fl2va', 'ref2va', true],
+    ['fl2va', 'ref2va', false],
+    ['ref2va', 'fl2va', true],
+    ['ref2va', 'fl2va', false],
+  ] as const)(
+    'reconciles task-specific Turbo on a detected %s → %s reclassification (replacement installed: %s)',
+    (from, to, installed) => {
+      const checkpoint = { ...h3Model('checkpoint', 'stable'), variant: from };
+      const component = h3Model();
+      const flTurbo = lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null);
+      const refTurbo = lora('MiniMax H3 Ref2V Turbo LoRA', 'minimax-h3', null);
+      const frame = { image_name: 'keep.png', width: 512, height: 512 };
+      const values = {
+        ...createDefaultVideoWidgetValues([checkpoint, component, flTurbo, refTurbo]),
+        firstFrameImage: frame,
+      };
+      const reclassified = { ...checkpoint, variant: to };
+      const originalTurbo = from === 'fl2va' ? flTurbo : refTurbo;
+      const replacementTurbo = to === 'fl2va' ? flTurbo : refTurbo;
+      const catalog = [reclassified, component, originalTurbo, ...(installed ? [replacementTurbo] : [])];
+      const after = syncVideoWidgetValuesWithModels(values, catalog);
+      expect(after.h3TaskOverride).toBeUndefined();
+      expect(after.model).toBe(reclassified);
+      expect(after.acceleratorEnabled).toBe(installed);
+      expect(after.acceleratorLoraKeys).toEqual(installed ? [replacementTurbo.key] : []);
+      expect(after.loras.map((entry) => entry.model.key)).toEqual(installed ? [replacementTurbo.key] : []);
+      expect(after.firstFrameImage).toBe(frame);
+      expect(after.steps).toBe(installed ? (to === 'fl2va' ? 6 : 4) : 50);
+      expect(syncVideoWidgetValuesWithModels(after, catalog)).toBe(after);
+    }
+  );
+
+  it('Detected follows same-key catalog reclassification without creating an override', () => {
+    const checkpoint = h3Model('checkpoint', 'stable');
+    const component = h3Model('diffusers', 'components');
+    const detected = syncVideoWidgetValuesWithModels(createDefaultVideoWidgetValues([checkpoint, component]), [
+      checkpoint,
+      component,
+    ]);
+    const reclassified = { ...checkpoint, variant: 'ref2va' };
+    const after = syncVideoWidgetValuesWithModels(detected, [reclassified, component]);
+    expect(after.model).toEqual(reclassified);
+    expect(after.h3TaskOverride).toBeUndefined();
+    expect(getVideoModelPolicy(after.model!, after).modes).toEqual(['reference']);
+    expect(
+      getVideoComponentSectionPolicy(after.model!, after).slots.some((slot) => slot.key === 'h3HybridBaseModel')
+    ).toBe(true);
+    const graph = compileVideoGraph(
+      {
+        ...after,
+        references: [{ kind: 'image', detail: 'match', image: { image_name: 'ref.png', width: 512, height: 512 } }],
+      },
+      after.model!
+    ).backendGraph;
+    expect(graph.nodes.model_loader?.task_variant_override).toBeUndefined();
+  });
   const model = wanModel('i2v_a14b', 'gguf_quantized');
 
   it('promotes a legacy transformer override to the top model slot', () => {
@@ -284,25 +342,24 @@ describe('H3 per-job mode override', () => {
     const changed = syncVideoWidgetValuesWithModels(
       {
         ...base,
-        h3SelectedTask: undefined,
-        h3ModeOverride: true,
+        h3TaskOverride: 'ref2va',
         references: [{ kind: 'image', detail: 'match', image: { image_name: 'r.png', width: 512, height: 512 } }],
       },
       catalog
     );
     expect(checkpoint.variant).toBe('fl2va');
-    expect(changed.model?.variant).toBe('ref2va');
-    expect(changed.h3ModeOverride).toBe(true);
+    expect(changed.model).toBe(checkpoint);
+    expect(changed.h3TaskOverride).toBe('ref2va');
     expect(syncVideoWidgetValuesWithModels(changed, catalog)).toBe(changed);
     const refreshed = syncVideoWidgetValuesWithModels(changed, [
       { ...checkpoint, name: 'Renamed model', hash: 'newhash' },
       source,
     ]);
-    expect(refreshed.model).toMatchObject({ name: 'Renamed model', hash: 'newhash', variant: 'ref2va' });
+    expect(refreshed.model).toMatchObject({ name: 'Renamed model', hash: 'newhash', variant: 'fl2va' });
     const replaced = syncVideoWidgetValuesWithModels(changed, [other, source]);
     expect(replaced.model?.key).toBe(other.key);
     expect(replaced.model?.variant).toBe('fl2va');
-    expect(replaced.h3ModeOverride).toBe(false);
+    expect(replaced.h3TaskOverride).toBeUndefined();
   });
 });
 
@@ -314,21 +371,47 @@ describe('H3 override queue readiness', () => {
     const values = {
       ...createDefaultVideoWidgetValues([model, component]),
       model,
-      h3SelectedTask: undefined,
-      h3ModeOverride: true,
+      h3TaskOverride: 'ref2va' as const,
       componentSourceModel: component,
       references: [{ kind: 'image' as const, detail: 'match' as const, image }],
     };
     const reasons = getVideoWidgetValidationReasons(values, [model, component]);
     expect(reasons.some((reason) => reason.includes('does not support reference-conditioned generation'))).toBe(false);
-    const detectedReasons = getVideoWidgetValidationReasons({ ...values, h3ModeOverride: false }, [model, component]);
+    const detectedReasons = getVideoWidgetValidationReasons({ ...values, h3TaskOverride: undefined }, [
+      model,
+      component,
+    ]);
     expect(detectedReasons.some((reason) => reason.includes('does not support reference-conditioned generation'))).toBe(
       true
     );
   });
 });
 
-describe('H3 selected task persistence', () => {
+describe('H3 explicit task persistence', () => {
+  it('reconciles deleted components and LoRAs without inferring intent from media', () => {
+    const model = h3Model('checkpoint');
+    const component = h3Model();
+    const style = { ...lora('deleted', 'minimax-h3', null), type: 'lora' as const };
+    const values = {
+      ...createDefaultVideoWidgetValues([model, component]),
+      h3TaskOverride: 'ref2va' as const,
+      loras: [{ model: style, weight: 1, isEnabled: true }],
+      references: [
+        {
+          kind: 'image' as const,
+          detail: 'match' as const,
+          image: { image_name: 'keep.png', width: 512, height: 512 },
+        },
+      ],
+    };
+    const result = syncVideoWidgetValuesWithModels(values, [model]);
+    expect(result.componentSourceModel).toBeNull();
+    expect(result.loras).toEqual([]);
+    expect(result.references).toEqual(values.references);
+    expect(result.h3TaskOverride).toBe('ref2va');
+    expect(result.model).toBe(model);
+  });
+
   it('preserves references across same-key catalog reclassification', () => {
     const model = h3Model('checkpoint', 'stable');
     const component = h3Model();
@@ -336,8 +419,7 @@ describe('H3 selected task persistence', () => {
     const values = syncVideoWidgetValuesWithModels(
       {
         ...createDefaultVideoWidgetValues([model, component]),
-        h3SelectedTask: 'ref2va',
-        h3ModeOverride: true,
+        h3TaskOverride: 'ref2va',
         references: [{ kind: 'image', detail: 'match', image }],
       },
       [model, component]
@@ -345,16 +427,17 @@ describe('H3 selected task persistence', () => {
     const reclassified = syncVideoWidgetValuesWithModels(values, [{ ...model, variant: 'ref2va' }, component]);
     expect(reclassified.model?.variant).toBe('ref2va');
     expect(reclassified.references).toEqual(values.references);
-    expect(reclassified.h3SelectedTask).toBe('ref2va');
-    expect(reclassified.h3ModeOverride).toBe(false);
+    expect(reclassified.h3TaskOverride).toBe('ref2va');
+    const restored = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(reclassified)))!;
+    expect(restored.model).toEqual(reclassified.model);
+    expect(restored.h3TaskOverride).toBe('ref2va');
   });
 
   it('does not invert an effective persisted model without a catalog', () => {
     const model = { ...h3Model('checkpoint'), variant: 'ref2va' };
     const values = {
       ...createDefaultVideoWidgetValues([model]),
-      h3ModeOverride: true,
-      h3SelectedTask: 'ref2va' as const,
+      h3TaskOverride: 'ref2va' as const,
       references: [
         { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'r.png', width: 512, height: 512 } },
       ],
@@ -364,255 +447,5 @@ describe('H3 selected task persistence', () => {
         reason.includes('does not support reference-conditioned generation')
       )
     ).toBe(false);
-  });
-});
-
-describe('H3 legacy migration', () => {
-  const image = { image_name: 'legacy.png', width: 512, height: 512 };
-  const reference = { kind: 'image' as const, detail: 'match' as const, image };
-
-  it.each([
-    ['synthetic reference reclassified before migration', 'ref2va', 'ref2va', 'ref2va', [reference], null],
-    ['classified frame model with references', 'fl2va', 'fl2va', 'ref2va', [reference], null],
-    ['synthetic frame reclassified before migration', 'fl2va', 'fl2va', 'fl2va', [], image],
-    ['classified reference model with a frame', 'ref2va', 'ref2va', 'fl2va', [], image],
-    ['ambiguous no-media classified identity', 'fl2va', 'fl2va', 'fl2va', [], null],
-    ['ambiguous no-media synthetic identity', 'ref2va', 'ref2va', 'ref2va', [], null],
-    ['distinct stored identity', 'ref2va', 'fl2va', 'ref2va', [], null],
-  ] as const)('%s', (_name, stored, detected, expected, references, firstFrameImage) => {
-    const catalog = { ...h3Model('checkpoint', 'legacy'), variant: detected };
-    const values = {
-      ...createDefaultVideoWidgetValues([catalog]),
-      model: { ...catalog, variant: stored },
-      h3SelectedTask: undefined,
-      h3ModeOverride: true,
-      references: [...references],
-      firstFrameImage,
-    };
-    const migrated = syncVideoWidgetValuesWithModels(values, [catalog]);
-    expect(migrated.h3SelectedTask).toBe(expected);
-    expect(migrated.model?.variant).toBe(expected);
-    expect(migrated.references).toEqual(values.references);
-    expect(migrated.firstFrameImage).toEqual(firstFrameImage);
-    expect(syncVideoWidgetValuesWithModels(migrated, [catalog])).toBe(migrated);
-    const hydrated = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(migrated)))!;
-    const reclassified = syncVideoWidgetValuesWithModels(hydrated, [
-      { ...catalog, variant: expected === 'ref2va' ? 'fl2va' : 'ref2va' },
-    ]);
-    expect(reclassified.h3SelectedTask).toBe(expected);
-    expect(reclassified.references).toEqual(values.references);
-    expect(reclassified.firstFrameImage).toEqual(firstFrameImage);
-    const before = getVideoWidgetValidationReasons(values, [catalog]);
-    const after = getVideoWidgetValidationReasons(migrated, [catalog]);
-    expect(before).toEqual(after);
-  });
-
-  it('preserves the entire legacy setup until conflict resolution, including unavailable selections', () => {
-    const main = { ...h3Model('checkpoint', 'hybrid-ref'), variant: 'ref2va', pruned: true };
-    const hybrid = { ...h3Model('checkpoint', 'chosen-hybrid'), pruned: true };
-    const components = { ...h3Model('diffusers', 'components'), components_only: true };
-    const encoder = { base: 'minimax-h3', key: 'missing-encoder', name: 'Missing encoder', type: 'qwen3_vl_encoder' };
-    const style = lora('missing-style', 'minimax-h3', null);
-    const catalog = [main, hybrid, components];
-    const legacy = {
-      ...createDefaultVideoWidgetValues(catalog),
-      model: main,
-      modelKey: main.key,
-      componentSourceModel: components,
-      h3HybridBaseModel: hybrid,
-      h3HybridStartBlock: 31,
-      h3TextEncoderModel: encoder,
-      loras: [{ model: style, weight: 0.75, isEnabled: true }],
-      h3ModeOverride: true,
-      h3SelectedTask: undefined,
-      references: [reference],
-      firstFrameImage: image,
-      lastFrameImage: image,
-      steps: 27,
-      cfgScale: 4,
-    };
-    const normalized = normalizeVideoWidgetValues(legacy)!;
-    expect(normalized).toMatchObject(legacy);
-    const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
-    expect(synced).toBe(normalized);
-    expect(synced).toEqual(normalized);
-    const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
-    expect(reloaded).toEqual(normalized);
-    const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
-    expect(resynced).toBe(reloaded);
-    for (const values of [normalized, synced, reloaded, resynced]) {
-      expect(getVideoWidgetValidationReasons(values, catalog)).toContain(
-        'References cannot be combined with first/last frames. Clear one side.'
-      );
-    }
-    const resolved = syncVideoWidgetValuesWithModels(
-      { ...resynced, firstFrameImage: null, lastFrameImage: null },
-      catalog
-    );
-    expect(resolved.h3SelectedTask).toBe('ref2va');
-    // Normal slot reconciliation resumes once the conflict is gone.
-    expect(resolved.h3HybridBaseModel).toBeNull();
-    expect(resolved.h3TextEncoderModel).toBeNull();
-    expect(resolved.loras).toEqual([]);
-    expect(getVideoWidgetValidationReasons(resolved, catalog)).toEqual(
-      expect.arrayContaining([expect.stringContaining('select a single-file Text encoder')])
-    );
-    expect(syncVideoWidgetValuesWithModels(resolved, catalog)).toBe(resolved);
-  });
-
-  it('preserves conflicting legacy media and lets validation reject the conflict', () => {
-    const model = h3Model('checkpoint', 'conflict');
-    const values = {
-      ...createDefaultVideoWidgetValues([model]),
-      h3SelectedTask: undefined,
-      h3ModeOverride: true,
-      references: [reference],
-      firstFrameImage: image,
-    };
-    const normalized = normalizeVideoWidgetValues({ ...values, lastFrameImage: image })!;
-    expect(normalized.references).toEqual([reference]);
-    expect(normalized.firstFrameImage).toEqual(image);
-    expect(normalized.lastFrameImage).toEqual(image);
-    const migrated = syncVideoWidgetValuesWithModels(normalized, [model]);
-    expect(migrated.references).toEqual([reference]);
-    expect(migrated.firstFrameImage).toEqual(image);
-    expect(migrated.lastFrameImage).toEqual(image);
-    expect(getVideoWidgetValidationReasons(migrated, [model])).toContain(
-      'References cannot be combined with first/last frames. Clear one side.'
-    );
-    const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(migrated)))!;
-    const resynced = syncVideoWidgetValuesWithModels(reloaded, [model]);
-    expect(resynced.references).toEqual([reference]);
-    expect(resynced.firstFrameImage).toEqual(image);
-    expect(resynced.lastFrameImage).toEqual(image);
-    expect(getVideoWidgetValidationReasons(resynced, [model])).toContain(
-      'References cannot be combined with first/last frames. Clear one side.'
-    );
-    const resolved = syncVideoWidgetValuesWithModels({ ...resynced, references: [] }, [model]);
-    expect(resolved.h3SelectedTask).toBe('fl2va');
-    expect(resolved.firstFrameImage).toEqual(image);
-    expect(resolved.lastFrameImage).toEqual(image);
-  });
-
-  it.each(['empty', 'replacement'] as const)(
-    'retains a missing model and conflicting media across reload with %s catalog, then resolves',
-    (catalogKind) => {
-      const model = h3Model('checkpoint', 'missing-conflict');
-      const replacement = h3Model('checkpoint', 'replacement');
-      const catalog = catalogKind === 'empty' ? [] : [replacement];
-      const legacy = {
-        ...createDefaultVideoWidgetValues([model]),
-        h3ModeOverride: true,
-        h3SelectedTask: undefined,
-        references: [reference],
-        firstFrameImage: image,
-        lastFrameImage: image,
-      };
-      const normalized = normalizeVideoWidgetValues(legacy)!;
-      const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
-      const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
-      const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
-      for (const values of [normalized, synced, reloaded, resynced]) {
-        expect(values.model?.key).toBe(model.key);
-        expect(values.h3ModeOverride).toBe(true);
-        expect(values.h3SelectedTask).toBeUndefined();
-        expect(values.references).toEqual([reference]);
-        expect(values.firstFrameImage).toEqual(image);
-        expect(values.lastFrameImage).toEqual(image);
-        expect(getVideoWidgetValidationReasons(values, catalog)).toEqual(
-          expect.arrayContaining([expect.stringContaining('no longer installed')])
-        );
-      }
-      const restored = syncVideoWidgetValuesWithModels(resynced, [model]);
-      expect(restored.h3ModeOverride).toBe(true);
-      expect(restored.h3SelectedTask).toBeUndefined();
-      expect(getVideoWidgetValidationReasons(restored, [model])).toContain(
-        'References cannot be combined with first/last frames. Clear one side.'
-      );
-      const resolved = syncVideoWidgetValuesWithModels({ ...restored, references: [] }, [model]);
-      expect(resolved.h3SelectedTask).toBe('fl2va');
-      expect(resolved.firstFrameImage).toEqual(image);
-      expect(resolved.lastFrameImage).toEqual(image);
-      expect(getVideoWidgetValidationReasons(resolved, [model])).not.toContain(
-        'References cannot be combined with first/last frames. Clear one side.'
-      );
-    }
-  );
-
-  it.each(['frames', 'references'] as const)(
-    'preserves an installed legacy transformer with a missing Diffusers main until resolving to %s',
-    (keep) => {
-      const main = h3Model('diffusers', 'missing-main');
-      const transformer = h3Model('checkpoint', 'installed-transformer');
-      const catalog = [transformer];
-      const legacy = {
-        ...createDefaultVideoWidgetValues([main]),
-        model: main,
-        modelKey: main.key,
-        h3TransformerModel: transformer,
-        h3ModeOverride: true,
-        h3SelectedTask: undefined,
-        references: [reference],
-        firstFrameImage: image,
-        lastFrameImage: image,
-        steps: 27,
-        cfgScale: 4,
-      };
-      const normalized = normalizeVideoWidgetValues(legacy)!;
-      const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
-      const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
-      const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
-      for (const values of [normalized, synced, reloaded, resynced]) {
-        expect(values).toMatchObject({
-          model: main,
-          modelKey: main.key,
-          h3TransformerModel: transformer,
-          h3ModeOverride: true,
-          references: [reference],
-          firstFrameImage: image,
-          lastFrameImage: image,
-          steps: 27,
-          cfgScale: 4,
-        });
-        expect(values.h3SelectedTask).toBeUndefined();
-        expect(getVideoWidgetValidationReasons(values, catalog)).toEqual(
-          expect.arrayContaining([expect.stringContaining('no longer installed')])
-        );
-      }
-      expect(syncVideoWidgetValuesWithModels(resynced, catalog)).toBe(resynced);
-      const resolved = syncVideoWidgetValuesWithModels(
-        keep === 'frames'
-          ? { ...resynced, references: [] }
-          : { ...resynced, firstFrameImage: null, lastFrameImage: null },
-        catalog
-      );
-      expect(resolved.model?.key).toBe(transformer.key);
-      expect(resolved.modelKey).toBe(transformer.key);
-      expect(resolved.h3TransformerModel).toBeNull();
-      expect(resolved.h3SelectedTask).toBe(keep === 'frames' ? 'fl2va' : 'ref2va');
-      expect(resolved.references).toEqual(keep === 'frames' ? [] : [reference]);
-      expect(resolved.firstFrameImage).toEqual(keep === 'frames' ? image : null);
-      expect(resolved.lastFrameImage).toEqual(keep === 'frames' ? image : null);
-      expect(resolved.steps).toBe(27);
-      expect(resolved.cfgScale).toBe(4);
-    }
-  );
-
-  it('honors explicit modern selection even when media suggests another task', () => {
-    const model = h3Model('checkpoint', 'modern');
-    const values = {
-      ...createDefaultVideoWidgetValues([model]),
-      h3SelectedTask: 'fl2va' as const,
-      h3ModeOverride: false,
-      references: [reference],
-    };
-    const synced = syncVideoWidgetValuesWithModels(values, [model]);
-    expect(synced.h3SelectedTask).toBe('fl2va');
-    expect(synced.references).toEqual([reference]);
-    expect(
-      getVideoWidgetValidationReasons(synced, [model]).some((reason) =>
-        reason.includes('does not support reference-conditioned generation')
-      )
-    ).toBe(true);
   });
 });

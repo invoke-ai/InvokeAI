@@ -28,6 +28,7 @@ import type { SupportedVideoBase } from './videoPolicies';
 import { getLtx2StageCanvases, isLtx2TwoStage, MINIMAX_H3_FPS } from './dimensions';
 import { MINIMAX_H3_HYBRID_BLOCK_RANGE, resolveVideoMode } from './settings';
 import {
+  getEffectiveVideoModel,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getVideoModelPolicy,
@@ -435,7 +436,8 @@ const buildWanVideoGraph = (settings: VideoSettings, model: MainModelConfig): Ba
   return graph;
 };
 
-const buildMiniMaxH3VideoGraph = (settings: VideoSettings, model: MainModelConfig): BackendGraphContract => {
+const buildMiniMaxH3VideoGraph = (settings: VideoSettings, catalogModel: MainModelConfig): BackendGraphContract => {
+  const model = getEffectiveVideoModel(catalogModel, settings);
   const mode = resolveVideoMode(settings);
   const dimensions = getVideoDimensions(model, settings);
 
@@ -455,7 +457,7 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, model: MainModelConfi
   // Hybrid loading overlays Ref2VA AdaLN blocks onto FL2VA; guard stale settings so unsupported mains cannot
   // silently load the wrong file.
   const hybridBase =
-    isSingleFileMain && model.variant === 'ref2va' && !settings.h3ModeOverride ? settings.h3HybridBaseModel : null;
+    isSingleFileMain && model.variant === 'ref2va' && !settings.h3TaskOverride ? settings.h3HybridBaseModel : null;
 
   const graph: BackendGraphContract = { edges: [], id: createId('minimax_h3_video_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -463,8 +465,8 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, model: MainModelConfi
     id: 'model_loader',
     model: componentSource ?? model,
     text_encoder_model: settings.h3TextEncoderModel ?? undefined,
-    task_variant_override: settings.h3ModeOverride ? model.variant : undefined,
-    transformer_model: isSingleFileMain ? (hybridBase ?? model) : undefined,
+    task_variant_override: model.variant !== catalogModel.variant ? model.variant : undefined,
+    transformer_model: isSingleFileMain ? (hybridBase ?? catalogModel) : undefined,
     type: 'minimax_h3_model_loader',
   });
   let transformerSource: BackendInvocationContract = modelLoader;

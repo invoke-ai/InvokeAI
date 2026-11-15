@@ -180,14 +180,12 @@ export interface VideoSettings extends DynamicPromptsSettings {
    * decides whether it applies to a given run.
    */
   autoDuration: boolean;
+  /** Explicit checkpoint task choice; absent follows the catalog classification. */
+  h3TaskOverride?: 'fl2va' | 'ref2va';
   /**
    * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while
    * retaining reference conditioning.
    */
-  /** Effective task, independent of later catalog reclassification. */
-  h3SelectedTask?: 'fl2va' | 'ref2va';
-  /** Compatibility flag for graph loading and legacy persisted records. */
-  h3ModeOverride?: boolean;
   h3HybridBaseModel: MainModelConfig | null;
   /** First transformer block (0-49) whose AdaLN projection stays Ref2VA's under the hybrid. */
   h3HybridStartBlock: number;

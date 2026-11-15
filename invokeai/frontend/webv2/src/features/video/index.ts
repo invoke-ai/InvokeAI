@@ -74,6 +74,7 @@ export {
   getAcceleratorSteps,
   getAcceleratorToggleResult,
   getDefaultVideoSettings,
+  getEffectiveVideoModel,
   getVideoComponentSectionPolicy,
   getVideoAspectRatioOptions,
   getVideoDimensions,

@@ -482,7 +482,9 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
   });
 
   it('passes an explicit override only for an overridden job', () => {
-    const { backendGraph } = compileVideoGraph({ ...referenceSettings, h3ModeOverride: true }, model);
+    const catalogModel = { ...model, variant: 'fl2va' };
+    const { backendGraph } = compileVideoGraph({ ...referenceSettings, h3TaskOverride: 'ref2va' }, catalogModel);
+    expect(nodeOfType(backendGraph, 'minimax_h3_model_loader').transformer_model).toMatchObject({ variant: 'fl2va' });
     expect(nodeOfType(backendGraph, 'minimax_h3_model_loader').task_variant_override).toBe('ref2va');
     const baseline = compileVideoGraph(referenceSettings, model);
     expect(nodeOfType(baseline.backendGraph, 'minimax_h3_model_loader').task_variant_override).toBeUndefined();

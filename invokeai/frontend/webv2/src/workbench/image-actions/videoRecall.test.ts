@@ -5,6 +5,8 @@ import {
   compileVideoGraph,
   createDefaultVideoWidgetValues,
   getDefaultVideoSettings,
+  getAcceleratorToggleResult,
+  syncVideoWidgetValuesWithModels,
   type VideoSettings,
 } from '@features/video';
 import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
@@ -1532,6 +1534,48 @@ describe('recall of what the video graphs record', () => {
 });
 
 describe('H3 overridden task recall', () => {
+  it.each(['fl2va', 'ref2va'] as const)('round-trips a %s override with its Turbo through graph metadata', (task) => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: task === 'ref2va' ? 'fl2va' : 'ref2va' };
+    const component = h3Model('components');
+    const flTurbo = lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null);
+    const refTurbo = lora('MiniMax H3 Ref2V Turbo LoRA', 'minimax-h3', null);
+    const catalog = [model, component, flTurbo, refTurbo];
+    const references = [
+      { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'ref.png', width: 512, height: 512 } },
+    ];
+    const settings = getAcceleratorToggleResult(
+      {
+        ...getDefaultVideoSettings(model, catalog),
+        h3TaskOverride: task,
+        references: task === 'ref2va' ? references : [],
+      },
+      model,
+      catalog,
+      true
+    ).settings;
+    const selectedTurbo = task === 'ref2va' ? refTurbo : flTurbo;
+    expect(settings.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    const graph = compileVideoGraph(settings, model).backendGraph;
+    expect(graph.nodes.model_loader).toMatchObject({ task_variant_override: task });
+    const metadata = recordedMetadata(settings, model);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues(catalog),
+      kind: 'all',
+      metadata,
+      models: catalog,
+    })!;
+    expect(result.values.h3TaskOverride).toBe(task);
+    expect(result.values.model).toBe(model);
+    expect(result.values.acceleratorEnabled).toBe(true);
+    expect(result.values.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    // Hydration supplies the media returned separately by recall.
+    const restored = syncVideoWidgetValuesWithModels({ ...result.values, references: settings.references }, catalog);
+    expect(compileVideoGraph(restored, restored.model!).backendGraph.nodes.model_loader).toMatchObject({
+      task_variant_override: task,
+    });
+    expect(restored.steps).toBe(settings.steps);
+  });
+
   it('restores the effective task from generation_mode for the same checkpoint', () => {
     const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: 'fl2va' };
     const values = createDefaultVideoWidgetValues([model]);
@@ -1544,9 +1588,8 @@ describe('H3 overridden task recall', () => {
       },
       models: [model],
     });
-    expect(result?.values.h3ModeOverride).toBe(true);
-    expect(result?.values.h3SelectedTask).toBe('ref2va');
-    expect(result?.values.model?.variant).toBe('ref2va');
+    expect(result?.values.h3TaskOverride).toBe('ref2va');
+    expect(result?.values.model).toBe(model);
     expect(model.variant).toBe('fl2va');
   });
 
@@ -1563,8 +1606,7 @@ describe('H3 overridden task recall', () => {
       },
       models: [current],
     });
-    expect(result?.values.h3ModeOverride).toBe(false);
-    expect(result?.values.h3SelectedTask).toBe('fl2va');
+    expect(result?.values.h3TaskOverride).toBeUndefined();
     expect(result?.values.model?.variant).toBe('fl2va');
   });
 });

@@ -11,6 +11,8 @@ import type { VideoWidgetValues } from './types';
 
 import {
   getAcceleratorLoraChangeResult,
+  getAcceleratorToggleResult,
+  getEffectiveVideoModel,
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
   getVideoModelAvailabilityReasons,
@@ -26,23 +28,6 @@ import {
 // Shared empty array, so clearing already-clear keys keeps its identity.
 const EMPTY_ACCELERATOR_LORA_KEYS: string[] = [];
 
-// Old override records did not distinguish catalog snapshots from effective synthetic models. Media is
-// conclusive only when it uses one kind of conditioning; otherwise retain the stored model's identity.
-const resolveH3Task = (values: VideoWidgetValues, detected: 'fl2va' | 'ref2va'): 'fl2va' | 'ref2va' => {
-  if (values.h3SelectedTask) {
-    return values.h3SelectedTask;
-  }
-  if (!values.h3ModeOverride) {
-    return detected;
-  }
-  const hasReferences = values.references.length > 0;
-  const hasFrames = Boolean(values.firstFrameImage || values.lastFrameImage);
-  if (hasReferences !== hasFrames) {
-    return hasReferences ? 'ref2va' : 'fl2va';
-  }
-  return values.model?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
-};
-
 export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = []): VideoWidgetValues => {
   const model = (models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null;
 
@@ -57,17 +42,6 @@ export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
 ): VideoWidgetValues => {
-  // Do not pick a task or replace the model while ambiguous legacy media needs a user decision.
-  const unresolvedLegacyConflict = Boolean(
-    values.h3ModeOverride &&
-    !values.h3SelectedTask &&
-    values.references.length &&
-    (values.firstFrameImage || values.lastFrameImage)
-  );
-  // No catalog reconciliation is safe until the user chooses which conditioning to keep.
-  if (unresolvedLegacyConflict) {
-    return values;
-  }
   // Promote only installed H3 checkpoint overrides before other reconciliation; retain the old Diffusers main as
   // components and drop invalid overrides without evicting it.
   if (values.model?.base === 'minimax-h3' && values.model.format === 'diffusers' && values.h3TransformerModel) {
@@ -99,31 +73,29 @@ export const syncVideoWidgetValuesWithModels = (
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
   const sameH3 =
     registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
-  const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
-  const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
-  const override = Boolean(sameH3 && effectiveVariant !== detected);
-  // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
-  // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
-  const candidate =
-    registered?.base === 'minimax-h3' && registered.format === 'checkpoint'
-      ? { ...registered, variant: effectiveVariant }
-      : registered;
-  const sameCandidate =
-    candidate &&
-    values.model &&
-    Object.keys(candidate).length === Object.keys(values.model).length &&
-    Object.entries(candidate).every(
-      ([key, value]) =>
-        JSON.stringify(value) === JSON.stringify((values.model as unknown as Record<string, unknown>)[key])
-    );
-  const model: MainModelConfig | null = sameCandidate ? values.model : candidate;
+  const model = registered;
 
   // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution
   // cannot remain stale.
-  const base: VideoWidgetValues =
+  let base: VideoWidgetValues =
     model && model.key !== values.model?.key
       ? { ...getVideoModelSelectionResult({ currentSettings: values, model, models }).settings, model }
       : values;
+
+  // Catalog reclassification changes Detected's task, not user intent. Replace only toggle-owned Turbo
+  // adapters; retain media for validation instead of silently discarding it in a model-selection transition.
+  if (
+    sameH3 &&
+    base.acceleratorEnabled &&
+    model &&
+    getEffectiveVideoModel(values.model, values)?.variant !== getEffectiveVideoModel(model, base).variant
+  ) {
+    const enabled = getAcceleratorToggleResult(base, model, models, true);
+    base = {
+      ...base,
+      ...(enabled.missingLoras ? getAcceleratorToggleResult(base, model, models, false).settings : enabled.settings),
+    };
+  }
 
   const componentPolicy = model ? getVideoComponentSectionPolicy(model, base) : null;
   const slotsByKey = new Map(componentPolicy?.slots.map((slot) => [slot.key, slot]) ?? []);
@@ -211,13 +183,7 @@ export const syncVideoWidgetValuesWithModels = (
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
-    h3ModeOverride: override,
-    h3SelectedTask:
-      model?.base === 'minimax-h3' && model.format === 'checkpoint'
-        ? model.variant === 'ref2va'
-          ? 'ref2va'
-          : 'fl2va'
-        : undefined,
+    h3TaskOverride: sameH3 ? base.h3TaskOverride : undefined,
     vae: syncComponent('vae', base.vae),
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
@@ -238,8 +204,7 @@ export const syncVideoWidgetValuesWithModels = (
     base === values &&
     next.model === values.model &&
     next.modelKey === values.modelKey &&
-    next.h3SelectedTask === values.h3SelectedTask &&
-    next.h3ModeOverride === values.h3ModeOverride &&
+    next.h3TaskOverride === values.h3TaskOverride &&
     next.acceleratorEnabled === values.acceleratorEnabled &&
     next.acceleratorLoraKeys === values.acceleratorLoraKeys &&
     next.vae === values.vae &&
@@ -272,13 +237,7 @@ export const getVideoWidgetValidationReasons = (
   // Resolve the same effective H3 task the graph compiler will use, without changing any media.
   const registered = models?.find((item) => item.key === values.model?.key);
   const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
-  const effectiveModel =
-    source.base === 'minimax-h3' && source.format === 'checkpoint'
-      ? {
-          ...source,
-          variant: resolveH3Task(values, source.variant === 'ref2va' ? 'ref2va' : 'fl2va'),
-        }
-      : source;
+  const effectiveModel = getEffectiveVideoModel(source, values);
   const reasons = getVideoValidationReasons(effectiveModel, values);
 
   if (models) {
