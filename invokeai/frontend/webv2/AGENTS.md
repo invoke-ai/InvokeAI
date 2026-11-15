@@ -22,9 +22,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 ## React and product quality
 
 - Polished desktop experience: deliberate layouts, responsive interactions, cohesive accessible controls, complete loading/empty/error/recovery states.
-- No direct `useEffect`. Effect-driven state synchronization can cause unnecessary renders and feedback loops. Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters.
-- `@platform/react/useMountEffect`: only mount/unmount registration with stable dependencies and complete cleanup. No changing-dependency refs, wrapper aliases, layout-effect evasions. Layout effects only for pre-paint DOM measurement.
-- Changing an effect's behavior: migrate it. Existing direct effects are not permission to add more, including in adapters. No unrelated sweeps. Identity changes use store/runtime lifecycles or deliberate keyed remounts, without accidental state loss. See [React adapters](ARCHITECTURE.md#react-adapters) for supported paths and enforcement limits.
+- No direct `useEffect`, adapters included; existing effects are not precedent. Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters; `@platform/react/useMountEffect` only for stable mount/unmount registration. Changing an effect's behavior: migrate it, without unrelated sweeps. Rationale, layout effects, identity resets, and what lint does not catch: [React adapters](ARCHITECTURE.md#react-adapters).
 - Reuse Platform controls, Chakra/theme tokens, icons, interactions. No second styling system, no generic Next.js/SWR patterns. Import controls by subpath (`@platform/ui/Button`): the `@platform/ui` barrel's importer budget is full.
 - Include disabled states. Keep keyboard operation, visible and restored focus, accessible names, pointer alternatives.
 - Icon-only controls get the platform `Tooltip`, menu and popover triggers included (share `useTooltipTriggerIds` between root and Tooltip). Never native `title`.
