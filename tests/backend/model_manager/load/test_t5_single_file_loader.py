@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_loaders.flux import T5EncoderSingleFileLoader
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 FP8 = torch.float8_e4m3fn
@@ -251,7 +252,7 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
     monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda device: device.type == "cuda")
     monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda device, _logger=None: False)
     path = tmp_path / "t5xxl.safetensors"
@@ -305,7 +306,7 @@ def test_a_cpu_only_t5_on_a_gpu_box_holds_float32(
 ) -> None:
     # `cpu_only` runs the encoder on the CPU while the loader's own device is the GPU; the dtype follows the
     # execution device, not `_torch_device`. The dtype choice is patched to float16 so a GPU decision shows.
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
     _keep_fp8(monkeypatch, False)
     path = tmp_path / "t5xxl.safetensors"
     _write_fp16(_tiny_reference(), path)
@@ -327,7 +328,7 @@ def test_device_caches_do_not_share_folded_weights_of_different_dtypes(
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
     _keep_fp8(monkeypatch, False)
     path = tmp_path / "t5xxl.safetensors"
     _write_scaled_fp8(_tiny_reference(), path)

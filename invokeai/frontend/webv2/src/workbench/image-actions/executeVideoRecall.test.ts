@@ -7,6 +7,7 @@ import type { TFunction } from 'i18next';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
+import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
@@ -28,6 +29,24 @@ import { createDefaultVideoWidgetValues } from '@features/video';
 import { applyVideoRecallMetadata, executeVideoRecall } from './executeVideoRecall';
 
 const t = ((key: string) => key) as unknown as TFunction;
+
+const englishCatalog = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+
+/** The English copy, for asserting what a notice shows rather than which key it asked for. */
+const createEnglishTranslator = async (): Promise<TFunction> => {
+  const instance = createInstance();
+
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
+  });
+
+  return ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+};
 
 const wanModel = {
   base: 'wan',
@@ -330,7 +349,7 @@ describe('executeVideoRecall', () => {
 
     const didRecall = await executeVideoRecall({
       queryClient,
-      t,
+      t: await createEnglishTranslator(),
       commands,
       getVideoValues: () => videoValues as unknown as Record<string, unknown>,
       item,
@@ -345,9 +364,11 @@ describe('executeVideoRecall', () => {
       { ...videoValues, aspectRatioId: '9:16', targetResolution: '720p' },
       undefined
     );
-    expect(commands.notifications.add).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.videoTitles.size' })
-    );
+    expect(commands.notifications.add).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Applied size.',
+      title: 'Recalled size',
+    });
   });
 
   it('says the recorded size has no preset on the panel model, not that the metadata is missing', async () => {
@@ -520,6 +541,95 @@ describe('executeVideoRecall', () => {
     await expect(recall()).resolves.toBe(true);
     expect(videoMetadata).toHaveBeenCalledTimes(2);
     expect(patchValues).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the target resolution of a canvas the recorded media sized', () => {
+  const wanI2v = { ...wanModel, key: 'wan-i2v', name: 'Wan 2.2 i2v_a14b', variant: 'i2v_a14b' } as ModelConfig;
+  const h3Fl2va = { ...h3Model, key: 'h3-fl2va', name: 'MiniMax H3 FL2VA', variant: 'fl2va' } as ModelConfig;
+
+  beforeEach(() => {
+    queryClient = new QueryClient();
+    accountLifecycle.activate('test-account');
+    videoMetadata.mockReset();
+    galleryApi.galleryImages.resolveMany.mockReset();
+  });
+
+  /** Recalls a first-frame run onto a panel on the same model, the gallery holding `frames`. */
+  const recallFirstFrame = async (
+    model: ModelConfig,
+    panel: Record<string, unknown>,
+    recorded: Record<string, unknown>,
+    frames: { height: number; imageName: string; width: number }[]
+  ) => {
+    recallSeq += 1;
+    videoMetadata.mockResolvedValue({
+      first_frame_image: { image_name: 'first.png' },
+      model: { base: model.base, key: model.key, name: model.name, type: 'main' },
+      num_frames: 81,
+      positive_prompt: 'a red fox',
+      seed: 7,
+      ...recorded,
+    });
+    galleryApi.galleryImages.resolveMany.mockResolvedValue(frames);
+    const { commands, patchValues } = createCommands();
+
+    await executeVideoRecall({
+      queryClient,
+      t: await createEnglishTranslator(),
+      commands,
+      getVideoValues: () => ({ ...createDefaultVideoWidgetValues([model]), ...panel }),
+      item: { ...item, name: `media-sized-${recallSeq}.mp4` },
+      kind: 'all',
+      models: [model],
+    });
+
+    const [notice] = vi.mocked(commands.notifications.add).mock.calls.at(-1) ?? [];
+
+    return { message: notice?.message, values: patchValues.mock.calls.at(-1)?.[1] as Record<string, unknown> };
+  };
+
+  it.each([
+    // 1800x1000 at 768 highres: over the area cap, scaled to 1363.1x757.3 and snapped to 1376x768. The canvas fed
+    // back would give 1344x768, and 768 lowres gives the frame 768x416.
+    ['an area-capped H3 canvas', h3Fl2va, 'minimax_h3_i2v', 1376, 768, 1800, 1000, '768 lowres', '768 highres'],
+    // 1000x700 at 1080p: 1542.9x1080, snapped to 1536x1088. The canvas fed back would give 1520x1088.
+    ['a Wan 1080p canvas', wanI2v, 'wan_i2v', 1536, 1088, 1000, 700, '720p', '1080p'],
+  ] as const)(
+    'restores the target resolution of %s from the frame as the gallery returns it',
+    async (_, model, generationMode, width, height, frameWidth, frameHeight, panelResolution, recalled) => {
+      const { message, values } = await recallFirstFrame(
+        model,
+        { targetResolution: panelResolution },
+        { generation_mode: generationMode, height, width },
+        [{ height: frameHeight, imageName: 'first.png', width: frameWidth }]
+      );
+
+      expect(values).toMatchObject({
+        firstFrameImage: { height: frameHeight, image_name: 'first.png', width: frameWidth },
+        targetResolution: recalled,
+      });
+      expect(message).toContain('size');
+    }
+  );
+
+  it('leaves the panel resolution, and claims no size, when the frame is gone or reaches the canvas nowhere', async () => {
+    // 688x480 is the frame's 480p canvas, which fed back would give itself: only the frame missing refuses it. A 16:9
+    // frame gives Wan 848x480, 1280x720 or 1920x1088, never 1536x1088.
+    for (const [size, frames] of [
+      [{ height: 480, width: 688 }, []],
+      [{ height: 1088, width: 1536 }, [{ height: 720, imageName: 'first.png', width: 1280 }]],
+    ] as const) {
+      const { message, values } = await recallFirstFrame(
+        wanI2v,
+        { targetResolution: '720p' },
+        { generation_mode: 'wan_i2v', ...size },
+        [...frames]
+      );
+
+      expect(values.targetResolution).toBe('720p');
+      expect(message).not.toContain('size');
+    }
   });
 });
 

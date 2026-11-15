@@ -11,11 +11,15 @@ import pytest
 from pydantic_core import to_jsonable_python
 from sqlalchemy import insert
 
+from invokeai.app.invocations.primitives import IntegerInvocation
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.session_queue import session_queue, session_queue_enqueue_receipts
 from invokeai.app.services.shared.database.schema.users import users
-from invokeai.app.services.shared.execution_state_migration import dump_execution_state
+from invokeai.app.services.shared.execution_state_migration import (
+    CURRENT_EXECUTION_STATE_VERSION,
+    dump_execution_state,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.pagination import SQLiteDirection
 
@@ -52,13 +56,15 @@ def _item(
     destination: Optional[str] = None,
     parent_item_id: Optional[int] = None,
     workflow: Optional[str] = None,
+    session_payload: Optional[dict[str, Any]] = None,
 ) -> int:
     session = GraphExecutionState(graph=Graph())
+    snapshot = session_payload if session_payload is not None else dump_execution_state(session)
     values: dict[str, Any] = {
         "queue_id": queue_id,
         "batch_id": batch_id,
-        "session_id": session.id,
-        "session": json.dumps(dump_execution_state(session), default=to_jsonable_python),
+        "session_id": snapshot["id"],
+        "session": json.dumps(snapshot, default=to_jsonable_python),
         "status": status,
         "priority": priority,
         "user_id": user_id,
@@ -355,6 +361,54 @@ class TestServiceReads:
         assert item._snapshot_readable and for_api._snapshot_readable
         assert (item.item_id, item.user_display_name, item.field_values[0].value) == (item_id, "Alice", 7)  # type: ignore[index]
         assert (for_api.status, for_api.origin, for_api.destination) == ("pending", "canvas", "gallery")
+
+    def test_a_row_written_with_child_policy_keys_still_reads(self, database: Database, service: SessionQueue) -> None:
+        """Rows written before the child policy knobs were removed must not read as failed synthetic items."""
+        graph = Graph()
+        graph.add_node(IntegerInvocation(id="source-call", value=1))
+        state = GraphExecutionState(graph=graph)
+        state.execution_graph.add_node(IntegerInvocation(id="prepared-call", value=1))
+        state.prepared_source_mapping["prepared-call"] = "source-call"
+        frame = state.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="saved-workflow")
+        state.begin_waiting_on_workflow_call(frame)
+        state.attach_waiting_workflow_call_child_sessions([GraphExecutionState(graph=Graph()) for _ in range(2)])
+        state.set_waiting_workflow_call_child_item_ids([20, 10])
+
+        snapshot = dump_execution_state(state)
+        dependency_id = next(iter(snapshot["execution_child_dependencies"]))
+        # Real rows written before removal carry the policies as their defaults.
+        snapshot["execution_child_dependencies"][dependency_id].update(
+            {"failure_policy": "fail_parent", "cancellation_policy": "cancel_parent"}
+        )
+        item_id = _item(database, status="in_progress", session_payload=snapshot)
+
+        item = service.get_queue_item_for_api(item_id)
+
+        assert item._snapshot_readable, item.error_message
+        assert item.status == "in_progress"
+        assert item.error_message is None
+        assert "source-call" in item.session.graph.nodes
+        assert set(item.session.execution_child_dependencies) == {dependency_id}
+
+    def test_a_row_with_a_malformed_child_ledger_reads_as_unreadable(
+        self, database: Database, service: SessionQueue
+    ) -> None:
+        """A non-mapping child ledger is malformed persisted state, not something the read projection iterates."""
+        item_id = _item(
+            database,
+            status="in_progress",
+            session_payload={
+                "id": "malformed-child-ledger-session",
+                "execution_state_version": CURRENT_EXECUTION_STATE_VERSION,
+                "graph": {},
+                "execution_child_dependencies": "garbage",
+            },
+        )
+
+        item = service.get_queue_item_for_api(item_id)
+
+        assert not item._snapshot_readable
+        assert item.status == "failed"
 
     def test_summaries_follow_the_callers_order(self, database: Database, service: SessionQueue) -> None:
         item_ids = [_item(database) for _ in range(3)]

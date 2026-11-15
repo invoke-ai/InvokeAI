@@ -25,7 +25,7 @@ from invokeai.backend.krea2.text_encoding import (
     working_memory_bytes,
 )
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelFormat, SubModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -48,13 +48,19 @@ from invokeai.backend.util.devices import TorchDevice
 # ai-toolkit trains edit LoRAs with the encoder frozen.
 _VISUAL_TOWER_LORA_LAYERS = re.compile(rf"^{re.escape(KREA2_LORA_QWEN3VL_PREFIX)}visual\.")
 
+_NO_VISION_TOWER = (
+    "Reference images are read by the Qwen3-VL vision tower, and the GGUF encoder '{name}' has none. Select the "
+    "Vision Tower model (the 4B llama.cpp mmproj file) beside it, or use a Diffusers Krea-2 model's own encoder or "
+    "a standalone non-GGUF Qwen3-VL 4B encoder."
+)
+
 
 @invocation(
     "krea2_text_encoder",
     title="Prompt - Krea-2",
     tags=["prompt", "conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -83,7 +89,7 @@ class Krea2TextEncoderInvocation(BaseInvocation):
         default=[],
         max_length=KREA2_MAX_REFERENCE_IMAGES,
         description="Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order "
-        "(Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.",
+        "(Picture 1, 2, 3). A GGUF encoder reads them through the selected Vision Tower model (the mmproj file).",
     )
 
     @torch.no_grad()
@@ -106,9 +112,22 @@ class Krea2TextEncoderInvocation(BaseInvocation):
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         images = [prepare_vlm_reference(context.images.get_pil(field.image_name)) for field in self.reference_images]
+        encoder_config = context.models.get_config(self.qwen3_vl_encoder.text_encoder)
+        text_encoder_format = encoder_config.format
+        # Chosen on the config, before anything heavy loads. A GGUF encoder has no tower of its own: it reads the
+        # model the field names, the mmproj file (not a submodel of anything). Any other encoder carries its own.
+        vision_identifier = None
+        if images:
+            field = self.qwen3_vl_encoder
+            if text_encoder_format is not ModelFormat.GGUFQuantized:
+                vision_identifier = field.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionEncoder})
+            elif field.vision_tower is not None:
+                vision_identifier = field.vision_tower.model_copy(update={"submodel_type": None})
+            else:
+                raise ValueError(_NO_VISION_TOWER.format(name=encoder_config.name))
         tokenizer_info = context.models.load(self.qwen3_vl_encoder.tokenizer)
         image_inputs = vision_info = None
-        if images:
+        if vision_identifier is not None:
             # The processor and tokenizer are small and run on the CPU, so a reference the processor refuses (an
             # extreme aspect ratio) fails here, before either tower is read.
             processor_info = context.models.load(
@@ -116,14 +135,17 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             )
             with processor_info as processor, tokenizer_info as tokenizer:
                 image_inputs = tokenize_krea2_prompt_with_images(self.prompt, images, processor, tokenizer)
-            # Before the encoder: the loader refuses an encoder without a tower (GGUF) here, ahead of reading
+            # Before the encoder: the loader refuses an encoder without a tower here, ahead of reading
             # the far larger language tower for nothing. The tower is its own cache entry, so text-only prompts
             # never pay for it.
-            vision_info = context.models.load(
-                self.qwen3_vl_encoder.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionEncoder})
-            )
+            vision_info = context.models.load(vision_identifier)
         text_encoder_info = context.models.load(self.qwen3_vl_encoder.text_encoder)
-        text_encoder_format = context.models.get_config(self.qwen3_vl_encoder.text_encoder).format
+        if vision_info is not None and vision_info.compute_device != text_encoder_info.compute_device:
+            raise RuntimeError(
+                f"The vision tower runs on {vision_info.compute_device} and the encoder on "
+                f"{text_encoder_info.compute_device}; an edit attaches one to the other, so they need one device. "
+                "Give both models the same CPU Only setting in the Model Manager."
+            )
         # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does
         # not cover. Read from the unlocked model, before the lock the reservation applies to; zero for
         # other builds.

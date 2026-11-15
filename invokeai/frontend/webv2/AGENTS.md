@@ -57,6 +57,7 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Missing engines for completion: `pnpm exec playwright install chromium firefox webkit` (`--with-deps` in Linux CI).
 - Colocate tests: unit `*.test.ts`/`*.test.tsx`, browser `*.browser.test.ts`/`*.browser.test.tsx`.
 - Use real IndexedDB, Web Locks, focus, pointer, rendering where mocks cannot prove correctness.
+- Every metadata key a graph builder writes needs an entry in `src/workbench/image-actions/imageRecallContract.test.ts` or `src/workbench/image-actions/videoRecallContract.test.ts`. They fail only for keys their coverage fixtures write: a key written under some setting needs that setting tuned in the fixtures (`recallTunedSettingsFor` for images).
 - Droppable enabled only after drag start: drag through dnd-kit mouse sensors with `dragWithMouse` (`@platform/browser/mouseDrag.testing`). Single-jump drags such as `userEvent.dragAndDrop` miss it.
 
 Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.
