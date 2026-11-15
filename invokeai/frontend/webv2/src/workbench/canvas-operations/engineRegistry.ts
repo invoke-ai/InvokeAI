@@ -4,17 +4,20 @@
  * the tool the person was on, their quick-switch bookmark and how many undo steps went with it, for this session.
  */
 
-import type { CanvasDocumentContractV3, ToolId } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentContractV3,
+  CanvasEngine as PublicCanvasEngine,
+  ToolId,
+} from '@workbench/canvas-engine/api';
 import type { LiveCanvasEngines } from '@workbench/projects/projectAssets';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   createCanvasEngine,
   type CanvasEngine,
   type CanvasEngineOptions,
 } from '@workbench/canvas-operations/createCanvasEngine';
-
-import { bindCanvasEngineLookup, isBlankCanvasDocument } from './operationAccess';
 
 /** Engine creation dependencies, minus what the registry supplies: the project id and its previous engine's carry. */
 export type EngineDeps = Omit<CanvasEngineOptions, 'droppedHistorySteps' | 'projectId'> & {
@@ -38,6 +41,10 @@ interface EngineCarry {
   /** Undo and redo steps the disposal dropped, with those its history had already let go; History says so. */
   droppedHistorySteps: number;
 }
+
+/** Whether the canvas holds nothing yet: no raster, control or regional layer, and no mask with coverage. */
+export const isBlankCanvasDocument = (document: CanvasDocumentContractV3 | null): boolean =>
+  getDocumentLeaves(document).every((layer) => layer.type === 'inpaint_mask' && layer.mask.bitmap === null);
 
 /**
  * The tool a fresh engine starts on: the one its project's last engine was on, else Brush on a blank canvas with
@@ -236,7 +243,6 @@ export const createEngineRegistry = (
 
 /** The process-wide default registry shared by all widget surfaces. */
 const defaultRegistry = createEngineRegistry();
-bindCanvasEngineLookup(defaultRegistry.getEngine);
 
 registerAccountOwnedResource({
   clear: defaultRegistry.disposeAll,
@@ -245,3 +251,7 @@ registerAccountOwnedResource({
 
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;
+
+/** Queries the default registry without constructing an engine or acquiring a lease. */
+export const getCanvasEngine = (projectId: string): PublicCanvasEngine | undefined =>
+  defaultRegistry.getEngine(projectId);

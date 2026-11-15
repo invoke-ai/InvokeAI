@@ -31,8 +31,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EngineDeps, RegistryTimers } from './engineRegistry';
 
-import { createEngineRegistry, getOrCreateEngine, releaseEngine } from './engineRegistry';
-import { getCanvasEngine, isBlankCanvasDocument } from './operationAccess';
+import {
+  createEngineRegistry,
+  getCanvasEngine,
+  getOrCreateEngine,
+  isBlankCanvasDocument,
+  releaseEngine,
+} from './engineRegistry';
 import { TOOL_MEMORY_WRITE_DELAY_MS } from './toolMemory';
 
 const createDeferred = <T>() => {
