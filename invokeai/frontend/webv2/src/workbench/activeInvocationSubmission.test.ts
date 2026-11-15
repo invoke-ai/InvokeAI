@@ -152,6 +152,56 @@ describe('active invocation submission', () => {
     expect(onStarted).toHaveBeenCalledTimes(1);
   });
 
+  it('runs the Video preview to Gallery without changing the locked top-bar Canvas route', async () => {
+    const videoModel = {
+      key: 'wan-model',
+      name: 'Wan',
+      type: 'main' as const,
+      base: 'wan' as const,
+      format: 'diffusers',
+      variant: 't2v_a14b' as const,
+      file_size: 1,
+      hash: 'wan-hash',
+      path: 'wan',
+      source: 'wan',
+      source_type: 'path' as const,
+    };
+    let state: ReturnType<typeof createInitialWorkbenchState> = createGenerateState();
+    state = workbenchReducer(state, { region: 'left', type: 'toggleRegionWidget', widgetId: 'video' });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      widgetId: 'video',
+      values: { model: videoModel, positivePrompt: 'a fox' },
+    });
+    state.projects[0]!.invocation = {
+      sourceId: 'generate',
+      sourceLocked: true,
+      destination: 'canvas',
+      destinationLocked: true,
+    };
+    const submit = vi.fn();
+    const runtime: ActiveInvocationSubmissionRuntime = {
+      assertCurrent: () => undefined,
+      capture: () => owner,
+      flushDrafts: () => undefined,
+      isCurrent: () => true,
+      loadPrepareCanvasInvocation: () => Promise.reject(new Error('Video needs no Canvas preparation')),
+      submit,
+    };
+    await submitActiveInvocation({ ...createArgs(state), getModels: () => [videoModel], sourceId: 'video' }, runtime);
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: expect.objectContaining({ destination: 'gallery', mode: 'dialog', sourceId: 'video' }),
+      })
+    );
+    expect(state.projects[0]!.invocation).toEqual({
+      sourceId: 'generate',
+      sourceLocked: true,
+      destination: 'canvas',
+      destinationLocked: true,
+    });
+  });
+
   it('single-flights a canvas submission before its lazy module loads and until preparation settles', async () => {
     let resolveModule = (_value: { prepareCanvasInvocation: () => Promise<void> }): void => undefined;
     const modulePromise = new Promise<{ prepareCanvasInvocation: () => Promise<void> }>((resolve) => {

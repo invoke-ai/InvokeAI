@@ -225,6 +225,7 @@ const PLUMBING_TYPES = new Set(['collect', 'core_metadata']);
  * what feeds it, feeds what it feeds.
  */
 const RECORDING_TYPES = new Set(['core_metadata']);
+const VALUE_PRIMITIVE_TYPES = new Set(['string', 'integer', 'float', 'boolean']);
 const SCALAR_FIELD_TYPES = new Set(['StringField', 'IntegerField', 'FloatField', 'BooleanField']);
 const SHORT_TEXT_LENGTH = 24;
 
@@ -296,7 +297,13 @@ const getAuthoredInputs = (template: InvocationTemplate): FieldInputTemplate[] =
   Object.values(template.inputs).filter((input) => input.fieldKind === 'input' && !input.uiHidden);
 
 const getFieldTemplate = (node: WorkflowInvocationNode, template: InvocationTemplate | undefined, name: string) =>
-  template?.inputs[name] ?? node.data.dynamicInputTemplates?.[name];
+  (template && Object.hasOwn(template.inputs, name) ? template.inputs[name] : undefined) ??
+  (node.data.dynamicInputTemplates && Object.hasOwn(node.data.dynamicInputTemplates, name)
+    ? node.data.dynamicInputTemplates[name]
+    : undefined);
+
+const getTemplate = (templates: InvocationTemplates, type: string) =>
+  Object.hasOwn(templates, type) ? templates[type] : undefined;
 
 const getFieldLabel = (node: WorkflowInvocationNode, template: InvocationTemplate | undefined, name: string) =>
   node.data.inputs[name]?.label || getFieldTemplate(node, template, name)?.title || name;
@@ -526,11 +533,12 @@ const buildModel = (
   const isPlumbing = (id: string) => PLUMBING_TYPES.has(documentNodes.get(id)!.data.type);
   /** A value-only primitive's one input: a scalar it holds itself, with nothing feeding the node and something fed. */
   const getFoldableInput = (id: string): FieldInputTemplate | null => {
-    const template = templates[documentNodes.get(id)!.data.type];
+    const template = getTemplate(templates, documentNodes.get(id)!.data.type);
     const inputs = template ? getAuthoredInputs(template) : [];
     const input = inputs[0];
 
-    return inputs.length === 1 &&
+    return VALUE_PRIMITIVE_TYPES.has(documentNodes.get(id)!.data.type) &&
+      inputs.length === 1 &&
       input!.type.cardinality === 'SINGLE' &&
       SCALAR_FIELD_TYPES.has(input!.type.name) &&
       !incoming.has(id) &&
@@ -543,7 +551,7 @@ const buildModel = (
 
   for (const id of order) {
     const node = documentNodes.get(id)!;
-    const template = templates[node.data.type];
+    const template = getTemplate(templates, node.data.type);
     const values: Record<string, unknown> = {};
     const fields: WorkflowPreviewField[] = [];
 
@@ -593,7 +601,7 @@ const buildModel = (
       return null;
     }
 
-    const template = templates[node.data.type];
+    const template = getTemplate(templates, node.data.type);
     const fieldTemplate = getFieldTemplate(node, template, fieldName);
 
     return {
@@ -723,7 +731,7 @@ const buildModel = (
     if (foldedInput) {
       // Labelled by the form even while its value is empty: the form names what the value is for.
       const node = documentNodes.get(id)!;
-      const template = templates[node.data.type];
+      const template = getTemplate(templates, node.data.type);
       const value = describeValue(node.data.inputs[foldedInput.name]?.value, foldedInput);
       const pill: WorkflowPreviewPill = {
         label: exposedFields.has(fieldKey(id, foldedInput.name))

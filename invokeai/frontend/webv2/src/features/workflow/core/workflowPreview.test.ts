@@ -212,6 +212,62 @@ const build = (document: ProjectGraphState) => buildWorkflowPreviewModel(documen
 const titles = (model: WorkflowPreviewModel, ids: readonly string[]) => ids.map((id) => model.nodes.get(id)!.title);
 
 describe('buildWorkflowPreviewModel', () => {
+  it.each(['toString', 'constructor', '__proto__'])('previews a parsed unknown node type named %s', (name) => {
+    const parsed = parseWorkflowJson(graph([node('unknown', name, { value: 'saved' })], []));
+    const model = build(parsed.document);
+
+    expect(model.nodes.get('unknown')).toMatchObject({ isUnknown: true, title: name });
+    expect(model.nodes.get('unknown')!.fields).toEqual([
+      { isExposed: false, label: 'value', name: 'value', value: { kind: 'text', text: 'saved' } },
+    ]);
+  });
+
+  it.each(['toString', 'constructor', '__proto__'])(
+    'previews a parsed form field named %s without an inherited template',
+    (name) => {
+      const parsed = parseWorkflowJson(graph([node('primitive', 'string')], [], exposed(['primitive', name])));
+      const model = build(parsed.document);
+
+      expect(model.inputs).toMatchObject([{ fieldName: name, isModelField: false, label: name, value: null }]);
+    }
+  );
+
+  it.each(['string_split_neg', 'custom_prompt'])(
+    'keeps single-input computation %s visible in the simplified view',
+    (name) => {
+      const document = graph(
+        [
+          node('seed', 'integer', { value: 1 }),
+          node('compute', name, { value: 'cat [dog]' }),
+          node('positive', 'prompt'),
+          node('negative', 'prompt'),
+        ],
+        [
+          edge('seed', 'positive', 'seed'),
+          edge('compute', 'positive', 'prompt', 'positive'),
+          edge('compute', 'negative', 'prompt', 'negative'),
+        ]
+      );
+      const model = buildWorkflowPreviewModel(
+        document,
+        {
+          ...TEMPLATES,
+          [name]: template(name, 'Compute prompt', [input('value', type('StringField'))]),
+        },
+        METRICS
+      );
+
+      expect(model.simplified!.nodeIds).toContain('compute');
+      expect(model.simplified!.pills.negative).toBeUndefined();
+      expect(model.simplified!.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ source: 'compute', target: 'positive' }),
+          expect.objectContaining({ source: 'compute', target: 'negative' }),
+        ])
+      );
+    }
+  );
+
   it('names nodes by their own label, then their template, then their type id, and marks an unknown type', () => {
     const model = build(
       graph(

@@ -78,7 +78,15 @@ const project = (
   const queueItem = {
     cancellable: false,
     id: 'run-1',
-    snapshot: { backendSubmission: { batchCount: 1, graph: {}, kind: 'workflow', projectWorkflowId } },
+    snapshot: {
+      backendSubmission: {
+        batchCount: 1,
+        graph: {},
+        kind: 'workflow',
+        projectWorkflowId,
+        ...(source ? { libraryWorkflowSource: { ...source } } : {}),
+      },
+    },
     status,
   } as unknown as WorkbenchQueueItem;
 
@@ -102,6 +110,15 @@ describe('getCompletedLibraryWorkflowRun', () => {
     expect(decide(project('running', linked), project('completed', linked), 'user-a')).toBe('wf-user-1');
   });
 
+  it('credits the enqueued template after relinking or removing the project workflow', () => {
+    const before = project('running', linked);
+    const after = project('completed', linked);
+    after.workflows.entries[0]!.source = { libraryWorkflowId: 'other-template', ownerUserId: 'user-b', revision: 4 };
+    expect(decide(before, after, 'user-a')).toBe('wf-user-1');
+    after.workflows.entries = [];
+    expect(decide(before, after, 'user-a')).toBe('wf-user-1');
+  });
+
   it('bumps a completion only once', () => {
     expect(decide(project('completed', linked), project('completed', linked))).toBe(null);
   });
@@ -111,11 +128,9 @@ describe('getCompletedLibraryWorkflowRun', () => {
     expect(decide(project('running', linked), project('completed', linked), 'user-b')).toBe(null);
   });
 
-  it('ignores runs that did not complete or whose workflow is gone', () => {
+  it('ignores runs that did not complete or predate captured library bindings', () => {
     expect(decide(project('running', linked), project('cancelled', linked))).toBe(null);
-    expect(
-      decide(project('running', linked), project('completed', { ...linked, projectWorkflowId: 'deleted-workflow' }))
-    ).toBe(null);
+    expect(decide(project('running', linked), project('completed', { projectWorkflowId: document.id }))).toBe(null);
   });
 });
 

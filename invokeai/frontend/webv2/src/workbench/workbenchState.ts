@@ -4033,6 +4033,9 @@ const enqueueCompiledSnapshot = (
   const expansionSampleSeed = expandedPositivePrompts ? (compiled.positivePromptsSampleSeed ?? null) : null;
   // Compilation already reserved the starting seed; failures and cancellations do not roll the sequence back.
   const seedPlan = submissionPlan?.seedPlan ?? null;
+  const libraryWorkflowSource = compiled.projectWorkflowId
+    ? project.workflows.entries.find((entry) => entry.document.id === compiled.projectWorkflowId)?.source
+    : undefined;
   const backendSubmission: QueueCompiledSubmission = !backendGraph
     ? { error: `${route.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' }
     : route.sourceId === 'workflow'
@@ -4044,6 +4047,14 @@ const enqueueCompiledSnapshot = (
             ...(compiled.workflow.batchData.length ? { batchData: compiled.workflow.batchData } : {}),
             graph: backendGraph,
             kind: 'workflow',
+            ...(libraryWorkflowSource
+              ? {
+                  libraryWorkflowSource: {
+                    libraryWorkflowId: libraryWorkflowSource.libraryWorkflowId,
+                    ...(libraryWorkflowSource.ownerUserId ? { ownerUserId: libraryWorkflowSource.ownerUserId } : {}),
+                  },
+                }
+              : {}),
             ...(compiled.workflowJson ? { workflow: compiled.workflowJson } : {}),
             // Capture the originating project workflow so results and seed advances return to it even after the
             // active workflow changes.

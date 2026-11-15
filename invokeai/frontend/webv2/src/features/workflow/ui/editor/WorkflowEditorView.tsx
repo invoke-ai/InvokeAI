@@ -428,8 +428,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     return element;
   }, []);
   const onExportComplete = useCallback(() => setExportView(null), []);
-  // The toolbar's camera and the widget menu's Download as PNG both draw from this editor's offscreen view.
-  useMountEffect(() => registerWorkflowPngExportHost({ complete: onExportComplete, prepare: onExportPrepare }));
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
@@ -1433,6 +1431,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       onPointerMove={onEditorPointerMove}
       {...pointerToolHandlers}
     >
+      {flowInstance ? <WorkflowPngExportRegistration complete={onExportComplete} prepare={onExportPrepare} /> : null}
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
         colorMode={getFlowColorMode(themeId)}
         connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
@@ -1566,4 +1565,10 @@ export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi })
       </Box>
     </Flex>
   );
+};
+
+/** Export becomes available only after the on-screen flow has initialized. */
+const WorkflowPngExportRegistration = ({ complete, prepare }: Parameters<typeof registerWorkflowPngExportHost>[0]) => {
+  useMountEffect(() => registerWorkflowPngExportHost({ complete, prepare }));
+  return null;
 };

@@ -365,6 +365,7 @@ describe('queue runtime', () => {
       graph: { edges: [], id: 'backend-graph', nodes: {} },
       kind: 'workflow',
       libraryWorkflowId: 'lib-1',
+      libraryWorkflowSource: { libraryWorkflowId: 'lib-2', ownerUserId: 'user-a' },
       projectWorkflowId: 'wf-1',
     } as never;
     queueItem.snapshot.sourceId = 'workflow';
@@ -375,6 +376,7 @@ describe('queue runtime', () => {
     expect(submission).toHaveProperty('request');
     expect((submission as { request: object }).request).not.toHaveProperty('projectWorkflowId');
     expect((submission as { request: object }).request).not.toHaveProperty('libraryWorkflowId');
+    expect((submission as { request: object }).request).not.toHaveProperty('libraryWorkflowSource');
   });
 
   it('replays persisted batch groups and rejects ones the graph or the backend would refuse', () => {

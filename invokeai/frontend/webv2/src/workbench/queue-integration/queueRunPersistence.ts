@@ -48,13 +48,14 @@ export const withQueueRecallCache = <T extends Pick<QueueRunJournal, 'record' | 
   };
 };
 
-type RunProject = Pick<Project, 'queue' | 'workflows'>;
+type RunProject = Pick<Project, 'queue'>;
 
 /**
  * The library template whose `last_run_at` a routed result should bump: the run must have just turned completed
  * (a cancelled run, or a second routing of the same completion, bumps nothing) and come from a project workflow
- * linked to a library template. Dependency-free so the editor boot path never loads the workflow data module; the
- * caller drops bundled templates once that module loads. On a multiuser server (`viewerUserId` set) a template whose recorded
+ * linked to a library template when queued. Older snapshots without a captured binding skip this bookkeeping.
+ * Dependency-free so editor boot never loads workflow data; the caller drops bundled templates once it loads.
+ * On a multiuser server (`viewerUserId` set) a template whose recorded
  * owner is another account is skipped; a link without a recorded owner is sent, and the server refuses it (403)
  * unless the caller owns the template or is an administrator, whose run then bumps the owner's row.
  */
@@ -79,9 +80,13 @@ export const getCompletedLibraryWorkflowRun = (
     return null;
   }
 
-  const source = after.workflows.entries.find((entry) => entry.document.id === submission.projectWorkflowId)?.source;
+  const source = submission.libraryWorkflowSource;
 
-  if (!source || (viewerUserId !== null && source.ownerUserId !== undefined && source.ownerUserId !== viewerUserId)) {
+  if (
+    !source ||
+    typeof source.libraryWorkflowId !== 'string' ||
+    (viewerUserId !== null && source.ownerUserId !== undefined && source.ownerUserId !== viewerUserId)
+  ) {
     return null;
   }
 

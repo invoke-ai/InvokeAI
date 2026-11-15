@@ -150,12 +150,18 @@ const buildGenerateProject = (): Project => {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const Probe = (): ReactNode => {
-  const state = useInvocationState();
+const Probe = ({ sourceId }: { sourceId?: 'video' }): ReactNode => {
+  const state = useInvocationState({ sourceId });
 
   return (
     <>
-      <span data-batch-count={state.batchCount} data-prompt-count={state.promptExpansion.count} data-testid="reasons">
+      <span
+        data-batch-count={state.batchCount}
+        data-destination={state.invocation.destination}
+        data-issue-targets={state.issues.map((issue) => issue.target.kind).join(' ')}
+        data-prompt-count={state.promptExpansion.count}
+        data-testid="reasons"
+      >
         {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
       <span data-testid="issue-layers">
@@ -171,13 +177,13 @@ const Probe = (): ReactNode => {
   );
 };
 
-const renderProbe = async (project: Project) => {
+const renderProbe = async (project: Project, sourceId?: 'video') => {
   harness.project = project;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(() => {
-    root?.render(<Probe />);
+    root?.render(<Probe sourceId={sourceId} />);
   });
 };
 
@@ -294,6 +300,17 @@ describe('useInvocationState and the remembered control-model picks', () => {
 });
 
 describe('useInvocationState and Video dynamic prompts', () => {
+  it('fixes the Video dialog route to Gallery without offering a global destination fix', async () => {
+    const project = buildGenerateProject();
+    project.invocation = { sourceId: 'generate', sourceLocked: true, destination: 'canvas', destinationLocked: true };
+    await renderProbe(project, 'video');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-destination')).toBe('gallery');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-issue-targets')).not.toContain(
+      'destination'
+    );
+    expect(project.invocation.destination).toBe('canvas');
+  });
+
   const renderVideo = async (videoValues: Record<string, unknown>) => {
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     let state = workbenchReducer(createInitialWorkbenchState(), {

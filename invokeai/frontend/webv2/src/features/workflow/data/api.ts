@@ -308,6 +308,11 @@ export const onLibraryWorkflowOpened = (listener: () => void): (() => void) => {
 };
 
 export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
+  // Bundled opens are global rows: non-admin writes fail and admin writes leak into everyone's Recent.
+  if (isBundledLibraryWorkflowId(workflowId)) {
+    return;
+  }
+
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
 
   for (const listener of openedListeners) {

@@ -168,7 +168,9 @@ export const buildGraphPreviewSource = ({
   t,
   templates,
 }: GraphPreviewSourceDeps): GraphPreviewSourceState => {
-  const destinationLabel = getDestinationLabel(project.invocation.destination);
+  const destinationLabel = getDestinationLabel(
+    surface.sourceId === 'video' ? 'gallery' : project.invocation.destination
+  );
 
   switch (surface.sourceId) {
     case 'workflow':

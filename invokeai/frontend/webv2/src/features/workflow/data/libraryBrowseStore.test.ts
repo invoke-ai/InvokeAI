@@ -517,6 +517,55 @@ describe('workflow library sort', () => {
     }
   );
 
+  it('shares the stale-view revalidation requested by both opening sessions', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'lastRun' });
+    releaseBrowseHold();
+    api.notifyRun();
+    const response = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockClear().mockReturnValue(response.promise);
+
+    const first = browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'lastRun' });
+    const second = browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'lastRun' });
+    response.resolve(buildPage([buildItem('latest')]));
+    await Promise.all([first, second]);
+    await flushAsyncWork();
+
+    expect(listCalls()).toHaveLength(1);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('latest');
+  });
+
+  it('revalidates on reopening instead of joining a refresh fenced by a closed-session run', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'lastRun' });
+    const response = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(response.promise);
+    const staleRefresh = browse.refreshWorkflowLibraryBrowse();
+    releaseBrowseHold();
+    api.notifyRun();
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('latest')]));
+    const opening = browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'lastRun' });
+    response.resolve(buildPage([buildItem('stale')]));
+    await Promise.all([staleRefresh, opening]);
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('latest')
+    );
+  });
+
+  it('fences a closed-session filter reset when a run completes before its first page returns', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded({ search: 'cat', sort: 'lastRun' });
+    releaseBrowseHold();
+    const response = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(response.promise);
+    browse.setWorkflowLibraryBrowseFilter({ search: '' });
+    api.notifyRun();
+    response.resolve(buildPage([buildItem('stale')]));
+    await flushAsyncWork();
+
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toEqual([]);
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('latest')]));
+    await browse.ensureWorkflowLibraryBrowseLoaded({ search: '', sort: 'lastRun' });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('latest');
+  });
+
   it('keeps views in other orders when a workflow is opened', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
     demandEntries();
@@ -1000,6 +1049,38 @@ describe('workflow library place totals', () => {
     });
   });
 
+  it('does not launch place probes when cache invalidation is part of account cleanup', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    await browse.loadWorkflowLibraryPlaceTotals(['recent']);
+    api.listLibraryWorkflows.mockClear();
+
+    // The account lifecycle clears the record cache first, then the browse store.
+    invalidate();
+    account.accountLifecycle.invalidate();
+    await flushAsyncWork();
+
+    expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({});
+  });
+
+  it('refreshes other place totals on mutations and ignores probes from before the mutation', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    const stale = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(stale.promise);
+    const priorProbe = browse.loadWorkflowLibraryPlaceTotals(['recent']);
+    api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
+      Promise.resolve(buildPage([], { total: perPage === 1 ? 2 : 4 }))
+    );
+
+    invalidate();
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 2, user: 4 })
+    );
+    stale.resolve(buildPage([], { total: 3 }));
+    await priorProbe;
+    expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 2, user: 4 });
+  });
+
   it('shares a probe in flight and follows the current place’s unfiltered listings', async () => {
     api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
       Promise.resolve(buildPage([buildItem('a')], { total: perPage === 1 ? 7 : 9 }))
@@ -1199,7 +1280,10 @@ describe('stale cached view revalidation', () => {
     const held: HeldPage[] = [];
     api.listLibraryWorkflows
       .mockClear()
-      .mockImplementation(({ query = '', page: index }: { query?: string; page: number }) => {
+      .mockImplementation(({ query = '', page: index, perPage }: { query?: string; page: number; perPage: number }) => {
+        if (perPage === 1) {
+          return Promise.resolve(page(query, index, perPage, true));
+        }
         const read = { query, page: index, response: createDeferred<WorkflowLibraryPage>() };
         held.push(read);
         return read.response.promise;

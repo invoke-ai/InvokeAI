@@ -136,7 +136,7 @@ export interface InvokeOptions {
 
 /**
  * Invoke's state for the active route; given a `sourceId`, for that source's route instead, its source fixed (a graph
- * preview's Invoke), with the active route's destination.
+ * preview's Invoke), with the active route's destination. Video's fixed route always uses Gallery.
  */
 export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId } = {}): InvocationState => {
   const { t } = useTranslation();
@@ -150,7 +150,15 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const invocation = useMemo(
-    () => (sourceId ? { ...routeInput.invocation, sourceId, sourceLocked: true } : routeInput.invocation),
+    () =>
+      sourceId
+        ? {
+            ...routeInput.invocation,
+            ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
+            sourceId,
+            sourceLocked: true,
+          }
+        : routeInput.invocation,
     [routeInput.invocation, sourceId]
   );
   const isPreparing = useIsInvocationPreparing(routeInput.projectId);

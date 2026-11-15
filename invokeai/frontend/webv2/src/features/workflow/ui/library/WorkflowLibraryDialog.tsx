@@ -624,9 +624,7 @@ export const WorkflowLibraryDialog = ({
   );
   const handleOpenWorkflow = useCallback(
     (workflowId: string) => {
-      const entry = getWorkflowLibraryBrowseSnapshot().entries.find(
-        (candidate) => candidate.item.workflow_id === workflowId
-      );
+      const entry = selectWorkflowLibraryEntry(getWorkflowLibraryBrowseSnapshot(), workflowId);
 
       if (entry) {
         handleOpenItem(entry.item);

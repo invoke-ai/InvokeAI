@@ -19,6 +19,7 @@ import { clearWorkflowClipboard, copyNodesToClipboard } from './clipboard';
 import { getWorkflowFlowInstance } from './flowInstanceStore';
 import { CONTENT_VISIBILITY_ZOOM } from './InvocationFlowNode';
 import { WorkflowEditorView } from './WorkflowEditorView';
+import { useWorkflowPngExportState } from './workflowPngExport';
 import { clearWorkflowViewports, getWorkflowViewport, getWorkflowViewportKey } from './workflowViewportStore';
 
 const templatesSnapshot = vi.hoisted(() => {
@@ -213,6 +214,11 @@ const runtime = {
   typeId: 'workflow',
 } as const;
 
+const PngExportAvailability = () => {
+  const { isAvailable } = useWorkflowPngExportState();
+  return <output hidden data-png-export-available={String(isAvailable)} />;
+};
+
 /** Mounts the editor over the project port and returns the adapter, whose commands the test inspects. */
 const renderEditor = async (
   root: Root,
@@ -227,6 +233,7 @@ const renderEditor = async (
         <ChakraProvider value={system}>
           <QueryClientProvider client={new QueryClient()}>
             <WorkflowUiProvider adapter={adapter}>
+              <PngExportAvailability />
               <WorkflowEditorView runtime={runtime} />
             </WorkflowUiProvider>
           </QueryClientProvider>
@@ -277,6 +284,33 @@ describe('WorkflowEditorView first open', () => {
 
     return { addedFieldInputs, zoom: getWorkflowViewport(viewportKey)!.zoom };
   };
+
+  it('keeps PNG export unavailable while a large workflow prepares, then enables it after flow initialization', async () => {
+    const frames: FrameRequestCallback[] = [];
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback));
+
+    try {
+      const graph = {
+        ...createProjectGraph('large'),
+        nodes: Array.from({ length: 300 }, (_, index) => addNode(`node-${index}`, index * 300, 0)),
+      };
+      await renderEditor(root, createProjectStore(graph));
+
+      expect(getWorkflowFlowInstance()).toBeNull();
+      expect(host.querySelector('[data-png-export-available]')?.getAttribute('data-png-export-available')).toBe(
+        'false'
+      );
+      frame.mockRestore();
+      await act(() => frames.forEach((callback) => callback(performance.now())));
+
+      await expect.poll(getWorkflowFlowInstance).not.toBeNull();
+      await expect
+        .poll(() => host.querySelector('[data-png-export-available]')?.getAttribute('data-png-export-available'))
+        .toBe('true');
+    } finally {
+      frame.mockRestore();
+    }
+  });
 
   it('never mounts field controls for a graph whose fit lands zoomed out', async () => {
     const nodes = Array.from({ length: 6 }, (_, index) => addNode(`node-${index}`, index * 600, (index % 2) * 400));

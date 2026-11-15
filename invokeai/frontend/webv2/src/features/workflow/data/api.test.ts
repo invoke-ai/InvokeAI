@@ -10,12 +10,32 @@ import {
   getWorkflowTagCounts,
   listLibraryWorkflows,
   setLibraryWorkflowPublic,
+  touchLibraryWorkflowOpenedAt,
+  onLibraryWorkflowOpened,
 } from './api';
 
 describe('workflow library api', () => {
   beforeEach(() => {
     mocks.apiFetch.mockReset().mockResolvedValue(new Response());
     mocks.apiFetchJson.mockReset().mockResolvedValue({});
+  });
+
+  it('records user workflow opens but leaves bundled templates untouched', async () => {
+    const opened = vi.fn();
+    const unsubscribe = onLibraryWorkflowOpened(opened);
+    try {
+      await touchLibraryWorkflowOpenedAt('default_text_to_image');
+      expect(mocks.apiFetch).not.toHaveBeenCalled();
+      expect(opened).not.toHaveBeenCalled();
+      await touchLibraryWorkflowOpenedAt('my-workflow');
+      expect(mocks.apiFetch).toHaveBeenCalledWith('/api/v1/workflows/i/my-workflow/opened_at', {
+        method: 'PUT',
+        signal: undefined,
+      });
+      expect(opened).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('forwards repeated tags query params when listing workflows', async () => {

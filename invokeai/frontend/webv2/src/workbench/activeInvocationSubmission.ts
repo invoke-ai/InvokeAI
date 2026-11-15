@@ -30,7 +30,7 @@ export interface ActiveInvocationSubmissionArgs {
   queries: WorkbenchQueries;
   /**
    * Runs this source's route, its source fixed, as a graph preview of that source does, rather than the active route.
-   * The destination stays the active route's.
+   * Video uses Gallery; other sources keep the active route's destination.
    */
   sourceId?: InvocationSourceId;
   /** Hears that the submission has started: it is valid and holds the project's preparation lease. */
@@ -93,6 +93,7 @@ export const submitActiveInvocation = async (
     ...active,
     ...(destinationOverride ? { destination: destinationOverride } : {}),
     ...(sourceId ? { sourceId, sourceLocked: true } : {}),
+    ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
   };
   const models = getModels();
   const route = resolveInvocationRoute(snapshot.activeProject, sourceId ? 'dialog' : 'global', invocation, models);

@@ -3,7 +3,6 @@ import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@featu
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { WorkflowPreviewView } from '@features/workflow/ui/graph-preview/WorkflowPreviewStage';
 import type { WorkflowLibraryLayout } from '@features/workflow/ui/WorkflowUiContext';
-import type { WorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 
 import { HStack, type SystemStyleObject, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
@@ -14,8 +13,9 @@ import {
   setWorkflowLibrarySelectedDemand,
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
+import { workflowUiStore, type WorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { memo, type RefObject, useCallback, useMemo } from 'react';
+import { memo, type RefObject, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardContextMenuHandler, WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
@@ -226,6 +226,23 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
     : null;
   const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
   const duplicateGuard = useWorkflowLibraryDuplicateGuard();
+  const selectionIntent = useRef(0);
+  const selectEntry = useCallback(
+    (workflowId: string) => {
+      selectionIntent.current += 1;
+      onSelect(workflowId);
+    },
+    [onSelect]
+  );
+  const handleDuplicated = useCallback(
+    (workflowId: string) => {
+      // Copies belong to My library; the other places keep their current selection.
+      if (tab === 'user') {
+        selectEntry(workflowId);
+      }
+    },
+    [selectEntry, tab]
+  );
 
   // The selection's server position, while its page is resident; a pinned selection outside the window has none.
   const residentIndex = entries.findIndex((entry) => entry.item.workflow_id === activeWorkflowId);
@@ -242,21 +259,30 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
       const resident = entries[target - startIndex];
 
       if (resident) {
-        onSelect(resident.item.workflow_id);
+        selectEntry(resident.item.workflow_id);
         return;
       }
 
-      // Past the resident window: read that position as scrolling to it would, then select what arrived there.
+      // Past the resident window: a new selection or query cancels the intent, even before search debounces.
+      const intent = selectionIntent.current;
+      const query = workflowUiStore.getSnapshot().libraryQuery;
       void loadWorkflowLibraryRange(target, target).then((ready) => {
         const snapshot = getWorkflowLibraryBrowseSnapshot();
         const loaded = snapshot.entries[target - (snapshot.startIndex ?? 0)];
 
-        if (ready && loaded && isCurrent()) {
-          onSelect(loaded.item.workflow_id);
+        if (
+          ready &&
+          loaded &&
+          isCurrent() &&
+          selectionIntent.current === intent &&
+          snapshot.filter === filter &&
+          workflowUiStore.getSnapshot().libraryQuery === query
+        ) {
+          selectEntry(loaded.item.workflow_id);
         }
       });
     },
-    [entries, onSelect, position, startIndex, total]
+    [entries, filter, position, selectEntry, startIndex, total]
   );
 
   const stepper = useMemo(
@@ -298,7 +324,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             onContextMenu={onContextMenu}
             onOpen={onOpen}
             onPreview={onPreview}
-            onSelect={onSelect}
+            onSelect={selectEntry}
             trailingField={trailingField}
           />
         ) : (
@@ -318,7 +344,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
             onContextMenu={onContextMenu}
             onOpen={onOpen}
             onPreview={onPreview}
-            onSelect={onSelect}
+            onSelect={selectEntry}
           />
         )}
         {preview.isActive ? (
@@ -341,7 +367,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
           projectWorkflows={projectWorkflows}
           onClose={onClose}
           onDeleted={onDeleted}
-          onDuplicated={onSelect}
+          onDuplicated={handleDuplicated}
           onOpen={onOpenItem}
           onPreview={onPreview}
           stepper={stepper}
@@ -356,7 +382,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
         target={contextMenuTarget}
         onClose={onClose}
         onDeleted={onDeleted}
-        onDuplicated={onSelect}
+        onDuplicated={handleDuplicated}
         onMenuClose={onContextMenuClose}
         onOpen={onOpenItem}
       />

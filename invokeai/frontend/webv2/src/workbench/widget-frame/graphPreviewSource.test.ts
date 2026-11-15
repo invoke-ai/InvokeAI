@@ -12,6 +12,7 @@ import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
+import { videoWidgetManifest } from '@workbench/widgets/video/manifest';
 import { workflowWidgetManifest } from '@workbench/widgets/workflow/manifest';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -73,6 +74,18 @@ const canvasSurface = createGraphBearingSurface(canvasWidgetManifest, 'center', 
 seedArchitectureCapabilities();
 
 describe('buildGraphPreviewSource', () => {
+  it('reports Gallery for Video while the top-bar route goes to Canvas', () => {
+    const source = buildGraphPreviewSource({
+      models,
+      project: { ...project, invocation: { ...project.invocation, destination: 'canvas' } },
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: createGraphBearingSurface(videoWidgetManifest, 'left', 'Video')!,
+      t,
+      templates: idleTemplates,
+    });
+    expect(source.destinationLabel).toBe('Gallery');
+  });
+
   it('live-compiles the generate source and reports a seed notice when randomized', () => {
     const source = buildGraphPreviewSource({
       models,

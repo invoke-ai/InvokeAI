@@ -31,6 +31,7 @@ import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/work
 import {
   openWorkflowLibraryAtProjectWorkflow,
   setWorkflowLibraryOpen,
+  setWorkflowLibrarySearch,
   setWorkflowLibraryTab,
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
@@ -2032,6 +2033,26 @@ describe('WorkflowLibraryDialog', () => {
     expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
   });
 
+  it('opens the selected workflow on double click while its metadata page is evicted', async () => {
+    preferences.setSnapshot({ ...preferences.port.getSnapshot(), workflowLibraryLayout: 'list' });
+    await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE], total: 24 }));
+    const primary = () => document.getElementById('workflow-library-card-wf-landscape')!;
+    await act(() => primary().click());
+    await act(() =>
+      browse.setSnapshot?.(
+        withSnapshot({
+          entries: [SKETCH],
+          selectedEntry: LANDSCAPE,
+          startIndex: 20,
+          total: 24,
+        })
+      )
+    );
+    await act(() => primary().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+
+    expect(loader.open).toHaveBeenCalledExactlyOnceWith(LANDSCAPE.item, 'first-copy');
+  });
+
   it('dedupes entries that share a workflow id', async () => {
     await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE, { ...PORTRAIT }] }));
 
@@ -2358,6 +2379,25 @@ describe('WorkflowLibraryDialog', () => {
       expect(items()).toContain('rename');
       expect(items()).toContain('delete');
     });
+
+    it.each(['default', 'shared'] as const)(
+      'keeps the selection when duplicating outside the %s place',
+      async (place) => {
+        setWorkflowLibraryTab(place);
+        await openWith(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, place } }));
+        await act(() => card('wf-landscape')!.click());
+        await act(() =>
+          card('wf-sketch')!.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+          )
+        );
+        await vi.waitFor(() => expect(openMenu()).not.toBeNull());
+        await selectMenuItem(openMenu()?.querySelector<HTMLElement>('[data-value="duplicate"]'));
+        await vi.waitFor(() => expect(libraryWrites.create).toHaveBeenCalledOnce());
+        await act(settleFrame);
+        expect(detail()).toBe('wf-landscape');
+      }
+    );
 
     it('duplicates the card it was raised for, once per press, and selects the copy', async () => {
       let finishCopy!: (workflowId: string) => void;
@@ -2994,6 +3034,44 @@ describe('WorkflowLibraryDialog', () => {
 
       expect(stage()).toBeNull();
       expect(railId()).toBe('wf-landscape');
+    });
+
+    it.each(['selection', 'search', 'filter'] as const)('ignores a late step after a new %s intent', async (change) => {
+      await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE], total: 24 }));
+      await act(() => card('wf-landscape')!.click());
+      await clickText('Preview');
+      let arrive!: () => void;
+      browse.loadWorkflowLibraryRange.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            arrive = () => {
+              browse.setSnapshot?.({ ...browse.getSnapshot!(), entries: [PORTRAIT, LANDSCAPE, SKETCH], total: 24 });
+              resolve(true);
+            };
+          })
+      );
+      await act(() => stepButton('Next workflow')!.click());
+      await act(() => {
+        if (change === 'selection') {
+          card('wf-portrait')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        } else if (change === 'search') {
+          setWorkflowLibrarySearch('cat');
+        } else {
+          browse.setSnapshot?.({
+            ...browse.getSnapshot!(),
+            filter: { ...browse.getSnapshot!().filter, search: 'cat' },
+          });
+        }
+      });
+      if (change === 'selection') {
+        expect(railId()).toBe('wf-portrait');
+      }
+      await act(async () => {
+        arrive();
+        await settleFrame();
+      });
+
+      expect(railId()).toBe(change === 'selection' ? 'wf-portrait' : 'wf-landscape');
     });
 
     it('draws the saved document simplified, with editor titles and markers, and every node on Show all', async () => {

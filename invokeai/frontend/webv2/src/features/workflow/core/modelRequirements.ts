@@ -301,7 +301,8 @@ export const extractWorkflowModelRequirements = (
   };
 
   for (const node of document.nodes) {
-    const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
+    const template =
+      isInvocationNode(node) && Object.hasOwn(templates, node.data.type) ? templates[node.data.type] : undefined;
 
     if (isInvocationNode(node) && template) {
       visitNodeModelNeeds(node, template, connectionTargets, addExactRequirement, addSlotRequirement);
@@ -329,7 +330,8 @@ export const extractNodeModelRequirements = (
   const byNode = new Map<string, WorkflowFieldModelRequirement[]>();
 
   for (const node of document.nodes) {
-    const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
+    const template =
+      isInvocationNode(node) && Object.hasOwn(templates, node.data.type) ? templates[node.data.type] : undefined;
 
     if (!isInvocationNode(node) || !template) {
       continue;

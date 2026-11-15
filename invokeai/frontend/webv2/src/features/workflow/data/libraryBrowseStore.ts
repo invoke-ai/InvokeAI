@@ -290,6 +290,8 @@ const rememberCurrentView = (): void => {
 
 const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
+let initialLoadGeneration = -1;
+let refreshGeneration = -1;
 
 /**
  * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of
@@ -790,6 +792,7 @@ const loadTagCounts = async (place: WorkflowLibraryPlace, owner: AccountScope): 
   }
 };
 
+let placeTotalsGeneration = 0;
 const placeTotalFlights = new Map<WorkflowLibraryPlace, Promise<void>>();
 
 /** One place's one-row probe; a caller during a probe of the same place shares it. */
@@ -801,6 +804,7 @@ const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
   }
 
   const owner = captureAccountScope();
+  const generation = placeTotalsGeneration;
   const flight: Promise<void> = listLibraryWorkflows({
     ...getListScope(place),
     page: 0,
@@ -809,7 +813,7 @@ const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
   })
     .then(
       (result) => {
-        if (isAccountScopeCurrent(owner)) {
+        if (isAccountScopeCurrent(owner) && generation === placeTotalsGeneration) {
           store.patchSnapshot({ placeTotals: { ...store.getSnapshot().placeTotals, [place]: result.total } });
         }
       },
@@ -934,13 +938,18 @@ export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibra
 
     // A view outdated while nobody looked (see `onOrderTouched`) revalidates as the library opens on it again.
     if (store.getSnapshot().filter === snapshot.filter && currentViewFetchedAt === 0) {
-      void refreshWorkflowLibraryBrowse();
+      return (
+        (initialLoadGeneration === listGeneration ? initialLoadFlight.inflight() : null) ??
+        (refreshGeneration === listGeneration ? refreshFlight.inflight() : null) ??
+        refreshWorkflowLibraryBrowse()
+      );
     }
 
     return initialLoadFlight.inflight() ?? Promise.resolve();
   }
 
   return initialLoadFlight.run(async () => {
+    initialLoadGeneration = listGeneration;
     const owner = captureAccountScope();
     const current = store.getSnapshot().filter;
     const filter = {
@@ -1038,6 +1047,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
     const request = ++windowRequest;
 
     const generation = listGeneration;
+    refreshGeneration = generation;
     const firstPage = Math.floor((store.getSnapshot().startIndex ?? 0) / PER_PAGE);
     const residentStart = store.getSnapshot().startIndex ?? 0;
     const residentEnd = residentStart + store.getSnapshot().entries.length;
@@ -1156,6 +1166,12 @@ const scheduleCurrentViewRefresh = (): void => {
 };
 
 onWorkflowLibraryCacheInvalidated(() => {
+  const { filter, placeTotals } = store.getSnapshot();
+  const places = [
+    ...new Set([...(Object.keys(placeTotals) as WorkflowLibraryPlace[]), ...placeTotalFlights.keys()]),
+  ].filter((place) => place !== filter.place || filter.search !== '' || filter.tags.length > 0);
+  placeTotalsGeneration += 1;
+  placeTotalFlights.clear();
   metadataGeneration = -1;
   currentViewFetchedAt = 0;
   // A mutation can change any view; the current one refreshes, the others fetch afresh when revisited.
@@ -1168,10 +1184,18 @@ onWorkflowLibraryCacheInvalidated(() => {
   selectedValidation = store.getSnapshot().selectedEntry ? listGeneration + 1 : null;
   scheduleCurrentViewRefresh();
   store.patchSnapshot({
+    placeTotals: EMPTY_PLACE_TOTALS,
     entries: store.getSnapshot().entries.map((entry) => ({ ...entry, enrichment: PENDING_ENRICHMENT })),
     selectedEntry: store.getSnapshot().selectedEntry
       ? { ...store.getSnapshot().selectedEntry!, enrichment: PENDING_ENRICHMENT }
       : null,
+  });
+  const generation = placeTotalsGeneration;
+  queueMicrotask(() => {
+    // Account cleanup invalidates the record cache before clearing this store.
+    if (browseHolds > 0 && placeTotalsGeneration === generation) {
+      void loadWorkflowLibraryPlaceTotals(places);
+    }
   });
 });
 
@@ -1214,6 +1238,7 @@ const onOrderTouched = (orderBy: ListOrderBy) => (): void => {
   if (browseHolds > 0) {
     scheduleCurrentViewRefresh();
   } else {
+    listGeneration += 1;
     currentViewFetchedAt = 0;
     metadataGeneration = -1;
   }
@@ -1239,6 +1264,7 @@ registerAccountOwnedResource({
     rangeController = null;
     windowRequest += 1;
     templatesFlight = null;
+    placeTotalsGeneration += 1;
     placeTotalFlights.clear();
     hasTemplateLoadFailed = false;
     isRefreshScheduled = false;

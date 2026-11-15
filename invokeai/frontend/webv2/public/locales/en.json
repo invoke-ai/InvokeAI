@@ -6839,7 +6839,6 @@
       "showingNodes_one": "Showing {{shown, number}} of {{count, number}} node",
       "showingNodes_other": "Showing {{shown, number}} of {{count, number}} nodes",
       "simplify": "Simplify",
-      "spaceKey": "Space",
       "stepper": "Step through workflows",
       "summaryFrames_one": "{{count, number}} frame",
       "summaryFrames_other": "{{count, number}} frames",
