@@ -35,7 +35,6 @@ loaders, which import the identification.
 """
 
 import itertools
-import json
 import math
 import re
 from collections.abc import Iterable, Mapping
@@ -139,13 +138,14 @@ _FLUX3_NATIVE_SINGLE_LEAVES = frozenset({"q_proj", "k_proj", "v_proj", "attn_out
 _FLUX3_DIFFUSERS_SINGLE_LEAVES = (("ff", "linear_in"), ("ff", "linear_out"))
 
 
-def _layer_value_sets() -> frozenset[frozenset[str]]:
+def lora_layer_value_sets() -> frozenset[frozenset[str]]:
     """Every set of value keys that builds one layer reading all of them: nothing missing, nothing it would ignore.
 
     The kinds `any_lora_layer_from_state_dict` builds: low-rank, DoRA with either magnitude, LoKR with each operand
     whole or factored, LoHA, and a full diff, which has no rank for an alpha to scale. LyCORIS writes Tucker cores
-    (`lokr_t2`, `hada_t1`/`hada_t2`) only for convolution kernels, and this transformer is all Linears, so a layer
-    with one is refused. No Linear here has a bias, so no bias key is recognized.
+    (`lokr_t2`, `hada_t1`/`hada_t2`) only for convolution kernels, and the transformers whose probes use these sets
+    (FLUX.3, MOSS-Image) have only Linears, so a layer with one is refused. No bias key is recognized, so a file with a
+    bias delta is refused rather than applied in part.
     """
     low_rank = frozenset({"lora_down.weight", "lora_up.weight"})
     lokr_w1 = (frozenset({"lokr_w1"}), frozenset({"lokr_w1_a", "lokr_w1_b"}))
@@ -160,7 +160,7 @@ def _layer_value_sets() -> frozenset[frozenset[str]]:
     return frozenset([*ranked, *(layer | {"alpha"} for layer in ranked), frozenset({"diff"})])
 
 
-_LAYERS = _layer_value_sets()
+_LAYERS = lora_layer_value_sets()
 
 
 def _weight_shape(module: str) -> tuple[int, int] | None:
@@ -274,7 +274,7 @@ def read_flux3_lora_keys(state_dict: Mapping[str | int, Any]) -> Flux3LoRAKeys:
 
     A key is refused when it is no LoRA parameter (see the module docstring), names a module this transformer has no
     Linear for, names its layer as another key does under another prefix or name, or belongs to a layer that is not
-    exactly one complete layer (`_layer_value_sets`). Shapes are `misshapen_flux3_layers`' to check.
+    exactly one complete layer (`lora_layer_value_sets`). Shapes are `misshapen_flux3_layers`' to check.
     """
     refused: dict[str, str] = {}
     pdd_heads: list[str] = []
@@ -381,53 +381,3 @@ def describe_refusal(refused: Mapping[str, str]) -> str:
     parts = [f"{len(keys)} key(s) {reason}, e.g. '{sorted(keys)[0]}'" for reason, keys in by_reason.items()]
     next_steps = [_NEXT_STEPS[reason] for reason in by_reason if reason in _NEXT_STEPS]
     return " ".join(["This FLUX.3 LoRA does not apply in full: " + "; ".join(parts) + ".", *next_steps])
-
-
-LORA_ADAPTER_METADATA_KEY = "lora_adapter_metadata"
-"""The header entry diffusers saves PEFT `LoraConfig`s in: a pipeline's save keys each component's fields
-`<component>.<field>`, a model's `save_lora_adapter` writes the model's own unprefixed."""
-
-
-def peft_scale(metadata: Mapping[str, str] | None) -> float | None:
-    """The scale PEFT gives every low-rank layer of the transformer LoRA a diffusers header describes, or None for a
-    header that describes none.
-
-    The transformer's config is the header's `transformer.` fields, as a pipeline's save writes them and
-    `load_lora_adapter` reads them; a header without any holds it unprefixed, as the transformer's own
-    `save_lora_adapter` writes it and `load_lora_adapter(prefix=None)` reads it. A header with both is read by its
-    `transformer.` fields, a pipeline's. diffusers rebuilds the config from those (`_create_lora_config`, PEFT's
-    defaults for the fields it lacks: r 8, lora_alpha 8), and PEFT scales each layer by `lora_alpha / r`, or
-    `lora_alpha / sqrt(r)` with rsLoRA. Raises ValueError for a header this cannot apply as PEFT would: not a JSON
-    object, an adapter other than a LoRA (how PEFT scales a LoKr or LoHa layer is not checked against InvokeAI's
-    layers), a rank or alpha set per module (`rank_pattern`, `alpha_pattern`), or no usable rank.
-    """
-    raw = (metadata or {}).get(LORA_ADAPTER_METADATA_KEY)
-    if not raw:
-        return None
-    try:
-        fields = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"This FLUX.3 LoRA's lora_adapter_metadata header is not JSON ({e}).") from None
-    if not isinstance(fields, dict):
-        raise ValueError("This FLUX.3 LoRA's lora_adapter_metadata header is not a JSON object of PEFT settings.")
-    prefixed = {
-        key.removeprefix("transformer."): value for key, value in fields.items() if key.startswith("transformer.")
-    }
-    # Another component's fields (`text_encoder.r`) are not the transformer's.
-    config = prefixed or {key: value for key, value in fields.items() if "." not in key}
-    if not config:
-        return None
-    if config.get("peft_type", "LORA") != "LORA":
-        raise ValueError(
-            f"This FLUX.3 LoRA's lora_adapter_metadata header describes a PEFT {config['peft_type']} adapter; "
-            "InvokeAI applies PEFT LoRA headers only."
-        )
-    if config.get("rank_pattern") or config.get("alpha_pattern"):
-        raise ValueError(
-            "This FLUX.3 LoRA sets its rank or alpha per module (rank_pattern or alpha_pattern in its "
-            "lora_adapter_metadata header), which InvokeAI does not apply."
-        )
-    rank, alpha = config.get("r", 8), config.get("lora_alpha", 8)
-    if not isinstance(rank, int | float) or not isinstance(alpha, int | float) or rank <= 0:
-        raise ValueError("This FLUX.3 LoRA's lora_adapter_metadata header gives no usable r and lora_alpha.")
-    return alpha / math.sqrt(rank) if config.get("use_rslora") else alpha / rank

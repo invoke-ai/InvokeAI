@@ -73,6 +73,10 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
     lora_model_from_minimax_h3_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import has_moss_image_lora_keys
+from invokeai.backend.patches.lora_conversions.moss_image_lora_conversion_utils import (
+    lora_model_from_moss_image_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
     lora_model_from_qwen_image_21_state_dict,
@@ -218,10 +222,24 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_flux3_state_dict(
                 state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
             )
+        elif self._model_base == BaseModelType.MossImage:
+            # ai-toolkit, ComfyUI, kohya/LyCORIS, DiffSynth and diffusers/PEFT keys already name the transformer's
+            # modules; a fused `proj.qkv` is cut into the `proj.q/k/v` it has. The header holds a diffusers file's
+            # PEFT config, which sets its scale.
+            model = lora_model_from_moss_image_state_dict(
+                state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
+            )
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.ZImage:
+            if has_moss_image_lora_keys(state_dict):
+                # Versions without MOSS-Image LoRA support registered these as Z-Image LoRAs, whose conversion would
+                # map their layers onto nothing.
+                raise ValueError(
+                    f"LoRA '{config.name}' is a MOSS-Image LoRA, registered as a Z-Image LoRA by an earlier version of "
+                    "InvokeAI. Use Re-identify model in the Model Manager to register it as a MOSS-Image LoRA."
+                )
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)

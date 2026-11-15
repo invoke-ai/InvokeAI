@@ -1,7 +1,7 @@
 ---
 title: Qwen-Image-2.1
 description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders, a GGUF or an int8 transformer, including transparent (RGBA) output.
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 sidebar:
   order: 9
 ---
@@ -42,7 +42,7 @@ The **Qwen-Image-2.1 (Q4_K_M GGUF)** starter model, from [`unsloth/Qwen-Image-2.
 
 The **Qwen-Image-2.1 (int8)** and **Qwen-Image-2.1 Turbo (int8)** starter models, Comfy-Org's `int8_convrot` builds (~7.3 GB each), install the same VAE and 8B encoder. Their int8 layers stay int8 on every supported GPU, and [int8 Compute](/configuration/optimization/int8-compute/) can run them on NVIDIA int8 tensor cores.
 
-Single-file transformers in bf16, scaled fp8 or `int8_convrot` (ComfyUI repackages) load as well. nvfp4 files, torchao-quantized files (such as unsloth's FP8 build), and int8 files without ComfyUI's `int8_convrot` marker, are refused at install. GGUF files with int8 layers (ComfyUI-GGUF's `Q8_CR`) are refused too.
+Single-file transformers in bf16, scaled fp8 or `int8_convrot` (ComfyUI repackages) load as well, as do torchao FP8 files with one scale per output row, such as unsloth's FP8 builds. nvfp4 files, other torchao layouts (per-tensor or block-wise fp8, and INT8 builds such as unsloth's), and other int8 files without ComfyUI's `int8_convrot` marker, are refused at install. GGUF files with int8 layers (ComfyUI-GGUF's `Q8_CR`) are refused too.
 
 The Turbo variant is recognized from the filename: a single file or GGUF whose name contains `turbo` installs as Turbo, anything else as the base model. If a file was detected as the wrong variant, edit the model in the Model Manager and change its **Variant**. The default settings were chosen at install, so also set **Steps** under **Default Settings**: 8 for Turbo, 40 for the base model.
 
