@@ -242,6 +242,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/notifications/toastPolicy.ts',
   // The boot UI adapters and the lazy palette, image menu and canvas saves find gallery items through it.
   '/workbench/image-actions/useFindGalleryItem.ts',
+  // The queue runtime (editor boot) and the lazy recall menus share the recall cache; alone it costs a boot request.
+  '/workbench/queue-integration/queueRecallCache.ts',
   // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
   // costs a boot request.
   '/platform/react/useModifierHeld.ts',
@@ -417,6 +419,26 @@ const WIDGET_HOST_MODULES = [
   '/features/queue/ui/QueueDataRuntime.tsx',
   '/features/workflow/ui/WorkflowWidgetChrome.tsx',
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
+] as const;
+
+// The image menus and actions the Gallery and Preview boot with. The lazy Canvas reaches only their import notices and
+// reference append, so without the group Rolldown splits those out, costing every editor boot a request.
+const IMAGE_ACTIONS_MODULES = [
+  '/workbench/canvas-operations/canvasImportNotice.ts',
+  '/workbench/image-actions/ContextSubMenu.tsx',
+  '/workbench/image-actions/ImageContextMenu.tsx',
+  '/workbench/image-actions/ImageItemMenuGroups.tsx',
+  '/workbench/image-actions/RecallActionButtons.tsx',
+  '/workbench/image-actions/appendReferenceImage.ts',
+  '/workbench/image-actions/canvasImportError.ts',
+  '/workbench/image-actions/executeVideoRecall.ts',
+  '/workbench/image-actions/galleryOptimisticRollback.ts',
+  '/workbench/image-actions/index.ts',
+  '/workbench/image-actions/pbrMapsGraph.ts',
+  '/workbench/image-actions/useDeletionConfirmation.tsx',
+  '/workbench/image-actions/useImageActions.ts',
+  '/workbench/image-actions/useImageRecallCapabilities.ts',
+  '/workbench/image-actions/videoRecall.ts',
 ] as const;
 
 // Keep the Image Map data modules in one chunk. Its API is also reached through the Gallery's lazily loaded label
@@ -627,6 +649,12 @@ export default defineConfig({
               name: 'widget-hosts',
               priority: 30,
               test: (id) => matchesAnySuffix(id, WIDGET_HOST_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'image-actions',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, IMAGE_ACTIONS_MODULES),
             },
             {
               includeDependenciesRecursively: false,

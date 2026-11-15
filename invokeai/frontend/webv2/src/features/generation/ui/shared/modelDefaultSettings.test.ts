@@ -11,15 +11,14 @@ import { getDefaultGenerateSettings } from '@features/generation/core/baseGenera
 import i18n from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { getDefaultSource, getFieldResetLabel } from './modelDefaultSettings';
 import {
   describeChanges,
   describeUnset,
   getApplyModelDefaultsPlan,
   getChangedSettings,
-  getDefaultSource,
-  getFieldResetLabel,
   getModelDefaultsPatch,
-} from './modelDefaultSettings';
+} from './modelDefaultsReset';
 
 seedArchitectureCapabilities();
 

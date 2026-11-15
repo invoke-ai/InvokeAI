@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
 import { StagingItemContextMenu } from './StagingItemContextMenu';
@@ -136,6 +136,9 @@ const render = async (handlers: Partial<Parameters<typeof StagingItemContextMenu
   );
 };
 
+// The menu loads its recall verbs lazily; transforming their module graph on first load can outlast `vi.waitFor`.
+beforeAll(() => import('./StagingItemRecallGroup'));
+
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
@@ -148,7 +151,8 @@ describe('StagingItemContextMenu', () => {
   it('recalls from the staged result’s own queue item and disables verbs its snapshot cannot back', async () => {
     await render();
 
-    expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item');
+    // The recall verbs load with the menu.
+    await vi.waitFor(() => expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item'));
     // The executed prompt and seed come from the backend item that produced the result.
     await vi.waitFor(() => expect(mocks.meta).toEqual({ positivePrompt: 'a staged cat', seed: 4242 }));
     expect(menuItem('widgets.gallery.itemActions.recall.verbs.seed').getAttribute('aria-disabled')).toBe('true');
