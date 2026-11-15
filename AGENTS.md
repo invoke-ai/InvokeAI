@@ -9,6 +9,8 @@
 
 Before editing, read every `AGENTS.md` along each target path. Scoped rules add to this file. Policy lives in `AGENTS.md` files and the `.agents/` file they link.
 
+Keep cross-cutting decisions here, area-specific decisions in scoped guidance, and implementation contracts beside their owner. Link to executable rules and package commands instead of restating their detection logic.
+
 | Area | Guidance and source of truth |
 | --- | --- |
 | Active frontend | [webv2/AGENTS.md](invokeai/frontend/webv2/AGENTS.md), its `ARCHITECTURE.md`, executable architecture policy |
@@ -31,6 +33,7 @@ Before these steps, read:
 ## Engineering standard
 
 - Before designing: read implementations, callers, contracts, tests. Define observable outcome and validation. Reproduce bugs where feasible. Fix root causes. Rethink designs that pile up patches.
+- When a correction reveals a recurring failure, first consider preventing it through the owning API, types, architecture check, or behavioral test. Use prose for judgment and constraints those mechanisms cannot express; keep the response proportional to the failure.
 - Keep ownership and interfaces clear. Cover edge cases, failures, data lifecycles, operational limits.
 - Every function, dependency, fallback, test earns its place. Abstractions must translate contracts, isolate dependencies, own lifecycles, prevent drift, or simplify callers. No pass-through wrappers, speculative extensibility, redundant validation/config, or abstraction justified only by similar-looking code.
 - Remove obsolete code, tests, scaffolding. Preserve unrelated work. Comment only non-obvious intent, constraints, trade-offs.
@@ -38,7 +41,6 @@ Before these steps, read:
 - Dependency and lockfile changes only on purpose. Never weaken assertions, gates, architecture policy, or performance budgets to pass. Explain existing failures and verification limits.
 - Keep architecture and reference docs matching the code. State current invariants, not migration history. Write paths from a stated root. Give the reason for a non-obvious rule.
 - Repo guidance beats external skill, plugin, workflow defaults: test boundaries follow existing owner interfaces and tests; reviews use the tiers below over the full task-owned diff, uncommitted files included; notes go in `.scratch/agents/<task>/`; commands use package-owned scripts and pnpm. No personal paths, no generic ceremony.
-- Any webv2 UI change: verify changed interactions in the browser. Automated checks alone do not prove visual quality.
 
 ## Performance
 
@@ -63,6 +65,7 @@ Milestone = one coherent, commit-ready unit. Run relevant checks and self-review
 
 - Reviewers did not implement the change. Self-review is never independent, including review by an implementing agent. Required independent review unavailable: self-review the matching focuses and tell the user. Ordinary low-risk self-review needs no disclaimer.
 - Never declare ready with material findings or unexplained failing gates. Report resolved findings, passed/failed/unavailable checks, remaining limits. PRs omit subagent counts, tiers, process narration.
+- Match evidence to the claimed behavior: name the exercised scenario and environment, and what remains unverified. Static checks prove encoded boundaries; mocks prove only their modeled behavior. A screenshot cannot prove retry safety, nor a passing suite every platform or failure mode. Required package gates still apply.
 - Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
 
 ## Commands and environments

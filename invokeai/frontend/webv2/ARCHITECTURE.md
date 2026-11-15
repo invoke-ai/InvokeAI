@@ -45,9 +45,17 @@ Ownership follows invariants, not the first caller:
 
 `pnpm architecture:check` is the executable source of truth for dependency direction. It parses TypeScript and classifies static imports, type imports, dynamic imports, re-exports, inline imported types, after resolving aliases and relative paths. Temporary violations go in `src/architecture/migrationExceptions.ts` with owner and removal ticket. Architecture is complete only when that registry is empty.
 
+## React adapters
+
+Domain orchestration and account/project lifetimes belong to non-React runtimes. React reads their state through external-store adapters; backend read models use Query. Derived values stay in render and user actions call the owner from event handlers. An effect must not duplicate these responsibilities.
+
+An adapter may synchronize React with an external system it owns. Reusable browser mechanics live in Platform: [useDebouncedValue](src/platform/react/useDebouncedValue.ts) owns a timer and cancellation, while [useMountEffect](src/platform/react/useMountEffect.ts) registers only mount/unmount work with stable dependencies. App composes cross-owner integrations; domain-specific adapters remain with their feature or Workbench owner. Keep the resource lifetime, dependency changes, and cleanup together. Do not add a pass-through hook, changing-dependency ref, or layout effect to disguise synchronization or avoid dependency checks. Layout effects are for pre-paint DOM measurement.
+
+The [lint configuration](.oxlintrc.json) checks hooks, dependencies, and common state-derivation mistakes; it does not enforce a blanket effect ban. Review must establish the external resource, the correct owner, and cleanup on dependency changes and unmount, including account/project transitions where relevant. Existing usages have no exemption from that review when changed. Identity resets use the owning runtime or a deliberate keyed remount whose state loss is intended.
+
 ## Owner documents
 
-Behavior specs live beside their owning code. Read the owner's document before changing its behavior.
+Behavior specs live beside their owning code. Read the owner's document before changing its behavior. [VERIFICATION.md](VERIFICATION.md) maps user-visible flows to these owners and existing verification assets.
 
 | Topic                                                         | Document                                                                               |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
