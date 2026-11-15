@@ -12,6 +12,8 @@ export interface QueueUiNotificationPort {
 /** This UI port preserves dependency direction: Queue cannot import Workbench. */
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
+  /** A row's context menu entries for recalling its settings; mounted only while that row's menu is open. */
+  ItemRecallMenuGroup: ComponentType<{ item: QueueItemReadModel }>;
   activeProjectId: string | null;
   /** Names the active-project scope in confirmations and results. */
   activeProjectName: string | null;
@@ -43,6 +45,8 @@ export interface QueueUiAdapter {
    */
   preloadItemActions?(): void;
   queueJobsScope: 'active-project' | 'all';
+  /** Recalls every setting the item records into the active project, as its menus' Recall all does. */
+  recallAllFromItem(item: QueueItemReadModel): void;
   /**
    * The first model the server is loading now, or null: a running item with no progress yet waits for it. A store, so
    * only the components that read it (`useLoadingModelLabel`) re-render as loads come and go.

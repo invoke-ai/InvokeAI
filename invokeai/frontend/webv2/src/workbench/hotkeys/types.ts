@@ -1,7 +1,7 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetContributionSource, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'viewer' | 'workflows';
+export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'queue' | 'viewer' | 'workflows';
 
 export type HotkeyScope =
   | { kind: 'global' }

@@ -1,6 +1,5 @@
 import type { QueueGenerationMeta, QueueReadModel } from '@features/queue/contracts';
 import type { CanvasCandidateSlot } from '@workbench/canvasStagingView';
-import type { ImageRecallKind } from '@workbench/image-actions';
 
 import { Menu, Portal } from '@chakra-ui/react';
 import {
@@ -11,7 +10,7 @@ import {
 import { getQueueReadModelOptions } from '@features/queue/queries';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
-import { getImageRecallVerb, IMAGE_RECALL_KINDS } from '@workbench/image-actions';
+import { QueueRecallMenuGroup } from '@workbench/queue-integration/QueueRecallMenuGroup';
 import { useQueueItemRecall } from '@workbench/queue-integration/useQueueItemRecall';
 import { useActiveProjectId } from '@workbench/WorkbenchContext';
 import { CheckIcon, SaveIcon, XIcon } from 'lucide-react';
@@ -58,7 +57,7 @@ export const StagingItemContextMenu = ({
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
   const meta = useStagedCandidateMeta(projectId, target.slot.candidate.sourceBackendItemId);
-  const { capabilities, recall } = useQueueItemRecall(buildQueueItemOrigin(target.slot.queueItemId, projectId), meta);
+  const recall = useQueueItemRecall(buildQueueItemOrigin(target.slot.queueItemId, projectId), meta);
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => ({ height: 1, width: 1, x: target.x, y: target.y }),
@@ -80,12 +79,7 @@ export const StagingItemContextMenu = ({
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="13rem" py="1">
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel>{t('widgets.canvas.staging.recall')}</Menu.ItemGroupLabel>
-              {IMAGE_RECALL_KINDS.map((kind) => (
-                <RecallItem key={kind} disabled={!capabilities[kind]} kind={kind} onRecall={recall} />
-              ))}
-            </Menu.ItemGroup>
+            <QueueRecallMenuGroup recall={recall} />
             <Menu.Separator borderColor="border.subtle" />
             <MenuActionItem
               icon={SaveIcon}
@@ -106,19 +100,4 @@ export const StagingItemContextMenu = ({
       </Portal>
     </Menu.Root>
   );
-};
-
-const RecallItem = ({
-  disabled,
-  kind,
-  onRecall,
-}: {
-  disabled: boolean;
-  kind: ImageRecallKind;
-  onRecall: (kind: ImageRecallKind) => void;
-}) => {
-  const { t } = useTranslation();
-  const verb = getImageRecallVerb(kind, t);
-  const onSelect = useCallback(() => onRecall(kind), [kind, onRecall]);
-  return <MenuActionItem disabled={disabled} icon={verb.icon} label={verb.label} value={kind} onSelect={onSelect} />;
 };

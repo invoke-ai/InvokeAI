@@ -967,6 +967,7 @@
       "app": "App",
       "canvas": "Canvas",
       "gallery": "Gallery",
+      "queue": "Queue",
       "viewer": "Viewer",
       "workflows": "Workflows"
     },
@@ -4189,6 +4190,7 @@
         "noModelsClearedDescription": "No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use."
       },
       "noCurrentItem": "Nothing to cancel",
+      "nothingRecalled": "Nothing recalled",
       "openQueue": "Open queue",
       "pauseProcessor": "Pause processor",
       "processorPaused": "Processor paused",
@@ -4198,6 +4200,9 @@
       "queued_one": "{{count}} queued",
       "queued_other": "{{count}} queued",
       "recallAll": "Recall all",
+      "recallNotForVideo": "Not offered for video jobs; Recall all restores every setting.",
+      "recallRandomSeed": "This job used a random seed the server has not reported.",
+      "recallSettingsNotKept": "This browser did not keep this item's settings, so only a prompt or seed the server recorded can be recalled.",
       "recallUnavailable": "Nothing recallable for this item — select a supported Generate model first.",
       "recallUnavailableCapabilities": "Nothing recallable yet — model capabilities have not loaded. If loading failed, retry from the Generate panel.",
       "recallUnavailableForItem": "Nothing recallable for this item.",

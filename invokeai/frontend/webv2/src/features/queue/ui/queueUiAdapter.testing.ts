@@ -1,10 +1,12 @@
 import type { QueueLocalRun, QueueUiAdapter } from './QueueUiContext';
+import type { QueueWidgetRuntime } from './QueueWidgetView';
 
 const noLoadingModel = { getLabel: (): string | null => null, subscribe: () => () => undefined };
 
 /** A single-user adapter that can manage everything, connected, with nothing queued locally. */
 export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}): QueueUiAdapter => ({
   ItemActions: () => null,
+  ItemRecallMenuGroup: () => null,
   activeProjectId: null,
   activeProjectName: null,
   canManageInvocationCache: false,
@@ -22,6 +24,7 @@ export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}
   openQueue: () => undefined,
   preloadItemActions: () => undefined,
   queueJobsScope: 'all',
+  recallAllFromItem: () => undefined,
   viewer: 'single',
   ...overrides,
 });
@@ -34,4 +37,9 @@ export const createTestLocalRun = (overrides: Partial<QueueLocalRun> = {}): Queu
   retry: null,
   submittedAt: 0,
   ...overrides,
+});
+
+/** A widget runtime that takes registrations and runs nothing. */
+export const createTestQueueWidgetRuntime = (): QueueWidgetRuntime => ({
+  commands: { register: () => () => undefined },
 });

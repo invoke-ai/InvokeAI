@@ -1,7 +1,7 @@
 ---
 title: Keyboard shortcuts
 description: Every default keyboard shortcut in Invoke, where each one works, and how to change, add, disable or reset shortcuts in Settings.
-lastUpdated: 2026-10-30
+lastUpdated: 2026-11-14
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -13,7 +13,7 @@ In the tables, <kbd>Mod</kbd> means <kbd>Ctrl</kbd> on Windows and Linux and <kb
 ## Where shortcuts work
 
 - **App** shortcuts work anywhere in the workbench.
-- **Panel** shortcuts (Canvas, Workflows, Viewer, Gallery) work only while that panel has keyboard focus. Click in a panel, or move focus to it, to give its keys priority. The center panel has focus when a project opens, and gets it back when a focused window docks or closes. The Viewer shortcuts belong to the **Preview** panel.
+- **Panel** shortcuts (Canvas, Workflows, Viewer, Gallery, Queue) work only while that panel has keyboard focus. Click in a panel, or move focus to it, to give its keys priority. The center panel has focus when a project opens, and gets it back when a focused window docks or closes. The Viewer shortcuts belong to the **Preview** panel.
 - When a panel shortcut uses the same key as an App shortcut, the panel's shortcut wins while that panel has focus, and the App shortcut works everywhere else. For example, <kbd>T</kbd> selects the Text tool on the Canvas and collapses the left panel elsewhere.
 - While you type in a text field, single-key shortcuts do nothing so your typing is never interrupted. Shortcuts that make sense while writing a prompt still work there: Invoke, Invoke Front, Invoke To Other Destination, Focus Prompt, the prompt history and prompt weight keys, Open Project Switcher, Open Settings, the command palette, and the region and widget focus keys.
 - While a dialog is open, only the command palette shortcut works.
@@ -27,7 +27,7 @@ The **Shortcuts** chip in the status bar lists the keys for whatever has focus, 
 
 Open **Settings** (<kbd>Mod</kbd>+<kbd>,</kbd>, or the app menu) and choose **Keyboard shortcuts**. You can also choose **Keyboard Shortcuts** in the [command palette](#app), or **Keyboard shortcut settings** in the status bar's **Shortcuts** chip.
 
-The **Hotkeys** list groups every shortcut under App, Canvas, Workflows, Viewer and Gallery, whether or not that panel is in your layout. **Search hotkeys** filters the list by command name or default key. Your shortcuts are saved with your account and apply in every project.
+The **Hotkeys** list groups every shortcut under App, Canvas, Workflows, Viewer, Gallery and Queue, whether or not that panel is in your layout. **Search hotkeys** filters the list by command name or default key. Your shortcuts are saved with your account and apply in every project.
 
 <Steps>
 1. Click a key chip on a row to change it. The chip reads **Press keys**: press the new combination. Press <kbd>Esc</kbd> to stop recording without changing the chip, or click the trash button to remove that key.
@@ -210,6 +210,10 @@ These work while the Gallery has focus. See [Gallery reference](/users-guide/gal
 | <kbd>Esc</kbd> | Cancel or exit compare | Cancels **Select for compare** while it waits for a second image, or closes the comparison |
 
 **Clear gallery selection**, **Add or remove the focused gallery item from the selection** and **Toggle gallery starred-only filter** have no default keys.
+
+## Queue
+
+While a row in the Queue panel has focus, <kbd>A</kbd> runs **Recall All**: it recalls all of that job's settings into the Generate panel, or into the Video panel for a video job. Elsewhere in the Queue the key does nothing. See [Generating and modifying still images](/users-guide/image-generation/introduction/) for what a job can recall.
 
 ## Image Map
 

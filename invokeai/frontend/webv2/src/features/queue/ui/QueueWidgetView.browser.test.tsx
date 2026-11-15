@@ -23,7 +23,7 @@ vi.mock('@features/queue/publicApi', () => ({
 }));
 
 import { QUEUE_FILTER_TABS_ID } from './QueueFilterTabs';
-import { createTestQueueUiAdapter } from './queueUiAdapter.testing';
+import { createTestQueueUiAdapter, createTestQueueWidgetRuntime } from './queueUiAdapter.testing';
 import { QueueUiProvider } from './QueueUiContext';
 import { QueueWidgetView } from './QueueWidgetView';
 
@@ -74,7 +74,7 @@ const renderQueue = async (width: number, counts: Counts) => {
       <ChakraProvider value={system}>
         <QueryClientProvider client={client}>
           <QueueUiProvider adapter={createTestQueueUiAdapter()}>
-            <QueueWidgetView region="right" />
+            <QueueWidgetView region="right" runtime={createTestQueueWidgetRuntime()} />
           </QueueUiProvider>
         </QueryClientProvider>
       </ChakraProvider>

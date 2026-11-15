@@ -14,6 +14,7 @@ const categoryScopes = {
   app: { kind: 'global' },
   canvas: { kind: 'widget', typeIds: ['canvas'] },
   gallery: { kind: 'widget', typeIds: ['gallery'] },
+  queue: { kind: 'widget', typeIds: ['queue'] },
   viewer: { kind: 'widget', typeIds: ['preview'] },
   workflows: { kind: 'widget', typeIds: ['workflow'] },
 } as const satisfies Record<HotkeyCategory, HotkeyScope>;
@@ -97,6 +98,12 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
  * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
  */
 const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
+
+/**
+ * The Queue marks a row this way while it offers recall, so its A key works where the Gallery's does and keeps its
+ * meaning everywhere else in the queue.
+ */
+const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue-recall-item] *';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
@@ -289,4 +296,5 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   // Preview's compare Esc, answered where its second image is picked.
   hotkey('gallery', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('gallery', 'toggleStarredOnly', []),
+  { ...hotkey('queue', 'recallAll', ['a']), targetSelector: QUEUE_RECALL_ITEM_TARGET_SELECTOR },
 ];

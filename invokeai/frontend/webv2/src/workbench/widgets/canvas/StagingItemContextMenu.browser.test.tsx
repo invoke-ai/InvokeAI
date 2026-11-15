@@ -52,7 +52,7 @@ vi.mock('@workbench/queue-integration/useQueueItemRecall', () => ({
   useQueueItemRecall: (origin: string, meta: unknown) => {
     mocks.origin = origin;
     mocks.meta = meta;
-    return { capabilities: mocks.capabilities, isPending: false, recall: mocks.recall };
+    return { capabilities: mocks.capabilities, isPending: false, reasons: {}, recall: mocks.recall };
   },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));

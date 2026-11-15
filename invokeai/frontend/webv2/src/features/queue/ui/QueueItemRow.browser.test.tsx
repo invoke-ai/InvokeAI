@@ -4,7 +4,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, lazy } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -264,5 +264,31 @@ describe('QueueItemRow', () => {
     root = createRoot(host);
     await render(adapter({ canManageItem: () => false }), item({ id: 14, status: 'canceled' }));
     expect(host.querySelector('button[aria-label="widgets.queue.retryItem"]')).toBeNull();
+  });
+
+  it('opens its menu at once and lets Escape close it while the recall entries still load', async () => {
+    const NeverLoaded = lazy(() => new Promise<{ default: () => null }>(() => {}));
+    await render(adapter({ ItemRecallMenuGroup: NeverLoaded }), item());
+
+    await act(() =>
+      primary().dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 })
+      )
+    );
+
+    const menu = await vi.waitFor(() => {
+      const open = document.querySelector<HTMLElement>('[role="menu"]');
+      expect(open).not.toBeNull();
+      return open!;
+    });
+    // Only menu items while loading: a disabled one in the entries' place.
+    const items = [...menu.children].filter((child) => child.getAttribute('role') !== 'presentation');
+    expect(items.map((child) => [child.getAttribute('role'), child.getAttribute('aria-disabled')])).toEqual([
+      ['menuitem', 'true'],
+    ]);
+    expect(menu.textContent).toContain('common.loading');
+
+    await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
   });
 });

@@ -8,7 +8,15 @@ import { RetryBoundary } from '@platform/ui/RetryBoundary';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
 import { CloudOffIcon, ListOrderedIcon, PauseIcon, type LucideIcon } from 'lucide-react';
-import { lazy, Suspense, useState, useSyncExternalStore, type ComponentProps, type ComponentType } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffectEvent,
+  useState,
+  useSyncExternalStore,
+  type ComponentProps,
+  type ComponentType,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type * as LocalRunListExports from './LocalRunList';
@@ -16,6 +24,7 @@ import type { QueueFilterId } from './queueFilters';
 import type { QueueLocalRun } from './QueueUiContext';
 
 import { CurrentBatchSection } from './NowNextSection';
+import { useQueueReadModelData } from './queueDataStore';
 import { QueueFilterTabs } from './QueueFilterTabs';
 import { useShownLocalRuns } from './queueScope';
 import { useQueueUi } from './QueueUiContext';
@@ -86,25 +95,73 @@ export const createLocalRunListLoader = (importer: () => Promise<LocalRunListMod
 
 const localRunList = createLocalRunListLoader(() => import('./LocalRunList'));
 
+/** The part of the Workbench's widget runtime the queue uses: Queue cannot import Workbench. */
+export interface QueueWidgetRuntime {
+  commands: {
+    register(command: { handler: () => unknown; id: string; title: string }): () => void;
+  };
+}
+
+type QueueWidgetRegion = 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
+
 export const QueueWidgetView = ({
   presentation,
   region,
+  runtime,
 }: {
   presentation?: 'compact' | 'expanded' | 'tooltip';
-  region: 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
+  region: QueueWidgetRegion;
+  runtime: QueueWidgetRuntime;
 }) => {
   if (region === 'bottom' && presentation !== 'expanded') {
     return <QueueStatusChip />;
   }
 
-  return <QueueContent />;
+  return <QueueContent region={region} runtime={runtime} />;
 };
 
-const QueueContent = () => {
+/** The Workbench's hotkey catalog binds `queue.recallAll` (A) to it, claimed only on a row offering recall. */
+const QUEUE_RECALL_ALL_COMMAND = 'queue.recallAll';
+
+/**
+ * Recalls the focused row's settings. The key goes to the focused element, so that is the row it names. Registered
+ * once per mount; the queue keys it by project, region and language, which its source and title follow.
+ */
+const QueueRecallAllCommand = ({ runtime }: { runtime: QueueWidgetRuntime }) => {
   const { t } = useTranslation();
+  const { recallAllFromItem } = useQueueUi();
+  const readModel = useQueueReadModelData();
+  const recallFocusedItem = useEffectEvent(() => {
+    const itemId = Number(
+      document.activeElement?.closest('[data-queue-recall-item]')?.getAttribute('data-queue-recall-item')
+    );
+    const item = readModel
+      ? [readModel.current, readModel.next, ...readModel.items].find((candidate) => candidate?.id === itemId)
+      : undefined;
+
+    if (item) {
+      recallAllFromItem(item);
+    }
+  });
+
+  /* eslint-disable react-hooks/rules-of-hooks -- useMountEffect is the repository's explicit useEffect wrapper */
+  useMountEffect(() =>
+    runtime.commands.register({
+      handler: () => recallFocusedItem(),
+      id: QUEUE_RECALL_ALL_COMMAND,
+      title: t('widgets.queue.recallAll'),
+    })
+  );
+  /* eslint-enable react-hooks/rules-of-hooks */
+
+  return null;
+};
+
+const QueueContent = ({ region, runtime }: { region: QueueWidgetRegion; runtime: QueueWidgetRuntime }) => {
+  const { i18n, t } = useTranslation();
   const [filter, setFilter] = useState<QueueFilterId>('all');
   const revealRequest = usePendingQueueItemReveal();
-  const { localRuns } = useQueueUi();
+  const { activeProjectId, localRuns } = useQueueUi();
   const shownLocalRuns = useShownLocalRuns();
   const [handledRevealRequestId, setHandledRevealRequestId] = useState<number | null>(null);
 
@@ -118,6 +175,7 @@ const QueueContent = () => {
   // the extra row gap keeps row surfaces off the panel edges by the same distance that separates rows.
   return (
     <Stack gap="2" h="full" minH="0" pt="2">
+      <QueueRecallAllCommand key={`${activeProjectId}:${region}:${i18n.language}`} runtime={runtime} />
       {localRuns.length > 0 ? <LocalRunListPreload rows={localRunList} /> : null}
       <Box flexShrink={0} px="2">
         <QueueFilterTabs localRunCount={shownLocalRuns.length} value={filter} onChange={setFilter} />

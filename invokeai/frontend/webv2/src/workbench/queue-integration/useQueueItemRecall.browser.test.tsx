@@ -59,6 +59,13 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
       generation: { setSettings: mocks.setSettings },
       widgets: { patchValues: mocks.patchValues },
     },
+  // Read once per render: these probes do not re-render on Workbench changes.
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    const snapshot = mocks.store?.queries.getSnapshot();
+    return selector(
+      snapshot ? getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults) : {}
+    );
+  },
 }));
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsModule>()),
@@ -146,7 +153,8 @@ describe('useQueueItemRecall', () => {
 
   it('recalls a generate submission into the Generate panel and reveals it', async () => {
     await render({ generateValues: generateSnapshot, sourceId: 'canvas' });
-    expect(handle.current!.capabilities).toMatchObject({ all: true, prompts: true, seed: true });
+    // A full recall replaces the Generate values, so it needs no supported model selected.
+    expect(handle.current!.capabilities).toMatchObject({ all: true, remix: true });
 
     await recall('all');
 
@@ -166,15 +174,43 @@ describe('useQueueItemRecall', () => {
     expect(mocks.openWidget).toHaveBeenCalledWith('video', { preferredRegions: ['left'] });
   });
 
-  it('explains an unavailable recall instead of writing anything', async () => {
-    // A foreign item: no snapshot, only the executed prompt from the session.
+  it('says why each kind is unavailable, and explains instead of writing when one is recalled anyway', async () => {
+    // A foreign item: no snapshot, only the executed prompt from the session, and no supported model selected.
     await render(null, { positivePrompt: 'session prompt' });
-    expect(handle.current!.capabilities).toMatchObject({ all: false, prompts: true, seed: false });
+    expect(handle.current!.capabilities).toMatchObject({ all: false, prompts: false, seed: false });
+    expect(handle.current!.reasons).toMatchObject({
+      all: 'widgets.queue.recallSettingsNotKept',
+      prompts: 'widgets.queue.recallUnavailable',
+      seed: 'widgets.queue.recallSettingsNotKept',
+    });
 
+    await recall('prompts');
     await recall('seed');
 
     expect(mocks.setSettings).not.toHaveBeenCalled();
-    expect(mocks.notifyInfo).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.recallUnavailable');
+    expect(mocks.notifyInfo.mock.calls).toEqual([
+      [expect.any(String), 'widgets.queue.recallUnavailable'],
+      [expect.any(String), 'widgets.queue.recallSettingsNotKept'],
+    ]);
+  });
+
+  it('offers a foreign item its session prompt once a supported model is selected', async () => {
+    const main = { base: 'sdxl', key: 'main', name: 'SDXL', type: 'main' } as MainModelConfig &
+      ModelsModule.ModelConfig;
+    mocks.models = [main];
+    mocks.store = createWorkbenchStore();
+    const projectId = mocks.store.queries.getSnapshot().activeProject.id;
+    mocks.store.commands.generation.setSettings({ ...getDefaultGenerateSettings(main), model: main }, projectId);
+    await render(null, { positivePrompt: 'session prompt' });
+    expect(handle.current!.capabilities).toMatchObject({ all: false, prompts: true });
+    expect(handle.current!.reasons.prompts).toBeUndefined();
+
+    await recall('prompts');
+
+    const snapshot = mocks.store.queries.getSnapshot();
+    expect(
+      getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults).positivePrompt
+    ).toBe('session prompt');
   });
 
   it('names the missing capability table, not a missing model, while the table is absent', async () => {
@@ -182,7 +218,8 @@ describe('useQueueItemRecall', () => {
 
     await act(() => resetArchitectureCapabilities());
     try {
-      await recall('seed');
+      expect(handle.current!.reasons.prompts).toBe('widgets.queue.recallUnavailableCapabilities');
+      await recall('prompts');
     } finally {
       await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
     }
