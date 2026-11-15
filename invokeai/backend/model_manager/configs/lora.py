@@ -742,7 +742,7 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)
 
-# No double block: the hidden size is also the input width of a single block's fused `linear1` and of the shared
+    # No double block: the hidden size is also the input width of a single block's fused `linear1` and of the shared
     # modulations.
     for key in state_dict:
         if not isinstance(key, str):
