@@ -2,7 +2,7 @@ import type { PointerInput } from '@workbench/canvas-engine/types';
 
 import { documentFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createVectorLayer } from '@workbench/canvas-engine/document/layerFactories';
+import { createVectorLayer } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { describe, expect, it, vi } from 'vitest';

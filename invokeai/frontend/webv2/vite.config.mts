@@ -419,7 +419,6 @@ const CANVAS_COMMAND_SHARED_MODULES = [
   '/workbench/canvas-engine/document/layerFactories.ts',
   '/workbench/canvas-engine/render/alphaBounds.ts',
   '/workbench/canvas-engine/samCoordinates.ts',
-  '/workbench/canvas-engine/vectorDefaults.ts',
   '/workbench/canvas-operations/api.ts',
   '/workbench/canvas-operations/backend/canvasImages.ts',
   '/workbench/canvas-operations/compositeForGeneration.ts',
@@ -447,6 +446,8 @@ const CANVAS_COMMAND_SHARED_MODULES = [
 // Group Canvas/Layer interaction dependencies to avoid extra text-tool activation requests.
 const CANVAS_LAYER_SHARED_MODULES = [
   '/features/workflow/core/layerWorkflow.ts',
+  '/workbench/canvas-engine/document/vectorLayerFactories.ts',
+  '/workbench/canvas-engine/vectorDefaults.ts',
   // Only Canvas composition reaches these creation roots; keep them with its lazy owner instead of extra chunks.
   '/workbench/canvas-operations/engineRegistry.ts',
   '/workbench/canvas-operations/createCanvasEngine.ts',

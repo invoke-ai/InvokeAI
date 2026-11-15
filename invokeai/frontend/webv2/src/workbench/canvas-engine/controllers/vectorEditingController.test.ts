@@ -6,7 +6,7 @@ import type { VectorEditSession, VectorPointRef } from '@workbench/canvas-engine
 
 import { documentFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { captureInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import { createVectorLayer } from '@workbench/canvas-engine/document/layerFactories';
+import { createVectorLayer } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import { anchorsToBezierPoints } from '@workbench/canvas-engine/math/bezierPath';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { normalizeCanvasDocumentContract } from '@workbench/canvasMigration';

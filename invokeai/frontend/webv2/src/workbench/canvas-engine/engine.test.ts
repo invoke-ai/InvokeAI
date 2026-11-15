@@ -37,8 +37,8 @@ import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createVectorLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
+import { createVectorLayer } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import * as compositor from '@workbench/canvas-engine/render/compositor';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';

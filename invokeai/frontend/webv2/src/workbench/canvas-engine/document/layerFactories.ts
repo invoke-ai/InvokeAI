@@ -7,11 +7,9 @@ import type {
   CanvasMaskFillContract,
   CanvasPixelSourceContract,
   CanvasRegionalGuidanceLayerContract,
-  CanvasVectorLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/vectorDefaults';
 import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
@@ -25,7 +23,7 @@ export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
   '#a178d6',
 ];
 
-const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
+export const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
   const expression = new RegExp(`^${prefix} (\\d+)$`);
   const used = new Set(
     existingNames
@@ -41,21 +39,6 @@ const nextNumberedName = (prefix: string, existingNames: readonly string[]): str
 
 export const nextInpaintMaskName = (names: readonly string[]): string => nextNumberedName('Inpaint Mask', names);
 export const nextControlLayerName = (names: readonly string[]): string => nextNumberedName('Control Layer', names);
-export const nextVectorLayerName = (names: readonly string[]): string => nextNumberedName('Vector Layer', names);
-
-export const createVectorLayer = (input: { id: string; name: string }): CanvasVectorLayerContract => ({
-  blendMode: 'normal',
-  id: input.id,
-  isEnabled: true,
-  isLocked: false,
-  name: input.name,
-  opacity: 1,
-  paths: [],
-  strokeColor: DEFAULT_VECTOR_STROKE_COLOR,
-  strokeWidth: DEFAULT_VECTOR_STROKE_WIDTH,
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-  type: 'vector',
-});
 export const nextRegionalGuidanceName = (names: readonly string[]): string =>
   nextNumberedName('Regional Guidance', names);
 export const nextRegionalGuidanceFillColor = (count: number): string =>

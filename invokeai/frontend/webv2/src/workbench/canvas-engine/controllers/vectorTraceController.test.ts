@@ -1,6 +1,6 @@
 import { documentFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createVectorLayer } from '@workbench/canvas-engine/document/layerFactories';
+import { createVectorLayer } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import { anchorsToBezierPoints, approximateBezierPath } from '@workbench/canvas-engine/math/bezierPath';
 import { getTraceLineBounds } from '@workbench/canvas-engine/math/vectorTrace';
 import { describe, expect, it } from 'vitest';

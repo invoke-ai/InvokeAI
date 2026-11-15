@@ -10,7 +10,7 @@ import { addedVectorLayerMutations } from '@workbench/canvas-engine/controllers/
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
-import { createVectorLayer, nextVectorLayerName } from '@workbench/canvas-engine/document/layerFactories';
+import { createVectorLayer, nextVectorLayerName } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import {
   anchorsToBezierPoints,
   fitPolylineToBezierPoints,
