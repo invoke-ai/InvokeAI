@@ -341,7 +341,6 @@ The spline tool owns an optional active-path transform frame in `vectorEditSessi
 
 Vector layer Properties owns Trace controls. Stroke width reads/writes shared brush size; optional traceTaperEnds/traceTaper config properties persist per layer. vectorTraceController samples Bezier curves and renders ordinary round strokes or v6-style tapered pressure outlines into layer-local paint pixels. It uses the standard mutation transaction and publishAddedRasterLayer for reserved allocation, atomic insertion, pixel persistence and global replay. The new raster layer inherits the vector transform; source geometry and display guide color are unaffected.
 
-
 ### Vector layer Trace/Fill and path-menu scope
 
 Layer Properties exposes Shapes-style Appearance rows with independent Fill/Stroke toggles and colors, stroke width, taper settings, and one Trace/Fill action. Fill defaults off and Stroke defaults on. The optional `fillColor`, `fillEnabled`, `strokeEnabled`, `traceTaperEnds` and `traceTaper` properties persist on the vector layer; stroke color and width currently use shared brush settings.
@@ -351,7 +350,6 @@ Intersection-based filling belongs exclusively to the layer action. When Fill is
 The path context menu deliberately has narrower semantics: Trace Path strokes only the targeted path, while Fill Path fills only the targeted explicitly closed path (at least three points), using the layer fill color regardless of the Appearance toggles. It does not discover regions involving other curves. There is no context-menu Fill Region or cursor-based region selection.
 
 Region discovery runs only when the layer action executes, not when opening a context menu or moving points. It yields bounded work chunks to the browser and checks AbortSignal between chunks. Cancel or Escape interrupts it; document edits, engine cooldown and disposal abort pending work. Results are fenced against the captured document and brush width/color before admission and publication. The prototype uses 24 samples per Bezier segment, x-sorted bounding-box candidate rejection, segment splitting and directed planar-face traversal. Worst-case intersection work is quadratic, bounded by 24,000 input segments, 2,000,000 candidate comparisons and 120,000 directed edges. Exceeding a limit returns a distinct too-complex result instead of publishing partial output. Approximation can miss small features; gap snapping, coincident-segment repair, robust tangency handling and intentional holes are outside the current scope. Numerical endpoint coincidences may connect. Live Trace/Fill preview is not implemented.
-
 
 Trace/Fill capabilities return `Promise<VectorTraceResult>` with distinct empty, canceled/stale, busy, memory-budget and complexity outcomes. Properties offers Cancel while its request runs; the path menu closes immediately and reports actionable failures. Raster bounds include the tension curve control-point hull and actual taper outline. Geometry preparation is browser-independent; Path2D construction can be injected for recording tests.
 

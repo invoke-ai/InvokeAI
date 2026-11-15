@@ -348,7 +348,9 @@ const hasMutablePixels = (context: LayerContextActionState): boolean =>
   isLayerMutable(context) && hasReadablePixels(context);
 const hasTransformablePixels = (context: LayerContextActionState): boolean =>
   context.layer.type === 'vector'
-    ? context.layer.isEnabled && isLayerMutable(context) && context.hasEngine &&
+    ? context.layer.isEnabled &&
+      isLayerMutable(context) &&
+      context.hasEngine &&
       !(layerEntry(context)?.ancestorsEnabled === false) &&
       context.layer.paths.some((path) => path.points.length >= 2)
     : context.layer.isEnabled && hasMutablePixels(context);

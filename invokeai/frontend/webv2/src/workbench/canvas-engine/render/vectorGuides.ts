@@ -1,8 +1,8 @@
 import type { CanvasBezierPathContract, CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { DEFAULT_VECTOR_GUIDE_COLOR } from '@workbench/canvas-engine/contracts';
+import { applyToPoint, multiply } from '@workbench/canvas-engine/math/mat2d';
 
 import type { RasterSurface } from './raster';
 
@@ -65,7 +65,9 @@ export const drawVectorGuides = (
   layers: readonly VectorGuideLayer[],
   preview: VectorShapePreview | null
 ): void => {
-  if (layers.length === 0 && !preview) { return; }
+  if (layers.length === 0 && !preview) {
+    return;
+  }
   ctx.save();
   ctx.setLineDash([]);
   ctx.strokeStyle = GUIDE_COLOR;
@@ -79,7 +81,9 @@ export const drawVectorGuides = (
     ctx.strokeStyle = layer.guideColor ?? GUIDE_COLOR;
     ctx.lineWidth = 1.5;
     for (const path of layer.paths) {
-      if (editing && path.id === layer.editActivePathId) { continue; }
+      if (editing && path.id === layer.editActivePathId) {
+        continue;
+      }
       strokePath(ctx, path.points, path.isClosed, matrix);
     }
     const active = editing ? layer.paths.find((path) => path.id === layer.editActivePathId) : null;

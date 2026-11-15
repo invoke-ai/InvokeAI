@@ -1,13 +1,22 @@
-import { addedVectorLayerMutations } from '../controllers/editSteps';
-import type { CanvasBezierPointContract, CanvasVectorLayerContract, ParametricShapeKind } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasBezierPointContract,
+  CanvasVectorLayerContract,
+  ParametricShapeKind,
+} from '@workbench/canvas-engine/contracts';
 import type { ShapeToolOptions } from '@workbench/canvas-engine/engineStores';
 import type { Mat2d, PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
+import { addedVectorLayerMutations } from '@workbench/canvas-engine/controllers/editSteps';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { createVectorLayer, nextVectorLayerName } from '@workbench/canvas-engine/document/layerFactories';
-import { anchorsToBezierPoints, fitPolylineToBezierPoints, ovalToBezierPoints, rectToBezierPoints } from '@workbench/canvas-engine/math/bezierPath';
+import {
+  anchorsToBezierPoints,
+  fitPolylineToBezierPoints,
+  ovalToBezierPoints,
+  rectToBezierPoints,
+} from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import { polygonShapeVertices } from '@workbench/canvas-engine/math/shapeGeometry';
 import { getStrokePoints } from 'perfect-freehand';
@@ -95,9 +104,17 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     const doc = ctx.getDocument();
     const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
     const options = ctx.stores.shapeOptions.get();
-    if (!leaf || leaf.layer.type !== 'vector' || leaf.id !== session.layer.id || leaf.documentHidden || leafEditRefusal(leaf) ||
-      leaf.layer.paths !== session.layer.paths || leaf.layer.transform !== session.layer.transform ||
-      options.kind !== session.kind || options.target !== session.target) {
+    if (
+      !leaf ||
+      leaf.layer.type !== 'vector' ||
+      leaf.id !== session.layer.id ||
+      leaf.documentHidden ||
+      leafEditRefusal(leaf) ||
+      leaf.layer.paths !== session.layer.paths ||
+      leaf.layer.transform !== session.layer.transform ||
+      options.kind !== session.kind ||
+      options.target !== session.target
+    ) {
       reset(ctx);
       return false;
     }
@@ -109,14 +126,18 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       return input;
     }
     const local = applyToPoint(current.toLocal, input.documentPoint);
-    const documentPoint = applyToPoint(layerMatrix(current.layer.transform), { x: Math.floor(local.x), y: Math.floor(local.y) });
+    const documentPoint = applyToPoint(layerMatrix(current.layer.transform), {
+      x: Math.floor(local.x),
+      y: Math.floor(local.y),
+    });
     return { ...input, documentPoint };
   };
 
   const polygonCursor = (ctx: ToolContext, current: Session): Vec2 => {
     const point = current.input.documentPoint;
     const first = current.points[0]!;
-    current.closeArmed = current.points.length >= 3 &&
+    current.closeArmed =
+      current.points.length >= 3 &&
       distance(ctx.viewport.documentToScreen(first), current.input.screenPoint) <= CLOSE_RADIUS_PX;
     if (current.closeArmed) {
       return first;
@@ -126,7 +147,7 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     }
     const last = current.points.at(-1)!;
     const length = distance(last, point);
-    const angle = Math.round(Math.atan2(point.y - last.y, point.x - last.x) / (Math.PI / 4)) * Math.PI / 4;
+    const angle = (Math.round(Math.atan2(point.y - last.y, point.x - last.x) / (Math.PI / 4)) * Math.PI) / 4;
     const snapped = { x: last.x + Math.cos(angle) * length, y: last.y + Math.sin(angle) * length };
     if (current.points.length >= 2) {
       const threshold = CLOSE_RADIUS_PX / ctx.viewport.getZoom();
@@ -149,24 +170,27 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     let points: CanvasBezierPointContract[];
     let isClosed = false;
     if (current.pending) {
-      points = current.pending.points; isClosed = current.pending.isClosed;
+      points = current.pending.points;
+      isClosed = current.pending.isClosed;
     } else if (isBoxKind(current.kind)) {
       const rect = dragRect(current);
-      points = rect.width > 0 && rect.height > 0
-        ? boxPoints(current.kind, rect)
-        : [];
+      points = rect.width > 0 && rect.height > 0 ? boxPoints(current.kind, rect) : [];
       isClosed = true;
     } else if (current.kind === 'polygon') {
       const cursor = polygonCursor(ctx, current);
-      const anchors = current.closeArmed || distance(cursor, current.points.at(-1)!) === 0
-        ? current.points : [...current.points, cursor];
+      const anchors =
+        current.closeArmed || distance(cursor, current.points.at(-1)!) === 0
+          ? current.points
+          : [...current.points, cursor];
       points = anchorsToBezierPoints(anchors);
       isClosed = current.closeArmed;
     } else {
       points = anchorsToBezierPoints(current.points);
     }
     ctx.stores.vectorShapePreview.set({
-      layerId: current.layer.id, points, isClosed,
+      layerId: current.layer.id,
+      points,
+      isClosed,
       vertices: current.kind === 'polygon' ? current.points.slice() : null,
       closeRadiusPx: current.kind === 'polygon' && current.points.length >= 3 ? CLOSE_RADIUS_PX : null,
       closeArmed: current.closeArmed,
@@ -198,17 +222,22 @@ export const createVectorShapeTool = (): VectorShapeTool => {
     const current = session;
     const doc = ctx.getDocument()!;
     if (points.length < (isClosed ? 3 : 2)) {
-      reset(ctx); return;
+      reset(ctx);
+      return;
     }
     const toLocal = current.target === 'selected' ? current.toLocal : null;
     const path = {
-      id: ctx.createLayerId(), name: null, isClosed,
-      points: toLocal ? points.map((point) => ({
-        ...point,
-        anchor: applyToPoint(toLocal, point.anchor),
-        inHandle: point.inHandle ? applyToPoint(toLocal, point.inHandle) : null,
-        outHandle: point.outHandle ? applyToPoint(toLocal, point.outHandle) : null,
-      })) : points,
+      id: ctx.createLayerId(),
+      name: null,
+      isClosed,
+      points: toLocal
+        ? points.map((point) => ({
+            ...point,
+            anchor: applyToPoint(toLocal, point.anchor),
+            inHandle: point.inHandle ? applyToPoint(toLocal, point.inHandle) : null,
+            outHandle: point.outHandle ? applyToPoint(toLocal, point.outHandle) : null,
+          }))
+        : points,
     };
     let result: ReturnType<ToolContext['commitStructural']>;
     if (current.target === 'new') {
@@ -217,23 +246,42 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         name: nextVectorLayerName(getDocumentIndex(doc).nodes.map((entry) => entry.node.name)),
       });
       layer.paths = [path];
-      const mutations = addedVectorLayerMutations(layer, ctx.captureInsertionAnchor('vector', current.layer.id), doc.selectedLayerId);
+      const mutations = addedVectorLayerMutations(
+        layer,
+        ctx.captureInsertionAnchor('vector', current.layer.id),
+        doc.selectedLayerId
+      );
       result = ctx.commitStructural('Add vector shape', mutations.forward, mutations.inverse);
     } else {
-      result = ctx.commitStructural('Add vector path', {
-        type: 'updateCanvasLayerConfig', id: current.layer.id,
-        config: { layerType: 'vector', paths: [...current.layer.paths, path] },
-      }, {
-        type: 'updateCanvasLayerConfig', id: current.layer.id,
-        config: { layerType: 'vector', paths: current.layer.paths },
-      });
+      result = ctx.commitStructural(
+        'Add vector path',
+        {
+          type: 'updateCanvasLayerConfig',
+          id: current.layer.id,
+          config: { layerType: 'vector', paths: [...current.layer.paths, path] },
+        },
+        {
+          type: 'updateCanvasLayerConfig',
+          id: current.layer.id,
+          config: { layerType: 'vector', paths: current.layer.paths },
+        }
+      );
     }
-    if (result.status === 'committed') { reset(ctx); return; }
+    if (result.status === 'committed') {
+      reset(ctx);
+      return;
+    }
     const status = result.status;
-    ctx.reportEditRefusal?.(status === 'busy' || status === 'gesture-active' || status === 'over-budget' || status === 'not-ready' ? status : 'not-ready');
+    ctx.reportEditRefusal?.(
+      status === 'busy' || status === 'gesture-active' || status === 'over-budget' || status === 'not-ready'
+        ? status
+        : 'not-ready'
+    );
     // Keep the geometry and let Enter retry; a fresh press explicitly starts another shape.
     current.pending = { points, isClosed };
-    if (session === current) { requestPreview(ctx); }
+    if (session === current) {
+      requestPreview(ctx);
+    }
   };
 
   return {
@@ -268,18 +316,26 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       }
       if (code === 'Space') {
         session.spaceHeld = pressed;
-        session.input = snapInput({
-          ...session.input,
-          documentPoint: ctx.viewport.screenToDocument(session.input.screenPoint),
-        }, session);
+        session.input = snapInput(
+          {
+            ...session.input,
+            documentPoint: ctx.viewport.screenToDocument(session.input.screenPoint),
+          },
+          session
+        );
       } else {
-        session.input = { ...session.input, modifiers: { ...session.input.modifiers, [code === 'Alt' ? 'alt' : 'shift']: pressed } };
+        session.input = {
+          ...session.input,
+          modifiers: { ...session.input.modifiers, [code === 'Alt' ? 'alt' : 'shift']: pressed },
+        };
       }
       requestPreview(ctx);
-      return code === 'Space' || code === 'Alt' && isBoxKind(session.kind);
+      return code === 'Space' || (code === 'Alt' && isBoxKind(session.kind));
     },
     onKeyCommand: (ctx, command) => {
-      if (!session) { return false; }
+      if (!session) {
+        return false;
+      }
       if (command === 'cancel') {
         reset(ctx);
       } else if (isCurrent(ctx) && session?.pending) {
@@ -296,7 +352,9 @@ export const createVectorShapeTool = (): VectorShapeTool => {
       if (session && !isCurrent(ctx)) {
         return;
       }
-      if (session?.pending) { reset(ctx); }
+      if (session?.pending) {
+        reset(ctx);
+      }
       if (!session) {
         const doc = ctx.getDocument()!;
         const layer = lookupDocumentLeaf(doc, doc.selectedLayerId!)!.layer as CanvasVectorLayerContract;
@@ -306,9 +364,17 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         }
         const options = ctx.stores.shapeOptions.get();
         session = {
-          layer, toLocal, kind: options.kind, target: options.target,
-          start: rawInput.documentPoint, points: [], input: rawInput, lastSample: rawInput.screenPoint,
-          lastPress: { screen: rawInput.screenPoint, time: -Infinity }, closeArmed: false, spaceHeld: false,
+          layer,
+          toLocal,
+          kind: options.kind,
+          target: options.target,
+          start: rawInput.documentPoint,
+          points: [],
+          input: rawInput,
+          lastSample: rawInput.screenPoint,
+          lastPress: { screen: rawInput.screenPoint, time: -Infinity },
+          closeArmed: false,
+          spaceHeld: false,
         };
         const input = snapInput(rawInput, session);
         session.input = input;
@@ -328,7 +394,10 @@ export const createVectorShapeTool = (): VectorShapeTool => {
           requestPreview(ctx);
           return;
         }
-        if (rawInput.timeStamp - session.lastPress.time <= 350 && distance(rawInput.screenPoint, session.lastPress.screen) <= 5) {
+        if (
+          rawInput.timeStamp - session.lastPress.time <= 350 &&
+          distance(rawInput.screenPoint, session.lastPress.screen) <= 5
+        ) {
           session.finish = false;
           return;
         }
@@ -342,7 +411,9 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         return;
       }
       const current = session;
-      if (current.pending) { return; }
+      if (current.pending) {
+        return;
+      }
       if (current.spaceHeld) {
         if (isBoxKind(current.kind)) {
           const input = snapInput(rawInput, current);
@@ -352,7 +423,10 @@ export const createVectorShapeTool = (): VectorShapeTool => {
           };
           current.input = input;
         } else {
-          ctx.viewport.panBy({ x: rawInput.screenPoint.x - current.input.screenPoint.x, y: rawInput.screenPoint.y - current.input.screenPoint.y });
+          ctx.viewport.panBy({
+            x: rawInput.screenPoint.x - current.input.screenPoint.x,
+            y: rawInput.screenPoint.y - current.input.screenPoint.y,
+          });
           current.input = { ...rawInput, documentPoint: ctx.viewport.screenToDocument(rawInput.screenPoint) };
           ctx.invalidate({ view: true, overlay: true });
         }
@@ -364,10 +438,13 @@ export const createVectorShapeTool = (): VectorShapeTool => {
               continue;
             }
             const from = current.points.at(-1)!;
-            const steps = Math.max(1, Math.ceil(distance(from, input.documentPoint) * ctx.viewport.getZoom() / 2));
+            const steps = Math.max(1, Math.ceil((distance(from, input.documentPoint) * ctx.viewport.getZoom()) / 2));
             for (let step = 1; step <= steps; step += 1) {
               const t = step / steps;
-              current.points.push({ x: from.x + (input.documentPoint.x - from.x) * t, y: from.y + (input.documentPoint.y - from.y) * t });
+              current.points.push({
+                x: from.x + (input.documentPoint.x - from.x) * t,
+                y: from.y + (input.documentPoint.y - from.y) * t,
+              });
             }
             current.lastSample = input.screenPoint;
           }
@@ -393,7 +470,12 @@ export const createVectorShapeTool = (): VectorShapeTool => {
         }
         const zoom = ctx.viewport.getZoom();
         const stabilized = getStrokePoints(current.points, {
-          size: 1 / zoom, smoothing: 0.5, streamline: 0.35, thinning: 0, simulatePressure: false, last: true,
+          size: 1 / zoom,
+          smoothing: 0.5,
+          streamline: 0.35,
+          thinning: 0,
+          simulatePressure: false,
+          last: true,
         }).map(({ point }) => ({ x: point[0]!, y: point[1]! }));
         commit(ctx, fitPolylineToBezierPoints(stabilized, Math.max(0.25, 2 / zoom)), false);
       } else {

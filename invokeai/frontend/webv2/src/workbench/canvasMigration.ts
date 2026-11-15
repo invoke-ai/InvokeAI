@@ -267,8 +267,16 @@ const zCanvasLayer = z.discriminatedUnion('type', [
       })
     ),
     type: z.literal('vector'),
-    guideColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i).optional().catch(undefined),
-    fillColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i).optional().catch(undefined),
+    guideColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
+    fillColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
     fillEnabled: z.boolean().optional().catch(undefined),
     strokeEnabled: z.boolean().optional().catch(undefined),
     traceTaperEnds: z.boolean().optional().catch(undefined),

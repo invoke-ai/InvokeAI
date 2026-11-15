@@ -13,10 +13,18 @@ export interface VectorEditOverlay {
 }
 
 /** Editable anchors/handles use screen-sized hit targets; guide curves are drawn by vectorGuides. */
-export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, overlay: VectorEditOverlay | null): void => {
-  if (!overlay) { return; }
+export const drawVectorEditOverlay = (
+  ctx: RasterSurface['ctx'],
+  view: Mat2d,
+  overlay: VectorEditOverlay | null
+): void => {
+  if (!overlay) {
+    return;
+  }
   const { session } = overlay;
-  if (session.pathTransform) { return; }
+  if (session.pathTransform) {
+    return;
+  }
   const matrix = multiply(view, overlay.matrix);
   const selected = new Set(session.selectedPoints.map((ref) => `${ref.pathId}:${ref.pointIndex}`));
   const active = session.selectedPoints.at(-1);
@@ -27,14 +35,24 @@ export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, ov
   for (const ref of session.selectedPoints) {
     const path = session.paths.find((path) => path.id === ref.pathId);
     const point = path?.points[ref.pointIndex];
-    if (!path || !point) { continue; }
+    if (!path || !point) {
+      continue;
+    }
     const anchor = applyToPoint(matrix, point.anchor);
     const handles = vectorHandleLayout(path, ref.pointIndex, matrix);
     for (const p of [handles.inHandle, handles.outHandle]) {
-      if (!p) { continue; }
-      ctx.beginPath(); ctx.moveTo(anchor.x, anchor.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-      ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+      if (!p) {
+        continue;
+      }
+      ctx.beginPath();
+      ctx.moveTo(anchor.x, anchor.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.stroke();
     }
   }
   for (const path of session.paths) {
@@ -42,11 +60,17 @@ export const drawVectorEditOverlay = (ctx: RasterSurface['ctx'], view: Mat2d, ov
       const isSelected = selected.has(`${path.id}:${pointIndex}`);
       const isActive = active?.pathId === path.id && active.pointIndex === pointIndex;
       const p = applyToPoint(matrix, point.anchor);
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
       ctx.lineWidth = 2;
-      ctx.fillStyle = isActive ? 'rgba(90, 175, 255, 1)' : isSelected ? 'rgba(90, 175, 255, 0.55)' : 'rgba(255, 255, 255, 0.95)';
+      ctx.fillStyle = isActive
+        ? 'rgba(90, 175, 255, 1)'
+        : isSelected
+          ? 'rgba(90, 175, 255, 0.55)'
+          : 'rgba(255, 255, 255, 0.95)';
       ctx.strokeStyle = isActive ? '#3ed684' : isSelected ? 'rgba(255, 255, 255, 0.9)' : 'rgba(90, 175, 255, 1)';
-      ctx.fill(); ctx.stroke();
+      ctx.fill();
+      ctx.stroke();
     });
   }
   ctx.globalAlpha = 1;

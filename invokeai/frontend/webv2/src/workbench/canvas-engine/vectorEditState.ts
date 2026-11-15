@@ -1,6 +1,6 @@
 import type { CanvasBezierPathContract } from './contracts';
-import type { Rect } from './types';
 import type { LayerTransform } from './transform/transformMath';
+import type { Rect } from './types';
 
 export interface VectorPointRef {
   pathId: string;

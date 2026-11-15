@@ -1,6 +1,7 @@
 /** Path topology adapted from the v6 spline implementation (c4c0594261). */
 import type { CanvasBezierPathContract, CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
 import type { Vec2 } from '@workbench/canvas-engine/types';
+
 import { setBezierPointType } from './bezierPath';
 
 type TopologyResult = {
@@ -135,7 +136,8 @@ export const canJoinVectorPathEndpoints = (
   if (!firstPoint || !secondPoint) {
     return false;
   }
-  const first = project(firstPoint.anchor), second = project(secondPoint.anchor);
+  const first = project(firstPoint.anchor),
+    second = project(secondPoint.anchor);
   const shouldWeld = Math.hypot(first.x - second.x, first.y - second.y) <= weldRadius;
   return !shouldWeld || firstPath.points.length >= 4;
 };

@@ -14,7 +14,7 @@ import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act, StrictMode, Profiler, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import type * as DetailModule from './WorkflowLibraryDetailPanel';

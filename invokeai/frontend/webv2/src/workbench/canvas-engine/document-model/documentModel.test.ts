@@ -1128,7 +1128,11 @@ describe('createDocumentModel', () => {
       [
         'a config patch on a group',
         { config: { layerType: 'raster', isTransparencyLocked: true }, id: 'G', type: 'patch-config' },
-        { actual: 'group', expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'], status: 'wrong-type' },
+        {
+          actual: 'group',
+          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
+          status: 'wrong-type',
+        },
       ],
       [
         'a source patch on a mask',

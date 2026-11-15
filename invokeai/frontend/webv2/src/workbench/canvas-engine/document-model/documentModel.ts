@@ -1518,7 +1518,7 @@ export const createDocumentModel = (
       return node && !isGroupNode(node) ? node : null;
     },
     getNode: (id) => index.byId.get(id)?.node ?? null,
-    getStack: (kind) => stacks[kind],
+    getStack: (kind) => stacks[kind] ?? [],
     prepare: (command) => {
       switch (command.type) {
         case 'insert':

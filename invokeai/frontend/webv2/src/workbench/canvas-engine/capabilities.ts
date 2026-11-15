@@ -12,8 +12,8 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
-import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
 import type { CopyLayerResult } from './controllers/copyLayerController';
@@ -771,7 +771,19 @@ export interface CanvasVectorEditCapability {
   canJoin(): boolean;
 }
 
-export type VectorTraceResult = { status: 'committed' | 'empty' | 'aborted' | 'stale' | 'too-complex' | 'busy' | 'gesture-active' | 'not-ready' | 'over-budget' | 'failed' };
+export type VectorTraceResult = {
+  status:
+    | 'committed'
+    | 'empty'
+    | 'aborted'
+    | 'stale'
+    | 'too-complex'
+    | 'busy'
+    | 'gesture-active'
+    | 'not-ready'
+    | 'over-budget'
+    | 'failed';
+};
 
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */

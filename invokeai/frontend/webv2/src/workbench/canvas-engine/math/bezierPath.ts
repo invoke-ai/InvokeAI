@@ -1,7 +1,8 @@
-/** Bezier geometry and editing math adapted from v6 feat(canvas)--Splines-tool (c4c0594261). */
-import { applyToPoint } from './mat2d';
 import type { CanvasBezierPathContract, CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
+
+/** Bezier geometry and editing math adapted from v6 feat(canvas)--Splines-tool (c4c0594261). */
+import { applyToPoint } from './mat2d';
 
 type RenderableBezierPoint = Pick<CanvasBezierPointContract, 'anchor' | 'inHandle' | 'outHandle'>;
 
@@ -453,10 +454,7 @@ const fitCubicBezierSegments = (
   );
 };
 
-export const fitPolylineToBezierPoints = (
-  inputPoints: Vec2[],
-  maximumError: number
-): CanvasBezierPointContract[] => {
+export const fitPolylineToBezierPoints = (inputPoints: Vec2[], maximumError: number): CanvasBezierPointContract[] => {
   const points = inputPoints.filter((point, index) => {
     const previous = inputPoints[index - 1];
     return !previous || getSquaredDistance(point, previous) > BEZIER_FIT_EPSILON;
@@ -556,11 +554,7 @@ export const ovalToBezierPoints = (rect: Rect): CanvasBezierPointContract[] => {
   ];
 };
 
-const getSmoothTangent = (
-  previousAnchor: Vec2 | null,
-  anchor: Vec2,
-  nextAnchor: Vec2 | null
-): Vec2 => {
+const getSmoothTangent = (previousAnchor: Vec2 | null, anchor: Vec2, nextAnchor: Vec2 | null): Vec2 => {
   const previousDistance = previousAnchor ? getDistance(previousAnchor, anchor) : 0;
   const nextDistance = nextAnchor ? getDistance(anchor, nextAnchor) : 0;
   const previousInterval = previousDistance ** CENTRIPETAL_CATMULL_ROM_ALPHA;
@@ -588,11 +582,7 @@ const getSmoothTangent = (
   return { x: 0, y: 0 };
 };
 
-const getSmoothTurningAngle = (
-  previousAnchor: Vec2 | null,
-  anchor: Vec2,
-  nextAnchor: Vec2 | null
-): number => {
+const getSmoothTurningAngle = (previousAnchor: Vec2 | null, anchor: Vec2, nextAnchor: Vec2 | null): number => {
   if (!previousAnchor || !nextAnchor) {
     return 0;
   }
@@ -660,11 +650,7 @@ export const smoothBezierPathPoints = (
   });
 };
 
-const evaluateBezierSegment = (
-  from: RenderableBezierPoint,
-  to: RenderableBezierPoint,
-  t: number
-): Vec2 => {
+const evaluateBezierSegment = (from: RenderableBezierPoint, to: RenderableBezierPoint, t: number): Vec2 => {
   const p0 = from.anchor;
   const p1 = from.outHandle ?? from.anchor;
   const p2 = to.inHandle ?? to.anchor;
@@ -855,7 +841,9 @@ export const approximateBezierPath = (
 
 /** Preserve path identity fields while applying one affine transform to anchors and handles. */
 export const transformBezierPath = (path: CanvasBezierPathContract, matrix: Mat2d): CanvasBezierPathContract => ({
-  ...path, points: path.points.map((point) => ({ ...point,
+  ...path,
+  points: path.points.map((point) => ({
+    ...point,
     anchor: applyToPoint(matrix, point.anchor),
     inHandle: point.inHandle ? applyToPoint(matrix, point.inHandle) : null,
     outHandle: point.outHandle ? applyToPoint(matrix, point.outHandle) : null,

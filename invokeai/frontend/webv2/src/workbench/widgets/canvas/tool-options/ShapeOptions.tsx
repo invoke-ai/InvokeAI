@@ -67,9 +67,11 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
     () =>
       SHAPE_KIND_ORDER.map((value) => ({
         icon: SHAPE_KIND_PRESENTATION[value].icon,
-        label: t(placement === 'vector' && value === 'polygon'
-          ? 'widgets.canvas.toolOptions.vectorShapePolyline'
-          : SHAPE_KIND_PRESENTATION[value].labelKey),
+        label: t(
+          placement === 'vector' && value === 'polygon'
+            ? 'widgets.canvas.toolOptions.vectorShapePolyline'
+            : SHAPE_KIND_PRESENTATION[value].labelKey
+        ),
         value,
       })),
     [placement, t]
@@ -309,11 +311,12 @@ const ShapeAppearanceControls = ({
   );
 };
 
-const useSelectedVectorName = () => useActiveProjectSelector((project) => {
-  const { document } = project.canvas;
-  const layer = getDocumentLayer(document, document.selectedLayerId);
-  return layer?.type === 'vector' ? layer.name : null;
-});
+const useSelectedVectorName = () =>
+  useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const layer = getDocumentLayer(document, document.selectedLayerId);
+    return layer?.type === 'vector' ? layer.name : null;
+  });
 
 const ShapeAppearanceSettings = (props: ToolFormProps) => {
   const name = useSelectedVectorName();

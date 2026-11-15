@@ -133,7 +133,7 @@ const sourceNames = (layer: CanvasLayerContract): string[] => {
     if (layer.source.type === 'paint' && layer.source.bitmap) {
       names.push(layer.source.bitmap.imageName);
     }
-  } else if (layer.mask.bitmap) {
+  } else if ((layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') && layer.mask.bitmap) {
     names.push(layer.mask.bitmap.imageName);
   }
   if (layer.type === 'control' && layer.original) {

@@ -6,8 +6,8 @@ import { gradientForm } from '@workbench/widgets/canvas/tool-options/GradientOpt
 import { brushForm, eraserForm } from '@workbench/widgets/canvas/tool-options/paintForm';
 import { selectObjectOperationForm } from '@workbench/widgets/canvas/tool-options/SamOptions';
 import { lassoForm, marqueeForm } from '@workbench/widgets/canvas/tool-options/selectionForm';
-import { splineForm } from '@workbench/widgets/canvas/tool-options/SplineOptions';
 import { shapeForm } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
+import { splineForm } from '@workbench/widgets/canvas/tool-options/SplineOptions';
 import { textForm } from '@workbench/widgets/canvas/tool-options/textForm';
 
 import type { CanvasOperationKind, OperationPropertyForm, ToolPropertyForm } from './toolFormContracts';

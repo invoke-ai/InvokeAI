@@ -10,7 +10,6 @@ import {
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { LayerSection } from './LayerSection';
 import { PropertiesSection } from './PropertiesSection';

@@ -446,7 +446,7 @@ const applyMoves = (stacks: CanvasStackForests, moves: readonly CanvasNodeMove[]
   };
   const next = { ...removed };
   for (const stack of Object.keys(next) as CanvasNodeInsertionAnchor['stack'][]) {
-    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack], stack);
+    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack] ?? [], stack);
     if (roots !== removed[stack]) {
       next[stack] = [...roots];
     }

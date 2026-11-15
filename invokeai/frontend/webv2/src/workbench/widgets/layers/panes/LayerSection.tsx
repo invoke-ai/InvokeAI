@@ -22,9 +22,9 @@ import { useLayerChildSelection } from '@workbench/widgets/layers/layerChildSele
 import { LayerRegionSettings } from '@workbench/widgets/layers/LayerRegionSettings';
 import { MaskModifierSettings } from '@workbench/widgets/layers/MaskModifierSettings';
 import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerFilterSection';
-import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
+import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

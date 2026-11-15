@@ -496,7 +496,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       pointerFocused = event.target && arrivedByPointer(event.target) ? new WeakRef(event.target) : null;
     },
     onKeyUp: (event) => {
-      const modifier = event.code === 'Space' ? 'Space' : isAltKey(event) ? 'Alt' : event.key === 'Shift' ? 'Shift' : null;
+      const modifier =
+        event.code === 'Space' ? 'Space' : isAltKey(event) ? 'Alt' : event.key === 'Shift' ? 'Shift' : null;
       if (modifier) {
         deps.getActiveTool()?.onModifierKey?.(deps.getToolContext(), modifier, false);
       }

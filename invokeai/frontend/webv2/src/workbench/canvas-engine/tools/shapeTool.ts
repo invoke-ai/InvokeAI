@@ -37,7 +37,6 @@ import type { Tool, ToolContext } from './tool';
 
 import { dragRect, type DragRectConstraints } from './dragRect';
 import { layerMatrix } from './moveHitTest';
-import { createVectorShapeTool } from './vectorShapeTool';
 import { MASK_PAINT_COLOR } from './paintConstants';
 import {
   extendFreehandTrace,
@@ -52,6 +51,7 @@ import {
   type PolylineSession,
 } from './polylineSession';
 import { shapeDrawsOnLayer, shapePaintSourceOf } from './shapeTarget';
+import { createVectorShapeTool } from './vectorShapeTool';
 
 type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
 
@@ -85,7 +85,15 @@ const CUTOUT_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' he
 </svg>`;
 
 type Session =
-  | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; lastDoc: Vec2; spaceHeld: boolean; moved: boolean; editsSelected: boolean }
+  | {
+      kind: 'drag';
+      startDoc: Vec2;
+      startScreen: Vec2;
+      lastDoc: Vec2;
+      spaceHeld: boolean;
+      moved: boolean;
+      editsSelected: boolean;
+    }
   | {
       kind: 'polyline';
       session: PolylineSession;
@@ -449,8 +457,12 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
 
   return {
     cursor: (ctx) => {
-      if (selectsVector(ctx)) { return vectorTool.cursor!(ctx); }
-      if (session?.kind === 'drag' && session.spaceHeld) { return 'move'; }
+      if (selectsVector(ctx)) {
+        return vectorTool.cursor!(ctx);
+      }
+      if (session?.kind === 'drag' && session.spaceHeld) {
+        return 'move';
+      }
       if (session?.kind === 'polyline' && session.session.closeArmed) {
         return 'pointer';
       }
@@ -464,8 +476,12 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     hasSession: () => session !== null || vectorTool.hasSession(),
     onDocumentChanged: (ctx) => vectorTool.onDocumentChanged?.(ctx),
     onModifierKey: (ctx, code, pressed) => {
-      if (selectsVector(ctx)) { return vectorTool.onModifierKey!(ctx, code, pressed); }
-      if (code !== 'Space' || session?.kind !== 'drag') { return false; }
+      if (selectsVector(ctx)) {
+        return vectorTool.onModifierKey!(ctx, code, pressed);
+      }
+      if (code !== 'Space' || session?.kind !== 'drag') {
+        return false;
+      }
       session.spaceHeld = pressed;
       ctx.updateCursor();
       return true;
@@ -480,7 +496,9 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       }
     },
     onKeyCommand: (ctx, command) => {
-      if (vectorTool.hasSession()) { return vectorTool.onKeyCommand?.(ctx, command) ?? false; }
+      if (vectorTool.hasSession()) {
+        return vectorTool.onKeyCommand?.(ctx, command) ?? false;
+      }
       if (!session) {
         return false;
       }
@@ -539,7 +557,10 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       noteSelectedLayerEdit(ctx, session, input.modifiers);
     },
     onPointerMove: (ctx, input, batch) => {
-      if (vectorTool.hasSession() || selectsVector(ctx)) { vectorTool.onPointerMove?.(ctx, input, batch); return; }
+      if (vectorTool.hasSession() || selectsVector(ctx)) {
+        vectorTool.onPointerMove?.(ctx, input, batch);
+        return;
+      }
       noteModifiers(ctx, input.modifiers);
       if (!session) {
         return;
@@ -586,7 +607,10 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       }
     },
     onPointerUp: (ctx, input) => {
-      if (vectorTool.hasSession() || selectsVector(ctx)) { vectorTool.onPointerUp?.(ctx, input); return; }
+      if (vectorTool.hasSession() || selectsVector(ctx)) {
+        vectorTool.onPointerUp?.(ctx, input);
+        return;
+      }
       noteModifiers(ctx, input.modifiers);
       if (!session) {
         return;

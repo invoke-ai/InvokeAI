@@ -202,7 +202,11 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
     const vectorSession = engine?.interaction.get('vectorEditSession');
-    if (engine && vectorSession && (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)) {
+    if (
+      engine &&
+      vectorSession &&
+      (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)
+    ) {
       engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
       return;
     }

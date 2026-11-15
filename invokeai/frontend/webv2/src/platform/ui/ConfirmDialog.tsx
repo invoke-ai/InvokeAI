@@ -1,6 +1,6 @@
 import { Portal, Stack } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -57,7 +57,9 @@ export const ConfirmDialog = ({
   const [dialogEpoch, setDialogEpoch] = useState(0);
   useMountEffect(() => {
     active.current = true;
-    return () => { active.current = false; };
+    return () => {
+      active.current = false;
+    };
   });
   const [isPending, setIsPending] = useState(false);
   const isPendingRef = useRef(false);
@@ -91,7 +93,9 @@ export const ConfirmDialog = ({
       setIsPending(false);
       // Activity disconnects the dialog machine's controlled-prop watcher. If completion happened while hidden,
       // recreate that machine from the closed props on resume; visible closes retain their exit animation.
-      if (!active.current) { setDialogEpoch((epoch) => epoch + 1); }
+      if (!active.current) {
+        setDialogEpoch((epoch) => epoch + 1);
+      }
       onClose();
     }
   }, [isConfirmDisabled, onClose, onConfirm]);

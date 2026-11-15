@@ -344,7 +344,16 @@ export const addedVectorLayerMutations = (
   selectedBefore: string | null,
   selectNew = true
 ): { forward: CanvasProjectMutation; inverse: CanvasProjectMutation } => ({
-  forward: { type: 'applyCanvasLayerStackMutation', enabledUpdates: [], add: [{ anchor, nodes: [layer] }],
-    selectedLayerId: selectNew ? layer.id : selectedBefore },
-  inverse: { type: 'applyCanvasLayerStackMutation', enabledUpdates: [], removeIds: [layer.id], selectedLayerId: selectedBefore },
+  forward: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    add: [{ anchor, nodes: [layer] }],
+    selectedLayerId: selectNew ? layer.id : selectedBefore,
+  },
+  inverse: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    removeIds: [layer.id],
+    selectedLayerId: selectedBefore,
+  },
 });

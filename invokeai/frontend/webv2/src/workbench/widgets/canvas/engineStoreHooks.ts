@@ -43,8 +43,13 @@ const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
 };
 
 /** Point-tool selection and in-flight geometry preview. Completed edits use document history. */
-export const useVectorEditSession = (engine: CanvasCoreStoreCapability | null): CanvasInteractionState['vectorEditSession'] => {
-  const subscribe = useCallback((listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => {}), [engine]);
+export const useVectorEditSession = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['vectorEditSession'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => {}),
+    [engine]
+  );
   const read = useCallback(() => engine?.interaction.get('vectorEditSession') ?? null, [engine]);
   return useSyncExternalStore(subscribe, read, read);
 };
@@ -306,4 +311,3 @@ export const usePsdExportStatus = (
   const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
-

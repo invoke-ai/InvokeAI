@@ -15,6 +15,7 @@ const TOOL_IDS = Object.keys({
   move: true,
   sam: true,
   shape: true,
+  spline: true,
   text: true,
   transform: true,
   view: true,

@@ -1,10 +1,14 @@
-import type { CanvasBezierPathContract } from '../contracts';
-import type { Mat2d, Vec2 } from '../types';
+import type { CanvasBezierPathContract } from '@workbench/canvas-engine/contracts';
+import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from './mat2d';
 
 /** Missing Corner handles get grab markers; existing handles always show their real positions. */
-export const vectorHandleLayout = (path: CanvasBezierPathContract, pointIndex: number, matrix: Mat2d): {
+export const vectorHandleLayout = (
+  path: CanvasBezierPathContract,
+  pointIndex: number,
+  matrix: Mat2d
+): {
   inHandle: Vec2 | null;
   outHandle: Vec2 | null;
 } => {
@@ -19,14 +23,21 @@ export const vectorHandleLayout = (path: CanvasBezierPathContract, pointIndex: n
   const next = path.points[pointIndex + 1] ?? (path.isClosed ? path.points[0] : undefined);
   const anchor = applyToPoint(matrix, point.anchor);
   const extend = (handle: Vec2 | null, fallback: Vec2 | undefined, minimum: number): Vec2 | null => {
-    if (handle) { return applyToPoint(matrix, handle); }
+    if (handle) {
+      return applyToPoint(matrix, handle);
+    }
     const direction = handle ?? fallback;
-    if (!direction) { return null; }
+    if (!direction) {
+      return null;
+    }
     const projected = applyToPoint(matrix, direction);
-    const dx = projected.x - anchor.x, dy = projected.y - anchor.y;
+    const dx = projected.x - anchor.x,
+      dy = projected.y - anchor.y;
     const length = Math.hypot(dx, dy);
-    if (length < 1e-6) { return null; }
-    return { x: anchor.x + dx * minimum / length, y: anchor.y + dy * minimum / length };
+    if (length < 1e-6) {
+      return null;
+    }
+    return { x: anchor.x + (dx * minimum) / length, y: anchor.y + (dy * minimum) / length };
   };
   const inHandle = extend(point.inHandle, previous?.anchor, 28);
   let outHandle = extend(point.outHandle, next?.anchor, 28);

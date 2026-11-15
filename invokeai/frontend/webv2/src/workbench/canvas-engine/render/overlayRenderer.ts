@@ -18,9 +18,9 @@ import type { RgbaSample } from './colorSample';
 import type { RasterSurface } from './raster';
 import type { VectorGuideLayer, VectorShapePreview } from './vectorGuides';
 
-import { drawVectorGuides } from './vectorGuides';
-import { drawVectorEditOverlay, type VectorEditOverlay } from './vectorEditOverlay';
 import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './shapePreview';
+import { drawVectorEditOverlay, type VectorEditOverlay } from './vectorEditOverlay';
+import { drawVectorGuides } from './vectorGuides';
 
 /** Minimum screen-space grid spacing (px) below which the grid is too dense to draw. */
 export const MIN_GRID_SPACING_PX = 8;

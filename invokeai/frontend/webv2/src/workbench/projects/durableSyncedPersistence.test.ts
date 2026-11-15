@@ -257,8 +257,13 @@ const createService = (
 
 beforeEach(() => {
   // These tests own their persistence API. Unrelated lifecycle reads must not open real HTTP sockets.
-  vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Network unavailable in persistence unit test'))));
-  onTestFinished(() => vi.unstubAllGlobals());
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.reject(new TypeError('Network unavailable in persistence unit test')))
+  );
+  onTestFinished(() => {
+    vi.unstubAllGlobals();
+  });
   accountLifecycle.activate('durable-sync-test');
   vi.mocked(acquireProjectMutationLock).mockReset();
   vi.mocked(acquireProjectMutationLock).mockResolvedValue({

@@ -14,10 +14,10 @@ export const polygonShapeVertices = (kind: 'triangle' | 'star', rect: Rect): Vec
   // Match the existing Shapes pentagram: five spikes with sin(18°) / sin(54°) inner radius.
   return Array.from({ length: 10 }, (_, index) => {
     const radius = index % 2 === 0 ? 1 : 0.382;
-    const angle = -Math.PI / 2 + index * Math.PI / 5;
+    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
     return {
-      x: cx + Math.cos(angle) * rect.width / 2 * radius,
-      y: cy + Math.sin(angle) * rect.height / 2 * radius,
+      x: cx + ((Math.cos(angle) * rect.width) / 2) * radius,
+      y: cy + ((Math.sin(angle) * rect.height) / 2) * radius,
     };
   });
 };

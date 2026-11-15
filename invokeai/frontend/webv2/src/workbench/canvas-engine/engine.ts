@@ -85,7 +85,6 @@ import type {
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { LayerCacheReadiness } from '@workbench/canvas-engine/controllers/editSteps';
-import { traceVectorLayer as traceVectorLayerCommand } from '@workbench/canvas-engine/controllers/vectorTraceController';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
@@ -132,6 +131,8 @@ import {
 import { RenderController } from '@workbench/canvas-engine/controllers/renderController';
 import { StagedResultController } from '@workbench/canvas-engine/controllers/stagedResultController';
 import { StructuralLayerController } from '@workbench/canvas-engine/controllers/structuralLayerController';
+import { VectorEditingController } from '@workbench/canvas-engine/controllers/vectorEditingController';
+import { traceVectorLayer as traceVectorLayerCommand } from '@workbench/canvas-engine/controllers/vectorTraceController';
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import {
   compileDocumentLeaves,
@@ -192,7 +193,6 @@ import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
 import { createMarqueeTool } from '@workbench/canvas-engine/tools/marqueeTool';
 import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
-import { VectorEditingController } from '@workbench/canvas-engine/controllers/vectorEditingController';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
 import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
@@ -446,18 +446,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['brush', createBrushTool()],
     ['eraser', createEraserTool()],
     ['move', createMoveTool()],
-    ['spline', {
-      id: 'spline',
-      usesAltKey: true,
-      cursor: () => vectorEditor.cursor(),
-      onActivate: () => vectorEditor.onActivate(),
-      onDeactivate: (ctx, options) => vectorEditor.onDeactivate(ctx, options),
-      onPointerDown: (ctx, input) => vectorEditor.onPointerDown(ctx, input),
-      onPointerMove: (ctx, input) => vectorEditor.onPointerMove(ctx, input),
-      onPointerUp: () => vectorEditor.onPointerUp(),
-      onPointerCancel: () => vectorEditor.onPointerCancel(),
-      onKeyCommand: (ctx, command) => vectorEditor.onKeyCommand(ctx, command),
-    }],
+    [
+      'spline',
+      {
+        id: 'spline',
+        usesAltKey: true,
+        cursor: () => vectorEditor.cursor(),
+        onActivate: () => vectorEditor.onActivate(),
+        onDeactivate: (ctx, options) => vectorEditor.onDeactivate(ctx, options),
+        onPointerDown: (ctx, input) => vectorEditor.onPointerDown(ctx, input),
+        onPointerMove: (ctx, input) => vectorEditor.onPointerMove(ctx, input),
+        onPointerUp: () => vectorEditor.onPointerUp(),
+        onPointerCancel: () => vectorEditor.onPointerCancel(),
+        onKeyCommand: (ctx, command) => vectorEditor.onKeyCommand(ctx, command),
+      },
+    ],
     ['transform', createTransformTool()],
     ['bbox', createBboxTool()],
     ['colorPicker', createColorPickerTool()],
@@ -2041,7 +2044,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * with pipeline wiring and node tests.
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
-    if (vectorTraceAbort) { vectorTraceAbort.abort(); return; }
+    if (vectorTraceAbort) {
+      vectorTraceAbort.abort();
+      return;
+    }
     if (tools.get('shape')?.hasSession?.()) {
       tools.get('shape')?.onKeyCommand?.(toolContext, 'cancel');
       return;
@@ -3093,14 +3099,33 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const document = mirror.getDocument();
     const brush = stores.brushOptions.get();
     try {
-      if (!document) { return { status: 'not-ready' as const }; }
-      return await traceVectorLayerCommand({ document, layerId, pathId,
-        appearance: mode === 'appearance', fillOnly: mode === 'fill', ctx: mutationContext, backend,
-        width: brush.size, color: brush.color,
-        id: createLayerId(), anchor: captureInsertionAnchor('raster'), signal: controller.signal,
-        isCurrent: () => !disposed && mirror.getDocument() === document &&
-          stores.brushOptions.get().size === brush.size && stores.brushOptions.get().color === brush.color });
-    } finally { if (vectorTraceAbort === controller) { vectorTraceAbort = null; } }
+      if (!document) {
+        return { status: 'not-ready' as const };
+      }
+      return await traceVectorLayerCommand({
+        document,
+        layerId,
+        pathId,
+        appearance: mode === 'appearance',
+        fillOnly: mode === 'fill',
+        ctx: mutationContext,
+        backend,
+        width: brush.size,
+        color: brush.color,
+        id: createLayerId(),
+        anchor: captureInsertionAnchor('raster', null),
+        signal: controller.signal,
+        isCurrent: () =>
+          !disposed &&
+          mirror.getDocument() === document &&
+          stores.brushOptions.get().size === brush.size &&
+          stores.brushOptions.get().color === brush.color,
+      });
+    } finally {
+      if (vectorTraceAbort === controller) {
+        vectorTraceAbort = null;
+      }
+    }
   };
   const layersCapability: CanvasEngineLayerCapability = {
     ...layerController.layers,

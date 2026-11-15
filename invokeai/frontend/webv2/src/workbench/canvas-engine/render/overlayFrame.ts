@@ -23,8 +23,8 @@ import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine
 import { transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
-import type { VectorGuideLayer } from './vectorGuides';
 import type { VectorEditOverlay } from './vectorEditOverlay';
+import type { VectorGuideLayer } from './vectorGuides';
 
 /** The SAM preview's resting overlay opacity — it sits over the layer it describes. */
 const SAM_PREVIEW_OPACITY = 0.45;
@@ -114,7 +114,9 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
       const edit = stores.vectorEditSession.get();
       const frame = edit?.pathTransform;
       const leaf = edit ? lookupDocumentLeaf(doc, edit.layerId) : null;
-      if (!frame || !leaf) { return null; }
+      if (!frame || !leaf) {
+        return null;
+      }
       const geometry = transformOverlayGeometry(frame.transform, frame.rect);
       const toDocument = leaf.worldTransform;
       return {
@@ -174,7 +176,9 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         const matrix = transformOverrides.has(leaf.id)
           ? fromTRS({ x: transform.x, y: transform.y }, transform.rotation, transform.scaleX, transform.scaleY)
           : leaf.worldTransform;
-        if (edit?.layerId === leaf.id) { vectorEdit = { session: edit, matrix }; }
+        if (edit?.layerId === leaf.id) {
+          vectorEdit = { session: edit, matrix };
+        }
         vectorGuides.push({
           paths: edit?.layerId === leaf.id ? edit.paths : leaf.layer.paths,
           matrix,

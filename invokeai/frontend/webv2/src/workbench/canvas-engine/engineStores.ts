@@ -13,10 +13,10 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
-import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 
