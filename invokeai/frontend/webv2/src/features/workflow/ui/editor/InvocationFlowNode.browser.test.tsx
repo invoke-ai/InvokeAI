@@ -54,17 +54,41 @@ import { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import '@xyflow/react/dist/style.css';
 
-const exportMocks = vi.hoisted(() => ({
-  progressImage: null as null | { dataUrl: string; height: number; width: number },
-  rasterize: vi.fn(),
-  translate: ((key: string) => key) as (key: string, options?: Record<string, unknown>) => string,
-}));
+const exportMocks = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    activeProgressTargets: [] as Array<{ itemIndex: number; queueItemId: string }>,
+    notify: () => listeners.forEach((listener) => listener()),
+    progressByQueueItemId: {} as Record<string, { message: string; percentage: number | null } | null>,
+    progressImage: null as null | {
+      dataUrl: string;
+      height: number;
+      target?: { itemIndex: number; queueItemId: string };
+      width: number;
+    },
+    rasterize: vi.fn(),
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    translate: ((key: string) => key) as (key: string, options?: Record<string, unknown>) => string,
+  };
+});
 vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
-vi.mock('@features/queue/react', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useProgressImage: () => exportMocks.progressImage,
-}));
+vi.mock('@features/queue/react', async (importOriginal) => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    useActiveProgressTargets: () =>
+      useSyncExternalStore(exportMocks.subscribe, () => exportMocks.activeProgressTargets),
+    useProgressImage: () => useSyncExternalStore(exportMocks.subscribe, () => exportMocks.progressImage),
+    useQueueItemProgress: (queueItemId: string) =>
+      useSyncExternalStore(exportMocks.subscribe, () => exportMocks.progressByQueueItemId[queueItemId] ?? null),
+  };
+});
 vi.mock('@features/generation/queries', () => ({
   promptTemplatesQueryOptions: () => ({
     queryFn: () => Promise.resolve([]),
@@ -2272,7 +2296,10 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
   let root: Root;
 
   beforeEach(() => {
+    exportMocks.activeProgressTargets = [];
+    exportMocks.progressByQueueItemId = {};
     exportMocks.progressImage = null;
+    delete document.documentElement.dataset.reduceMotion;
     host = document.createElement('div');
     host.style.height = '600px';
     host.style.width = '800px';
@@ -2281,6 +2308,10 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
   });
 
   afterEach(async () => {
+    exportMocks.activeProgressTargets = [];
+    exportMocks.progressByQueueItemId = {};
+    exportMocks.progressImage = null;
+    delete document.documentElement.dataset.reduceMotion;
     await act(() => {
       root.unmount();
     });
@@ -2334,5 +2365,69 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     expect(host.querySelector('[data-testid="current-image-media-drag-grip"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="current-image-copy-video-frame"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
+  });
+
+  it('pairs progress percentage with the displayed frame target during concurrent runs', async () => {
+    exportMocks.activeProgressTargets = [
+      { itemIndex: 0, queueItemId: 'run-a' },
+      { itemIndex: 0, queueItemId: 'run-b' },
+    ];
+    exportMocks.progressByQueueItemId = {
+      'run-a': { message: 'Run A', percentage: 0.25 },
+      'run-b': { message: 'Run B', percentage: 0.8 },
+    };
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(currentImageGraph));
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    // Before any live frame arrives, fall back to the oldest active target (run A).
+    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('25%');
+
+    // Once run B publishes a frame, switch percentage to run B instead of mixing run B's frame with run A's %.
+    await act(() => {
+      exportMocks.progressImage = {
+        dataUrl: 'data:image/png;base64,bGl2ZQ==',
+        height: 2,
+        target: { itemIndex: 0, queueItemId: 'run-b' },
+        width: 2,
+      };
+      exportMocks.notify();
+    });
+    const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
+    expect(badge.textContent).toBe('80%');
+    expect(badge.querySelector('.chakra-spinner')).toBeNull();
+    expect(badge.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('80');
+    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toContain('80%');
+  });
+
+  it('uses the platform spinner for indeterminate progress and honors Reduce Motion', async () => {
+    document.documentElement.dataset.reduceMotion = 'true';
+    exportMocks.activeProgressTargets = [{ itemIndex: 0, queueItemId: 'run-a' }];
+    exportMocks.progressByQueueItemId = { 'run-a': { message: 'Preparing', percentage: null } };
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(currentImageGraph));
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
+    expect(badge.textContent).toBe('');
+    const spinner = badge.querySelector<HTMLElement>('.chakra-spinner');
+    expect(spinner).not.toBeNull();
+    expect(getComputedStyle(spinner!).animationDuration).toBe('2s');
   });
 });

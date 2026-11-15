@@ -3,7 +3,11 @@ import type { GalleryImageItem, GalleryVideoItem } from '@features/gallery/contr
 import { createInstance } from 'i18next';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createVideoErrorRecovery, resolveCurrentImageExecutionState } from './CurrentImageFlowNode';
+import {
+  createVideoErrorRecovery,
+  resolveCurrentImageExecutionState,
+  resolveProgressQueueItemId,
+} from './CurrentImageFlowNode';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
   eager: true,
@@ -114,6 +118,36 @@ describe('resolveCurrentImageExecutionState', () => {
       isWaiting: false,
       progressPercent: null,
     });
+  });
+});
+
+describe('resolveProgressQueueItemId', () => {
+  it('selects the displayed progress frame target when concurrent runs are active', () => {
+    const activeTargets = [
+      { itemIndex: 0, queueItemId: 'run-a' },
+      { itemIndex: 0, queueItemId: 'run-b' },
+    ];
+    const frameFromRunB = {
+      dataUrl: 'data:image/png;base64,AA==',
+      height: 64,
+      target: { itemIndex: 0, queueItemId: 'run-b' },
+      width: 64,
+    };
+
+    expect(resolveProgressQueueItemId(frameFromRunB, activeTargets)).toBe('run-b');
+  });
+
+  it('falls back to the oldest active target before a frame arrives or when the frame has no target', () => {
+    const activeTargets = [
+      { itemIndex: 0, queueItemId: 'run-a' },
+      { itemIndex: 0, queueItemId: 'run-b' },
+    ];
+
+    expect(resolveProgressQueueItemId(null, activeTargets)).toBe('run-a');
+    expect(
+      resolveProgressQueueItemId({ dataUrl: 'data:image/png;base64,AA==', height: 64, width: 64 }, activeTargets)
+    ).toBe('run-a');
+    expect(resolveProgressQueueItemId(null, [])).toBe('');
   });
 });
 

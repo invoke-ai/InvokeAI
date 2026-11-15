@@ -5,10 +5,11 @@ import type {
   GalleryVideoItem,
   GeneratedImageContract,
 } from '@features/gallery/contracts';
+import type { LatestProgressImageSnapshot } from '@features/queue/react';
 import type * as VideoPlayerModule from '@platform/ui/video-player/VideoPlayer';
 import type { NodeProps } from '@xyflow/react';
 
-import { Badge, Box, Flex, HStack, Icon, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, ProgressCircle, Spinner, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import {
   getSelectedGalleryItemFromValues,
@@ -61,8 +62,6 @@ import { useTranslation } from 'react-i18next';
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
 const KEYBOARD_RESIZE_STEP_PX = 32;
-const RING_CIRCUMFERENCE = 37.7;
-const INDETERMINATE_DASH_OFFSET = 27.1;
 // Seek far enough from zero to clear poster state while staying within frame zero.
 const FIRST_FRAME_SEEK_SECONDS = 0.0001;
 
@@ -98,6 +97,16 @@ interface ResizeDragSession {
   startY: number;
   zoom: number;
 }
+
+/**
+ * Pair the displayed live frame's queue item with its progress percentage so concurrent runs never mix
+ * one run's preview image with another run's percentage; fall back to the first active target before
+ * any frame arrives.
+ */
+export const resolveProgressQueueItemId = (
+  progressImage: LatestProgressImageSnapshot | null | undefined,
+  activeTargets: readonly { queueItemId: string }[]
+): string => progressImage?.target?.queueItemId ?? activeTargets[0]?.queueItemId ?? '';
 
 export interface CurrentImageExecutionState {
   dragRef: GalleryItemRef | null;
@@ -254,9 +263,8 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const progressImage = useProgressImage();
   const activeTargets = useActiveProgressTargets();
 
-  const activeQueueItemId = activeTargets[0]?.queueItemId ?? '';
-  const hasActiveRun = Boolean(progressImage) || activeTargets.length > 0;
-  const activeProgress = useQueueItemProgress(hasActiveRun ? activeQueueItemId : '');
+  const activeQueueItemId = resolveProgressQueueItemId(progressImage, activeTargets);
+  const activeProgress = useQueueItemProgress(activeQueueItemId);
 
   const displayedItem = useMemo(() => resolveDisplayedGalleryItem(galleryValues), [galleryValues]);
   const displayedItemKey = useMemo(() => (displayedItem ? toGalleryItemKey(displayedItem) : null), [displayedItem]);
@@ -599,33 +607,17 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             shadow="sm"
             zIndex="1"
           >
-            <Box
-              animationDuration={progressPercent === null ? '0.9s' : undefined}
-              animationIterationCount={progressPercent === null ? 'infinite' : undefined}
-              animationName={progressPercent === null ? 'spin' : undefined}
-              animationTimingFunction={progressPercent === null ? 'linear' : undefined}
-              boxSize="3.5"
-            >
-              <svg height="100%" viewBox="0 0 16 16" width="100%">
-                <circle cx="8" cy="8" fill="none" r="6" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
-                <circle
-                  cx="8"
-                  cy="8"
-                  fill="none"
-                  r="6"
-                  stroke="currentColor"
-                  strokeDasharray={RING_CIRCUMFERENCE}
-                  strokeDashoffset={
-                    progressPercent === null
-                      ? INDETERMINATE_DASH_OFFSET
-                      : RING_CIRCUMFERENCE * (1 - progressPercent / 100)
-                  }
-                  strokeLinecap="round"
-                  strokeWidth="2"
-                  transform="rotate(-90 8 8)"
-                />
-              </svg>
-            </Box>
+            {progressPercent === null ? (
+              // Reuse Chakra's Spinner so reduced-motion CSS slows it instead of bypassing app motion settings.
+              <Spinner borderWidth="2px" boxSize="3.5" />
+            ) : (
+              <ProgressCircle.Root size="xs" value={progressPercent}>
+                <ProgressCircle.Circle>
+                  <ProgressCircle.Track />
+                  <ProgressCircle.Range stroke="currentColor" strokeLinecap="round" />
+                </ProgressCircle.Circle>
+              </ProgressCircle.Root>
+            )}
             {progressPercent !== null ? (
               <Text fontSize="xs" fontVariantNumeric="tabular-nums" fontWeight="600">
                 {`${progressPercent}%`}
