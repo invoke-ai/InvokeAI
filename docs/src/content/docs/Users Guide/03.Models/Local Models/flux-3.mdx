@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
 description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, LoRAs, layout boxes from Canvas regional guidance and the GGUF, single-file and quantized builds.
-lastUpdated: 2026-11-03
+lastUpdated: 2026-11-06
 sidebar:
   order: 6
 ---
@@ -117,6 +117,13 @@ extra pass over the weights on every load.
 - **fp8r** stores fp8 weights with one scale per row. With [FP8 Storage](/configuration/optimization/fp8-storage/), which
   installing it switches on, or with `fp8_compute`, the weights stay fp8; otherwise they are expanded to bf16 as the
   model loads.
+
+- **unsloth's FP8 build** (`flux-3-image-klein-FP8.safetensors`, Klein only) is fp8 with one scale per output row,
+  saved under Diffusers' key names, and behaves like fp8r: on a GPU with fp8 support it stays fp8 with FP8 Storage or
+  [`fp8_compute`](/configuration/optimization/fp8-compute/) (with `fp8_compute` on fp8 hardware the
+  matmul runs directly on the fp8 weights), and it is expanded to bf16 as the model loads otherwise. unsloth's INT8 build and other
+  torchao layouts, such as per-tensor or block-wise fp8, are refused at install with a message saying why. A
+  Diffusers-named file that is not a torchao export is not recognized.
 
 FP8 Storage does not apply to the int8 and nvfp4 builds: their quantized layers are smaller already, and the layers
 they keep in bf16 stay bf16. The Model Manager can still show the toggle as on for an nvfp4 build, because installing
