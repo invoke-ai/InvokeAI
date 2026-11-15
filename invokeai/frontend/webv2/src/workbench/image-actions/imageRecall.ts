@@ -13,6 +13,7 @@ import type { TFunction } from 'i18next';
 import {
   clampAnimaInpaintAdapterWeight,
   clampDimension,
+  clampPidSteps,
   cloneGenerateWidgetValues,
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
@@ -37,6 +38,7 @@ import {
   isOpenAIImageBackground,
   isOpenAIImageQuality,
   isOpenAIInputFidelity,
+  isPidMode,
   GEMINI_TEMPERATURE_MAX,
   GEMINI_TEMPERATURE_MIN,
   isRefinerModel,
@@ -554,26 +556,15 @@ const getRecordedTimestepShift = (metadata: unknown, key: string): number | null
   return getBoundedNumber(metadata, key, MIN_TIMESTEP_SHIFT, MAX_TIMESTEP_SHIFT) ?? undefined;
 };
 
-/**
- * Per-family tuning the graphs record under their own keys. Gated on the model recall settles on, since each
- * setting only reaches that family's denoise or encoder nodes.
- *
- * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
- * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
- * Values that only matter while a switch is on (DyPE scale, variance strength) stay as they are when missing.
- */
-const getMetadataModelTuning = (
-  metadata: unknown,
-  model: GenerateModelConfig | undefined
+/** The recorded value, else the fallback when a generation record of the model's own family leaves the key out. */
+type RecordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T) => T | undefined;
+
+/** The settings each family records under its own keys. */
+const getFamilyTuning = (
+  metadata: Record<string, unknown>,
+  model: GenerateModelConfig,
+  recordedOrDefault: RecordedOrDefault
 ): Partial<GenerateWidgetValues> => {
-  if (!model || model.type !== 'main' || !isRecord(metadata)) {
-    return {};
-  }
-
-  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
-  const recordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T): T | undefined =>
-    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
-
   if (model.base === 'flux') {
     const preset = recordedOrDefault(
       'dype_preset',
@@ -676,6 +667,56 @@ const getMetadataModelTuning = (
   }
 
   return {};
+};
+
+/**
+ * PiD decoding, shared by several families. The graphs record its keys only while it decodes, so a generation record
+ * of the model's family without the mode decoded through the VAE. Out-of-range steps are clamped to what the decoder
+ * takes rather than applied.
+ */
+const getPidTuning = (
+  metadata: Record<string, unknown>,
+  model: GenerateModelConfig,
+  recordedOrDefault: RecordedOrDefault
+): Partial<Pick<GenerateWidgetValues, 'pidMode' | 'pidSteps'>> => {
+  if (!getGenerationUiPolicy(model).pidVisible) {
+    return {};
+  }
+
+  const mode = recordedOrDefault('pid_mode', isPidMode(metadata.pid_mode) ? metadata.pid_mode : undefined, 'off');
+  const steps = getNumber(metadata, 'pid_steps');
+
+  return {
+    ...(mode === undefined ? {} : { pidMode: mode }),
+    ...(steps === null ? {} : { pidSteps: clampPidSteps(steps) }),
+  };
+};
+
+/**
+ * Per-family tuning the graphs record under their own keys, and PiD. Gated on the model recall settles on, since each
+ * setting only reaches that family's denoise, encoder or decode nodes.
+ *
+ * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
+ * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
+ * Values that only matter while a switch is on (DyPE scale, variance strength, PiD steps) stay as they are when
+ * missing.
+ */
+const getMetadataModelTuning = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (!model || model.type !== 'main' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
+  const recordedOrDefault: RecordedOrDefault = (key, recorded, fallback) =>
+    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
+
+  return {
+    ...getFamilyTuning(metadata, model, recordedOrDefault),
+    ...getPidTuning(metadata, model, recordedOrDefault),
+  };
 };
 
 const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
@@ -841,11 +882,32 @@ const getMetadataAnimaInpaintAdapter = (
 const hasAnimaInpaintAdapterSettings = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataAnimaInpaintAdapter(metadata, model)).length > 0;
 
+/**
+ * The prompt upsampler switch; only a FLUX.3 image can carry it. A recorded model means the upsampler ran, so the
+ * switch turns on. `core_metadata` drops `null` on write, so a FLUX.3 record without the key ran without it: the
+ * switch turns off and the current pick stays. Other records say nothing about it.
+ */
+const getMetadataFlux3PromptUpsampler = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<Pick<GenerateWidgetValues, 'flux3PromptUpsamplerEnabled'>> => {
+  if (model?.base !== 'flux3' || !isRecord(metadata)) {
+    return {};
+  }
+
+  if ('flux3_prompt_upsampler' in metadata) {
+    return { flux3PromptUpsamplerEnabled: true };
+  }
+
+  return getString(metadata, 'generation_mode')?.startsWith('flux3_') ? { flux3PromptUpsamplerEnabled: false } : {};
+};
+
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
   | 'componentSourceModel'
+  | 'flux3PromptUpsamplerModel'
   | 'gemma2EncoderModel'
   | 'ideogram4UnconditionalModel'
   | 'mistralEncoderModel'
@@ -879,6 +941,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
   { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
@@ -1381,7 +1444,9 @@ export const getImageRecallCapabilities = ({
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
-  const hasAdapterSettings = hasAnimaInpaintAdapterSettings(metadata, clipSkipModel);
+  const hasSwitchSettings =
+    hasAnimaInpaintAdapterSettings(metadata, clipSkipModel) ||
+    Object.keys(getMetadataFlux3PromptUpsampler(metadata, clipSkipModel)).length > 0;
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1401,7 +1466,7 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings ||
+    hasSwitchSettings ||
     hasCanvasRecall(metadata);
   const hasNonSeedMetadata =
     hasModel ||
@@ -1419,7 +1484,7 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings ||
+    hasSwitchSettings ||
     hasCanvasRecall(metadata);
 
   return {
@@ -1533,7 +1598,7 @@ export const buildImageRecallSettings = ({
     }
 
     const adapterPatch = getMetadataAnimaInpaintAdapter(metadata, values.model);
-    values = { ...values, ...adapterPatch };
+    values = { ...values, ...adapterPatch, ...getMetadataFlux3PromptUpsampler(metadata, values.model) };
 
     if (adapterPatch.animaInpaintAdapterWeight !== undefined) {
       fields.push('animaInpaintAdapterWeight');
@@ -1557,7 +1622,8 @@ export const buildImageRecallSettings = ({
     // change too: a record can turn it off without touching the pick.
     if (
       recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
-      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled
+      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled ||
+      values.flux3PromptUpsamplerEnabled !== currentValues.flux3PromptUpsamplerEnabled
     ) {
       fields.push('components');
     }

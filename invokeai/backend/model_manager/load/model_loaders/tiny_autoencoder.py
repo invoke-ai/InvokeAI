@@ -60,4 +60,8 @@ class TinyAutoencoderLoader(ModelLoader):
             raise ValueError(f"'{config.name}' is not a supported Tiny AutoEncoder checkpoint.")
         decoder = build_tiny_autoencoder_decoder(layout)
         decoder.load_state_dict(tiny_autoencoder_state_dict(checkpoint, layout), strict=True)
-        return decoder.to(self._torch_dtype).eval().requires_grad_(False)
+        # float32 for CPU-only decoders, the policy of CPU-only text LLMs (`text_llm.py`): CPU float16 is emulated
+        # and slow, CPU bfloat16 is fast only with native support (about 4.7x slower than float32 without it), and
+        # torch's CPU bfloat16 kernels fault with an illegal instruction on some CPUs.
+        dtype = torch.float32 if config.cpu_only is True else self._torch_dtype
+        return decoder.to(dtype).eval().requires_grad_(False)

@@ -102,6 +102,7 @@ const selectRenderSettings = pickGenerateSettings([
   'fluxDypeExponent',
   'fluxDypePreset',
   'fluxDypeScale',
+  'flux3PromptUpsamplerEnabled',
   'ideogram4ColorPalette',
   'ideogram4GuidanceScale',
   'ideogram4Mu',
@@ -341,6 +342,20 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
         />
       ) : null}
     </GenerateToggleSwitch>
+  );
+};
+
+/** Off by default: every new prompt loads a 9B model. The model slot appears in Components while this is on. */
+const Flux3PromptUpsamplerField = ({ onCommit, settings }: RenderFieldsProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <GenerateToggleSwitch
+      checked={settings.flux3PromptUpsamplerEnabled}
+      helpText={t('widgets.generate.flux3PromptUpsamplerHelp')}
+      label={t('widgets.generate.flux3PromptUpsampler')}
+      onCheckedChange={(flux3PromptUpsamplerEnabled) => onCommit({ flux3PromptUpsamplerEnabled })}
+    />
   );
 };
 
@@ -707,6 +722,7 @@ export const GenerateRenderSection = ({
         />
       ) : null}
       {familyBase === 'flux' ? <FluxDypeFields settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'flux3' ? <Flux3PromptUpsamplerField settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.schedulerVisible ? (
         <GenerateFieldContextMenu
           fieldLabel={t('widgets.generate.scheduler')}
