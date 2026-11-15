@@ -1,4 +1,5 @@
 import copy
+from collections.abc import Iterator
 from contextlib import ExitStack
 from typing import Optional
 
@@ -16,6 +17,7 @@ from invokeai.app.invocations.fields import (
     MossImageConditioningField,
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
+from invokeai.app.invocations.moss_image.moss_image_lora_loader import require_moss_image_lora
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ernie_image.sampling_utils import patchify_latents
@@ -23,6 +25,10 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.moss_image.denoise import denoise
 from invokeai.backend.moss_image.sampling import get_moss_noise, get_moss_sigmas, to_model_space, to_raw_latent
 from invokeai.backend.moss_image.working_memory import estimate_moss_image_denoise_working_memory
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import MOSS_IMAGE_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import MossImageConditioningInfo
@@ -38,7 +44,7 @@ MOSS_IMAGE_RAW_LATENT_SCALE = 8
     title="Denoise - MOSS-Image",
     tags=["image", "moss_image", "moss-image"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class MossImageDenoiseInvocation(BaseInvocation):
@@ -46,7 +52,8 @@ class MossImageDenoiseInvocation(BaseInvocation):
 
     Takes and returns latents in the FLUX.2 VAE's raw layout, so the FLUX.2 VAE encode and decode nodes work on either
     side. The schedule is the model's own shifted Euler schedule; with CFG the negative branch skips the transformer
-    blocks in `uncond_skip_layers`, as the reference pipeline does.
+    blocks in `uncond_skip_layers`, as the reference pipeline does. The transformer's LoRAs apply to both branches: merged
+    into the weights where the build allows it, beside them as sidecars on GGUF, int8 and FP8 Storage builds.
     """
 
     latents: Optional[LatentsField] = InputField(
@@ -100,6 +107,7 @@ class MossImageDenoiseInvocation(BaseInvocation):
                 "the reference default), or set cfg_scale to 1."
             )
 
+        self._require_moss_image_loras(context)
         init_latents = self._load_init_latents(context)
         if init_latents is None:
             if self.denoise_mask is not None:
@@ -118,6 +126,8 @@ class MossImageDenoiseInvocation(BaseInvocation):
 
         transformer_info = context.models.load(self.transformer.transformer)
         transformer_config = transformer_info.model.config
+        record = context.models.get_config(self.transformer.transformer)
+        loras = self._active_loras(context)
         skip_layers = self._validated_skip_layers(int(transformer_config.num_layers)) if use_cfg else []
 
         device = transformer_info.compute_device
@@ -159,6 +169,8 @@ class MossImageDenoiseInvocation(BaseInvocation):
             height=self.height,
             width=self.width,
             text_tokens=max(e.shape[1] for e in (positive, negative) if e is not None),
+            loras=loras,
+            model_format=record.format,
             device=device,
             dtype=dtype,
         )
@@ -167,7 +179,20 @@ class MossImageDenoiseInvocation(BaseInvocation):
             context.util.sd_step_callback(state, BaseModelType.MossImage)
 
         with ExitStack() as exit_stack:
-            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device(working_memory=working_memory))
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_memory=working_memory)
+            )
+            # GGUF, int8 and fp8 weights cannot take an update in place: those LoRAs run as sidecars.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=MOSS_IMAGE_LORA_TRANSFORMER_PREFIX,
+                    dtype=dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=requires_sidecar_patching(transformer, record.format),
+                )
+            )
             result = denoise(
                 transformer=transformer,
                 latents=x,
@@ -181,6 +206,26 @@ class MossImageDenoiseInvocation(BaseInvocation):
             )
 
         return to_raw_latent(result, bn).cpu()
+
+    def _require_moss_image_loras(self, context: InvocationContext) -> None:
+        """Refuse, before anything loads, a LoRA that is not a MOSS-Image one: one applied by another family's loader
+        node would be converted for that family's transformer, whose layers this one does not have."""
+        for lora in self.transformer.loras:
+            require_moss_image_lora(context, lora.lora)
+
+    def _active_loras(self, context: InvocationContext) -> list[ModelPatchRaw]:
+        """The patch of each LoRA the patcher applies: those at a weight other than 0. Loaded before the transformer's
+        device lock, so the reservation can price them."""
+        return [context.models.load(lora.lora).model for lora in self.transformer.loras if lora.weight != 0]
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     def _load_init_latents(self, context: InvocationContext) -> Optional[torch.Tensor]:
         """The starting latents in the FLUX.2 raw layout, float32 on the CPU, checked against the requested size."""
