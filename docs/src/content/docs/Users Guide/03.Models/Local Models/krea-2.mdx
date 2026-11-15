@@ -100,9 +100,14 @@ encoder closely; the remaining difference is the quantization of the encoder.
   same shapes but conditions wrongly, so InvokeAI identifies the encoder from the file's
   `qwen3vl` architecture tag and does not install a plain Qwen3 file as one.
 - The `mmproj-*.gguf` file next to it holds the vision part and is not needed for text-to-image. It installs
-  as its own **Qwen3-VL Vision Tower** model, but Krea-2 does not use it yet: without the vision part in the
-  encoder, a GGUF encoder cannot encode the reference images of [edit LoRAs](#edit-loras-and-reference-images).
-  [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/#reference-images) takes it for its own references.
+  as its own **Qwen3-VL Vision Tower** model. Select the 4B one (*Qwen3-VL 4B Vision Tower*, hidden size 2560)
+  as **Vision Tower** beside a GGUF encoder and it reads the reference images of
+  [edit LoRAs](#edit-loras-and-reference-images). The **Vision Tower** slot shows only while a GGUF 4B encoder is
+  selected, and a tower beside any other encoder is refused: those carry their own. Without a tower, a GGUF
+  encoder is refused when reference images are connected. A tower of the 8B encoder does not fit Krea-2. The tower runs on the encoder's device, so when the
+  encoder is set to CPU Only in the Model Manager, set the tower to CPU Only too.
+  [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/#reference-images) reads its references through
+  the 8B's.
 - ComfyUI-GGUF's `Q8_CR` and `Q4_CR` encoder files are refused at install; only the transformer loads from them.
 - LoRAs with text-encoder layers still apply to a quantized encoder.
 
@@ -111,7 +116,8 @@ Qwen3-VL encoder starter models, none of which belong to a bundle:
 | Starter model | Format | Size | Used by |
 | --- | --- | --- | --- |
 | Qwen3-VL 4B Encoder (bf16 / fp8 / int8) | Comfy-Org single files | ~8.9 / ~5.2 / ~4.9 GB | Krea-2, FLUX.3 |
-| Qwen3-VL 4B Encoder (Q4_K_M / Q8_0 GGUF) | GGUF, language tower only | ~2.5 / ~4.3 GB | Krea-2, FLUX.3; text only |
+| Qwen3-VL 4B Encoder (Q4_K_M / Q8_0 GGUF) | GGUF, language tower only | ~2.5 / ~4.3 GB | Krea-2, FLUX.3; Krea-2 edit references need the 4B Vision Tower |
+| Qwen3-VL 4B Vision Tower | GGUF mmproj (F16) | ~0.8 GB | Krea-2 edit references beside a GGUF 4B encoder |
 | Qwen3-VL 8B Encoder (NVFP4) | Comfy-Org single file | ~6.3 GB | Ideogram 4, Qwen-Image-2.1 |
 | Qwen3-VL 8B Encoder (Q4_K_M / Q8_0 GGUF) | GGUF, language tower only | ~5.0 / ~8.7 GB | Ideogram 4, Qwen-Image-2.1; text only |
 
@@ -211,8 +217,9 @@ A reference image reaches the model twice, and both are needed:
   keeps its size. A side shorter than 28 pixels is stretched to 28. The Qwen3-VL processor then works on 32-pixel cells and enlarges an image below its floor
   of 65,536 pixels to that floor. This needs the encoder's vision weights. The encoder of the Krea-2
   Diffusers models has them, and so do Qwen3-VL single files and folders that include the vision weights.
-  [GGUF encoders](#qwen3-vl-gguf-encoders) do not. An encoder without them is refused when reference images
-  are connected.
+  A [GGUF encoder](#qwen3-vl-gguf-encoders) has none and reads references through the selected Vision Tower
+  model instead. A GGUF encoder without a Vision Tower, or another encoder without vision weights, is refused when
+  reference images are connected.
 - **The transformer sees it as clean image tokens.** The reference is encoded with the VAE and its tokens
   are added after the image being generated. They are always presented as fully denoised. An image above
   1 megapixel is scaled to about 1 megapixel, keeping its aspect ratio, and both sides are then rounded to
@@ -241,7 +248,8 @@ not be part of the canvas image. On the Canvas the Edit references apply to ever
 image-to-image and inpainting.
 
 With CFG above 1 the negative prompt reads the same references. Invoke stays disabled, and says why, while
-Edit references are combined with a Style reference or with a [GGUF Qwen3-VL encoder](#qwen3-vl-gguf-encoders).
+Edit references are combined with a Style reference or with a [GGUF Qwen3-VL encoder](#qwen3-vl-gguf-encoders)
+that has no Vision Tower selected, or with a tower and encoder whose CPU Only settings differ.
 A Canvas Invoke with enabled regional guidance layers stops with a message instead, since Edit references
 cannot be combined with regional prompts. **Reference K/V cache** under **Advanced** sets the
 [K/V cache](#reference-kv-cache) below; it can be switched only while Edit references are active and a LoRA is

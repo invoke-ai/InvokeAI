@@ -540,6 +540,38 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the FLUX.3 prompt upsampler settings', () => {
+  const upsampler = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+
+  it('defaults a project saved without them to off with no model, and keeps what a later one stored', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      flux3PromptUpsamplerEnabled: false,
+      flux3PromptUpsamplerModel: null,
+    });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: upsampler,
+      })
+    ).toMatchObject({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler });
+    // Only a real `true` turns it on, and a malformed model is dropped.
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        flux3PromptUpsamplerEnabled: 'yes',
+        flux3PromptUpsamplerModel: { key: 'no-name' },
+      })
+    ).toMatchObject({ flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: null });
+  });
+});
+
 describe('the Anima inpaint adapter settings', () => {
   it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
@@ -668,6 +700,16 @@ describe('Generate widget value snapshots', () => {
     expect(synced.qwen3EncoderModel).toBe(currentComponent);
     expect(synced.vae).toBe(currentVae);
     expect(synced.loras[0]?.model).toBe(currentLora);
+  });
+
+  it('refreshes the saved prompt upsampler from the catalog and clones it', () => {
+    const upsampler = { base: 'any', key: 'pup', name: 'Old Upsampler', type: 'text_llm' };
+    const saved = { ...values, flux3PromptUpsamplerModel: upsampler };
+    const renamed = { ...upsampler, name: 'Renamed' };
+
+    expect(syncGenerateWidgetValuesWithModels(saved, [model, renamed]).flux3PromptUpsamplerModel).toBe(renamed);
+    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).toEqual(upsampler);
+    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).not.toBe(upsampler);
   });
 
   it('notices a CPU Only change on the GGUF encoder and its tower, and the policy then blocks references', () => {

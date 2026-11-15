@@ -204,7 +204,7 @@ def test_continuation_record_has_atomic_idempotent_status_transitions() -> None:
     [
         ("complete", {"output": 2}, {"output": 3}, "completed continuation has conflicting result"),
         ("fail", "first failure", "different failure", "failed continuation has conflicting error"),
-        ("cancel", "user requested", "shutdown", "cancelled continuation has conflicting error"),
+        ("cancel", "user requested", "shutdown", "canceled continuation has conflicting error"),
     ],
 )
 def test_continuation_record_terminal_replay_rejects_conflicts_without_mutation(

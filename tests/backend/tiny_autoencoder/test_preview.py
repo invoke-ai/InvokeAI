@@ -37,6 +37,7 @@ def taesd() -> TaesdDecoder:
 
 
 MIB = 2**20
+CPU = torch.device("cpu")
 
 
 def _latent(*shape: int, seed: int = 1) -> torch.Tensor:
@@ -139,10 +140,22 @@ def test_a_decode_reserves_its_full_resolution_activations_at_the_capped_size(ta
 
     # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size, and
     # the fixed 5 MiB allowance.
-    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4 + 5 * MIB
-    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2 + 5 * MIB
+    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5), CPU) == (3 + 2) * 64 * (24 * 40) * 4 + 5 * MIB
+    assert decode_working_memory_bytes(half, _latent(4, 3, 5), CPU) == (3 + 2) * 64 * (24 * 40) * 2 + 5 * MIB
     # 12 x 18 latents exceed the cap and are decoded at 4 x 6.
-    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4 + 5 * MIB
+    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18), CPU) == (3 + 2) * 64 * (32 * 48) * 4 + 5 * MIB
+
+
+def test_a_cpu_decode_is_capped_at_512_pixels_where_a_gpu_decode_is_not(taesd: TaesdDecoder) -> None:
+    """A 544 x 512 image is within TAESD's own 1024 cap, so only the device decides. Decoding on a CPU is slow enough
+    (1.7 s against 0.4 s at 512 pixels on a Ryzen 9 7900) to be worth the lower resolution."""
+    latent = _latent(4, 68, 64)
+    per_pixel = (3 + 2) * 64 * 4
+
+    assert decode_preview(taesd, latent).size == (480, 512)  # the decoder's own device is the CPU
+    # The reservation follows the same size, so the VRAM a lock keeps is that of the image a GPU renders.
+    assert decode_working_memory_bytes(taesd, latent, torch.device("cuda")) == per_pixel * (544 * 512) + 5 * MIB
+    assert decode_working_memory_bytes(taesd, latent, torch.device("cpu")) == per_pixel * (512 * 480) + 5 * MIB
 
 
 @pytest.fixture(scope="module")
@@ -298,7 +311,8 @@ class _Stop(Exception):
 
 
 def _first_conv_input(decoder: TinyAutoencoderDecoder, latent: torch.Tensor) -> tuple[int, ...]:
-    """The latent shape the decoder's first convolution receives, without paying for the decode."""
+    """The latent shape the decoder's first convolution receives on a device that is not a CPU, without paying for the
+    decode: the sample is moved to `meta`, which the hook stops at."""
     seen: list[tuple[int, ...]] = []
 
     def record(_module: torch.nn.Module, args: tuple[torch.Tensor, ...]) -> None:
@@ -309,7 +323,7 @@ def _first_conv_input(decoder: TinyAutoencoderDecoder, latent: torch.Tensor) -> 
     handle = first_conv.register_forward_pre_hook(record)
     try:
         with pytest.raises(_Stop):
-            decode_preview(decoder, latent)
+            decode_preview(decoder, latent, device=torch.device("meta"))
     finally:
         handle.remove()
     return seen[0]
@@ -405,12 +419,12 @@ def test_a_video_decode_reserves_its_live_activations_and_workspace_per_output_f
     # 2.25 live 64-channel float32 activations and 2 of workspace per output frame of the full-resolution stage, and
     # the fixed 5 MiB allowance.
     per_output_frame = (2.25 + 2) * 64 * stage_pixels * 4
-    assert decode_working_memory_bytes(decoder, _latent(*latent)) == per_output_frame * frames_per_latent + 5 * MIB
+    assert decode_working_memory_bytes(decoder, _latent(*latent), CPU) == per_output_frame * frames_per_latent + 5 * MIB
     window = _latent(latent[0], latent[1], 2, *latent[2:])
-    assert decode_working_memory_bytes(decoder, window) == per_output_frame * frames_per_latent * 2 + 5 * MIB
+    assert decode_working_memory_bytes(decoder, window, CPU) == per_output_frame * frames_per_latent * 2 + 5 * MIB
 
 
 def test_a_video_decode_is_priced_at_its_own_cap(taew2_1: TinyAutoencoderDecoder) -> None:
-    """taew2_1's 512-pixel cap decodes a 128 x 128 latent (1024 pixels) at 64 x 64."""
+    """taew2_1's 512-pixel cap decodes a 128 x 128 latent (1024 pixels) at 64 x 64, on a GPU as on a CPU."""
     expected = (2.25 + 2) * 64 * 512 * 512 * 4 * 4 + 5 * MIB
-    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128)) == expected
+    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128), torch.device("cuda")) == expected
