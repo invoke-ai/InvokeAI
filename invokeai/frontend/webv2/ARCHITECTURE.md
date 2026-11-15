@@ -49,9 +49,11 @@ Ownership follows invariants, not the first caller:
 
 Domain orchestration and account/project lifetimes belong to non-React runtimes. React reads their state through external-store adapters; backend read models use Query. Derived values stay in render and user actions call the owner from event handlers. An effect must not duplicate these responsibilities.
 
-An adapter may synchronize React with an external system it owns. Reusable browser mechanics live in Platform: [useDebouncedValue](src/platform/react/useDebouncedValue.ts) owns a timer and cancellation, while [useMountEffect](src/platform/react/useMountEffect.ts) registers only mount/unmount work with stable dependencies. App composes cross-owner integrations; domain-specific adapters remain with their feature or Workbench owner. Keep the resource lifetime, dependency changes, and cleanup together. Do not add a pass-through hook, changing-dependency ref, or layout effect to disguise synchronization or avoid dependency checks. Layout effects are for pre-paint DOM measurement.
+Do not add direct `useEffect`: effect-driven state synchronization can cause unnecessary renders and feedback loops. Calling code an adapter, or placing it in Platform, does not exempt it. Existing direct effects are not approved examples; migrate them when changing their behavior, without unrelated sweeps.
 
-The [lint configuration](.oxlintrc.json) checks hooks, dependencies, and common state-derivation mistakes; it does not enforce a blanket effect ban. Review must establish the external resource, the correct owner, and cleanup on dependency changes and unmount, including account/project transitions where relevant. Existing usages have no exemption from that review when changed. Identity resets use the owning runtime or a deliberate keyed remount whose state loss is intended.
+Use [useMountEffect](src/platform/react/useMountEffect.ts) only for mount/unmount registration with stable dependencies and complete cleanup. Do not hide a direct effect in a pass-through hook, changing-dependency ref, or layout effect. Layout effects are for pre-paint DOM measurement. Identity resets use the owning runtime or a deliberate keyed remount whose state loss is intended.
+
+The [lint configuration](.oxlintrc.json) checks hooks, dependencies, and common state-derivation mistakes, but does not fully enforce the direct-effect ban. A passing check does not authorize a direct effect; review must enforce the rule and verify lifecycle cleanup, including account/project transitions where relevant.
 
 ## Owner documents
 

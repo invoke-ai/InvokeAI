@@ -22,10 +22,9 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 ## React and product quality
 
 - Polished desktop experience: deliberate layouts, responsive interactions, cohesive accessible controls, complete loading/empty/error/recovery states.
-- Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters. Effects must not mirror derived state, relay user actions, fetch backend read models, or orchestrate domain workflows.
-- Genuine React/external-system synchronization belongs in its owning adapter: reusable browser/UI mechanics in Platform, cross-owner composition in App, domain-specific integrations with their feature or Workbench owner. A direct effect there must synchronize an identified external resource with complete dependencies and cleanup; naming a wrapper an adapter does not establish ownership. [ARCHITECTURE.md](ARCHITECTURE.md#react-adapters) gives entry points and review obligations.
+- No direct `useEffect`. Effect-driven state synchronization can cause unnecessary renders and feedback loops. Derive during render, act in event handlers, fetch through Query, subscribe via external-store adapters.
 - `@platform/react/useMountEffect`: only mount/unmount registration with stable dependencies and complete cleanup. No changing-dependency refs, wrapper aliases, layout-effect evasions. Layout effects only for pre-paint DOM measurement.
-- Changing an effect's behavior: apply the ownership rule above; existing effects are not proof of an approved pattern. No unrelated sweeps. Identity changes use store/runtime lifecycles or deliberate keyed remounts, without accidental state loss.
+- Changing an effect's behavior: migrate it. Existing direct effects are not permission to add more, including in adapters. No unrelated sweeps. Identity changes use store/runtime lifecycles or deliberate keyed remounts, without accidental state loss. See [React adapters](ARCHITECTURE.md#react-adapters) for supported paths and enforcement limits.
 - Reuse Platform controls, Chakra/theme tokens, icons, interactions. No second styling system, no generic Next.js/SWR patterns. Import controls by subpath (`@platform/ui/Button`): the `@platform/ui` barrel's importer budget is full.
 - Include disabled states. Keep keyboard operation, visible and restored focus, accessible names, pointer alternatives.
 - Icon-only controls get the platform `Tooltip`, menu and popover triggers included (share `useTooltipTriggerIds` between root and Tooltip). Never native `title`.
