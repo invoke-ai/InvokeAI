@@ -24,12 +24,36 @@ FLUX_KOHYA_TRANSFORMER_KEY_REGEX = (
     r"(img_attn|img_mlp|img_mod|txt_attn|txt_mlp|txt_mod|linear1|linear2|modulation)_?(.*)"
 )
 
-# A regex pattern that matches all of the last layer keys in the Kohya FLUX LoRA format.
+# The layers outside the transformer blocks that kohya-style FLUX trainers write, by their kohya name (the BFL module
+# path with periods turned into underscores) and mapped to the BFL module path. A table because underscores cannot be
+# turned back into periods by rule (`time_in_in_layer` is `time_in.in_layer`). The names are BFL's own, so they cover
+# FLUX.1 and FLUX.2 alike: FLUX.2 has no `vector_in` (and `guidance_in` only in [dev]) and adds the three shared
+# modulations, which FLUX.1 lacks.
+# `final_layer_adaLN_modulation_1` keeps BFL's (shift, scale) halves; FLUX.2 runs on diffusers modules, which
+# `convert_bfl_lora_patch_to_diffusers` swaps for it.
+FLUX_KOHYA_NON_BLOCK_LAYERS: dict[str, str] = {
+    "img_in": "img_in",
+    "txt_in": "txt_in",
+    "time_in_in_layer": "time_in.in_layer",
+    "time_in_out_layer": "time_in.out_layer",
+    "vector_in_in_layer": "vector_in.in_layer",
+    "vector_in_out_layer": "vector_in.out_layer",
+    "guidance_in_in_layer": "guidance_in.in_layer",
+    "guidance_in_out_layer": "guidance_in.out_layer",
+    "final_layer_linear": "final_layer.linear",
+    "final_layer_adaLN_modulation_1": "final_layer.adaLN_modulation.1",
+    "double_stream_modulation_img_lin": "double_stream_modulation_img.lin",
+    "double_stream_modulation_txt_lin": "double_stream_modulation_txt.lin",
+    "single_stream_modulation_lin": "single_stream_modulation.lin",
+}
+
+# A regex pattern that matches the keys of FLUX_KOHYA_NON_BLOCK_LAYERS: the layer name, then the LoRA parameter suffix.
 # Example keys:
-#   lora_unet_final_layer_linear.alpha
-#   lora_unet_final_layer_linear.lora_down.weight
-#   lora_unet_final_layer_linear.lora_up.weight
-FLUX_KOHYA_LAST_LAYER_KEY_REGEX = r"lora_unet_final_layer_(linear|linear1|linear2)_?(.*)"
+#   lora_unet_img_in.alpha
+#   lora_unet_final_layer_adaLN_modulation_1.lora_down.weight
+FLUX_KOHYA_NON_BLOCK_KEY_REGEX = (
+    r"lora_unet_(?P<layer>" + "|".join(re.escape(name) for name in FLUX_KOHYA_NON_BLOCK_LAYERS) + r")(?P<suffix>\..*)?"
+)
 
 # A regex pattern that matches all of the CLIP keys in the Kohya FLUX LoRA format.
 # Example keys:
@@ -52,15 +76,23 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: dict[str | int, Any]) 
 
     This is intended to be a high-precision detector, but it is not guaranteed to have perfect precision. (A
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
+
+    Layers outside the blocks (`img_in`, `txt_in`, ...) are accepted, but do not identify FLUX on their own: Qwen-Image,
+    SD3 and others share some of those module names, so at least one block, CLIP or T5 key must be present.
     """
-    return all(
-        re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
-        or re.match(FLUX_KOHYA_LAST_LAYER_KEY_REGEX, k)
-        or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
-        or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
-        for k in state_dict.keys()
-        if isinstance(k, str)
-    )
+    anchored = False
+    for k in state_dict.keys():
+        if not isinstance(k, str):
+            continue
+        if (
+            re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
+            or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
+            or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
+        ):
+            anchored = True
+        elif not re.fullmatch(FLUX_KOHYA_NON_BLOCK_KEY_REGEX, k):
+            return False
+    return anchored
 
 
 def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> ModelPatchRaw:
@@ -78,9 +110,6 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     t5_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
     for layer_name, layer_state_dict in grouped_state_dict.items():
         if layer_name.startswith("lora_unet"):
-            # Skip the final layer. This is incompatible with current model definition.
-            if layer_name.startswith("lora_unet_final_layer"):
-                continue
             transformer_grouped_sd[layer_name] = layer_state_dict
         elif layer_name.startswith("lora_te1"):
             clip_grouped_sd[layer_name] = layer_state_dict
@@ -139,6 +168,7 @@ def _convert_flux_transformer_kohya_state_dict_to_invoke_format(state_dict: Dict
     Example key conversions:
     "lora_unet_double_blocks_0_img_attn_proj" -> "double_blocks.0.img_attn.proj"
     "lora_unet_double_blocks_0_img_attn_qkv" -> "double_blocks.0.img_attn.qkv"
+    "lora_unet_time_in_in_layer" -> "time_in.in_layer"
     """
 
     def replace_func(match: re.Match[str]) -> str:
@@ -150,8 +180,12 @@ def _convert_flux_transformer_kohya_state_dict_to_invoke_format(state_dict: Dict
     converted_dict: dict[str, T] = {}
     for k, v in state_dict.items():
         match = re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
+        non_block_match = re.fullmatch(FLUX_KOHYA_NON_BLOCK_KEY_REGEX, k)
         if match:
             new_key = re.sub(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, replace_func, k)
+            converted_dict[new_key] = v
+        elif non_block_match:
+            new_key = FLUX_KOHYA_NON_BLOCK_LAYERS[non_block_match["layer"]] + (non_block_match["suffix"] or "")
             converted_dict[new_key] = v
         else:
             raise ValueError(f"Key '{k}' does not match the expected pattern for FLUX LoRA weights.")
