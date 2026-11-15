@@ -2,6 +2,11 @@
 
 For the main agent. Implementers and reviewers need only root `AGENTS.md`, the scoped files for their paths, and their brief.
 
+## Form coherent work
+
+- Before dispatching related reports, check their source, affected revision/environment, current reproduction, and existing work. Group by the owning invariant or shared cause instead of opening one implementation task per symptom. New evidence updates the acceptance criteria and reaches affected implementers; it does not silently expand scope or authorization.
+- For recurring corrections, collect concrete locations, failure scenarios, and evidence in `.scratch/agents/<task>/`, then group observations before choosing a structural fix. Promote confirmed work into the owning implementation, check, or durable contract; never commit the observation log. Do not delay a serious defect while waiting for recurrence.
+
 ## Delegation
 
 - Main agent investigates, plans, briefs, integrates, validates, reports. It owns shared contracts and completion.

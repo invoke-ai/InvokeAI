@@ -8,6 +8,25 @@ For manual interaction and visual checks, use `pnpm dev:mock` as described in [b
 
 The production-build journeys start and stop their own preview/backend processes. Use their package commands instead of reimplementing a driver. Their setup, fault injection, and selectors are executable examples; use a spare port for focused runs and respect the single-machine performance gate.
 
+## Bounded local verification
+
+For a shared development machine, opt into two Vitest workers through the existing package command. Use the Node version in the repository's `.nvmrc`, pnpm 10, frozen dependencies, and the locked Chromium/Firefox/WebKit engines; installation commands are in [AGENTS.md](AGENTS.md#performance-and-validation). Run from this package directory, in a POSIX shell:
+
+```sh
+VITEST_MAX_WORKERS=2 pnpm check:release
+```
+
+This limits the unit and browser test workers, not total machine memory or every subprocess. It does not change the selected tests, assertions, budgets, or CI configuration. The [performance guide](performance/README.md#running) owns exclusive-machine requirements and ports: the main agent schedules one performance gate at a time, with no concurrent builds or tests. The [lifecycle smoke guide](performance/README.md#browser-lifecycle-smoke) names the journey ports and engine prerequisites. Never kill an unrelated process to obtain a port.
+
+Keep the command, revision, environment, exit status, and original failure diagnostics with the run's ignored artifacts or task scratch. Distinguish:
+
+- **Assertion or budget failure:** report the failing behavior and investigate; a retry does not erase the first result. Do not reduce coverage or relax limits to pass.
+- **Process termination:** report the exit code or signal and which stage was interrupted. Exit 137 alone does not establish an out-of-memory cause. Check available resource diagnostics before attributing it; a bounded retry keeps the same checks.
+- **Setup failure:** missing engines/dependencies or occupied ports leave checks unavailable, not passed. Repair the owned environment and rerun the affected command.
+- **Unrun stages:** `check:release` stops at its first failing command. Name later stages as not run. If `lint:code` already passed and its inputs are unchanged, resume the complete test chain with `VITEST_MAX_WORKERS=2 pnpm check:release:tests`; otherwise rerun completion. Report both commands and their outcomes.
+
+Use focused checks during development. This profile does not require application suites for documentation-only changes or replace any required completion gate.
+
 ## Feature and evidence map
 
 | User flow and entry point                                                                                                                                        | Owner and supported starting point                                                                                                 | Existing reproduction or evidence                                                                                                                                                                                                                                                                                                                                                                                 | What it does not establish                                                                                                                                                                    |

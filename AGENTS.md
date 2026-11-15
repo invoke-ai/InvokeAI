@@ -30,9 +30,12 @@ Before these steps, read:
 - Running Python tests: [tests/AGENTS.md](tests/AGENTS.md).
 - Committing or opening a PR: [.github/AGENTS.md](.github/AGENTS.md).
 
+For a targeted evaluation of material agent-guidance changes, use [.agents/evaluation.md](.agents/evaluation.md). This is not a gate for every edit.
+
 ## Engineering standard
 
 - Before designing: read implementations, callers, contracts, tests. Define observable outcome and validation. Reproduce bugs where feasible. Fix root causes. Rethink designs that pile up patches.
+- When implementation conflicts with policy, establish the intended invariant before changing either. Existing violations do not authorize relaxing the constraint; a policy change needs its own explicit design decision.
 - When a correction reveals a recurring failure, first consider preventing it through the owning API, types, architecture check, or behavioral test. Use prose for judgment and constraints those mechanisms cannot express; keep the response proportional to the failure.
 - Keep ownership and interfaces clear. Cover edge cases, failures, data lifecycles, operational limits.
 - Every function, dependency, fallback, test earns its place. Abstractions must translate contracts, isolate dependencies, own lifecycles, prevent drift, or simplify callers. No pass-through wrappers, speculative extensibility, redundant validation/config, or abstraction justified only by similar-looking code.
@@ -66,7 +69,7 @@ Milestone = one coherent, commit-ready unit. Run relevant checks and self-review
 - Reviewers did not implement the change. Self-review is never independent, including review by an implementing agent. Required independent review unavailable: self-review the matching focuses and tell the user. Ordinary low-risk self-review needs no disclaimer.
 - Never declare ready with material findings or unexplained failing gates. Report resolved findings, passed/failed/unavailable checks, remaining limits. PRs omit subagent counts, tiers, process narration.
 - Match evidence to the claimed behavior: name the exercised scenario and environment, and what remains unverified. Static checks prove encoded boundaries; mocks prove only their modeled behavior. A screenshot cannot prove retry safety, nor a passing suite every platform or failure mode. Required package gates still apply.
-- Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
+- Verification reduces uncertainty; it does not make irreversible actions reversible or grant authority to act. Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
 
 ## Commands and environments
 

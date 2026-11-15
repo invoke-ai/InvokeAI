@@ -46,6 +46,7 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Check rendering/subscriptions, galleries/lists, pointer handlers, Canvas resources, lazy loading, request scheduling. Use existing virtualization/lazy boundaries. Memoize only identified costs.
 - Preserve disposal, bounded memory, account transitions, responsive input. Never update goldens/baselines to hide regressions.
 - Run pnpm from this package directory. Install: `pnpm install --frozen-lockfile`.
+- Shared development machines can opt into the [bounded local verification profile](VERIFICATION.md#bounded-local-verification). It preserves the gates and documents setup, resource ownership, and failure reporting.
 
 | Change/check                            | Command                                                               |
 | --------------------------------------- | --------------------------------------------------------------------- |
